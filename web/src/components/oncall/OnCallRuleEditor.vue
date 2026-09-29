@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('oncall.ruleTeamPlaceholder')"
           :help-text="ladderNote"
           size="sm"
-          width="sm"
+          width="md"
           searchable
           data-test="oncall-rule-editor-team"
           @update:model-value="(v: unknown) => (team = String(v))"

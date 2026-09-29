@@ -274,6 +274,33 @@ export default defineComponent({
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
 
+    // latched from GET /{org}/passcode alone (null = unknown), so the concurrent tokens read cannot clear a 403
+    const passcodeReadForbidden = ref<boolean | null>(null);
+
+    // so a late 403 withdraws only a selector-published passcode, never one a successful read returned
+    const passcodeCameFromTokenSelector = ref(false);
+
+    // refuses once a 403 is latched: the credential was never this role's to see
+    const publishSelectedToken = (token: string) => {
+      if (passcodeReadForbidden.value === true) return false;
+      passcodeCameFromTokenSelector.value = true;
+      store.dispatch("setOrganizationPasscodeForbidden", false);
+      store.dispatch("setOrganizationPasscode", token);
+      return true;
+    };
+
+    const applyPasscodeForbidden = (forbidden: boolean) => {
+      passcodeReadForbidden.value = forbidden;
+      store.dispatch("setOrganizationPasscodeForbidden", forbidden);
+      if (forbidden) {
+        // the tokens request can resolve before this 403, so withdraw what it published
+        if (passcodeCameFromTokenSelector.value) {
+          store.dispatch("setOrganizationPasscode", "");
+        }
+      }
+      passcodeCameFromTokenSelector.value = false;
+    };
+
     // Token selector — pick which ingestion token the curl examples use
     const selectedTokenName = ref("");
     const tokenOptions = computed(() => {
@@ -298,7 +325,7 @@ export default defineComponent({
           const tokens = store.state.organizationData.orgTokens || [];
           const token = tokens.find((t: any) => t.name === opts[0].value);
           if (token?.token) {
-            store.dispatch("setOrganizationPasscode", token.token);
+            publishSelectedToken(token.token);
           }
         }
       },
@@ -308,7 +335,7 @@ export default defineComponent({
       const tokens = store.state.organizationData.orgTokens || [];
       const token = tokens.find((t: any) => t.name === name);
       if (token?.token) {
-        store.dispatch("setOrganizationPasscode", token.token);
+        publishSelectedToken(token.token);
       }
     };
 
@@ -345,6 +372,8 @@ export default defineComponent({
     onBeforeMount(() => {
       if (store.state.selectedOrganization.identifier != undefined) {
         fetchOrgTokens();
+        // only this call establishes readability; a tokens 403 is not observable on enterprise
+        getOrganizationPasscode();
         getRUMToken();
       }
     });
@@ -382,6 +411,16 @@ export default defineComponent({
 
     watch(() => route.name, syncTabFromRoute);
 
+    // the latch is per-org, so the new org's passcode read must decide afresh
+    watch(
+      () => store.state.selectedOrganization.identifier,
+      (identifier, previous) => {
+        if (identifier === previous) return;
+        passcodeReadForbidden.value = null;
+        passcodeCameFromTokenSelector.value = false;
+      },
+    );
+
     onUpdated(() => {
       if (router.currentRoute.value.name === "ingestion") {
         router.push({
@@ -407,13 +446,17 @@ export default defineComponent({
               timeout: 5000,
             });
           } else {
+            applyPasscodeForbidden(false);
             store.dispatch("setOrganizationPasscode", res.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
           }
         })
-        .catch(() => {
-          // Silently fail — passcode is not critical for page render
+        .catch((e: any) => {
+          // other errors stay silent: the passcode is not critical for page render
+          if (e?.response?.status === 403) {
+            applyPasscodeForbidden(true);
+          }
         });
     };
 
@@ -443,6 +486,7 @@ export default defineComponent({
               message: t("toastMessages.views.tokenResetSuccessfully"),
               timeout: 5000,
             });
+            applyPasscodeForbidden(false);
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;

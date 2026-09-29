@@ -24,6 +24,7 @@ import {
   MAX_SETTLE_BUDGET_MS,
   MAX_STEP_TIMEOUT_MS,
   MIN_SETTLE_BUDGET_MS,
+  SUBSTITUTED_VALUE_ACTIONS,
   VALUE_ACTIONS,
   VALUE_LABEL_KEYS,
   VALUE_TOOLTIP_KEYS,
@@ -35,11 +36,16 @@ import type { ClickType } from "@/constants/synthetics";
 import { applyValueToWire, defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
 import { stepNeedsTarget } from "@/utils/synthetics/stepTarget";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { unboundPlaceholders } from "@/components/synthetics/variables/placeholders";
+import type { VariableSuggestion } from "@/components/synthetics/variables/suggestions";
+import VariableSuggestionRow from "@/components/synthetics/variables/VariableSuggestionRow.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import BrowserJourneyLocator from "./BrowserJourneyLocator.vue";
 import BrowserJourneyAssertion from "./BrowserJourneyAssertion.vue";
@@ -67,6 +73,10 @@ const props = defineProps<{
   selectorErrorMessage?: string;
   valueErrorMessage?: string;
   expectedErrorMessage?: string;
+  /** Names the check resolves; absent where the host cannot tell. */
+  knownVariables?: ReadonlySet<string>;
+  /** Rows offered on `{{` in the value field; absent where the host cannot tell. */
+  variableSuggestions?: VariableSuggestion[];
 }>();
 
 const emit = defineEmits<{
@@ -139,6 +149,15 @@ const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { can
 const actionSelectOptions = computed(() => actionOptions(t));
 
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
+/** `upload` writes `files`, which the probe never substitutes, so its value field stays plain. */
+const valueSuggestions = computed(() =>
+  SUBSTITUTED_VALUE_ACTIONS.includes(props.step.action) ? props.variableSuggestions : undefined,
+);
+const unboundNames = computed(() =>
+  props.knownVariables && showValue.value
+    ? unboundPlaceholders(props.step.value ?? "", props.knownVariables)
+    : [],
+);
 const valueLabel = computed(() => {
   const key = VALUE_LABEL_KEYS[props.step.action];
   return key ? t(key) : t("synthetics.journey.valueFallback");
@@ -446,7 +465,7 @@ const hasAdvancedChanges = computed(
       </div>
 
       <!-- Value (action-specific label) -->
-      <OInput
+      <OTemplateInput
         v-if="showValue"
         v-model="valueComputed"
         :label="valueLabel"
@@ -454,12 +473,29 @@ const hasAdvancedChanges = computed(
         class="w-full"
         :error="!!valueErrorMessage"
         :error-message="raw(valueErrorMessage ?? '')"
+        :suggestions="valueSuggestions"
         data-test="synthetics-journey-step-value-input"
       >
         <template v-if="valueTooltip" #tooltip>
           <OTooltip :content="valueTooltip" />
         </template>
-      </OInput>
+        <template #suggestion="{ suggestion, active }">
+          <VariableSuggestionRow :suggestion="suggestion" :active="active" />
+        </template>
+      </OTemplateInput>
+      <OBanner
+        v-if="unboundNames.length"
+        variant="warning"
+        data-test="synthetics-journey-step-unbound-warning"
+      >
+        {{
+          t(
+            "synthetics.journey.unboundVariables",
+            { names: unboundNames.join(", ") },
+            unboundNames.length,
+          )
+        }}
+      </OBanner>
 
       <!-- Typed assertion — what this step actually verifies -->
       <BrowserJourneyAssertion

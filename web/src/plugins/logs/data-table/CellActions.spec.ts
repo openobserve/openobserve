@@ -134,6 +134,17 @@ describe("CellActions", () => {
       expect(wrapper.vm.isStreamField).toBe(false);
     });
 
+    it("returns true for _stream_name, which is in no stream schema", () => {
+      const wrapper = mountComponent({
+        column: { id: "_stream_name" },
+        row: { _stream_name: "app" },
+        selectedStreamFields: [{ name: "status", isSchemaField: true }],
+      });
+      expect(wrapper.vm.isStreamField).toBe(true);
+      expect(wrapper.find('[data-test="log-details-include-field-app"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="log-details-exclude-field-app"]').exists()).toBe(true);
+    });
+
     it("returns false when selectedStreamFields is empty", () => {
       const wrapper = mountComponent({
         selectedStreamFields: [],

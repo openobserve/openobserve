@@ -73,7 +73,7 @@ export interface PlaygroundSample {
 }
 
 export interface PlaygroundProvenance {
-  type: "experiment" | "dataset" | "trace";
+  type: "experiment" | "dataset" | "trace" | "prompt";
   label: I18nText;
 }
 
@@ -210,19 +210,6 @@ export function renderTemplate(text: string, vars: Record<string, string>): stri
     if (name === EXPECTED_OUTPUT_TOKEN) return "";
     return vars[name] ?? "";
   });
-}
-
-/** The variable name of the completed `{{name}}` token the caret sits inside
- *  (either edge counts as inside), or null if it isn't in one. */
-export function tokenAtCaret(text: string, caret: number): string | null {
-  VARIABLE_PATTERN.lastIndex = 0;
-  let found: RegExpExecArray | null;
-  while ((found = VARIABLE_PATTERN.exec(text))) {
-    const start = found.index;
-    const end = start + found[0].length;
-    if (caret >= start && caret <= end) return found[1];
-  }
-  return null;
 }
 
 // ── labels ────────────────────────────────────────────────────────

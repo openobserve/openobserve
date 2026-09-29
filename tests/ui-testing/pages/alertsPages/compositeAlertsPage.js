@@ -419,13 +419,32 @@ export class CompositeAlertsPage {
    *
    * Only what the select has RENDERED: a searchable OSelect windows its list,
    * so treat this as "does not offer" evidence for a small fixture set, never
-   * as the complete option universe.
+   * as the complete option universe. `searchText` narrows the list first so the
+   * fixtures under test are inside the window; `settleOn` is the option value to
+   * wait for before reading, so the filtered list is not read mid-render.
    */
-  async optionIdsFor(id) {
+  async optionIdsFor(id, searchText, settleOn) {
     const base = this.locators.childSelectBase(id);
     const popover = this.page.locator(`[data-test="${base}-popover"]`);
     await this.page.locator(`[data-test="${base}-trigger"]`).click();
     await expect(popover).toBeVisible();
+
+    // The picker's list is WINDOWED, so a snapshot of the rendered options is only
+    // the truth about what is offered when every candidate fits the window. On an
+    // org holding more than a screenful of alerts — any parallel run, and every run
+    // on a shared cloud org — an alert that IS offered can be absent from the DOM
+    // until the search narrows to it. Narrow first, then read.
+    if (searchText) {
+      const search = this.page.locator(`[data-test="${base}-search"]`);
+      if (await search.count()) await search.fill(searchText);
+    }
+    // Settle on the filtered list having rendered, rather than reading mid-render.
+    if (settleOn) {
+      await expect(
+        this.page.locator(`[data-test="${base}-option"][data-test-value="${settleOn}"]`)
+      ).toBeVisible();
+    }
+
     const ids = await this.page
       .locator(`[data-test="${base}-option"]`)
       .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-test-value')));

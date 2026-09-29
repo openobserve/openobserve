@@ -349,7 +349,7 @@ export default defineComponent({
 
 <style scoped>
 /* keep(scrollbar): custom webkit scrollbar for the query preview, plus :deep
-   overrides for the highlight <mark> and Monaco token spans injected via v-html. */
+   override for the highlight <mark> injected via v-html. */
 .inspector-query-editor::-webkit-scrollbar {
   width: 0.375rem;
   height: 0.375rem;
@@ -374,10 +374,5 @@ export default defineComponent({
   color: var(--color-table-highlight-text);
   border-radius: 0.125rem;
   padding: 0;
-}
-
-/* Ensure Monaco colorized content looks good */
-.inspector-query-editor :deep(.mtk1) {
-  color: inherit;
 }
 </style>

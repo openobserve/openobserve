@@ -233,7 +233,11 @@ import {
   provide,
   inject,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import {
+  clearExemplarOverride,
+  exemplarOverrideKey,
+} from "@/composables/dashboard/useExemplarOverride";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   addPanel,
   checkIfVariablesAreLoaded,
@@ -584,9 +588,20 @@ export default defineComponent({
       panelId: currentPanelId.value,
     }));
 
-    // this is used to activate the watcher only after on mounted
-    let isPanelConfigWatcherActivated = false;
-    const isPanelConfigChanged = ref(false);
+    let isUnsavedTrackingActive = false;
+    let panelBaseline: unknown = null;
+
+    // Mutations before the user's first input are the editor loading itself (defaults, stream auto-select), not edits.
+    const captureBaselineOnFirstInput = () => {
+      if (isUnsavedTrackingActive && panelBaseline === null) {
+        panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      }
+    };
+
+    const hasUnsavedChanges = () =>
+      isUnsavedTrackingActive &&
+      panelBaseline !== null &&
+      !isEqual(panelBaseline, JSON.parse(JSON.stringify(dashboardPanelData.data)));
 
     // @submit fires only after the schema passes (title required+trim). Write
     // the validated `value` into the editor state, then run the existing save
@@ -605,6 +620,8 @@ export default defineComponent({
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
+      window.removeEventListener("pointerdown", captureBaselineOnFirstInput, true);
+      window.removeEventListener("keydown", captureBaselineOnFirstInput, true);
 
       removeAiContextHandler();
 
@@ -673,9 +690,10 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime();
       }
-      // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
-      isPanelConfigWatcherActivated = true;
+      isUnsavedTrackingActive = true;
+      window.addEventListener("pointerdown", captureBaselineOnFirstInput, true);
+      window.addEventListener("keydown", captureBaselineOnFirstInput, true);
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
@@ -1056,10 +1074,8 @@ export default defineComponent({
 
     const runQuery = (withoutCache = false) => {
       try {
-        if (!isValid(true, true)) {
-          // do not return if query is not valid
-          // allow to fire query
-        }
+        // PanelEditor.runQuery shows the toast on Apply.
+        isValid(true, true, false);
 
         // should use cache flag
         shouldRefreshWithoutCache.value = withoutCache;
@@ -1167,20 +1183,9 @@ export default defineComponent({
       });
     };
 
-    //watch dashboardpaneldata when changes, isUpdated will be true
-    watch(
-      () => dashboardPanelData.data,
-      () => {
-        if (isPanelConfigWatcherActivated) {
-          isPanelConfigChanged.value = true;
-        }
-      },
-      { deep: true },
-    );
-
     const beforeUnloadHandler = (e: any) => {
       //check is data updated or not
-      if (isPanelConfigChanged.value) {
+      if (hasUnsavedChanges()) {
         // Display a confirmation message
         const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
         e.returnValue = confirmMessage;
@@ -1201,7 +1206,7 @@ export default defineComponent({
       }
 
       // else continue to warn user
-      if (from.path === "/dashboards/add_panel" && isPanelConfigChanged.value) {
+      if (from.path === "/dashboards/add_panel" && hasUnsavedChanges()) {
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
           // User confirmed navigation - clean up variables created during this session
@@ -1232,7 +1237,7 @@ export default defineComponent({
     });
 
     //validate the data
-    const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
+    const isValid = (onlyChart = false, isFieldsValidationRequired = true, notify = true) => {
       const errors = errorData.errors;
       errors.splice(0);
       const dashboardData = dashboardPanelData;
@@ -1247,8 +1252,9 @@ export default defineComponent({
       // will push errors in errors array
       validatePanel(errors, isFieldsValidationRequired);
 
-      if (errors.length) {
-        showErrorNotification(t("dashboard.addPanel.fixErrors"));
+      if (errors.length && notify) {
+        // This view's `errorData` is rendered nowhere, so the toast is all the user gets.
+        showErrorNotification(raw(errors.join(", ")));
       }
 
       if (errors.length) {
@@ -1259,6 +1265,7 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
+      // Left generic: these errors are never cleared before this guard, so they can be stale.
       if (dashboardPanelData.data.type === "custom_chart" && errorData.errors.length > 0) {
         showErrorNotification(t("dashboard.addPanel.fixErrors"));
         return;
@@ -1393,8 +1400,16 @@ export default defineComponent({
           }
         }
 
-        isPanelConfigWatcherActivated = false;
-        isPanelConfigChanged.value = false;
+        isUnsavedTrackingActive = false;
+
+        // The author sees the value just saved, not an older view-mode override of this panel.
+        clearExemplarOverride(
+          exemplarOverrideKey(
+            store.state.selectedOrganization.identifier,
+            dashId,
+            String(dashboardPanelData.data.id),
+          ),
+        );
 
         // Clear variables created during session since panel is being saved
         variablesCreatedInSession.value = [];

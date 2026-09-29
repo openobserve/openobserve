@@ -148,6 +148,12 @@ function onClick(event: MouseEvent) {
   emit("row-click", props.row.original, event);
 }
 
+// Clicks on the checkbox itself are stopped by OCheckbox, so this only sees misses on the cell padding.
+function onSelectCellClick() {
+  if (props.isRowSelectable && !props.isRowSelectable(props.row.original)) return;
+  emit("toggle-selection", props.row.original);
+}
+
 function onDblclick(event: MouseEvent) {
   emit("row-dblclick", props.row.original, event);
 }
@@ -216,7 +222,7 @@ function onRowMouseleave() {
       :class="[
         'text-left align-middle',
         bordered ? 'border-table-row-divider border-b' : '',
-        isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : '',
+        isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : 'cursor-pointer',
       ]"
       :style="{
         width: TABLE_CHECKBOX_COL_WIDTH + 'px',
@@ -225,6 +231,7 @@ function onRowMouseleave() {
         paddingLeft: 'var(--spacing-table-edge)',
       }"
       data-test="o2-table-select-cell"
+      @click.stop="onSelectCellClick"
     >
       <div class="flex items-center justify-start">
         <OTableSelectCheckbox

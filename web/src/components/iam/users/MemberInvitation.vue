@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-slot="{ isSubmitting }"
       >
         <div class="relative">
-          <OFormInput name="email" :placeholder="t('user.inviteByEmail')" class="w-56" />
+          <OFormInput name="email" :placeholder="t('user.inviteByEmailPlaceholder')" class="w-56" />
           <OTooltip :content="t('user.inviteByEmail')" side="top" max-width="16rem" />
         </div>
         <OFormSelect

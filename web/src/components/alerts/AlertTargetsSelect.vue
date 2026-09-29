@@ -166,15 +166,38 @@ const toTagged = (list: RawOption[] | undefined, tag: string) =>
     .filter(isFilled)
     .map(({ name, label }) => ({ label, value: `${tag}${name}` }));
 
+// A selected name absent from its options list — flagged, not dropped, so it stays until removed.
+const missingOptions = (
+  selected: string[] | undefined,
+  known: { value: string }[],
+  tag: string,
+) => {
+  const knownValues = new Set(known.map((o) => o.value));
+  return (selected || [])
+    .filter(isFilled)
+    .map((v) => `${tag}${v}`)
+    .filter((v) => !knownValues.has(v))
+    .map((value) => ({
+      label: raw(value.slice(tag.length)),
+      value,
+      badge: t("alert_dependencies.missingTag"),
+      badgeMuted: true,
+    }));
+};
+
 const options = computed(() => {
   const dests = toTagged(props.destinationOptions, DEST);
-  if (!props.workflowsEnabled) return dests;
+  const missingDests = missingOptions(props.destinations, dests, DEST);
+  if (!props.workflowsEnabled) return [...dests, ...missingDests];
   const wfs = toTagged(props.workflowOptions, WF);
+  const missingWfs = missingOptions(props.workflows, wfs, WF);
   return [
     { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
     ...dests,
+    ...missingDests,
     { header: true, label: t("alerts.alertSettings.targetsWorkflowsGroup") },
     ...wfs,
+    ...missingWfs,
   ];
 });
 

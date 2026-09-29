@@ -43,7 +43,7 @@ use promql::{
     DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
     ast::{
         at_modifier::resolve_query, result_order::top_level_sort_descending,
-        selector_window::selector_window,
+        selector_window::selector_window, subquery_grid::max_subquery_steps,
     },
     micros,
 };
@@ -290,9 +290,9 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
-    let window = parser::parse(&req.query.as_ref().unwrap().query)
-        .map(|ast| selector_window(&ast))
+    let ast = parser::parse(&req.query.as_ref().unwrap().query)
         .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
+    let window = selector_window(&ast);
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -303,14 +303,32 @@ async fn search_in_cluster(
         query_data: _,
         label_selector: _,
     } = req.query.as_ref().unwrap();
+    if rejects_root_subquery(&ast, start != end, query_exemplars) {
+        return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
+            "invalid expression type \"range vector\" for range query, must be Scalar or instant Vector".to_string(),
+        )));
+    }
     let nr_queriers = nodes.len() as i64;
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
     // the cache keys on the output range, but a pinned value follows the data at `T` (#14688)
-    let cacheable = cfg.common.result_cache_enabled && window.pinned.is_none();
+    // the cache key ignores the query type, so exemplar results never share it with samples
+    let cacheable = cfg.common.result_cache_enabled && window.pinned.is_none() && !query_exemplars;
     let use_cache = cacheable && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
+    let max_points = if cfg.limit.metrics_max_points_per_series > 0 {
+        cfg.limit.metrics_max_points_per_series
+    } else {
+        DEFAULT_MAX_POINTS_PER_SERIES
+    };
+    // checked over the whole range, so the answer does not depend on how workers split it
+    let subquery_steps = max_subquery_steps(&ast, start, end);
+    if !query_exemplars && subquery_steps > max_points as i64 {
+        return Err(Error::ErrorCode(ErrorCodes::InvalidParams(format!(
+            "subquery evaluates {subquery_steps} steps per series, more than the {max_points} allowed by ZO_METRICS_MAX_POINTS_PER_SERIES; use a larger subquery step"
+        ))));
+    }
 
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
@@ -337,7 +355,7 @@ async fn search_in_cluster(
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 let cache_ratio = (new_start - start) as f64 / (end - start) as f64;
-                config::metrics::QUERY_METRICS_CACHE_RATIO
+                config::metrics::promql::QUERY_METRICS_CACHE_RATIO
                     .with_label_values(&[&req.org_id])
                     .observe(cache_ratio);
                 log::info!(
@@ -366,11 +384,6 @@ async fn search_in_cluster(
         return Ok(values);
     }
 
-    let max_points = if cfg.limit.metrics_max_points_per_series > 0 {
-        cfg.limit.metrics_max_points_per_series
-    } else {
-        DEFAULT_MAX_POINTS_PER_SERIES
-    };
     if (end - start) / step > max_points as i64 {
         return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
             "too many points per series must be returned on the given, you can change the limit by ZO_METRICS_MAX_POINTS_PER_SERIES".to_string(),
@@ -575,6 +588,19 @@ async fn search_in_cluster(
     Ok(values)
 }
 
+/// Whether a range query would answer with a subquery's own samples, which sit off its grid.
+fn rejects_root_subquery(expr: &parser::Expr, is_range: bool, query_exemplars: bool) -> bool {
+    // exemplars only read the selectors, never the root expression
+    is_range && !query_exemplars && is_root_subquery(expr)
+}
+
+fn is_root_subquery(expr: &parser::Expr) -> bool {
+    match expr {
+        parser::Expr::Paren(paren) => is_root_subquery(&paren.expr),
+        expr => matches!(expr, parser::Expr::Subquery(_)),
+    }
+}
+
 async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
@@ -678,6 +704,9 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
+        let Some(exemplars) = ser.exemplars.as_ref() else {
+            continue;
+        };
         let labels: Labels = ser
             .metric
             .iter()
@@ -686,14 +715,9 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
         let entry = merged_data
             .entry(signature(&labels))
             .or_insert_with(HashMap::new);
-        ser.exemplars
-            .as_ref()
-            .unwrap()
-            .exemplars
-            .iter()
-            .for_each(|v| {
-                entry.insert(v.time, v);
-            });
+        exemplars.exemplars.iter().for_each(|v| {
+            entry.insert(v.time, v);
+        });
         merged_metrics.insert(signature(&labels), labels);
     }
     let mut merged_data = merged_data
@@ -780,6 +804,31 @@ fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_is_root_subquery() {
+        for (query, expected) in [
+            ("up[5m:1m]", true),
+            ("((up[5m:1m] offset 1m))", true),
+            ("max_over_time(up[5m:1m])", false),
+            ("up[5m]", false),
+            ("up", false),
+        ] {
+            assert_eq!(
+                is_root_subquery(&parser::parse(query).unwrap()),
+                expected,
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_rejects_root_subquery_only_in_range_sample_queries() {
+        let expr = parser::parse("up[5m:1m]").unwrap();
+        assert!(rejects_root_subquery(&expr, true, false));
+        assert!(!rejects_root_subquery(&expr, false, false));
+        assert!(!rejects_root_subquery(&expr, true, true));
+    }
+
     #[tokio::test]
     async fn test_merge_matrix_preserves_instant_worker_sample_with_cached_prefix() {
         let latest = Sample::new(3_000_000, 3.0);
@@ -822,6 +871,40 @@ mod tests {
                 vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_merge_exemplars_skips_series_without_exemplars() {
+        let labels = vec![Arc::new(Label::new("job", "test"))];
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Matrix(vec![RangeValue::new(
+                labels.clone(),
+                vec![Sample::new(1_000_000, 1.0)],
+            )]),
+        );
+        grpc::add_value(
+            &mut response,
+            Value::Matrix(vec![RangeValue::new_with_exemplars(
+                labels.clone(),
+                vec![Arc::new(Exemplar {
+                    timestamp: 2_000_000,
+                    value: 2.0,
+                    labels: vec![],
+                })],
+            )]),
+        );
+
+        let value = merge_exemplars_query(&response.series, "test_exemplars_merge")
+            .await
+            .unwrap();
+        let Value::Matrix(matrix) = value else {
+            panic!("expected matrix result");
+        };
+        assert_eq!(matrix.len(), 1);
+        assert_eq!(matrix[0].labels, labels);
+        assert_eq!(matrix[0].exemplars.as_ref().unwrap().len(), 1);
     }
 
     #[test]

@@ -609,6 +609,11 @@ fn stream_comparator(
             .index_size
             .partial_cmp(&b.stats.index_size)
             .unwrap_or(Ordering::Equal),
+        "mindex_size" => a
+            .stats
+            .mindex_size
+            .partial_cmp(&b.stats.mindex_size)
+            .unwrap_or(Ordering::Equal),
         _ => a.name.cmp(&b.name),
     };
 
@@ -1113,5 +1118,20 @@ mod tests {
         let a = make_stream("same", 0, 0.0, 0.0, 0.0);
         let b = make_stream("same", 0, 0.0, 0.0, 0.0);
         assert_eq!(stream_comparator(&a, &b, "name", true), Ordering::Equal);
+    }
+    #[test]
+    fn test_comparator_by_mindex_size() {
+        let mut a = make_stream("a", 0, 0.0, 0.0, 100.0);
+        let mut b = make_stream("b", 0, 0.0, 0.0, 100.0);
+        a.stats.mindex_size = 19.0;
+        b.stats.mindex_size = 7.0;
+        assert_eq!(
+            stream_comparator(&a, &b, "mindex_size", true),
+            Ordering::Greater
+        );
+        assert_eq!(
+            stream_comparator(&a, &b, "mindex_size", false),
+            Ordering::Less
+        );
     }
 }

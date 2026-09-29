@@ -20,6 +20,8 @@ pub struct FileMeta {
     pub compressed_size: i64,
     #[prost(int64, tag = "6")]
     pub index_size: i64,
+    #[prost(int64, tag = "7")]
+    pub mindex_size: i64,
 }
 /// Job information for a request
 #[derive(serde::Serialize)]
@@ -4411,6 +4413,8 @@ pub struct StreamStats {
     pub compressed_size: f64,
     #[prost(double, tag = "8")]
     pub index_size: f64,
+    #[prost(double, tag = "9")]
+    pub mindex_size: f64,
 }
 /// Generated client implementations.
 pub mod streams_client {

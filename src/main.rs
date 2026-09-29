@@ -50,7 +50,13 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[cfg(feature = "profiling")]
+// Apple jemalloc is always prefixed (`_rjem_`); other targets use unprefixed `malloc_conf`.
+#[cfg(all(feature = "profiling", target_vendor = "apple"))]
+#[allow(non_upper_case_globals)]
+#[unsafe(export_name = "_rjem_malloc_conf")]
+pub static malloc_conf: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:16\0";
+
+#[cfg(all(feature = "profiling", not(target_vendor = "apple")))]
 #[allow(non_upper_case_globals)]
 #[unsafe(export_name = "malloc_conf")]
 pub static malloc_conf: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:16\0";

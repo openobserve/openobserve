@@ -45,6 +45,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
         />
 
+        <!-- Read-only: the identifier is the Basic-auth username, immutable after creation. -->
+        <div v-if="beingUpdated" class="mt-2">
+          <label class="text-text-secondary mb-1 block text-xs font-medium">
+            {{ t("serviceAccounts.form.identifier.label") }}
+          </label>
+          <div
+            data-test="iam-add-service-account-identifier-display"
+            class="border-border-default bg-surface-subtle text-text-secondary rounded-default border px-3 py-2 text-sm"
+          >
+            {{ modelValue?.email }}
+          </div>
+        </div>
+
         <OFormInput
           name="first_name"
           :label="t('user.description')"

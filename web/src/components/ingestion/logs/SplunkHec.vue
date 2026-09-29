@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { raw, useI18nTyped } from "@/types/i18n";
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
+import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -173,9 +173,10 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
-    // The origin, not getIngestionURL(): that carries the ZO_BASE_URI path, and
-    // the collector is mounted at the server root outside that nest.
-    const collectorBase = window.location.origin;
+    // The collector is registered like every other route, so a ZO_BASE_URI
+    // deployment serves it under that prefix too — resolve the configured
+    // ingest host rather than the browser origin serving the UI.
+    const collectorBase = getEndPoint(getIngestionURL()).url;
 
     const endpointUrl = `${collectorBase}/services/collector`;
 

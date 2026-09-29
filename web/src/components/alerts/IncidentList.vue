@@ -386,7 +386,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          qTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          qTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },

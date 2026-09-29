@@ -192,9 +192,29 @@ mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
+mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
+mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260918_000001_create_oncall_response_reports;
+mod m20260920_000001_add_anomaly_level_half_width;
+mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
+mod m20260922_000001_add_password_policy_columns_to_users;
+mod m20260922_000002_create_user_password_history_table;
+mod m20260922_000003_create_user_auth_state_table;
+mod m20260923_000001_create_llm_prompts;
+mod m20260924_000001_add_recovery_episode_columns;
+mod m20260928_000001_add_alert_recovery_destinations;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+#[cfg(test)]
+pub(crate) async fn create_llm_prompt_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20260923_000001_create_llm_prompts::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -446,12 +466,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
             Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
             Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
             Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
-            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
-            Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260806_000001_create_oncall_tables::Migration),
             Box::new(m20260807_000001_create_oncall_ownership::Migration),
             Box::new(m20260811_000001_create_oncall_unrouted_signals::Migration),
@@ -471,6 +491,17 @@ impl MigratorTrait for Migrator {
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
+            Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
+            Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
+            Box::new(m20260921_000001_add_input_preview_to_llm_annotation_queue_items::Migration),
+            Box::new(m20260922_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260922_000002_create_user_password_history_table::Migration),
+            Box::new(m20260922_000003_create_user_auth_state_table::Migration),
+            Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
+            Box::new(m20260923_000001_create_llm_prompts::Migration),
+            Box::new(m20260924_000001_add_recovery_episode_columns::Migration),
+            Box::new(m20260928_000001_add_alert_recovery_destinations::Migration),
+            Box::new(m20260918_000001_create_oncall_response_reports::Migration),
         ]
     }
 }
@@ -512,6 +543,17 @@ mod tests {
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
+        (86, "m20260917_000001_create_synthetics_shared_variables"),
+        (
+            87,
+            "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+        ),
+        (88, "m20260922_000003_create_user_auth_state_table"),
+        (89, "m20260920_000001_add_anomaly_level_half_width"),
+        (90, "m20260923_000001_create_llm_prompts"),
+        (91, "m20260924_000001_add_recovery_episode_columns"),
+        (92, "m20260928_000001_add_alert_recovery_destinations"),
+        (93, "m20260918_000001_create_oncall_response_reports"),
     ];
 
     #[test]
@@ -548,29 +590,54 @@ mod tests {
     }
 
     #[test]
-    fn composite_alert_migration_is_registered_after_existing_migrations() {
+    fn each_migration_is_registered_once_and_after_the_schema_it_builds_on() {
         let names: Vec<String> = Migrator::migrations()
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
-        assert_eq!(
-            names
+        let position = |name: &str| {
+            let found: Vec<usize> = names
                 .iter()
-                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
-                .count(),
-            1
-        );
-        // Asserting on the last entry coupled this to whichever migration was newest, so every
-        // feature added after it broke a test about composite alerts.
-        let composite = names
-            .iter()
-            .position(|name| name == "m20260812_000001_create_composite_alerts");
-        let later = names
-            .iter()
-            .position(|name| name == "m20260825_000001_create_status_page_custom_domains");
-        assert!(
-            composite.is_some() && composite < later,
-            "the composite migration must stay registered before the ones that follow it, got {composite:?} and {later:?}"
-        );
+                .enumerate()
+                .filter(|(_, n)| n.as_str() == name)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(found.len(), 1, "{name} is registered {} times", found.len());
+            found[0]
+        };
+
+        let unique: std::collections::HashSet<&String> = names.iter().collect();
+        assert_eq!(unique.len(), names.len(), "a migration is registered twice");
+
+        // Registration alone is what makes a migration run at all.
+        position("m20260812_000001_create_composite_alerts");
+
+        for (earlier, later) in [
+            (
+                "m20260707_000003_create_synthetics_jobs",
+                "m20260917_000001_add_env_to_synthetics_jobs",
+            ),
+            (
+                "m20260917_000001_create_synthetics_shared_variables",
+                "m20260917_000001_add_env_to_synthetics_jobs",
+            ),
+            (
+                "m20260812_000001_create_composite_alerts",
+                "m20260825_000001_create_status_page_custom_domains",
+            ),
+            (
+                "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
+                "m20260922_000001_add_password_policy_columns_to_users",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20260924_000001_add_recovery_episode_columns",
+            ),
+        ] {
+            assert!(
+                position(earlier) < position(later),
+                "{later} must be registered after {earlier}"
+            );
+        }
     }
 }

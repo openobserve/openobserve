@@ -779,11 +779,56 @@ describe("OTable", () => {
           data: makeRows(5),
           columns: makeColumns(),
           selection: "multiple",
+          onRowClick: vi.fn(),
         },
       });
-      // The checkbox might be a nested component; trigger the row click
-      const row = wrapper.find('[data-test="o2-table-row-0"]');
-      await row.trigger("click");
+      await wrapper.find('[data-test="o2-table-select-0"] button').trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[0][0]).toEqual(["1"]);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("toggles selection without a row-click when the select cell padding is clicked", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+          onRowClick: vi.fn(),
+        },
+      });
+      const cell = wrapper.findAll('[data-test="o2-table-select-cell"]')[1];
+      await cell.trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[0][0]).toEqual(["2"]);
+      await cell.trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[1][0]).toEqual([]);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("ignores select cell clicks on rows that are not selectable", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          selection: "multiple",
+          isRowSelectable: (row: TestRow) => row.id !== 1,
+          onRowClick: vi.fn(),
+        },
+      });
+      await wrapper.findAll('[data-test="o2-table-select-cell"]')[0].trigger("click");
+      expect(wrapper.emitted("update:selectedIds")).toBeFalsy();
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("toggles all rows when the header select cell padding is clicked", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          selection: "multiple",
+        },
+      });
+      await wrapper.find('[data-test="o2-table-th-select"]').trigger("click");
+      expect(wrapper.emitted("update:selectedIds")?.[0][0]).toEqual(["1", "2", "3"]);
     });
   });
 
@@ -893,6 +938,39 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(false);
+    });
+  });
+
+  // ── Header over a non-row state ────────────────────────────
+
+  describe("header over a non-row state", () => {
+    const isPinned = (w: VueWrapper) =>
+      w.find('[data-test="o2-table"]').classes().includes("sticky");
+
+    it("pins the header-only table above the empty state", () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns() } });
+      expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(true);
+      expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("pins it above the error and no-access states too", async () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), error: "API Error" } });
+      expect(isPinned(wrapper)).toBe(true);
+      await wrapper.setProps({ error: null, forbidden: true });
+      expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
+      expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("leaves pinning to the <thead> while rows show", () => {
+      wrapper = mount(OTable, { props: { data: makeRows(5), columns: makeColumns() } });
+      expect(isPinned(wrapper)).toBe(false);
+    });
+
+    it("stays unpinned when the header is not sticky or not shown", async () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), stickyHeader: false } });
+      expect(isPinned(wrapper)).toBe(false);
+      await wrapper.setProps({ stickyHeader: true, showHeader: false });
+      expect(isPinned(wrapper)).toBe(false);
     });
   });
 
@@ -2169,6 +2247,36 @@ describe("OTable", () => {
       await nextTick();
       await nextTick();
       expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+    });
+
+    it("restorePage lands on the requested page when it exists, without touching the parent", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(20), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(3);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
+      expect(wrapper.emitted("update:currentPage")).toBeUndefined();
+    });
+
+    it("restorePage falls back to page 1 and tells the parent when the page is past the end", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(3);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
+    });
+
+    it("restorePage treats a page below 1 like one past the end", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(7), columns: makeColumns(), pagination: "client", pageSize: 5 },
+      });
+      (wrapper.vm as any).restorePage(0);
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+      expect(wrapper.emitted("update:currentPage")).toEqual([[1]]);
     });
   });
 });

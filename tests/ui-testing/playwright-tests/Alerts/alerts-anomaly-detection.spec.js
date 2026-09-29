@@ -259,6 +259,24 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.setSensitivityPercentile(49);
       await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
     });
+
+    test('the percentile control is labeled Level and disowns the detection-function meaning', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async () => {
+      const label = pm.anomalyDetectionPage.getSensitivityPercentileLabelLocator();
+      await expect(label).toBeVisible();
+      await expect(label).toHaveText('Level');
+      await expect(label).not.toContainText('Percentile');
+
+      const info = pm.anomalyDetectionPage.getSensitivityPercentileInfoLocator();
+      await expect(info).toBeVisible();
+
+      await info.hover();
+      const tooltip = pm.anomalyDetectionPage.getTooltipContentLocator();
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText('confidence');
+      await expect(tooltip).toContainText('Detection Function');
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════════
@@ -322,6 +340,20 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
       await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeHidden();
     });
+
+    test('the Detection Function label explains p50/p95/p99 measure a field, not sensitivity', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async () => {
+      const info = pm.anomalyDetectionPage.getDetectionFunctionInfoLocator();
+      await expect(info).toBeVisible();
+
+      await info.hover();
+      const tooltip = pm.anomalyDetectionPage.getTooltipContentLocator();
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText('p95');
+      await expect(tooltip).toContainText('field');
+      await expect(tooltip).not.toContainText('sensitivity');
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════════
@@ -357,6 +389,23 @@ test.describe('Anomaly Detection', () => {
       // canPreview goes false, which blocks the query but must not tear the
       // chart down — the empty state means "nothing to preview", not "invalid".
       await expect(pm.anomalyDetectionPage.getDataPreviewChartLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('the preview caption appears once a stream is chosen and points at Detection results', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      // The empty state is the "nothing to preview" hint, never a caption.
+      await expect(pm.anomalyDetectionPage.getDataPreviewCaptionLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('caption'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.waitForDataPreview();
+
+      const caption = pm.anomalyDetectionPage.getDataPreviewCaptionLocator();
+      await expect(caption).toBeVisible();
+      await expect(caption).toContainText('Detection results');
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -542,11 +591,22 @@ test.describe('Anomaly Detection', () => {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async ({ page }) => {
         const name = await ownAnomaly(page, 'pause');
+        const pauseBtn = pm.anomalyDetectionPage.getPauseButtonLocator(name);
+
+        // The row starts enabled (createAnomalyViaApi hardcodes enabled: true),
+        // so the two-state control offers "pause" before the first click.
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
+
         await pm.anomalyDetectionPage.togglePause(name);
         await expect(pm.anomalyDetectionPage.getToastLocator(/success/i)).toBeVisible();
+        // Pause must actually flip the state: the control now offers "resume".
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'resume');
 
         await pm.anomalyDetectionPage.togglePause(name);
         await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
+        // Resume must flip it back. The row's own visibility is invariant across
+        // both states, so this state-flip is what proves the resume took effect.
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
       });
 
       test('detection can be triggered from the row menu', {
@@ -1105,6 +1165,86 @@ test.describe('Anomaly Detection', () => {
       expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('day');
 
       await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('budget mode does not render the percentile info tooltip', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'budgetinfo', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      // The Level label + its info icon belong to percentile mode only.
+      await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityPercentileInfoLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Look-back window floor — detection window must be at least
+  // Check Every (schedule) + one Detection Resolution (histogram).
+  //
+  // Only the cases that cross the client/server boundary live here: the floor
+  // arithmetic, the hint text and the legacy-row grandfathering are already
+  // pinned by web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.spec.ts
+  // ("look back window floor" and "client grandfathering of legacy rows"), which
+  // mounts the same component. Re-asserting them in a browser buys nothing.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Look-back window floor', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    test.beforeEach(async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('window'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+    });
+
+    // The boundary test saves successfully (wizard closes), so cancel only when
+    // the wizard is still open rather than failing on a missing cancel button.
+    test.afterEach(async () => {
+      if (await pm.anomalyDetectionPage.getSaveBtnLocator().isVisible()) {
+        await pm.anomalyDetectionPage.cancel();
+      }
+    });
+
+    test('a detection window below the floor blocks save and names the minimum', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h');
+      // 3600s is under the 1h 5m floor (schedule + histogram).
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+      await pm.anomalyDetectionPage.save();
+
+      const error = pm.anomalyDetectionPage.getDetectionWindowErrorLocator();
+      await expect(error).toBeVisible();
+      await expect(error).toContainText('at least 1h 5m');
+      // Rejected save keeps the wizard open — it did not create a config.
+      await expect(pm.anomalyDetectionPage.getSaveBtnLocator()).toBeVisible();
+    });
+
+    test('a new config defaults the detection window to 3 hours', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async () => {
+      expect(await pm.anomalyDetectionPage.getDetectionWindowValue()).toBe('3');
+      expect(await pm.anomalyDetectionPage.getDetectionWindowUnit()).toBe('h');
+    });
+
+    test('a window exactly at the floor is accepted', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P2', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h'); // floor 1h 5m
+      await pm.anomalyDetectionPage.setDetectionWindow(65, 'm'); // 3900s, exactly the floor
+
+      // Save must proceed: the boundary is valid, so a rejection here is the
+      // off-by-one regression the strict `<` comparison exists to prevent.
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(false);
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
     });
   });
 

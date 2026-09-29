@@ -294,6 +294,24 @@ use crate::{
         synthetics::set_synthetic_enabled,
         synthetics::run_synthetic_now,
         synthetics::list_locations,
+        synthetics::list_synthetics_variables,
+        synthetics::create_synthetics_variable,
+        synthetics::update_synthetics_variable,
+        synthetics::delete_synthetics_variable,
+        synthetics::list_synthetics_environments,
+        synthetics::create_synthetics_environment,
+        synthetics::update_synthetics_environment,
+        synthetics::delete_synthetics_environment,
+        synthetics::list_synthetics_environment_variables,
+        synthetics::create_synthetics_environment_variable,
+        synthetics::update_synthetics_environment_variable,
+        synthetics::delete_synthetics_environment_variable,
+        synthetics::duplicate_synthetics_environment,
+        synthetics::resync_synthetics_environments,
+        synthetics::get_synthetic_resolved_variables,
+        synthetics::promote_synthetic_variable,
+        synthetics::promote_environment_variable,
+        synthetics::split_synthetics_variable,
         synthetics::list_runs,
         synthetics::get_run_detail,
         synthetics::job_resolve,
@@ -360,6 +378,8 @@ use crate::{
             openobserve_api_management::models::destinations::Destination,
             openobserve_api_management::models::destinations::DestinationType,
             openobserve_api_management::models::destinations::Template,
+            openobserve_api_management::models::destinations::DestinationUseResponse,
+            openobserve_api_management::models::destinations::DestinationConsumerKind,
             // Alerts
             openobserve_api_management::models::alerts::requests::CreateAlertRequestBody,
             openobserve_api_management::models::alerts::requests::UpdateAlertRequestBody,
@@ -538,6 +558,22 @@ pub struct ApiDoc;
 #[cfg(feature = "enterprise")]
 #[derive(OpenApi)]
 #[openapi(paths(
+    openobserve_api_management::request::prompts::list_prompts,
+    openobserve_api_management::request::prompts::create_prompt,
+    openobserve_api_management::request::prompts::match_prompts,
+    openobserve_api_management::request::prompts::resolve_prompt,
+    openobserve_api_management::request::prompts::get_prompt_settings,
+    openobserve_api_management::request::prompts::update_prompt_settings,
+    openobserve_api_management::request::prompts::update_prompt_secret,
+    openobserve_api_management::request::prompts::get_prompt,
+    openobserve_api_management::request::prompts::update_prompt,
+    openobserve_api_management::request::prompts::archive_prompt,
+    openobserve_api_management::request::prompts::list_prompt_versions,
+    openobserve_api_management::request::prompts::create_prompt_version,
+    openobserve_api_management::request::prompts::get_prompt_version,
+    openobserve_api_management::request::prompts::list_prompt_activity,
+    openobserve_api_management::request::prompts::move_prompt_label,
+    openobserve_api_management::request::prompts::delete_prompt_label,
     openobserve_api_management::request::experiments::preview_experiment,
     openobserve_api_management::request::experiments::create_experiment,
     openobserve_api_management::request::experiments::list_experiments,
@@ -578,9 +614,15 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::activate_remote_task_signing_candidate,
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
+    openobserve_api_management::request::users::get,
+    openobserve_api_management::request::organization::password_policy::get_policy,
+    openobserve_api_management::request::organization::password_policy::set_policy,
+    openobserve_api_management::request::organization::password_policy::get_password_complexity,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+    o2_enterprise::enterprise::password_policy::lockout::LockoutState,
+    openobserve_api_management::request::users::UserDetailsResponse,
 )))]
 struct EnterpriseExperimentApiDoc;
 
@@ -725,6 +767,20 @@ mod experiment_tests {
         assert!(comparison.responses.responses.contains_key("400"));
         assert!(comparison.responses.responses.contains_key("403"));
     }
+
+    #[test]
+    fn prompt_paths_are_registered_in_enterprise_openapi() {
+        let api = EnterpriseExperimentApiDoc::openapi();
+        for path in [
+            "/api/{org_id}/prompts",
+            "/api/{org_id}/prompts/resolve",
+            "/api/{org_id}/prompts/settings",
+            "/api/{org_id}/prompts/{entity_id}",
+            "/api/{org_id}/prompts/{entity_id}/versions",
+        ] {
+            assert!(api.paths.paths.contains_key(path), "missing {path}");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -769,5 +825,20 @@ mod tests {
             }
         }
         assert!(missing.is_empty(), "{missing:#?}");
+    }
+
+    #[test]
+    fn prompt_paths_are_absent_from_oss_openapi() {
+        let api = ApiDoc::openapi();
+        let prompt_paths = api
+            .paths
+            .paths
+            .keys()
+            .filter(|path| path.contains("/prompts"))
+            .collect::<Vec<_>>();
+        assert!(
+            prompt_paths.is_empty(),
+            "OSS Prompt paths: {prompt_paths:?}"
+        );
     }
 }

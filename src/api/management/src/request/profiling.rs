@@ -15,14 +15,12 @@
 
 //! HTTP handlers for profiling endpoints
 
-use axum::{
-    Json,
-    extract::Query,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
+use axum::{Json, extract::Query};
 use config::get_config;
-use pprof::{ProfilerGuard, protos::Message};
+use openobserve_core::self_profiles::{
+    dump_cpu_profile, dump_memory_flamegraph, dump_memory_pprof,
+    jemalloc_stats as read_jemalloc_stats,
+};
 use serde::Deserialize;
 
 /// GET /debug/profile/memory
@@ -32,44 +30,20 @@ use serde::Deserialize;
 ///
 /// Returns: Binary profile data
 pub async fn memory_profile() -> Result<String, String> {
-    let prof_ctl = jemalloc_pprof::PROF_CTL
-        .as_ref()
-        .ok_or_else(|| "Profiling controller not available".to_string())?;
-
-    let mut prof_ctl = prof_ctl.lock().await;
-
-    if !prof_ctl.activated() {
-        return Err("Jemalloc profiling is not activated".to_string());
-    }
-
-    let pprof_data = prof_ctl
-        .dump_pprof()
-        .map_err(|e| format!("Failed to dump pprof: {e}"))?;
-
+    let pprof_data = dump_memory_pprof().await?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-
-    // Use the configured cache directory with a profiling subdirectory
     let cfg = get_config();
     let profile_dir = format!("{}profiling", cfg.common.data_cache_dir);
-
-    // Ensure the profiling directory exists
     std::fs::create_dir_all(&profile_dir)
         .map_err(|e| format!("Failed to create profile directory: {e}"))?;
-
     let filename = format!("{}/memory_profile_{}.pb", profile_dir, timestamp);
-
     std::fs::write(&filename, pprof_data)
         .map_err(|e| format!("Failed to write profile file: {e}"))?;
 
-    // dump flamegraph
-    let pprof_data = prof_ctl
-        .dump_flamegraph()
-        .map_err(|e| format!("Failed to dump pprof: {e}"))?;
-
+    let flamegraph = dump_memory_flamegraph().await?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let filename = format!("{}/memory_profile_graph_{}.svg", profile_dir, timestamp);
-
-    std::fs::write(&filename, pprof_data)
+    std::fs::write(&filename, flamegraph)
         .map_err(|e| format!("Failed to write profile file: {e}"))?;
 
     log::info!("Memory profile dumped to: {}", filename);
@@ -84,28 +58,8 @@ pub async fn memory_profile() -> Result<String, String> {
 /// - allocated: Current allocated memory (bytes)
 /// - resident: Current resident memory (bytes)
 /// - metadata: Metadata overhead (bytes)
-pub async fn jemalloc_stats() -> Response {
-    tikv_jemalloc_ctl::epoch::mib().unwrap().advance().unwrap();
-
-    let allocated_mib = tikv_jemalloc_ctl::stats::allocated::mib().unwrap();
-    let resident_mib = tikv_jemalloc_ctl::stats::resident::mib().unwrap();
-    let metadata_mib = tikv_jemalloc_ctl::stats::metadata::mib().unwrap();
-
-    let allocated = allocated_mib.read().unwrap();
-    let resident = resident_mib.read().unwrap();
-    let metadata = metadata_mib.read().unwrap();
-
-    let stats = serde_json::json!({
-        "allocated": allocated,
-        "resident": resident,
-        "metadata": metadata,
-        "allocated_mb": allocated as f64 / 1024.0 / 1024.0,
-        "resident_mb": resident as f64 / 1024.0 / 1024.0,
-        "metadata_mb": metadata as f64 / 1024.0 / 1024.0,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-    });
-
-    (StatusCode::OK, Json(stats)).into_response()
+pub async fn jemalloc_stats() -> Result<Json<serde_json::Value>, String> {
+    Ok(Json(read_jemalloc_stats()?))
 }
 
 /// Query parameters for CPU profiling
@@ -144,39 +98,15 @@ pub async fn cpu_profile(Query(params): Query<CpuProfileQuery>) -> Result<String
         params.frequency
     );
 
-    // Create CPU profiler with the specified sampling frequency
-    let guard = ProfilerGuard::new(params.frequency).map_err(|e| e.to_string())?;
+    let pprof_data = dump_cpu_profile(params.duration, params.frequency).await?;
 
-    // Sample for the specified duration
-    tokio::time::sleep(std::time::Duration::from_secs(params.duration)).await;
-
-    // Build the report
-    let report = guard
-        .report()
-        .build()
-        .map_err(|e| format!("Failed to build report: {e}"))?;
-
-    // Use the configured cache directory with a profiling subdirectory
     let cfg = get_config();
     let profile_dir = format!("{}profiling", cfg.common.data_cache_dir);
-
-    // Ensure the profiling directory exists
     std::fs::create_dir_all(&profile_dir)
         .map_err(|e| format!("Failed to create profile directory: {e}"))?;
-
-    // Generate filename with timestamp
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let filename = format!("{}/cpu_profile_{}.pb", profile_dir, timestamp);
-
-    // Create file and write pprof data
-    let mut file =
-        std::fs::File::create(&filename).map_err(|e| format!("Failed to create file: {e}"))?;
-
-    report
-        .pprof()
-        .map_err(|e| format!("Failed to convert to pprof: {e}"))?
-        .write_to_writer(&mut file)
-        .map_err(|e| format!("Failed to write profile: {e}"))?;
+    std::fs::write(&filename, pprof_data).map_err(|e| format!("Failed to write profile: {e}"))?;
 
     log::info!("CPU profile dumped to: {}", filename);
     Ok(filename)

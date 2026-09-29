@@ -69,10 +69,24 @@ vi.mock("@/composables/rum/usePerformance", () => ({
 
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  // Existing tests need the lookup to find a row; the no-replay tests override the first call.
+  const sessionRow = {
+    zo_sql_timestamp: 1692884313968000,
+    start_time: 1692884313968,
+    end_time: 1692884769270,
+    browser: "Chrome",
+    os: "macOS",
+    ip: "1.2.3.4",
+    source: "browser",
+    city: "San Francisco",
+    country: "US",
+    session_id: "session-abc",
+  };
   return overlayServiceMock(await importOriginal(), {
     default: {
-      search: vi.fn().mockResolvedValue({
-        data: { hits: [] },
+      search: vi.fn().mockImplementation(async (params: any) => {
+        const sql: string = params?.query?.query?.sql ?? "";
+        return { data: { hits: sql.includes("min(start)") ? [sessionRow] : [] } };
       }),
     },
   });
@@ -178,7 +192,10 @@ describe("SessionViewer.vue", () => {
 
     it("should show Unknown User when session has no user email initially", () => {
       // Default sessionDetails.user_email starts as "" before session load
-      expect(wrapper.text()).toContain("Unknown User");
+      vi.mocked(searchService.search).mockReturnValueOnce(new Promise(() => {}));
+      const pending = mountSessionViewer(router);
+      expect(pending.text()).toContain("Unknown User");
+      pending.unmount();
     });
   });
 
@@ -667,5 +684,145 @@ describe("SessionViewer.vue — session id with an embedded single quote", () =>
     }
 
     wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — no replay recorded", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  async function mountAt(id: string) {
+    vi.clearAllMocks();
+    const router = createTestRouter();
+    await router.push({
+      path: `/rum/sessions/${id}`,
+      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+    });
+    const wrapper = mountSessionViewer(router);
+    await flush();
+    await flush();
+    return wrapper;
+  }
+
+  function mountUnrecorded() {
+    // Only the first call is the lookup; a persistent override would leak into later tests.
+    vi.mocked(searchService.search).mockResolvedValueOnce({ data: { hits: [] } } as any);
+    return mountAt("session-unrecorded");
+  }
+
+  it("shows the no-replay state naming the session id", async () => {
+    const wrapper = await mountUnrecorded();
+
+    const empty = wrapper.find('[data-test="session-viewer-no-replay"]');
+    expect(empty.exists()).toBe(true);
+    expect(empty.text()).toContain("No replay was recorded for this session");
+    expect(empty.text()).toContain("session-unrecorded");
+    wrapper.unmount();
+  });
+
+  it("does not mount the player or the events sidebar", async () => {
+    const wrapper = await mountUnrecorded();
+
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="stub-player-events-sidebar"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("issues only the session lookup, not the segment or event fetches", async () => {
+    const wrapper = await mountUnrecorded();
+
+    const sqlCalls = vi
+      .mocked(searchService.search)
+      .mock.calls.map((call) => (call[0] as any).query.query.sql as string);
+    expect(sqlCalls).toHaveLength(1);
+    expect(sqlCalls[0]).toContain("min(start)");
+    wrapper.unmount();
+  });
+
+  it("renders neither the session subtitle nor the share button", async () => {
+    const wrapper = await mountUnrecorded();
+
+    expect(wrapper.find('[data-test="session-viewer-subtitle"]').exists()).toBe(false);
+    expect(wrapper.findComponent(ShareButton).exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Unknown User");
+    wrapper.unmount();
+  });
+
+  it("keeps the Go Back navigation", async () => {
+    const wrapper = await mountUnrecorded();
+
+    expect(wrapper.find('[data-test="session-viewer-back-btn"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("mounts the player when the session lookup finds a row", async () => {
+    const wrapper = await mountAt("session-abc");
+
+    expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — repeated view documents", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const start = 1692884313968;
+  // The SDK re-sends a view on every update: same view_id and date, rising version.
+  const viewDoc = (view_id: string, url: string, version: number, date: number) => ({
+    type: "view",
+    view_id,
+    view_url: url,
+    view_loading_type: "route_change",
+    _o2_document_version: version,
+    view_time_spent: version * 1_000_000_000,
+    date,
+  });
+
+  it("renders one breadcrumb per view, at the navigation time, from its latest document", async () => {
+    vi.clearAllMocks();
+    const search = vi.mocked(searchService.search);
+    const defaultImpl = search.getMockImplementation();
+    search.mockImplementation(async (params: any) => {
+      const sql: string = params?.query?.query?.sql ?? "";
+      if (sql.includes("min(start)")) return defaultImpl!(params, "RUM");
+      if (sql.includes('"_rumdata"')) {
+        return {
+          data: {
+            hits: [
+              viewDoc("v-login", "https://app/#/Login", 2, start + 1000),
+              viewDoc("v-login", "https://app/#/Login", 6, start + 1000),
+              viewDoc("v-login", "https://app/#/Login", 4, start + 1000),
+              { type: "action", action_id: "a1", view_id: "v-login", date: start + 2000 },
+              viewDoc("v-files", "https://app/#/file-manager", 3, start + 5000),
+              viewDoc("v-files", "https://app/#/file-manager", 14, start + 5000),
+            ],
+          },
+        } as any;
+      }
+      return { data: { hits: [] } } as any;
+    });
+
+    try {
+      const router = createTestRouter();
+      await router.push({
+        path: "/rum/sessions/session-abc",
+        query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+      });
+      const wrapper = mountSessionViewer(router);
+      await flush();
+      await flush();
+
+      const events = (wrapper.vm as any).segmentEvents;
+      expect(events.map((e: any) => e.type)).toEqual(["view", "action", "view"]);
+      const views = events.filter((e: any) => e.type === "view");
+      expect(views.map((e: any) => e.name)).toEqual([
+        "route_change : https://app/#/Login",
+        "route_change : https://app/#/file-manager",
+      ]);
+      expect(views.map((e: any) => e.timestamp)).toEqual([start + 1000, start + 5000]);
+      expect((wrapper.vm as any).rawEventsMap.get("v-files")._o2_document_version).toBe(14);
+      wrapper.unmount();
+    } finally {
+      search.mockImplementation(defaultImpl!);
+    }
   });
 });

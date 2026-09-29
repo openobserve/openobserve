@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { DBM_SOFT_TONES, DBM_STATUS_TONES, DBM_TONE_ICONS } from "./tones";
+import { DBM_SOFT_TONES, DBM_SOFT_VARIANTS, DBM_STATUS_TONES, DBM_TONE_ICONS } from "./tones";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -55,6 +55,18 @@ describe("DBM tone maps", () => {
 
     for (const tone of Object.values(DBM_STATUS_TONES)) {
       expect(tone).not.toContain("badge-");
+    }
+  });
+
+  it("renders each soft tone through the OTag variant painted with the same badge token", () => {
+    expect(DBM_SOFT_VARIANTS).toEqual({
+      error: "error-soft",
+      warning: "warning-soft",
+      info: "blue-soft",
+      new: "primary-soft",
+    });
+    for (const [tone, variant] of Object.entries(DBM_SOFT_VARIANTS)) {
+      expect(DBM_SOFT_TONES[tone as keyof typeof DBM_SOFT_TONES]).toContain(`badge-${variant}-bg`);
     }
   });
 
