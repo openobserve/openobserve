@@ -181,6 +181,12 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
+  // Raw discard-button locator for callers that must own the confirm dialog
+  // themselves (discardPanel() installs its own auto-accepting handler).
+  getPanelDiscardBtn() {
+    return this.discardPanelBtn;
+  }
+
   // Save panel button
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
