@@ -240,6 +240,7 @@
       "otableSelectCell.spec.js",
       "shared-components-form-validation.spec.js",
       "ai-toolsets-form-validation.spec.js",
+      "annotationQueueInputPreview.spec.js",
       "login-form-validation.spec.js"
     ],
     "disabled": []
