@@ -34,15 +34,13 @@ use crate::{
         distributed_plan::metadata_count_exec::MetadataCountExec,
         plan::tantivy_optimize_exec::TantivyOptimizeExec,
     },
-    index::IndexCondition,
-    types::QueryParams,
+    tantivy::TantivyMultiResult,
 };
 
 pub fn aggregate_optimize_rewrite(
-    query: Arc<QueryParams>,
     metadata_count_file_list: Vec<FileKey>,
     tantivy_file_list: Vec<FileKey>,
-    index_condition: Option<IndexCondition>,
+    result: Option<TantivyMultiResult>,
     index_optimize_mode: Option<IndexOptimizeMode>,
     physical_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -55,9 +53,8 @@ pub fn aggregate_optimize_rewrite(
     }
 
     let mut visitor = AggregateOptimizeRewriter::new(
-        query,
         tantivy_file_list,
-        index_condition,
+        result,
         index_optimize_mode,
         metadata_records,
         metadata_files,
@@ -66,9 +63,8 @@ pub fn aggregate_optimize_rewrite(
 }
 
 pub struct AggregateOptimizeRewriter {
-    query: Arc<QueryParams>,
     file_list: Vec<FileKey>,
-    index_condition: Option<IndexCondition>,
+    result: Option<TantivyMultiResult>,
     index_optimize_mode: Option<IndexOptimizeMode>,
     metadata_records: i64,
     metadata_files: usize,
@@ -76,17 +72,15 @@ pub struct AggregateOptimizeRewriter {
 
 impl AggregateOptimizeRewriter {
     pub fn new(
-        query: Arc<QueryParams>,
         file_list: Vec<FileKey>,
-        index_condition: Option<IndexCondition>,
+        result: Option<TantivyMultiResult>,
         index_optimize_mode: Option<IndexOptimizeMode>,
         metadata_records: i64,
         metadata_files: usize,
     ) -> Self {
         Self {
-            query,
             file_list,
-            index_condition,
+            result,
             index_optimize_mode,
             metadata_records,
             metadata_files,
@@ -95,10 +89,11 @@ impl AggregateOptimizeRewriter {
 
     fn tantivy_exec(&mut self, schema: SchemaRef) -> Arc<dyn ExecutionPlan> {
         Arc::new(TantivyOptimizeExec::new(
-            self.query.clone(),
             schema,
             std::mem::take(&mut self.file_list),
-            std::mem::take(&mut self.index_condition),
+            self.result
+                .take()
+                .expect("prepared result must accompany index files"),
             self.index_optimize_mode
                 .clone()
                 .expect("index optimize mode should exist when tantivy files are present"),
@@ -150,35 +145,28 @@ impl TreeNodeRewriter for AggregateOptimizeRewriter {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::stream::{FileKey, FileMeta, StreamType};
+    use config::meta::stream::{FileKey, FileMeta};
     use datafusion::{
-        common::{Result, TableReference},
+        common::Result,
+        execution::context::SessionConfig,
         functions_aggregate::count::count_udaf,
-        physical_expr::aggregate::AggregateExprBuilder,
+        physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr},
         physical_plan::{
-            ExecutionPlan,
+            ExecutionPlan, ExecutionPlanProperties,
             aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            coalesce_partitions::CoalescePartitionsExec,
+            collect,
             empty::EmptyExec,
             expressions::lit,
             union::UnionExec,
         },
+        prelude::{ParquetReadOptions, SessionContext},
     };
+    use parquet::arrow::ArrowWriter;
 
     use super::*;
-
-    fn query_params() -> Arc<QueryParams> {
-        Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org".to_string(),
-            stream: TableReference::from("logs"),
-            stream_type: StreamType::Logs,
-            stream_name: "logs".to_string(),
-            time_range: (0, 1000),
-            work_group: None,
-            use_inverted_index: true,
-        })
-    }
 
     fn partial_count_exec() -> Result<Arc<dyn ExecutionPlan>> {
         let schema = Arc::new(Schema::new(vec![Field::new(
@@ -215,10 +203,9 @@ mod tests {
         }];
 
         let rewritten = aggregate_optimize_rewrite(
-            query_params(),
             metadata_files,
             vec![FileKey::default()],
-            None,
+            Some(TantivyMultiResult::Count(7)),
             Some(IndexOptimizeMode::SimpleCount),
             plan,
         )?;
@@ -238,10 +225,9 @@ mod tests {
     #[test]
     fn test_aggregate_optimize_rewrite_tantivy_only() -> Result<()> {
         let rewritten = aggregate_optimize_rewrite(
-            query_params(),
             vec![],
             vec![FileKey::default()],
-            None,
+            Some(TantivyMultiResult::Count(7)),
             Some(IndexOptimizeMode::SimpleCount),
             partial_count_exec()?,
         )?;
@@ -253,6 +239,124 @@ mod tests {
         assert_eq!(inputs.len(), 2);
         assert_eq!(inputs[0].name(), "AggregateExec");
         assert_eq!(inputs[1].name(), "TantivyOptimizeExec");
+
+        Ok(())
+    }
+
+    async fn fallback_parquet_ctx() -> Result<(tempfile::TempDir, SessionContext)> {
+        let directory = tempfile::tempdir()?;
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "service_name",
+            DataType::Utf8,
+            true,
+        )]));
+        for part in 0..2 {
+            let file = std::fs::File::create(directory.path().join(format!("{part}.parquet")))?;
+            let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
+            writer.write(&RecordBatch::try_new(
+                schema.clone(),
+                vec![Arc::new(StringArray::from(vec![
+                    Some("svc-a"),
+                    Some("svc-b"),
+                    None,
+                ]))],
+            )?)?;
+            writer.close()?;
+        }
+        let ctx = SessionContext::new_with_config(
+            SessionConfig::new()
+                .with_target_partitions(2)
+                .with_repartition_file_scans(false),
+        );
+        ctx.register_parquet(
+            "fallback",
+            directory.path().to_str().unwrap(),
+            ParquetReadOptions::default(),
+        )
+        .await?;
+        Ok((directory, ctx))
+    }
+
+    async fn partial_count_over(
+        ctx: &SessionContext,
+        sql: &str,
+    ) -> Result<(Arc<dyn ExecutionPlan>, Arc<AggregateFunctionExpr>)> {
+        let scan = ctx.sql(sql).await?.create_physical_plan().await?;
+        let schema = scan.schema();
+        let aggregate = Arc::new(
+            AggregateExprBuilder::new(count_udaf(), vec![lit(1i32)])
+                .schema(schema.clone())
+                .alias("COUNT(*)")
+                .build()?,
+        );
+        let partial = Arc::new(AggregateExec::try_new(
+            AggregateMode::Partial,
+            PhysicalGroupBy::default(),
+            vec![aggregate.clone()],
+            vec![None],
+            scan,
+            schema,
+        )?);
+        Ok((partial, aggregate))
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_rewrite_merges_parquet_fallback_with_index_count() -> Result<()> {
+        let (_directory, ctx) = fallback_parquet_ctx().await?;
+        let (partial, aggregate) = partial_count_over(
+            &ctx,
+            "SELECT service_name FROM fallback WHERE service_name = 'svc-a'",
+        )
+        .await?;
+        assert_eq!(partial.output_partitioning().partition_count(), 2);
+        let input_schema = partial.children()[0].schema();
+
+        let merged = aggregate_optimize_rewrite(
+            vec![],
+            vec![FileKey::default()],
+            Some(TantivyMultiResult::Count(7)),
+            Some(IndexOptimizeMode::SimpleCount),
+            partial,
+        )?;
+        assert_eq!(merged.output_partitioning().partition_count(), 3);
+
+        let final_plan = Arc::new(AggregateExec::try_new(
+            AggregateMode::Final,
+            PhysicalGroupBy::default(),
+            vec![aggregate],
+            vec![None],
+            Arc::new(CoalescePartitionsExec::new(merged)),
+            input_schema,
+        )?);
+        let batches = collect(final_plan, ctx.task_ctx()).await?;
+        let count = batches[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap()
+            .value(0);
+        assert_eq!(count, 9);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_rewrite_propagates_parquet_fallback_error() -> Result<()> {
+        let (_directory, ctx) = fallback_parquet_ctx().await?;
+        let (partial, _) = partial_count_over(
+            &ctx,
+            "SELECT 1 / (length(service_name) - 5) AS n FROM fallback",
+        )
+        .await?;
+
+        let merged = aggregate_optimize_rewrite(
+            vec![],
+            vec![FileKey::default()],
+            Some(TantivyMultiResult::Count(7)),
+            Some(IndexOptimizeMode::SimpleCount),
+            partial,
+        )?;
+        assert!(collect(merged, ctx.task_ctx()).await.is_err());
 
         Ok(())
     }

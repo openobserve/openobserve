@@ -71,6 +71,7 @@ use crate::{
     index::IndexCondition,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     match_file,
+    tantivy::{TantivyMultiResult, aggregate::prepare_aggregate},
 };
 
 #[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.query_identifier.org_id))]
@@ -245,6 +246,7 @@ pub async fn search(
     // search in object storage
     let mut metadata_count_file_list = Vec::new();
     let mut tantivy_file_list = Vec::new();
+    let mut tantivy_result = None;
     if !req.search_info.file_id_list.is_empty() {
         let (mut file_list, file_list_took) = get_file_list_by_ids(
             &trace_id,
@@ -314,6 +316,22 @@ pub async fn search(
                     .build()
             )
         );
+
+        if !tantivy_file_list.is_empty() {
+            let prepared = prepare_aggregate(
+                query_params.clone(),
+                std::mem::take(&mut tantivy_file_list),
+                index_condition.clone(),
+                idx_optimize_rule
+                    .clone()
+                    .expect("index files require an aggregate mode"),
+            )
+            .await;
+            file_list.extend(prepared.fallback_files);
+            tantivy_file_list = prepared.files;
+            tantivy_result = prepared.result;
+            scan_stats.idx_took += prepared.took as i64;
+        }
 
         // Apply sampling if configured (enterprise feature)
         #[cfg(feature = "enterprise")]
@@ -510,10 +528,9 @@ pub async fn search(
         &ctx,
         physical_plan,
         &mut scan_stats,
-        query_params.clone(),
         metadata_count_file_list,
         tantivy_file_list,
-        index_condition,
+        tantivy_result,
         idx_optimize_rule,
     )?;
 
@@ -543,10 +560,9 @@ fn apply_pushdowns_and_optimizations(
     ctx: &SessionContext,
     mut physical_plan: Arc<dyn ExecutionPlan>,
     scan_stats: &mut ScanStats,
-    query_params: Arc<QueryParams>,
     metadata_count_file_list: Vec<FileKey>,
     tantivy_file_list: Vec<FileKey>,
-    index_condition: Option<IndexCondition>,
+    tantivy_result: Option<TantivyMultiResult>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let cfg = get_config();
@@ -586,10 +602,9 @@ fn apply_pushdowns_and_optimizations(
         scan_stats.add(&collect_stats(&metadata_count_file_list));
         scan_stats.add(&collect_stats(&tantivy_file_list));
         physical_plan = aggregate_optimize_rewrite(
-            query_params.clone(),
             metadata_count_file_list,
             tantivy_file_list,
-            index_condition,
+            tantivy_result,
             idx_optimize_rule,
             physical_plan,
         )?;
