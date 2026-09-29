@@ -13142,6 +13142,7 @@
       "promptLabel": "판사 프롬프트",
       "includeReasoningLabel": "추론 포함",
       "includeReasoningHint": "판정자가 해당 점수를 부여한 이유를 설명하며, 각 결과와 함께 저장됩니다.",
+      "decisionProviderNote": "결정 모델은 점수와 근거만 반환하므로 추가 필드는 사용할 수 없습니다.",
       "extraFieldsLabel": "추가 메타데이터 필드(선택 사항)",
       "extraFieldsHint": "판정자에게 각 점수와 함께 추가 값을 반환하도록 요청하십시오 — 예를 들어 카테고리 또는 신뢰도.",
       "extraFields": {
@@ -19568,6 +19569,8 @@
     "unroutedDismissedTag": "무시됨",
     "notAvailableTitle": "이 배포 환경에서는 온콜을 사용할 수 없습니다.",
     "notAvailableDescription": "링크는 정상입니다. 이 빌드에서는 온콜을 제공하지 않습니다. 실패한 항목이 없으며 다시 시도할 필요가 없습니다.",
+    "teamNotFoundTitle": "팀을 찾을 수 없음",
+    "teamNotFoundDescription": "이 팀은 더 이상 존재하지 않습니다. 삭제되었을 수 있습니다.",
     "unroutedPagedNobody": "알림을 받은 사람이 없습니다.",
     "unroutedLoadFailed": "라우팅되지 않은 큐를 불러올 수 없습니다.",
     "routingLoadFailed": "할당 및 라우팅 구성을 불러올 수 없습니다.",
