@@ -137,6 +137,7 @@
       "tests/ui-testing/pages/generalPages/**"
     ],
     "Org": [
+      "web/src/components/iam/organizations/**",
       "web/src/services/organizations.*",
       "tests/ui-testing/pages/iamPages/**",
       "tests/ui-testing/pages/generalPages/**"
