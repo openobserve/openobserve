@@ -216,13 +216,34 @@ describe("tableConfigUtils", () => {
       }
     });
 
-    it("accepts a bounded repeat of a group, or an unbounded repeat of a bounded group", () => {
+    it("treats a wide or open brace repeat as unbounded, and a variable-width inner brace as repeating", () => {
+      for (const pattern of ["(a{2,5})+", "^(a+){2,1000}$", "^(a{1,1000})+$", "(a+){0,11}"]) {
+        expect(hasNestedQuantifier(pattern)).toBe(true);
+      }
+      for (const pattern of ["^(a{2,5})+$", "^(a+){2,1000}$", "^(a{1,1000})+$"]) {
+        expect(isSafeValueMappingPattern(pattern)).toBe(false);
+      }
+    });
+
+    it("skips a variable-width brace group mapping and returns quickly on a catastrophic input", () => {
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: "^(a{2,5})+$", text: "bad" },
+      ]);
+      const start = performance.now();
+
+      expect(lookupValueMappingFull("a".repeat(60) + "!", cache)).toBeNull();
+      expect(performance.now() - start).toBeLessThan(100);
+    });
+
+    it("accepts a bounded repeat of a group, or an unbounded repeat of a fixed-width group", () => {
       for (const pattern of [
         "^(\\d+\\.){3}\\d+$",
         "(a+){1,5}",
         "(a+){0,3}b",
-        "(a{2,5})+",
+        "(a{2})+",
         "(ab?)*",
+        "\\d{1,3}",
+        "^(\\d{1,3}\\.){3}\\d{1,3}$",
       ]) {
         expect(hasNestedQuantifier(pattern)).toBe(false);
       }
