@@ -6,7 +6,10 @@
     "run_files": [
       "logs-bugs.spec.js",
       "logs-query-editor-resize-bounds.spec.js",
-      "logs-result-display.spec.js"
+      "logs-result-display.spec.js",
+      "logs-nonsql-limit.spec.js",
+      "logs-stream-type-scope.spec.js",
+      "logs-14376-int64-precision.spec.js"
     ],
     "disabled": []
   },
@@ -49,7 +52,8 @@
     "browser": "chrome",
     "run_files": [
       "dashboard-regression.spec.js",
-      "dashboard-cache-browser-refresh.spec.js"
+      "dashboard-cache-browser-refresh.spec.js",
+      "dashboard-save-validation-message-11283.spec.js"
     ],
     "disabled": []
   },
@@ -87,7 +91,8 @@
       "traces-span-kind-badges.spec.js",
       "traces-11615-flame-graph-span-selection.spec.js",
       "traces-6591-explorer-state.spec.js",
-      "traces-6591-details-interactions.spec.js"
+      "traces-6591-details-interactions.spec.js",
+      "traces-14317-error-filter-pagination.spec.js"
     ],
     "disabled": []
   },
@@ -108,7 +113,8 @@
     "run_files": [
       "ui-regression.spec.js",
       "landing-regression.spec.js",
-      "internal-route-guards.spec.js"
+      "internal-route-guards.spec.js",
+      "datetime-paste-invalid-values-14648.spec.js"
     ],
     "disabled": []
   },
@@ -152,7 +158,9 @@
     "browser": "chrome",
     "run_files": [
       "function-delete-confirm.spec.js",
-      "pipeline-query-filter-removal.spec.js"
+      "pipeline-query-filter-removal.spec.js",
+      "enrichment-explore-context.spec.js",
+      "pipeline-default-destination-guard.spec.js"
     ],
     "disabled": []
   },

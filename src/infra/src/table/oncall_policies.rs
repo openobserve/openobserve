@@ -88,6 +88,7 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             config::meta::oncall::L0Policy::defaults()
         }),
     };
+    let l0 = normalize_legacy_only(l0);
     match serde_json::from_str::<Vec<PriorityRung>>(&m.rungs) {
         Ok(rungs) => EscalationPolicy {
             id: m.id,
@@ -105,6 +106,20 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             EscalationPolicy::whole_team_fallback(m.id, m.org_id, m.team_id)
         }
     }
+}
+
+/// `only` was legal at P2/P3 before this build's validation tightened; a row
+/// written then must still round-trip clean rather than 400 a team's next
+/// unrelated save. Read-path only — a fresh write of `only` there is refused
+/// by [`config::meta::oncall::L0Policy::validate`].
+fn normalize_legacy_only(mut l0: config::meta::oncall::L0Policy) -> config::meta::oncall::L0Policy {
+    if l0.mode.p2 == config::meta::oncall::L0Mode::Only {
+        l0.mode.p2 = config::meta::oncall::L0Mode::Parallel;
+    }
+    if l0.mode.p3 == config::meta::oncall::L0Mode::Only {
+        l0.mode.p3 = config::meta::oncall::L0Mode::Parallel;
+    }
+    l0
 }
 
 /// Reads the team's policy, creating it from the defaults if it has none.
@@ -325,6 +340,28 @@ mod tests {
             to_policy(stored).l0,
             config::meta::oncall::L0Policy::defaults()
         );
+    }
+
+    /// I21: `only` was legal at P2/P3 before this build's validation
+    /// tightened. A row a team never touched must still read back as a value
+    /// `set_policy` accepts on their next unrelated save, not 400 them for a
+    /// field they never opened.
+    #[test]
+    fn test_a_legacy_only_at_p2_or_p3_reads_back_as_parallel() {
+        let encoded = serde_json::to_string(
+            &EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", None)
+                .rungs,
+        )
+        .unwrap();
+        let mut stored = model(&encoded);
+        stored.l0_json = r#"{"mode":{"P1":"parallel","P2":"only","P3":"only","P4":"only"},
+            "triage_budget_seconds":90,"allow_promotion":true,"max_promotion_steps":2,
+            "allow_downgrade":true,"allow_suppress":false}"#
+            .into();
+        let l0 = to_policy(stored).l0;
+        assert_eq!(l0.mode.p2, config::meta::oncall::L0Mode::Parallel);
+        assert_eq!(l0.mode.p3, config::meta::oncall::L0Mode::Parallel);
+        l0.validate().unwrap();
     }
 
     /// Unlike a schedule, a corrupt policy falls back to the defaults: an empty

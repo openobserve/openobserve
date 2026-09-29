@@ -57,6 +57,7 @@ pub mod incidents;
 pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
+pub mod recovery;
 pub mod scheduler;
 pub mod templates;
 

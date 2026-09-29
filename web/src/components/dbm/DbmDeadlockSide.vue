@@ -81,12 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          DBA rather than thrown away. -->
     <p v-if="waitSentence" class="text-text-secondary text-2xs leading-relaxed">
       {{ waitSentence }}
-      <span
-        v-if="rawLock"
-        class="bg-surface-subtle text-text-body rounded-default text-3xs mt-1 inline-block px-1.5 py-0.5 font-mono"
-      >
+      <OTag v-if="rawLock" variant="default-soft" size="xs" shape="rounded" class="mt-1 font-mono">
         {{ rawLock }}
-      </span>
+      </OTag>
     </p>
 
     <!-- The per-side copy is ICON-ONLY, and that is the whole resolution of the
@@ -117,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

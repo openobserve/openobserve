@@ -195,13 +195,26 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260918_000001_create_oncall_response_reports;
 mod m20260920_000001_add_anomaly_level_half_width;
 mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
 mod m20260922_000001_add_password_policy_columns_to_users;
 mod m20260922_000002_create_user_password_history_table;
 mod m20260922_000003_create_user_auth_state_table;
+mod m20260923_000001_create_llm_prompts;
+mod m20260924_000001_add_recovery_episode_columns;
+mod m20260928_000001_add_alert_recovery_destinations;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+#[cfg(test)]
+pub(crate) async fn create_llm_prompt_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20260923_000001_create_llm_prompts::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -485,6 +498,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260922_000002_create_user_password_history_table::Migration),
             Box::new(m20260922_000003_create_user_auth_state_table::Migration),
             Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
+            Box::new(m20260923_000001_create_llm_prompts::Migration),
+            Box::new(m20260924_000001_add_recovery_episode_columns::Migration),
+            Box::new(m20260928_000001_add_alert_recovery_destinations::Migration),
+            Box::new(m20260918_000001_create_oncall_response_reports::Migration),
         ]
     }
 }
@@ -533,6 +550,10 @@ mod tests {
         ),
         (88, "m20260922_000003_create_user_auth_state_table"),
         (89, "m20260920_000001_add_anomaly_level_half_width"),
+        (90, "m20260923_000001_create_llm_prompts"),
+        (91, "m20260924_000001_add_recovery_episode_columns"),
+        (92, "m20260928_000001_add_alert_recovery_destinations"),
+        (93, "m20260918_000001_create_oncall_response_reports"),
     ];
 
     #[test]
@@ -607,6 +628,10 @@ mod tests {
             (
                 "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
                 "m20260922_000001_add_password_policy_columns_to_users",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20260924_000001_add_recovery_episode_columns",
             ),
         ] {
             assert!(
