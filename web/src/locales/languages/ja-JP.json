@@ -4090,6 +4090,7 @@
       "oracleTagline": "OpenTelemetry Collector で Oracle DB メトリクスを収集し、OpenObserve に送信してください。",
       "otlpFixBody": "エクスポーターを定義するだけでは不十分です — パイプラインにリストされる必要があります。これは、正しく見える設定が何も送信しない最も一般的な理由です：",
       "otlpFixTitle": "エクスポーターが実際にパイプラインに配線されているか確認",
+      "otlpGrpcCloudNote": "OpenObserve Cloud の公開 gRPC ゲートウェイ — 大量の Span を扱う場合、HTTP よりもオーバーヘッドが小さく、セルフホストのネットワーク設定も不要です。",
       "otlpGrpcNote": "高スパン量の場合、HTTPよりもオーバーヘッドが低くなります。ポート5081にコレクターから到達できる必要があります。",
       "otlpHttpNote": "OpenTelemetry Collectorのデフォルトであり、プロキシやロードバランサーの背後を含むどこでも動作します。",
       "otlpSdkEnvNote": "標準のOTEL_*環境変数 — すべてのOpenTelemetry SDKがこれらを読み取るため、コードの変更は不要です。",

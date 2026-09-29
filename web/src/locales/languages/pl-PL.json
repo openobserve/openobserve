@@ -4090,6 +4090,7 @@
       "oracleTagline": "Zbieraj metryki Oracle DB za pomocą kolektora OpenTelemetry i wysyłaj je do OpenObserve.",
       "otlpFixBody": "Zdefiniowanie eksportera nie wystarczy — musi on być wymieniony w potoku. To najczęstszy powód, dla którego poprawnie wyglądająca konfiguracja nic nie wysyła:",
       "otlpFixTitle": "Sprawdź, czy eksporter jest faktycznie podłączony do potoku",
+      "otlpGrpcCloudNote": "Publiczna brama gRPC OpenObserve Cloud — mniejszy narzut niż w przypadku HTTP przy dużej liczbie spanów, bez konieczności konfigurowania sieci we własnym środowisku.",
       "otlpGrpcNote": "Mniejsze narzuty niż HTTP przy dużych wolumenach spanów. Port 5081 musi być osiągalny z kolektora.",
       "otlpHttpNote": "Domyślne ustawienie kolektora OpenTelemetry — działa wszędzie, w tym za proxy i load balancerami.",
       "otlpSdkEnvNote": "Standardowe zmienne środowiskowe OTEL_* — każdy pakiet SDK OpenTelemetry je odczytuje, więc nie są potrzebne żadne zmiany w kodzie.",

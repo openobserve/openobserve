@@ -4090,6 +4090,7 @@
       "oracleTagline": "使用 OpenTelemetry Collector 收集 Oracle DB 指标并将其发送到 OpenObserve。",
       "otlpFixBody": "仅定义导出器是不够的 — 它必须列在 pipeline 中。这是看起来正确的配置不发送任何内容的唯一最常见原因：",
       "otlpFixTitle": "检查导出器是否确实已接入 pipeline",
+      "otlpGrpcCloudNote": "OpenObserve Cloud 的公共 gRPC 网关 — 在高 Span 量下比 HTTP 开销更低，无需配置自托管网络。",
       "otlpGrpcNote": "对于高 span 量，比 HTTP 开销更低。端口 5081 必须可从收集器访问。",
       "otlpHttpNote": "OpenTelemetry Collector 的默认设置 — 适用于任何地方，包括代理和负载均衡器后面。",
       "otlpSdkEnvNote": "标准 OTEL_* 环境变量 — 每个 OpenTelemetry SDK 都会读取它们，因此无需更改代码。",
