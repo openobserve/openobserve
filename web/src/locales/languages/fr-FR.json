@@ -4090,6 +4090,7 @@
       "oracleTagline": "Collectez les métriques Oracle DB avec le collecteur OpenTelemetry et envoyez-les à OpenObserve.",
       "otlpFixBody": "Définir un exportateur ne suffit pas — il doit être listé dans un pipeline. C'est la raison la plus courante pour laquelle une configuration apparemment correcte n'envoie rien :",
       "otlpFixTitle": "Vérifier que l'exportateur est effectivement intégré au pipeline",
+      "otlpGrpcCloudNote": "La passerelle gRPC publique d'OpenObserve Cloud — une surcharge moindre que HTTP pour de gros volumes de spans, aucun réseau auto-hébergé à configurer.",
       "otlpGrpcNote": "Surcharge plus faible que HTTP pour des volumes de spans élevés. Le port 5081 doit être accessible depuis le collecteur.",
       "otlpHttpNote": "Le défaut pour le collecteur OpenTelemetry — fonctionne partout, y compris derrière des proxys et des équilibreurs de charge.",
       "otlpSdkEnvNote": "Variables d'environnement OTEL_* standard — chaque SDK OpenTelemetry les lit, donc aucune modification de code n'est nécessaire.",
@@ -17976,7 +17977,34 @@
     },
     "samples": {
       "logOffTitle": "Vos bases de données ne journalisent pas encore les instructions lentes",
-      "logOffDescription": "Aucune trace n'a été faite pour ces appels, nous avons donc demandé aux bases de données leurs propres instructions les plus lentes — et elles n'en journalisent aucune. Cette liste provient du journal des instructions de PostgreSQL (log_min_duration_statement), désactivé par défaut — l'étape de journalisation de la carte de configuration l'active. La capture par instruction est actuellement réservée à PostgreSQL, donc MySQL et MariaDB ne peuvent pas encore alimenter cette liste. Les requêtes principales peuvent toujours montrer ce qui s'exécute le plus, car elles lisent les tables de compteurs à la place.",
+      "notCollecting": {
+        "description": "Aucune trace n'a été faite pour ces appels, nous avons donc demandé aux bases de données leurs propres instructions les plus lentes — et elles n'en journalisent aucune. Nous vérifions quatre choses.",
+        "checklistTitle": "Ce que nous avons vérifié",
+        "setUp": "Configurer la journalisation des instructions",
+        "checks": {
+          "queries": {
+            "ok": "Vos données de requêtes arrivent",
+            "okDetail": "{queries} depuis {databases} — l'onglet Top queries fonctionne",
+            "okDetailNoFleet": "{queries} — l'onglet Top queries fonctionne",
+            "no": "Aucune donnée de requête n'arrive non plus",
+            "noDetail": "Commencez par l'onglet Top queries — rien ne nous parvient encore de ces bases de données."
+          },
+          "enabled": {
+            "ok": "La surveillance des bases de données est activée",
+            "okDetail": "pour cette organisation",
+            "no": "La surveillance des bases de données est désactivée",
+            "noDetail": "Activez-la dans les paramètres pour commencer la collecte."
+          },
+          "log": {
+            "no": "Les instructions lentes ne sont pas journalisées",
+            "noDetail": "Cette liste provient du journal des instructions de PostgreSQL (log_min_duration_statement), désactivé par défaut — l'étape de journalisation de la carte de configuration l'active."
+          },
+          "engines": {
+            "title": "PostgreSQL uniquement, pour l'instant",
+            "detail": "La capture par instruction est actuellement réservée à PostgreSQL, donc MySQL et MariaDB ne peuvent pas encore alimenter cette liste. Les requêtes principales peuvent toujours montrer ce qui s'exécute le plus, car elles lisent les tables de compteurs à la place."
+          }
+        }
+      },
       "searchPlaceholder": "Rechercher du texte de requête, un service ou une base de données…",
       "columns": {
         "query": "Requête",
@@ -18430,6 +18458,7 @@
       "never": "Jamais",
       "countersCumulative": "Les compteurs de scan et de vacuum sont des totaux cumulés depuis la dernière réinitialisation des statistiques, pas des compteurs pour la période sélectionnée.",
       "tuplesEstimated": "Les nombres de lignes et le pourcentage de bloat sont des estimations statistiques du moteur de base de données, pas des comptes exacts.",
+      "aboutNumbers": "À propos de ces chiffres",
       "notCollectingTitle": "Aucune statistique de table pour l'instant",
       "notCollectingDescription": "Rien n'a signalé de statistiques de table dans cette période. Ce signal est fourni comme une recette de collecteur distincte.",
       "engineUnsupportedTitle": "Non collecté pour ce moteur",

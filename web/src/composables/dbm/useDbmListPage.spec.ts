@@ -260,6 +260,16 @@ describe("useDbmListPage", () => {
     await page.run(() => Promise.reject(axiosErr(403)), { onForbidden });
     expect(onForbidden).toHaveBeenCalledTimes(1);
     expect(page.error.value).toBeNull();
+    expect(page.forbidden.value).toBe(false);
+  });
+
+  it("run flags a 403 as forbidden, not an error, for a page with no handler", async () => {
+    const { page } = mountPage({ load: vi.fn() });
+    await page.run(() => Promise.reject(axiosErr(403, "Unauthorized Access")));
+    expect(page.forbidden.value).toBe(true);
+    expect(page.error.value).toBeNull();
+    await page.run(() => Promise.resolve());
+    expect(page.forbidden.value).toBe(false);
   });
 
   it("run lets a page own the banner copy via onError", async () => {

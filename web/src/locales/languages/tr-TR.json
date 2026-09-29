@@ -4090,6 +4090,7 @@
       "oracleTagline": "Oracle DB metriklerini OpenTelemetry Collector ile topla ve OpenObserve'e gönder.",
       "otlpFixBody": "Bir dışa aktarıcı tanımlamak yeterli değildir — bir boru hattında listelenmesi gerekir. Bu, doğru görünen bir yapılandırmanın hiçbir şey göndermemesinin en yaygın tek nedenidir:",
       "otlpFixTitle": "Dışa Aktarıcının Gerçekten Boru Hattına Bağlı Olduğunu Kontrol Edin",
+      "otlpGrpcCloudNote": "OpenObserve Cloud'un herkese açık gRPC ağ geçidi — yüksek span hacimleri için HTTP'den daha düşük ek yük, yapılandırılacak kendi barındırılan ağ gerekmez.",
       "otlpGrpcNote": "Yüksek span hacimleri için HTTP'den daha düşük ek yük. 5081 portu toplayıcıdan erişilebilir olmalıdır.",
       "otlpHttpNote": "OpenTelemetry Collector için varsayılan — proxy'lerin ve yük dengeleyicilerin arkasında dahil her yerde çalışır.",
       "otlpSdkEnvNote": "Standart OTEL_* ortam değişkenleri — her OpenTelemetry SDK bunları okur, bu nedenle kod değişikliği gerekmez.",
@@ -17976,7 +17977,34 @@
     },
     "samples": {
       "logOffTitle": "Veritabanlarınız henüz yavaş ifadeleri günlüğe kaydetmiyor",
-      "logOffDescription": "Hiçbir şey bu çağrıları izlemedi, bu yüzden veritabanlarına kendi en yavaş ifadelerini sorduk — ve hiçbirini günlüğe kaydetmiyorlar. Bu liste PostgreSQL'in ifade günlüğünden (log_min_duration_statement) gelir; varsayılan olarak kapalıdır — kurulum kartının günlüğe kaydetme adımı onu açar. İfade başına yakalama şu anda yalnızca PostgreSQL'e özgüdür, bu nedenle MySQL ve MariaDB henüz bu listeyi besleyemez. En çok çalışan sorgular size neyin en çok çalıştığını gösterebilir, çünkü bunun yerine sayaç tablolarını okur.",
+      "notCollecting": {
+        "description": "Hiçbir şey bu çağrıları izlemedi, bu yüzden veritabanlarına kendi en yavaş ifadelerini sorduk — ve hiçbirini günlüğe kaydetmiyorlar. Dört şeyi kontrol ediyoruz.",
+        "checklistTitle": "Kontrol ettiklerimiz",
+        "setUp": "İfade günlüğünü ayarla",
+        "checks": {
+          "queries": {
+            "ok": "Sorgu verileriniz ulaşıyor",
+            "okDetail": "{queries} sorgu {databases}'dan — En çok sorgular sekmesi çalışıyor",
+            "okDetailNoFleet": "{queries} — En çok sorgular sekmesi çalışıyor",
+            "no": "Sorgu verisi de ulaşmıyor",
+            "noDetail": "En çok sorgular sekmesiyle başlayın — bu veritabanlarından henüz bize bir şey ulaşmıyor."
+          },
+          "enabled": {
+            "ok": "Veritabanı izleme açık",
+            "okDetail": "bu kuruluş için",
+            "no": "Veritabanı izleme kapalı",
+            "noDetail": "Toplamaya başlamak için Ayarlar'dan açın."
+          },
+          "log": {
+            "no": "Yavaş ifadeler günlüğe kaydedilmiyor",
+            "noDetail": "Bu liste PostgreSQL'in ifade günlüğünden (log_min_duration_statement) gelir; varsayılan olarak kapalıdır — kurulum kartının günlüğe kaydetme adımı onu açar."
+          },
+          "engines": {
+            "title": "Şimdilik yalnızca PostgreSQL",
+            "detail": "İfade başına yakalama şu anda yalnızca PostgreSQL'e özgüdür, bu nedenle MySQL ve MariaDB henüz bu listeyi besleyemez. En çok çalışan sorgular size neyin en çok çalıştığını gösterebilir, çünkü bunun yerine sayaç tablolarını okur."
+          }
+        }
+      },
       "searchPlaceholder": "Sorgu metni, hizmet veya veritabanı ara…",
       "columns": {
         "query": "Sorgu",
@@ -18430,6 +18458,7 @@
       "never": "Asla",
       "countersCumulative": "Tarama ve vakum sayıları, son istatistik sıfırlamasından bu yana ömür boyu toplamlardır, seçilen zaman aralığı için sayılar değildir.",
       "tuplesEstimated": "Satır sayıları ve şişkinlik yüzdesi, veritabanı motorundan alınan istatistik tahminleridir, kesin sayılar değildir.",
+      "aboutNumbers": "Bu sayılar hakkında",
       "notCollectingTitle": "Henüz tablo istatistiği yok",
       "notCollectingDescription": "Bu zaman aralığında hiçbir şey tablo istatistiği bildirmedi. Bu sinyal ayrı bir toplayıcı tarifi olarak gelir.",
       "engineUnsupportedTitle": "Bu motor için toplanmadı",

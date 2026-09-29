@@ -4090,6 +4090,7 @@
       "oracleTagline": "Colete métricas do Oracle DB com o OpenTelemetry Collector e envie-as para o OpenObserve.",
       "otlpFixBody": "Definir um exportador não é suficiente — ele precisa estar listado em um pipeline. Esse é o motivo mais comum pelo qual uma configuração aparentemente correta não envia nada:",
       "otlpFixTitle": "Verifique se o exportador está realmente conectado ao pipeline",
+      "otlpGrpcCloudNote": "Gateway gRPC público do OpenObserve Cloud — sobrecarga menor que o HTTP para grandes volumes de spans, sem necessidade de configurar rede auto-hospedada.",
       "otlpGrpcNote": "Sobrecarga menor que HTTP para altos volumes de spans. A porta 5081 deve estar acessível a partir do coletor.",
       "otlpHttpNote": "O padrão para o OpenTelemetry Collector — funciona em qualquer lugar, inclusive atrás de proxies e balanceadores de carga.",
       "otlpSdkEnvNote": "Variáveis de ambiente padrão OTEL_* — todos os SDKs do OpenTelemetry as leem, portanto nenhuma alteração de código é necessária.",
@@ -17976,7 +17977,34 @@
     },
     "samples": {
       "logOffTitle": "Seus bancos de dados ainda não estão registrando instruções lentas",
-      "logOffDescription": "Nada rastreou essas chamadas, então pedimos aos bancos de dados suas próprias instruções mais lentas — e eles não registram nenhuma. Esta lista vem do log de instruções do PostgreSQL (log_min_duration_statement), que está desligado por padrão — a etapa de registro do cartão de configuração o ativa. A captura por instrução é atualmente exclusiva do PostgreSQL, então MySQL e MariaDB ainda não podem alimentar esta lista. As principais consultas ainda podem mostrar o que é executado com mais frequência, pois leem as tabelas de contadores em vez disso.",
+      "notCollecting": {
+        "description": "Nada rastreou essas chamadas, então pedimos aos bancos de dados suas próprias instruções mais lentas — e eles não registram nenhuma. Verificamos quatro coisas.",
+        "checklistTitle": "O que verificamos",
+        "setUp": "Configurar o registro de instruções",
+        "checks": {
+          "queries": {
+            "ok": "Seus dados de consultas estão chegando",
+            "okDetail": "{queries} de {databases} — a aba Principais consultas funciona",
+            "okDetailNoFleet": "{queries} — a aba Principais consultas funciona",
+            "no": "Também não está chegando nenhum dado de consultas",
+            "noDetail": "Comece pela aba Principais consultas — nada está chegando até nós desses bancos de dados ainda."
+          },
+          "enabled": {
+            "ok": "O monitoramento de banco de dados está ativado",
+            "okDetail": "para esta organização",
+            "no": "O monitoramento de banco de dados está desativado",
+            "noDetail": "Ative-o nas Configurações para começar a coletar."
+          },
+          "log": {
+            "no": "As instruções lentas não estão sendo registradas",
+            "noDetail": "Esta lista vem do log de instruções do PostgreSQL (log_min_duration_statement), que está desligado por padrão — a etapa de registro do cartão de configuração o ativa."
+          },
+          "engines": {
+            "title": "Somente PostgreSQL, por enquanto",
+            "detail": "A captura por instrução é atualmente exclusiva do PostgreSQL, então MySQL e MariaDB ainda não podem alimentar esta lista. As principais consultas ainda podem mostrar o que é executado com mais frequência, pois leem as tabelas de contadores em vez disso."
+          }
+        }
+      },
       "searchPlaceholder": "Buscar texto de consulta, serviço ou banco de dados…",
       "columns": {
         "query": "Consulta",
@@ -18430,6 +18458,7 @@
       "never": "Nunca",
       "countersCumulative": "As contagens de scan e vacuum são totais acumulados desde a última redefinição de estatísticas, não contagens para o intervalo de tempo selecionado.",
       "tuplesEstimated": "As contagens de linhas e a porcentagem de bloat são estimativas de estatísticas do mecanismo de banco de dados, não contagens exatas.",
+      "aboutNumbers": "Sobre estes números",
       "notCollectingTitle": "Nenhuma estatística de tabela ainda",
       "notCollectingDescription": "Nada relatou estatísticas de tabela neste intervalo de tempo. Este sinal é fornecido como uma receita de coletor separada.",
       "engineUnsupportedTitle": "Não coletado para este mecanismo",
