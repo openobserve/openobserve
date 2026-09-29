@@ -58,7 +58,7 @@ pub async fn search(
         req.index_info.index_optimize_mode.clone().map(Into::into),
     )?;
 
-    // 4. Shared by the index search, the parquet scan and the WAL scan.
+    // 4. Shared by the index search, the storage scan and the WAL scan.
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: req.query_identifier.org_id.to_string(),
@@ -77,16 +77,17 @@ pub async fn search(
     );
 
     let mut scan_stats = ScanStats::new();
-    // 5. Decide per file: metadata count, exact index aggregate, or parquet scan.
-    let route = route_files(&query, req, &stream, &index, &mut scan_stats).await?;
-    // 6. Table providers for the parquet files, plus this node's WAL when it is an ingester.
+    // 5. Decide per file: metadata count, exact index aggregate, or storage scan.
+    let mut route = route_files(&query, req, &stream, &index, &mut scan_stats).await?;
+    // 6. Table providers for the storage files, plus this node's WAL when it is an ingester.
     let tables = search_tables(
         &query,
         &ctx,
         &target,
         &stream,
         &index,
-        route.as_ref().map(|route| route.parquet.as_slice()),
+        // Moved out so the file list is freed right after the storage load, before the WAL.
+        route.scan_files.take(),
         &mut scan_stats,
     )
     .await?;
@@ -98,7 +99,7 @@ pub async fn search(
         &ctx,
         physical_plan,
         tables,
-        route.unwrap_or_default(),
+        route,
         &mut scan_stats,
     )
     .await?;

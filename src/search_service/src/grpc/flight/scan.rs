@@ -145,22 +145,22 @@ impl StreamIndexSettings {
 pub(super) struct FileRoute {
     pub(super) metadata_count: Vec<FileKey>,
     pub(super) index_aggregate: Option<IndexAggregate>,
-    pub(super) parquet: Vec<FileKey>,
+    /// Parquet or vortex files left for the storage scan; `None` when the request has no file ids.
+    pub(super) scan_files: Option<Vec<FileKey>>,
 }
 
-/// Splits the partition's object-storage files; `None` when the request carries no file ids.
 pub(super) async fn route_files(
     query: &Arc<QueryParams>,
     req: &FlightSearchRequest,
     stream: &StreamIndexSettings,
     index: &IndexPlan,
     scan_stats: &mut ScanStats,
-) -> Result<Option<FileRoute>, Error> {
+) -> Result<FileRoute, Error> {
     if req.search_info.file_id_list.is_empty() {
-        return Ok(None);
+        return Ok(FileRoute::default());
     }
     let trace_id = query.trace_id.as_str();
-    let (mut parquet, file_list_took) = get_file_list_by_ids(
+    let (mut scan_files, file_list_took) = get_file_list_by_ids(
         trace_id,
         &query.org_id,
         query.stream_type,
@@ -176,7 +176,7 @@ pub(super) async fn route_files(
             format!(
                 "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, files: {}, took: {file_list_took} ms",
                 req.query_identifier.partition,
-                parquet.len()
+                scan_files.len()
             ),
             SearchInspectorFieldsBuilder::new()
                 .trace_id(trace_id.to_string())
@@ -190,12 +190,12 @@ pub(super) async fn route_files(
 
     let mut metadata_count = Vec::new();
     if index.use_metadata_count() {
-        (metadata_count, parquet) = split_metadata_count_files(parquet, query.time_range);
+        (metadata_count, scan_files) = split_metadata_count_files(scan_files, query.time_range);
         if !metadata_count.is_empty() {
             log::info!(
                 "[trace_id {trace_id}] flight->search: metadata count files: {}, remaining storage files: {}",
                 metadata_count.len(),
-                parquet.len()
+                scan_files.len()
             );
         }
     }
@@ -209,15 +209,15 @@ pub(super) async fn route_files(
         let distinct_range =
             matches!(mode, IndexOptimizeMode::SimpleDistinct(..)).then_some(query.time_range);
         let index_files;
-        (index_files, parquet) =
-            split_file_list_by_time_range(parquet, index_updated_at, distinct_range);
+        (index_files, scan_files) =
+            split_file_list_by_time_range(scan_files, index_updated_at, distinct_range);
         log::info!(
             "{}",
             search_inspector_fields(
                 format!(
                     "[trace_id {trace_id}] flight->search: handle tantivy optimize, tantivy files: {}, datafusion files: {}",
                     index_files.len(),
-                    parquet.len()
+                    scan_files.len()
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .trace_id(trace_id.to_string())
@@ -229,6 +229,7 @@ pub(super) async fn route_files(
             )
         );
         if !index_files.is_empty() {
+            let start = std::time::Instant::now();
             let prepared = prepare_aggregate(
                 query.clone(),
                 index_files,
@@ -236,7 +237,16 @@ pub(super) async fn route_files(
                 mode.clone(),
             )
             .await;
-            parquet.extend(prepared.fallback_files);
+            log::info!(
+                "[trace_id {trace_id}] flight->search: index aggregate, answered files: {}, fallback files: {}, took: {} ms",
+                prepared
+                    .answered
+                    .as_ref()
+                    .map_or(0, |answered| answered.files.len()),
+                prepared.fallback_files.len(),
+                start.elapsed().as_millis(),
+            );
+            scan_files.extend(prepared.fallback_files);
             index_aggregate = prepared.answered;
             scan_stats.idx_took += prepared.took as i64;
         }
@@ -246,7 +256,7 @@ pub(super) async fn route_files(
     #[cfg(feature = "enterprise")]
     if let Some(sampling_config) = &req.search_info.sampling_config {
         apply_sampling_to_files(
-            &mut parquet,
+            &mut scan_files,
             sampling_config,
             Some(query.time_range),
             req.search_info.histogram_interval,
@@ -254,11 +264,11 @@ pub(super) async fn route_files(
         );
     }
 
-    Ok(Some(FileRoute {
+    Ok(FileRoute {
         metadata_count,
         index_aggregate,
-        parquet,
-    }))
+        scan_files: Some(scan_files),
+    })
 }
 
 pub(super) async fn search_tables(
@@ -267,19 +277,19 @@ pub(super) async fn search_tables(
     target: &ScanTarget,
     stream: &StreamIndexSettings,
     index: &IndexPlan,
-    parquet_files: Option<&[FileKey]>,
+    scan_files: Option<Vec<FileKey>>,
     scan_stats: &mut ScanStats,
 ) -> Result<Vec<Arc<dyn TableProvider>>, Error> {
     let trace_id = query.trace_id.as_str();
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
     let mut tables = Vec::new();
 
-    if let Some(files) = parquet_files {
+    if let Some(files) = scan_files {
         let start = std::time::Instant::now();
         let (tbls, stats, _) = storage::search(
             query.clone(),
             target.schema.clone(),
-            files,
+            &files,
             target.sort_order,
             file_stats_cache.clone(),
             index.condition.clone(),
@@ -316,8 +326,6 @@ pub(super) async fn search_tables(
     }
 
     // search in WAL memory first to capture the snapshot_time
-    // IMPORTANT: WAL data is NEVER sampled - it's always returned in full
-    // Sampling only applies to parquet files (applied above in file_list processing)
     let (tbls, stats, memtable_ids) = wal::search_memtable(
         query.clone(),
         target.schema.clone(),
