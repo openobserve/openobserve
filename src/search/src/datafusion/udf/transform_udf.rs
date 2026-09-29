@@ -22,7 +22,7 @@ use datafusion::{
         datatypes::DataType,
     },
     common::cast::as_string_array,
-    error::Result,
+    error::{DataFusionError, Result},
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
@@ -98,16 +98,25 @@ fn get_udf_vrl(
             let mut obj_str = String::from("");
             for (j, arg) in args.iter().enumerate() {
                 let col = as_string_array(&arg)?;
+                let Some(param) = in_params.get(j) else {
+                    return Err(DataFusionError::Execution(format!(
+                        "vrl_transform UDF has no parameter name for argument {j}"
+                    )));
+                };
                 obj_str.push_str(&format!(
-                    " .{} = \"{}\" \n",
-                    in_params.get(j).unwrap(),
-                    col.value(i).replace("\"", "\\\"")
+                    " .{param} = \"{}\" \n",
+                    escape_vrl_string_literal(col.value(i))
                 ));
             }
             obj_str.push_str(&format!(" \n {}", local_func));
             match compile_vrl_function(&obj_str, &local_org_id) {
                 Ok(result) => {
-                    let registry = result.config.get_custom::<TableRegistry>().unwrap();
+                    let Some(registry) = result.config.get_custom::<TableRegistry>() else {
+                        return Err(DataFusionError::Execution(
+                            "vrl_transform UDF is missing its enrichment table registry"
+                                .to_string(),
+                        ));
+                    };
                     registry.finish_load();
                     let result = apply_vrl_fn(&mut runtime, result.program);
                     if result != json::Value::Null {
@@ -156,6 +165,23 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> j
             json::Value::Null
         }
     }
+}
+
+/// Escapes a row value for interpolation inside a VRL double-quoted string literal.
+fn escape_vrl_string_literal(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for c in value.chars() {
+        // Backslash must be escaped first, or a later escape's own backslash gets re-escaped.
+        match c {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
 }
 
 #[cfg(test)]
@@ -326,5 +352,34 @@ mod tests {
     fn a_convertible_result_is_returned_unchanged() {
         let body = "upcase!(.row)\n# uppercased.";
         assert_eq!(run_udf(body, "ok"), json::Value::String("OK".into()));
+    }
+
+    #[tokio::test]
+    async fn vrl_udf_row_value_cannot_break_out_of_the_string_literal() {
+        let sql = "select echo(log) as ret from t";
+        let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
+
+        // Escaping only `"` would let the trailing `\` un-escape the next quote and break out.
+        let payload = r#"x\" + "INJECTED" + \""#;
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![payload]))],
+        )
+        .unwrap();
+
+        let vrl_udf = get_udf_vrl("echo".to_string(), " . = .col1", "col1", 1, "org1").unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(vrl_udf);
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        let out = result[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(out.value(0), payload, "row value must round-trip verbatim");
     }
 }
