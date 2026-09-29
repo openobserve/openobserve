@@ -1079,13 +1079,11 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                         return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
                     }
                 };
-                let creds = amz_creds
-                    .split(':')
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>();
+                let Some((user_id, password)) = get_user_details(&amz_creds) else {
+                    return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+                };
 
-                match validate_credentials(&creds[0], &creds[1], path, &req_data.method, false)
-                    .await
+                match validate_credentials(&user_id, &password, path, &req_data.method, false).await
                 {
                     Ok(res) => {
                         if res.is_valid {
@@ -1129,12 +1127,11 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                 Ok(val) => val,
                 Err(_) => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
             };
-            let creds = gcp_creds
-                .split(':')
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>();
+            let Some((user_id, password)) = get_user_details(&gcp_creds) else {
+                return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+            };
 
-            match validate_credentials(&creds[0], &creds[1], path, &req_data.method, false).await {
+            match validate_credentials(&user_id, &password, path, &req_data.method, false).await {
                 Ok(res) => {
                     if res.is_valid {
                         Ok(AuthValidationResult {
@@ -1486,6 +1483,39 @@ mod tests {
                 "{auth} must be refused"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn cloud_ingest_credentials_without_a_colon_are_rejected() {
+        let encoded = base64::encode("nocolon");
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Amz-Firehose-Access-Key", encoded.parse().unwrap());
+        let aws = RequestData {
+            uri: "/aws/default/mystream/_kinesis_firehose"
+                .parse::<Uri>()
+                .unwrap(),
+            method: Method::POST,
+            headers,
+        };
+        assert!(matches!(
+            validator_aws(&aws).await,
+            Err(AuthError::Unauthorized(_))
+        ));
+
+        let query: String = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("API-Key", &encoded)
+            .finish();
+        let gcp = RequestData {
+            uri: format!("/gcp/default/mystream/_sub?{query}")
+                .parse::<Uri>()
+                .unwrap(),
+            method: Method::POST,
+            headers: HeaderMap::new(),
+        };
+        assert!(matches!(
+            validator_gcp(&gcp).await,
+            Err(AuthError::Unauthorized(_))
+        ));
     }
 
     #[tokio::test]
