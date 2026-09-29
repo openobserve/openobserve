@@ -127,10 +127,20 @@ jobs:
           compression-level: 0
 
   api_integration_tests:
-    name: api_integration_tests
+    name: "api_integration / ${{ matrix.config.label }}"
     needs: [check_changes, build_api_binary]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - label: alerts
+            pytest_args: "tests/alerts"
+          - label: pipelines
+            pytest_args: "tests/pipelines"
+          - label: core
+            pytest_args: "--ignore=tests/alerts --ignore=tests/pipelines"
     permissions:
       actions: read
       contents: read  # only need to checkout the repo
@@ -163,7 +173,7 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -171,45 +181,30 @@ jobs:
         working-directory: tests/api-testing/
 
       - name: Rye sync
-        run: rye sync
+        run: rye sync --no-lock
         working-directory: tests/api-testing/
 
-      - name: Run default-set tests
-        # Phase 6.b: regression matrix tests moved to their own
-        # api_regression_tests job below — they now run in parallel
-        # with this default-set job instead of sequentially within it.
-        # Cuts ~8 min off CI wall time at the cost of more runner minutes.
-        # NB: --force-sugar is intentionally omitted. pytest-sugar is already
-        # auto-loaded via the entry point; passing --force-sugar registers it
-        # a second time, which inflates the progress counter (CI displayed
-        # ~3x the real test count). Letting the plugin load via discovery
-        # alone keeps the counter honest.
+      - name: Run integration tests (${{ matrix.config.label }})
         run: |
-          ${{ github.workspace }}/target/debug/openobserve > o2_default.log 2>&1 &
-          SERVER_PID_DEFAULT=$!
-          echo "OpenObserve PID for default tests: $SERVER_PID_DEFAULT"
+          ${{ github.workspace }}/target/debug/openobserve > o2_integration_${{ matrix.config.label }}.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          echo "OpenObserve PID for integration tests: $SERVER_PID"
           for i in $(seq 1 60); do
             if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
               echo "Server ready after ${i}s"; break
             fi
             sleep 1
           done
-          # test_pending_silence.py is carved into api_alerts_pending_tests
-          # (runs -n 4 in parallel) — those 4 wall-clock tests were ~85% of the
-          # alerts runtime when run serially here.
-          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts/test_pending_silence.py --junitxml=junit-integration.xml
-          kill $SERVER_PID_DEFAULT || true
+          rye run pytest ${{ matrix.config.pytest_args }} --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts/test_pending_silence.py --durations=20 --junitxml=junit-integration-${{ matrix.config.label }}.xml
         working-directory: tests/api-testing/
 
-      # Test-count metrics sidecar: ship the junit so report_to_openobserve can
-      # tally API active/skipped counts (suite=api). always() so counts emit even
-      # when pytest fails (junit is written before pytest's non-zero exit).
       - name: Upload API junit (integration)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-junit__api_integration_tests__main
-          path: tests/api-testing/junit-integration.xml
+          name: api-junit__api_integration_tests__${{ matrix.config.label }}
+          path: tests/api-testing/junit-integration-${{ matrix.config.label }}.xml
           if-no-files-found: warn
           retention-days: 7
 
@@ -217,8 +212,8 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: openobserve-server-logs
-          path: tests/api-testing/o2_*.log
+          name: openobserve-server-logs-integration-${{ matrix.config.label }}
+          path: tests/api-testing/o2_integration_${{ matrix.config.label }}.log
           if-no-files-found: warn
           retention-days: 14
 
@@ -280,7 +275,7 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -288,7 +283,7 @@ jobs:
         working-directory: tests/api-testing/
 
       - name: Rye sync
-        run: rye sync
+        run: rye sync --no-lock
         working-directory: tests/api-testing/
 
       - name: Regenerate query-agent expected values
@@ -393,7 +388,7 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -401,7 +396,7 @@ jobs:
         working-directory: tests/api-testing/
 
       - name: Rye sync
-        run: rye sync
+        run: rye sync --no-lock
         working-directory: tests/api-testing/
 
       - name: "Run ${{ matrix.config.label }} regression test"
@@ -576,7 +571,7 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -584,7 +579,7 @@ jobs:
         working-directory: tests/api-testing/
 
       - name: Rye sync (schemathesis dep installed)
-        run: rye sync
+        run: rye sync --no-lock
         working-directory: tests/api-testing/
 
       - name: Start OpenObserve
