@@ -64,6 +64,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom,
                 panelSchema.config?.decimals,
+                panelSchema.config?.unit_locale,
               ),
             );
           return params?.value?.toString();
@@ -134,6 +135,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
                       panelSchema.config?.decimals,
+                      panelSchema.config?.unit_locale,
                     ),
                   ),
                 )} </strong>`,
@@ -148,6 +150,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
                       panelSchema.config?.decimals,
+                      panelSchema.config?.unit_locale,
                     ),
                   ),
                 )}`,

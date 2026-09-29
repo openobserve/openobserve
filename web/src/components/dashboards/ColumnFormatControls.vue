@@ -57,6 +57,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mt-2 w-full max-w-[22.5rem]"
         :data-test="`o2-format-custom-unit-${col.field}`"
       />
+      <OSelect
+        v-if="col.unit === 'locale'"
+        v-model="unitLocaleModel"
+        :options="unitLocaleOptions"
+        :label="t('dashboard.unitLocaleLabel')"
+        class="mt-2 w-full max-w-[22.5rem]"
+        :data-test="`o2-format-unit-locale-${col.field}`"
+      />
     </div>
 
     <!-- Alignment -->
@@ -209,10 +217,12 @@ import ColorSwatchPicker from "./ColorSwatchPicker.vue";
 import {
   type ColumnOverrideUI,
   emptyConditionalRule,
+  getUnitLocaleOptions,
   useColumnFormattingOptions,
   TEXT_SWATCHES,
   BG_SWATCHES,
 } from "@/composables/dashboard/useColumnFormatting";
+import { toSupportedNumberLocale } from "@/locales/numberFormat";
 
 export default defineComponent({
   name: "ColumnFormatControls",
@@ -237,6 +247,16 @@ export default defineComponent({
     // Alias preserves the same prop reference for in-place mutation via v-model.
     const colModel = computed(() => props.col);
 
+    // An unusable stored tag formats as Auto, so it must also display as Auto.
+    const unitLocaleModel = computed({
+      get: () => toSupportedNumberLocale(props.col.unitLocale),
+      set: (next: string | null) => {
+        colModel.value.unitLocale = next;
+      },
+    });
+
+    const unitLocaleOptions = computed(() => getUnitLocaleOptions(t, props.col.unitLocale));
+
     // Explicit "Auto" replaces tap-to-clear: null ⇄ the "auto" sentinel item.
     const alignmentModel = computed({
       get: () => props.col.alignment ?? "auto",
@@ -248,6 +268,8 @@ export default defineComponent({
     return {
       t,
       colModel,
+      unitLocaleModel,
+      unitLocaleOptions,
       unitOptions,
       fieldTypeOptions,
       alignOptions,

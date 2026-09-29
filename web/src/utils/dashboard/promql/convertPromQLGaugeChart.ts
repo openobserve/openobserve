@@ -88,6 +88,7 @@ export class GaugeConverter implements PromQLChartConverter {
                     config?.unit,
                     config?.unit_custom,
                     config?.decimals,
+                    config?.unit_locale,
                   );
                   return unitValue.value + unitValue.unit;
                 },
@@ -130,7 +131,13 @@ export class GaugeConverter implements PromQLChartConverter {
         extraCssText: TOOLTIP_SCROLL_STYLE,
         valueFormatter: (value: any) => {
           return formatUnitValue(
-            getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
+            getUnitValue(
+              value,
+              config?.unit,
+              config?.unit_custom,
+              config?.decimals,
+              config?.unit_locale,
+            ),
           );
         },
       },

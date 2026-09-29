@@ -10,6 +10,7 @@
       :value-mapping="dashboardPanelData.data.config.mappings || []"
       :panel-unit="dashboardPanelData.data.config.unit ?? ''"
       :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
+      :panel-unit-locale="dashboardPanelData.data.config.unit_locale ?? ''"
       :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
       :initial-field="pendingInitialField"
       @close="showOverrideConfigPopup = false"

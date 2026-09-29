@@ -36,6 +36,7 @@ export function buildTooltip(
   const decimals = config.decimals ?? 2;
   const unit = config.unit;
   const unitCustom = config.unit_custom;
+  const unitLocale = config.unit_locale;
 
   return {
     trigger: triggerType,
@@ -90,7 +91,9 @@ export function buildTooltip(
           const value = param.value?.[1] ?? param.value;
 
           // Apply unit formatting
-          const formattedValue = formatUnitValue(getUnitValue(value, unit, unitCustom, decimals));
+          const formattedValue = formatUnitValue(
+            getUnitValue(value, unit, unitCustom, decimals, unitLocale),
+          );
 
           const row = `${marker} ${escapeHtml(param.seriesName)}: ${escapeHtml(formattedValue)}`;
           tooltipItems.push(param.seriesName === hoveredName ? `<strong>${row}</strong>` : row);
@@ -160,7 +163,13 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
       // Add unit formatting to Y-axis labels
       formatter: (value: any) => {
         return formatUnitValue(
-          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
+          getUnitValue(
+            value,
+            config?.unit,
+            config?.unit_custom,
+            config?.decimals,
+            config?.unit_locale,
+          ),
         );
       },
     },
@@ -181,7 +190,13 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
         // Preserve unit formatter when axis_width is set
         formatter: (value: any) => {
           return formatUnitValue(
-            getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
+            getUnitValue(
+              value,
+              config?.unit,
+              config?.unit_custom,
+              config?.decimals,
+              config?.unit_locale,
+            ),
           );
         },
       },
@@ -294,7 +309,13 @@ export function buildValueAxis(panelSchema: any, store?: any): any {
       // Add unit formatting to value axis labels
       formatter: (value: any) => {
         return formatUnitValue(
-          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
+          getUnitValue(
+            value,
+            config?.unit,
+            config?.unit_custom,
+            config?.decimals,
+            config?.unit_locale,
+          ),
         );
       },
     },

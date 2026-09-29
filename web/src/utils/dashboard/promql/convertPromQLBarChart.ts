@@ -121,7 +121,13 @@ export class BarConverter implements PromQLChartConverter {
               // Add unit formatting to labels
               formatter: (params: any) => {
                 return formatUnitValue(
-                  getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
+                  getUnitValue(
+                    params.value,
+                    config?.unit,
+                    config?.unit_custom,
+                    config?.decimals,
+                    config?.unit_locale,
+                  ),
                 );
               },
             },
@@ -193,7 +199,13 @@ export class BarConverter implements PromQLChartConverter {
           // Add unit formatting to labels
           formatter: (params: any) => {
             return formatUnitValue(
-              getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
+              getUnitValue(
+                params.value,
+                config?.unit,
+                config?.unit_custom,
+                config?.decimals,
+                config?.unit_locale,
+              ),
             );
           },
         },

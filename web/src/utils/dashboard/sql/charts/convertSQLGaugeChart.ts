@@ -67,6 +67,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
             panelSchema.config?.unit,
             panelSchema.config?.unit_custom,
             panelSchema.config?.decimals,
+            panelSchema.config?.unit_locale,
           ),
         );
       } catch (error) {
@@ -142,6 +143,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals,
+                  panelSchema.config?.unit_locale,
                 );
                 return unitValue.value + unitValue.unit;
               } catch (error) {

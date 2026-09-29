@@ -162,13 +162,16 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         // Pre-fetch unit config to avoid repeated lookups
         let unitToUse = null;
         let customUnitToUse = null;
+        let localeToUse = null;
         if (unitConfigMap[aliasLower]) {
           unitToUse = unitConfigMap[aliasLower].unit;
           customUnitToUse = unitConfigMap[aliasLower].customUnit;
+          localeToUse = unitConfigMap[aliasLower].unitLocale;
         }
         if (!unitToUse) {
           unitToUse = panelSchema.config?.unit;
           customUnitToUse = panelSchema.config?.unit_custom;
+          localeToUse = panelSchema.config?.unit_locale;
         }
         const decimals = panelSchema.config?.decimals ?? 2;
 
@@ -180,6 +183,7 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
             customUnitToUse,
             decimals,
             missingValue,
+            localeToUse,
           );
       }
 
@@ -303,7 +307,15 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
           const decimals = panelSchema.config?.decimals ?? 2;
 
           obj["format"] = (val: any) =>
-            formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals, missingValue);
+            formatNumericValue(
+              val,
+              valueMappingCache,
+              unit,
+              unitCustom,
+              decimals,
+              missingValue,
+              panelSchema.config?.unit_locale,
+            );
         }
 
         // Check if it's a histogram field
@@ -548,7 +560,15 @@ export const convertMultiQueryTableData = (
           const decimals = panelSchema.config?.decimals ?? 2;
 
           col["format"] = (val: any) =>
-            formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals, missingValue);
+            formatNumericValue(
+              val,
+              valueMappingCache,
+              unit,
+              unitCustom,
+              decimals,
+              missingValue,
+              panelSchema.config?.unit_locale,
+            );
         }
 
         if (detectedTimestampAliases.has(it)) {
@@ -615,13 +635,16 @@ export const convertMultiQueryTableData = (
 
       let unitToUse = null;
       let customUnitToUse = null;
+      let localeToUse = null;
       if (unitConfigMap[colNameLower]) {
         unitToUse = unitConfigMap[colNameLower].unit;
         customUnitToUse = unitConfigMap[colNameLower].customUnit;
+        localeToUse = unitConfigMap[colNameLower].unitLocale;
       }
       if (!unitToUse) {
         unitToUse = panelSchema.config?.unit;
         customUnitToUse = panelSchema.config?.unit_custom;
+        localeToUse = panelSchema.config?.unit_locale;
       }
       const decimals = panelSchema.config?.decimals ?? 2;
 
@@ -633,6 +656,7 @@ export const convertMultiQueryTableData = (
           customUnitToUse,
           decimals,
           missingValue,
+          localeToUse,
         );
     } else {
       col["format"] = (val: any) => {

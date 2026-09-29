@@ -218,7 +218,7 @@ describe("tableConfigUtils", () => {
           ],
         },
       ]);
-      expect(maps.unitConfigMap.count).toEqual({ unit: "bytes", customUnit: "" });
+      expect(maps.unitConfigMap.count).toEqual({ unit: "bytes", customUnit: "", unitLocale: "" });
       expect(maps.styleConfigMap.count.alignment).toBe("center");
       expect(maps.styleConfigMap.count.textColor).toBe("#111");
       expect(maps.styleConfigMap.count.bgColor).toBe("#eee");
@@ -309,6 +309,20 @@ describe("tableConfigUtils", () => {
     it("value mapping wins over numeric formatting", () => {
       const cache = buildValueMappingCache([{ type: "value", value: "5", text: "five" }]);
       expect(formatNumericValue(5, cache, "bytes", "", 2)).toBe("five");
+    });
+
+    it("passes the Locale Format locale through", () => {
+      expect(formatNumericValue(1234.5, null, "locale", "", 2, "", "de-DE")).toBe("1.234,50");
+      expect(
+        resolveMetricValueStyle(1234.5, {
+          mappings: undefined,
+          unit: "locale",
+          customUnit: "",
+          decimals: 2,
+          panelBackground: "",
+          locale: "de-DE",
+        }).text,
+      ).toBe("1.234,50");
     });
 
     it("formats a plain number to a non-empty string", () => {

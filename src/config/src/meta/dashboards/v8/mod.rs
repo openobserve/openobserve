@@ -380,6 +380,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    unit_locale: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
     decimals: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -650,6 +652,8 @@ pub struct Value {
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     custom_unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unit_locale: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1718,6 +1722,21 @@ mod tests {
         let json = serde_json::to_string(&v).unwrap();
         assert!(!json.contains("unit"));
         assert!(!json.contains("customUnit"));
+        assert!(!json.contains("unitLocale"));
+    }
+
+    #[test]
+    fn test_value_unit_locale_round_trip() {
+        let cfg: Config = serde_json::from_value(serde_json::json!({
+            "type": "unit",
+            "value": {"unit": "locale", "unitLocale": "cs-CZ"}
+        }))
+        .unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["value"]["unitLocale"], serde_json::json!("cs-CZ"));
+        assert!(json["value"].get("customUnit").is_none());
+        let back: Config = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
     }
 
     #[test]
@@ -1804,5 +1823,38 @@ mod tests {
         assert_eq!(cfg.show_exemplars, None);
         let json = serde_json::to_value(&cfg).unwrap();
         assert!(json.get("show_exemplars").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_unit_locale_round_trip() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "unit": "locale",
+            "unit_locale": "cs-CZ"
+        }))
+        .unwrap();
+        assert_eq!(cfg.unit_locale, Some("cs-CZ".to_string()));
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["unit_locale"], serde_json::json!("cs-CZ"));
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_unit_locale_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "unit_locale": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.unit_locale, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("unit_locale").is_none());
     }
 }

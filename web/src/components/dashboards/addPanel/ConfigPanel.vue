@@ -533,6 +533,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-custom-unit"
         />
 
+        <OSelect
+          v-if="dashboardPanelData.data.config.unit == 'locale'"
+          v-show="isConfigOptionVisible('data', 'unit-locale')"
+          v-model="unitLocaleModel"
+          :options="unitLocaleOptions"
+          :label="t('dashboard.unitLocaleLabel')"
+          :valueKey="'value'"
+          :labelKey="'label'"
+          data-test="dashboard-config-unit-locale"
+        />
+
         <OInput
           v-show="isConfigOptionVisible('data', 'decimals')"
           type="number"
@@ -1786,7 +1797,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
+import { getUnitLocaleOptions, getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
+import { toSupportedNumberLocale } from "@/locales/numberFormat";
 import {
   computed,
   defineComponent,
@@ -2224,6 +2236,18 @@ export default defineComponent({
     // already translated; raw() only re-brands the `string` the helper widens to.
     const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
 
+    // An unusable stored tag formats as Auto, so it must also display as Auto.
+    const unitLocaleModel = computed({
+      get: () => toSupportedNumberLocale(dashboardPanelData.data.config.unit_locale),
+      set: (next: string | null) => {
+        dashboardPanelData.data.config.unit_locale = next;
+      },
+    });
+
+    const unitLocaleOptions = computed(() =>
+      getUnitLocaleOptions(t, dashboardPanelData.data.config.unit_locale),
+    );
+
     const labelPositionOptions = [
       {
         label: t("dashboard.none"),
@@ -2647,6 +2671,8 @@ export default defineComponent({
       legendTypeOptions,
       chartAlignOptions,
       unitOptions,
+      unitLocaleModel,
+      unitLocaleOptions,
       labelPositionOptions,
       showSymbol,
       lineInterpolationOptions,

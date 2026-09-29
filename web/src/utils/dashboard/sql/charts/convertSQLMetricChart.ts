@@ -273,6 +273,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     customUnit: panelSchema?.config?.unit_custom,
     decimals: panelSchema?.config?.decimals,
     panelBackground: panelSchema?.config?.background?.value?.color ?? "",
+    locale: panelSchema?.config?.unit_locale,
   });
   const metricText = metricStyle.text;
   options.backgroundColor = metricStyle.bgColor;

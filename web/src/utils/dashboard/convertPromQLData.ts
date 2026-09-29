@@ -446,6 +446,7 @@ export const convertPromQLData = async (
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals,
+                  panelSchema.config?.unit_locale,
                 ),
               ),
             )}`;
@@ -483,6 +484,7 @@ export const convertPromQLData = async (
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals,
+                  panelSchema.config?.unit_locale,
                 ),
               );
             const date = new Date(name.value);
@@ -534,6 +536,7 @@ export const convertPromQLData = async (
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
               panelSchema.config?.decimals,
+              panelSchema.config?.unit_locale,
             ),
           );
         },
@@ -892,6 +895,7 @@ export const convertPromQLData = async (
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
                       panelSchema.config?.decimals,
+                      panelSchema.config?.unit_locale,
                     );
                     return unitValue.value + unitValue.unit;
                   },
@@ -938,6 +942,7 @@ export const convertPromQLData = async (
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom,
                 panelSchema.config?.decimals,
+                panelSchema.config?.unit_locale,
               ),
             );
           },
@@ -987,6 +992,7 @@ export const convertPromQLData = async (
               customUnit: panelSchema.config?.unit_custom,
               decimals: panelSchema.config?.decimals,
               panelBackground: panelSchema.config?.background?.value?.color ?? "",
+              locale: panelSchema.config?.unit_locale,
             });
             options.backgroundColor = metricStyle.bgColor;
             const metricText = metricStyle.text;

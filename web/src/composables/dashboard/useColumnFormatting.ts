@@ -17,8 +17,13 @@
 // `ColumnOverrideUI` shape and (de)serializes to/from the persisted
 // `config.override_config` array on load/save.
 
-import { useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
+import {
+  NUMBER_LOCALE_TAGS,
+  getNumberLocale,
+  toSupportedNumberLocale,
+} from "@/locales/numberFormat";
 
 // null means "not set" → renderer falls back to the panel-level default.
 export interface ConditionalRuleUI {
@@ -41,6 +46,7 @@ export interface ColumnOverrideUI {
   fieldType: "auto" | "num" | "text";
   unit: string | null; // null === inherit panel-level unit
   customUnit: string | null;
+  unitLocale: string | null; // Locale Format tag; null === Auto
   alignment: string | null;
   textColor: string | null;
   bgColor: string | null;
@@ -73,6 +79,7 @@ export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   fieldType: "auto",
   unit: null,
   customUnit: null,
+  unitLocale: null,
   alignment: null,
   textColor: null,
   bgColor: null,
@@ -90,6 +97,7 @@ const applyConfigItems = (col: ColumnOverrideUI, items: any[]): void => {
       case OVERRIDE_CONFIG_TYPES.UNIT:
         col.unit = cfg.value?.unit ?? null;
         col.customUnit = cfg.value?.customUnit ?? null;
+        col.unitLocale = cfg.value?.unitLocale ?? null;
         break;
       case OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR:
         col.autoColor = !!cfg.autoColor;
@@ -137,7 +145,11 @@ export const serializeColumnOverride = (c: ColumnOverrideUI): any | null => {
   if (c.unit)
     config.push({
       type: OVERRIDE_CONFIG_TYPES.UNIT,
-      value: { unit: c.unit, customUnit: c.customUnit },
+      value: {
+        unit: c.unit,
+        customUnit: c.customUnit,
+        ...(c.unit === "locale" && c.unitLocale ? { unitLocale: c.unitLocale } : {}),
+      },
     });
   if (c.alignment) config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
   if (c.textColor) config.push({ type: OVERRIDE_CONFIG_TYPES.TEXT_COLOR, value: c.textColor });
@@ -200,6 +212,33 @@ export const getUnitOptions = (
   { label: t("dashboard.currencyRupees"), value: "currency-rupee" },
   { label: t("dashboard.custom"), value: "custom" },
 ];
+
+const localeDisplayName = (names: Intl.DisplayNames, tag: string): string => {
+  try {
+    // DisplayNames rejects Unicode extensions such as the Arabic UI's `-u-nu-latn`.
+    return names.of(new Intl.Locale(tag).baseName) ?? tag;
+  } catch {
+    return tag;
+  }
+};
+
+/** Locale choices for the Locale Format unit: Auto (null) first, then every locale this browser supports. */
+export const getUnitLocaleOptions = (
+  t: TranslateFn,
+  current?: string | null,
+): Array<{ label: I18nText; value: string | null }> => {
+  const currentTag = toSupportedNumberLocale(current);
+  const tags = currentTag ? [...new Set([...NUMBER_LOCALE_TAGS, currentTag])] : NUMBER_LOCALE_TAGS;
+  const names = new Intl.DisplayNames([getNumberLocale()], { type: "language" });
+
+  const locales = tags
+    .map((tag) => toSupportedNumberLocale(tag))
+    .filter((tag): tag is string => tag !== null)
+    .map((tag) => ({ label: raw(localeDisplayName(names, tag)), value: tag }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  return [{ label: t("dashboard.unitLocaleAuto"), value: null }, ...locales];
+};
 
 /** i18n-bound option lists for the formatting controls. */
 export const useColumnFormattingOptions = () => {

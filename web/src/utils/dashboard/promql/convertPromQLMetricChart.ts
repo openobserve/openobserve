@@ -43,7 +43,13 @@ export class MetricConverter implements PromQLChartConverter {
       queryData.series.forEach((seriesData) => {
         const value = applyAggregation(seriesData.values, aggregation);
 
-        const unitValue = getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals);
+        const unitValue = getUnitValue(
+          value,
+          config?.unit,
+          config?.unit_custom,
+          config?.decimals,
+          config?.unit_locale,
+        );
 
         metrics.push({
           name: seriesData.name,
@@ -59,7 +65,13 @@ export class MetricConverter implements PromQLChartConverter {
       const totalValue = metrics.reduce((sum, m) => sum + m.rawValue, 0);
       const avgValue = config.aggregate_method === "avg" ? totalValue / metrics.length : totalValue;
 
-      const unitValue = getUnitValue(avgValue, config?.unit, config?.unit_custom, config?.decimals);
+      const unitValue = getUnitValue(
+        avgValue,
+        config?.unit,
+        config?.unit_custom,
+        config?.decimals,
+        config?.unit_locale,
+      );
 
       return {
         type: "metric",

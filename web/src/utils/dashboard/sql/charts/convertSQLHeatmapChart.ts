@@ -134,6 +134,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals,
+                  panelSchema.config?.unit_locale,
                 ),
               ) || params?.value?.[2]
             );
@@ -170,6 +171,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
               panelSchema?.config?.unit,
               panelSchema?.config?.unit_custom,
               panelSchema?.config?.decimals,
+              panelSchema?.config?.unit_locale,
             ),
           ) || params?.value?.[2];
         return `${escapeHtml(yLabel)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;

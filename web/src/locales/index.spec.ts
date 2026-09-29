@@ -24,7 +24,13 @@ vi.mock("@/utils/cookies", () => ({
   setLanguage: vi.fn(),
 }));
 
-import { getNumberLocale, APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
+import {
+  getNumberLocale,
+  APP_LOCALE_TO_BCP47,
+  NUMBER_LOCALE_TAGS,
+  resolveNumberLocale,
+  toSupportedNumberLocale,
+} from "@/locales/numberFormat";
 import { applyDocumentLocale, getLocale, isRtlLocale, localeFileMap } from "@/locales";
 
 const withNavigatorLanguage = (language: string, assertion: () => void) => {
@@ -121,6 +127,44 @@ describe("getNumberLocale (locale format unit)", () => {
     const ar = new Intl.NumberFormat(getNumberLocale(), { useGrouping: false }).format(1234567890);
 
     expect(ar).toBe("1234567890");
+  });
+});
+
+describe("panel-chosen number locale", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getLanguage as any).mockReturnValue("de");
+  });
+
+  it("canonicalizes supported tags", () => {
+    expect(toSupportedNumberLocale("cs-cz")).toBe("cs-CZ");
+    expect(toSupportedNumberLocale("  hi-IN ")).toBe("hi-IN");
+  });
+
+  it.each([null, undefined, "", "   ", "xx-ZZ", "not a locale!!"])("rejects %j", (tag) => {
+    expect(toSupportedNumberLocale(tag)).toBeNull();
+  });
+
+  it("accepts every offered locale", () => {
+    for (const tag of NUMBER_LOCALE_TAGS) {
+      expect(toSupportedNumberLocale(tag)).toBe(tag);
+    }
+  });
+
+  it("uses a supported chosen locale over the UI language", () => {
+    expect(resolveNumberLocale("cs-CZ")).toBe("cs-CZ");
+  });
+
+  it.each([null, undefined, "", "xx-ZZ"])("treats %j as Auto (UI language)", (tag) => {
+    expect(resolveNumberLocale(tag)).toBe("de-DE");
+  });
+
+  it("offers every UI-language locale plus locales with no UI translation", () => {
+    for (const tag of Object.values(APP_LOCALE_TO_BCP47)) {
+      expect(NUMBER_LOCALE_TAGS).toContain(tag);
+    }
+    expect(NUMBER_LOCALE_TAGS).toEqual(expect.arrayContaining(["cs-CZ", "hi-IN"]));
+    expect(new Set(NUMBER_LOCALE_TAGS).size).toBe(NUMBER_LOCALE_TAGS.length);
   });
 });
 

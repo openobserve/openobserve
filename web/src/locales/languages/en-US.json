@@ -4791,6 +4791,8 @@
     "basemapLabel": "Base Map",
     "world": "World",
     "customunitLabel": "Custom Unit",
+    "unitLocaleLabel": "Locale",
+    "unitLocaleAuto": "Auto (viewer's language)",
     "currencyDollar": "Currency - Dollar ($)",
     "currencyEuro": "Currency - Euro (€)",
     "currencyPound": "Currency - Pound (£)",

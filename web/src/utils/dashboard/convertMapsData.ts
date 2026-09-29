@@ -55,6 +55,7 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
             panelSchema.config?.unit,
             panelSchema.config?.unit_custom,
             panelSchema.config?.decimals,
+            panelSchema.config?.unit_locale,
           ),
         );
       }

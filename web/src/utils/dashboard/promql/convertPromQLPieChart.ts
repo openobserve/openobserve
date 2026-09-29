@@ -132,7 +132,13 @@ export class PieConverter implements PromQLChartConverter {
                 .replace(
                   "{c}",
                   formatUnitValue(
-                    getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
+                    getUnitValue(
+                      params.value,
+                      config?.unit,
+                      config?.unit_custom,
+                      config?.decimals,
+                      config?.unit_locale,
+                    ),
                   ),
                 )
                 .replace("{d}", params.percent.toFixed(1));
@@ -143,6 +149,7 @@ export class PieConverter implements PromQLChartConverter {
               config?.unit,
               config?.unit_custom,
               config?.decimals,
+              config?.unit_locale,
             );
             return `${params.name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(1)}%)`;
           },

@@ -66,6 +66,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
             panelSchema.config?.unit,
             panelSchema.config?.unit_custom,
             panelSchema.config?.decimals,
+            panelSchema.config?.unit_locale,
           ),
         ),
       ) + 8
@@ -116,6 +117,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
               panelSchema.config?.decimals,
+              panelSchema.config?.unit_locale,
             ),
           );
         },

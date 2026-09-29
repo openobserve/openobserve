@@ -217,6 +217,7 @@ export const applyAutoSQLTimeSeries = (
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
                       panelSchema.config?.decimals,
+                      panelSchema.config?.unit_locale,
                     ),
                   ),
                 )} </strong>`,
@@ -231,6 +232,7 @@ export const applyAutoSQLTimeSeries = (
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
                       panelSchema.config?.decimals,
+                      panelSchema.config?.unit_locale,
                     ),
                   ),
                 )}`,
@@ -256,6 +258,7 @@ export const applyAutoSQLTimeSeries = (
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
                     panelSchema.config?.decimals,
+                    panelSchema.config?.unit_locale,
                   ),
                 );
               return Number.isInteger(params?.value)
@@ -455,6 +458,7 @@ export const applyCustomSQLTimeSeries = (
                         panelSchema.config?.unit,
                         panelSchema.config?.unit_custom,
                         panelSchema.config?.decimals,
+                        panelSchema.config?.unit_locale,
                       ),
                     ),
                   )} </strong>`,
@@ -469,6 +473,7 @@ export const applyCustomSQLTimeSeries = (
                         panelSchema.config?.unit,
                         panelSchema.config?.unit_custom,
                         panelSchema.config?.decimals,
+                        panelSchema.config?.unit_locale,
                       ),
                     ),
                   )}`,
@@ -496,6 +501,7 @@ export const applyCustomSQLTimeSeries = (
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
                     panelSchema.config?.decimals,
+                    panelSchema.config?.unit_locale,
                   ),
                 );
               return formatDate(new Date(params?.value))?.toString() ?? "";

@@ -33,6 +33,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       chart_align: null,
       unit: null,
       unit_custom: null,
+      unit_locale: null,
       decimals: 2,
       line_thickness: 1.5,
       step_value: "0",

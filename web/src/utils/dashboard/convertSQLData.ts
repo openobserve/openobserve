@@ -679,6 +679,7 @@ export const convertMultiSQLData = async (
                 panelSchema?.config?.unit,
                 panelSchema?.config?.unit_custom,
                 panelSchema?.config?.decimals,
+                panelSchema?.config?.unit_locale,
               ),
             ) || rawVal;
           return `${escapeHtml(yLabel)} <br/> ${params?.marker ?? ""} ${escapeHtml(params?.name ?? "")} : ${escapeHtml(formatted)}`;

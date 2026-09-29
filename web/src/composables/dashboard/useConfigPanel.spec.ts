@@ -584,6 +584,16 @@ describe("useConfigPanel – data section", () => {
     expect(c.isConfigOptionVisible("data", "custom-unit")).toBe(true);
   });
 
+  it("unit-locale is hidden when unit is not 'locale'", () => {
+    const c = makeComposable(makePanelData("bar", { unit: "custom" }));
+    expect(c.isConfigOptionVisible("data", "unit-locale")).toBe(false);
+  });
+
+  it("unit-locale is visible when unit is 'locale'", () => {
+    const c = makeComposable(makePanelData("bar", { unit: "locale" }));
+    expect(c.isConfigOptionVisible("data", "unit-locale")).toBe(true);
+  });
+
   it("limit is visible when promqlMode=false and customQuery=false", () => {
     const c = makeComposable(makePanelData("bar", {}, { customQuery: false }), ref(false));
     expect(c.isConfigOptionVisible("data", "limit")).toBe(true);

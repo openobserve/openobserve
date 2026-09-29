@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 // Mock the useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(),
@@ -942,6 +942,54 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Locale Format locale selector", () => {
+    const makePanel = (config: Record<string, unknown>) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    const findSelect = (dataTest: string) =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.vm.$attrs["data-test"] === dataTest);
+    const trigger = () => wrapper.find('[data-test="dashboard-config-unit-locale-trigger"]');
+
+    it("renders only when the unit is Locale Format", () => {
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "bytes" }) });
+      expect(trigger().exists()).toBe(false);
+      wrapper.unmount();
+
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "locale" }) });
+      expect(trigger().exists()).toBe(true);
+    });
+
+    it.each([null, "xx-ZZ"])("shows Auto when the stored locale is %j", (unitLocale) => {
+      wrapper = createWrapper({
+        dashboardPanelData: makePanel({ unit: "locale", unit_locale: unitLocale }),
+      });
+      expect(trigger().attributes("data-test-selected-label")).toBe("Auto (viewer's language)");
+    });
+
+    it("does not read the locale from unit_custom", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: makePanel({ unit: "locale", unit_custom: "cs-CZ", unit_locale: null }),
+      });
+      expect(trigger().attributes("data-test-selected-label")).toBe("Auto (viewer's language)");
+    });
+
+    it("writes the chosen locale to unit_locale and leaves unit_custom alone", async () => {
+      const panel = makePanel({ unit: "locale", unit_custom: "req/s", unit_locale: null });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await findSelect("dashboard-config-unit-locale").vm.$emit("update:modelValue", "cs-CZ");
+      expect(panel.data.config.unit_locale).toBe("cs-CZ");
+      expect(panel.data.config.unit_custom).toBe("req/s");
+      await flushPromises();
+      expect(trigger().attributes("data-test-selected-label")).toBe("Czech (Czechia)");
+    });
+  });
   describe("Table Configuration Options", () => {
     it("should initialize table_transpose as false by default", () => {
       wrapper = createWrapper();

@@ -1,4 +1,4 @@
-import { getNumberLocale } from "@/locales/numberFormat";
+import { resolveNumberLocale } from "@/locales/numberFormat";
 
 const units: any = {
   bytes: [
@@ -93,6 +93,7 @@ const units: any = {
  * @param {any} value - The value to be converted.
  * @param {string} unit - The unit of measurement to convert to.
  * @param {string} customUnit - (optional) A custom unit of measurement.
+ * @param {string} locale - (optional) The Locale Format unit's BCP-47 tag; empty means Auto.
  * @return {object} An object containing the converted value and unit.
  */
 export const getUnitValue = (
@@ -100,6 +101,7 @@ export const getUnitValue = (
   unit: string,
   customUnit: string,
   decimals: number = 2,
+  locale?: string | null,
 ) => {
   // console.time("getUnitValue:");
   let formattedValue;
@@ -178,7 +180,7 @@ export const getUnitValue = (
       const num = Number(value);
       if (Number.isNaN(num)) return { value: value, unit: "" };
       return {
-        value: new Intl.NumberFormat(getNumberLocale(), {
+        value: new Intl.NumberFormat(resolveNumberLocale(locale), {
           minimumFractionDigits: decimals,
           maximumFractionDigits: decimals,
         }).format(num),

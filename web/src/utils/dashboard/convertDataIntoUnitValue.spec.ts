@@ -91,9 +91,16 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 const mockGetNumberLocale = vi.fn(() => "en-GB");
-vi.mock("@/locales/numberFormat", () => ({
-  getNumberLocale: () => mockGetNumberLocale(),
-}));
+vi.mock("@/locales/numberFormat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/locales/numberFormat")>();
+  return {
+    ...actual,
+    getNumberLocale: () => mockGetNumberLocale(),
+    // The real resolveNumberLocale calls the unmocked getNumberLocale internally.
+    resolveNumberLocale: (tag?: string | null) =>
+      actual.toSupportedNumberLocale(tag) ?? mockGetNumberLocale(),
+  };
+});
 
 describe("Dashboard Data Conversion Utils", () => {
   // Use actual checkTimestampAlias from logsUtils
@@ -300,6 +307,29 @@ describe("Dashboard Data Conversion Utils", () => {
         const result = getUnitValue(NaN, "locale", "", 2);
         expect(Number.isNaN(result.value)).toBe(true);
         expect(result.unit).toBe("");
+      });
+
+      it("should use the panel's chosen locale over the viewer's language", () => {
+        expect(getUnitValue(14158, "locale", "", 2, "cs-CZ")).toEqual({
+          value: "14\u00a0158,00",
+          unit: "",
+        });
+        expect(getUnitValue(14158, "locale", "", 2, "de-DE").value).toBe("14.158,00");
+      });
+
+      it.each([null, undefined, "", "xx-ZZ", "not a locale!!"])(
+        "should treat panel locale %j as Auto",
+        (locale) => {
+          expect(getUnitValue(1234567.89, "locale", "", 2, locale).value).toBe("1,234,567.89");
+        },
+      );
+
+      it("should not read the locale from the custom unit", () => {
+        expect(getUnitValue(1234567.89, "locale", "de-DE", 2).value).toBe("1,234,567.89");
+      });
+
+      it("should ignore the locale for other units", () => {
+        expect(getUnitValue(1024, "bytes", "", 2, "de-DE")).toEqual({ value: "1.00", unit: "KB" });
       });
     });
 

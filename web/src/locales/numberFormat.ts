@@ -35,6 +35,36 @@ export const APP_LOCALE_TO_BCP47: Record<string, string> = {
   vi: "vi-VN",
 };
 
+export const NUMBER_LOCALE_TAGS: readonly string[] = [
+  ...new Set([
+    ...Object.values(APP_LOCALE_TO_BCP47),
+    "en-GB",
+    "en-IN",
+    "de-AT",
+    "de-CH",
+    "fr-CA",
+    "fr-CH",
+    "es-MX",
+    "pt-BR",
+    "cs-CZ",
+    "sk-SK",
+    "sv-SE",
+    "nb-NO",
+    "da-DK",
+    "fi-FI",
+    "uk-UA",
+    "hi-IN",
+    "id-ID",
+    "th-TH",
+    "he-IL",
+    "el-GR",
+    "hu-HU",
+    "ro-RO",
+    "bg-BG",
+    "hr-HR",
+  ]),
+];
+
 // Resolve the active app language without importing the i18n instance, so
 // widely-used utils don't pull `createI18n` into their import graph (which
 // breaks specs that partially mock vue-i18n).
@@ -54,3 +84,19 @@ const resolveAppLanguage = (): string => {
  * `Intl.NumberFormat`. Falls back to "en-US" for unmapped languages.
  */
 export const getNumberLocale = (): string => APP_LOCALE_TO_BCP47[resolveAppLanguage()] ?? "en-US";
+
+/** Returns the canonical form of `tag`, or null when `Intl.NumberFormat` cannot use it. */
+export const toSupportedNumberLocale = (tag?: string | null): string | null => {
+  if (typeof tag !== "string" || !tag.trim()) return null;
+  try {
+    const [canonical] = Intl.getCanonicalLocales(tag.trim());
+    if (!canonical) return null;
+    return Intl.NumberFormat.supportedLocalesOf([canonical]).length > 0 ? canonical : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Resolves a panel's chosen locale; empty or unusable values mean Auto (the viewer's UI language). */
+export const resolveNumberLocale = (tag?: string | null): string =>
+  toSupportedNumberLocale(tag) ?? getNumberLocale();
