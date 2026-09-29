@@ -716,7 +716,7 @@ pub async fn _search_partition_multi(
     headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<search::MultiSearchPartitionRequest>,
+    Json(mut req): Json<search::MultiSearchPartitionRequest>,
 ) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -758,6 +758,10 @@ pub async fn _search_partition_multi(
             }
             _ => {}
         }
+    }
+
+    if let Err(e) = req.decode() {
+        return MetaHttpResponse::bad_request(e);
     }
 
     #[cfg(feature = "enterprise")]
@@ -2242,6 +2246,85 @@ mod tests {
             queries[0].query.query_fn.is_some(),
             "per_query_response=false should always set query_fn on requests"
         );
+    }
+
+    async fn partition_multi_partitions(
+        sql: String,
+        encoding: config::meta::search::RequestEncoding,
+        end_time: i64,
+    ) -> Vec<[i64; 2]> {
+        use axum::{
+            extract::{Path, Query},
+            http::{HeaderMap, StatusCode},
+        };
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let resp = super::_search_partition_multi(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+            axum::Json(MultiSearchPartitionRequest {
+                sql: vec![sql],
+                start_time: end_time - 3_600_000_000,
+                end_time,
+                encoding,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice::<config::meta::search::SearchPartitionResponse>(&body)
+            .unwrap()
+            .partitions
+    }
+
+    #[tokio::test]
+    async fn test_search_partition_multi_decodes_base64_sql() {
+        use config::{meta::search::RequestEncoding, utils::base64};
+
+        let sql = "SELECT * FROM \"partition_multi_b64\"";
+        infra::file_list::create_table().await.unwrap();
+        infra::cluster::add_node_to_cache(config::meta::cluster::Node {
+            uuid: "partition-multi-querier".to_string(),
+            role: vec![config::meta::cluster::Role::Querier],
+            cpu_num: 1,
+            status: config::meta::cluster::NodeStatus::Online,
+            ..Default::default()
+        })
+        .await;
+        {
+            use arrow_schema::{DataType, Field, Schema};
+            use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+            let schema = Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("level", DataType::Utf8, true),
+            ]);
+            STREAM_SCHEMAS_LATEST.write().await.insert(
+                "default/logs/partition_multi_b64".to_string(),
+                SchemaCache::new(schema),
+            );
+        }
+        let end_time = Utc::now().timestamp_micros();
+        let plain =
+            partition_multi_partitions(sql.to_string(), RequestEncoding::Empty, end_time).await;
+        assert!(!plain.is_empty());
+        let encoded =
+            partition_multi_partitions(base64::encode_url(sql), RequestEncoding::Base64, end_time)
+                .await;
+        assert_eq!(encoded, plain);
     }
 
     #[tokio::test]
