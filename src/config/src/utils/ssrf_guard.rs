@@ -20,7 +20,7 @@
 //! not on the top-level `openobserve` crate).
 
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::Arc,
 };
 
@@ -142,11 +142,15 @@ impl SsrfGuard {
     pub async fn validate_url_with_config_async(url: &str) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
         let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        // When loopback is explicitly allowed we're in a dev/test environment;
-        // skip SSRF validation entirely so test fixtures with placeholder URLs
-        // (e.g. "DEMO") and unresolvable hostnames don't get rejected at save time.
-        // Production keeps ZO_SSRF_ALLOW_LOOPBACK=false and remains strict.
-        if allow_loopback || skip_ssrf {
+        Self::validate_url_async_inner(url, allow_loopback, skip_ssrf).await
+    }
+
+    async fn validate_url_async_inner(
+        url: &str,
+        allow_loopback: bool,
+        skip_ssrf: bool,
+    ) -> Result<(), String> {
+        if skip_ssrf {
             return Ok(());
         }
         Self::validate_url_inner(url, allow_loopback, skip_ssrf)?;
@@ -196,6 +200,7 @@ impl SsrfGuard {
                     || (octets[0] == 192 && octets[1] == 168)
                     || (octets[0] == 169 && octets[1] == 254)
                     || (octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127)
+                    || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
                     || (octets[0] == 192 && octets[1] == 0 && octets[2] == 2)
                     || (octets[0] == 198 && octets[1] == 51 && octets[2] == 100)
                     || (octets[0] == 203 && octets[1] == 0 && octets[2] == 113)
@@ -207,7 +212,7 @@ impl SsrfGuard {
                             && octets[3] == 255))
             }
             IpAddr::V6(ipv6) => {
-                if let Some(v4) = ipv6.to_ipv4_mapped() {
+                if let Some(v4) = ipv6.to_ipv4_mapped().or_else(|| Self::embedded_ipv4(ipv6)) {
                     return Self::is_private_ip_inner(&IpAddr::V4(v4), allow_loopback);
                 }
 
@@ -220,6 +225,19 @@ impl SsrfGuard {
                     || (segments[0] & 0xfe00) == 0xfc00
                     || (segments[0] == 0x2001 && segments[1] == 0xdb8)
             }
+        }
+    }
+
+    /// IPv4 destination carried by a NAT64, 6to4 or IPv4-compatible IPv6 address.
+    fn embedded_ipv4(ip: &Ipv6Addr) -> Option<Ipv4Addr> {
+        let v4 = |hi: u16, lo: u16| Ipv4Addr::from((u32::from(hi) << 16) | u32::from(lo));
+        match ip.segments() {
+            [0x64, 0xff9b, 0, 0, 0, 0, hi, lo] => Some(v4(hi, lo)),
+            [0x2002, hi, lo, ..] => Some(v4(hi, lo)),
+            [0, 0, 0, 0, 0, 0, hi, lo] if !ip.is_unspecified() && !ip.is_loopback() => {
+                Some(v4(hi, lo))
+            }
+            _ => None,
         }
     }
 }
@@ -339,6 +357,61 @@ mod tests {
         assert!(SsrfGuard::is_private_ip(&"172.16.0.1".parse().unwrap()));
         assert!(SsrfGuard::is_private_ip(&"172.31.255.255".parse().unwrap()));
         assert!(!SsrfGuard::is_private_ip(&"172.32.0.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_embedded_ipv4_is_checked() {
+        for ip in [
+            "64:ff9b::a9fe:a9fe",
+            "64:ff9b::7f00:1",
+            "64:ff9b::a00:1",
+            "2002:a9fe:a9fe::",
+            "2002:7f00:1::1",
+            "2002:c0a8:101::",
+            "::a9fe:a9fe",
+            "::10.0.0.1",
+            "::127.0.0.1",
+        ] {
+            assert!(SsrfGuard::is_private_ip(&ip.parse().unwrap()), "{ip}");
+        }
+        for ip in ["64:ff9b::808:808", "2002:808:808::", "::8.8.8.8"] {
+            assert!(!SsrfGuard::is_private_ip(&ip.parse().unwrap()), "{ip}");
+        }
+    }
+
+    #[test]
+    fn test_ietf_protocol_assignments_block() {
+        assert!(SsrfGuard::is_private_ip(&"192.0.0.1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"192.0.0.170".parse().unwrap()));
+        assert!(!SsrfGuard::is_private_ip(&"192.0.1.1".parse().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn test_async_allow_loopback_still_blocks_private_and_metadata() {
+        for url in [
+            "http://127.0.0.1:5080/",
+            "http://localhost/",
+            "http://[::1]/",
+        ] {
+            let res = SsrfGuard::validate_url_async_inner(url, true, false).await;
+            assert!(res.is_ok(), "{url}: {res:?}");
+        }
+        for url in [
+            "http://10.0.0.1/",
+            "http://192.168.1.1/",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://metadata.google.internal/",
+            "http://[fd00::1]/",
+        ] {
+            let res = SsrfGuard::validate_url_async_inner(url, true, false).await;
+            assert!(res.is_err(), "{url} must be rejected");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_async_skip_ssrf_allows_everything() {
+        let res = SsrfGuard::validate_url_async_inner("http://169.254.169.254/", false, true).await;
+        assert!(res.is_ok(), "{res:?}");
     }
 
     #[test]
