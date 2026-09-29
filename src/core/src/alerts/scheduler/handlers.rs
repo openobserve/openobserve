@@ -1815,6 +1815,7 @@ async fn trigger_rca_for_alert_firing(
     let org_id = alert.org_id.clone();
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
+    let alert_id = alert.id.map(|id| id.to_string());
     let severity = alert
         .priority
         .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
@@ -1868,7 +1869,8 @@ async fn trigger_rca_for_alert_firing(
         // §2.2: one context for the whole firing — every record it opened reads the same answer.
         let context = config::meta::oncall::RcaContext {
             subject_type: config::meta::oncall::SubjectType::Alert,
-            subject_id: representative.response.subject.subject_id(),
+            // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
+            subject_id: alert_id.unwrap_or_else(|| representative.response.subject.subject_id()),
             // Omitted, never null — the agent routes on `"incident_id" in context`.
             incident_id: None,
             org_id: org_id.clone(),
