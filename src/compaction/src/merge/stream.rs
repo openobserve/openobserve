@@ -22,7 +22,9 @@ use config::{
     utils::time::hour_micros,
 };
 use hashbrown::{HashMap, HashSet};
-use infra::{cache::file_data, file_list as infra_file_list, schema::get_partition_time_level};
+use infra::{cache::file_data, file_list as infra_file_list};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
 use tokio::{
@@ -31,7 +33,7 @@ use tokio::{
 };
 
 use super::{
-    job::job_range_end,
+    job::{job_range_end, job_time_level},
     plan::{BatchLimits, plan_batches},
 };
 use crate::worker::{MergeBatch, MergeSender};
@@ -80,7 +82,9 @@ pub async fn merge_by_stream(
     let is_incremental = !crate::is_past_hour(offset);
 
     // check offset
-    let partition_time_level = get_partition_time_level(stream_type);
+    let partition_time_level = job_time_level(stream_type, offset, !is_incremental, |max_ts| {
+        has_downsampling_rule(stream_name, max_ts)
+    });
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
         (
@@ -318,6 +322,13 @@ pub async fn merge_by_stream(
         .inc_by(time);
 
     Ok(())
+}
+
+fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {
+    #[cfg(feature = "enterprise")]
+    return get_largest_downsampling_rule(_stream_name, _max_ts).is_some();
+    #[cfg(not(feature = "enterprise"))]
+    false
 }
 
 async fn write_file_list(
