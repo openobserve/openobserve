@@ -174,6 +174,9 @@ export default function useRumSpanBuilder(
     }
   };
 
+  // The RUM Session Replay page only lists sessions whose events carry this flag.
+  const hasReplay = (event: any): boolean => event?.session_has_replay === true;
+
   /** Fetches the browser request and its page view for a trace with a dangling parent, searching only around the window its spans span. */
   const fetchRumEventsForTrace = async (traceId: string, spans: any[]) => {
     const empty = {
@@ -316,6 +319,7 @@ export default function useRumSpanBuilder(
       span_kind: event.type === "resource" ? SPAN_KIND_CLIENT : SPAN_KIND_UNSPECIFIED,
       rum_event_type: event.type,
       rum_session_id: event.session_id,
+      rum_session_has_replay: hasReplay(event),
       _is_trace_bridge: isTraced,
     };
   };
@@ -374,6 +378,7 @@ export default function useRumSpanBuilder(
         span_kind: SPAN_KIND_UNSPECIFIED,
         rum_event_type: "view",
         rum_session_id: view.session_id,
+        rum_session_has_replay: hasReplay(view),
       };
     });
   };
@@ -424,6 +429,7 @@ export default function useRumSpanBuilder(
         span_kind: SPAN_KIND_UNSPECIFIED,
         rum_event_type: "action",
         rum_session_id: action.session_id,
+        rum_session_has_replay: hasReplay(action),
       });
     }
 
@@ -438,6 +444,7 @@ export default function useRumSpanBuilder(
           {
             rum_event_type: "collapsed_actions",
             rum_session_id: firstTracedResource?.session_id,
+            rum_session_has_replay: hasReplay(firstTracedResource),
           },
         ),
       );
@@ -472,8 +479,47 @@ export default function useRumSpanBuilder(
     return { staticAssets, apiCalls, errors, longTasks };
   };
 
+  const traceIdOf = (event: any): string => {
+    const raw = rumField<string>(event, "trace_id") || "";
+    return normalizeTraceId(raw) || raw;
+  };
+
+  // The view's other requests belong to other traces; listing each buries the one opened here.
+  const splitRequestsByTrace = (apiCalls: any[], tracedResources: any[], traceId: string) => {
+    if (!traceId) return { ownRequests: apiCalls, otherRequests: [] as any[] };
+    const ownRequests = apiCalls.filter((event) => traceIdOf(event) === traceId);
+    const otherRequests = apiCalls.filter((event) => traceIdOf(event) !== traceId);
+    // A busy view can fill the leaf page before the traced request is reached.
+    if (!ownRequests.length) {
+      ownRequests.push(...tracedResources.filter((event) => event?.type === "resource"));
+    }
+    return { ownRequests, otherRequests };
+  };
+
   const buildResourceSpans = (apiCalls: any[], actionEvents: any[]): any[] =>
     apiCalls.map((event) => createLeafSpan(event, resolveParentSpanId(event, actionEvents)));
+
+  const buildOtherRequestSpans = (
+    otherRequests: any[],
+    firstTracedResource: any,
+    traceId: string,
+  ): any[] => {
+    if (!otherRequests.length) return [];
+    return [
+      makeCollapsedSpan(
+        t("rum.collapsedOtherRequests", { count: otherRequests.length }),
+        otherRequests,
+        firstTracedResource?.view_id,
+        firstTracedResource?.session_id,
+        traceId,
+        {
+          rum_event_type: "collapsed_requests",
+          rum_session_id: firstTracedResource?.session_id,
+          rum_session_has_replay: hasReplay(firstTracedResource),
+        },
+      ),
+    ];
+  };
 
   const buildErrorSpans = (
     errors: any[],
@@ -575,6 +621,7 @@ export default function useRumSpanBuilder(
   /**
    * Format RUM events as trace spans with full parent-child hierarchy.
    * Builds Session → View → Action → Resource/Error/LongTask → Backend spans.
+   * Only the traced request is shown; the view's other requests collapse into one row.
    */
   const formatRumEventsAsSpans = (
     tracedResources: any[],
@@ -582,7 +629,8 @@ export default function useRumSpanBuilder(
     actionEvents: any[],
     allViewEvents: any[],
   ) => {
-    if (!allViewEvents.length) return [];
+    // An empty view page still shows the traced request, via the fallback in splitRequestsByTrace.
+    if (!allViewEvents.length && !tracedResources.length) return [];
 
     const firstTracedResource = tracedResources[0];
     const rawTraceId = rumField<string>(firstTracedResource, "trace_id") || "";
@@ -590,11 +638,13 @@ export default function useRumSpanBuilder(
     const tracedTimestamp = firstTracedResource?.date || 0;
 
     const { staticAssets, apiCalls, errors, longTasks } = classifyLeafEvents(allViewEvents);
+    const { ownRequests, otherRequests } = splitRequestsByTrace(apiCalls, tracedResources, traceId);
 
     const spans: any[] = [
       ...buildViewSpans(viewEvents, traceId),
       ...buildActionSpans(actionEvents, firstTracedResource, traceId, tracedTimestamp),
-      ...buildResourceSpans(apiCalls, actionEvents),
+      ...buildResourceSpans(ownRequests, actionEvents),
+      ...buildOtherRequestSpans(otherRequests, firstTracedResource, traceId),
       ...buildErrorSpans(errors, firstTracedResource, traceId, actionEvents),
       ...buildStaticAssetSpans(staticAssets, firstTracedResource, traceId),
       ...buildLongTaskSpans(longTasks, firstTracedResource, traceId),

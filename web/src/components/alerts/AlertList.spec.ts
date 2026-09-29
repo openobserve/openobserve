@@ -934,6 +934,27 @@ describe("AlertList - pagination restoration", () => {
 
     expect(wrapper.vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
   });
+
+  it("resets the persisted page on a folder switch so it is not restored onto the new folder", async () => {
+    (store.state as any).organizationData.allAlertsListByFolderId = {};
+    alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
+    (store.state as any).alertListFilters = {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      perPage: 5,
+      currentPage: 3,
+    };
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    expect(wrapper.vm.currentPage).toBe(3);
+
+    wrapper.vm.activeFolderId = "team-b";
+    await flushPromises();
+
+    expect(wrapper.vm.currentPage).toBe(1);
+    expect((store.state as any).alertListFilters.currentPage).toBe(1);
+  });
 });
 
 // 6. Search behaviors and debounce

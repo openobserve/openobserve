@@ -1073,16 +1073,16 @@ describe("WorkflowsList", () => {
       await flushPromises();
       vi.useFakeTimers();
       wrapper.vm.currentPage = 3;
-      const setPageIndex = vi.fn();
+      const restorePage = vi.fn();
       // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
-      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      wrapper.vm.oTableRef = { restorePage };
 
       wrapper.vm.restorePageIndex();
-      expect(setPageIndex).not.toHaveBeenCalled();
+      expect(restorePage).not.toHaveBeenCalled();
 
       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
       vi.runOnlyPendingTimers();
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      expect(restorePage).toHaveBeenCalledWith(3);
     });
 
     it("reasserts the persisted page once the initial fetch resolves on mount", async () => {
@@ -1101,13 +1101,13 @@ describe("WorkflowsList", () => {
       await flushPromises();
 
       // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
-      const setPageIndex = vi.fn();
-      wrapper.vm.oTableRef = { table: { setPageIndex } };
-      expect(setPageIndex).not.toHaveBeenCalled();
+      const restorePage = vi.fn();
+      wrapper.vm.oTableRef = { restorePage };
+      expect(restorePage).not.toHaveBeenCalled();
 
       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
       vi.runOnlyPendingTimers();
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      expect(restorePage).toHaveBeenCalledWith(3);
     });
 
     it("reasserts the restored page when a save lands while OTable has remounted mid-fetch", async () => {
@@ -1133,13 +1133,13 @@ describe("WorkflowsList", () => {
       await flushPromises();
 
       // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake.
-      const setPageIndex = vi.fn();
-      wrapper.vm.oTableRef = { table: { setPageIndex } };
-      expect(setPageIndex).not.toHaveBeenCalled();
+      const restorePage = vi.fn();
+      wrapper.vm.oTableRef = { restorePage };
+      expect(restorePage).not.toHaveBeenCalled();
 
       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
       vi.runOnlyPendingTimers();
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      expect(restorePage).toHaveBeenCalledWith(3);
     });
   });
 });

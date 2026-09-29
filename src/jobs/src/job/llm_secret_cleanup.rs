@@ -24,16 +24,8 @@ pub fn run() {
         log::debug!("[LLM_SECRET_CLEANUP] not a scheduler node, skipping");
         return;
     }
-    if !o2_enterprise::enterprise::common::config::get_config()
-        .llm_eval_config
-        .enabled
-    {
-        log::debug!("[LLM_SECRET_CLEANUP] LLM evaluations disabled, skipping");
-        return;
-    }
-
     spawn_pausable_job!("llm_secret_cleanup", CLEANUP_INTERVAL_SECS, {
-        match o2_enterprise::enterprise::llm_evaluations::secrets::sweep_expired().await {
+        match infra::secrets::sweep_expired().await {
             Ok(0) => log::debug!("[LLM_SECRET_CLEANUP] no expired signing keys"),
             Ok(removed) => {
                 log::info!("[LLM_SECRET_CLEANUP] removed {removed} expired signing key(s)")

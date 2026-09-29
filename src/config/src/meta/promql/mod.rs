@@ -69,7 +69,10 @@ where
 }
 
 pub mod grpc;
+pub mod index;
 pub mod value;
+
+pub use index::MetricsBlockScan;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";

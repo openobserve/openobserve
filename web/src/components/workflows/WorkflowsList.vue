@@ -443,6 +443,8 @@ watch(activeFolderId, (folderId) => {
     searchAcrossFolders.value = false;
     filterQuery.value = "";
   }
+  // A folder switch starts a new list, so the page kept for the previous folder must not be restored onto it.
+  currentPage.value = 1;
   getWorkflows(folderId);
 });
 
@@ -485,7 +487,7 @@ const onPageChange = (page: number) => {
 // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
 const restorePageIndex = () => {
   setTimeout(() => {
-    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+    oTableRef.value?.restorePage?.(currentPage.value);
   }, 0);
 };
 

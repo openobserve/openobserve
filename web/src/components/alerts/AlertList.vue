@@ -959,7 +959,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
-import oncallService from "@/services/oncall";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
 import {
   isSloAlert,
   isUnplaceableSloAlert,
@@ -1073,10 +1073,9 @@ export default defineComponent({
     async function fetchOnCallTeams() {
       if (!oncallEnabled.value) return;
       try {
-        const res = await oncallService.listTeams({
-          org_identifier: store.state.selectedOrganization.identifier,
-        });
-        oncallTeams.value = res.data ?? [];
+        oncallTeams.value = await queryClient.fetchQuery(
+          oncallTeamsQuery(store.state.selectedOrganization.identifier),
+        );
       } catch {
         oncallTeams.value = [];
       }
@@ -1130,7 +1129,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          oTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },
@@ -2293,6 +2292,8 @@ export default defineComponent({
           loading.value = false;
           return;
         }
+        // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
+        currentPage.value = 1;
         if (searchAcrossFolders.value) {
           searchAcrossFolders.value = false;
           searchQuery.value = "";

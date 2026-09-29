@@ -249,6 +249,7 @@ mod tests {
     use crate::{
         aggregations::AggOp,
         functions::{self, RangeFunc},
+        scalar_param::ScalarParam,
         streaming_eval::{RangeExpr, aggregate, eval_range, tests::*},
     };
 
@@ -260,8 +261,8 @@ mod tests {
 
         let agg_cases = [
             AggOp::Avg,
-            AggOp::Bottomk(1),
-            AggOp::Bottomk(2),
+            AggOp::Bottomk(ScalarParam::Const(1.0)),
+            AggOp::Bottomk(ScalarParam::Const(2.0)),
             AggOp::Count,
             AggOp::Group,
             AggOp::Max,
@@ -269,8 +270,8 @@ mod tests {
             AggOp::Stddev,
             AggOp::Stdvar,
             AggOp::Sum,
-            AggOp::Topk(2),
-            AggOp::Topk(10),
+            AggOp::Topk(ScalarParam::Const(2.0)),
+            AggOp::Topk(ScalarParam::Const(10.0)),
         ];
         let func_cases = ["rate", "increase", "sum_over_time", "last_over_time"];
         let modifiers = [
@@ -294,9 +295,9 @@ mod tests {
                     .unwrap()
                     .unwrap();
                     let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
-                    let expected = aggregate(sources, op, eval).await.unwrap().0;
+                    let expected = aggregate(sources, op.clone(), eval).await.unwrap().0;
 
-                    let actual = run_streaming(&ctx, modifier, func_name, op, range)
+                    let actual = run_streaming(&ctx, modifier, func_name, op.clone(), range)
                         .await
                         .expect("streaming path must not fall back on the sorted table");
 

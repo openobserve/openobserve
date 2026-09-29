@@ -83,7 +83,14 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 84: add folder_id to workflow_drafts.
 // 85: create llm_experiment_slot_retries.
 // 86: create synthetics shared variables tables; add env to synthetics_jobs.
-pub const DB_SCHEMA_VERSION: u64 = 86;
+// 87: add input_preview to llm_annotation_queue_items.
+// 88: add iam password policy tables.
+// 89: add level_half_width_seconds to anomaly_detection_config.
+// 90: create the Prompt registry, webhook outbox, and Experiment attribution columns.
+// 91: add firing-episode columns for alert recovery.
+// 92: add recovery_destinations to alerts.
+// 93: create oncall_response_reports.
+pub const DB_SCHEMA_VERSION: u64 = 93;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -980,6 +987,59 @@ pub struct Config {
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
+    pub self_profiles: SelfProfiles,
+}
+
+/// Background self CPU/memory profile ingest into `_meta.self_profiles`.
+/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct SelfProfiles {
+    #[env_config(
+        name = "ZO_SELF_PROFILES_ENABLED",
+        default = false,
+        help = "Enable background self CPU/memory profile sampling into _meta.self_profiles"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_INTERVAL_SECS",
+        default = 30,
+        help = "Seconds between self-profile cycle starts; 0 disables the background loop"
+    )]
+    pub interval_secs: u64,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_CPU_SECS",
+        default = 5,
+        help = "CPU sample duration in seconds within each self-profile cycle"
+    )]
+    pub cpu_secs: u64,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_URL",
+        default = "",
+        help = "Empty = in-process ingest; set to POST OTLP Profiles protobuf to a remote URL"
+    )]
+    pub url: String,
+    #[env_config(
+        name = "ZO_SELF_PROFILES_AUTH_HEADER",
+        default = "",
+        help = "Optional Authorization header value for remote ZO_SELF_PROFILES_URL"
+    )]
+    pub auth_header: String,
+}
+
+impl SelfProfiles {
+    /// Returns Ok when the background loop may run; Err with a reason otherwise.
+    pub fn validate_loop_timing(&self) -> Result<(), String> {
+        if !self.enabled || self.interval_secs == 0 {
+            return Ok(());
+        }
+        if self.interval_secs <= self.cpu_secs {
+            return Err(format!(
+                "ZO_SELF_PROFILES_INTERVAL_SECS ({}) must be greater than ZO_SELF_PROFILES_CPU_SECS ({})",
+                self.interval_secs, self.cpu_secs
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
@@ -1658,17 +1718,11 @@ pub struct Search {
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
-        default = false,
-        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+        name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
+        default = 0,
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
     )]
-    pub metrics_index_selection_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
-        default = 256,
-        help = "Maximum memory size in MB of the metrics index selection cache."
-    )]
-    pub metrics_index_selection_cache_max_size: usize,
+    pub metrics_blocks_cache_max_size: usize,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -2203,6 +2257,18 @@ pub struct Common {
         help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
     )]
     pub regex_patterns_source_url: String,
+    #[env_config(
+        name = "ZO_SDR_DETECT_POLICY_ENABLED",
+        default = false,
+        help = "Allow AUTHORING the Detect (count-only) redaction policy on this node. It gates writes made here only; it does NOT stop a Detect association authored elsewhere from replicating to this node, which honours it as count-only either way. On a build that predates Detect the association stops redacting instead of being applied as Redact, so the field is left unredacted until that build is upgraded."
+    )]
+    pub sdr_detect_policy_enabled: bool,
+    #[env_config(
+        name = "ZO_SDR_EVIDENCE_HEARTBEAT_INTERVAL",
+        default = 300,
+        help = "Seconds between redaction-evidence heartbeat rows per (org, stream). A heartbeat records that scanning was active even when nothing matched."
+    )]
+    pub sdr_evidence_heartbeat_interval: u64,
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
@@ -2880,7 +2946,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges the pending files of an open hour into size-split `hash-merged-v1-` files and a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
     )]
     pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
@@ -3538,6 +3604,8 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    check_self_profiles_config(&mut cfg);
+
     // check grpc config
     if let Err(e) = check_grpc_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -3972,6 +4040,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.usage_publish_interval = 60;
     }
 
+    // A zero interval makes every batch overdue, so heartbeats overflow their own queue.
+    if cfg.common.sdr_evidence_heartbeat_interval == 0 {
+        cfg.common.sdr_evidence_heartbeat_interval = 300;
+    }
+
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
     if !matches!(
         cfg.common.log_page_default_field_list.as_str(),
@@ -4204,18 +4277,18 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.search.inverted_index_footer_cache_max_size == 0 {
         cfg.search.inverted_index_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     if cfg.search.bloom_footer_cache_max_size == 0 {
-        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // 1% of total mem, clamped to [4, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
         cfg.search.bloom_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(4, 256)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
@@ -4223,7 +4296,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
         cfg.limit.datafusion_file_stat_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
@@ -4242,7 +4315,19 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_result_cache_max_size =
             cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
+    cfg.search.metrics_blocks_cache_max_size = metrics_blocks_cache_size_mb(
+        cfg.search.metrics_blocks_cache_max_size,
+        cfg.limit.mem_total,
+    );
     Ok(())
+}
+
+fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
+    match configured {
+        0 => (mem_total / SIZE_IN_MB as usize / 50).clamp(128, 1024),
+        1..=9 => 0,
+        size => size,
+    }
 }
 
 /// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
@@ -4642,6 +4727,14 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Warns and disables the background loop when interval is not greater than CPU sample duration.
+fn check_self_profiles_config(cfg: &mut Config) {
+    if let Err(reason) = cfg.self_profiles.validate_loop_timing() {
+        log::warn!("[SELF-PROFILES] {reason}; disabling background self-profile loop");
+        cfg.self_profiles.enabled = false;
+    }
+}
+
 /// The env vars that exist in every build but are only ever read by
 /// enterprise-gated code. Setting one in an OSS-only build is configured-and-
 /// ignored, which is indistinguishable from configured-and-broken unless we say
@@ -4736,6 +4829,18 @@ mod tests {
     #[test]
     fn every_env_config_default_parses() {
         let _ = super::Config::init().expect("a default failed to parse");
+    }
+
+    #[test]
+    fn metrics_blocks_cache_auto_budget_preserves_explicit_limits() {
+        let gib = 1024 * 1024 * 1024;
+        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 128);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 983);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 64 * gib), 1024);
+        assert_eq!(metrics_blocks_cache_size_mb(1, 48 * gib), 0);
+        assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
+        assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);
+        assert_eq!(metrics_blocks_cache_size_mb(2048, 48 * gib), 2048);
     }
 
     use super::*;
@@ -5041,6 +5146,37 @@ mod tests {
             cfg.limit.req_cols_per_record_limit,
             get_config().limit.req_cols_per_record_limit
         );
+    }
+
+    #[test]
+    fn self_profiles_validate_loop_timing_requires_interval_gt_cpu() {
+        let mut cfg = SelfProfiles {
+            enabled: true,
+            interval_secs: 30,
+            cpu_secs: 5,
+            ..Default::default()
+        };
+        assert!(cfg.validate_loop_timing().is_ok());
+
+        cfg.interval_secs = 5;
+        assert!(cfg.validate_loop_timing().is_err());
+
+        cfg.interval_secs = 0;
+        assert!(cfg.validate_loop_timing().is_ok());
+
+        cfg.enabled = false;
+        cfg.interval_secs = 5;
+        assert!(cfg.validate_loop_timing().is_ok());
+    }
+
+    #[test]
+    fn check_self_profiles_config_disables_on_invalid_timing() {
+        let mut cfg = Config::default();
+        cfg.self_profiles.enabled = true;
+        cfg.self_profiles.interval_secs = 5;
+        cfg.self_profiles.cpu_secs = 5;
+        check_self_profiles_config(&mut cfg);
+        assert!(!cfg.self_profiles.enabled);
     }
 
     #[test]

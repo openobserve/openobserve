@@ -70,22 +70,7 @@ async validateAddJob(jobId) {
   // OTable rows are indexed as [data-test="o2-table-row-{index}"] (positional integer).
   // trace_id is the row-key but is NOT a visible column, so filter({ hasText }) won't match.
   // Instead: intercept the GET response from clicking "Get Jobs" to find the job's row index.
-  const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
-  const orgId = getOrgIdentifier();
-  // The scheduler list renders under v-show="showSearchScheduler", which the logs page
-  // resets whenever the URL query loses the action=search_scheduler param — leaving the
-  // Get-Jobs button in the DOM but display:none. If that happened, re-open the scheduler
-  // list from the toolbar to restore the view before clicking (graceful workaround for
-  // origin/fix/search-scheduler-job-issue).
   const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
-  let jobsBtnVisible = await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 })
-    .then(() => true).catch(() => false);
-  for (let attempt = 0; attempt < 2 && !jobsBtnVisible; attempt++) {
-    await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click().catch(() => {});
-    await this.page.locator('[data-test="search-scheduler-list-btn"]').click().catch(() => {});
-    jobsBtnVisible = await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 })
-      .then(() => true).catch(() => false);
-  }
   await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 });
   const responsePromise = this.page.waitForResponse(
     resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',

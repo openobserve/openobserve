@@ -316,10 +316,16 @@ describe("O2AIChat SSE protocol", () => {
     });
 
     it("starts the typewriter with an empty displayedTitle", async () => {
-      await stream(vm, [sse({ type: "title", title: "Error budget review" })]);
+      // The typewriter ticks every 30ms on a real interval; on a loaded runner the first tick lands before the assertion.
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      try {
+        await stream(vm, [sse({ type: "title", title: "Error budget review" })]);
 
-      expect(vm.isTypingTitle).toBe(true);
-      expect(vm.displayedTitle).toBe("");
+        expect(vm.isTypingTitle).toBe(true);
+        expect(vm.displayedTitle).toBe("");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("types the title out one character at a time and then stops", async () => {

@@ -81,4 +81,34 @@ mod tests {
         assert_eq!(decoded.len(), 1);
         assert_eq!(decoded[0]["key"], "value");
     }
+    #[test]
+    fn mindex_size_wire_compatibility() {
+        use prost::Message;
+        let old = cluster_rpc::FileMeta::decode(&[0x30, 7][..]).unwrap();
+        assert_eq!((old.index_size, old.mindex_size), (7, 0));
+        let new = cluster_rpc::FileMeta {
+            index_size: 7,
+            mindex_size: 91,
+            ..Default::default()
+        };
+        assert_eq!(
+            cluster_rpc::FileMeta::decode(new.encode_to_vec().as_slice()).unwrap(),
+            new
+        );
+        let old_stats = cluster_rpc::StreamStats {
+            index_size: 17.0,
+            ..Default::default()
+        };
+        let decoded =
+            cluster_rpc::StreamStats::decode(old_stats.encode_to_vec().as_slice()).unwrap();
+        assert_eq!(decoded.mindex_size, 0.0);
+        let new_stats = cluster_rpc::StreamStats {
+            mindex_size: 37.0,
+            ..old_stats
+        };
+        assert_eq!(
+            cluster_rpc::StreamStats::decode(new_stats.encode_to_vec().as_slice()).unwrap(),
+            new_stats
+        );
+    }
 }

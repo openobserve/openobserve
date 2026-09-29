@@ -19,6 +19,7 @@ use arrow_schema::{DataType, FieldRef, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
+        db_monitoring::is_dbm_server_stream,
         promql::HASH_LABEL,
         stream::{StreamParams, StreamType},
     },
@@ -94,7 +95,7 @@ impl JsonColumnar {
             &schema,
             flatten_level,
             time_range,
-            get_config().db_monitoring.enabled,
+            get_config().db_monitoring.enabled && is_dbm_server_stream(stream_name),
         )
     }
 

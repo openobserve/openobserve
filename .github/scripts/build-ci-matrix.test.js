@@ -124,9 +124,9 @@ test("cross-folder consumers are routed, not dropped", () => {
   // correlation plugin is runtime-imported by logs, traces, and alerts components.
   folders = run(["web/src/plugins/correlation/CorrelationPanel.vue"]);
   for (const f of ["Logs-Core", "Traces", "Alerts"]) assert.ok(folders.includes(f), f);
-  // RUM-Token's spec asserts on the ingestion RUM config page.
+  // RUM-Token's spec asserts on the ingestion RUM config page; ingestion specs now live in Streams.
   folders = run(["web/src/components/ingestion/recommended/FrontendRumConfig.vue"]);
-  assert.ok(folders.includes("RUM-Token") && folders.includes("GeneralTests"), folders.join(","));
+  assert.ok(folders.includes("RUM-Token") && folders.includes("Streams"), folders.join(","));
 });
 
 test("empty changed-files list forces the full matrix", () => {

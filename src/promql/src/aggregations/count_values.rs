@@ -125,7 +125,7 @@ pub fn count_values(
                     // Only include timestamps that are in eval_timestamps
                     if eval_timestamps.contains(&sample.timestamp) {
                         // Convert the sample value to a string for counting
-                        let value_str = sample.value.to_string();
+                        let value_str = value_label(sample.value);
                         timestamp_value_counts
                             .entry(sample.timestamp)
                             .or_default()
@@ -197,6 +197,15 @@ pub fn count_values(
         results.len()
     );
     Ok(Value::Matrix(results))
+}
+
+/// The value label Prometheus writes with `strconv.FormatFloat(v, 'f', -1, 64)`.
+fn value_label(value: f64) -> String {
+    match value {
+        f64::INFINITY => "+Inf".to_string(),
+        f64::NEG_INFINITY => "-Inf".to_string(),
+        _ => value.to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -418,5 +427,37 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_count_values_formats_values_like_prometheus() {
+        let timestamp = 1640995200;
+        let data = Value::Matrix(
+            [f64::INFINITY, f64::NEG_INFINITY, f64::NAN, 1e21, 0.5]
+                .into_iter()
+                .enumerate()
+                .map(|(idx, value)| RangeValue {
+                    labels: vec![Arc::new(Label::new("i", &idx.to_string()))],
+                    samples: vec![Sample::new(timestamp, value)],
+                    exemplars: None,
+                    time_window: None,
+                })
+                .collect(),
+        );
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let Value::Matrix(matrix) = count_values("v", &None, data, &eval_ctx).unwrap() else {
+            panic!("Expected Matrix result");
+        };
+        let mut values: Vec<String> = matrix
+            .iter()
+            .flat_map(|series| series.labels.iter())
+            .filter(|label| label.name == "v")
+            .map(|label| label.value.clone())
+            .collect();
+        values.sort();
+        assert_eq!(
+            values,
+            ["+Inf", "-Inf", "0.5", "1000000000000000000000", "NaN"]
+        );
     }
 }

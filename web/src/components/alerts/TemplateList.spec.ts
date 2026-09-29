@@ -151,7 +151,7 @@ describe("Alert List", async () => {
 
 // ── pagination restoration ────────────────────────────────────────────────
 // This spec mounts the real OTable (not stubbed), so the TanStack pageIndex
-// restoration itself (setTimeout(0) + table.setPageIndex) isn't exercised
+// restoration itself (setTimeout(0) + OTable restorePage) isn't exercised
 // end-to-end here. These tests cover what IS reachable: seeding currentPage
 // from the URL, and that navigating to/from the add/edit/clone/import views
 // preserves the `page` query param instead of stripping it.
@@ -174,10 +174,32 @@ describe("TemplateList pagination persistence", () => {
 
   it("seeds currentPage from the URL's page query param", async () => {
     (router as any).currentRoute.value.query = { page: "3" };
+    // Mocked so the clamp's own URL rewrite (covered below) never becomes a real navigation that leaks into later tests.
+    const replaceSpy = vi
+      .spyOn(router, "replace")
+      .mockImplementation((() => Promise.resolve()) as any);
     wrapper = mountComponent();
-    await flushPromises();
 
+    // Read before the fetch settles: once it does, a page past the end is clamped.
     expect((wrapper.vm as any).currentPage).toBe(3);
+
+    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
+    replaceSpy.mockRestore();
+  });
+
+  it("falls back to page 1 once the list loads shorter than the URL's page", async () => {
+    (router as any).currentRoute.value.query = { page: "3" };
+    const replaceSpy = vi
+      .spyOn(router, "replace")
+      .mockImplementation((() => Promise.resolve()) as any);
+    wrapper = mountComponent();
+    // The restore runs in a setTimeout(0) after the fetch lands, so poll rather than guess the delay.
+    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
+
+    expect(replaceSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ page: "1" }) }),
+    );
+    replaceSpy.mockRestore();
   });
 
   it("defaults currentPage to 1 when no page query param is present", async () => {

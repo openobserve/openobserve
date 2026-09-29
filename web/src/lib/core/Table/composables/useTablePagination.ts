@@ -111,6 +111,14 @@ export function useTablePagination<TData>(
     goToPage(totalPages.value);
   }
 
+  // A stored page can outlive the rows it was chosen for (folder/tab switch resets the table but not the URL/store), so a page past the end falls back to 1 and the parent is told to fix its copy.
+  function restorePage(page: number) {
+    if (!isClientMode.value) return;
+    const target = page >= 1 && page <= totalPages.value ? page : 1;
+    table.setPageIndex(target - 1);
+    if (target !== page) emit("update:currentPage", target);
+  }
+
   return {
     isClientMode,
     isServerMode,
@@ -130,5 +138,6 @@ export function useTablePagination<TData>(
     prevPage,
     firstPage,
     lastPage,
+    restorePage,
   };
 }
