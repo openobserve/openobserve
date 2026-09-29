@@ -9188,6 +9188,7 @@ export class LogsPage {
             if (state.query === expected) return 'committed';
             // SearchBar.updateQueryValue drops editor emissions while loadingStream is set, so the edit never reaches searchObj.
             if (!state.loading) {
+                testLogger.warn('Query edit never reached searchObj (dropped during loadingStream); re-firing editor change', { state: state.query.slice(0, 60) });
                 await this.page.evaluate(({ selector, value }) => {
                     const host = document.querySelector(selector);
                     const ed = (window.monaco?.editor?.getEditors?.() ?? []).find(e => host?.contains(e.getDomNode?.()));
@@ -9216,6 +9217,7 @@ export class LogsPage {
             if (norm(state.fn) === expected && state.type === 'function') return 'committed';
             // Visualize only forces table + dynamic columns when tempFunctionContent is already set as it opens.
             if (norm(state.fn) !== expected) {
+                testLogger.warn('VRL edit never reached tempFunctionContent; re-firing editor change', { fn: state.fn.slice(0, 40) });
                 await this.page.evaluate(({ selector, value }) => {
                     const host = document.querySelector(selector);
                     const ed = (window.monaco?.editor?.getEditors?.() ?? []).find(e => host?.contains(e.getDomNode?.()));

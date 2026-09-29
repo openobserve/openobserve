@@ -227,7 +227,7 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.logsApplyQueryButton();
 
-    // The table type is auto-selected only after result_schema answers; a panel saved before then keeps the default bar type and renders "No Data".
+    // Pin the table type explicitly: a panel saved before result_schema auto-selects it keeps the default bar type and renders "No Data".
     await pm.logsVisualise.openVisualiseTabWithVrl();
 
     await pm.logsVisualise.runQueryAndWaitForCompletion({ expectTable: true });

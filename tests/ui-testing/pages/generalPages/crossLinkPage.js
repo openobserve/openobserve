@@ -167,7 +167,9 @@ export class CrossLinkPage {
         await this.page.waitForFunction((name) => {
             const cells = [...document.querySelectorAll('[data-test^="log-stream-name-cell-"]')];
             return cells.length > 0 && cells.every((c) => c.textContent.trim().includes(name));
-        }, streamName, { timeout: 15000 }).catch(() => {});
+        }, streamName, { timeout: 15000 }).catch(() => {
+            testLogger.warn('Stream list did not narrow to the searched stream within 15s', { streamName });
+        });
     }
 
     async openStreamDetail() {

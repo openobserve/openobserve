@@ -4,6 +4,7 @@ import { expect } from "@playwright/test";
 import DateTimeHelper from "./dashboard-time.js";
 import { selectLogsViewMode } from "../commonActions.js";
 import { LogsPage } from "../logsPages/logsPage.js";
+import testLogger from "../../playwright-tests/utils/test-logger.js";
 
 // Long enough for the empty-state overlay to reappear if the panel is genuinely empty.
 const quietPeriodProbeMs = 3000;
@@ -115,6 +116,7 @@ export default class LogsVisualise {
         if (idle && (sawRequest || Date.now() >= firstRequestDeadline)) return;
         await this.page.waitForTimeout(250);
       }
+      testLogger.warn(`Visualize pipeline still busy after ${timeout}ms; continuing`, { inFlight });
     } finally {
       this.page.off("request", onRequest);
       this.page.off("requestfinished", onRequestSettled);

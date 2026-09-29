@@ -2,6 +2,9 @@
 // Page Object Model for PromQL Builder Mode UI interactions
 // Covers: Label Filters, Operations, Options, Query Mode tabs, Add to Dashboard
 
+// Keyed by page so every PageManager built on the same page shares one set of listeners instead of stacking more.
+const promqlTrackers = new WeakMap();
+
 export class MetricsBuilderPage {
     constructor(page) {
         this.page = page;
@@ -176,22 +179,7 @@ export class MetricsBuilderPage {
         this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.toastError = page.locator('[data-test-variant="error"]');
 
-        // PromQL panel queries stream over SSE, so a response's headers arrive long before its data; track body completion instead.
-        this.promqlInFlight = new Set();
-        this.promqlLastActivity = Date.now();
-        const isPromql = (req) => /\/prometheus\/api\/v1\/query(_range)?/.test(req.url());
-        const settle = (req) => {
-            if (!isPromql(req)) return;
-            this.promqlInFlight.delete(req);
-            this.promqlLastActivity = Date.now();
-        };
-        page.on('request', (req) => {
-            if (!isPromql(req)) return;
-            this.promqlInFlight.add(req);
-            this.promqlLastActivity = Date.now();
-        });
-        page.on('requestfinished', settle);
-        page.on('requestfailed', settle);
+        this.promqlTracker = trackPromqlRequests(page);
     }
 
     // ============== Factory helpers for per-index locators ==============
@@ -969,11 +957,11 @@ export class MetricsBuilderPage {
         const since = Date.now();
         const deadline = since + timeout;
         while (Date.now() < deadline) {
-            const lastActivity = Math.max(this.promqlLastActivity, since);
-            if (this.promqlInFlight.size === 0 && Date.now() - lastActivity >= quietMs) return;
+            const lastActivity = Math.max(this.promqlTracker.lastActivity, since);
+            if (this.promqlTracker.inFlight.size === 0 && Date.now() - lastActivity >= quietMs) return;
             await new Promise((resolve) => setTimeout(resolve, 200));
         }
-        throw new Error(`PromQL queries still in flight after ${timeout}ms (${this.promqlInFlight.size} open)`);
+        throw new Error(`PromQL queries still in flight after ${timeout}ms (${this.promqlTracker.inFlight.size} open)`);
     }
 
     // ===== Add to Dashboard =====
@@ -1718,4 +1706,26 @@ export class MetricsBuilderPage {
     async hasErrorNotification() {
         return await this.toastError.isVisible({ timeout: 3000 }).catch(() => false);
     }
+}
+
+function trackPromqlRequests(page) {
+    const existing = promqlTrackers.get(page);
+    if (existing) return existing;
+    const tracker = { inFlight: new Set(), lastActivity: Date.now() };
+    // PromQL panel queries stream over SSE, so a response's headers arrive long before its data; track body completion instead.
+    const isPromql = (req) => /\/prometheus\/api\/v1\/query(_range)?/.test(req.url());
+    const settle = (req) => {
+        if (!isPromql(req)) return;
+        tracker.inFlight.delete(req);
+        tracker.lastActivity = Date.now();
+    };
+    page.on('request', (req) => {
+        if (!isPromql(req)) return;
+        tracker.inFlight.add(req);
+        tracker.lastActivity = Date.now();
+    });
+    page.on('requestfinished', settle);
+    page.on('requestfailed', settle);
+    promqlTrackers.set(page, tracker);
+    return tracker;
 }
