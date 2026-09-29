@@ -3185,7 +3185,7 @@ pub struct Log {
     pub local_time_format: String,
 }
 
-#[derive(Serialize, Debug, EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -3253,6 +3253,49 @@ pub struct Nats {
         default = ""
     )]
     pub kv_watch_modules: String,
+}
+
+impl std::fmt::Debug for Nats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            addr,
+            prefix,
+            user,
+            replicas,
+            history,
+            deliver_policy,
+            connect_timeout,
+            lock_wait_timeout,
+            subscription_capacity,
+            queue_max_age,
+            event_max_age,
+            lock_max_age,
+            queue_max_size,
+            event_storage,
+            v211_support,
+            kv_watch_modules,
+            password: _,
+        } = self;
+        f.debug_struct("Nats")
+            .field("addr", addr)
+            .field("prefix", prefix)
+            .field("user", user)
+            .field("password", &"[REDACTED]")
+            .field("replicas", replicas)
+            .field("history", history)
+            .field("deliver_policy", deliver_policy)
+            .field("connect_timeout", connect_timeout)
+            .field("lock_wait_timeout", lock_wait_timeout)
+            .field("subscription_capacity", subscription_capacity)
+            .field("queue_max_age", queue_max_age)
+            .field("event_max_age", event_max_age)
+            .field("lock_max_age", lock_max_age)
+            .field("queue_max_size", queue_max_size)
+            .field("event_storage", event_storage)
+            .field("v211_support", v211_support)
+            .field("kv_watch_modules", kv_watch_modules)
+            .finish()
+    }
 }
 
 #[derive(Serialize, Debug, Default, EnvConfig)]
@@ -4857,6 +4900,19 @@ mod tests {
     #[test]
     fn every_env_config_default_parses() {
         let _ = super::Config::init().expect("a default failed to parse");
+    }
+
+    #[test]
+    fn nats_debug_redacts_password() {
+        let nats = super::Nats {
+            addr: "nats:4222".to_string(),
+            user: "nats-user".to_string(),
+            password: "NATS-PASSWORD-VALUE".to_string(),
+            ..Default::default()
+        };
+        let printed = format!("{nats:?}");
+        assert!(!printed.contains("NATS-PASSWORD-VALUE"), "{printed}");
+        assert!(printed.contains("nats:4222"));
     }
 
     #[test]
