@@ -169,17 +169,6 @@ describe("OButton", () => {
     expect(classes).toContain("w-8");
   });
 
-  it("applies icon-sm-split size classes (sm height, square width, no horizontal padding)", () => {
-    const wrapper = mount(OButton, { props: { size: "icon-sm-split", iconLeft: "add" } });
-    const classes = wrapper.classes();
-    expect(classes).toContain("h-[2.125rem]");
-    expect(classes).toContain("w-8");
-    expect(classes).toContain("p-0");
-    expect(classes).toContain("shrink-0");
-    expect(classes).not.toContain("ps-3");
-    expect(classes).not.toContain("pe-3");
-  });
-
   it("applies icon-md size classes (h-10 w-10)", () => {
     const wrapper = mount(OButton, { props: { size: "icon-md" } });
     const classes = wrapper.classes().join(" ");

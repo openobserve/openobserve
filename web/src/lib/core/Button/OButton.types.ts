@@ -73,8 +73,6 @@ export type ButtonSize =
   | "icon-xs-sq"
   | "icon-chip"
   | "icon-sm"
-  // sm height, icon-only width — the narrow segment of a split button beside an sm button
-  | "icon-sm-split"
   | "icon-md"
   | "icon-lg"
   | "icon-circle"

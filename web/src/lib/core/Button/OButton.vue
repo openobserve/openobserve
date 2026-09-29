@@ -295,8 +295,6 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 24px square — matches chip size for paired close/remove buttons
   "icon-chip": "h-6 w-6 shrink-0 p-0 rounded-default gap-x-0",
   "icon-sm": "h-8 w-8 shrink-0 p-0 rounded-default gap-x-0",
-  // sm height so a split-button segment lines up with the sm button it sits beside
-  "icon-sm-split": "h-[2.125rem] w-8 shrink-0 p-0 rounded-default gap-x-0",
   "icon-md": "h-10 w-10 shrink-0 p-0 rounded-default gap-x-0",
   "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
