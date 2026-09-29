@@ -354,6 +354,10 @@
       "title": "İz bulunamadı",
       "description": "Seçilen hizmet ve zaman aralığıyla eşleşen iz yok. Daha geniş bir zaman aralığı veya farklı bir hizmet deneyin."
     },
+    "noProfiles": {
+      "title": "Profil bulunamadı",
+      "description": "Zaman aralığınız bu akıştan herhangi bir profil verisi içermiyor. Daha geniş bir zaman aralığı veya farklı bir hizmet deneyin."
+    },
     "noServiceGraph": {
       "title": "Servis grafiği verisi yok",
       "description": "Daha uzun bir zaman aralığı sorgulamayı deneyin veya hizmetlerinizin span metrikleri yaydığından emin olun."
@@ -421,6 +425,7 @@
       "alerts": "uyarılar",
       "incidents": "olaylar",
       "traces": "izler",
+      "profiles": "profiller",
       "discoveryItems": "sağlıksız öğeler",
       "datasetItems": "öğeler",
       "searches": "aramalar",
@@ -1306,6 +1311,8 @@
     "tagKey": "Etiket anahtarı",
     "tagValue": "Etiket değeri",
     "addFilter": "Filtre ekle",
+    "removeFilter": "Filtreyi kaldır {key}={value}",
+    "searchFrames": "Çerçeveleri ara",
     "runQuery": "Sorguyu çalıştır",
     "timeSeriesTitle": "Zaman içinde profil değerleri",
     "resultTitle": "Profil sonucu",
@@ -1314,14 +1321,28 @@
     "viewTree": "Yığın ağacı",
     "self": "Kendi",
     "total": "Toplam",
+    "share": "Paylaş",
     "cpuDuration": "CPU süresi",
     "percent": "%",
+    "sortBySelf": "Self'e göre sırala",
+    "sortByTotal": "Toplama göre sırala",
     "noStreams": "Kullanılabilir profil akışı yok",
-    "noSeries": "Bu aralıkta zaman serisi verisi yok",
-    "noResults": "Bu aralıkta profil sonucu yok",
+    "noSeries": "Veri yok",
+    "noResults": "Profil bulunamadı",
+    "noProfilesFound": "Profil bulunamadı",
+    "noProfilesFoundDesc": "Zaman aralığınız bu akıştan herhangi bir profil verisi içermiyor. Daha geniş bir zaman aralığı veya farklı bir hizmet deneyin.",
+    "loading": "Profiller yükleniyor…",
     "filters": "Filtreler",
     "expand": "Genişlet",
     "collapse": "Daralt",
+    "resetFocus": "Odağı sıfırla",
+    "labelAlign": "Etiket hizalaması",
+    "alignLeft": "Sola hizala",
+    "alignRight": "Sağa hizala",
+    "inverted": "Ters",
+    "copyFunctionName": "İşlev adını kopyala",
+    "focusBlock": "Bloğa odaklan",
+    "focusOfTotal": "{percent}% toplam",
     "errors": {
       "loadFailed": "Profil verileri yüklenemedi"
     }
@@ -2771,6 +2792,13 @@
         "node": "Uyarı tetikleyicisi",
         "desc": "Bir uyarı tetiklendiğinde çalıştır",
         "intro": "Bağlı bir uyarı tetiklendiğinde, aşağı akıştaki her adım bu veri yükünü alır."
+      },
+      "alertResolved": {
+        "label": "Uyarı Çözüldü",
+        "tab": "Çözüldü",
+        "node": "Uyarı Çözüldü Tetikleyicisi",
+        "desc": "Tetiklenen bir uyarı kurtarıldığında çalıştır",
+        "intro": "Tetiklenen bir uyarı kurtarıldığında, tüm alt adımlar bu yükü alır."
       },
       "incidentEvent": {
         "label": "Olay etkinliği",
@@ -7435,6 +7463,8 @@
         "streamName": "Uyarının izlediği akışın adı",
         "alertName": "Uyarının adı",
         "alertType": "Uyarı türü (ör. zamanlanmış, gerçek zamanlı)",
+        "alertStatus": "tetikleniyor veya çözüldü — bir kurtarma mesajının yeni bir uyarıdan farklı okunmasını sağlar",
+        "episodeId": "Bu tetiklenme için benzersiz kimlik, kurtarması tarafından paylaşılır. Uyarının çözülebilmesi için PagerDuty, Opsgenie ve ServiceNow'a otomatik olarak gönderilir.",
         "alertPeriod": "Değerlendirme penceresi, dakika cinsinden",
         "alertOperator": "Eşik karşılaştırma operatörü (>, <, =)",
         "alertThreshold": "Yapılandırılmış eşik değeri",
@@ -7449,7 +7479,19 @@
         "alertTriggerTimeSeconds": "Epoch saniye cinsinden tetikleme zamanı",
         "alertTriggerTimeStr": "İnsan tarafından okunabilir tetikleme zamanı",
         "rows": "Satır şablonuna göre biçimlendirilmiş tüm eşleşen satırlar"
-      }
+      },
+      "notifyOnRecovery": "Kurtarma durumunda bildir",
+      "notifyOnRecoveryTooltip": "Bu uyarı tetiklenmeyi durdurduğunda yukarıdaki hedeflere bir mesaj gönder.",
+      "notifyOnRecoveryTemplateHint": "Şablonunuzu yeniden kullanan hedefler {'{'}alert_status{'}'} içermelidir, aksi halde kurtarma mesajı yeni bir uyarı gibi görünür.",
+      "recoveryDestinations": "Kurtarma hedefi",
+      "recoveryDestinationsTooltip": "Kurtarmayı uyarının tetiklendiği her yerde duyurmak için boş bırakın. Bunun yerine başka bir yere göndermek için buradan hedefleri seçin. PagerDuty, Opsgenie ve ServiceNow kendi tetiklenmelerinin açtığı talebi yine de kapatır.",
+      "recoveryResolvesIncident": "olayı çözer",
+      "recoveryClosesAlert": "uyarıyı kapatır",
+      "recoveryChatMessage": "yeni \"Çözüldü\" mesajı",
+      "keepFiringFor": "Tetiklenme süresi",
+      "keepFiringForTooltip": "Koşul temizlendikten sonra kurtarmadan önce bu kadar bekleyin. 0 hemen kurtarır.",
+      "keepFiringForInvalid": "0 veya daha fazla saniye girin",
+      "keepFiringForTooLong": "En fazla 86400 saniye (24 saat) girin"
     },
     "advanced": {
       "addVariable": "Değişken Ekle",
@@ -7680,6 +7722,8 @@
       "servicenowPasswordHelp": "ServiceNow şifresi veya API token'ı",
       "servicenowAssignmentGroup": "Atama Grubu (isteğe bağlı)",
       "servicenowAssignmentGroupHelp": "Olayların atanacağı grup (ör. IT Operasyonları)",
+      "servicenowResolutionCode": "Çözüm kodu (isteğe bağlı)",
+      "servicenowResolutionCodeHelp": "ServiceNow örneğinizde geçerli bir çözüm koduyla eşleşmelidir. OpenObserve olayı çözdüğünde kullanılır. Varsayılan olarak Solved (Permanently) olur.",
       "usernameRequired": "Kullanıcı adı gereklidir",
       "passwordRequired": "Şifre gereklidir",
       "emailRecipients": "Alıcı E-posta Adresleri",
@@ -7976,7 +8020,8 @@
     "sloKind": "Koşul türü",
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
-    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz."
+    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
+    "seconds": "Saniye"
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -8174,6 +8219,7 @@
     "filterPrebuilt": "Önceden oluşturulmuş",
     "filterCustom": "Özel",
     "variableRowsDescription": "satır şablonunun birden çok satırı",
+    "variableEpisodeIdDescription": "Bu tetiklenme için benzersiz kimlik. Uyarının çözülebilmesi için PagerDuty, Opsgenie ve ServiceNow yüklerine otomatik olarak eklenir.",
     "variableStreamFields": "Akış alanlarının tümü değişkendir.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} satırları veya dize uzunluğunu sınırlamak için kullanılır.",
     "variableTimezoneNote": "Zaman damgası değişkenleri ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) sunucunun yerel saat diliminde işlenir.",
@@ -13096,6 +13142,7 @@
       "promptLabel": "Yargıç istemi",
       "includeReasoningLabel": "Gerekçeyi Dahil Et",
       "includeReasoningHint": "Hakem, bu puanı neden verdiğini açıklar ve her sonuçla birlikte kaydedilir.",
+      "decisionProviderNote": "Karar modelleri yalnızca bir puan ve gerekçe döndürür, bu nedenle ek alanlar kullanılamaz.",
       "extraFieldsLabel": "Ek Meta Veri Alanları (İsteğe Bağlı)",
       "extraFieldsHint": "Hakemden her puanla birlikte ek değerler döndürmesini isteyin — örneğin bir kategori veya güven düzeyi.",
       "extraFields": {
@@ -19522,6 +19569,8 @@
     "unroutedDismissedTag": "kapatıldı",
     "notAvailableTitle": "Nöbet özelliği bu dağıtımda kullanılamıyor",
     "notAvailableDescription": "Bağlantı sorunsuz — bu sürüm burada nöbet desteği sunmuyor. Hiçbir şey başarısız olmadı ve yeniden denenecek bir şey yok.",
+    "teamNotFoundTitle": "Ekip bulunamadı",
+    "teamNotFoundDescription": "Bu ekip artık mevcut değil. Silinmiş olabilir.",
     "unroutedPagedNobody": "Kimse bilgilendirilmedi",
     "unroutedLoadFailed": "Yönlendirilmemiş kuyruk yüklenemedi",
     "routingLoadFailed": "Sahiplik ve yönlendirme yüklenemedi",

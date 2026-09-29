@@ -320,6 +320,7 @@ export function usePrebuiltDestinations() {
     // Sample alert data with realistic context
     const sampleData: Record<string, string> = {
       alert_name: "Test Alert - High CPU Usage",
+      alert_status: "firing",
       stream_name: "system-metrics",
       stream_type: "logs",
       alert_count: "15",
@@ -436,6 +437,7 @@ export function usePrebuiltDestinations() {
 
       const sampleData: Record<string, string> = {
         alert_name: "Test Alert - High CPU Usage",
+        alert_status: "firing",
         stream_name: "system-metrics",
         stream_type: "logs",
         alert_count: "15",

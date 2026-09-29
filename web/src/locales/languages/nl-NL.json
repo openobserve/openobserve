@@ -354,6 +354,10 @@
       "title": "Geen traces gevonden",
       "description": "Geen traces komen overeen met de geselecteerde service en het tijdsbereik. Probeer een breder tijdsbereik of een andere service."
     },
+    "noProfiles": {
+      "title": "Geen profielen gevonden",
+      "description": "Uw tijdvenster bevat geen profielgegevens uit deze stream. Probeer een breder tijdbereik of een andere service."
+    },
     "noServiceGraph": {
       "title": "Geen servicegrafiekgegevens",
       "description": "Probeer een langer tijdsbereik te doorzoeken, of zorg ervoor dat uw services span-metrieken uitzenden."
@@ -421,6 +425,7 @@
       "alerts": "waarschuwingen",
       "incidents": "incidenten",
       "traces": "traces",
+      "profiles": "profielen",
       "discoveryItems": "ongezonde items",
       "datasetItems": "items",
       "searches": "zoekopdrachten",
@@ -1306,6 +1311,8 @@
     "tagKey": "Tag-sleutel",
     "tagValue": "Tag-waarde",
     "addFilter": "Filter toevoegen",
+    "removeFilter": "Filter {key}={value} verwijderen",
+    "searchFrames": "Frames zoeken",
     "runQuery": "Query uitvoeren",
     "timeSeriesTitle": "Profielwaarden in de tijd",
     "resultTitle": "Profielresultaat",
@@ -1314,14 +1321,28 @@
     "viewTree": "Stackboom",
     "self": "Zelf",
     "total": "Totaal",
+    "share": "Delen",
     "cpuDuration": "CPU-duur",
     "percent": "%",
+    "sortBySelf": "Sorteren op Self",
+    "sortByTotal": "Sorteren op Totaal",
     "noStreams": "Geen profielstreams beschikbaar",
-    "noSeries": "Geen tijdreeksgegevens in dit bereik",
-    "noResults": "Geen profielresultaat in dit bereik",
+    "noSeries": "Geen gegevens",
+    "noResults": "Geen profielen gevonden",
+    "noProfilesFound": "Geen profielen gevonden",
+    "noProfilesFoundDesc": "Uw tijdvenster bevat geen profielgegevens uit deze stream. Probeer een breder tijdbereik of een andere service.",
+    "loading": "Profielen laden…",
     "filters": "Filters",
     "expand": "Uitvouwen",
     "collapse": "Inklappen",
+    "resetFocus": "Focus resetten",
+    "labelAlign": "Labeluitlijning",
+    "alignLeft": "Links uitlijnen",
+    "alignRight": "Rechts uitlijnen",
+    "inverted": "Omgekeerd",
+    "copyFunctionName": "Functienaam kopiëren",
+    "focusBlock": "Blok focussen",
+    "focusOfTotal": "{percent}% van totaal",
     "errors": {
       "loadFailed": "Kan profielgegevens niet laden"
     }
@@ -2771,6 +2792,13 @@
         "node": "Alerttrigger",
         "desc": "Uitvoeren wanneer een alert afgaat",
         "intro": "Wanneer een gekoppelde alert afgaat, ontvangt elke downstream-stap deze payload."
+      },
+      "alertResolved": {
+        "label": "Alarm opgelost",
+        "tab": "Opgelost",
+        "node": "Trigger voor alarm opgelost",
+        "desc": "Uitvoeren wanneer een actief alarm herstelt",
+        "intro": "Wanneer een alarm dat is afgegaan herstelt, ontvangt elke volgende stap deze payload."
       },
       "incidentEvent": {
         "label": "Incident event",
@@ -7435,6 +7463,8 @@
         "streamName": "Naam van de stream waar de alert op let",
         "alertName": "De naam van de alert",
         "alertType": "Alerttype (bijv. gepland, real-time)",
+        "alertStatus": "actief of opgelost — laat een herstelbericht anders lezen dan een nieuw alarm",
+        "episodeId": "Unieke id voor deze activering, gedeeld met het bijbehorende herstel. Wordt automatisch naar PagerDuty, Opsgenie en ServiceNow verzonden zodat het alarm kan worden opgelost.",
         "alertPeriod": "Evaluatievenster, in minuten",
         "alertOperator": "Operator voor drempelvergelijking (>, <, =)",
         "alertThreshold": "De geconfigureerde drempelwaarde",
@@ -7449,7 +7479,19 @@
         "alertTriggerTimeSeconds": "Triggentijd in epoch-seconden",
         "alertTriggerTimeStr": "Triggentijd, mensleesbaar",
         "rows": "Alle overeenkomende rijen, opgemaakt door de rijtemplate"
-      }
+      },
+      "notifyOnRecovery": "Melden bij herstel",
+      "notifyOnRecoveryTooltip": "Stuur één bericht naar de bovenstaande bestemmingen wanneer dit alarm niet meer afgaat.",
+      "notifyOnRecoveryTemplateHint": "Bestemmingen die uw sjabloon hergebruiken moeten {'{'}alert_status{'}'} bevatten, anders lijkt het herstelbericht op een nieuw alarm.",
+      "recoveryDestinations": "Herstelbestemming",
+      "recoveryDestinationsTooltip": "Laat leeg om het herstel aan te kondigen waar het alarm ook afging. Kies hier bestemmingen om het ergens anders naartoe te sturen. PagerDuty, Opsgenie en ServiceNow sluiten nog steeds het ticket dat hun eigen activering heeft geopend.",
+      "recoveryResolvesIncident": "lost het incident op",
+      "recoveryClosesAlert": "sluit het alarm",
+      "recoveryChatMessage": "nieuw \"Opgelost\"-bericht",
+      "keepFiringFor": "Blijf afgaan gedurende",
+      "keepFiringForTooltip": "Wacht zo lang nadat de voorwaarde is verdwenen voordat wordt hersteld. 0 herstelt onmiddellijk.",
+      "keepFiringForInvalid": "Voer 0 of meer seconden in",
+      "keepFiringForTooLong": "Voer maximaal 86400 seconden in (24 uur)"
     },
     "advanced": {
       "addVariable": "Variabele toevoegen",
@@ -7680,6 +7722,8 @@
       "servicenowPasswordHelp": "ServiceNow-wachtwoord of API-token",
       "servicenowAssignmentGroup": "Toewijzingsgroep (optioneel)",
       "servicenowAssignmentGroupHelp": "Groep waaraan incidenten worden toegewezen (bijv., IT Operations)",
+      "servicenowResolutionCode": "Oplossingscode (optioneel)",
+      "servicenowResolutionCodeHelp": "Moet overeenkomen met een geldige oplossingscode op uw ServiceNow-exemplaar. Wordt gebruikt wanneer OpenObserve het incident oplost. Standaard is Solved (Permanently).",
       "usernameRequired": "Gebruikersnaam is vereist",
       "passwordRequired": "Wachtwoord is vereist",
       "emailRecipients": "E-mailadressen van ontvangers",
@@ -7976,7 +8020,8 @@
     "sloKind": "Conditietype",
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
-    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond."
+    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
+    "seconds": "Seconden"
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -8174,6 +8219,7 @@
     "filterPrebuilt": "Voorgebouwd",
     "filterCustom": "Op maat",
     "variableRowsDescription": "meerdere regels van rijsjabloon",
+    "variableEpisodeIdDescription": "Unieke id voor deze activering. Wordt automatisch toegevoegd aan PagerDuty-, Opsgenie- en ServiceNow-payloads zodat het alarm kan worden opgelost.",
     "variableStreamFields": "Alle streamvelden zijn variabelen.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} gebruikt om rijen of tekenreekslengte te beperken.",
     "variableTimezoneNote": "Tijdstempelvariabelen ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) worden weergegeven in de lokale tijdzone van de server.",
@@ -13096,6 +13142,7 @@
       "promptLabel": "Prompt van de rechter",
       "includeReasoningLabel": "Redenering opnemen",
       "includeReasoningHint": "De beoordelaar legt uit waarom het die score gaf, opgeslagen bij elk resultaat.",
+      "decisionProviderNote": "Beslissingsmodellen retourneren alleen een score en een redenering, dus extra velden zijn niet beschikbaar.",
       "extraFieldsLabel": "Extra Metadata-velden (Optioneel)",
       "extraFieldsHint": "Vraag de beoordelaar om extra waarden bij elke score te retourneren — bijvoorbeeld een categorie of een vertrouwensniveau.",
       "extraFields": {
@@ -19522,6 +19569,8 @@
     "unroutedDismissedTag": "genegeerd",
     "notAvailableTitle": "On-call is niet beschikbaar op deze deployment",
     "notAvailableDescription": "De link is prima — deze build biedt hier geen on-call aan. Er is niets mislukt en er is niets om opnieuw te proberen.",
+    "teamNotFoundTitle": "Team niet gevonden",
+    "teamNotFoundDescription": "Dit team bestaat niet meer. Het is mogelijk verwijderd.",
     "unroutedPagedNobody": "Niemand opgeroepen",
     "unroutedLoadFailed": "Kan de ongerouteerde wachtrij niet laden",
     "routingLoadFailed": "Kan eigendom en routing niet laden",
