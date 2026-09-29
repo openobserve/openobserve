@@ -994,7 +994,8 @@ export default defineComponent({
       height: auto !important;
       min-height: 100% !important;
       max-height: none !important;
-      overflow: visible !important;
+      overflow-x: clip !important;
+      overflow-y: visible !important;
     }
 
     :deep(.table-wrapper .my-sticky-virtscroll-table) {
