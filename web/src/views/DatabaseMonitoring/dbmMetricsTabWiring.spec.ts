@@ -102,4 +102,20 @@ describe("dbm metrics tab wiring", () => {
       /defineAsyncComponent\(\s*\(\) => import\("@\/components\/dashboards\/PanelSchemaRenderer\.vue"\)/,
     );
   });
+
+  it("turns a missing server-vantage stream into a pointer to the setup card", () => {
+    expect(page).toContain("loadNotCollecting.value = panelErrorIsStreamMissing(event)");
+    expect(page).toMatch(/v-else-if="loadNotCollecting"/);
+    expect(page).toMatch(/@action="openSetup"/);
+    expect(page).toMatch(/router\s*\.push\(\{ name: DBM_SETUP_ROUTE/);
+  });
+
+  it("sends every catalog panel's missing-stream state to the same setup card", () => {
+    expect(panel).toContain("streamMissing.value = panelErrorIsStreamMissing(event)");
+    expect(panel).toMatch(/v-else-if="streamMissing"/);
+    expect(panel).toContain("@action=\"emit('setup')\"");
+    const sites = page.match(/<DbmMetricPanel[\s\S]*?\/>/g) ?? [];
+    expect(sites.length).toBeGreaterThan(0);
+    for (const site of sites) expect(site).toContain('@setup="openSetup"');
+  });
 });

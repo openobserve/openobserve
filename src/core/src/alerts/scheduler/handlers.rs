@@ -64,17 +64,7 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
-/// Fold this evaluation's outcome into the alert's durable state (Part IV of
-/// `alerts.md`).
-///
-/// Best-effort by design: state persistence must never fail an evaluation that
-/// has already run and notified. Failures are logged, not propagated.
-/// Returns `false` when a write was attempted and failed. Best-effort for the
-/// single-row path (a state write must never fail an evaluation that already
-/// notified), but the per-group caller MUST check it: dispatching against
-/// stale state would send a group's page under the previous episode, and its
-/// delivery callback would then be rejected as stale — a page with no record
-/// that it happened.
+/// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
 #[must_use]
 async fn persist_alert_run_state(
     alert: &config::meta::alerts::alert::Alert,
@@ -82,6 +72,7 @@ async fn persist_alert_run_state(
     outcome: &RunOutcome,
     level: Option<config::meta::alerts::level::AlertLevel>,
     grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
+    episode: &config::meta::alerts::recovery::EpisodeInput,
 ) -> bool {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
@@ -156,7 +147,10 @@ async fn persist_alert_run_state(
     let prev = match infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await {
         Ok(p) => p,
         Err(e) => {
-            log::warn!("[SCHEDULER] could not read alert state for {alert_id}: {e}");
+            log::warn!(
+                "[SCHEDULER] could not read alert state for {}/{alert_id}: {e}",
+                alert.org_id
+            );
             return false;
         }
     };
@@ -165,7 +159,7 @@ async fn persist_alert_run_state(
     // the same evaluation, and two `now_micros()` calls would let the coverage
     // record and the freshness clock disagree about when it happened.
     let now = now_micros();
-    let update = apply_outcome(
+    let mut update = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.as_ref(),
@@ -173,6 +167,17 @@ async fn persist_alert_run_state(
         level,
         now,
     );
+
+    // Emitted only once `persist` committed, or consumers hear of an unrecorded recovery.
+    let recovered = update.state.as_mut().and_then(|state| {
+        let firing = state.level.is_some_and(|l| l.is_firing());
+        config::meta::alerts::recovery::apply_episode(state, firing, episode, now, || {
+            episode
+                .episode_id
+                .clone()
+                .unwrap_or_else(config::ider::uuid)
+        })
+    });
 
     // ── Availability ledger (S-16) ──────────────────────────────────────────
     // Fleet-wide from the day this ships, deliberately: a lazy
@@ -203,8 +208,19 @@ async fn persist_alert_run_state(
         return true;
     }
     if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
-        log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
+        log::error!(
+            "[SCHEDULER] could not persist alert state for {}/{alert_id}: {e}",
+            alert.org_id
+        );
         return false;
+    }
+
+    if let Some(closed) = recovered
+        && let Some(state) = update.state.as_ref()
+    {
+        let event =
+            config::meta::alerts::recovery::recovery_event(&alert.org_id, state, closed, now);
+        crate::alerts::recovery::dispatch_recovery(alert, &event).await;
     }
 
     // Composite parents observe this rollup row. Nudge them on a level/outcome
@@ -333,6 +349,7 @@ async fn dispatch_per_group(
         &rollup_outcome,
         rollup_level,
         Some(classification),
+        &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
     )
     .await
     {
@@ -441,6 +458,7 @@ async fn dispatch_per_group(
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
                 &[],
+                None,
             )
             .await;
 
@@ -695,7 +713,9 @@ async fn nudge_composite_parents(
     {
         Ok(parents) => parents,
         Err(error) => {
-            log::error!("[COMPOSITE_ALERT] failed to look up parents for {child_id}: {error}");
+            log::error!(
+                "[COMPOSITE_ALERT] failed to look up parents for {org}/{child_id}: {error}"
+            );
             return;
         }
     };
@@ -709,7 +729,7 @@ async fn nudge_composite_parents(
                 .await
         {
             log::error!(
-                "[COMPOSITE_ALERT] failed to increment generation for parent {}: {error}",
+                "[COMPOSITE_ALERT] failed to increment generation for parent {org}/{}: {error}",
                 parent.id
             );
             continue;
@@ -725,7 +745,7 @@ async fn nudge_composite_parents(
             parent_job.next_run_at = parent_job.next_run_at.min(debounce_at);
             if let Err(error) = infra::scheduler::update_trigger(parent_job, false).await {
                 log::error!(
-                    "[COMPOSITE_ALERT] failed to advance parent {}: {error}",
+                    "[COMPOSITE_ALERT] failed to advance parent {org}/{}: {error}",
                     parent.id
                 );
             }
@@ -1014,7 +1034,8 @@ async fn handle_composite_alert_trigger(
                 .map(|outcome| outcome.is_some())
                 .unwrap_or_else(|error| {
                     log::error!(
-                        "[COMPOSITE_ALERT] incident correlation failed for {}: {error}",
+                        "[COMPOSITE_ALERT] incident correlation failed for {}/{}: {error}",
+                        trigger.org,
                         definition.definition.id
                     );
                     false
@@ -1052,6 +1073,7 @@ async fn handle_composite_alert_trigger(
                         Some(i32::from(evaluated.result) as f64),
                         None,
                         skip_destinations,
+                        None,
                     )
                     .await
             };
@@ -1077,7 +1099,8 @@ async fn handle_composite_alert_trigger(
                 }
                 Err(error) => {
                     log::error!(
-                        "[COMPOSITE_ALERT] delivery failed for {}: {error}",
+                        "[COMPOSITE_ALERT] delivery failed for {}/{}: {error}",
+                        trigger.org,
                         definition.definition.id
                     );
                     trigger.retries = trigger.retries.saturating_add(1);
@@ -1371,7 +1394,10 @@ async fn handle_anomaly_detection_triggers(
                     count,
                 ),
                 Err(e) => {
-                    log::error!("[anomaly_detection] detection failed for {anomaly_id}: {e}");
+                    log::error!(
+                        "[anomaly_detection] detection failed for {}/{anomaly_id}: {e}",
+                        trigger.org
+                    );
                     (RunOutcome::Error, Some(e.to_string()), None, 0i32)
                 }
             }
@@ -1431,14 +1457,30 @@ async fn handle_anomaly_detection_triggers(
     if matches!(trigger_status, RunOutcome::Firing | RunOutcome::Normal) && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
-            use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+            use infra::table::entity::anomaly_detection_config as anomaly_entity;
+            use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+
             let mut active = config.into_active_model();
             active.status = Set(AnomalyStatus::Active.to_i32());
             active.updated_at = Set(run_end_us);
-            if let Err(e) = active.update(db).await {
-                log::warn!(
-                    "[anomaly_detection] failed to reset status to Active for {anomaly_id}: {e}"
-                );
+            // Without this predicate a stale Active write spawns a second concurrent training.
+            match anomaly_entity::Entity::update_many()
+                .set(active)
+                .filter(anomaly_entity::Column::AnomalyId.eq(anomaly_id.as_str()))
+                .filter(anomaly_entity::Column::Status.ne(AnomalyStatus::Training.to_i32()))
+                .exec(db)
+                .await
+            {
+                // Losing the CAS means a training holds the row and writes the real status itself.
+                Ok(res) if res.rows_affected == 0 => log::debug!(
+                    "[anomaly_detection] status not reset to Active for {anomaly_id}: a training \
+                     claim holds the row"
+                ),
+                Ok(_) => {}
+                Err(e) => log::warn!(
+                    "[anomaly_detection] failed to reset status to Active for {}/{anomaly_id}: {e}",
+                    trigger.org
+                ),
             }
         }
     }
@@ -1744,12 +1786,180 @@ pub(crate) async fn page_for_alert_firing(
                     );
                 }
             }
+            // §2.2: one L0 run for the whole firing, not one per team it woke.
+            trigger_rca_for_alert_firing(trace_id, alert, opened).await;
         }
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] on-call paging failed for {}/{}: {e}",
                 alert.org_id,
                 alert.name
+            );
+        }
+    }
+}
+
+/// I9-I11: one RCA run for a whole firing, guarded by config, agent health and
+/// "no analysis already pending on these records" — the three guards §2.3 says
+/// apply to an alert subject, cooldown and in-flight-via-event-log having no
+/// referent here. Mirrors `create_new_incident`'s spawn shape (guards, spawn,
+/// `tokio::spawn`), but serves every record `opened` rather than one incident.
+///
+/// Blocked by any guard ⇒ `escalation::skip_analysis` for every record, so I9's
+/// removal of the incident-only gate never holds a page with nothing coming to
+/// release it (I10).
+#[cfg(feature = "enterprise")]
+async fn trigger_rca_for_alert_firing(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    opened: Vec<o2_enterprise::enterprise::oncall::escalation::PagedGroup>,
+) {
+    use o2_enterprise::enterprise::{
+        ai::client::get_agent_client, common::config::get_config as get_o2_config,
+        oncall::escalation,
+    };
+
+    let cfg = get_o2_config();
+    // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
+    if !cfg.incidents.rca_enabled || !cfg.ai.enabled || cfg.ai.agent_url.is_empty() {
+        release_alert_firing_hold(&alert.org_id, &opened).await;
+        return;
+    }
+
+    let org_id = alert.org_id.clone();
+    let alert_name = alert.name.clone();
+    let stream_name = alert.stream_name.clone();
+    let alert_id = alert.id.map(|id| id.to_string());
+    let severity = alert
+        .priority
+        .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
+    let trace_id = trace_id.to_string();
+
+    tokio::spawn(async move {
+        // §2.3: the record's own `AnalysisState` is the in-flight marker a retried opener reads.
+        // Asked before the credentials fetch and the health round-trip, so a firing that reopened
+        // nothing pays for neither.
+        let mut pending = Vec::new();
+        for paged in &opened {
+            if escalation::analysis_may_run(&org_id, &paged.response.subject).await {
+                pending.push(paged);
+            }
+        }
+        let Some(representative) = pending.first() else {
+            // Nothing is waiting on an answer — every record was already settled.
+            return;
+        };
+
+        let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("[SCHEDULER trace_id {trace_id}] no RCA credentials for {org_id}: {e}");
+                release_alert_firing_hold(&org_id, &opened).await;
+                return;
+            }
+        };
+        let auth_header = crate::auth::build_basic_auth_header(&email, &token);
+
+        let Some(client) = get_agent_client() else {
+            log::warn!("[SCHEDULER trace_id {trace_id}] RCA agent client not initialized");
+            release_alert_firing_hold(&org_id, &opened).await;
+            return;
+        };
+
+        if let Err(e) = client.health(&auth_header).await {
+            log::debug!("[SCHEDULER trace_id {trace_id}] agent health check failed: {e}");
+            release_alert_firing_hold(&org_id, &opened).await;
+            return;
+        }
+
+        // One report is written to every record this firing opened, so scoping the prompt to one
+        // group's dimensions would mis-describe the others. Sent only when they all agree.
+        let dimensions = pending
+            .iter()
+            .all(|p| p.dimensions == representative.dimensions)
+            .then(|| serde_json::to_value(&representative.dimensions).ok())
+            .flatten();
+
+        // §2.2: one context for the whole firing — every record it opened reads the same answer.
+        let context = config::meta::oncall::RcaContext {
+            subject_type: config::meta::oncall::SubjectType::Alert,
+            // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
+            subject_id: alert_id.unwrap_or_else(|| representative.response.subject.subject_id()),
+            // Omitted, never null — the agent routes on `"incident_id" in context`.
+            incident_id: None,
+            org_id: org_id.clone(),
+            previous_analysis: None,
+            severity: Some(severity),
+            past_causes: o2_enterprise::enterprise::alerts::rca_service::past_causes_for_record(
+                &org_id,
+                &representative.response.id,
+            )
+            .await,
+            alert_name: Some(alert_name.clone()),
+            stream: Some(stream_name),
+            dimensions,
+        };
+        let subjects: Vec<config::meta::oncall::SubjectRef> =
+            pending.iter().map(|p| p.response.subject.clone()).collect();
+
+        match client.analyze_incident(context, &auth_header).await {
+            Ok(content) if !content.is_empty() => {
+                o2_enterprise::enterprise::alerts::rca_service::save_rca_result_for_records(
+                    &org_id, &subjects, &content, None,
+                )
+                .await;
+            }
+            Ok(_) => {
+                release_analysis_without_verdict(&org_id, &subjects).await;
+            }
+            Err(e) => {
+                log::warn!(
+                    "[SCHEDULER trace_id {trace_id}] RCA call failed for {org_id}/{alert_name}: {e}"
+                );
+                release_analysis_without_verdict(&org_id, &subjects).await;
+            }
+        }
+    });
+}
+
+/// I10 again, for a run that happened and came back empty: `Failed`, not `Skipped`, because the
+/// agent was asked. Without it the hold serves out the whole triage budget waiting on an answer
+/// that already came back.
+#[cfg(feature = "enterprise")]
+async fn release_analysis_without_verdict(
+    org_id: &str,
+    subjects: &[config::meta::oncall::SubjectRef],
+) {
+    let now = config::utils::time::now_micros();
+    for subject in subjects {
+        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::analysis_produced_no_verdict(
+            org_id, subject, now,
+        )
+        .await
+        {
+            log::warn!("[SCHEDULER] could not release the triage hold on {subject}: {e}");
+        }
+    }
+}
+
+/// I10: nothing is coming, so nothing may go on holding a page for one.
+#[cfg(feature = "enterprise")]
+async fn release_alert_firing_hold(
+    org_id: &str,
+    opened: &[o2_enterprise::enterprise::oncall::escalation::PagedGroup],
+) {
+    let now = config::utils::time::now_micros();
+    for paged in opened {
+        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::skip_analysis(
+            org_id,
+            &paged.response.subject,
+            now,
+        )
+        .await
+        {
+            log::warn!(
+                "[SCHEDULER] could not release the triage hold on {}: {e}",
+                paged.response.id
             );
         }
     }
@@ -1786,8 +1996,9 @@ async fn handle_alert_triggers(
             Ok(Some((_, alert))) => alert,
             Ok(None) => {
                 log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert not found for module_key: {}, deleting this trigger job",
-                    trigger.module_key
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert not found for module_key: {}, org_id: {}, deleting this trigger job",
+                    trigger.module_key,
+                    trigger.org
                 );
                 if let Err(e) = db::scheduler::delete(
                     &trigger.org,
@@ -1797,7 +2008,8 @@ async fn handle_alert_triggers(
                 .await
                 {
                     log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: org_id: {}, error: {e}",
+                        trigger.org
                     );
                 }
                 publish_triggers_usage(TriggerData {
@@ -1822,7 +2034,8 @@ async fn handle_alert_triggers(
             }
             Err(e) => {
                 log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: {e}"
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: org_id: {}, error: {e}",
+                    trigger.org
                 );
                 // if trigger max retries is reached, update the next run at
                 if trigger.retries + 1 >= max_retries {
@@ -1867,8 +2080,9 @@ async fn handle_alert_triggers(
         }
     } else {
         log::error!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Alert id is not a valid ksuid: {}, deleting this trigger job",
-            trigger.module_key
+            "[SCHEDULER trace_id {scheduler_trace_id}] Alert id is not a valid ksuid: {}, org_id: {}, deleting this trigger job",
+            trigger.module_key,
+            trigger.org
         );
         // Module key is not a valid ksuid, delete the trigger job
         if let Err(e) = db::scheduler::delete(
@@ -1879,7 +2093,8 @@ async fn handle_alert_triggers(
         .await
         {
             log::error!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
+                "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: org_id: {}, error: {e}",
+                trigger.org
             );
         }
         publish_triggers_usage(TriggerData {
@@ -2128,7 +2343,7 @@ async fn handle_alert_triggers(
         && alert.pending_period_sec > 0
     {
         load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
-            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {} error in getting alert state: {e}",trigger.module_key);
+            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{} error in getting alert state: {e}",trigger.org,trigger.module_key);
         })?
     } else {
         Default::default()
@@ -2186,7 +2401,8 @@ async fn handle_alert_triggers(
         trigger_data_stream.status = RunOutcome::Error;
         let err_string = err.to_string();
         log::error!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] alert {} evaluation failed: {}",
+            "[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{} evaluation failed: {}",
+            new_trigger.org,
             new_trigger.module_key,
             err_string
         );
@@ -2248,6 +2464,7 @@ async fn handle_alert_triggers(
                 &trigger_data_stream.status,
                 None,
                 None,
+                &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
             )
             .await;
         }
@@ -2282,7 +2499,7 @@ async fn handle_alert_triggers(
         matched_level,
     );
 
-    // Outside the fired branch: that branch runs only while firing, when recovery must not.
+    // Every clear run: on-call pages BEFORE the send, so an undelivered page leaves it open.
     #[cfg(feature = "enterprise")]
     if matched_level.is_none()
         && o2_enterprise::enterprise::oncall::is_enabled()
@@ -2465,6 +2682,29 @@ async fn handle_alert_triggers(
     let condition_matched = trigger_results.data.is_some();
     let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
 
+    // What this evaluation DELIVERED, not what it decided to: the episode opens on a landed send.
+    let mut episode_delivered = false;
+    // Only the enterprise correlation block assigns this.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut episode_incident_id: Option<String> = None;
+    // Read-or-mint BEFORE the send: a resolve only matches a key the vendor saw on the trigger.
+    let episode_key: Option<String> = if alert.notify_on_recovery
+        && delivery.should_deliver()
+        && let Some(alert_id) = alert.id.as_ref()
+    {
+        let open = infra::table::alert_states::get(
+            &alert_id.to_string(),
+            config::meta::alerts::state::ROLLUP_GROUP_KEY,
+        )
+        .await
+        .ok()
+        .flatten()
+        .and_then(|state| state.episode_id);
+        Some(open.unwrap_or_else(config::ider::uuid))
+    } else {
+        None
+    };
+
     if let Some(data) = trigger_results.data
         && !data.is_empty()
         // Suppressed deliveries still record state and history; only the
@@ -2532,6 +2772,9 @@ async fn handle_alert_triggers(
                                 &trigger_data_stream.status,
                                 eval_level,
                                 trigger_results.group_classification.as_ref(),
+                                &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                                    alert.keep_firing_for,
+                                ),
                             )
                             .await;
                         }
@@ -2568,6 +2811,9 @@ async fn handle_alert_triggers(
                                     &trigger_data_stream.status,
                                     eval_level,
                                     trigger_results.group_classification.as_ref(),
+                                    &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                                        alert.keep_firing_for,
+                                    ),
                                 )
                                 .await;
                             }
@@ -2607,6 +2853,9 @@ async fn handle_alert_triggers(
                         &trigger_data_stream.status,
                         eval_level,
                         trigger_results.group_classification.as_ref(),
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -2699,7 +2948,8 @@ async fn handle_alert_triggers(
                         .await
                     {
                         log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: org_id: {}, error: {}",
+                            new_trigger.org,
                             e
                         );
                         grouped_delivery_ok = false;
@@ -2731,8 +2981,7 @@ async fn handle_alert_triggers(
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                // The alert fired; grouping only batches the delivery. State
-                // must reflect the firing (Part IV write-coverage).
+                // No episode: a batch holds several alerts, so no per-alert key can ride it.
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
                         &alert,
@@ -2740,6 +2989,9 @@ async fn handle_alert_triggers(
                         &trigger_data_stream.status,
                         eval_level,
                         trigger_results.group_classification.as_ref(),
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -2800,6 +3052,9 @@ async fn handle_alert_triggers(
                                 &trigger_data_stream.status,
                                 eval_level,
                                 trigger_results.group_classification.as_ref(),
+                                &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                                    alert.keep_firing_for,
+                                ),
                             )
                             .await;
                         }
@@ -2872,6 +3127,8 @@ async fn handle_alert_triggers(
                     );
                     // Notification was handled inside correlate_alert_to_incident
                     // (sent for new incidents/alert types, suppressed for repeats).
+                    // The incident owns the resolve too, so the episode records it.
+                    episode_incident_id = Some(outcome.incident_id().to_string());
                     true
                 }
                 Ok(None) => {
@@ -2884,7 +3141,8 @@ async fn handle_alert_triggers(
                 }
                 Err(e) => {
                     log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error in incident correlation, falling back to direct notification: {e}"
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error in incident correlation, falling back to direct notification: org_id: {}, error: {e}",
+                        new_trigger.org
                     );
                     // Fall through to direct notification — don't silently lose the notification.
                     false
@@ -2936,6 +3194,7 @@ async fn handle_alert_triggers(
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
             record_delivery(&mut trigger_data);
+            episode_delivered = true;
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
             } else {
@@ -3006,6 +3265,9 @@ async fn handle_alert_triggers(
                         &RunOutcome::NotifyFailed,
                         eval_level,
                         None,
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -3027,6 +3289,9 @@ async fn handle_alert_triggers(
                         &RunOutcome::Pending,
                         eval_level,
                         None,
+                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                            alert.keep_firing_for,
+                        ),
                     )
                     .await;
                 }
@@ -3043,6 +3308,7 @@ async fn handle_alert_triggers(
                 .collect();
             confirm_dedup_reservations(&confirmable, !confirmable.is_empty()).await;
             record_delivery(&mut trigger_data);
+            episode_delivered = true;
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
             } else {
@@ -3070,6 +3336,7 @@ async fn handle_alert_triggers(
                     trigger_results.actual_value,
                     None,
                     skip_destinations,
+                    episode_key.clone(),
                 )
                 .await
             {
@@ -3183,6 +3450,7 @@ async fn handle_alert_triggers(
                         // only here, on the terminal branch, so no retry can be
                         // suppressed by a window this same cycle opened.
                         record_delivery(&mut trigger_data);
+                        episode_delivered = true;
                         if partial_failure {
                             log::error!(
                                 "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{}: \
@@ -3330,6 +3598,12 @@ async fn handle_alert_triggers(
             &trigger_data_stream.status,
             eval_level,
             trigger_results.group_classification.as_ref(),
+            &config::meta::alerts::recovery::EpisodeInput {
+                delivered: episode_delivered,
+                incident_id: episode_incident_id,
+                keep_firing_for_secs: alert.keep_firing_for,
+                episode_id: episode_key,
+            },
         )
         .await;
     }
@@ -3715,14 +3989,14 @@ async fn handle_report_triggers(
                         .await;
                         if result.is_err() {
                             log::error!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {report_name} after trigger: {}",
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {org_id}/{report_name} after trigger: {}",
                                 result.err().unwrap()
                             );
                         }
                     }
                     None => {
                         log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {report_id} while updating run_once state"
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {org_id}/{report_id} while updating run_once state"
                         );
                     }
                 }
@@ -3735,7 +4009,7 @@ async fn handle_report_triggers(
         }
         Err(e) => {
             log::error!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Error sending report to subscribers: {e}"
+                "[SCHEDULER trace_id {scheduler_trace_id}] Error sending report to subscribers: org_id: {org_id}, error: {e}"
             );
             if trigger.retries + 1 >= max_retries && !run_once {
                 // It has been tried the maximum time, just update the
@@ -3793,16 +4067,18 @@ async fn handle_derived_stream_triggers(
     let (_, max_retries) = get_scheduler_max_retries();
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
-    let (org_id, stream_type, pipeline_name, pipeline_id) =
-        match get_pipeline_info_from_module_key(&trigger.module_key) {
-            Ok(info) => info,
-            Err(e) => {
-                log::error!(
-                    "[SCHEDULER trace_id {trace_id}] error getting pipeline module key {e}"
-                );
-                return Err(anyhow::anyhow!("[SCHEDULER trace_id {trace_id}] {e}"));
-            }
-        };
+    let (org_id, stream_type, pipeline_name, pipeline_id) = match get_pipeline_info_from_module_key(
+        &trigger.module_key,
+    ) {
+        Ok(info) => info,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] error getting pipeline module key: org_id: {}, error: {e}",
+                trigger.org
+            );
+            return Err(anyhow::anyhow!("[SCHEDULER trace_id {trace_id}] {e}"));
+        }
+    };
 
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
@@ -4536,6 +4812,7 @@ async fn handle_backfill_triggers(
 
     let (_, max_retries) = get_scheduler_max_retries();
     let job_id = trigger.module_key.clone();
+    let org_id = trigger.org.clone();
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     log::debug!(
@@ -4552,7 +4829,7 @@ async fn handle_backfill_triggers(
         Ok(config) => config,
         Err(e) => {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to fetch backfill job config: {e}",
+                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to fetch backfill job config: {e}",
                 job_id
             );
             // Delete the trigger if config is not found
@@ -4615,7 +4892,7 @@ async fn handle_backfill_triggers(
         Ok(data) => data,
         Err(e) => {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to parse backfill trigger data: {e}",
+                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to parse backfill trigger data: {e}",
                 job_id
             );
             let new_retries = trigger.retries + 1;
@@ -4673,7 +4950,7 @@ async fn handle_backfill_triggers(
         Some(job) => job,
         None => {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Missing backfill job data in trigger",
+                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Missing backfill job data in trigger",
                 job_id
             );
             let new_retries = trigger.retries + 1;
@@ -4732,7 +5009,7 @@ async fn handle_backfill_triggers(
         Ok(pipeline) => pipeline,
         Err(e) => {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to fetch pipeline {}: {e}",
+                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to fetch pipeline {}: {e}",
                 job_id,
                 config.pipeline_id
             );
@@ -4808,7 +5085,7 @@ async fn handle_backfill_triggers(
         PipelineSource::Scheduled(ds) => ds,
         _ => {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Pipeline {} is not scheduled",
+                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Pipeline {} is not scheduled",
                 job_id,
                 config.pipeline_id
             );
@@ -4848,7 +5125,7 @@ async fn handle_backfill_triggers(
         Ok(streams) => streams,
         Err(e) => {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to get destination streams: {e}",
+                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to get destination streams: {e}",
                 job_id
             );
             let _ = db::scheduler::delete(
@@ -4893,7 +5170,7 @@ async fn handle_backfill_triggers(
     let deletion_requested = config.delete_before_backfill && !destination_streams.is_empty();
     if config.delete_before_backfill && destination_streams.is_empty() {
         log::warn!(
-            "[BACKFILL trace_id {trace_id}] [job_id: {}] delete_before_backfill is enabled but the pipeline has no local destination streams (remote-only); skipping deletion — data in remote destinations cannot be pre-deleted.",
+            "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] delete_before_backfill is enabled but the pipeline has no local destination streams (remote-only); skipping deletion — data in remote destinations cannot be pre-deleted.",
             job_id
         );
     }
@@ -4951,7 +5228,7 @@ async fn handle_backfill_triggers(
                                 stream.stream_type, stream.stream_name, e
                             );
                             log::error!(
-                                "[BACKFILL trace_id {trace_id}] [job_id: {}] {}",
+                                "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] {}",
                                 job_id,
                                 error_msg
                             );
@@ -5036,7 +5313,7 @@ async fn handle_backfill_triggers(
                             }
                             Err(e) => {
                                 log::warn!(
-                                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to check deletion job {} status: {}",
+                                    "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to check deletion job {} status: {}",
                                     job_id,
                                     deletion_job_id,
                                     e
@@ -5121,7 +5398,7 @@ async fn handle_backfill_triggers(
         Ok(results) => results,
         Err(e) => {
             log::error!(
-                "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to evaluate pipeline: {e}",
+                "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to evaluate pipeline: {e}",
                 job_id
             );
 
@@ -5136,7 +5413,7 @@ async fn handle_backfill_triggers(
             if new_retries >= max_retries {
                 // Max retries reached, report error and reset retries for next scheduled run
                 log::warn!(
-                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries.",
+                    "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries.",
                     job_id,
                     config.pipeline_id
                 );
@@ -5211,7 +5488,7 @@ async fn handle_backfill_triggers(
         Ok(ep) => ep,
         Err(e) => {
             log::error!(
-                "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to create executable pipeline: {e}",
+                "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to create executable pipeline: {e}",
                 job_id
             );
 
@@ -5226,7 +5503,7 @@ async fn handle_backfill_triggers(
             if new_retries >= max_retries {
                 // Max retries reached, report error and reset retries for next scheduled run
                 log::warn!(
-                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on pipeline creation.",
+                    "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on pipeline creation.",
                     job_id,
                     config.pipeline_id
                 );
@@ -5311,7 +5588,7 @@ async fn handle_backfill_triggers(
         {
             Err(e) => {
                 log::error!(
-                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to process batch: {e}",
+                    "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Failed to process batch: {e}",
                     job_id
                 );
 
@@ -5329,7 +5606,7 @@ async fn handle_backfill_triggers(
                 if new_retries >= max_retries {
                     // Max retries reached, report error and reset retries for next scheduled run
                     log::warn!(
-                        "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
+                        "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
                         job_id,
                         config.pipeline_id
                     );
@@ -5484,7 +5761,7 @@ async fn handle_backfill_triggers(
         if new_retries >= max_retries {
             // Max retries reached, report error and reset retries for next scheduled run
             log::warn!(
-                "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on ingestion.",
+                "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on ingestion.",
                 job_id,
                 config.pipeline_id
             );
@@ -5918,7 +6195,10 @@ async fn handle_slo_backfill_triggers(
         }
         Ok(crate::slo::backfill::ChunkOutcome::More) => {}
         Err(e) => {
-            log::error!("[slo] backfill chunk failed for {slo_id}: {e}");
+            log::error!(
+                "[slo] backfill chunk failed for {}/{slo_id}: {e}",
+                trigger.org
+            );
         }
     }
 

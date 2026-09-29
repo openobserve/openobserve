@@ -50,6 +50,7 @@ pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
 pub mod profiles;
+pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]

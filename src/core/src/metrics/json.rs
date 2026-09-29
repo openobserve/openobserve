@@ -407,7 +407,7 @@ pub async fn ingest(
                 stream_skipped: false,
             });
         } else {
-            log::error!("Metrics ingestion error: {e}");
+            log::error!("[METRICS:JSON] Metrics ingestion error: org_id: {org_id}, error: {e}");
             return Ok(IngestionResponse {
                 code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
                 status: vec![],
@@ -445,7 +445,9 @@ pub async fn ingest(
 
     // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
-        log::warn!("[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted");
+        log::warn!(
+            "[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
+        );
     }
 
     let (pipeline_outputs, failures) = ingest::run_pipelines(
@@ -480,6 +482,13 @@ pub async fn ingest(
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     for (stream_name, records) in records_by_stream {
+        // redacted before finish_rows, so the series hash covers the stored values
+        #[cfg(feature = "vectorscan")]
+        let records = {
+            let mut records = records;
+            ingest::apply_redaction(org_id, &stream_name, &mut records).await;
+            records
+        };
         let rows = finish_rows(records)?;
         let row_count = rows.0.len();
         let triggers = buffer_stream_rows(

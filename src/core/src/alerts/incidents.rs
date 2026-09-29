@@ -305,7 +305,7 @@ async fn collect_incident_destinations(
         Ok(v) => v,
         Err(e) => {
             log::warn!(
-                "[incidents] Failed to fetch alert list for destination merge (incident {incident_id}): {e}"
+                "[incidents] Failed to fetch alert list for destination merge (incident {org_id}/{incident_id}): {e}"
             );
             return destinations;
         }
@@ -426,7 +426,7 @@ async fn send_incident_notifications_inner(
         Ok(s) => s,
         Err(e) => {
             log::error!(
-                "[incidents] Failed to serialize notification payload for {incident_id}: {e}"
+                "[incidents] Failed to serialize notification payload for {org_id}/{incident_id}: {e}"
             );
             return;
         }
@@ -457,7 +457,7 @@ async fn send_incident_notifications_inner(
                     Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
                     Err(e) => {
                         log::error!(
-                            "[incidents] Failed to notify {dest_name} for incident {incident_id}: {e}"
+                            "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
                         );
                         err_parts.push(format!("{dest_name}: {e}"));
                     }
@@ -465,7 +465,7 @@ async fn send_incident_notifications_inner(
             }
             Err(e) => {
                 log::error!(
-                    "[incidents] Destination {dest_name} not found for incident {incident_id}: {e}"
+                    "[incidents] Destination {dest_name} not found for incident {org_id}/{incident_id}: {e}"
                 );
                 err_parts.push(format!("{dest_name}: {e}"));
             }
@@ -479,7 +479,7 @@ async fn send_incident_notifications_inner(
         );
     } else {
         log::error!(
-            "[incidents] Notification partially failed for incident {incident_id} ({event}): {}",
+            "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {}",
             err_parts.join("; ")
         );
     }
@@ -494,7 +494,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
         Ok(v) => v,
         Err(e) => {
             log::warn!(
-                "[incidents] Failed to load alerts for severity notification (incident {incident_id}): {e}"
+                "[incidents] Failed to load alerts for severity notification (incident {org_id}/{incident_id}): {e}"
             );
             return;
         }
@@ -611,7 +611,8 @@ pub async fn correlate_alert_to_incident(
     if group_values.is_empty() {
         key_type = KeyType::AlertId;
         log::warn!(
-            "[incidents] Alert {} has no group_values - isolated by alert_id",
+            "[incidents] Alert {}/{} has no group_values - isolated by alert_id",
+            alert.org_id,
             alert.name
         );
     }
@@ -729,7 +730,10 @@ pub async fn correlate_alert_to_incident(
                 )
                 .await
                 {
-                    log::error!("[incidents] could not link on-call record for {incident_id}: {e}");
+                    log::error!(
+                        "[incidents] could not link on-call record for {}/{incident_id}: {e}",
+                        alert.org_id
+                    );
                 }
 
                 if let Err(e) = crate::alerts::scheduler::handlers::page_blast_radius(
@@ -739,11 +743,17 @@ pub async fn correlate_alert_to_incident(
                 )
                 .await
                 {
-                    log::error!("[incidents] impacted paging failed for {incident_id}: {e}");
+                    log::error!(
+                        "[incidents] impacted paging failed for {}/{incident_id}: {e}",
+                        alert.org_id
+                    );
                 }
             }
             Ok(None) => {}
-            Err(e) => log::error!("[incidents] on-call paging failed for {incident_id}: {e}"),
+            Err(e) => log::error!(
+                "[incidents] on-call paging failed for {}/{incident_id}: {e}",
+                alert.org_id
+            ),
         }
     }
 
@@ -877,7 +887,7 @@ pub async fn correlate_external_event(
     if group_values.is_empty() {
         key_type = KeyType::AlertId;
         log::warn!(
-            "[incidents] External event '{}' has no group_values - isolated by alert_id",
+            "[incidents] External event '{}' has no group_values - isolated by alert_id, org_id: {org_id}",
             external.title
         );
     }
@@ -951,6 +961,69 @@ pub async fn correlate_external_event(
     }
 
     Ok(Some(outcome))
+}
+
+/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
+/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
+pub async fn resolve_alert_firing(
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let Some(incident_id) = event.incident_id.as_deref() else {
+        return Ok(());
+    };
+    infra::table::alert_incidents::resolve_alert_firings(
+        incident_id,
+        &event.alert_id,
+        event.recovered_at,
+    )
+    .await?;
+
+    // Published even when this region updated no rows: the receiver runs the same idempotent update
+    // against its own replica, which may still be behind.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
+            &event.org_id,
+            incident_id,
+            &event.alert_id,
+            event.recovered_at,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
+    }
+
+    let Some(incident) = infra::table::alert_incidents::get(&event.org_id, incident_id).await?
+    else {
+        return Ok(());
+    };
+    if incident.status == "resolved" {
+        return Ok(());
+    }
+    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
+        return Ok(());
+    }
+
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+        return Ok(());
+    }
+
+    update_status(
+        &event.org_id,
+        incident_id,
+        "resolved",
+        "system@openobserve.ai",
+    )
+    .await?;
+    log::info!(
+        "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
+        links.len()
+    );
+    Ok(())
 }
 
 /// Auto-resolve the open incident containing `external.id`, but only once every
@@ -1187,7 +1260,7 @@ async fn create_new_incident(
     // Initialize event timeline for new incident
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
         log::error!(
-            "[Incidents] Failed to init events for incident {}: {e}",
+            "[Incidents] Failed to init events for incident {org_id}/{}: {e}",
             incident.id
         );
     }
@@ -1228,7 +1301,7 @@ async fn create_new_incident(
     .await
     {
         log::error!(
-            "[Incidents] Failed to record alert event for incident {}: {e}",
+            "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
             incident.id
         );
     }
@@ -1272,7 +1345,9 @@ async fn create_new_incident(
         )
         .await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish incident create: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish incident create: org_id: {org_id}, error: {e}"
+        );
     }
 
     spawn_topology_enrichment(
@@ -1302,7 +1377,7 @@ async fn create_new_incident(
             .await
             {
                 log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {}: {e}",
+                    "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{}: {e}",
                     incident.id
                 );
             }
@@ -1389,7 +1464,7 @@ async fn find_or_create_incident(
             .await
             {
                 log::error!(
-                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     incident.id
                 );
             }
@@ -1466,7 +1541,7 @@ async fn find_or_create_incident(
                 .await
                 {
                     log::error!(
-                        "[Incidents] Failed to record severity-upgrade event for incident {}: {e}",
+                        "[Incidents] Failed to record severity-upgrade event for incident {org_id}/{}: {e}",
                         incident.id
                     );
                 }
@@ -1539,7 +1614,7 @@ async fn find_or_create_incident(
             .await
             {
                 log::error!(
-                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     existing.id
                 );
             }
@@ -1588,7 +1663,9 @@ async fn find_or_create_incident(
                 )
                 .await
                 {
-                    log::error!("[Incidents] Failed to record dimensions upgrade event: {e}");
+                    log::error!(
+                        "[Incidents] Failed to record dimensions upgrade event: org_id: {org_id}, error: {e}"
+                    );
                 }
             } else if dimensions_changed {
                 infra::table::alert_incidents::update_incident_metadata(
@@ -1618,7 +1695,9 @@ async fn find_or_create_incident(
                     )
                     .await
             {
-                log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
+                log::error!(
+                    "[SUPER_CLUSTER] Failed to publish incident add_alert: org_id: {org_id}, error: {e}"
+                );
             }
 
             spawn_topology_enrichment(
@@ -1731,7 +1810,8 @@ pub async fn get_incident_with_alerts(
     let actual_count = incident_alerts.len() as i32;
     if incident_data.alert_count != actual_count {
         log::warn!(
-            "[incidents] Incident {} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            "[incidents] Incident {}/{} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            org_id,
             incident_id,
             incident_data.alert_count,
             actual_count
@@ -1788,7 +1868,8 @@ pub async fn get_incident_with_alerts(
             }
             Err(e) => {
                 log::warn!(
-                    "[incidents] Failed to fetch external alert details for incident {}: {}",
+                    "[incidents] Failed to fetch external alert details for incident {}/{}: {}",
+                    incident_org_id,
                     incident_id,
                     e
                 );
@@ -1831,14 +1912,16 @@ pub async fn get_incident_with_alerts(
                             }
                             Ok(None) => {
                                 log::warn!(
-                                    "Failed to fetch alert details for {}: {}",
+                                    "Failed to fetch alert details for {}/{}: {}",
+                                    incident_org_id,
                                     trigger.alert_id,
                                     e
                                 );
                             }
                             Err(composite_error) => {
                                 log::warn!(
-                                    "Failed to fetch composite details for {}: {}",
+                                    "Failed to fetch composite details for {}/{}: {}",
+                                    incident_org_id,
                                     trigger.alert_id,
                                     composite_error
                                 );
@@ -2260,7 +2343,7 @@ async fn emit_analysis_failure(
     .await
     {
         log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {incident_id}: {e}"
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {org_id}/{incident_id}: {e}"
         );
     }
 }
@@ -2314,6 +2397,20 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
+    // I20: the run must be refused here — before the billable agent call below — or `Off` only
+    // stops the ladder from waiting while the agent still runs and still bills.
+    if o2_enterprise::enterprise::alerts::rca_service::l0_off_for_incident(&org_id, &incident_id)
+        .await
+    {
+        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, skipping trigger");
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
+        return Ok(());
+    }
+
     // When the caller already emitted Begin synchronously, skip the guards and Begin emission
     // to avoid a DB race where the spawned task can't yet see the freshly-init'd events row.
     if !begin_already_emitted {
@@ -2356,7 +2453,7 @@ pub async fn trigger_rca_for_incident(
     let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
         Some(inc) => inc,
         None => {
-            log::warn!("[INCIDENTS::RCA] Incident {incident_id} not found");
+            log::warn!("[INCIDENTS::RCA] Incident {org_id}/{incident_id} not found");
             return Err(anyhow::anyhow!("Incident not found"));
         }
     };
@@ -2374,7 +2471,9 @@ pub async fn trigger_rca_for_incident(
         )
         .await
     {
-        log::error!("[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {incident_id}: {e}");
+        log::error!(
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
+        );
     }
 
     // AI credit check for reanalysis (cloud only)
@@ -2439,30 +2538,29 @@ pub async fn trigger_rca_for_incident(
     }
 
     // Analyze incident
-    // §7: the agent is told how loudly this pages, and stops rendering
-    // `Severity: Unknown` on every automatic run.
-    let severity = o2_enterprise::enterprise::alerts::rca_service::paging_severity_for_incident(
+    // `build_on_previous` opts into continuity: the prior report is sent so the
+    // agent extends it rather than starting over. Extracted via typed
+    // `IncidentTopology` (same deserialization path used by `save_rca_result`)
+    // so field renames are caught at compile time.
+    let previous_analysis: Option<String> = if build_on_previous {
+        incident
+            .topology_context
+            .as_ref()
+            .and_then(|v| serde_json::from_value::<IncidentTopology>(v.clone()).ok())
+            .and_then(|t| t.suggested_root_cause)
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+    // §7/C1: the single builder, so this and the manual endpoint cannot tell
+    // the agent different things about the same incident.
+    let context = o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
         &org_id,
         &incident_id,
+        previous_analysis,
     )
     .await;
-    // §7: what this same subject turned out to be the last few times, which is
-    // the cross-incident memory the agent otherwise has none of.
-    let past_causes = o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
-        &org_id,
-        &incident_id,
-    )
-    .await;
-    match client
-        .analyze_incident(
-            &incident,
-            &auth_header,
-            build_on_previous,
-            severity,
-            past_causes,
-        )
-        .await
-    {
+    match client.analyze_incident(context, &auth_header).await {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
@@ -2480,7 +2578,9 @@ pub async fn trigger_rca_for_incident(
             )
             .await
             {
-                log::error!("[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}");
+                log::error!(
+                    "[INCIDENTS::RCA] Failed to save RCA result for {org_id}/{incident_id}: {e}"
+                );
                 return Err(e);
             }
 
@@ -2493,7 +2593,7 @@ pub async fn trigger_rca_for_incident(
             .await
             {
                 log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {incident_id}: {e}"
+                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {org_id}/{incident_id}: {e}"
                 );
             }
 
@@ -2503,7 +2603,7 @@ pub async fn trigger_rca_for_incident(
             Ok(())
         }
         Err(e) => {
-            log::warn!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
+            log::warn!("[INCIDENTS::RCA] RCA failed for {org_id}/{incident_id}: {e}");
 
             // Determine trigger type based on function context
             let trigger_type = if reanalysis {
@@ -2596,7 +2696,7 @@ pub async fn update_status(
             o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
                 .await
     {
-        log::error!("[incidents] on-call recovery failed for {incident_id}: {e}");
+        log::error!("[incidents] on-call recovery failed for {org_id}/{incident_id}: {e}");
     }
 
     // Emit status change event
@@ -2610,7 +2710,7 @@ pub async fn update_status(
     if let Some(evt) = event
         && let Err(e) = crate::incidents::append_event(org_id, incident_id, evt).await
     {
-        log::error!("[Incidents] Failed to record status event: {e}");
+        log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
     }
 
     // Trigger RCA reanalysis when incident is reopened — context is fresh,
@@ -2680,7 +2780,9 @@ pub async fn update_status(
         )
         .await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish incident update_status: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
+        );
     }
 
     model_to_incident(updated).await
@@ -2711,7 +2813,9 @@ pub async fn update_title(
         )
         .await
     {
-        log::error!("[Incidents] Failed to record title change event: {e}");
+        log::error!(
+            "[Incidents] Failed to record title change event: org_id: {org_id}, error: {e}"
+        );
     }
 
     model_to_incident(updated).await
@@ -2748,7 +2852,9 @@ pub async fn update_severity(
         )
         .await
         {
-            log::error!("[Incidents] Failed to record severity event: {e}");
+            log::error!(
+                "[Incidents] Failed to record severity event: org_id: {org_id}, error: {e}"
+            );
         }
         send_incident_severity_notification(org_id, incident_id).await;
     }

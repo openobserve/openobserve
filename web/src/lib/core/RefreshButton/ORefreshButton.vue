@@ -99,9 +99,17 @@ function handleClick(e: MouseEvent) {
     :data-test="dataTest"
     @click="handleClick"
   >
-    <span v-if="lastRunAt" class="bg-border-default h-4 w-px shrink-0" aria-hidden="true" />
+    <!-- The age drops below md so a toolbar keeps search, columns and refresh on one phone row. -->
+    <span
+      v-if="lastRunAt"
+      class="bg-border-default h-4 w-px shrink-0 max-md:hidden"
+      aria-hidden="true"
+    />
     <!-- No colour class: here the age is the button's label, not the loose caption `split` renders. -->
-    <span v-if="lastRunAt" class="inline-block min-w-12 text-left text-xs tabular-nums">
+    <span
+      v-if="lastRunAt"
+      class="inline-block min-w-12 text-left text-xs tabular-nums max-md:hidden"
+    >
       {{ relativeTime || t("refreshButton.justNow") }}
     </span>
     <OTooltip :content="exactTime" :shortcut-id="shortcutId" />

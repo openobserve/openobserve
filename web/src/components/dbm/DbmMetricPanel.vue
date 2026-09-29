@@ -93,6 +93,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dbm.metrics.noAccess", { stream: streamName }) }}
         </span>
       </div>
+      <div
+        v-else-if="streamMissing"
+        class="bg-surface-base absolute inset-0 mx-2 mb-2 flex items-center justify-center"
+        :data-test="`dbm-metric-panel-not-collecting-${panelKey}`"
+      >
+        <OEmptyState
+          size="inline"
+          icon="database"
+          :title="t('dbm.metrics.serverStreamMissing.title')"
+          :action-label="t('dbm.metrics.serverStreamMissing.action')"
+          :data-test="`dbm-metric-panel-setup-${panelKey}`"
+          @action="emit('setup')"
+        />
+      </div>
     </div>
   </section>
 </template>
@@ -100,13 +114,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from "vue";
 
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { panelErrorIsForbidden } from "@/utils/dbm/metricsPanels";
+import { panelErrorIsForbidden, panelErrorIsStreamMissing } from "@/utils/dbm/metricsPanels";
 
 // Async: the dashboards engine is heavy and must not ride the DBM shell's
 // initial chunk — same reason DbmHistoryPanel defers it.
@@ -143,6 +158,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   zoom: [event: { start?: number; end?: number }];
   "update:by": [value: string];
+  setup: [];
 }>();
 
 const { t } = useI18nTyped();
@@ -153,8 +169,10 @@ const streamName = computed(() => raw(props.schema?.queries?.[0]?.fields?.stream
 
 /** The engine re-emits `{code: ""}` on reset, so recovery clears this too. */
 const noAccess = ref(false);
+const streamMissing = ref(false);
 const onPanelError = (event: { message?: string; code?: unknown }) => {
   noAccess.value = panelErrorIsForbidden(event);
+  streamMissing.value = panelErrorIsStreamMissing(event);
 };
 
 // The dashboard pipeline carries timestamps as `new Date(microseconds)` so
