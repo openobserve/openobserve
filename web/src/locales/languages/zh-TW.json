@@ -13137,6 +13137,7 @@
       "promptLabel": "評審提示",
       "includeReasoningLabel": "包含推理",
       "includeReasoningHint": "評審解釋為何給出該分數，並與每個結果一起儲存。",
+      "decisionProviderNote": "決策模型僅回傳分數與推理結果，因此無法提供額外欄位。",
       "extraFieldsLabel": "額外中繼資料欄位（選用）",
       "extraFieldsHint": "要求評審隨每個分數返回額外值 — 例如類別或信心度。",
       "extraFields": {
@@ -19569,6 +19570,8 @@
     "unroutedDismissedTag": "已忽略",
     "notAvailableTitle": "此部署不提供值班功能",
     "notAvailableDescription": "連結本身沒有問題 — 此組建未在此處提供值班功能。沒有任何失敗，也不需要重試。",
+    "teamNotFoundTitle": "找不到團隊",
+    "teamNotFoundDescription": "此團隊已不存在，可能已被刪除。",
     "unroutedPagedNobody": "未通知任何人",
     "unroutedLoadFailed": "無法載入未路由的佇列",
     "routingLoadFailed": "無法載入歸屬與路由設定",

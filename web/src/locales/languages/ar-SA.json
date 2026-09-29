@@ -13142,6 +13142,7 @@
       "promptLabel": "طلب القاضي",
       "includeReasoningLabel": "تضمين المنطق",
       "includeReasoningHint": "يشرح القاضي سبب منح تلك الدرجة، التي تحفظ مع كل نتيجة.",
+      "decisionProviderNote": "تعيد نماذج القرار درجة وتفسيرًا فقط، لذا لا تتوفر حقول إضافية.",
       "extraFieldsLabel": "حقول بيانات وصفية إضافية (اختيارية)",
       "extraFieldsHint": "اطلب من الحكم أن يعيد القيم الإضافية مع كل درجة — مثل فئة أو ثقة، على سبيل المثال.",
       "extraFields": {
@@ -19574,6 +19575,8 @@
     "unroutedDismissedTag": "مُتجاهَل",
     "notAvailableTitle": "المناوبة غير متاحة في هذا النشر",
     "notAvailableDescription": "الرابط سليم — هذا الإصدار لا يوفّر المناوبة هنا. لم يحدث أي خطأ ولا يوجد شيء لإعادة المحاولة.",
+    "teamNotFoundTitle": "لم يتم العثور على الفريق",
+    "teamNotFoundDescription": "لم يعد هذا الفريق موجودًا. ربما تم حذفه.",
     "unroutedPagedNobody": "لم يتم إشعار أحد",
     "unroutedLoadFailed": "تعذّر تحميل قائمة انتظار غير المُوجَّهة",
     "routingLoadFailed": "تعذّر تحميل بيانات الملكية والتوجيه",
