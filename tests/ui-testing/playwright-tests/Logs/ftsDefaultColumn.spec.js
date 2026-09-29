@@ -103,7 +103,7 @@ test.describe("FTS Default Column Selection testcases", () => {
   // -----------------------------------------------------------------------
 
   test("should auto-pick FTS column on first search with no prior selection", {
-    tag: ['@ftsDefaultColumn', '@all', '@logs']
+    tag: ['@bug-12473', '@ftsDefaultColumn', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('TC-FTS-001: verifying FTS column auto-picked on first search');
 

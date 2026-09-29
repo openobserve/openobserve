@@ -21,6 +21,7 @@ pub mod loki;
 pub mod maxmind;
 pub mod middleware_data;
 pub mod organization;
+pub mod otlp;
 pub mod proxy;
 pub mod saved_view;
 pub mod service;

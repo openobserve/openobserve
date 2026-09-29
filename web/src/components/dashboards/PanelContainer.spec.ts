@@ -194,7 +194,7 @@ describe("PanelContainer", () => {
     }
   });
 
-  const createWrapper = (props = {}) => {
+  const createWrapper = (props = {}, extraStubs = {}) => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
@@ -291,6 +291,7 @@ describe("PanelContainer", () => {
               "viewOnly",
             ],
           },
+          ...extraStubs,
         },
         mocks: {
           $t: (key: string) => key,
@@ -1393,17 +1394,56 @@ describe("PanelContainer", () => {
   });
 
   describe("Refresh Without Cache", () => {
-    it("should show refresh without cache option in enterprise mode", () => {
-      // Mock config
+    // Regression coverage for GH #14488: this item must not be gated behind
+    // enterprise, since the backend supports clear_cache in OSS too.
+    const dropdownStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        template:
+          '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+        emits: ["select"],
+      },
+    };
+
+    const originalIsEnterprise = config.isEnterprise;
+
+    afterEach(() => {
+      (config as any).isEnterprise = originalIsEnterprise;
+    });
+
+    it.each([
+      ["OSS build", "false"],
+      ["undefined build flag", undefined],
+      ["enterprise build", "true"],
+    ])(
+      "shows the refresh-without-cache item regardless of build type (%s)",
+      (_label, isEnterprise) => {
+        (config as any).isEnterprise = isEnterprise;
+
+        wrapper = createWrapper({ viewOnly: false }, dropdownStubs);
+
+        const item = wrapper
+          .findAllComponents({ name: "ODropdownItem" })
+          .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
+
+        expect(item).toBeTruthy();
+      },
+    );
+
+    it("hides the refresh-without-cache item in simplified panel view, independent of build type", () => {
       (config as any).isEnterprise = "true";
 
-      wrapper = createWrapper();
+      wrapper = createWrapper({ viewOnly: false, simplifiedPanelView: true }, dropdownStubs);
 
-      // Check config value instead of DOM
-      expect(config.isEnterprise).toBe("true");
+      const item = wrapper
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
 
-      // Reset
-      (config as any).isEnterprise = undefined;
+      expect(item).toBeFalsy();
     });
 
     it("should handle refresh without cache click", async () => {
@@ -2004,6 +2044,98 @@ describe("PanelContainer", () => {
       const headerIndex = children.indexOf(header.element);
       const next = children[headerIndex + 1] as HTMLElement;
       expect(next?.className).toContain("flex-1");
+    });
+  });
+
+  describe("exemplars", () => {
+    const promqlPanel = (over: Record<string, unknown> = {}) => ({
+      ...mockPanelData,
+      id: `exemplar-panel-${Math.random()}`,
+      type: "line",
+      queryType: "promql",
+      queries: [{ query: "rate(x[5m])", config: { query_type: "range" } }],
+      config: {},
+      ...over,
+    });
+
+    const rendererStub = (status: string, error = "") => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height", "exemplarsOverride"],
+        data: () => ({
+          noData: "",
+          exemplarsStatus: status,
+          exemplarsCount: 0,
+          exemplarsError: error,
+        }),
+        methods: { retryExemplars: vi.fn() },
+      },
+    });
+
+    beforeEach(() => {
+      window.sessionStorage.clear();
+    });
+
+    it("shows the header toggle only for an eligible PromQL panel", () => {
+      wrapper = createWrapper({ data: promqlPanel() }, rendererStub("off"));
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ data: promqlPanel({ type: "h-bar" }) }, rendererStub("off"));
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ data: mockPanelData }, rendererStub("off"));
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper(
+        { data: promqlPanel({ queries: [{ query: "up", config: { query_type: "instant" } }] }) },
+        rendererStub("off"),
+      );
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(false);
+    });
+
+    it("toggling writes a session override for this panel without touching the saved config", async () => {
+      const panel = promqlPanel();
+      wrapper = createWrapper({ data: panel }, rendererStub("off"));
+      const toggle = wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]');
+      expect(toggle.attributes("aria-pressed")).toBe("false");
+      await toggle.trigger("click");
+      expect(
+        window.sessionStorage.getItem(`o2.exemplars.test-org.test-dashboard-id.${panel.id}`),
+      ).toBe("1");
+      expect(panel.config).toEqual({});
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("exemplarsOverride")).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').attributes("aria-pressed"),
+      ).toBe("true");
+    });
+
+    it("shows the empty indicator when exemplars are on and none came back", async () => {
+      wrapper = createWrapper(
+        { data: promqlPanel({ config: { show_exemplars: true } }) },
+        rendererStub("empty"),
+      );
+      await flushPromises();
+      const tag = wrapper.find('[data-test="dashboard-panel-exemplars-empty"]');
+      expect(tag.exists()).toBe(true);
+      expect(tag.attributes("aria-label")).toBe("No exemplars in this time range");
+    });
+
+    it("hands the exemplar error to the warning cluster", async () => {
+      wrapper = createWrapper(
+        { data: promqlPanel({ config: { show_exemplars: true } }) },
+        {
+          ...rendererStub("error", "scan failed"),
+          PanelErrorButtons: {
+            name: "PanelErrorButtons",
+            props: ["exemplarError"],
+            template: "<div data-test='errors-stub'>{{ exemplarError }}</div>",
+          },
+        },
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
     });
   });
 });

@@ -64,11 +64,14 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
 }));
 
-vi.mock("@/services/search", () => ({
-  default: {
-    get_search_profile: vi.fn().mockResolvedValue({ data: null }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_search_profile: vi.fn().mockResolvedValue({ data: null }),
+    },
+  });
+});
 
 const mountComponent = () =>
   mount(SearchJobInspector, {

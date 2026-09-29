@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::synthetics_variables::{placeholder_names, substitute_placeholders};
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
@@ -165,6 +169,9 @@ pub struct Synthetic {
     /// Key-value variables injected into the probe environment.
     #[serde(default)]
     pub variables: Vec<SyntheticVariable>,
+    /// Environments this check runs against, by id.
+    #[serde(default)]
+    pub environments: Vec<String>,
     /// Unix epoch microseconds — when to first run the check ("schedule later").
     /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -521,6 +528,8 @@ pub struct SyntheticSettings {
     pub session_replay: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub environments: Vec<String>,
 }
 
 fn default_wait_before_retry_secs_i32() -> i32 {
@@ -1299,7 +1308,6 @@ const V2_VISIBILITY_ASSERTION_KINDS: &[&str] = &["element_visible", "element_not
 /// Kinds that describe the page rather than an element, and so need no locator.
 const V2_PAGE_LEVEL_ASSERTION_KINDS: &[&str] = &["url_matches", "page_title"];
 
-const MAX_STEPS: usize = 50;
 /// A step carries up to 5 locator candidates and 5 settle patterns. A maximal
 /// 50-step journey lands near 60KB; the cap is set well clear of that. The
 /// `config` column is already JSON (jsonb on PostgreSQL), and steps travel over
@@ -1346,7 +1354,10 @@ pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
 const MAX_TEST_ID_ATTR_LEN: usize = 64;
 const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
-const MAX_VARIABLES: usize = 50;
+pub const MAX_VARIABLES: usize = 50;
+
+/// Environments one check may fan out over.
+pub const MAX_ENVIRONMENTS_PER_CHECK: usize = 5;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
 /// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
@@ -1356,14 +1367,66 @@ const MIN_INTERVAL_SECS: i64 = 1;
 /// one Lambda invocation per location per browser×device combo.
 const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 
-fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+/// Stand-in for a placeholder while validating a templated URL's shape.
+const TEMPLATE_PROBE_TOKEN: &str = "placeholder";
+
+/// Validates a URL that may be templated.
+pub fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, true)
+}
+
+/// The same rule as [`validate_http_url`], with errors that never quote the value.
+pub fn validate_http_url_quietly(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, false)
+}
+
+/// A templated or resolved URL with no scheme is read as https, at save time and at run time.
+pub fn with_default_scheme(value: &str) -> String {
+    if value.contains("://") {
+        value.to_string()
+    } else {
+        format!("https://{value}")
+    }
+}
+
+/// `echo` decides whether an error quotes the value; a resolved URL may hold a secret.
+fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
+    let quoted = |sep: &str| {
+        if echo {
+            format!("{sep}'{value}'")
+        } else {
+            String::new()
+        }
+    };
+    if value.contains("{{") {
+        if value.chars().any(char::is_whitespace) {
+            return Err(format!(
+                "{field}: must not contain whitespace{}",
+                quoted(": ")
+            ));
+        }
+        let tokens: HashMap<String, String> = placeholder_names(value)
+            .into_iter()
+            .map(|name| (name, TEMPLATE_PROBE_TOKEN.to_string()))
+            .collect();
+        let probe = substitute_placeholders(value, &tokens);
+        if probe.contains("{{") {
+            return Err(format!(
+                "{field}: unclosed or invalid '{{{{'{}",
+                quoted(" in ")
+            ));
+        }
+        return check_http_url(field, &with_default_scheme(&probe), echo);
+    }
     let parsed =
-        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL '{value}': {e}"))?;
+        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL{}: {e}", quoted(" ")))?;
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return Err(format!(
-            "{field}: URL scheme must be http or https, got '{}'",
-            parsed.scheme()
-        ));
+        let got = if echo {
+            format!(", got '{}'", parsed.scheme())
+        } else {
+            String::new()
+        };
+        return Err(format!("{field}: URL scheme must be http or https{got}"));
     }
     if parsed.host_str().is_none_or(str::is_empty) {
         return Err(format!("{field}: URL has no host"));
@@ -1632,8 +1695,31 @@ impl Synthetic {
                     v.name
                 ));
             }
+            if crate::meta::synthetics_variables::has_reserved_prefix(&v.name) {
+                return Err(format!(
+                    "variables: '{}' is reserved for credentials the probe injects itself",
+                    crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX
+                ));
+            }
             if !seen_vars.insert(v.name.as_str()) {
                 return Err(format!("variables: duplicate name '{}'", v.name));
+            }
+        }
+
+        // ── environments ───────────────────────────────────────────────────
+        if self.environments.len() > MAX_ENVIRONMENTS_PER_CHECK {
+            return Err(format!(
+                "environments: too many ({} > {MAX_ENVIRONMENTS_PER_CHECK})",
+                self.environments.len()
+            ));
+        }
+        let mut seen_envs = std::collections::HashSet::new();
+        for env in &self.environments {
+            if env.trim().is_empty() {
+                return Err("environments: empty environment id not allowed".to_string());
+            }
+            if !seen_envs.insert(env.as_str()) {
+                return Err(format!("environments: duplicate environment '{env}'"));
             }
         }
 
@@ -2149,9 +2235,10 @@ fn validate_browser_config(
     if cfg.steps.is_empty() {
         return Err("config.steps: at least one step is required".to_string());
     }
-    if cfg.steps.len() > MAX_STEPS {
+    let browser_max_steps = crate::get_config().synthetics.browser_max_steps;
+    if cfg.steps.len() > browser_max_steps {
         return Err(format!(
-            "config.steps: too many steps ({} > {MAX_STEPS})",
+            "config.steps: too many steps ({} > {browser_max_steps})",
             cfg.steps.len()
         ));
     }
@@ -2692,6 +2779,151 @@ mod tests {
             config: serde_json::json!({ "port": 5432, "timeout_ms": 10000 }),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn the_probes_own_credential_prefix_is_reserved_on_the_check_tier_too() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        for name in ["_AUTH_COOKIES", "_auth_token", "_Auth_Token"] {
+            s.variables = vec![SyntheticVariable {
+                name: name.to_string(),
+                value: "x".to_string(),
+                secure: false,
+                example: String::new(),
+            }];
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("reserved"), "{name}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_templated_target_validates_on_its_shape() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        for target in [
+            "{{BASE_URL}}/login",
+            "https://{{TENANT}}.shop.test/login",
+            "{{BASE_URL}}",
+        ] {
+            s.target = target.to_string();
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{target} should validate"
+            );
+        }
+    }
+
+    #[test]
+    fn a_templated_target_still_has_to_look_like_a_url() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        // Permitting templates must not turn the field into a free-text box.
+        s.target = "{{BASE_URL}} /login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "whitespace");
+
+        s.target = "{{BASE_URL/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "unclosed");
+
+        s.target = "ftp://{{HOST}}/x".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "scheme");
+    }
+
+    #[test]
+    fn an_untemplated_target_validates_exactly_as_before() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        s.target = "https://shop.test/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        s.target = "not-a-url".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err());
+    }
+
+    #[test]
+    fn a_quiet_url_error_names_the_field_and_never_the_value() {
+        for bad in [
+            "file:///etc/hunter2",
+            "https://hunter2 x",
+            "hunter2",
+            "https://",
+            "{{A}} hunter2",
+            "{{A/hunter2",
+        ] {
+            let quiet = validate_http_url_quietly("target", bad).unwrap_err();
+            assert!(quiet.starts_with("target: "), "{quiet}");
+            assert!(!quiet.contains("hunter2"), "{quiet}");
+            assert!(validate_http_url("target", bad).is_err(), "{bad}");
+        }
+        assert!(validate_http_url_quietly("target", "https://shop.test/login").is_ok());
+    }
+
+    #[test]
+    fn a_url_without_a_scheme_is_read_as_https() {
+        assert_eq!(
+            with_default_scheme("shop.test/login"),
+            "https://shop.test/login"
+        );
+        assert_eq!(with_default_scheme("http://shop.test"), "http://shop.test");
+    }
+
+    #[test]
+    fn a_check_may_fan_out_over_several_environments() {
+        let (locs, brs, devs) = allowed();
+
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec![];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-2".to_string()];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn the_environment_count_is_bounded_because_it_multiplies_jobs() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = (0..=MAX_ENVIRONMENTS_PER_CHECK)
+            .map(|i| format!("env-{i}"))
+            .collect();
+
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("environments: too many"), "{err}");
+    }
+
+    #[test]
+    fn a_duplicate_environment_is_rejected_not_collapsed() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-1".to_string()];
+
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("duplicate environment"), "{err}");
+    }
+
+    #[test]
+    fn environments_survive_the_settings_round_trip() {
+        let legacy: SyntheticSettings =
+            serde_json::from_value(serde_json::json!({ "retries": 2 })).unwrap();
+        assert!(legacy.environments.is_empty());
+
+        let packed = serde_json::to_value(SyntheticSettings {
+            environments: vec!["env-1".to_string()],
+            ..Default::default()
+        })
+        .unwrap();
+        let round_tripped: SyntheticSettings = serde_json::from_value(packed).unwrap();
+        assert_eq!(round_tripped.environments, vec!["env-1".to_string()]);
     }
 
     #[test]
@@ -3964,6 +4196,48 @@ mod tests {
         });
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("at least one step"), "{err}");
+    }
+
+    /// The cap is read through `get_config()` at validation time, which is the
+    /// whole reason `ZO_SYNTHETICS_BROWSER_MAX_STEPS` is hot: a reload has to
+    /// change what the next save accepts, with no restart.
+    #[test]
+    fn the_step_cap_follows_the_configured_value() {
+        let (locs, brs, devs) = allowed();
+        let mut steps = vec![serde_json::json!({
+            "id": "s1", "action": "navigate", "url": "https://example.com"
+        })];
+        for i in 2..=6 {
+            steps.push(serde_json::json!({
+                "id": format!("s{i}"),
+                "action": "click",
+                "name": "Sign in",
+                "locator": { "candidates": [ { "kind": "css", "value": "#login" } ] }
+            }));
+        }
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": steps,
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+
+        let install = |cap: usize| {
+            let mut cfg = crate::Config::init().unwrap();
+            cfg.synthetics.browser_max_steps = cap;
+            crate::CONFIG.store(std::sync::Arc::new(cfg));
+        };
+        let saved = crate::CONFIG.load_full();
+
+        install(5);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("too many steps (6 > 5)"), "{err}");
+
+        // Second read, no restart in between.
+        install(6);
+        let accepted = s.validate(&locs, &brs, &devs, true);
+
+        crate::CONFIG.store(saved);
+        assert!(accepted.is_ok(), "{accepted:?}");
     }
 
     #[test]

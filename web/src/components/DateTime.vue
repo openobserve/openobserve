@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="date-time-container justify-between">
+  <div
+    icon="info"
+    class="date-time-container inline-flex items-stretch"
+    :class="{
+      'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
+    }"
+  >
+    <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
+      <OButton
+        data-test="date-time-prev-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border h-auto! rounded-e-none! border-e!"
+        icon-left="chevron-left"
+        :aria-label="t('common.previous')"
+        :disabled="disable"
+        @click.prevent.stop="shiftTimeRange('prev')"
+      />
+    </OTooltip>
     <OPopover
       v-model:open="menuOpen"
       side="bottom"
@@ -37,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             hideRelative: disableRelative,
             'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
+            'h-auto! rounded-none! border-0!': !hideRangeShift,
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
@@ -187,6 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : undefined
                         "
                         @update:model-value="onCustomPeriodSelect"
+                        @focus="onCustomValueFocus"
+                        @blur="onCustomValueBlur"
                       />
                     </div>
                     <div class="flex min-w-0 flex-1 flex-col">
@@ -299,6 +320,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPopover>
+    <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
+      <OButton
+        data-test="date-time-next-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border h-auto! rounded-s-none! border-s!"
+        icon-left="chevron-right"
+        :aria-label="t('common.next')"
+        :disabled="disable || isNextShiftDisabled()"
+        @click.prevent.stop="shiftTimeRange('next')"
+      />
+    </OTooltip>
   </div>
 </template>
 
@@ -335,6 +368,17 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
+
+const MICROS_PER_SECOND = 1_000_000;
+// Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
+const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
+  s: 315_360_000,
+  m: 5_256_000,
+  h: 87_600,
+  d: 3_650,
+  w: 520,
+  M: 120,
+};
 
 interface ConsumableDateTime {
   startTime: number;
@@ -411,6 +455,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    hideRangeShift: {
+      type: Boolean,
+      default: false,
+    },
     minDate: {
       type: String,
       default: null,
@@ -441,6 +489,7 @@ export default defineComponent({
     });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
+    const lastValidCustomValue = ref(15);
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(currentTimezone);
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
@@ -664,22 +713,37 @@ export default defineComponent({
       if (props.autoApply) saveDate("relative");
     };
 
+    const isValidCustomValue = (value: unknown) =>
+      value !== "" && value !== null && Number.isFinite(Number(value));
+
     const onCustomPeriodSelect = () => {
+      // An emptied or non-numeric field is mid-edit: apply nothing until a number is typed.
+      if (!isValidCustomValue(relativeValue.value)) return;
+
+      let value = Math.max(1, Math.trunc(Number(relativeValue.value)));
+      const restrictedMax = relativePeriodsMaxValue.value[relativePeriod.value];
       if (
         selectedType.value == "relative" &&
         props.queryRangeRestrictionInHour > 0 &&
-        relativeValue.value > relativePeriodsMaxValue.value[relativePeriod.value]
+        value > restrictedMax
       ) {
-        relativeValue.value =
-          relativePeriodsMaxValue.value[relativePeriod.value] > -1
-            ? relativePeriodsMaxValue.value[relativePeriod.value]
-            : 15;
+        value = restrictedMax > -1 ? restrictedMax : 15;
       }
-
-      // relativeValue can hold a string at runtime (text input); parseInt coerces
-      relativeValue.value = parseInt(relativeValue.value as unknown as string);
+      relativeValue.value = Math.min(
+        value,
+        MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
+      );
+      lastValidCustomValue.value = relativeValue.value;
 
       if (props.autoApply) saveDate("relative-custom");
+    };
+
+    const onCustomValueFocus = () => {
+      lastValidCustomValue.value = relativeValue.value;
+    };
+    const onCustomValueBlur = () => {
+      if (!isValidCustomValue(relativeValue.value))
+        relativeValue.value = lastValidCustomValue.value;
     };
 
     const setRelativeTime = (period: string) => {
@@ -1049,7 +1113,10 @@ export default defineComponent({
 
     const getDisplayValue = computed(() => {
       if (!props.disableRelative && selectedType.value === "relative") {
-        return t(pastPeriodKey.value, { count: relativeValue.value });
+        const count = isValidCustomValue(relativeValue.value)
+          ? relativeValue.value
+          : lastValidCustomValue.value;
+        return t(pastPeriodKey.value, { count });
       } else {
         if (selectedDate.value != null) {
           // Here as if multiple dates is selected we get object with from and to keys
@@ -1191,6 +1258,50 @@ export default defineComponent({
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
       if (props.autoApply) saveDate(type === "absolute" ? "absolute" : "relative-custom");
+    };
+
+    /**
+     * Shift the applied time window backward (`prev`) or forward (`next`) by its
+     * own duration, then promote the picker to an absolute range and emit the
+     * change so the page re-runs its query. Works from both relative and
+     * absolute modes: `getConsumableDateTime` resolves the current window to
+     * concrete microsecond timestamps first, so shifting across midnight/day
+     * boundaries stays exact and a relative picker is switched to absolute.
+     *
+     * Deliberately does NOT call `markProgrammaticDateChange()`: the change is
+     * user-driven, so `userChangedValue` stays `true` and consumers (e.g.
+     * traces live-mode) re-run their query just like a manual Apply. With
+     * `autoApply` the deep `selectedDate`/`selectedTime` watcher saves the new
+     * range; otherwise we save and emit directly.
+     */
+    const shiftTimeRange = (direction: "prev" | "next") => {
+      const { startTime, endTime } = getConsumableDateTime();
+      const duration = endTime - startTime;
+      if (!(duration > 0)) return;
+
+      let delta = (direction === "prev" ? -1 : 1) * duration;
+      if (direction === "next") {
+        // The calendar rejects future dates, so a forward shift stops at now.
+        delta = Math.min(delta, Date.now() * 1000 - endTime);
+        if (delta < MICROS_PER_SECOND) return;
+      }
+      const startDateTime = convertUnixTime(startTime + delta);
+      const endDateTime = convertUnixTime(endTime + delta);
+
+      selectedDate.value.from = startDateTime.date;
+      selectedDate.value.to = endDateTime.date;
+      selectedTime.value.startTime = startDateTime.time;
+      selectedTime.value.endTime = endDateTime.time;
+      selectedType.value = "absolute";
+
+      menuOpen.value = false;
+      if (!props.autoApply) saveDate("absolute");
+    };
+
+    const isNextShiftDisabled = () => {
+      if (selectedType.value === "relative") return true;
+      const { endUTC } = getUTCTimeStamp();
+      return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
     };
 
     // Arrow-key navigation for the picker panel: Left/Right switch the
@@ -1391,6 +1502,8 @@ export default defineComponent({
       datetimeBtn,
       getImageURL,
       onCustomPeriodSelect,
+      onCustomValueFocus,
+      onCustomValueBlur,
       setRelativeDate,
       relativePeriods,
       relativeDates,
@@ -1421,6 +1534,8 @@ export default defineComponent({
       setSavedDate,
       optionsFn,
       setDateType,
+      shiftTimeRange,
+      isNextShiftDisabled,
       onPickerKeydown,
       getConsumableDateTime,
       relativeDatesInHour,

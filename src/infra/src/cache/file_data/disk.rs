@@ -722,18 +722,11 @@ pub async fn get_size(file: &str) -> Option<usize> {
     files.get_size(file).await
 }
 
-/// Batched range read against the disk cache: one `File::open` followed
-/// by N `pread`s, all inside one `block_in_place`. Returns one `Bytes`
-/// per input range, in input order. This is the hot path for the search
-/// side's `.bf` block fetches — without it each range turns into a
-/// separate `File::open` and async task spawn, which dominates wall
-/// clock for queries touching many buckets.
-///
-/// Returns `Err(NotFound)` when the file isn't in the disk cache; the
-/// caller falls back to remote storage.
 #[cfg(unix)]
 pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Result<Vec<Bytes>> {
-    use std::os::unix::fs::FileExt;
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
 
     let Some(files) = get_file_reader(file) else {
         return Err(object_store::Error::NotFound {
@@ -751,27 +744,33 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
     let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
     let file_label = file.to_string();
 
-    tokio::task::block_in_place(move || -> object_store::Result<Vec<Bytes>> {
+    let read = move || -> object_store::Result<Vec<Bytes>> {
         let f = std::fs::File::open(&path).map_err(|e| object_store::Error::NotFound {
             path: file_label.clone(),
             source: Box::new(e),
         })?;
-        let mut out = Vec::with_capacity(ranges_owned.len());
-        for r in &ranges_owned {
-            if r.start > r.end {
-                return Err(crate::storage::Error::BadRange(file_label.clone()).into());
+        crate::storage::read_ranges_from_file(&f, &ranges_owned).map_err(|error| {
+            object_store::Error::Generic {
+                store: "DiskCache",
+                source: Box::new(error),
             }
-            let len = (r.end - r.start) as usize;
-            let mut buf = vec![0u8; len];
-            f.read_exact_at(&mut buf, r.start)
-                .map_err(|e| object_store::Error::Generic {
-                    store: "DiskCache",
-                    source: Box::new(e),
-                })?;
-            out.push(Bytes::from(buf));
-        }
-        Ok(out)
-    })
+        })
+    };
+    if tokio::runtime::Handle::try_current().is_ok_and(|handle| {
+        matches!(
+            handle.runtime_flavor(),
+            tokio::runtime::RuntimeFlavor::MultiThread
+        )
+    }) {
+        tokio::task::block_in_place(read)
+    } else {
+        tokio::task::spawn_blocking(read)
+            .await
+            .map_err(|error| object_store::Error::Generic {
+                store: "DiskCache",
+                source: Box::new(error),
+            })?
+    }
 }
 
 #[cfg(not(unix))]
@@ -1476,6 +1475,65 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn batched_ranges_preserve_bounds_and_order() {
+        assert_batched_ranges().await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "current_thread")]
+    async fn batched_ranges_support_current_thread_runtime() {
+        assert_batched_ranges().await;
+    }
+
+    #[cfg(unix)]
+    async fn assert_batched_ranges() {
+        let key = format!(
+            "files/default/logs/ranges/2026/09/20/10/{}.parquet",
+            config::ider::uuid()
+        );
+        assert!(get_config().disk_cache.enabled);
+        set(&key, Bytes::from_static(b"0123456789abcdef"))
+            .await
+            .unwrap();
+        assert_eq!(
+            get_ranges(&key, &[10..14, 1..5, 3..7, 1..5, 14..20])
+                .await
+                .unwrap(),
+            vec![
+                Bytes::from_static(b"abcd"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"ef")
+            ]
+        );
+        assert!(get_ranges("missing", &[]).await.unwrap().is_empty());
+        for range in [Range { start: 7, end: 3 }, 3..3, 16..17] {
+            assert!(
+                get_ranges(&key, std::slice::from_ref(&range))
+                    .await
+                    .is_err()
+            );
+        }
+        if usize::BITS == 64 {
+            assert_eq!(
+                get_ranges(&key, std::slice::from_ref(&(14..u64::MAX)))
+                    .await
+                    .unwrap(),
+                vec![Bytes::from_static(b"ef")]
+            );
+        }
+        remove(&key).await.unwrap();
+        assert!(matches!(
+            get_ranges(&key, std::slice::from_ref(&(0..1)))
+                .await
+                .unwrap_err(),
+            object_store::Error::NotFound { .. }
+        ));
+    }
 
     #[test]
     fn key_escapes_rejects_traversal_and_absolute() {

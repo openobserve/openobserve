@@ -118,12 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { watch } from "vue";
+import { watch, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
-import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -133,6 +132,9 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddStreamSchema, addStreamDefaults, type AddStreamForm } from "./AddStream.schema";
+import { createStreamMutation } from "@/services/stream.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 
 const { t } = useI18nTyped();
 
@@ -149,6 +151,9 @@ const props = defineProps<{
 }>();
 
 const { addStream, getStream } = useStreams(t);
+
+const orgId = useOrgId();
+const createStream = useMutation(() => createStreamMutation(orgId.value));
 
 const store = useStore();
 
@@ -228,14 +233,9 @@ const saveStream = async (value: AddStreamForm) => {
   const payload = getStreamPayload(Number(value.dataRetentionDays), value.fields ?? []);
   if (!payload) return;
 
-  await streamService
-    .createStream(
-      store.state.selectedOrganization.identifier,
-      value.name,
-      value.stream_type,
-      payload,
-    )
-    .then(() => {
+  await createStream
+    .mutateAsync({ name: value.name, type: value.stream_type, payload })
+    .then(async () => {
       toast({
         message: t("toastMessages.logstream.streamCreatedSuccessfully"),
         variant: "success",

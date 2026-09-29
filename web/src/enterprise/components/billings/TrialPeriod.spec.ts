@@ -25,11 +25,14 @@ vi.mock("@/constants/config", () => ({
 }));
 
 // Mock BillingService
-vi.mock("@/services/billings", () => ({
-  default: {
-    list_subscription: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_subscription: vi.fn(),
+    },
+  });
+});
 
 // Import the mocked module to access the mock function
 import BillingService from "@/services/billings";

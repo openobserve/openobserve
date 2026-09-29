@@ -21,6 +21,7 @@ import { describe, it, expect } from "vitest";
 import { hostsPage } from "./hosts.page";
 import { GROUP, STALENESS_24H_US } from "../types";
 import golden from "./__fixtures__/hostDashboard.golden.json";
+import { b64DecodeUnicode } from "@/utils/formatters";
 
 const allPanels = () => hostsPage.sections.flatMap((section: any) => section.panels);
 
@@ -107,6 +108,48 @@ describe("panel identity — frozen against the pre-retrofit builder", () => {
   });
 });
 
+describe("the drawer's panels agree with the list's columns", () => {
+  // Stated literally, not imported: interpolating the constant under test would
+  // make a typo'd label name pass.
+  const GUARD = 'instrumentation_library_name!~".*instrumentation.system_metrics.*"';
+
+  const panelQueries = () =>
+    allPanels().flatMap((p: any) =>
+      p.variants.flatMap((v: any) => v.queries.map((q: any) => q.query)),
+    );
+
+  // The drilldown carries its query base64'd inside the explorer URL.
+  const drilldownQueries = () =>
+    allPanels().flatMap((p: any) =>
+      (p.drilldown ?? []).map((d: any) => {
+        const encoded = new URLSearchParams(d.data.url.split("?")[1]).get("query") ?? "";
+        return b64DecodeUnicode(encoded) ?? "";
+      }),
+    );
+
+  it("every panel query excludes language-SDK process metrics", () => {
+    const queries = panelQueries();
+    expect(queries.length).toBe(10);
+    for (const q of queries) expect(q, q).toContain(GUARD);
+  });
+
+  it("drilldowns carry the same exclusion, so the explorer matches the panel", () => {
+    for (const q of drilldownQueries()) expect(q, q).toContain(GUARD);
+  });
+
+  it("the filesystem panel drops firmware mountpoints like the Disk column does", () => {
+    const q = panel("hd_fs_used_pct").variants[0].queries[0].query;
+    expect([...q.matchAll(/mountpoint!~"([^"]*)"/g)].map((m: any) => m[1])).toEqual([
+      "/boot.*|/efi.*",
+      "/boot.*|/efi.*",
+    ]);
+  });
+
+  it("no panel query carries a backslash escape the metrics engine rejects", () => {
+    for (const q of [...panelQueries(), ...drilldownQueries()]) expect(q, q).not.toContain("\\");
+  });
+});
+
 describe("variants declare their FULL stream set (§4.1)", () => {
   it("each panel requires exactly the system_* streams its queries read", () => {
     const expected: Record<string, string[]> = {
@@ -153,9 +196,47 @@ describe("queries carry tokens, not literals", () => {
   });
 
   it("preserves the device/filesystem exclusions the builder carried", () => {
-    expect(panel("hd_disk_read").variants[0].queries[0].query).toContain('device!~"loop.*"');
-    expect(panel("hd_disk_write").variants[0].queries[0].query).toContain('device!~"loop.*"');
+    expect(panel("hd_disk_read").variants[0].queries[0].query).toContain("device!~");
+    expect(panel("hd_disk_write").variants[0].queries[0].query).toContain("device!~");
     expect(panel("hd_fs_used_pct").variants[0].queries[0].query).toContain("device!~");
+  });
+
+  // Run the SHIPPED matcher against real device names: a pattern anchored on a
+  // trailing digit blanks the panel on every nvme host, which reads as no data.
+  const deviceMatcher = (panelId: string) => {
+    const m = panel(panelId).variants[0].queries[0].query.match(/device!~"([^"]*)"/);
+    if (!m) throw new Error(`no device matcher on ${panelId}`);
+    return new RegExp(`^(?:${m[1]})$`);
+  };
+
+  it.each(["hd_disk_read", "hd_disk_write"])("%s keeps whole disks and drops partitions", (id) => {
+    const re = deviceMatcher(id);
+    for (const keep of ["nvme0n1", "nvme1n1", "nvme14n1", "sda", "sdb", "sdd", "xvda"]) {
+      expect(re.test(keep), `${keep} must survive`).toBe(false);
+    }
+    for (const drop of ["nvme0n1p1", "nvme0n1p128", "sda1", "sda15", "sdb1", "xvda1", "sr0"]) {
+      expect(re.test(drop), `${drop} must be excluded`).toBe(true);
+    }
+  });
+
+  it("the filesystem panel groups by device so a bind mount is one line", () => {
+    const query = panel("hd_fs_used_pct").variants[0].queries[0].query;
+    expect(query).toContain("sum by (device)");
+    expect(query).not.toContain("sum by (mountpoint)");
+  });
+
+  // This panel sums ACROSS devices, so a virtual interface lands in the total.
+  it("the network panel excludes loopback and virtual interfaces", () => {
+    const query = panel("hd_network_by_direction").variants[0].queries[0].query;
+    const m = query.match(/device!~"([^"]*)"/);
+    expect(m, "network panel must carry a device exclusion").toBeTruthy();
+    const re = new RegExp(`^(?:${m![1]})$`);
+    for (const drop of ["lo", "veth123abc", "docker0", "br-abc123", "cni0", "flannel.1", "tunl0"]) {
+      expect(re.test(drop), `${drop} must be excluded`).toBe(true);
+    }
+    for (const keep of ["eth0", "ens5", "enp0s3"]) {
+      expect(re.test(keep), `${keep} must survive`).toBe(false);
+    }
   });
 
   it("keeps the state selectors the builder used, character for character", () => {

@@ -158,3 +158,11 @@ const stream = {
 };
 
 export default stream;
+
+export interface StreamPageParams {
+  offset: number;
+  limit: number;
+  keyword?: string;
+  sort?: string;
+  asc?: boolean;
+}

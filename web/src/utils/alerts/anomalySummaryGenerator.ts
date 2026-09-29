@@ -83,17 +83,30 @@ export function generateAnomalySummary(
         : t("alerts.anomaly.summaryRetrainEveryDays", { days: config.retrain_interval_days });
     parts.push(t("alerts.anomaly.summaryRetrain", { retrain: chip(retrain) }));
 
-    // A cleared field reaches here as "", and 100 - "" is 100 — "flag everything".
-    // Number("") and Number(null) are both 0, so blanks need excluding first.
-    const stored = config.threshold;
-    const percentile =
-      stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
-    if (Number.isFinite(percentile)) {
-      parts.push(
-        t("alerts.anomaly.summaryThreshold", {
-          threshold: chip(t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })),
-        }),
-      );
+    const budget = Number(config.alert_budget_per_day);
+    if (Number.isFinite(budget) && budget > 0) {
+      // Budget mode: the enforced cap IS the sensitivity statement.
+      const round = (n: number) => Math.round(n * 1e6) / 1e6;
+      const label =
+        budget < 1
+          ? t("alerts.anomaly.summaryBudgetPerWeek", { count: round(budget * 7) })
+          : t("alerts.anomaly.summaryBudgetPerDay", { count: round(budget) });
+      parts.push(t("alerts.anomaly.summaryThreshold", { threshold: chip(label) }));
+    } else {
+      // A cleared field reaches here as "", and Number("")/Number(null) are
+      // both 0, so blanks need excluding before any number is shown.
+      const stored = config.threshold;
+      const percentile =
+        stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
+      if (Number.isFinite(percentile)) {
+        // The stored percentile indexes TRAINING scores; never restate it as
+        // a live anomaly rate — that arithmetic was measured false.
+        parts.push(
+          t("alerts.anomaly.summaryThreshold", {
+            threshold: chip(t("alerts.anomaly.summaryThresholdPercentile", { percentile })),
+          }),
+        );
+      }
     }
   }
 

@@ -11,15 +11,18 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock the search service
-vi.mock("@/services/search", () => ({
-  default: {
-    get_history: vi.fn().mockResolvedValue({
-      data: {
-        hits: [],
-      },
-    }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_history: vi.fn().mockResolvedValue({
+        data: {
+          hits: [],
+        },
+      }),
+    },
+  });
+});
 
 // Mock useLogs composable
 vi.mock("@/composables/useLogs", () => ({

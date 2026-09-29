@@ -83,6 +83,12 @@ export interface LlmQueueItem {
   refTraceId: string | null;
   /** Lower bound for trace hydration and Score lookup, in microseconds. */
   refTraceStartTime: number;
+  /**
+   * Bounded excerpt of the first user turn, captured server-side at enqueue so
+   * the Workbench list can label items without a trace search per row. Null
+   * when the source trace carried no recognizable input.
+   */
+  inputPreview: string | null;
   status: LlmQueueItemStatus;
   reviewedAt: number | null;
   archivedAt: number | null;
@@ -232,6 +238,7 @@ function normalizeItem(item: any): LlmQueueItem {
     refId: item.ref_id ?? item.refId,
     refTraceId: item.ref_trace_id ?? item.refTraceId ?? null,
     refTraceStartTime: Number(item.ref_trace_start_time ?? item.refTraceStartTime ?? 0),
+    inputPreview: item.input_preview ?? item.inputPreview ?? null,
     status: (item.status ?? "pending") as LlmQueueItemStatus,
     reviewedAt: item.reviewed_at ?? item.reviewedAt ?? null,
     archivedAt: item.archived_at ?? item.archivedAt ?? null,

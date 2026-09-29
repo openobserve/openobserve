@@ -26,11 +26,11 @@ vi.mock("@/aws-exports", () => {
     freePlan: "free",
     paidPlan: "pay-as-you-go",
     enterprisePlan: "enterprise",
-    ooApplicationID: undefined,
-    ooClientToken: undefined,
-    ooSite: undefined,
-    ooService: undefined,
-    ooOrgIdentifier: undefined,
+    o2ApplicationID: undefined,
+    o2ClientToken: undefined,
+    o2Site: undefined,
+    o2Service: undefined,
+    o2OrgIdentifier: undefined,
     environment: undefined,
     ddAPPID: undefined,
     ddClientToken: undefined,
@@ -280,6 +280,29 @@ describe("useEnterpriseRoutes.ts", () => {
         ]),
       );
     });
+
+    // Synthetics produces an empty org's first data, so the empty-data gate must not block it.
+    it.each([
+      "synthetics",
+      "synthetics-add",
+      "synthetics-edit",
+      "synthetics-status-page-edit",
+      "synthetic-private-location",
+      "synthetic-monitor-results",
+      "synthetics-run-detail",
+    ])("should flag the %s route as allowOnEmptyData", (name) => {
+      const routes = useEnterpriseRoutes();
+      const route = routes.find((r: any) => r.name === name);
+      expect(route).toBeDefined();
+      expect(route.meta?.allowOnEmptyData).toBe(true);
+    });
+
+    // The flag on the parent is inherited by every IAM child through merged meta.
+    it("should flag the iam route as allowOnEmptyData", () => {
+      const routes = useEnterpriseRoutes();
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      expect(iamRoute.meta?.allowOnEmptyData).toBe(true);
+    });
   });
 
   describe("Cloud Configuration", () => {
@@ -385,6 +408,22 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(18);
+    });
+
+    // On-call is configured before any data flows, so the empty-data gate must not block it.
+    it.each([
+      "onCallResponses",
+      "onCallResponseDetail",
+      "onCallMine",
+      "onCallTeams",
+      "onCallTeamDetail",
+      "onCallPolicies",
+      "onCallRouting",
+    ])("should flag the %s route as allowOnEmptyData", (name) => {
+      const routes = useEnterpriseRoutes();
+      const route = routes.find((r: any) => r.name === name);
+      expect(route).toBeDefined();
+      expect(route.meta?.allowOnEmptyData).toBe(true);
     });
   });
 

@@ -1495,9 +1495,13 @@ import incidentsService, {
   IncidentCorrelatedStreams,
   ArchivedRcaReport,
 } from "@/services/incidents";
-import oncallService from "@/services/oncall";
+import { oncallTeamsQuery, responsesForIncidentQuery } from "@/services/oncall.queries";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
   type CorrelationResponse,
@@ -1558,6 +1562,12 @@ export default defineComponent({
     const route = useRoute();
     const { confirm } = useConfirmDialog();
 
+    const incidentOrgId = useOrgId();
+    const updateIncidentStatus = useMutation(() =>
+      updateIncidentStatusMutation(incidentOrgId.value),
+    );
+    const updateIncident = useMutation(() => updateIncidentMutation(incidentOrgId.value));
+
     // Copy to clipboard state
     const copiedField = ref<string | null>(null);
 
@@ -1598,11 +1608,7 @@ export default defineComponent({
     /// claiming nobody was paged.
     async function loadOnCallResponse(org: string, incidentId: string) {
       try {
-        const res = await oncallService.listResponsesForIncident({
-          org_identifier: org,
-          incident_id: incidentId,
-        });
-        const records = res.data ?? [];
+        const records = await queryClient.fetchQuery(responsesForIncidentQuery(org, incidentId));
         oncallResponses.value = records;
         // The owner fixes the thing; a liaison contains the blast radius. The
         // owner's record is the one the panel is about.
@@ -1620,10 +1626,8 @@ export default defineComponent({
     async function loadOnCallTeamNames(org: string, records: OnCallResponse[]) {
       if (!records.some((record) => record.team_id)) return;
       try {
-        const res = await oncallService.listTeams({ org_identifier: org });
-        oncallTeamNames.value = Object.fromEntries(
-          (res.data ?? []).map((team) => [team.id, team.name]),
-        );
+        const teams = await queryClient.fetchQuery(oncallTeamsQuery(org));
+        oncallTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
       } catch {
         // The ids still render; a failed lookup must not blank the panel.
         oncallTeamNames.value = {};
@@ -2122,7 +2126,7 @@ export default defineComponent({
           !correlationData.value?.traceStreams?.length
         ) {
           // No correlation data found - try building fallback correlation
-          await buildFallbackCorrelation(org, incidentDetails.value);
+          await buildFallbackCorrelation(org, incidentDetails.value, force);
         }
       } catch (error: any) {
         console.error("Failed to load correlated streams:", error);
@@ -2134,7 +2138,7 @@ export default defineComponent({
     };
 
     // Build fallback correlation using first alert's stream schema
-    const buildFallbackCorrelation = async (org: string, incident: Incident) => {
+    const buildFallbackCorrelation = async (org: string, incident: Incident, force = false) => {
       try {
         const groupValues: Record<string, string> = incident.group_values ?? {};
         // Get first alert to determine source stream
@@ -2149,8 +2153,16 @@ export default defineComponent({
         const streamName = firstAlert.stream_name || "default";
 
         // Step 1: Get stream schema (like logs page does)
-        const schemaResponse = await streamService.schema(org, streamName, streamType);
-        const schema = schemaResponse.data;
+        const schemaOptions = streamSchemaQuery(org, streamName, streamType);
+        // Retry is the user asking again, so a field added since the last read must show up.
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: schemaOptions.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        const schema = await queryClient.fetchQuery(schemaOptions);
 
         // Step 2: Extract schema fields (like logs page does)
         // CRITICAL FIX: Use uds_schema (user-defined schema) if available!
@@ -2255,9 +2267,8 @@ export default defineComponent({
     };
 
     // Refresh correlation data
-    const refreshCorrelation = () => {
-      fetchCorrelatedStreams(true);
-    };
+    // Returns the promise so callers (and specs) can await the refresh.
+    const refreshCorrelation = () => fetchCorrelatedStreams(true);
 
     // Lazy load correlation when user clicks telemetry tab for the first time
     watch(activeTab, (newTab) => {
@@ -2690,12 +2701,10 @@ export default defineComponent({
       if (!incidentDetails.value) return;
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
+        const response = await updateIncidentStatus.mutateAsync({
+          id: incidentDetails.value.id,
+          status: newStatus,
+        });
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
         incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
@@ -2739,7 +2748,8 @@ export default defineComponent({
         persistent: false,
       });
       if (!ok) return;
-      updateStatus("acknowledged");
+      // The caller's promise must cover the update, not just the confirm dialog.
+      return updateStatus("acknowledged");
     };
     const resolveIncident = () => updateStatus("resolved");
     const reopenIncident = () => updateStatus("open");
@@ -2764,9 +2774,9 @@ export default defineComponent({
       }
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateIncident(org, incidentDetails.value.id, {
-          title: nextTitle,
+        const response = await updateIncident.mutateAsync({
+          id: incidentDetails.value.id,
+          updates: { title: nextTitle },
         });
 
         // Update local state with the actual title from the API response
@@ -2896,12 +2906,10 @@ export default defineComponent({
 
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
+        const response = await updateIncidentStatus.mutateAsync({
+          id: incidentDetails.value.id,
+          status: newStatus,
+        });
 
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
@@ -2949,8 +2957,9 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
         const incidentId = incidentDetails.value.id;
-        const response = await incidentsService.updateIncident(org, incidentId, {
-          severity: newSeverity,
+        const response = await updateIncident.mutateAsync({
+          id: incidentId,
+          updates: { severity: newSeverity },
         });
 
         const data = response.data;

@@ -274,14 +274,24 @@ const anomalySourceFields = computed(() => {
       },
     );
   }
-  // Stored as the percentile scored against; the form shows its complement.
+  // Budget mode: the enforced cap is the sensitivity statement. Percentile
+  // mode: the stored value indexes TRAINING scores — never restated as a live
+  // anomaly rate, which was measured false.
+  const budget = isBlank(a?.alert_budget_per_day) ? NaN : Number(a.alert_budget_per_day);
   const percentile = isBlank(a?.threshold) ? NaN : Number(a.threshold);
+  const roundBudget = (n: number) => Math.round(n * 1e6) / 1e6;
+  const sensitivityValue =
+    Number.isFinite(budget) && budget > 0
+      ? budget < 1
+        ? t("alerts.anomaly.summaryBudgetPerWeek", { count: roundBudget(budget * 7) })
+        : t("alerts.anomaly.summaryBudgetPerDay", { count: roundBudget(budget) })
+      : Number.isFinite(percentile)
+        ? t("alerts.anomaly.summaryThresholdPercentile", { percentile })
+        : EMPTY;
   fields.push({
     key: "sensitivity",
     label: t("alerts.sensitivity"),
-    value: Number.isFinite(percentile)
-      ? t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })
-      : EMPTY,
+    value: sensitivityValue,
   });
   return fields;
 });

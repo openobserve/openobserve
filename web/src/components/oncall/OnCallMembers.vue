@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-full w-full flex-col gap-3" data-test="oncall-members">
     <OTable
-      :data="rows"
+      :data="filteredRows"
       :columns="columns"
       row-key="id"
       :frame="false"
@@ -16,6 +16,13 @@
            answers "is anyone missing" in the same glance that offers to fix it. -->
       <template #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2">
+          <OSearchInput
+            v-model="memberFilter"
+            class="w-full max-w-xs"
+            :placeholder="t('oncall.memberSearchPlaceholder')"
+            data-test="oncall-members-search"
+          />
+          <OSeparator vertical />
           <div class="min-w-0 flex-1">
             <OSelect
               v-if="!userLookupFailed"
@@ -46,6 +53,7 @@
             @click="addMembers"
           >
             {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
+            <OTooltip v-if="!pendingEmails.length" :content="t('oncall.addPeopleDisabledHint')" />
           </OButton>
 
           <span
@@ -151,8 +159,9 @@
         <OEmptyState
           size="hero"
           preset="no-oncall-members"
+          :filtered="!!memberFilter"
           data-test="oncall-members-empty"
-          @action="focusMemberPicker"
+          @action="(id) => (id === 'clear-filters' ? (memberFilter = '') : focusMemberPicker())"
         />
       </template>
     </OTable>
@@ -250,7 +259,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -259,9 +270,18 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OnCallChannelChips from "@/components/oncall/OnCallChannelChips.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
-import oncallService from "@/services/oncall";
-import usersService from "@/services/users";
+import {
+  addTeamMembersMutation,
+  createUnavailabilityMutation,
+  deleteUnavailabilityMutation,
+  removeTeamMemberMutation,
+  resolvedScheduleQuery,
+  unavailabilityQuery,
+} from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { orgUsersQuery } from "@/services/users.queries";
 import type {
   MemberReachability,
   OnCallPosition,
@@ -275,6 +295,7 @@ import type {
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { formatInZone, rotationMembers } from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -314,6 +335,12 @@ const { noteConfigurationDenied } = useOnCallPermissions();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
+// Getter form: the tab outlives a team switch, and a bound id would write to the one it opened on.
+const addMembersWrite = useMutation(() => addTeamMembersMutation(orgId.value, props.teamId));
+const removeMemberWrite = useMutation(() => removeTeamMemberMutation(orgId.value, props.teamId));
+const createAbsenceWrite = useMutation(() => createUnavailabilityMutation(orgId.value));
+const deleteAbsenceWrite = useMutation(() => deleteUnavailabilityMutation(orgId.value));
+
 /// Which rotation, if any, actually pages this person. Adding somebody to a
 /// team does not put them in the paging order, and that gap is where "why
 /// wasn't I paged" comes from.
@@ -350,12 +377,9 @@ const awaySaving = ref(false);
 async function fetchAbsences() {
   try {
     const now = Date.now() * 1000;
-    const res = await oncallService.listUnavailability({
-      org_identifier: orgId.value,
-      from: now,
-      to: now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY,
-    });
-    absences.value = res.data ?? [];
+    absences.value = await queryClient.fetchQuery(
+      unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY),
+    );
   } catch {
     absences.value = [];
   }
@@ -367,13 +391,14 @@ async function fetchAbsences() {
 async function fetchSegments() {
   try {
     const now = Date.now() * 1000;
-    const res = await oncallService.resolvedSchedule({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      from: now,
-      to: now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
-    });
-    segments.value = res.data ?? [];
+    segments.value = await queryClient.fetchQuery(
+      resolvedScheduleQuery(
+        orgId.value,
+        props.teamId,
+        now,
+        now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
+      ),
+    );
   } catch {
     segments.value = [];
   }
@@ -410,17 +435,15 @@ function openAway(email: string) {
 async function saveAbsence() {
   awaySaving.value = true;
   try {
-    await oncallService.createUnavailability({
-      org_identifier: orgId.value,
-      data: {
-        user_email: awayEmail.value,
-        start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
-        end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
-        ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
-      },
+    await createAbsenceWrite.mutateAsync({
+      user_email: awayEmail.value,
+      start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
+      end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
+      ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
     });
     awayOpen.value = false;
     toast({ variant: "success", message: t("oncall.awaySaved") });
+    // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     // The rota moves the away person's turn, so the schedule tab's answer
     // just changed too.
@@ -441,11 +464,9 @@ async function saveAbsence() {
 
 async function removeAbsence(absence: Unavailability) {
   try {
-    await oncallService.deleteUnavailability({
-      org_identifier: orgId.value,
-      unavailability_id: absence.id,
-    });
+    await deleteAbsenceWrite.mutateAsync(absence.id);
     toast({ variant: "success", message: t("oncall.awayRemoved") });
+    // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     emit("changed");
   } catch (err: any) {
@@ -527,6 +548,17 @@ const rows = computed<MemberRow[]>(() => {
   });
   return enriched.sort(
     (a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || a.name.localeCompare(b.name),
+  );
+});
+
+const memberFilter = ref("");
+
+/// Filters the roster only — pagesMax/heavyLoad below keep reading `rows`.
+const filteredRows = computed(() => {
+  const q = memberFilter.value.trim().toLowerCase();
+  if (!q) return rows.value;
+  return rows.value.filter(
+    (row) => row.name.toLowerCase().includes(q) || row.user_email.toLowerCase().includes(q),
   );
 });
 
@@ -643,6 +675,8 @@ function focusMemberPicker() {
   memberPickerRef.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" });
   memberPickerRef.value?.focus();
 }
+// Exposed so the attention banner's "Add a member" can land the cursor here even when this tab is already open.
+defineExpose({ focusMemberPicker });
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);
 // Losing the picker must not lose the ability to add anybody.
@@ -685,8 +719,7 @@ function nameOf(email: string): string {
 async function fetchOrgUsers() {
   loadingUsers.value = true;
   try {
-    const res = await usersService.orgUsers(orgId.value);
-    orgUsers.value = res.data?.data ?? [];
+    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId.value));
     userLookupFailed.value = false;
   } catch {
     // Not a toast: the form still works, and an error banner over a
@@ -708,11 +741,7 @@ async function commitMembers(emails: string[]) {
   if (!emails.length) return;
   adding.value = true;
   try {
-    await oncallService.addMembers({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      data: { user_emails: emails },
-    });
+    await addMembersWrite.mutateAsync(emails);
     selected.value = [];
     fallbackEmails.value = "";
     emit("changed");
@@ -733,11 +762,7 @@ async function confirmRemoveMember() {
   memberToRemove.value = null;
   if (!member) return;
   try {
-    await oncallService.removeMember({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      user_email: member.user_email,
-    });
+    await removeMemberWrite.mutateAsync(member.user_email);
     emit("changed");
   } catch (err: any) {
     toast({

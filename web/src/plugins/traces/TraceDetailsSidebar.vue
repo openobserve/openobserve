@@ -143,6 +143,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ spanHttpResendCount }}</span>
           </OTag>
+
+          <OTag
+            v-if="promptAttributionTarget"
+            type="metricChip"
+            clickable
+            class="text-2xs bg-surface-base border-border-default border-s-badge-purple-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            :title="promptAttributionText"
+            data-test="trace-details-sidebar-prompt-attribution"
+            @click.stop="openPromptAttribution"
+          >
+            <template #icon><OIcon name="edit" size="xs" /></template>
+            <span class="text-3xs text-text-body font-semibold">{{ promptAttributionText }}</span>
+          </OTag>
         </div>
 
         <div class="flex items-center">
@@ -959,15 +972,26 @@ import {
 } from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
+import {
+  defineComponent,
+  onBeforeMount,
+  ref,
+  watch,
+  type Ref,
+  type PropType,
+  inject,
+  computed,
+  onMounted,
+  onUnmounted,
+  defineAsyncComponent,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
-import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
@@ -1013,6 +1037,8 @@ import {
 } from "@/utils/traces/useSpanServiceDetection";
 import type { Span } from "@/ts/interfaces/traces/span.types";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import llmPromptsService from "@/services/llm-prompts.service";
+import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
 
 // luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
 const HUMAN_TZ_FORMAT = "MMM dd, yyyy HH:mm:ss.SSS ZZZ";
@@ -1243,6 +1269,70 @@ export default defineComponent({
     };
 
     const store = useStore();
+    const promptAttributionTarget = ref<{
+      entityId: string;
+      version: number;
+      name: string;
+      label: string | null;
+    } | null>(null);
+    let promptResolveRequest = 0;
+    const promptAttributionText = computed(() => {
+      const target = promptAttributionTarget.value;
+      if (!target) return "";
+      return `${target.name}@v${target.version}${target.label ? ` · ${target.label}` : ""}`;
+    });
+
+    async function resolvePromptAttribution() {
+      const request = ++promptResolveRequest;
+      promptAttributionTarget.value = null;
+      const name =
+        typeof props.span?.gen_ai_prompt_name === "string"
+          ? props.span.gen_ai_prompt_name.trim()
+          : "";
+      const version = Number(props.span?.gen_ai_prompt_version);
+      const label =
+        typeof props.span?.gen_ai_prompt_label === "string" && props.span.gen_ai_prompt_label.trim()
+          ? props.span.gen_ai_prompt_label.trim()
+          : null;
+      const orgId = String(store.state.selectedOrganization?.identifier ?? "");
+      // The prompts route and API are enterprise-only; OSS has nothing to link to.
+      if (!router.hasRoute("aiPrompts")) return;
+      if (!orgId || !name || !Number.isInteger(version) || version < 1) return;
+      try {
+        const resolved = await llmPromptsService.resolve(orgId, { name, version });
+        if (request !== promptResolveRequest || resolved.version.version !== version) return;
+        promptAttributionTarget.value = {
+          entityId: resolved.prompt.entityId,
+          version,
+          name: resolved.prompt.name,
+          label,
+        };
+      } catch {
+        if (request === promptResolveRequest) promptAttributionTarget.value = null;
+      }
+    }
+
+    function openPromptAttribution() {
+      const target = promptAttributionTarget.value;
+      if (!target) return;
+      router.push(
+        aiPromptsRoute(String(store.state.selectedOrganization?.identifier ?? ""), {
+          entityId: target.entityId,
+          version: target.version,
+        }),
+      );
+    }
+
+    watch(
+      () => [
+        props.span?.gen_ai_prompt_name,
+        props.span?.gen_ai_prompt_version,
+        props.span?.gen_ai_prompt_label,
+        store.state.selectedOrganization?.identifier,
+      ],
+      resolvePromptAttribution,
+      { immediate: true },
+    );
 
     const hasDbSpan = computed(() =>
       Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),
@@ -2353,6 +2443,9 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      promptAttributionTarget,
+      promptAttributionText,
+      openPromptAttribution,
       canPreviewSpan,
       scoreChipsRef,
       onScoreAnnotated,

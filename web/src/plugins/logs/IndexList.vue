@@ -328,6 +328,7 @@ export default defineComponent({
       } else {
         this.searchObj.data.stream.selectedStream = (value as string[]) ?? [];
       }
+      this.searchObj.data.filterErrMsg = "";
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect as any;
         if (indexListSelectField?.updateInputValue) {

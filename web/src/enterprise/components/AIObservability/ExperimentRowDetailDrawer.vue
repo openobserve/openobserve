@@ -227,6 +227,59 @@
             class="w-full"
             data-test="ai-experiment-row-score-matrix"
           />
+
+          <div
+            v-if="activeScoreDetails.length"
+            class="mt-3 space-y-2"
+            data-test="ai-experiment-row-score-details"
+          >
+            <article
+              v-for="score in activeScoreDetails"
+              :key="score.key"
+              class="border-border-default rounded-default border p-3"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-text-heading min-w-0 truncate text-xs font-semibold">
+                  {{ raw(score.dimension) }}
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span
+                    class="border-border-default text-text-body rounded-default border px-2 py-1 text-xs font-semibold tabular-nums"
+                  >
+                    {{ raw(score.value) }}
+                  </span>
+                  <OButton
+                    v-if="score.trace"
+                    size="sm"
+                    variant="outline"
+                    :data-test="`ai-experiment-row-score-trace-${score.key}`"
+                    @click="$emit('score-trace', score.trace)"
+                  >
+                    {{ t("aiObservability.experiments.rowDetail.viewTrace") }}
+                  </OButton>
+                </div>
+              </div>
+
+              <div
+                v-if="score.reasoning"
+                class="border-border-default rounded-default mt-2 flex gap-2 border p-2"
+              >
+                <OIcon
+                  name="lightbulb-outline"
+                  size="xs"
+                  class="text-text-secondary mt-0.5 shrink-0"
+                />
+                <div class="min-w-0">
+                  <div class="text-text-secondary mb-0.5 text-xs font-semibold">
+                    {{ t("onlineEvals.traceScoreChip.reasoning") }}
+                  </div>
+                  <p class="text-text-body m-0 text-xs leading-relaxed whitespace-pre-wrap">
+                    {{ raw(score.reasoning) }}
+                  </p>
+                </div>
+              </div>
+            </article>
+          </div>
         </section>
       </div>
     </div>
@@ -284,6 +337,7 @@ const emit = defineEmits<{
   navigate: [rowId: string];
   retry: [slot: ExperimentResultSlot];
   trace: [execution: ExperimentExecution];
+  "score-trace": [target: { traceId: string; timestamp: number }];
 }>();
 
 const { t } = useI18nTyped();
@@ -358,11 +412,7 @@ const scoreRows = computed(() =>
   (props.detail?.scoreSummaries ?? []).map((summary) => {
     const row: Record<string, string> = {
       key: `${summary.scorerId}:${summary.scorerVersion}`,
-      dimension:
-        summary.scoreConfigName ||
-        summary.name ||
-        scorerNames.value[summary.scorerId] ||
-        t("aiObservability.experiments.rowDetail.unknownDimension"),
+      dimension: scoreDimension(summary),
       aggregate: experimentScoreSummaryValue(summary.value),
     };
     for (const trial of props.detail?.trials ?? []) {
@@ -373,6 +423,29 @@ const scoreRows = computed(() =>
     return row;
   }),
 );
+
+const activeScoreDetails = computed(() => {
+  const trial = activeTrial.value;
+  if (!trial) return [];
+  return (props.detail?.scoreSummaries ?? []).flatMap((summary) => {
+    const result = scoreFor(trial, summary);
+    if (result?.status !== "success" || !result.score) return [];
+    const record = result.score;
+    const reasoning = stringField(record, "reasoning");
+    const traceId = stringField(record, "evaluatorTraceId", "evaluator_trace_id");
+    const timestamp = numberField(record, "timestamp", "_timestamp") ?? trial.execution?.timestamp;
+    if (!reasoning && !traceId) return [];
+    return [
+      {
+        key: `${summary.scorerId}:${summary.scorerVersion}`,
+        dimension: scoreDimension(summary),
+        value: experimentScoreValue(record),
+        reasoning,
+        trace: traceId && timestamp != null ? { traceId, timestamp } : null,
+      },
+    ];
+  });
+});
 
 // Same emptiness rules and copy behaviour as TraceDetailsSidebar.
 function hasContent(content: unknown): boolean {
@@ -434,6 +507,31 @@ function scoreFor(trial: ExperimentResultSlot, summary: ExperimentScoreSummary) 
   return trial.scores.find(
     (score) => score.scorerId === summary.scorerId && score.scorerVersion === summary.scorerVersion,
   );
+}
+
+function scoreDimension(summary: ExperimentScoreSummary): string {
+  return (
+    summary.scoreConfigName ||
+    summary.name ||
+    scorerNames.value[summary.scorerId] ||
+    t("aiObservability.experiments.rowDetail.unknownDimension")
+  );
+}
+
+function stringField(record: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function numberField(record: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const key of keys) {
+    const value = Number(record[key]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return null;
 }
 
 const numberValue = (value: number | null | undefined) => (value == null ? "—" : String(value));

@@ -8,15 +8,19 @@ import config from "@/aws-exports";
 import OTable from "@/lib/core/Table/OTable.vue";
 
 // Mock the organizations service
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list: vi.fn(),
-    // get_admin_org is mocked purely so a regression that reintroduces the
-    // all-orgs endpoint here fails loudly instead of hitting the network.
-    get_admin_org: vi.fn(),
-    delete_org: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      // getOrganizations() sources the list from the _meta admin endpoint (so it can
+      // surface status / deleted_at); resurrect_org + delete_org are used by row actions.
+      get_admin_org: vi.fn(),
+      resurrect_org: vi.fn(),
+      delete_org: vi.fn(),
+    },
+  });
+});
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
@@ -647,19 +651,24 @@ describe("ListOrganizations", () => {
       expect(wrapper.vm.toBeUpdatedOrganization.id).toBe("");
     });
 
-    it("renameOrganization sets dialog state before router push", () => {
+    it("renameOrganization opens the edit dialog and updates the route", async () => {
       const row = { name: "Test Org", identifier: "org-rename-1" };
+      await router.push("/organizations");
 
-      // Known bug: the function references props.row.identifier but props
-      // is not defined in setup scope. It throws after the initial statements.
-      expect(() => wrapper.vm.renameOrganization(row)).toThrow();
+      expect(() => wrapper.vm.renameOrganization(row)).not.toThrow();
+      await flushPromises();
 
-      // The synchronous statements before the crash do execute
       expect(wrapper.vm.showAddOrganizationDialog).toBe(true);
       expect(wrapper.vm.toBeUpdatedOrganization).toEqual({
         id: "org-rename-1",
         name: "Test Org",
         identifier: "org-rename-1",
+      });
+      expect(router.currentRoute.value.query).toEqual({
+        action: "update",
+        org_identifier: "test-org",
+        to_be_updated_org_id: "org-rename-1",
+        to_be_updated_org_name: "Test Org",
       });
     });
   });

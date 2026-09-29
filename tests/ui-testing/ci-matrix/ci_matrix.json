@@ -19,8 +19,14 @@
       "alerts-add-alert-org-identifier.spec.js",
       "alerts-composite-builder.spec.js",
       "alerts-composite-list.spec.js",
+      "alerts-clone-dialog.spec.js",
       "alerts-composite-preview.spec.js",
-      "alerts-composite-detail.spec.js"
+      "alerts-composite-detail.spec.js",
+      "alerts-evaluation-chart.spec.js",
+      "alerts-chart-error-state.spec.js",
+      "alertsPagination.spec.js",
+      "alertTemplatesPagination.spec.js",
+      "alertDestinationsPagination.spec.js"
     ],
     "disabled": [
       {
@@ -72,7 +78,8 @@
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
       "dashboard-metric-camelcase.spec.js",
-      "dashboard-create-alert.spec.js"
+      "dashboard-create-alert.spec.js",
+      "dashboard-zoom-brush.spec.js"
     ],
     "disabled": []
   },
@@ -94,7 +101,10 @@
       "crossLinking.spec.js",
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
-      "dashboards-form-validation.spec.js"
+      "dashboards-form-validation.spec.js",
+      "dashboard-refresh-without-cache.spec.js",
+      "dashboard-print-layout.spec.js",
+      "dashboardPagination.spec.js"
     ],
     "disabled": [
       {
@@ -163,7 +173,8 @@
       "dashboard-table-column-filtering.spec.js",
       "dashboard-table-pagination.spec.js",
       "dashboard-pivot-table.spec.js",
-      "interactive-dashboard-table.spec.js"
+      "interactive-dashboard-table.spec.js",
+      "dashboard-cell-explorer-detail.spec.js"
     ],
     "disabled": []
   },
@@ -244,7 +255,12 @@
       "rum-form-validation.spec.js",
       "login-form-validation.spec.js",
       "datetime-picker-copy-paste.spec.js",
-      "organizationStatusSteps.spec.js"
+      "splunk-hec-ingestion-window.spec.js",
+      "connectDataSourcePopup.spec.js",
+      "otableSelectCell.spec.js",
+      "theme.spec.js",
+      "passwordPolicy.spec.js",
+      "ingestion-passcode-forbidden.spec.js"
     ],
     "disabled": []
   },
@@ -287,7 +303,9 @@
       "monaco-query-prefill.spec.js",
       "logsqueries.matchall.spec.js",
       "ftsDefaultColumn.spec.js",
-      "logsVisualizePersistence.spec.js"
+      "logsVisualizePersistence.spec.js",
+      "streamNotFound.spec.js",
+      "logsRefreshCacheDropdown.spec.js"
     ],
     "disabled": [
       {
@@ -309,7 +327,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "searchPatternsMultiStream.spec.js"
     ],
     "disabled": [
       {
@@ -450,7 +469,8 @@
       "traceAdvancedFiltering.spec.js",
       "tracesAnalyzeDimensions.spec.js",
       "traces-autocomplete-suggestions.spec.js",
-      "traceGenAiParts.spec.js"
+      "traceGenAiParts.spec.js",
+      "tracesCharts.spec.js"
     ],
     "disabled": []
   },

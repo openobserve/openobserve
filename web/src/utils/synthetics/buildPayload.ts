@@ -257,6 +257,8 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
       example: example ?? "",
     })),
 
+    environments: check.environments ?? [],
+
     frequency: buildFrequency(check.schedule),
     config: buildProtocolConfig(check),
 

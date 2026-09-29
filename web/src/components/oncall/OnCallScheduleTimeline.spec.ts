@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import i18n from "@/locales";
+import usersService from "@/services/users";
+import store from "@/test/unit/helpers/store";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+
+vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -562,5 +566,30 @@ describe("OnCallScheduleTimeline", () => {
         render({ canCover: false }).find('[data-test="oncall-timeline-request-cover"]').exists(),
       ).toBe(false);
     });
+  });
+
+  // The org's users are the IAM list's own cache entry, so a revisit of the Schedule tab costs nothing.
+  it("serves the org's users to a remount from the cache", async () => {
+    vi.mocked(usersService.orgUsers).mockResolvedValue({
+      data: { data: [{ email: "ana@o2.ai", first_name: "Ana" }] },
+    } as any);
+    const renderWithOrg = () =>
+      mount(OnCallScheduleTimeline, {
+        props: {
+          rotations: [rotation("Primary")],
+          segments: [seg()],
+          timezone: "UTC",
+          window: { from: 0, to: 0 },
+          "onUpdate:window": () => {},
+        } as any,
+        global: { plugins: [i18n, store], stubs },
+      });
+
+    renderWithOrg().unmount();
+    await flushPromises();
+    renderWithOrg();
+    await flushPromises();
+
+    expect(usersService.orgUsers).toHaveBeenCalledTimes(1);
   });
 });

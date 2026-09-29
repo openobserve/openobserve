@@ -201,6 +201,11 @@ export default class DashboardactionPage {
     ]).catch(() => {});
   }
 
+  async getErrorToastText() {
+    await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
+    return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
+  }
+
   /**
    * Discard the current panel and return to the dashboard view page.
    * Use this for teardown when the panel intentionally holds an
@@ -305,6 +310,35 @@ export default class DashboardactionPage {
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  /**
+   * Open a dashboard's view page directly by id.
+   */
+  async openDashboardById(dashboardId, { folderId = 'default', tabId = 'default' } = {}) {
+    const url =
+      `${process.env["ZO_BASE_URL"]}/web/dashboards/view` +
+      `?org_identifier=${process.env["ORGNAME"]}` +
+      `&dashboard=${dashboardId}&folder=${folderId}&tab=${tabId}`;
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this.page
+      .locator('[data-test="dashboard-panel-container"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 30000 });
+  }
+
+  // A single-query, single-stream panel hands straight to the alert form; only a lossy prefill asks first.
+  /** Open the panel menu and pick "Create Alert". */
+  async openCreateAlertFromPanel(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+    const createAlert = this.page.locator(
+      '[data-test="dashboard-create-alert-from-panel"]'
+    );
+    await createAlert.waitFor({ state: "visible", timeout: 10000 });
+    await createAlert.click();
   }
 
   /**
@@ -416,8 +450,8 @@ export default class DashboardactionPage {
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
 
-    // 2. Canvas has non-background pixels
-    const hasData = await this.page.evaluate(() => {
+    // 2. Canvas has non-background pixels; polled because a mounted canvas can still be awaiting its query.
+    const scanCanvases = () => this.page.evaluate(() => {
       const canvases = document.querySelectorAll("canvas");
       for (const canvas of canvases) {
         if (canvas.width < 10 || canvas.height < 10) continue;
@@ -441,7 +475,7 @@ export default class DashboardactionPage {
       }
       return false;
     });
-    expect(hasData).toBe(true);
+    await expect.poll(scanCanvases, { timeout: 15000 }).toBe(true);
   }
 
   /**

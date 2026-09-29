@@ -25,6 +25,7 @@ use std::{
 };
 
 use arrow::buffer::BooleanBuffer;
+use config::VortexCompression;
 use datafusion::{common::stats::Precision, datasource::listing::PartitionedFile};
 use tokio::runtime::Runtime;
 use vortex::{
@@ -107,7 +108,7 @@ struct LongTextCompressor {
 impl LongTextCompressor {
     fn new(builder: BtrBlocksCompressorBuilder) -> Self {
         Self {
-            btr_compressor: builder.exclude_schemes([IntDictScheme.id()]).build(),
+            btr_compressor: builder.build(),
             options: LongTextCompressionOptions::default(),
         }
     }
@@ -175,21 +176,14 @@ impl CompressorPlugin for LongTextCompressor {
     }
 }
 
-/// Build the configured Vortex file write strategy.
-///
-/// OpenObserve's custom UTF8/Zstd compressor is used by default. Vortex's
-/// native compression strategy can be enabled with
-/// `ZO_VORTEX_USE_NATIVE_COMPRESSION=true`.
+/// Build the Vortex file write strategy selected by `ZO_VORTEX_COMPRESSION`.
 pub(super) fn vortex_write_strategy(session: &VortexSession) -> Arc<dyn LayoutStrategy> {
-    build_vortex_write_strategy(
-        session,
-        config::get_config().common.vortex_use_native_compression,
-    )
+    build_vortex_write_strategy(session, config::get_config().common.vortex_compression)
 }
 
 fn build_vortex_write_strategy(
     session: &VortexSession,
-    use_native_compression: bool,
+    compression: VortexCompression,
 ) -> Arc<dyn LayoutStrategy> {
     // Custom strategies must filter editions because they bypass the writer's defaults.
     let arrays = session.arrays();
@@ -199,16 +193,24 @@ fn build_vortex_write_strategy(
         .filter_map(|id| arrays.registry().get(id))
         .map(|plugin| plugin.id())
         .collect();
-    let btrblocks = BtrBlocksCompressorBuilder::default().retain_allowed_encodings(&allowed);
+    let btrblocks = match compression {
+        VortexCompression::Compact => BtrBlocksCompressorBuilder::default().with_compact(),
+        VortexCompression::O2 | VortexCompression::Native => BtrBlocksCompressorBuilder::default(),
+    }
+    .retain_allowed_encodings(&allowed);
     let builder = WriteStrategyBuilder::default().with_btrblocks_builder(btrblocks.clone());
-    if use_native_compression {
-        builder.build()
-    } else {
-        let compressor = LongTextCompressor::new(btrblocks);
-        builder
-            .with_compressor(compressor.clone())
-            .with_probe_compressor(compressor)
-            .build()
+    match compression {
+        VortexCompression::Native | VortexCompression::Compact => builder.build(),
+        VortexCompression::O2 => {
+            // probe keeps IntDictScheme so DictStrategy can pick dict; data side must not re-dict
+            // codes
+            let probe = LongTextCompressor::new(btrblocks.clone());
+            let data = LongTextCompressor::new(btrblocks.exclude_schemes([IntDictScheme.id()]));
+            builder
+                .with_compressor(data)
+                .with_probe_compressor(probe)
+                .build()
+        }
     }
 }
 
@@ -370,14 +372,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_native_and_custom_write_strategies_create_files() {
-        for use_native_compression in [true, false] {
+        for compression in [
+            VortexCompression::O2,
+            VortexCompression::Native,
+            VortexCompression::Compact,
+        ] {
             // Monotonic integers exercise encodings that require opt-in editions.
             let array = vortex::array::arrays::PrimitiveArray::from_iter(0..8192i64).into_array();
             let dtype = array.dtype().clone();
             let session = VortexSession::default().with_tokio();
-            let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
-                build_vortex_write_strategy(&session, use_native_compression),
-            );
+            let write_options = VortexWriteOptions::new(session.clone())
+                .with_strategy(build_vortex_write_strategy(&session, compression));
             let mut buf = Vec::new();
             let mut writer = write_options.writer(&mut buf, dtype.clone());
 
@@ -411,7 +416,7 @@ mod tests {
         let dtype = array.dtype().clone();
         let session = VortexSession::default().with_tokio();
         let write_options = VortexWriteOptions::new(session.clone())
-            .with_strategy(build_vortex_write_strategy(&session, false));
+            .with_strategy(build_vortex_write_strategy(&session, VortexCompression::O2));
         let mut buf = Vec::new();
         let mut writer = write_options.writer(&mut buf, dtype.clone());
 
@@ -435,5 +440,95 @@ mod tests {
         assert!(encoding_tree.contains("body: vortex.zstd"));
         assert!(!encoding_tree.contains("body: vortex.dict"));
         assert!(encoding_tree.contains("tag: vortex.dict"));
+    }
+
+    #[tokio::test]
+    async fn test_custom_strategy_dict_encodes_low_cardinality_integers() {
+        // 240 distinct scrape timestamps cycling over series, as in a hash-sorted metrics file
+        let ts = vortex::array::arrays::PrimitiveArray::from_iter(
+            (0..8192i64).map(|i| 1_789_452_000_000_000 + (i % 240) * 15_000_000),
+        )
+        .into_array();
+        let array = StructArray::try_new(
+            FieldNames::from(["ts"]),
+            vec![ts],
+            8192,
+            vortex::array::validity::Validity::NonNullable,
+        )
+        .unwrap()
+        .into_array();
+        let dtype = array.dtype().clone();
+        let session = VortexSession::default().with_tokio();
+        let write_options = VortexWriteOptions::new(session.clone())
+            .with_strategy(build_vortex_write_strategy(&session, VortexCompression::O2));
+        let mut buf = Vec::new();
+        let mut writer = write_options.writer(&mut buf, dtype.clone());
+
+        writer.push(array).await.unwrap();
+        writer.finish().await.unwrap();
+
+        let projected = session
+            .open_options()
+            .open_buffer(buf)
+            .unwrap()
+            .scan()
+            .unwrap()
+            .with_projection(select(["ts"], root()).bind(&dtype).unwrap())
+            .into_array_stream()
+            .unwrap()
+            .read_all()
+            .await
+            .unwrap();
+        let encoding_tree = projected.display_tree_encodings_only().to_string();
+
+        assert!(encoding_tree.contains("ts: vortex.dict"), "{encoding_tree}");
+        assert_eq!(
+            encoding_tree.matches("vortex.dict").count(),
+            1,
+            "{encoding_tree}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compact_strategy_uses_pco() {
+        // jittered 15s scrape steps defeat dict, sequence and plain bitpacking
+        let ts = vortex::array::arrays::PrimitiveArray::from_iter(
+            (0..8192i64).map(|i| 1_789_452_000_000_000 + i * 15_000_000 + (i % 7) * 1_000),
+        )
+        .into_array();
+        let array = StructArray::try_new(
+            FieldNames::from(["ts"]),
+            vec![ts],
+            8192,
+            vortex::array::validity::Validity::NonNullable,
+        )
+        .unwrap()
+        .into_array();
+        let dtype = array.dtype().clone();
+        let session = VortexSession::default().with_tokio();
+        let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
+            build_vortex_write_strategy(&session, VortexCompression::Compact),
+        );
+        let mut buf = Vec::new();
+        let mut writer = write_options.writer(&mut buf, dtype.clone());
+
+        writer.push(array).await.unwrap();
+        writer.finish().await.unwrap();
+
+        let projected = session
+            .open_options()
+            .open_buffer(buf)
+            .unwrap()
+            .scan()
+            .unwrap()
+            .with_projection(select(["ts"], root()).bind(&dtype).unwrap())
+            .into_array_stream()
+            .unwrap()
+            .read_all()
+            .await
+            .unwrap();
+        let encoding_tree = projected.display_tree_encodings_only().to_string();
+
+        assert!(encoding_tree.contains("vortex.pco"), "{encoding_tree}");
     }
 }

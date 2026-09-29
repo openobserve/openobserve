@@ -16,8 +16,11 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
+import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 
@@ -26,6 +29,9 @@ vi.mock("@/services/oncall", () => ({
     listTeams: vi.fn(),
     whoIsOnCall: vi.fn(),
     deleteTeam: vi.fn(),
+    getRoutingConfig: vi.fn(),
+    setRoutingConfig: vi.fn(),
+    coverageGaps: vi.fn(),
   },
 }));
 
@@ -39,6 +45,19 @@ vi.mock("vue-router", () => ({
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
+
+// setDefaultTeam awaits a confirm dialog that only resolves via user
+// interaction with a rendered provider — unmocked, the call hangs until timeout.
+const mockConfirm = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({
+    currentDialog: { value: null },
+    confirm: mockConfirm,
+    handleConfirm: vi.fn(),
+    handleCancel: vi.fn(),
+    handleUpdateOpen: vi.fn(),
+  }),
+}));
 
 const service = vi.mocked(oncallService);
 
@@ -109,9 +128,12 @@ function onCallCell(wrapper: any, _row?: unknown) {
 
 describe("OnCallTeams", () => {
   beforeEach(() => {
+    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
+    mockConfirm.mockResolvedValue(true);
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as any);
   });
 
   /// The setup checklist's first step sends somebody here already meaning to
@@ -365,6 +387,75 @@ describe("OnCallTeams", () => {
     });
   });
 
+  /// The routing screen was the only place this fact lived — a reader had to
+  /// leave the list to learn who catches everything it can't place.
+  describe("default team", () => {
+    it("badges the team the routing config names as default", async () => {
+      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
+      service.listTeams.mockResolvedValue({
+        data: [team("team_1", "Platform"), team("team_2", "Payments")],
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-team-default-badge-team_2"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-team-default-badge-team_1"]').exists()).toBe(false);
+    });
+
+    it("offers to set as default on every team but the current one", async () => {
+      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
+      service.listTeams.mockResolvedValue({
+        data: [team("team_1", "Platform"), team("team_2", "Payments")],
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-team-set-default-team_1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-team-set-default-team_2"]').exists()).toBe(false);
+    });
+
+    it("nominates the team without a trip to the routing page", async () => {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      service.setRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-team-set-default-team_1"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setRoutingConfig).toHaveBeenCalledWith({
+        org_identifier: "default",
+        data: { default_team_id: "team_1" },
+      });
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Default team nominated" }),
+      );
+    });
+
+    /// Mirrors the routing screen's own guard: nominating a team is the one
+    /// moment "nobody is on call" is still avoidable.
+    it("warns before nominating a team with nobody on it", async () => {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      service.coverageGaps.mockResolvedValue({
+        data: { teams: [{ id: "team_1" }], total: 1 },
+      } as any);
+      mockConfirm.mockResolvedValue(false);
+      const wrapper = render();
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-team-set-default-team_1"]').trigger("click");
+      await flushPromises();
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "This team is unstaffed" }),
+      );
+      // Declined: must not have saved.
+      expect(service.setRoutingConfig).not.toHaveBeenCalled();
+    });
+  });
+
   /// E9/§G.8.1: the teams list IS the capability probe. This state had no test
   /// and never rendered — it was a second `<template #empty>` on the same slot,
   /// which is a lint error and, at runtime, a branch Vue never reached. A
@@ -396,5 +487,26 @@ describe("OnCallTeams", () => {
     await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
+  });
+
+  // The New team drawer's member picker belongs to this page, so the page's refresh must expire it too.
+  it("expires the users entry on a refresh, and leaves it alone on mount", async () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const usersExpiry = {
+      queryKey: userKeys.users("default"),
+      exact: true,
+      refetchType: "none",
+    };
+    service.listTeams.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+    const wrapper = render();
+    await flushPromises();
+    expect(spy).not.toHaveBeenCalledWith(usersExpiry);
+
+    // Retry and the toolbar's Refresh are the same `refreshTeams` handler.
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
+    await flushPromises();
+    expect(spy).toHaveBeenCalledWith(usersExpiry);
+    spy.mockRestore();
   });
 });

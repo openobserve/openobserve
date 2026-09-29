@@ -24,12 +24,15 @@ import router from "@/test/unit/helpers/router";
 // ---------------------------------------------------------------------------
 // Service mocks
 // ---------------------------------------------------------------------------
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: vi.fn(),
-    getHistory: vi.fn(),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(),
+      getHistory: vi.fn(),
+    },
+  });
+});
 
 // Mock formatDate from utils/date to prevent the local shadowing recursion
 // (AlertHistory.vue defines its own formatDate that calls the imported one,
@@ -206,6 +209,8 @@ describe("AlertHistory.vue", () => {
         "",
         expect.any(String),
         "",
+        "",
+        // alertType — part of the list key, so it rides along on every call.
         "",
       );
     });

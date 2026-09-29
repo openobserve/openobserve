@@ -29,7 +29,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "100 * (1 - avg(irate(system_cpu_time{state=\"idle\",host_name=\"host-1\"}[5m])))",
+              "query": "100 * (1 - avg(irate(system_cpu_time{state=\"idle\",host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m])))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -73,7 +73,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "avg by (state)(irate(system_cpu_time{host_name=\"host-1\",state!=\"idle\"}[5m]))",
+              "query": "avg by (state)(irate(system_cpu_time{host_name=\"host-1\",state!=\"idle\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m]))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -117,7 +117,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "sum by (state)(system_memory_usage{host_name=\"host-1\"})",
+              "query": "sum by (state)(system_memory_usage{host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"})",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -161,7 +161,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "avg(system_cpu_load_average_1m{host_name=\"host-1\"})",
+              "query": "avg(system_cpu_load_average_1m{host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"})",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -182,7 +182,7 @@
               }
             },
             {
-              "query": "avg(system_cpu_load_average_5m{host_name=\"host-1\"})",
+              "query": "avg(system_cpu_load_average_5m{host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"})",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -203,7 +203,7 @@
               }
             },
             {
-              "query": "avg(system_cpu_load_average_15m{host_name=\"host-1\"})",
+              "query": "avg(system_cpu_load_average_15m{host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"})",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -247,7 +247,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "sum by (device)(irate(system_disk_io{direction=\"read\",host_name=\"host-1\",device!~\"loop.*\"}[5m]))",
+              "query": "sum by (device)(irate(system_disk_io{direction=\"read\",host_name=\"host-1\",device!~\"loop.*|nvme[0-9]+n[0-9]+p[0-9]+|sd[a-z]+[0-9]+|xvd[a-z]+[0-9]+|sr[0-9]+\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m]))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -291,7 +291,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "sum by (device)(irate(system_disk_io{direction=\"write\",host_name=\"host-1\",device!~\"loop.*\"}[5m]))",
+              "query": "sum by (device)(irate(system_disk_io{direction=\"write\",host_name=\"host-1\",device!~\"loop.*|nvme[0-9]+n[0-9]+p[0-9]+|sd[a-z]+[0-9]+|xvd[a-z]+[0-9]+|sr[0-9]+\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m]))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -335,7 +335,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "100 * sum by (mountpoint)(system_filesystem_usage{state=\"used\",host_name=\"host-1\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"}) / sum by (mountpoint)(system_filesystem_usage{host_name=\"host-1\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"})",
+              "query": "100 * sum by (device)(system_filesystem_usage{state=\"used\",host_name=\"host-1\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\",mountpoint!~\"/boot.*|/efi.*\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}) / sum by (device)(system_filesystem_usage{host_name=\"host-1\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\",mountpoint!~\"/boot.*|/efi.*\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"})",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -352,7 +352,7 @@
                 }
               },
               "config": {
-                "promql_legend": "{mountpoint}"
+                "promql_legend": "{device}"
               }
             }
           ],
@@ -379,7 +379,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "sum by (direction)(irate(system_network_io{host_name=\"host-1\"}[5m]))",
+              "query": "sum by (direction)(irate(system_network_io{host_name=\"host-1\",device!~\"lo|veth.*|docker.*|br-.*|cni.*|flannel.*|tunl.*\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m]))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {

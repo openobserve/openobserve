@@ -21,6 +21,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { queryClient } from "@/composables/query/queryClient";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
 
 // Mocked at the MODULE level, not stubbed at mount: importing the real editor pulls
 // in the logs constants chain, which needs far more of the app than this spec does.
@@ -95,6 +97,25 @@ describe("WorkflowConfigSummary — destination", () => {
     createWrapper();
     await flushPromises();
     expect(mockList).toHaveBeenCalledTimes(1);
+  });
+
+  // The lookup used to be load-once for the whole session, so a destination created later never resolved.
+  it("resolves a destination added later once a save has expired the shared list", async () => {
+    const missing = (w: any) =>
+      w.find('[data-test="workflow-config-summary-destination-missing"]').exists();
+    seedDestinationNode("added-later");
+    const before = createWrapper();
+    await flushPromises();
+    expect(missing(before)).toBe(true);
+
+    mockList.mockResolvedValue({ data: [CUSTOM, { ...CUSTOM, name: "added-later" }] });
+    await queryClient.invalidateQueries({
+      queryKey: destinationKeys.all(store.state.selectedOrganization.identifier),
+    });
+    const after = createWrapper();
+    await flushPromises();
+    expect(missing(after)).toBe(false);
+    expect(mockList).toHaveBeenCalledTimes(2);
   });
 
   it("does not fetch for a placeholder node with no destination", async () => {

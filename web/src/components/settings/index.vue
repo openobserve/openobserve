@@ -36,7 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="activeSectionItem?.icon as any"
         class="border-border-default shrink-0 border-b"
       />
-      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
+      <ConstrainedPage
+        :size="activeSection === 'password_policy' ? 'full' : 'lg'"
+        align="left"
+        :padded="false"
+        class="min-h-0 flex-1 px-4 py-3"
+      >
         <router-view title="" />
       </ConstrainedPage>
     </div>
@@ -89,6 +94,7 @@ export default defineComponent({
       queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
+      passwordPolicy: "password_policy",
       pipelineDestinations: "pipeline_destinations",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
@@ -109,12 +115,6 @@ export default defineComponent({
     );
     const { isMetaOrg } = useIsMetaOrg();
 
-    // /settings (name "settings") with no child → show the hub.
-    const isHub = computed(() => route.name === "settings");
-    const hubRoute = computed(() => ({
-      name: "settings",
-      query: { org_identifier: store.state.selectedOrganization?.identifier },
-    }));
     const activeSection = computed(() => routeToSettingsTab[route.name as string] ?? "");
 
     // Form-style sections render in a centered reading column (ConstrainedPage);
@@ -124,28 +124,12 @@ export default defineComponent({
       "organization",
       "license",
       "domain_management",
+      "password_policy",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
-    // Full-width sections that still want the shell-owned header (their content
-    // fills the whole width instead of a centered reading column).
-    // The rail is always shown, so the Settings root has no standalone landing —
-    // send it to the first section (General). Also guard meta-only sections.
     const handleSettingsRouting = () => {
       const name = router.currentRoute.value.name;
-      if (name === "settings") {
-        // .catch: a rejected navigation (e.g. unit-test router without child
-        // routes) must not surface as an unhandled error.
-        Promise.resolve(
-          router.replace({
-            path: "/settings/general",
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          }),
-        ).catch(() => {});
-        return;
-      }
       const toGeneral = () => {
         settingsTab.value = "general";
         router.push({
@@ -153,10 +137,16 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes and License are enterprise-only meta-org pages.
+      // Nodes, License, Password policy and Query Management are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
-      if ((name === "nodes" || name === "license") && notMeta) {
+      if (
+        (name === "nodes" ||
+          name === "license" ||
+          name === "passwordPolicy" ||
+          name === "query_management") &&
+        notMeta
+      ) {
         toGeneral();
         return;
       }
@@ -250,6 +240,16 @@ export default defineComponent({
           to: { name: "domainManagement", query: { org_identifier: org } },
           visible: isEnt && meta,
           dataTest: "domain-management-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "password_policy",
+          label: t("settings.passwordPolicy"),
+          description: t("settings.passwordPolicyDesc"),
+          icon: "lock",
+          to: { name: "passwordPolicy", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "password-policy-tab",
           group: "Access & Security",
         },
         // Notification Destinations and Templates are alerting configuration and
@@ -417,8 +417,6 @@ export default defineComponent({
       config,
       settingsTab,
       isMetaOrg,
-      isHub,
-      hubRoute,
       activeSection,
       isConstrainedSection,
       activeSectionItem,

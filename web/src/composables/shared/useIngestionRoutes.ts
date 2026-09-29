@@ -145,6 +145,7 @@ const useIngestionRoutes = () => {
       component: Ingestion,
       meta: {
         titleKey: "menu.ingestionText",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

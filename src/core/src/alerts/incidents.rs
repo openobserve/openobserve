@@ -37,6 +37,8 @@ use config::{
 /// alert nobody can identify belongs in the unrouted queue, not on the pager of
 /// whichever team happens to own this string.
 const UNKNOWN_SERVICE: &str = "unknown";
+/// Window behind the alert in which a service-graph edge counts as a dependency.
+const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -949,6 +951,69 @@ pub async fn correlate_external_event(
     }
 
     Ok(Some(outcome))
+}
+
+/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
+/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
+pub async fn resolve_alert_firing(
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let Some(incident_id) = event.incident_id.as_deref() else {
+        return Ok(());
+    };
+    infra::table::alert_incidents::resolve_alert_firings(
+        incident_id,
+        &event.alert_id,
+        event.recovered_at,
+    )
+    .await?;
+
+    // Published even when this region updated no rows: the receiver runs the same idempotent update
+    // against its own replica, which may still be behind.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
+            &event.org_id,
+            incident_id,
+            &event.alert_id,
+            event.recovered_at,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
+    }
+
+    let Some(incident) = infra::table::alert_incidents::get(&event.org_id, incident_id).await?
+    else {
+        return Ok(());
+    };
+    if incident.status == "resolved" {
+        return Ok(());
+    }
+    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
+        return Ok(());
+    }
+
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+        return Ok(());
+    }
+
+    update_status(
+        &event.org_id,
+        incident_id,
+        "resolved",
+        "system@openobserve.ai",
+    )
+    .await?;
+    log::info!(
+        "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
+        links.len()
+    );
+    Ok(())
 }
 
 /// Auto-resolve the open incident containing `external.id`, but only once every
@@ -1913,8 +1978,6 @@ pub async fn enrich_with_topology(
     use AlertNode;
     use EdgeType;
 
-    use crate::traces::service_graph;
-
     // Get current topology or create new
     let mut topology = infra::table::alert_incidents::get_topology(org_id, incident_id)
         .await?
@@ -1990,40 +2053,13 @@ pub async fn enrich_with_topology(
             let edge_type = if is_same_service {
                 EdgeType::Temporal
             } else {
-                // Query service graph to check for a known dependency
-                let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
-                    org_id, None, None, None, None,
+                dependency_edge_type(
+                    org_id,
+                    &topology.nodes[prev_idx].service_name,
+                    &topology.nodes[current_node_index].service_name,
+                    alert_fired_at,
                 )
                 .await
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        log::debug!(
-                            "[incidents] Service graph query failed: {e}, defaulting to temporal edge"
-                        );
-                        vec![]
-                    }
-                };
-
-                let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
-                    o2_enterprise::enterprise::service_graph::build_topology(
-                        raw_sg_edges,
-                        std::collections::HashMap::new(),
-                    )
-                } else {
-                    (vec![], vec![])
-                };
-
-                let has_sg_edge = sg_topo_edges.iter().any(|e| {
-                    e.from.as_deref() == Some(&*topology.nodes[prev_idx].service_name)
-                        && e.to == topology.nodes[current_node_index].service_name
-                });
-
-                if has_sg_edge {
-                    EdgeType::ServiceDependency
-                } else {
-                    EdgeType::Temporal
-                }
             };
 
             topology.edges.push(AlertEdge {
@@ -2050,6 +2086,67 @@ pub async fn enrich_with_topology(
     );
 
     Ok(())
+}
+
+/// Whether the service graph knows the `from -> to` dependency around `at`.
+async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
+    if crate::traces::service_graph::use_v4_source(org_id).await {
+        dependency_edge_type_v4(org_id, from, to, at).await
+    } else {
+        dependency_edge_type_v1(org_id, from, to).await
+    }
+}
+
+/// One forward instant query at the alert time; a name the escaper refuses is not a dependency.
+async fn dependency_edge_type_v4(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
+    use crate::traces::service_graph::v4::read::{
+        edge_type_from, instant, q_edge_exists, scalar_sum,
+    };
+
+    let Ok(forward) = q_edge_exists(from, to, INCIDENT_EDGE_RANGE_SECS) else {
+        return EdgeType::Temporal;
+    };
+    match instant(org_id, &forward, at).await {
+        Ok(rows) => edge_type_from(scalar_sum(&rows)),
+        Err(e) => {
+            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
+            EdgeType::Temporal
+        }
+    }
+}
+
+async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType {
+    // Query service graph to check for a known dependency
+    let raw_sg_edges = match crate::traces::service_graph::query_edges_from_stream_internal(
+        org_id, None, None, None, None,
+    )
+    .await
+    {
+        Ok(e) => e,
+        Err(e) => {
+            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
+            vec![]
+        }
+    };
+
+    let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
+        o2_enterprise::enterprise::service_graph::build_topology(
+            raw_sg_edges,
+            std::collections::HashMap::new(),
+        )
+    } else {
+        (vec![], vec![])
+    };
+
+    let has_sg_edge = sg_topo_edges
+        .iter()
+        .any(|e| e.from.as_deref() == Some(from) && e.to == to);
+
+    if has_sg_edge {
+        EdgeType::ServiceDependency
+    } else {
+        EdgeType::Temporal
+    }
 }
 
 /// Trigger RCA for a single incident immediately after creation

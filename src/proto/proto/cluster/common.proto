@@ -16,6 +16,7 @@ message FileMeta {
     int64 original_size   = 4;
     int64 compressed_size = 5;
     int64 index_size      = 6;
+    int64 mindex_size     = 7;
 }
 
 // Job information for a request
@@ -58,4 +59,15 @@ message FileKey {
 
 message SimpleFileList {
     repeated string files = 1;
+}
+
+message SearchEventContext {
+    optional string alert_key = 1;
+    optional string derived_stream_key = 2;
+    optional string report_key = 3;
+    optional string dashboard_id = 4;
+    optional string dashboard_name = 5;
+    optional string dashboard_folder_id = 6;
+    optional string dashboard_folder_name = 7;
+    optional string alert_name = 8;
 }

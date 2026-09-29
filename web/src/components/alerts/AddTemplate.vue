@@ -225,7 +225,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="px-1 py-3">
               <div>{{ raw("org_name, stream_type, stream_name") }}</div>
-              <div>{{ raw("alert_name, alert_type") }}</div>
+              <div>{{ raw("alert_name, alert_type, alert_status") }}</div>
+              <div>
+                <b>{{ raw("episode_id") }}</b>
+                {{ t("alert_templates.variableEpisodeIdDescription") }}
+              </div>
               <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
               <div>{{ raw("alert_count, alert_agg_value") }}</div>
               <div>{{ raw("alert_description") }}</div>
@@ -283,12 +287,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
 </template>
 <script lang="ts" setup>
+import { saveTemplateMutation } from "@/services/alert_templates.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, onActivated, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 
-import templateService from "@/services/alert_templates";
-import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -343,9 +348,13 @@ const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEdi
 const { t } = useI18nTyped();
 const splitterModel: Ref<number> = ref(55);
 const { isMobile } = useBreakpoint();
-const store = useStore();
 const router = useRouter();
 const isUpdatingTemplate = ref(false);
+
+const orgIdForWrites = useOrgId();
+const saveTemplateWrite = useMutation(() =>
+  saveTemplateMutation(orgIdForWrites.value, () => isUpdatingTemplate.value),
+);
 const { track } = useReo();
 
 // Owner pattern (Rule ③): AddTemplate OWNS <OForm>, and it needs to read `type`
@@ -751,12 +760,8 @@ async function saveTemplate(value: AddTemplateForm) {
   };
 
   if (isUpdatingTemplate.value) {
-    const request = templateService
-      .update({
-        org_identifier: store.state.selectedOrganization.identifier,
-        template_name: value.name,
-        data,
-      })
+    const request = saveTemplateWrite
+      .mutateAsync({ template_name: value.name, data })
       .then(onSuccess)
       .catch(onError);
     track("Button Click", {
@@ -766,12 +771,8 @@ async function saveTemplate(value: AddTemplateForm) {
     return request;
   }
 
-  const request = templateService
-    .create({
-      org_identifier: store.state.selectedOrganization.identifier,
-      template_name: value.name,
-      data,
-    })
+  const request = saveTemplateWrite
+    .mutateAsync({ template_name: value.name, data })
     .then(onSuccess)
     .catch(onError);
   track("Button Click", {

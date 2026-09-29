@@ -58,20 +58,26 @@ vi.mock("vue-router", () => ({
   onBeforeRouteLeave: vi.fn(),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocations: mockServiceGetLocations,
-    create: mockServiceCreate,
-    update: mockServiceUpdate,
-    get: mockServiceGet,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocations: mockServiceGetLocations,
+      create: mockServiceCreate,
+      update: mockServiceUpdate,
+      get: mockServiceGet,
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn().mockResolvedValue({ data: [] }),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn().mockResolvedValue({ data: [] }),
+    },
+  });
+});
 
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn().mockResolvedValue([]),
@@ -88,6 +94,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 import CreateProtocolCheck from "./CreateProtocolCheck.vue";
+import destinationService from "@/services/alert_destination";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
@@ -192,6 +199,22 @@ describe("CreateProtocolCheck", () => {
           message: "synthetics.locations.fetchFailed",
         }),
       );
+    });
+  });
+
+  describe("destinations refresh", () => {
+    // A destination made in another tab never expires this tab's cache, so only a forced read shows it.
+    it("should re-read the destinations from the server when the picker asks for a refresh", async () => {
+      wrapper = mountPage("http");
+      await flushPromises();
+      expect(destinationService.list).toHaveBeenCalledTimes(1);
+
+      wrapper
+        .findComponent('[data-test="synthetics-check-configure"]')
+        .vm.$emit("refresh:destinations");
+      await flushPromises();
+
+      expect(destinationService.list).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -39,16 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="col-md-2 w-full">
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="sm"
-            @click="refreshPatterns"
-            :loading="loading"
+            :last-run-at="lastUpdatedAt"
+            :loading="fetching"
             data-test="built-in-pattern-refresh-btn"
-          >
-            <template #icon-left><OIcon name="refresh" size="sm" /></template>
-            {{ t("regex_patterns.refresh") }}
-          </OButton>
+            @click="refreshPatterns"
+          />
         </div>
       </div>
     </div>
@@ -221,11 +219,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { builtInRegexPatternsQuery } from "@/services/regex_pattern.queries";
+import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
-import { useStore } from "vuex";
-import regexPatternsService from "@/services/regex_pattern";
-import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -235,6 +233,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -258,6 +257,7 @@ export default defineComponent({
   name: "BuiltInPatternsTab",
   components: {
     OButton,
+    ORefreshButton,
     ODialog,
     OSpinner,
     OIcon,
@@ -271,10 +271,20 @@ export default defineComponent({
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
-    const store = useStore();
 
     const patterns = ref<BuiltInPattern[]>([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const builtInList = useQuery(() =>
+      Object.assign(builtInRegexPatternsQuery(orgIdForList.value), {
+        enabled: !!orgIdForList.value,
+      }),
+    );
+
+    const loading = builtInList.isLoading;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = builtInList.isFetching;
+    const lastUpdatedAt = builtInList.dataUpdatedAt;
     const error = ref("");
     const searchQuery = ref("");
     const selectedTags = ref<string[]>([]);
@@ -316,6 +326,36 @@ export default defineComponent({
       return filtered;
     });
 
+    // `refetch()` resolves rather than rejecting, so the read's failure is
+    // surfaced from the query instead of a try/catch around the call.
+    watch(builtInList.error, (e: any) => {
+      if (!e) return;
+      error.value = e.response?.data?.message || e.message || t("regex_patterns.failed_to_load");
+      toast({
+        // Server-authored or already-translated text: `raw` is the escape hatch.
+        message: raw(error.value),
+        variant: "error",
+      });
+    });
+
+    // `patterns` stays local because each row carries a user-toggled `selected`
+    // flag — but it is driven by the query, so an invalidation repaints the rows
+    // while preserving whatever the user had ticked.
+    watch(
+      builtInList.data,
+      (list: any) => {
+        if (!list) return;
+        const wasSelected = new Set(
+          patterns.value.filter((p: any) => p.selected).map((p: any) => p.name),
+        );
+        patterns.value = (list as BuiltInPattern[]).map((p: BuiltInPattern) => ({
+          ...p,
+          selected: wasSelected.has((p as any).name),
+        }));
+      },
+      { immediate: true },
+    );
+
     const selectedPatterns = computed(() => {
       return patterns.value.filter((p) => p.selected);
     });
@@ -324,53 +364,15 @@ export default defineComponent({
 
     // Methods
     const fetchPatterns = async (clearCache = false) => {
-      loading.value = true;
       error.value = "";
 
       try {
-        const orgId = store.state.selectedOrganization.identifier;
-
-        // Clear cache if requested (manual refresh)
-        if (clearCache) {
-          RegexPatternCache.clear(orgId);
-          // console.log('[BuiltInPatternsTab] Cleared frontend cache, fetching fresh data');
-        }
-
-        // Check frontend cache first unless cleared
-        if (!clearCache) {
-          const cachedPatterns = RegexPatternCache.get<BuiltInPattern[]>(orgId);
-          if (cachedPatterns) {
-            patterns.value = cachedPatterns.map((p: BuiltInPattern) => ({
-              ...p,
-              selected: false,
-            }));
-
-            // console.log(`[BuiltInPatternsTab] Loaded ${patterns.value.length} patterns from frontend cache`);
-
-            toast({
-              message: t("regex_patterns.patterns_loaded", {
-                count: patterns.value.length,
-              }),
-              variant: "success",
-            });
-            loading.value = false;
-            return;
-          }
-        }
-
-        // Fetch from backend (no backend caching)
-        const response = await regexPatternsService.getBuiltInPatterns(orgId);
-
-        const fetchedPatterns = response.data.patterns;
-
-        // Cache the fetched patterns in frontend
-        RegexPatternCache.set(orgId, fetchedPatterns);
-        // console.log(`[BuiltInPatternsTab] Cached ${fetchedPatterns.length} patterns in frontend`);
-
-        patterns.value = fetchedPatterns.map((p: BuiltInPattern) => ({
-          ...p,
-          selected: false,
-        }));
+        // `clearCache` is the manual refresh button — it must reach the server.
+        // Otherwise `suspense()` settles from the cache without a request, which
+        // is what "cache hit" means here.
+        if (clearCache) await builtInList.refetch();
+        else await builtInList.suspense();
+        await nextTick();
 
         toast({
           message: t("regex_patterns.patterns_loaded", {
@@ -441,6 +443,7 @@ export default defineComponent({
       t,
       patterns,
       loading,
+      fetching,
       error,
       searchQuery,
       selectedTags,
@@ -452,6 +455,7 @@ export default defineComponent({
       previewedPattern,
       fetchPatterns,
       refreshPatterns,
+      lastUpdatedAt,
       updateSelection,
       previewPattern,
       importSinglePattern,

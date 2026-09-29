@@ -239,10 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
-import { computed } from "vue";
 import useTheme from "@/composables/useTheme";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";

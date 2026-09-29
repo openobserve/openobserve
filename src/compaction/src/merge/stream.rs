@@ -337,6 +337,7 @@ async fn write_file_list(
             account: v.account.clone(),
             file: v.key.clone(),
             index_file: v.meta.index_size > 0,
+            mindex_file: v.meta.mindex_size > 0,
             flattened: v.meta.flattened,
         })
         .collect::<Vec<_>>();
@@ -458,6 +459,7 @@ mod tests {
                 original_size,
                 compressed_size: original_size / 2, // assume 50% compression
                 index_size: 0,
+                mindex_size: 0,
                 flattened: false,
                 bloom_ver: 0,
             },

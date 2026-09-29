@@ -492,6 +492,38 @@ export class SloFormPage {
   getSliceNote() { return this.page.locator(this.locators.sliceNote); }
   getTimeSlicePreviewError() { return this.page.locator(this.locators.tsPreviewError); }
 
+  // ------------------------------------------------------------ failure stubs
+
+  /**
+   * Make the next create/update fail with a body of the caller's shape.
+   *
+   * A 422 JSON-deserialize rejection comes back as a bare plain-text body, not
+   * `{message}` — the shape the form used to drop on the floor in favour of
+   * axios's own "Request failed with status code N". No UI path can produce
+   * that body (the form always submits well-formed JSON), so it is stubbed.
+   */
+  async stubSaveFailure(body, { status = 422, contentType = 'text/plain' } = {}) {
+    await this.page.route('**/api/*/slos', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      await route.fulfill({
+        status,
+        contentType,
+        body: contentType.includes('json') ? JSON.stringify(body) : String(body),
+      });
+    });
+  }
+
+  /** Make the eligible-alert lookup behind the source picker fail. */
+  async stubEligibleAlertsFailure(message, { status = 500 } = {}) {
+    await this.page.route('**/api/*/alerts/slo-eligible', (route) =>
+      route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify({ message }),
+      }),
+    );
+  }
+
   // -------------------------------------------------------------- assertions
 
   async expectError(pattern) {
@@ -512,6 +544,18 @@ export class SloFormPage {
     const err = this.page.locator(`${fieldSelector} [data-test$="-error"]`).first();
     await expect(err).toBeVisible({ timeout: 15000 });
     if (pattern) await expect(err).toContainText(pattern);
+  }
+
+  /** The source-alert picker carries its own failure reason. */
+  async expectAlertSourceError(pattern) {
+    await this.expectFieldError(this.locators.alertSource, pattern);
+  }
+
+  /** No toast matching `pattern` is on screen. */
+  async expectNoError(pattern) {
+    await expect(
+      this.page.locator(this.locators.error).filter({ hasText: pattern }),
+    ).toHaveCount(0);
   }
 
   /** No inline error on this field. */

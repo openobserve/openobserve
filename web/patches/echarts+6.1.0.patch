@@ -1,0 +1,22 @@
+diff --git a/node_modules/echarts/lib/component/helper/BrushController.js b/node_modules/echarts/lib/component/helper/BrushController.js
+index 0097a37..cd4db2c 100644
+--- a/node_modules/echarts/lib/component/helper/BrushController.js
++++ b/node_modules/echarts/lib/component/helper/BrushController.js
+@@ -133,6 +133,17 @@ var BrushController = /** @class */function (_super) {
+     if (!this._enableGlobalPan) {
+       interactionMutex.take(zr, MUTEX_RESOURCE_KEY, this._uid);
+     }
++    // Keep a single set of brush handlers bound to the zr. Repeated toolbox re-renders
++    // (restore / takeGlobalCursor, fired on every zoom, annotation drag and mouse-leave)
++    // enable fresh brush controllers without unbinding the previous ones, leaking zr
++    // handlers that each repaint the selection cover until it stacks to full opacity.
++    zr.__ecBrushHandlers = zr.__ecBrushHandlers || [];
++    for (var _ri = 0; _ri < zr.__ecBrushHandlers.length; _ri++) {
++      each(zr.__ecBrushHandlers[_ri], function (handler, eventName) {
++        zr.off(eventName, handler);
++      });
++    }
++    zr.__ecBrushHandlers = [this._handlers];
+     each(this._handlers, function (handler, eventName) {
+       zr.on(eventName, handler);
+     });

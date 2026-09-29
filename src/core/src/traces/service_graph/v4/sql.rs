@@ -19,7 +19,8 @@ use arrow_schema::Schema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::LEARN_SAMPLE;
+use super::{AGENT_INHERIT_DEPTH, LEARN_SAMPLE};
+use crate::traces::otel::pricing::model_canonical_names;
 
 pub const BUCKET_COUNT: usize = 17;
 /// `le` strings in bucket order; the last one is the `+Inf` bucket (= requests).
@@ -30,8 +31,9 @@ pub const BUCKET_LE: [&str; BUCKET_COUNT + 1] = [
 const NULL_STR: &str = "CAST(NULL AS VARCHAR)";
 const NULL_PORT: &str = "CAST(NULL AS BIGINT)";
 const ROOT_PRED: &str = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+const NO_AGENT_PRED: &str = "(gen_ai_agent_name IS NULL OR gen_ai_agent_name = '')";
 
-/// Missing optional columns become typed NULL constants with the same alias; GROUP BY never moves.
+/// Missing optional columns become typed NULL constants with the same alias, outside GROUP BY.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Columns {
     pub infer_self_key: bool,
@@ -55,6 +57,12 @@ pub struct Columns {
     pub infer_service_type: bool,
     pub service_name: bool,
     pub span_kind: bool,
+    pub gen_ai_agent_name: bool,
+    pub gen_ai_agent_id: bool,
+    pub gen_ai_agent_env: bool,
+    pub gen_ai_tool_name: bool,
+    pub gen_ai_request_model: bool,
+    pub gen_ai_response_model: bool,
 }
 
 /// The parsed `<M>` block; also the per-window counts carried by every series.
@@ -142,6 +150,12 @@ impl Columns {
             infer_service_type: has("infer_service_type"),
             service_name: has("service_name"),
             span_kind: has("span_kind"),
+            gen_ai_agent_name: has("gen_ai_agent_name"),
+            gen_ai_agent_id: has("gen_ai_agent_id"),
+            gen_ai_agent_env: has("gen_ai_agent_env"),
+            gen_ai_tool_name: has("gen_ai_tool_name"),
+            gen_ai_request_model: has("gen_ai_request_model"),
+            gen_ai_response_model: has("gen_ai_response_model"),
         }
     }
 
@@ -168,6 +182,12 @@ impl Columns {
             infer_service_type: true,
             service_name: true,
             span_kind: true,
+            gen_ai_agent_name: true,
+            gen_ai_agent_id: true,
+            gen_ai_agent_env: true,
+            gen_ai_tool_name: true,
+            gen_ai_request_model: true,
+            gen_ai_response_model: true,
         }
     }
 
@@ -179,11 +199,45 @@ impl Columns {
         self.trace_id && self.span_id && self.reference_parent_span_id
     }
 
-    fn duration_expr(&self) -> Option<&'static str> {
+    /// Q2/QL gate: without any of these a CLIENT span can only ever be `no_peer`.
+    pub fn has_peer_keys(&self) -> bool {
+        self.infer_peer_key
+            || self.infer_peer_ip
+            || self.rpc_service
+            || self.infer_service_name
+            || (self.operation_name && self.supports_join())
+    }
+
+    /// Q0 gate; an agent id without a name never builds an agent node (§4.6), so it does not count.
+    pub fn has_gen_ai(&self) -> bool {
+        self.gen_ai_agent_name
+            || self.gen_ai_tool_name
+            || self.gen_ai_request_model
+            || self.gen_ai_response_model
+    }
+
+    /// The JOIN form and the orphan counts need the three join columns and the agent name.
+    pub fn can_join_agents(&self) -> bool {
+        self.supports_join() && self.gen_ai_agent_name
+    }
+
+    /// Model identity from whichever model columns exist; `''` never wins a COALESCE level.
+    pub fn model_expr(&self, prefix: &str) -> Option<String> {
+        let req = format!("NULLIF({prefix}gen_ai_request_model, '')");
+        let resp = format!("NULLIF({prefix}gen_ai_response_model, '')");
+        match (self.gen_ai_request_model, self.gen_ai_response_model) {
+            (true, true) => Some(format!("COALESCE({req}, {resp})")),
+            (true, false) => Some(req),
+            (false, true) => Some(resp),
+            (false, false) => None,
+        }
+    }
+
+    fn duration_expr(&self, prefix: &str) -> Option<String> {
         if self.duration {
-            Some("duration")
+            Some(format!("{prefix}duration"))
         } else if self.end_time && self.start_time {
-            Some("(end_time - start_time) / 1000")
+            Some(format!("({prefix}end_time - {prefix}start_time) / 1000"))
         } else {
             None
         }
@@ -280,6 +334,87 @@ impl Q3Row {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Q0Row {
+    pub gen_ai_spans: u64,
+    pub orphan_tool_spans: u64,
+    pub orphan_model_spans: u64,
+}
+
+impl Q0Row {
+    pub fn parse(v: &Value) -> Self {
+        Self {
+            gen_ai_spans: u64_field(v, "gen_ai_spans"),
+            orphan_tool_spans: u64_field(v, "orphan_tool_spans"),
+            orphan_model_spans: u64_field(v, "orphan_model_spans"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Q4Row {
+    pub client: String,
+    pub agent: String,
+    pub agent_env: Option<String>,
+    pub instances: u64,
+    pub counts: WindowCounts,
+}
+
+impl Q4Row {
+    pub fn parse(v: &Value) -> Option<Self> {
+        Some(Self {
+            client: str_field(v, "client")?,
+            agent: str_field(v, "agent")?,
+            agent_env: str_field(v, "agent_env"),
+            instances: u64_field(v, "instances"),
+            counts: WindowCounts::parse(v),
+        })
+    }
+}
+
+/// One Q5 or Q6 row; `agent_from = None` attributes the call to the host `service_name`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentEdgeRow {
+    pub agent_from: Option<String>,
+    pub service_name: String,
+    pub server: String,
+    pub agent_env: Option<String>,
+    pub counts: WindowCounts,
+}
+
+impl AgentEdgeRow {
+    /// A `<…>` agent name is synthetic (§4.6); tool/model names are already filtered in SQL.
+    pub fn parse(v: &Value) -> Option<Self> {
+        let agent_from = str_field(v, "agent_from");
+        if agent_from.as_deref().is_some_and(|a| a.starts_with('<')) {
+            return None;
+        }
+        Some(Self {
+            agent_from,
+            service_name: str_field(v, "service_name")?,
+            server: str_field(v, "server")?,
+            agent_env: str_field(v, "agent_env"),
+            counts: WindowCounts::parse(v),
+        })
+    }
+}
+
+/// Q5/Q6 shape (design D4): `Join` climbs the ancestor chain, `Flat` reads the span's own agent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AgentForm {
+    Flat,
+    Join,
+}
+
+impl AgentForm {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Flat => "",
+            Self::Join => "c.",
+        }
+    }
+}
+
 /// Stream names are the only non-numeric input spliced into SQL; only `[A-Za-z0-9_-]` passes.
 pub fn validate_stream_name(name: &str) -> bool {
     !name.is_empty()
@@ -313,7 +448,7 @@ pub fn build_q1(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
     };
     format!(
         "SELECT service_name, {root_requests}, {m} FROM \"{stream}\" WHERE {range} AND ({kind}) GROUP BY service_name",
-        m = metrics_block(cols),
+        m = metrics_block(cols, ""),
         range = time_range(start, end),
         kind = kind_pred(cols, "('2','5')"),
     )
@@ -324,19 +459,26 @@ pub fn build_self_identity_query(cols: &Columns, stream: &str, start: i64, end: 
     format!(
         "SELECT service_name, {self_key}, {self_port}, {self_ip}, {rpc}, \
          COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) IN ('2','5')) AS server_requests, COUNT(*) AS requests \
-         FROM \"{stream}\" WHERE {range} AND ({kind}) GROUP BY 1,2,3,4,5",
+         FROM \"{stream}\" WHERE {range} AND ({kind}) GROUP BY {group}",
         self_key = opt_str(cols.infer_self_key, "infer_self_key"),
         self_port = opt_port(cols.infer_self_port, "infer_self_port"),
         self_ip = opt_str(cols.infer_self_ip, "infer_self_ip"),
         rpc = opt_str(cols.rpc_service, "rpc_service"),
         range = time_range(start, end),
         kind = kind_pred(cols, "('2','3','4','5')"),
+        group = group_by(&[
+            true,
+            cols.infer_self_key,
+            cols.infer_self_port,
+            cols.infer_self_ip,
+            cols.rpc_service,
+        ]),
     )
 }
 
 /// Pairing learner (design §4.2 "QL"); `None` when a join column is missing (a hard SQL error).
 pub fn build_pairing_query(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
-    if !cols.supports_join() {
+    if !cols.supports_join() || !cols.has_peer_keys() {
         return None;
     }
     let suffixes = sample_suffixes(LEARN_SAMPLE)
@@ -351,25 +493,37 @@ pub fn build_pairing_query(cols: &Columns, stream: &str, start: i64, end: i64) -
          WHERE c._timestamp >= {start} AND c._timestamp < {end} AND p._timestamp >= {start} AND p._timestamp < {end} \
          AND right(c.trace_id, 2) IN ({suffixes}) AND right(p.trace_id, 2) IN ({suffixes}) \
          AND CAST(c.span_kind AS VARCHAR) IN ('1','2','5') AND CAST(p.span_kind AS VARCHAR) IN ('3','4') \
-         AND c.service_name != p.service_name GROUP BY 1,2,3,4,5,6,7",
+         AND c.service_name != p.service_name GROUP BY {group}",
         peer_key = opt_col(cols.infer_peer_key, "p.infer_peer_key", NULL_STR),
         peer_port = opt_col(cols.infer_peer_port, "p.infer_peer_port", NULL_PORT),
         peer_ip = opt_col(cols.infer_peer_ip, "p.infer_peer_ip", NULL_STR),
         peer_rpc = opt_col(cols.rpc_service, "p.rpc_service", NULL_STR),
         sig = sig_expr(cols, "p."),
+        group = group_by(&[
+            true,
+            cols.infer_peer_key,
+            cols.infer_peer_port,
+            cols.infer_peer_ip,
+            cols.rpc_service,
+            cols.operation_name,
+            true,
+        ]),
     ))
 }
 
-pub fn build_q2(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
+pub fn build_q2(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
+    if !cols.has_peer_keys() {
+        return None;
+    }
     let explicit_peer = if cols.peer_service {
         "(peer_service IS NOT NULL AND peer_service != '')"
     } else {
         "false"
     };
-    format!(
+    Some(format!(
         "SELECT service_name AS client, {peer_key}, {peer_port}, {peer_ip}, {rpc}, {sig} AS op_sig, \
          {svc_name}, {svc_type}, {explicit_peer} AS explicit_peer, {m} \
-         FROM \"{stream}\" WHERE {range} AND CAST(span_kind AS VARCHAR) IN ('3','4') GROUP BY 1,2,3,4,5,6,7,8,9",
+         FROM \"{stream}\" WHERE {range} AND CAST(span_kind AS VARCHAR) IN ('3','4') GROUP BY {group}",
         peer_key = opt_str(cols.infer_peer_key, "infer_peer_key"),
         peer_port = opt_port(cols.infer_peer_port, "infer_peer_port"),
         peer_ip = opt_str(cols.infer_peer_ip, "infer_peer_ip"),
@@ -377,9 +531,20 @@ pub fn build_q2(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
         sig = sig_expr(cols, ""),
         svc_name = opt_str(cols.infer_service_name, "infer_service_name"),
         svc_type = opt_str(cols.infer_service_type, "infer_service_type"),
-        m = metrics_block(cols),
+        m = metrics_block(cols, ""),
         range = time_range(start, end),
-    )
+        group = group_by(&[
+            true,
+            cols.infer_peer_key,
+            cols.infer_peer_port,
+            cols.infer_peer_ip,
+            cols.rpc_service,
+            cols.operation_name,
+            cols.infer_service_name,
+            cols.infer_service_type,
+            cols.peer_service,
+        ]),
+    ))
 }
 
 pub fn build_q3(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
@@ -390,24 +555,155 @@ pub fn build_q3(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<St
         "SELECT messaging_destination_name AS client, service_name AS server, {m} FROM \"{stream}\" \
          WHERE {range} AND CAST(span_kind AS VARCHAR) = '5' \
          AND messaging_destination_name IS NOT NULL AND messaging_destination_name != '' GROUP BY 1, 2",
-        m = metrics_block(cols),
+        m = metrics_block(cols, ""),
         range = time_range(start, end),
     ))
 }
 
-pub fn metrics_block(cols: &Columns) -> String {
-    let errors = if cols.span_status {
-        "COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors"
+/// AI probe: spans carrying any gen_ai column, plus the orphan counts that drive `agent_form`.
+pub fn build_q0(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
+    if !cols.has_gen_ai() {
+        return None;
+    }
+    let present = [
+        (cols.gen_ai_agent_name, "gen_ai_agent_name"),
+        (cols.gen_ai_tool_name, "gen_ai_tool_name"),
+        (cols.gen_ai_request_model, "gen_ai_request_model"),
+        (cols.gen_ai_response_model, "gen_ai_response_model"),
+    ]
+    .into_iter()
+    .filter(|(present, _)| *present)
+    .map(|(_, col)| format!("{col} IS NOT NULL"))
+    .collect::<Vec<_>>()
+    .join(" OR ");
+    let orphan_tool = if cols.can_join_agents() && cols.gen_ai_tool_name {
+        format!(
+            "COUNT(*) FILTER (WHERE gen_ai_tool_name IS NOT NULL AND gen_ai_tool_name != '' AND {NO_AGENT_PRED})"
+        )
     } else {
-        "0 AS errors"
+        "0".to_string()
     };
-    let dur = cols.duration_expr();
-    let dur_sum = match dur {
+    let orphan_model = match cols.model_expr("") {
+        Some(model) if cols.can_join_agents() => {
+            format!("COUNT(*) FILTER (WHERE {model} IS NOT NULL AND {NO_AGENT_PRED})")
+        }
+        _ => "0".to_string(),
+    };
+    Some(format!(
+        "SELECT COUNT(*) AS gen_ai_spans, {orphan_tool} AS orphan_tool_spans, {orphan_model} AS orphan_model_spans \
+         FROM \"{stream}\" WHERE {range} AND ({present})",
+        range = time_range(start, end),
+    ))
+}
+
+/// Service → agent, flat: the root or SERVER spans that carry an agent name (§4.2 Q4).
+pub fn build_q4(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
+    if !cols.gen_ai_agent_name {
+        return None;
+    }
+    // no parent column means no root (§4.2), so only the SERVER branch remains
+    let root = if cols.reference_parent_span_id {
+        format!("{ROOT_PRED} OR CAST(span_kind AS VARCHAR) = '2'")
+    } else {
+        "CAST(span_kind AS VARCHAR) = '2'".to_string()
+    };
+    let instances = if cols.gen_ai_agent_id {
+        "COUNT(DISTINCT NULLIF(gen_ai_agent_id, ''))"
+    } else {
+        "0"
+    };
+    Some(format!(
+        "SELECT service_name AS client, gen_ai_agent_name AS agent, {env} AS agent_env, {instances} AS instances, {m} \
+         FROM \"{stream}\" WHERE {range} AND gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != '' \
+         AND gen_ai_agent_name NOT LIKE '<%' AND ({root}) GROUP BY 1, 2, 3",
+        env = env_expr(cols, ""),
+        m = metrics_block(cols, ""),
+        range = time_range(start, end),
+    ))
+}
+
+/// Agent → tool (§4.2 Q5).
+pub fn build_q5(
+    cols: &Columns,
+    stream: &str,
+    start: i64,
+    end: i64,
+    form: AgentForm,
+) -> Option<String> {
+    if !cols.gen_ai_tool_name {
+        return None;
+    }
+    let form = effective_form(cols, form);
+    let p = form.prefix();
+    let pred = format!(
+        "{p}gen_ai_tool_name IS NOT NULL AND {p}gen_ai_tool_name != '' AND {p}gen_ai_tool_name NOT LIKE '<%'"
+    );
+    Some(agent_edge_query(
+        cols,
+        stream,
+        (start, end),
+        form,
+        &format!("{p}gen_ai_tool_name"),
+        &pred,
+    ))
+}
+
+/// Agent → model (§4.2 Q6); the display name is what is grouped, so vendor variants merge in SQL.
+pub fn build_q6(
+    cols: &Columns,
+    stream: &str,
+    start: i64,
+    end: i64,
+    form: AgentForm,
+) -> Option<String> {
+    let form = effective_form(cols, form);
+    let model = cols.model_expr(form.prefix())?;
+    let pred = format!("{model} IS NOT NULL AND {model} NOT LIKE '<%'");
+    Some(agent_edge_query(
+        cols,
+        stream,
+        (start, end),
+        form,
+        &model_display_expr(&model),
+        &pred,
+    ))
+}
+
+/// D4: JOIN only when the schema allows it and this window has tool/model spans without an agent.
+pub fn agent_form(cols: &Columns, orphans: u64) -> AgentForm {
+    if cols.can_join_agents() && orphans > 0 {
+        AgentForm::Join
+    } else {
+        AgentForm::Flat
+    }
+}
+
+/// Canonical display name (§4.6); the fallback strips a vendor prefix and a `-YYYYMMDD` suffix.
+pub fn model_display_expr(model_expr: &str) -> String {
+    let arms = model_canonical_names()
+        .map(|(pattern, canonical)| {
+            format!("WHEN regexp_like({model_expr}, '{pattern}') THEN '{canonical}'")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "CASE {arms} ELSE regexp_replace(regexp_replace(regexp_replace(lower({model_expr}), '^[^/]+/', ''), '-[0-9]{{8}}$', ''), '\\[[^\\]]*\\]$', '') END"
+    )
+}
+
+pub fn metrics_block(cols: &Columns, prefix: &str) -> String {
+    let errors = if cols.span_status {
+        format!("COUNT(*) FILTER (WHERE {prefix}span_status = 'ERROR') AS errors")
+    } else {
+        "0 AS errors".to_string()
+    };
+    let dur = cols.duration_expr(prefix);
+    let dur_sum = match &dur {
         Some(d) => format!("SUM({d}) AS dur_sum"),
         None => "0 AS dur_sum".to_string(),
     };
     let buckets = (0..BUCKET_COUNT)
-        .map(|i| match dur {
+        .map(|i| match &dur {
             Some(d) => format!(
                 "COUNT(*) FILTER (WHERE {d} <= {}) AS le_{i}",
                 bucket_threshold_micros(i)
@@ -458,6 +754,17 @@ fn opt_port(present: bool, col: &str) -> String {
     }
 }
 
+// DataFusion rejects two NULL constants in one GROUP BY ("duplicate unqualified field name NULL")
+fn group_by(present: &[bool]) -> String {
+    present
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| **p)
+        .map(|(i, _)| (i + 1).to_string())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 fn sig_expr(cols: &Columns, prefix: &str) -> String {
     if !cols.operation_name {
         return NULL_STR.to_string();
@@ -476,6 +783,93 @@ fn sig_expr(cols: &Columns, prefix: &str) -> String {
         ),
         rpc = opt_col(cols.rpc_service, &format!("{prefix}rpc_service"), NULL_STR),
     )
+}
+
+/// NULL and '' collapse to one series key in memory, so they must be one SQL group as well.
+fn env_expr(cols: &Columns, prefix: &str) -> String {
+    if cols.gen_ai_agent_env {
+        format!("NULLIF({prefix}gen_ai_agent_env, '')")
+    } else {
+        NULL_STR.to_string()
+    }
+}
+
+/// A JOIN without its columns is a hard SQL error, so the builder never trusts the form alone.
+fn effective_form(cols: &Columns, form: AgentForm) -> AgentForm {
+    if form == AgentForm::Join && !cols.can_join_agents() {
+        AgentForm::Flat
+    } else {
+        form
+    }
+}
+
+/// Q5/Q6 share one shape; `server` and `pred` arrive already prefixed for `form`.
+fn agent_edge_query(
+    cols: &Columns,
+    stream: &str,
+    (start, end): (i64, i64),
+    form: AgentForm,
+    server: &str,
+    pred: &str,
+) -> String {
+    let env = env_expr(cols, form.prefix());
+    match form {
+        AgentForm::Flat => format!(
+            "SELECT {agent_from} AS agent_from, service_name, {server} AS server, {env} AS agent_env, {m} \
+             FROM \"{stream}\" WHERE {range} AND {pred} GROUP BY 1, 2, 3, 4",
+            agent_from = opt_col(
+                cols.gen_ai_agent_name,
+                "NULLIF(gen_ai_agent_name, '')",
+                NULL_STR
+            ),
+            m = metrics_block(cols, ""),
+            range = time_range(start, end),
+        ),
+        AgentForm::Join => format!(
+            "{cte} SELECT {agent_from} AS agent_from, c.service_name AS service_name, {server} AS server, \
+             {env} AS agent_env, {m} FROM \"{stream}\" AS c {joins} \
+             LEFT JOIN trace_agent AS ta ON c.trace_id = ta.trace_id \
+             WHERE c._timestamp >= {start} AND c._timestamp < {end} AND {pred} GROUP BY 1, 2, 3, 4",
+            cte = trace_agent_cte(stream, start, end),
+            agent_from = agent_from_expr(AGENT_INHERIT_DEPTH),
+            m = metrics_block(cols, "c."),
+            joins = ancestor_joins(stream, AGENT_INHERIT_DEPTH),
+        ),
+    }
+}
+
+/// Nearest named ancestor wins, the per-trace agent is the last resort; `NULLIF` so '' never wins.
+fn agent_from_expr(depth: usize) -> String {
+    let mut levels = vec!["NULLIF(c.gen_ai_agent_name, '')".to_string()];
+    levels.extend((1..=depth).map(|k| format!("NULLIF(p{k}.gen_ai_agent_name, '')")));
+    levels.push("ta.gen_ai_agent_name".to_string());
+    format!("COALESCE({})", levels.join(", "))
+}
+
+/// One agent per trace is the norm; `MAX` keeps the pick deterministic when it is not.
+fn trace_agent_cte(stream: &str, start: i64, end: i64) -> String {
+    format!(
+        "WITH trace_agent AS (SELECT trace_id, MAX(gen_ai_agent_name) AS gen_ai_agent_name FROM \"{stream}\" \
+         WHERE {range} AND gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != '' GROUP BY trace_id)",
+        range = time_range(start, end),
+    )
+}
+
+/// Ancestor scans carry no time predicate of their own; the request range bounds every scan.
+fn ancestor_joins(stream: &str, depth: usize) -> String {
+    (1..=depth)
+        .map(|k| {
+            let prev = if k == 1 {
+                "c".to_string()
+            } else {
+                format!("p{}", k - 1)
+            };
+            format!(
+                "LEFT JOIN \"{stream}\" AS p{k} ON {prev}.reference_parent_span_id = p{k}.span_id AND {prev}.trace_id = p{k}.trace_id"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn str_field(v: &Value, key: &str) -> Option<String> {
@@ -594,7 +988,7 @@ mod tests {
 
     #[test]
     fn test_metrics_block_variants() {
-        let full = metrics_block(&Columns::all());
+        let full = metrics_block(&Columns::all(), "");
         assert!(full.contains("SUM(duration) AS dur_sum"));
         assert!(full.contains("COUNT(*) FILTER (WHERE duration <= 1000) AS le_0"));
         assert!(full.contains("COUNT(*) FILTER (WHERE duration <= 64000000) AS le_16"));
@@ -605,16 +999,25 @@ mod tests {
             span_status: false,
             ..Columns::all()
         };
-        let m = metrics_block(&derived);
+        let m = metrics_block(&derived, "");
         assert!(m.contains("SUM((end_time - start_time) / 1000) AS dur_sum"));
         assert!(m.contains("0 AS errors"));
+        let m = metrics_block(&derived, "c.");
+        assert!(m.contains("SUM((c.end_time - c.start_time) / 1000) AS dur_sum"));
+        assert!(m.contains(
+            "COUNT(*) FILTER (WHERE (c.end_time - c.start_time) / 1000 <= 1000) AS le_0"
+        ));
+        let m = metrics_block(&Columns::all(), "c.");
+        assert!(m.contains("COUNT(*) FILTER (WHERE c.span_status = 'ERROR') AS errors"));
+        assert!(m.contains("SUM(c.duration) AS dur_sum"));
+        assert!(m.contains("COUNT(*) FILTER (WHERE c.duration <= 1000) AS le_0"));
 
         let none = Columns {
             duration: false,
             end_time: false,
             ..Columns::all()
         };
-        let m = metrics_block(&none);
+        let m = metrics_block(&none, "");
         assert!(m.contains("0 AS dur_sum"));
         assert!(m.contains("0 AS le_0"));
         assert!(m.contains("0 AS le_16"));
@@ -653,7 +1056,7 @@ mod tests {
         let bare = build_self_identity_query(&cols, "t", 1, 2);
         assert_eq!(select_aliases(&full), select_aliases(&bare));
         assert_eq!(group_by(&full), "1,2,3,4,5");
-        assert_eq!(group_by(&bare), "1,2,3,4,5");
+        assert_eq!(group_by(&bare), "1");
         assert!(bare.contains("CAST(NULL AS VARCHAR) AS infer_self_key"));
         assert!(bare.contains("CAST(NULL AS BIGINT) AS infer_self_port"));
         assert!(bare.contains("IN ('2','3','4','5'))"));
@@ -662,13 +1065,12 @@ mod tests {
 
     #[test]
     fn test_q2_substitution_keeps_positions() {
-        let full = build_q2(&Columns::all(), "t", 1, 2);
+        let full = build_q2(&Columns::all(), "t", 1, 2).unwrap();
         let cols = Columns {
             infer_peer_key: false,
             infer_peer_port: false,
             infer_peer_ip: false,
             rpc_service: false,
-            operation_name: false,
             infer_service_name: false,
             infer_service_type: false,
             peer_service: false,
@@ -677,15 +1079,17 @@ mod tests {
             span_status: false,
             ..Columns::all()
         };
-        let bare = build_q2(&cols, "t", 1, 2);
+        let bare = build_q2(&cols, "t", 1, 2).unwrap();
         assert_eq!(select_aliases(&full), select_aliases(&bare));
         assert_eq!(group_by(&full), "1,2,3,4,5,6,7,8,9");
-        assert_eq!(group_by(&bare), "1,2,3,4,5,6,7,8,9");
+        assert_eq!(group_by(&bare), "1,6");
         assert!(
             full.contains("(peer_service IS NOT NULL AND peer_service != '') AS explicit_peer")
         );
         assert!(bare.contains("false AS explicit_peer"));
-        assert!(bare.contains("CAST(NULL AS VARCHAR) AS op_sig"));
+        assert!(bare.contains(
+            "CASE WHEN CAST(NULL AS VARCHAR) IS NULL AND CAST(NULL AS VARCHAR) IS NULL AND CAST(NULL AS VARCHAR) IS NULL THEN operation_name END AS op_sig"
+        ));
         assert!(full.contains(
             "CASE WHEN infer_peer_key IS NULL AND infer_peer_ip IS NULL AND rpc_service IS NULL THEN operation_name END AS op_sig"
         ));
@@ -693,7 +1097,7 @@ mod tests {
             infer_peer_ip: false,
             ..Columns::all()
         };
-        let sql = build_q2(&partial, "t", 1, 2);
+        let sql = build_q2(&partial, "t", 1, 2).unwrap();
         assert!(sql.contains("CAST(NULL AS VARCHAR) AS infer_peer_ip"));
         assert!(sql.contains("CASE WHEN infer_peer_key IS NULL AND CAST(NULL AS VARCHAR) IS NULL"));
     }
@@ -723,6 +1127,58 @@ mod tests {
         };
         let sql = build_pairing_query(&no_op, "t", 1, 2).unwrap();
         assert!(sql.contains("CAST(NULL AS VARCHAR) AS peer_sig"));
+        assert_eq!(group_by(&sql), "1,2,3,4,5,7");
+    }
+
+    #[test]
+    fn test_q2_and_pairing_need_a_peer_key() {
+        let none = Columns {
+            infer_peer_key: false,
+            infer_peer_ip: false,
+            rpc_service: false,
+            infer_service_name: false,
+            operation_name: false,
+            ..Columns::all()
+        };
+        assert!(build_q2(&none, "t", 1, 2).is_none());
+        assert!(build_pairing_query(&none, "t", 1, 2).is_none());
+        let sig_only = Columns {
+            operation_name: true,
+            ..none
+        };
+        assert!(build_q2(&sig_only, "t", 1, 2).is_some());
+        assert!(build_pairing_query(&sig_only, "t", 1, 2).is_some());
+        let sig_without_join = Columns {
+            reference_parent_span_id: false,
+            ..sig_only
+        };
+        assert!(build_q2(&sig_without_join, "t", 1, 2).is_none());
+    }
+
+    #[test]
+    fn test_group_by_skips_null_placeholders() {
+        let cols = Columns {
+            infer_peer_key: false,
+            infer_peer_port: false,
+            infer_peer_ip: false,
+            infer_self_key: false,
+            infer_self_port: false,
+            infer_self_ip: false,
+            ..Columns::all()
+        };
+        assert_eq!(
+            group_by(&build_self_identity_query(&cols, "t", 1, 2)),
+            "1,5"
+        );
+        assert_eq!(
+            group_by(&build_pairing_query(&cols, "t", 1, 2).unwrap()),
+            "1,5,6,7"
+        );
+        assert_eq!(
+            group_by(&build_q2(&cols, "t", 1, 2).unwrap()),
+            "1,5,6,7,8,9"
+        );
+        assert_eq!(super::group_by(&[true, false, true]), "1,3");
     }
 
     #[test]
@@ -745,14 +1201,459 @@ mod tests {
             Field::new("service_name", DataType::Utf8, true),
             Field::new("span_kind", DataType::Utf8, true),
             Field::new("infer_peer_key", DataType::Utf8, true),
+            Field::new("gen_ai_agent_id", DataType::Utf8, true),
         ]);
         let cols = Columns::from_schema(&schema);
         assert!(cols.has_required());
         assert!(cols.infer_peer_key);
         assert!(!cols.infer_peer_ip);
         assert!(!cols.supports_join());
+        assert!(cols.gen_ai_agent_id);
+        assert!(!cols.has_gen_ai());
+        assert!(!cols.can_join_agents());
         let empty = Columns::from_schema(&Schema::empty());
         assert!(!empty.has_required());
+        let all = Columns::all();
+        assert!(all.has_gen_ai() && all.can_join_agents());
+        for flag in ["agent_name", "tool_name", "request_model", "response_model"] {
+            let mut cols = no_gen_ai();
+            match flag {
+                "agent_name" => cols.gen_ai_agent_name = true,
+                "tool_name" => cols.gen_ai_tool_name = true,
+                "request_model" => cols.gen_ai_request_model = true,
+                _ => cols.gen_ai_response_model = true,
+            }
+            assert!(cols.has_gen_ai(), "{flag}");
+        }
+    }
+
+    fn no_gen_ai() -> Columns {
+        Columns {
+            gen_ai_agent_name: false,
+            gen_ai_agent_id: false,
+            gen_ai_agent_env: false,
+            gen_ai_tool_name: false,
+            gen_ai_request_model: false,
+            gen_ai_response_model: false,
+            ..Columns::all()
+        }
+    }
+
+    fn without_join(missing: &str) -> Columns {
+        let mut cols = Columns::all();
+        match missing {
+            "trace_id" => cols.trace_id = false,
+            "span_id" => cols.span_id = false,
+            _ => cols.reference_parent_span_id = false,
+        }
+        cols
+    }
+
+    fn main_select(sql: &str) -> String {
+        let (_, tail) = sql.rsplit_once("SELECT ").unwrap();
+        format!("SELECT {tail}")
+    }
+
+    #[test]
+    fn test_model_expr_by_present_columns() {
+        assert_eq!(
+            Columns::all().model_expr("").as_deref(),
+            Some("COALESCE(NULLIF(gen_ai_request_model, ''), NULLIF(gen_ai_response_model, ''))")
+        );
+        assert_eq!(
+            Columns::all().model_expr("c.").as_deref(),
+            Some(
+                "COALESCE(NULLIF(c.gen_ai_request_model, ''), NULLIF(c.gen_ai_response_model, ''))"
+            )
+        );
+        let req_only = Columns {
+            gen_ai_response_model: false,
+            ..Columns::all()
+        };
+        assert_eq!(
+            req_only.model_expr("").as_deref(),
+            Some("NULLIF(gen_ai_request_model, '')")
+        );
+        let resp_only = Columns {
+            gen_ai_request_model: false,
+            ..Columns::all()
+        };
+        assert_eq!(
+            resp_only.model_expr("").as_deref(),
+            Some("NULLIF(gen_ai_response_model, '')")
+        );
+        let neither = Columns {
+            gen_ai_request_model: false,
+            gen_ai_response_model: false,
+            ..Columns::all()
+        };
+        assert_eq!(neither.model_expr(""), None);
+    }
+
+    #[test]
+    fn test_q0_gate_predicate_and_orphan_placeholders() {
+        assert!(build_q0(&no_gen_ai(), "t", 1, 2).is_none());
+        let id_only = Columns {
+            gen_ai_agent_id: true,
+            ..no_gen_ai()
+        };
+        assert!(build_q0(&id_only, "t", 1, 2).is_none());
+
+        let full = build_q0(&Columns::all(), "t", 1, 2).unwrap();
+        assert!(full.starts_with("SELECT COUNT(*) AS gen_ai_spans, "));
+        assert!(full.contains(
+            "(gen_ai_agent_name IS NOT NULL OR gen_ai_tool_name IS NOT NULL OR gen_ai_request_model IS NOT NULL OR gen_ai_response_model IS NOT NULL)"
+        ));
+        assert!(full.contains(
+            "COUNT(*) FILTER (WHERE gen_ai_tool_name IS NOT NULL AND gen_ai_tool_name != '' AND (gen_ai_agent_name IS NULL OR gen_ai_agent_name = '')) AS orphan_tool_spans"
+        ));
+        assert!(full.contains(
+            "COUNT(*) FILTER (WHERE COALESCE(NULLIF(gen_ai_request_model, ''), NULLIF(gen_ai_response_model, '')) IS NOT NULL AND (gen_ai_agent_name IS NULL OR gen_ai_agent_name = '')) AS orphan_model_spans"
+        ));
+        assert!(full.contains("_timestamp >= 1 AND _timestamp < 2"));
+        assert!(!full.contains("gen_ai_agent_id"));
+
+        let tool_only = Columns {
+            gen_ai_tool_name: true,
+            ..no_gen_ai()
+        };
+        let sql = build_q0(&tool_only, "t", 1, 2).unwrap();
+        assert!(sql.contains("AND (gen_ai_tool_name IS NOT NULL)"));
+        assert!(sql.contains("0 AS orphan_tool_spans, 0 AS orphan_model_spans"));
+
+        for missing in ["trace_id", "span_id", "reference_parent_span_id"] {
+            let sql = build_q0(&without_join(missing), "t", 1, 2).unwrap();
+            assert!(
+                sql.contains("0 AS orphan_tool_spans, 0 AS orphan_model_spans"),
+                "{missing}"
+            );
+        }
+        let no_agent = Columns {
+            gen_ai_agent_name: false,
+            ..Columns::all()
+        };
+        let sql = build_q0(&no_agent, "t", 1, 2).unwrap();
+        assert!(sql.contains("0 AS orphan_tool_spans, 0 AS orphan_model_spans"));
+        assert!(sql.contains(
+            "(gen_ai_tool_name IS NOT NULL OR gen_ai_request_model IS NOT NULL OR gen_ai_response_model IS NOT NULL)"
+        ));
+        let no_tool = Columns {
+            gen_ai_tool_name: false,
+            ..Columns::all()
+        };
+        let sql = build_q0(&no_tool, "t", 1, 2).unwrap();
+        assert!(sql.contains("0 AS orphan_tool_spans, COUNT(*) FILTER"));
+        let no_model = Columns {
+            gen_ai_request_model: false,
+            gen_ai_response_model: false,
+            ..Columns::all()
+        };
+        let sql = build_q0(&no_model, "t", 1, 2).unwrap();
+        assert!(sql.contains(") AS orphan_tool_spans, 0 AS orphan_model_spans"));
+    }
+
+    #[test]
+    fn test_q4_root_predicate_instances_and_env_placeholders() {
+        let no_agent = Columns {
+            gen_ai_agent_name: false,
+            ..Columns::all()
+        };
+        assert!(build_q4(&no_agent, "t", 1, 2).is_none());
+
+        let full = build_q4(&Columns::all(), "t", 1, 2).unwrap();
+        assert!(full.starts_with(
+            "SELECT service_name AS client, gen_ai_agent_name AS agent, NULLIF(gen_ai_agent_env, '') AS agent_env, COUNT(DISTINCT NULLIF(gen_ai_agent_id, '')) AS instances, COUNT(*) AS requests"
+        ));
+        assert!(full.contains(
+            "AND ((reference_parent_span_id IS NULL OR reference_parent_span_id = '') OR CAST(span_kind AS VARCHAR) = '2')"
+        ));
+        assert!(full.contains("gen_ai_agent_name NOT LIKE '<%'"));
+        assert!(!full.contains("operation_name"));
+        assert!(!full.contains("service_name !="));
+        assert_eq!(group_by(&full), "1, 2, 3");
+
+        let bare = Columns {
+            reference_parent_span_id: false,
+            gen_ai_agent_id: false,
+            gen_ai_agent_env: false,
+            ..Columns::all()
+        };
+        let sql = build_q4(&bare, "t", 1, 2).unwrap();
+        assert!(sql.contains("AND (CAST(span_kind AS VARCHAR) = '2')"));
+        assert!(!sql.contains("reference_parent_span_id"));
+        assert!(sql.contains("CAST(NULL AS VARCHAR) AS agent_env, 0 AS instances"));
+        assert_eq!(select_aliases(&full), select_aliases(&sql));
+        assert_eq!(group_by(&sql), "1, 2, 3");
+    }
+
+    #[test]
+    fn test_agent_env_group_normalizes_null_and_empty() {
+        let q4 = build_q4(&Columns::all(), "t", 1, 2).unwrap();
+        assert_eq!(select_aliases(&q4)[2], "agent_env");
+        assert!(q4.contains(", NULLIF(gen_ai_agent_env, '') AS agent_env, "));
+        assert!(!q4.contains(" gen_ai_agent_env AS agent_env"));
+        assert_eq!(group_by(&q4), "1, 2, 3");
+        for form in [AgentForm::Flat, AgentForm::Join] {
+            let p = form.prefix();
+            let q5 = build_q5(&Columns::all(), "t", 1, 2, form).unwrap();
+            let q6 = build_q6(&Columns::all(), "t", 1, 2, form).unwrap();
+            for sql in [&q5, &q6] {
+                assert!(
+                    sql.contains(&format!(
+                        " AS server, NULLIF({p}gen_ai_agent_env, '') AS agent_env, "
+                    )),
+                    "{form:?}"
+                );
+                assert!(
+                    !sql.contains(&format!(" {p}gen_ai_agent_env AS agent_env")),
+                    "{form:?}"
+                );
+                assert_eq!(select_aliases(&main_select(sql))[3], "agent_env");
+                assert_eq!(group_by(sql), "1, 2, 3, 4");
+            }
+        }
+        let no_env = Columns {
+            gen_ai_agent_env: false,
+            ..Columns::all()
+        };
+        let q4 = build_q4(&no_env, "t", 1, 2).unwrap();
+        assert!(q4.contains(", CAST(NULL AS VARCHAR) AS agent_env, "));
+        assert!(!q4.contains("gen_ai_agent_env"));
+    }
+
+    #[test]
+    fn test_agent_form_truth_table() {
+        assert_eq!(agent_form(&Columns::all(), 0), AgentForm::Flat);
+        assert_eq!(agent_form(&Columns::all(), 1), AgentForm::Join);
+        for missing in ["trace_id", "span_id", "reference_parent_span_id"] {
+            assert_eq!(
+                agent_form(&without_join(missing), 5),
+                AgentForm::Flat,
+                "{missing}"
+            );
+        }
+        let no_agent = Columns {
+            gen_ai_agent_name: false,
+            ..Columns::all()
+        };
+        assert_eq!(agent_form(&no_agent, 5), AgentForm::Flat);
+        assert_eq!(agent_form(&no_agent, 0), AgentForm::Flat);
+    }
+
+    #[test]
+    fn test_q5_flat_and_join_shapes() {
+        let no_tool = Columns {
+            gen_ai_tool_name: false,
+            ..Columns::all()
+        };
+        assert!(build_q5(&no_tool, "t", 1, 2, AgentForm::Flat).is_none());
+
+        let flat = build_q5(&Columns::all(), "t", 1, 2, AgentForm::Flat).unwrap();
+        assert!(flat.starts_with(
+            "SELECT NULLIF(gen_ai_agent_name, '') AS agent_from, service_name, gen_ai_tool_name AS server, NULLIF(gen_ai_agent_env, '') AS agent_env, COUNT(*) AS requests"
+        ));
+        assert!(flat.contains(
+            "WHERE _timestamp >= 1 AND _timestamp < 2 AND gen_ai_tool_name IS NOT NULL AND gen_ai_tool_name != '' AND gen_ai_tool_name NOT LIKE '<%'"
+        ));
+        assert!(!flat.contains("JOIN") && !flat.contains("WITH"));
+        assert_eq!(group_by(&flat), "1, 2, 3, 4");
+
+        let join = build_q5(&Columns::all(), "t", 1, 2, AgentForm::Join).unwrap();
+        assert!(join.starts_with(
+            "WITH trace_agent AS (SELECT trace_id, MAX(gen_ai_agent_name) AS gen_ai_agent_name FROM \"t\" WHERE _timestamp >= 1 AND _timestamp < 2 AND gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != '' GROUP BY trace_id) SELECT "
+        ));
+        assert!(join.contains(
+            "COALESCE(NULLIF(c.gen_ai_agent_name, ''), NULLIF(p1.gen_ai_agent_name, ''), NULLIF(p2.gen_ai_agent_name, ''), NULLIF(p3.gen_ai_agent_name, ''), NULLIF(p4.gen_ai_agent_name, ''), ta.gen_ai_agent_name) AS agent_from, c.service_name AS service_name, c.gen_ai_tool_name AS server, NULLIF(c.gen_ai_agent_env, '') AS agent_env, COUNT(*) AS requests"
+        ));
+        let coalesce = join.split("AS agent_from").next().unwrap();
+        assert!(!coalesce.contains("service_name"));
+        assert!(!coalesce.contains("gen_ai_agent_id"));
+        assert!(join.contains("FROM \"t\" AS c LEFT JOIN \"t\" AS p1 ON c.reference_parent_span_id = p1.span_id AND c.trace_id = p1.trace_id LEFT JOIN \"t\" AS p2 ON p1.reference_parent_span_id = p2.span_id AND p1.trace_id = p2.trace_id"));
+        assert!(join.contains("LEFT JOIN \"t\" AS p4 ON p3.reference_parent_span_id = p4.span_id AND p3.trace_id = p4.trace_id LEFT JOIN trace_agent AS ta ON c.trace_id = ta.trace_id WHERE c._timestamp >= 1 AND c._timestamp < 2 AND c.gen_ai_tool_name IS NOT NULL AND c.gen_ai_tool_name != '' AND c.gen_ai_tool_name NOT LIKE '<%'"));
+        assert_eq!(
+            join.matches("LEFT JOIN \"t\" AS p").count(),
+            AGENT_INHERIT_DEPTH
+        );
+        assert!(!join.contains("AS p5"));
+        assert!(join.contains(
+            "COUNT(*) FILTER (WHERE c.span_status = 'ERROR') AS errors, SUM(c.duration) AS dur_sum"
+        ));
+        assert!(join.contains("COUNT(*) FILTER (WHERE c.duration <= 1000) AS le_0"));
+        assert_eq!(group_by(&join), "1, 2, 3, 4");
+        assert_eq!(select_aliases(&flat), select_aliases(&main_select(&join)));
+
+        let no_env = Columns {
+            gen_ai_agent_env: false,
+            ..Columns::all()
+        };
+        let flat_no_env = build_q5(&no_env, "t", 1, 2, AgentForm::Flat).unwrap();
+        assert!(flat_no_env.contains("AS server, CAST(NULL AS VARCHAR) AS agent_env, "));
+        assert_eq!(select_aliases(&flat), select_aliases(&flat_no_env));
+        assert_eq!(group_by(&flat_no_env), "1, 2, 3, 4");
+        let join_no_env = build_q5(&no_env, "t", 1, 2, AgentForm::Join).unwrap();
+        assert!(join_no_env.contains("AS server, CAST(NULL AS VARCHAR) AS agent_env, "));
+        assert_eq!(
+            select_aliases(&flat),
+            select_aliases(&main_select(&join_no_env))
+        );
+        assert_eq!(group_by(&join_no_env), "1, 2, 3, 4");
+
+        let no_agent = Columns {
+            gen_ai_agent_name: false,
+            ..Columns::all()
+        };
+        let sql = build_q5(&no_agent, "t", 1, 2, AgentForm::Flat).unwrap();
+        assert!(sql.starts_with("SELECT CAST(NULL AS VARCHAR) AS agent_from, service_name, "));
+        let downgraded = build_q5(&without_join("span_id"), "t", 1, 2, AgentForm::Join).unwrap();
+        assert!(!downgraded.contains("JOIN"));
+        assert_eq!(
+            downgraded,
+            build_q5(&without_join("span_id"), "t", 1, 2, AgentForm::Flat).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_q6_shapes_and_model_predicate() {
+        let no_model = Columns {
+            gen_ai_request_model: false,
+            gen_ai_response_model: false,
+            ..Columns::all()
+        };
+        assert!(build_q6(&no_model, "t", 1, 2, AgentForm::Flat).is_none());
+        assert!(build_q6(&no_model, "t", 1, 2, AgentForm::Join).is_none());
+
+        let model = "COALESCE(NULLIF(gen_ai_request_model, ''), NULLIF(gen_ai_response_model, ''))";
+        let flat = build_q6(&Columns::all(), "t", 1, 2, AgentForm::Flat).unwrap();
+        assert!(flat.starts_with("SELECT NULLIF(gen_ai_agent_name, '') AS agent_from, service_name, CASE WHEN regexp_like("));
+        assert!(flat.contains(&format!(
+            "{model} IS NOT NULL AND {model} NOT LIKE '<%' GROUP BY 1, 2, 3, 4"
+        )));
+        assert!(flat.contains(&format!(
+            "{} AS server, NULLIF(gen_ai_agent_env, '') AS agent_env, ",
+            model_display_expr(model)
+        )));
+        assert!(!flat.contains("JOIN"));
+
+        let join = build_q6(&Columns::all(), "t", 1, 2, AgentForm::Join).unwrap();
+        let model_c =
+            "COALESCE(NULLIF(c.gen_ai_request_model, ''), NULLIF(c.gen_ai_response_model, ''))";
+        assert!(join.starts_with("WITH trace_agent AS ("));
+        assert!(join.contains(&format!(
+            "{} AS server, NULLIF(c.gen_ai_agent_env, '') AS agent_env, ",
+            model_display_expr(model_c)
+        )));
+        assert!(join.contains(&format!(
+            "AND {model_c} IS NOT NULL AND {model_c} NOT LIKE '<%' GROUP BY 1, 2, 3, 4"
+        )));
+        assert_eq!(join.matches("LEFT JOIN \"t\" AS p").count(), 4);
+        assert!(join.contains("LEFT JOIN trace_agent AS ta ON c.trace_id = ta.trace_id"));
+        assert_eq!(select_aliases(&flat), select_aliases(&main_select(&join)));
+
+        let resp_only = Columns {
+            gen_ai_request_model: false,
+            gen_ai_agent_env: false,
+            ..Columns::all()
+        };
+        let sql = build_q6(&resp_only, "t", 1, 2, AgentForm::Flat).unwrap();
+        assert!(sql.contains("NULLIF(gen_ai_response_model, '') IS NOT NULL AND NULLIF(gen_ai_response_model, '') NOT LIKE '<%'"));
+        assert!(!sql.contains("gen_ai_request_model"));
+        assert!(sql.contains("AS server, CAST(NULL AS VARCHAR) AS agent_env, "));
+        assert_eq!(select_aliases(&flat), select_aliases(&sql));
+        assert_eq!(group_by(&sql), "1, 2, 3, 4");
+    }
+
+    #[test]
+    fn test_model_display_expr_never_emits_a_pattern() {
+        let expr = model_display_expr("m");
+        assert!(expr.starts_with("CASE WHEN regexp_like(m, '"));
+        assert!(expr.ends_with(
+            " ELSE regexp_replace(regexp_replace(regexp_replace(lower(m), '^[^/]+/', ''), '-[0-9]{8}$', ''), '\\[[^\\]]*\\]$', '') END"
+        ));
+        assert!(expr.contains("WHEN regexp_like(m, 'gpt-5\\.2-pro') THEN 'gpt-5.2-pro'"));
+        assert!(expr.contains("WHEN regexp_like(m, '(?i)deepseek-v4-pro') THEN 'deepseek-v4-pro'"));
+        assert!(
+            expr.contains(
+                "WHEN regexp_like(m, '(?i)deepseek-(?:v3|chat)(?:$|-)') THEN 'deepseek-v3'"
+            )
+        );
+        let canonical: Vec<&str> = model_canonical_names().map(|(_, c)| c).collect();
+        let values: Vec<&str> = expr
+            .split(" THEN '")
+            .skip(1)
+            .map(|rest| rest.split('\'').next().unwrap())
+            .collect();
+        assert_eq!(values.len(), canonical.len());
+        for v in &values {
+            assert!(canonical.contains(v), "{v}");
+            assert!(
+                !v.contains(['\\', '(', ')', '[', ']', '?', '*', '+', '^', '$', '|']),
+                "{v}"
+            );
+        }
+        assert_eq!(expr.matches("WHEN ").count(), canonical.len());
+    }
+
+    #[test]
+    fn test_agent_row_parsing() {
+        let q0 = Q0Row::parse(
+            &json!({"gen_ai_spans": 7, "orphan_tool_spans": 2.0, "orphan_model_spans": null}),
+        );
+        assert_eq!(
+            q0,
+            Q0Row {
+                gen_ai_spans: 7,
+                orphan_tool_spans: 2,
+                orphan_model_spans: 0
+            }
+        );
+        assert_eq!(Q0Row::parse(&json!({})), Q0Row::default());
+
+        let q4 = Q4Row::parse(&json!({
+            "client": "o2-ai", "agent": "sre-rca", "agent_env": null, "instances": 3, "requests": 9
+        }))
+        .unwrap();
+        assert_eq!(q4.client, "o2-ai");
+        assert_eq!(q4.agent, "sre-rca");
+        assert_eq!(q4.agent_env, None);
+        assert_eq!(q4.instances, 3);
+        assert_eq!(q4.counts.requests, 9);
+        let q4 = Q4Row::parse(&json!({"client": "s", "agent": "a", "agent_env": "prod"})).unwrap();
+        assert_eq!(q4.agent_env.as_deref(), Some("prod"));
+        assert_eq!(q4.instances, 0);
+        assert!(Q4Row::parse(&json!({"client": "s", "agent": null})).is_none());
+        assert!(Q4Row::parse(&json!({"client": "", "agent": "a"})).is_none());
+
+        let row = AgentEdgeRow::parse(&json!({
+            "agent_from": "sre-rca", "service_name": "o2-ai", "server": "search", "agent_env": "", "requests": 4
+        }))
+        .unwrap();
+        assert_eq!(row.agent_from.as_deref(), Some("sre-rca"));
+        assert_eq!(row.service_name, "o2-ai");
+        assert_eq!(row.server, "search");
+        assert_eq!(row.agent_env, None);
+        assert_eq!(row.counts.requests, 4);
+        let host = AgentEdgeRow::parse(&json!({"agent_from": "", "service_name": "o2-ai", "server": "gpt-4o", "agent_env": "dev"})).unwrap();
+        assert_eq!(host.agent_from, None);
+        assert_eq!(host.agent_env.as_deref(), Some("dev"));
+        let null_from = AgentEdgeRow::parse(
+            &json!({"agent_from": null, "service_name": "o2-ai", "server": "gpt-4o"}),
+        )
+        .unwrap();
+        assert_eq!(null_from.agent_from, None);
+        assert!(
+            AgentEdgeRow::parse(
+                &json!({"agent_from": "<synthetic>", "service_name": "s", "server": "t"})
+            )
+            .is_none()
+        );
+        assert!(
+            AgentEdgeRow::parse(&json!({"agent_from": "a", "service_name": null, "server": "t"}))
+                .is_none()
+        );
+        assert!(
+            AgentEdgeRow::parse(&json!({"agent_from": "a", "service_name": "s", "server": ""}))
+                .is_none()
+        );
     }
 
     #[test]

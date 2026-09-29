@@ -37,6 +37,7 @@ use tonic::{
     service::interceptor::InterceptedService,
     transport::{Identity, ServerTlsConfig, server::TcpIncoming},
 };
+use tonic_tracing_opentelemetry::middleware::server::OtelGrpcLayer;
 
 use crate::{
     handler::grpc::{
@@ -174,7 +175,7 @@ async fn run_common(
     );
     let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
 
-    let mut builder = server_builder()?;
+    let mut builder = server_builder()?.layer(otel_layer());
     let ret = builder
         .add_service(event_svc)
         .add_service(search_svc)
@@ -246,7 +247,7 @@ async fn run_router(
     );
     let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
 
-    let mut builder = server_builder()?;
+    let mut builder = server_builder()?.layer(otel_layer());
     let ret = builder
         .add_service(logs_svc)
         .add_service(metrics_svc)
@@ -286,6 +287,10 @@ async fn bind_listener(
     Ok(listener)
 }
 
+fn otel_layer() -> OtelGrpcLayer {
+    OtelGrpcLayer::default().filter(config::meta::logger::otel_middleware_enabled)
+}
+
 fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {
     let cfg = get_config();
     let builder = if cfg.grpc.tls_enabled {
@@ -305,10 +310,72 @@ fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use futures::StreamExt;
+    use proto::cluster_rpc::{self, metrics_client::MetricsClient, metrics_server::Metrics};
     use tokio::net::TcpStream;
+    use tonic::{Request, Response, Status};
+    use tracing_subscriber::{Layer, filter::LevelFilter, layer::Context, prelude::*};
 
     use super::*;
+
+    struct Echo;
+
+    #[tonic::async_trait]
+    impl Metrics for Echo {
+        async fn query(
+            &self,
+            _: Request<cluster_rpc::MetricsQueryRequest>,
+        ) -> Result<Response<cluster_rpc::MetricsQueryResponse>, Status> {
+            Ok(Response::new(Default::default()))
+        }
+        type DataStream = futures::stream::Empty<Result<cluster_rpc::MetricsQueryResponse, Status>>;
+        async fn data(
+            &self,
+            _: Request<cluster_rpc::MetricsQueryRequest>,
+        ) -> Result<Response<Self::DataStream>, Status> {
+            Ok(Response::new(futures::stream::empty()))
+        }
+    }
+
+    struct WarnRecorder(Arc<Mutex<usize>>);
+
+    impl<S: tracing::Subscriber> Layer<S> for WarnRecorder {
+        fn on_event(&self, event: &tracing::Event<'_>, _: Context<'_, S>) {
+            if *event.metadata().level() == tracing::Level::WARN {
+                *self.0.lock().unwrap() += 1;
+            }
+        }
+    }
+
+    async fn warnings_per_request(layer: OtelGrpcLayer, level: LevelFilter) -> usize {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            tonic::transport::Server::builder()
+                .layer(layer)
+                .add_service(MetricsServer::new(Echo))
+                .serve_with_incoming(TcpIncoming::from(listener)),
+        );
+        let warnings = Arc::new(Mutex::new(0));
+        let subscriber = tracing_subscriber::registry()
+            .with(WarnRecorder(Arc::clone(&warnings)).with_filter(level));
+        // a lone dispatcher lets parallel tests cache the WARN callsite as disabled
+        let _second = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let _guard = tracing::subscriber::set_default(subscriber);
+        let channel = tonic::transport::Channel::from_shared(addr)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        MetricsClient::new(channel)
+            .query(cluster_rpc::MetricsQueryRequest::default())
+            .await
+            .unwrap();
+        server.abort();
+        *warnings.lock().unwrap()
+    }
 
     #[tokio::test]
     async fn init_is_signaled_after_grpc_socket_listens() {
@@ -348,5 +415,13 @@ mod tests {
         let accepted = incoming.next().await.unwrap().unwrap();
 
         assert!(accepted.nodelay().unwrap());
+    }
+
+    #[tokio::test]
+    async fn otel_layer_is_silent_when_tracing_is_off() {
+        for level in [LevelFilter::INFO, LevelFilter::TRACE] {
+            assert!(warnings_per_request(OtelGrpcLayer::default(), level).await > 0);
+            assert_eq!(warnings_per_request(otel_layer(), level).await, 0);
+        }
     }
 }

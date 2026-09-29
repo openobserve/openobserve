@@ -28,7 +28,8 @@
 //   2. Give it a `buildSample()` (inline, or a builder like testSample.ts /
 //      incidentSample.ts) describing the payload it emits.
 //   3. Add its i18n strings under `workflow.triggerKind.<camelKind>` in
-//      en-US.json: { label, node, desc, intro }.
+//      en-US.json: { label, node, desc, intro, tab }. `tab` is the short list
+//      tab label; without it the tab falls back to the full `label`.
 // Nothing else needs touching — no picker/title/label/mapping edits.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ import { buildIncidentSample, INCIDENT_EVENT_TYPES, INCIDENT_COMMON_KEYS } from 
 import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
 import type { WorkflowFieldOption } from "./alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
+import { buildAlertResolvedSample, ALERT_RESOLVED_PAYLOAD_FIELDS } from "./alertResolvedSample";
 
 // A selectable variant of a trigger's sample payload. When a kind defines more
 // than one (e.g. an incident's lifecycle event_types), the trigger drawer shows
@@ -62,6 +64,9 @@ export interface WorkflowTriggerDef {
   icon: IconName;
   /** i18n key — picker label + the list's Trigger column. */
   labelKey: I18nKey;
+  /** i18n key — short form for the list's type tabs ("Alerts", not "Alert Fired").
+   *  Falls back to `labelKey` when a trigger does not define one. */
+  tabLabelKey?: I18nKey;
   /** i18n key — canvas card + config-drawer title (e.g. "Alert Trigger"). */
   nodeTitleKey: I18nKey;
   /** i18n key — picker sub-label. */
@@ -135,6 +140,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     enabled: true,
     icon: "notifications-active",
     labelKey: "workflow.triggerKind.alertFired.label",
+    tabLabelKey: "workflow.triggerKind.alertFired.tab",
     nodeTitleKey: "workflow.triggerKind.alertFired.node",
     descKey: "workflow.triggerKind.alertFired.desc",
     introKey: "workflow.triggerKind.alertFired.intro",
@@ -144,11 +150,28 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     linksAlerts: true,
   },
   {
+    kind: "alert_resolved",
+    triggerType: "AlertResolved",
+    // TODO: hidden until linking can write an AlertResolved association — it hardcodes AlertFired,
+    // so this trigger would run on the firing instead. Backend consumer removed until then.
+    enabled: false,
+    icon: "check-circle",
+    labelKey: "workflow.triggerKind.alertResolved.label",
+    tabLabelKey: "workflow.triggerKind.alertResolved.tab",
+    nodeTitleKey: "workflow.triggerKind.alertResolved.node",
+    descKey: "workflow.triggerKind.alertResolved.desc",
+    introKey: "workflow.triggerKind.alertResolved.intro",
+    buildSample: buildAlertResolvedSample,
+    conditionFields: ALERT_RESOLVED_PAYLOAD_FIELDS,
+    linksAlerts: true,
+  },
+  {
     kind: "incident_event",
     triggerType: "IncidentEvent",
     enabled: true,
     icon: "warning",
     labelKey: "workflow.triggerKind.incidentEvent.label",
+    tabLabelKey: "workflow.triggerKind.incidentEvent.tab",
     nodeTitleKey: "workflow.triggerKind.incidentEvent.node",
     descKey: "workflow.triggerKind.incidentEvent.desc",
     introKey: "workflow.triggerKind.incidentEvent.intro",

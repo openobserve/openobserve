@@ -96,6 +96,13 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
   "wait",
 ];
 
+const NOT_SUBSTITUTED_ACTIONS: readonly StepAction[] = ["upload", "scroll", "wait"];
+
+// Only these values reach url/key/value, the three step fields the probe substitutes.
+export const SUBSTITUTED_VALUE_ACTIONS: readonly StepAction[] = VALUE_ACTIONS.filter(
+  (action) => !NOT_SUBSTITUTED_ACTIONS.includes(action),
+);
+
 /**
  * Actions retired from the authoring vocabulary (spec X-9).
  *
@@ -275,6 +282,9 @@ export const DEFAULT_SETTLE_BUDGET_MS = 30000;
 /** Matches the server-side range check on `settle.budget_ms`. */
 export const MIN_SETTLE_BUDGET_MS = 100;
 export const MAX_SETTLE_BUDGET_MS = 60000;
+
+/** Mirrors the server's MAX_ENVIRONMENTS_PER_CHECK — job volume is envs × locations × devices. */
+export const MAX_CHECK_ENVIRONMENTS = 5;
 
 // ── Value field widths ───────────────────────────────────────────────────
 export const VALUE_WIDTH_MAP: Record<string, string> = {

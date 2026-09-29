@@ -145,7 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </ODescriptionItem>
 
-        <ODescriptionItem :label="subjectLabel">
+        <!-- When the subject IS the incident, this row would repeat the
+             Incident row above under the misleading "Alert" label instead of
+             adding information, so it only ever applies to an alert subject. -->
+        <ODescriptionItem v-if="subjectType === 'alert'" :label="subjectLabel">
           <span
             class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
             data-test="oncall-about-subject-id"
@@ -278,9 +281,7 @@ const showRoutingReason = computed(
       routingNotes.value.length > 0),
 );
 
-const subjectLabel = computed(() =>
-  props.subjectType === "alert" ? t("oncall.alertId") : t("oncall.subject"),
-);
+const subjectLabel = computed(() => t("oncall.alertId"));
 
 /// The alert's editor, which lives on the LIST route behind `action=update`
 /// rather than on a route of its own — `AlertDetail.editAlert` navigates the

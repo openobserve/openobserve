@@ -9,11 +9,14 @@ import streamService from "@/services/stream";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 // Mock streamService
-vi.mock("@/services/stream", () => ({
-  default: {
-    fieldValues: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      fieldValues: vi.fn(),
+    },
+  });
+});
 
 // Shared mocks accessible in both the vi.mock factory and test callbacks.
 // vi.hoisted ensures they exist before vi.mock factories run.

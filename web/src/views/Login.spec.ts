@@ -14,31 +14,39 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import LoginPage from "./Login.vue";
 
 // Mock dependencies first with factory functions to avoid hoisting issues
-vi.mock("@/services/config", () => ({
-  default: {
-    get_config: vi.fn(),
-  },
-}));
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_config: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/users", () => ({
-  default: {
-    verifyUser: vi.fn(),
-    addNewUser: vi.fn(),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      verifyUser: vi.fn(),
+      addNewUser: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -282,7 +290,7 @@ describe("Login.vue", () => {
           mocks: {},
         },
       });
-      await nextTick();
+      await flushPromises();
     });
 
     it("should return store from setup", () => {
@@ -325,7 +333,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
       expect(configService.get_config).toHaveBeenCalled();
       expect(store.commit).toHaveBeenCalledWith("setConfig", expect.any(Object));
     });
@@ -340,7 +348,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
       // Config should not be called in onBeforeMount when hash exists
       expect(configService.get_config).not.toHaveBeenCalled();
     });
@@ -357,7 +365,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
       expect(consoleSpy).toHaveBeenCalledWith("Error while fetching config:", expect.any(Error));
       consoleSpy.mockRestore();
     });
@@ -371,7 +379,7 @@ describe("Login.vue", () => {
           mocks: {},
         },
       });
-      await nextTick();
+      await flushPromises();
     });
 
     it("should initialize user data correctly", () => {
@@ -393,7 +401,7 @@ describe("Login.vue", () => {
     it("should allow user data modification", async () => {
       wrapper.vm.user.email = "new@example.com";
       wrapper.vm.user.first_name = "New";
-      await nextTick();
+      await flushPromises();
 
       expect(wrapper.vm.user.email).toBe("new@example.com");
       expect(wrapper.vm.user.first_name).toBe("New");
@@ -401,7 +409,7 @@ describe("Login.vue", () => {
 
     it("should allow userInfo modification", async () => {
       wrapper.vm.userInfo.email = "new@example.com";
-      await nextTick();
+      await flushPromises();
 
       expect(wrapper.vm.userInfo.email).toBe("new@example.com");
     });
@@ -415,7 +423,7 @@ describe("Login.vue", () => {
           mocks: {},
         },
       });
-      await nextTick();
+      await flushPromises();
     });
 
     it("should redirect to sessionStorage URI when available", async () => {
@@ -495,7 +503,7 @@ describe("Login.vue", () => {
           mocks: {},
         },
       });
-      await nextTick();
+      await flushPromises();
     });
 
     it("should fetch organizations list", async () => {
@@ -608,12 +616,26 @@ describe("Login.vue", () => {
 
     it("should set first time login flag when cloud and new_user_login", async () => {
       config.isCloud = "true";
-      zincutils.checkCallBackValues.mockReturnValue("true");
+      zincutils.checkCallBackValues.mockImplementation((_hash: string, key: string) =>
+        key === "new_user_login" ? "true" : "false",
+      );
 
       await wrapper.vm.getDefaultOrganization();
 
       expect(zincutils.checkCallBackValues).toHaveBeenCalledWith("", "new_user_login");
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith("isFirstTimeLogin", "true");
+    });
+
+    it("should not set first time login flag for an invited user even when new_user_login is true", async () => {
+      config.isCloud = "true";
+      zincutils.checkCallBackValues.mockImplementation((_hash: string, key: string) =>
+        key === "new_user_login" || key === "pending_invites" ? "true" : "false",
+      );
+
+      await wrapper.vm.getDefaultOrganization();
+
+      expect(zincutils.checkCallBackValues).toHaveBeenCalledWith("", "pending_invites");
+      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith("isFirstTimeLogin", "true");
     });
 
     it("should not set first time login flag when not cloud", async () => {
@@ -680,7 +702,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(configService.get_config).toHaveBeenCalled();
       expect(zincutils.getUserInfo).toHaveBeenCalled();
@@ -706,7 +728,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(wrapper.vm.user.email).toBe("token@example.com");
       expect(wrapper.vm.user.cognito_sub).toBe("token-sub");
@@ -732,7 +754,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(wrapper.vm.user.first_name).toBe("");
       expect(wrapper.vm.user.last_name).toBe("");
@@ -763,7 +785,7 @@ describe("Login.vue", () => {
       // Mock the method after mounting
       wrapper.vm.getDefaultOrganization = getDefaultOrgSpy;
 
-      await nextTick();
+      await flushPromises();
 
       expect(store.dispatch).toHaveBeenCalledWith(
         "login",
@@ -794,7 +816,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(store.dispatch).toHaveBeenCalledWith("login", expect.any(Object));
     });
@@ -818,7 +840,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       // Verify component handled user without pgdata correctly
       expect(wrapper.vm.userInfo.email).toBe("test@example.com");
@@ -840,7 +862,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(consoleSpy).toHaveBeenCalledWith("Error while fetching config:", expect.any(Error));
       consoleSpy.mockRestore();
@@ -860,7 +882,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       // getUserInfo should not be called when no hash
       expect(zincutils.getUserInfo).not.toHaveBeenCalled();
@@ -876,7 +898,7 @@ describe("Login.vue", () => {
         },
       });
       wrapper.vm.userInfo = { email: "test@example.com" };
-      await nextTick();
+      await flushPromises();
     });
 
     it("should verify user by email", async () => {
@@ -964,7 +986,7 @@ describe("Login.vue", () => {
       });
 
       wrapper.vm.user.email = "";
-      await nextTick();
+      await flushPromises();
 
       expect(wrapper.findComponent({ name: "Login" }).exists()).toBe(true);
     });
@@ -982,7 +1004,7 @@ describe("Login.vue", () => {
       expect(wrapper.findComponent({ name: "Login" }).exists()).toBe(true);
 
       wrapper.vm.user.email = "test@example.com";
-      await nextTick();
+      await flushPromises();
 
       // When user has email, check if login component logic changes
       // (Actual template behavior might differ from expected due to reactivity)
@@ -999,7 +1021,7 @@ describe("Login.vue", () => {
           mocks: {},
         },
       });
-      await nextTick();
+      await flushPromises();
     });
 
     it("should handle null user info from token", async () => {
@@ -1017,7 +1039,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(createdWrapper.vm.user.email).toBe("");
     });
@@ -1037,7 +1059,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(createdWrapper.vm.user.email).toBe("");
     });
@@ -1108,7 +1130,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(createdWrapper.vm.userInfo).toBeNull();
     });
@@ -1144,7 +1166,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(wrapper.vm.user.email).toBe("newuser@example.com");
       // Since this is an integration test, we verify the component was properly initialized
@@ -1172,7 +1194,7 @@ describe("Login.vue", () => {
         },
       });
 
-      await nextTick();
+      await flushPromises();
 
       expect(store.dispatch).toHaveBeenCalledWith(
         "login",

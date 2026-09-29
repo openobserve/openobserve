@@ -34,13 +34,16 @@ vi.mock("@/services/auth", () => ({
   },
 }));
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    os_list: vi.fn().mockResolvedValue({
-      data: { data: [] },
-    }),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      os_list: vi.fn().mockResolvedValue({
+        data: { data: [] },
+      }),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   getBasicAuth: vi.fn().mockReturnValue("basic-auth-token"),
@@ -496,7 +499,12 @@ describe("Login", () => {
     wrapper.vm.password = "password123";
 
     await wrapper.vm.onSignIn();
-    expect(mockDispatch).toHaveBeenCalledWith("setUserInfo", "encoded-data");
+    // The store must hold the decoded object: the dialog and MainLayout read `.email` off it directly.
+    expect(mockDispatch).toHaveBeenCalledWith(
+      "setUserInfo",
+      expect.objectContaining({ email: "testuser", name: "testuser" }),
+    );
+    expect(mockDispatch).not.toHaveBeenCalledWith("setUserInfo", "encoded-data");
   });
 
   // Test 21: successful sign in dispatches setCurrentUser

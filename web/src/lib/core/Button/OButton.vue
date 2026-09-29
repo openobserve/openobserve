@@ -323,6 +323,8 @@ const classes = computed<string[]>(() => [
   // taller than a borderless ghost one of the same size.
   "relative box-border",
   "whitespace-nowrap",
+  // `as="a"` renders a real anchor, which base-elements.css underlines on hover.
+  "no-underline hover:no-underline",
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
   "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
   "outline-none",

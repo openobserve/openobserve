@@ -3,7 +3,7 @@ import type { I18nText } from "@/types/i18n";
 import { computed, useSlots } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-interface Props {
+export interface Props {
   variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft" | "promo";
   content?: I18nText;
   icon?: string;
@@ -137,7 +137,7 @@ const barVariantClass = computed(() => {
             ? 'min-w-0 items-center'
             : 'min-w-0 flex-1 items-center'
           : inlineActions
-            ? 'flex-1 items-center'
+            ? 'min-w-0 flex-1 items-center'
             : preserveWhitespace
               ? 'min-w-0 items-start'
               : 'items-start',
@@ -159,7 +159,7 @@ const barVariantClass = computed(() => {
 
       <div
         :class="[
-          bar ? 'text-compact' : 'flex-1 text-sm',
+          bar ? 'text-compact' : inlineActions ? 'min-w-0 flex-1 text-sm' : 'flex-1 text-sm',
           preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
         ]"
       >

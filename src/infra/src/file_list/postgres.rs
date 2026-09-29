@@ -160,9 +160,9 @@ impl super::FileList for PostgresFileList {
             .inc();
         if let Err(e) = sqlx::query(
             r#"INSERT INTO file_list
-              (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+              (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)
             VALUES
-              ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+              ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             ON CONFLICT DO NOTHING"#
                 )
                 .bind(&dump_file.account)
@@ -177,6 +177,7 @@ impl super::FileList for PostgresFileList {
                 .bind(meta.original_size)
                 .bind(meta.compressed_size)
                 .bind(meta.index_size)
+                .bind(meta.mindex_size)
                 .bind(meta.bloom_ver)
                 .bind(meta.flattened)
                 .bind(now_ts)
@@ -235,7 +236,7 @@ impl super::FileList for PostgresFileList {
             // we don't care the id here, because the id is from file_list table not for this table
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -246,6 +247,7 @@ impl super::FileList for PostgresFileList {
                     .push_bind(date_key)
                     .push_bind(file_name)
                     .push_bind(item.index_file)
+                    .push_bind(item.mindex_file)
                     .push_bind(item.flattened)
                     .push_bind(created_at);
             });
@@ -336,7 +338,7 @@ impl super::FileList for PostgresFileList {
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, file, date
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, file, date
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -486,7 +488,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#
@@ -499,7 +501,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             let (date_from, date_to) = derive_date_range(time_start, time_end);
             let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;
                 "#;
@@ -542,7 +544,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .inc();
 
         let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#;
@@ -639,7 +641,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .inc();
 
         let sql = r#"
-SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
+SELECT id, account, stream, date, file, records, index_size, mindex_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
                 "#;
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
@@ -686,7 +688,7 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids}){date_filter}"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver FROM file_list WHERE id IN ({ids}){date_filter}"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list"])
@@ -897,7 +899,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let items: Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
         )
         .bind(org_id)
         .bind(time_max)
@@ -911,6 +913,7 @@ SELECT date
                     account: r.account.to_string(),
                     file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     index_file: r.index_file,
+                    mindex_file: r.mindex_file,
                     flattened: r.flattened,
                 })
                 .collect(),
@@ -974,7 +977,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -985,6 +988,7 @@ SELECT date
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
+                mindex_file: r.mindex_file,
                 flattened: r.flattened,
             })
             .collect())
@@ -1100,7 +1104,8 @@ SELECT
     SUM(records)::BIGINT AS records,
     SUM(original_size)::BIGINT AS original_size,
     SUM(compressed_size)::BIGINT AS compressed_size,
-    SUM(index_size)::BIGINT AS index_size
+    SUM(index_size)::BIGINT AS index_size,
+    SUM(mindex_size)::BIGINT AS mindex_size
 FROM file_list
 WHERE stream = $1 {time_filter}
 GROUP BY stream;
@@ -1203,8 +1208,8 @@ GROUP BY stream;
         if let Err(e) = sqlx::query(
             r#"
 INSERT INTO stream_stats
-    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, is_recent)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, is_recent)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (stream, is_recent)
 DO UPDATE SET
     file_num = EXCLUDED.file_num,
@@ -1213,7 +1218,8 @@ DO UPDATE SET
     records = EXCLUDED.records,
     original_size = EXCLUDED.original_size,
     compressed_size = EXCLUDED.compressed_size,
-    index_size = EXCLUDED.index_size;
+    index_size = EXCLUDED.index_size,
+    mindex_size = EXCLUDED.mindex_size;
             "#,
         )
         .bind(org_id)
@@ -1225,6 +1231,7 @@ DO UPDATE SET
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
+        .bind(stats.mindex_size as i64)
         .bind(is_recent)
         .execute(&mut *tx)
         .await
@@ -1255,7 +1262,7 @@ DO UPDATE SET
             .inc();
         sqlx
             ::query(
-                r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0, index_size = 0;"#
+                r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0, index_size = 0, mindex_size = 0;"#
             )
             .execute(&pool).await?;
         Ok(())
@@ -1340,8 +1347,19 @@ DO UPDATE SET
                 return Err(e.into());
             }
         };
-        let id = ret.try_get::<i64, &str>("id").unwrap_or_default();
-        let status = ret.try_get::<i64, &str>("status").unwrap_or_default();
+        // status is an INT column: decoding it as i64 fails and must not be read as Pending
+        let (id, status) = match ret
+            .try_get::<i64, &str>("id")
+            .and_then(|id| Ok((id, ret.try_get::<i32, &str>("status")?)))
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback add job error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
         if id > 0
             && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done
             && let Err(e) =
@@ -1779,8 +1797,8 @@ DO UPDATE SET
         sqlx::query(
             r#"
 INSERT INTO file_list_dump_stats
-    (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (stream, date, file)
 DO UPDATE SET
     file_num = EXCLUDED.file_num,
@@ -1789,7 +1807,8 @@ DO UPDATE SET
     records = EXCLUDED.records,
     original_size = EXCLUDED.original_size,
     compressed_size = EXCLUDED.compressed_size,
-    index_size = EXCLUDED.index_size;
+    index_size = EXCLUDED.index_size,
+    mindex_size = EXCLUDED.mindex_size;
             "#,
         )
         .bind(org_id)
@@ -1803,6 +1822,7 @@ DO UPDATE SET
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
+        .bind(stats.mindex_size as i64)
         .execute(&pool)
         .await?;
         Ok(())
@@ -1856,7 +1876,8 @@ SELECT
     SUM(records)::BIGINT AS records,
     SUM(original_size)::BIGINT AS original_size,
     SUM(compressed_size)::BIGINT AS compressed_size,
-    SUM(index_size)::BIGINT AS index_size
+    SUM(index_size)::BIGINT AS index_size,
+    SUM(mindex_size)::BIGINT AS mindex_size
 FROM file_list_dump_stats
 WHERE stream = $1 {time_filter}
 GROUP BY stream;
@@ -1917,8 +1938,8 @@ WHERE org = $1 AND account = $2;"#;
             .with_label_values(&["insert", "file_list_deleted"])
             .inc();
         sqlx::query(
-            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)
-               SELECT account, org, stream, date, file, index_file, flattened, $2
+            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)
+               SELECT account, org, stream, date, file, index_file, mindex_size > 0, flattened, $2
                FROM file_list WHERE org = $1;"#,
         )
         .bind(org_id)
@@ -1958,8 +1979,8 @@ impl PostgresFileList {
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
             format!(
                 r#"
-INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     ON CONFLICT DO NOTHING
     RETURNING id;
                 "#
@@ -1977,6 +1998,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.original_size)
             .bind(meta.compressed_size)
             .bind(meta.index_size)
+            .bind(meta.mindex_size)
             .bind(meta.bloom_ver)
             .bind(meta.flattened)
             .bind(now_ts)
@@ -2036,7 +2058,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)").as_str()
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
@@ -2054,6 +2076,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.mindex_size)
                         .push_bind(item.meta.bloom_ver)
                         .push_bind(item.meta.flattened)
                         .push_bind(now_ts);
@@ -2468,6 +2491,11 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
     sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
         "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bloom_ver BIGINT DEFAULT 0 NOT NULL"
     ))
     .execute(&mut *tx)
@@ -2645,6 +2673,11 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     log::info!("[POSTGRES] Table {table} start checking columns.");
 
     let mut tx = pool.begin().await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
 
     // 1. Widen file column
     sqlx::query(&format!(
@@ -2864,6 +2897,12 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
                     .execute(pool)
                     .await?;
                 }
+                // Add mindex_size for version: <=1.0.0
+                sqlx::query(&format!(
+                    "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mindex_size BIGINT DEFAULT 0 NOT NULL"
+                ))
+                .execute(pool)
+                .await?;
             }
             Some("r") => {
                 // Regular table: needs migration
@@ -2932,6 +2971,7 @@ CREATE TABLE {table} (
     original_size   BIGINT NOT NULL,
     compressed_size BIGINT NOT NULL,
     index_size      BIGINT NOT NULL,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     bloom_ver       BIGINT DEFAULT 0 NOT NULL,
     updated_at      BIGINT NOT NULL
 ) PARTITION BY RANGE (date)
@@ -2991,7 +3031,8 @@ CREATE TABLE file_list_dump_stats (
     records         BIGINT DEFAULT 0 NOT NULL,
     original_size   BIGINT DEFAULT 0 NOT NULL,
     compressed_size BIGINT DEFAULT 0 NOT NULL,
-    index_size      BIGINT DEFAULT 0 NOT NULL
+    index_size      BIGINT DEFAULT 0 NOT NULL,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL
 ) PARTITION BY RANGE (date)
     "#
     .to_string()
@@ -3016,6 +3057,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     date       VARCHAR(16)  not null,
     file       VARCHAR(1024) not null,
     index_file BOOLEAN default false not null,
+    mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
@@ -3057,6 +3099,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    mindex_size     BIGINT DEFAULT 0 NOT NULL,
     is_recent       BOOLEAN default false not null
 );
         "#,
@@ -3079,6 +3122,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .await?;
     add_column(
         "file_list_deleted",
+        "mindex_file",
+        "BOOLEAN DEFAULT FALSE NOT NULL",
+    )
+    .await?;
+    add_column(
+        "file_list_deleted",
         "account",
         "VARCHAR(128) default '' not null",
     )
@@ -3086,6 +3135,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
     add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
     add_column("stream_stats", "index_size", "BIGINT default 0 not null").await?;
+    add_column("stream_stats", "mindex_size", "BIGINT DEFAULT 0 NOT NULL").await?;
     add_column(
         "stream_stats",
         "is_recent",
@@ -3525,7 +3575,7 @@ mod tests {
     use tokio::sync::OnceCell;
 
     use super::*;
-    use crate::file_list::FileList;
+    use crate::file_list::{FileList, FileListJobStatus};
 
     static _INIT: Once = Once::new();
     static DB_POOL: OnceCell<PgPool> = OnceCell::const_new();
@@ -3569,6 +3619,7 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
+                mindex_size BIGINT DEFAULT 0 NOT NULL,
                 updated_at BIGINT not null
             )
             "#,
@@ -3593,6 +3644,7 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
+                mindex_size BIGINT DEFAULT 0 NOT NULL,
                 updated_at BIGINT not null
             )
             "#,
@@ -3610,6 +3662,7 @@ mod tests {
                 date VARCHAR(16) not null,
                 file VARCHAR(1024) not null,
                 index_file BOOLEAN default false not null,
+                mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
                 flattened BOOLEAN default false not null,
                 created_at BIGINT not null
             )
@@ -3635,6 +3688,11 @@ mod tests {
         )
         .execute(pool)
         .await?;
+        sqlx::query(
+            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offsets_idx ON file_list_jobs (stream, offsets)",
+        )
+        .execute(pool)
+        .await?;
 
         sqlx::query(
             r#"
@@ -3649,6 +3707,7 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
+                mindex_size BIGINT DEFAULT 0 NOT NULL,
                 is_recent BOOLEAN default false not null
             )
             "#,
@@ -3668,6 +3727,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            mindex_size: 1700,
             bloom_ver: 0,
         }
     }
@@ -3905,6 +3965,7 @@ mod tests {
                 file: "org1/stream1/logs/2021/01/01/pg_deleted1.parquet".to_string(),
                 flattened: false,
                 index_file: false,
+                mindex_file: false,
             },
             FileListDeleted {
                 id: 0,
@@ -3912,6 +3973,7 @@ mod tests {
                 file: "org1/stream1/logs/2021/01/01/pg_deleted2.parquet".to_string(),
                 flattened: true,
                 index_file: true,
+                mindex_file: false,
             },
         ];
 
@@ -4418,6 +4480,7 @@ mod tests {
             storage_size: 50000.0,
             compressed_size: 10000.0,
             index_size: 5000.0,
+            mindex_size: 1700.0,
         };
 
         // Set stream stats (should use ON CONFLICT DO UPDATE now)
@@ -4437,6 +4500,7 @@ mod tests {
             storage_size: 25000.0,
             compressed_size: 5000.0,
             index_size: 2500.0,
+            mindex_size: 850.0,
         };
 
         let result2 = postgres_list
@@ -5409,5 +5473,523 @@ mod tests {
                 .any(|j| j.stream == free_stream && j.id == rowlock_max[&free_stream]),
             "the unlocked stream's max-id job must still be claimed in the same call"
         );
+
+        // ---- add_job re-arms a Done job so the hour-end pass still runs ----
+        let rearm_stream = format!("rearm_{pid}");
+        let rearm_id = postgres_list
+            .add_job("fix4_org", StreamType::Logs, &rearm_stream, 3_600_000_000)
+            .await
+            .unwrap();
+        postgres_list.set_job_done(&[rearm_id]).await.unwrap();
+        let again_id = postgres_list
+            .add_job("fix4_org", StreamType::Logs, &rearm_stream, 3_600_000_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            again_id, rearm_id,
+            "add_job must reuse the existing job row"
+        );
+        let status: i32 = sqlx::query_scalar("SELECT status FROM file_list_jobs WHERE id = $1")
+            .bind(rearm_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            status,
+            FileListJobStatus::Pending as i32,
+            "add_job must re-arm a Done job to Pending"
+        );
+    }
+    #[tokio::test]
+    #[ignore = "Requires an isolated SQL database configured for this backend"]
+    async fn test_mindex_size_postgres_persistence_and_stats() {
+        // Global pools must remain in the same Tokio runtime as the production API checks.
+        let pool = CLIENT_DDL.clone();
+        let table = unique_partitioned_test_table_name();
+        sqlx::query(&format!(
+            "CREATE TABLE {table} (id INTEGER PRIMARY KEY, index_size BIGINT NOT NULL)"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(&format!(
+            "INSERT INTO {table} (id, index_size) VALUES (1, 53)"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        add_column(&table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+            .await
+            .unwrap();
+        let old: (i64, i64) =
+            sqlx::query_as(&format!("SELECT index_size, mindex_size FROM {table}"))
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(old, (53, 0));
+        sqlx::query(&format!(
+            "UPDATE {table} SET mindex_size = 811 WHERE id = 1"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        add_column(&table, "mindex_size", "BIGINT DEFAULT 0 NOT NULL")
+            .await
+            .unwrap();
+        sqlx::query(&format!(
+            "INSERT INTO {table} (id, index_size) VALUES (2, 59)"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        let values: Vec<(i64, i64)> = sqlx::query_as(&format!(
+            "SELECT index_size, mindex_size FROM {table} ORDER BY id"
+        ))
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(values, [(53, 811), (59, 0)]);
+        sqlx::query(&format!("DROP TABLE {table}"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        let list = PostgresFileList::new();
+        list.create_table().await.unwrap();
+        list.create_table_index().await.unwrap();
+        list.create_table().await.unwrap();
+        let org = format!("mindex_{}", now_micros());
+        let stream = format!("{org}/metrics/test");
+        let date = "2021/01/01/00";
+        let mut first = create_test_file_key(
+            "account",
+            &format!("files/{stream}/{date}/a.parquet"),
+            false,
+        );
+        first.meta.max_ts = first.meta.min_ts + 10;
+        let mut second = first.clone();
+        second.key = format!("files/{stream}/{date}/b.vortex");
+        second.meta.mindex_size = 2300;
+        let id = list
+            .add(&first.account, &first.key, &first.meta)
+            .await
+            .unwrap();
+        list.batch_add(std::slice::from_ref(&second)).await.unwrap();
+        assert_eq!(list.get(&first.key).await.unwrap().mindex_size, 1700);
+        assert_eq!(list.get(&second.key).await.unwrap().mindex_size, 2300);
+        assert_eq!(list.get(&second.key).await.unwrap().index_size, 5000);
+        list.update_compressed_size(&first.key, 9000).await.unwrap();
+        assert_eq!(list.get(&first.key).await.unwrap().mindex_size, 1700);
+        let range = (first.meta.min_ts, first.meta.max_ts);
+        for flattened in [None, Some(false)] {
+            let files = list
+                .query(
+                    &org,
+                    StreamType::Metrics,
+                    "test",
+                    PartitionTimeLevel::Hourly,
+                    range,
+                    flattened,
+                )
+                .await
+                .unwrap();
+            assert_eq!(files.len(), 2);
+            assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        }
+        let files = list
+            .query_for_merge(
+                &org,
+                StreamType::Metrics,
+                "test",
+                ("2021/01/01/00".into(), "2021/01/02/00".into()),
+                i64::MAX,
+            )
+            .await
+            .unwrap();
+        assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        let files = list
+            .query_for_bloom(&org, StreamType::Metrics, "test", date)
+            .await
+            .unwrap();
+        assert_eq!(files.iter().map(|f| f.meta.mindex_size).sum::<i64>(), 4000);
+        let files = list.query_by_ids(&[id], Some(range)).await.unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].meta.mindex_size, 1700);
+        let dumped = list
+            .query_for_dump(&org, StreamType::Metrics, "test", range)
+            .await
+            .unwrap();
+        assert_eq!(dumped.iter().map(|f| f.mindex_size).sum::<i64>(), 4000);
+        list.add_history(&first.account, &first.key, &first.meta)
+            .await
+            .unwrap();
+        list.batch_add_history(std::slice::from_ref(&second))
+            .await
+            .unwrap();
+        let history: Vec<FileRecord> =
+            sqlx::query_as("SELECT * FROM file_list_history WHERE stream = $1")
+                .bind(&stream)
+                .fetch_all(&*CLIENT_RW)
+                .await
+                .unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.iter().map(|f| f.mindex_size).sum::<i64>(), 4000);
+        let stats = list
+            .stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(stats.mindex_size, 4000.0);
+        assert_eq!(stats.index_size, 10000.0);
+        assert_eq!(
+            list.org_stats_by_account(&org, "account").await.unwrap(),
+            (100000, 10000)
+        );
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &stats, false)
+            .await
+            .unwrap();
+        let mut recent = stats;
+        recent.mindex_size = 333.0;
+        recent.index_size = 222.0;
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &recent, true)
+            .await
+            .unwrap();
+        recent.mindex_size = 444.0;
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &recent, true)
+            .await
+            .unwrap();
+        let merged = list
+            .get_stream_stats(&org, Some(StreamType::Metrics), Some("test"))
+            .await
+            .unwrap();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].1.mindex_size, 4444.0);
+        assert_eq!(merged[0].1.index_size, 10222.0);
+        let org_stats = list.get_stream_stats(&org, None, None).await.unwrap();
+        assert_eq!(org_stats[0].1.mindex_size, 4444.0);
+        let dump_stream = format!("{org}/{}/test_metrics", StreamType::Filelist);
+        let dump_key = format!("files/{dump_stream}/{date}/dump.parquet");
+        list.insert_dump_stats(&dump_key, &recent).await.unwrap();
+        recent.mindex_size = 888.0;
+        list.insert_dump_stats(&dump_key, &recent).await.unwrap();
+        let dump_stats = list
+            .query_dump_stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(dump_stats.mindex_size, 888.0);
+        assert_eq!(dump_stats.index_size, 222.0);
+        let mut dump_file = first.clone();
+        dump_file.key = dump_key.clone();
+        dump_file.meta.mindex_size = 777;
+        list.update_dump_records(&dump_file, &[(id, date.to_string())])
+            .await
+            .unwrap();
+        assert!(!list.contains(&first.key).await.unwrap());
+        assert_eq!(list.get(&dump_key).await.unwrap().mindex_size, 777);
+        let dumps = list
+            .query_for_dump_by_updated_at((0, now_micros()))
+            .await
+            .unwrap();
+        assert_eq!(
+            dumps
+                .iter()
+                .find(|f| f.stream == dump_stream)
+                .unwrap()
+                .mindex_size,
+            777
+        );
+        list.reset_stream_stats().await.unwrap();
+        let reset = list.get_stream_stats(&org, None, None).await.unwrap();
+        assert_eq!(reset[0].1.mindex_size, 0.0);
+        let rebuilt = list
+            .stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rebuilt.mindex_size, 2300.0);
+        list.set_stream_stats(&org, StreamType::Metrics, "test", &rebuilt, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            list.get_stream_stats(&org, None, None).await.unwrap()[0]
+                .1
+                .mindex_size,
+            2300.0
+        );
+        second.deleted = true;
+        list.batch_process(std::slice::from_ref(&second))
+            .await
+            .unwrap();
+        assert_eq!(
+            list.stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new())
+            )
+            .await
+            .unwrap()
+            .mindex_size,
+            0.0
+        );
+        list.delete_dump_stats(&dump_key).await.unwrap();
+        assert_eq!(
+            list.query_dump_stats_by_date_range(
+                &org,
+                StreamType::Metrics,
+                "test",
+                (String::new(), String::new())
+            )
+            .await
+            .unwrap()
+            .mindex_size,
+            0.0
+        );
+    }
+    async fn mindex_test_schema() -> (PgPool, PgPool, String) {
+        let admin = connect_partitioned_test_db().await;
+        let suffix =
+            PARTITIONED_TEST_TABLE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let schema = format!("mindex_{}_{}", std::process::id(), suffix);
+        sqlx::query(&format!("CREATE SCHEMA {schema}"))
+            .execute(&admin)
+            .await
+            .unwrap();
+        let url = std::env::var("TEST_POSTGRES_URL").expect("isolated PostgreSQL DSN required");
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect(&url)
+            .await
+            .unwrap();
+        sqlx::query(&format!("SET search_path TO {schema}"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        (admin, pool, schema)
+    }
+
+    fn legacy_mindex_ddl(table: &str, partitioned: bool) -> String {
+        let ddl = if table == "file_list_dump_stats" {
+            file_list_dump_stats_partition_ddl()
+        } else {
+            file_list_partition_ddl(table)
+        };
+        let ddl = ddl
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("mindex_size "))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .replace(",\n)", "\n)");
+        if partitioned {
+            ddl
+        } else {
+            ddl.replace(" PARTITION BY RANGE (date)", "")
+        }
+    }
+
+    async fn insert_legacy_mindex_row(pool: &PgPool, table: &str, file: &str) {
+        let sql = if table == "file_list_dump_stats" {
+            format!(
+                "INSERT INTO {table} (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size) VALUES ('org', 'org/filelist/test_metrics', '2021/01/01/00', $1, 3, 1, 2, 5, 7, 11, 13)"
+            )
+        } else {
+            format!(
+                "INSERT INTO {table} (account, org, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, updated_at) VALUES ('acct', 'org', 'org/metrics/test', '2021/01/01/00', $1, 1, 2, 5, 7, 11, 13, 17, 19)"
+            )
+        };
+        sqlx::query(&sql).bind(file).execute(pool).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires an isolated PostgreSQL database with schema creation permission"]
+    async fn test_mindex_size_postgres_regular_to_partitioned_upgrade() {
+        let (admin, pool, schema) = mindex_test_schema().await;
+        for table in ["file_list", "file_list_history", "file_list_dump_stats"] {
+            sqlx::query(&legacy_mindex_ddl(table, false))
+                .execute(&pool)
+                .await
+                .unwrap();
+            insert_legacy_mindex_row(&pool, table, "old.parquet").await;
+        }
+        sqlx::query(
+            "ALTER TABLE file_list_history ADD COLUMN mindex_size BIGINT DEFAULT 0 NOT NULL",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE file_list_history SET mindex_size = 701")
+            .execute(&pool)
+            .await
+            .unwrap();
+        migrate_file_list_table(&pool, "file_list").await.unwrap();
+        migrate_file_list_table(&pool, "file_list_history")
+            .await
+            .unwrap();
+        migrate_dump_stats_table(&pool).await.unwrap();
+        handle_partitioned_tables(&pool).await.unwrap();
+        handle_partitioned_tables(&pool).await.unwrap();
+        for (table, expected) in [
+            ("file_list", 0),
+            ("file_list_history", 701),
+            ("file_list_dump_stats", 0),
+        ] {
+            assert_eq!(
+                get_table_relkind(&pool, table).await.unwrap().as_deref(),
+                Some("p")
+            );
+            let row: (i64, i64, i64, i64) = sqlx::query_as(&format!(
+                "SELECT original_size, compressed_size, index_size, mindex_size FROM {table}"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(row, (7, 11, 13, expected));
+            if table != "file_list_dump_stats" {
+                let rec: FileRecord = sqlx::query_as(&format!("SELECT * FROM {table}"))
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    (rec.bloom_ver, rec.updated_at, rec.mindex_size),
+                    (17, 19, expected)
+                );
+            }
+            insert_legacy_mindex_row(&pool, table, "old-writer.parquet").await;
+            let zero: i64 = sqlx::query_scalar(&format!(
+                "SELECT mindex_size FROM {table} WHERE file = 'old-writer.parquet'"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(zero, 0);
+        }
+        pool.close().await;
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+            .execute(&admin)
+            .await
+            .unwrap();
+        admin.close().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires an isolated PostgreSQL database with schema creation permission"]
+    async fn test_mindex_size_postgres_partitioned_upgrade() {
+        let (admin, pool, schema) = mindex_test_schema().await;
+        let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+        for table in tables {
+            sqlx::query(&legacy_mindex_ddl(table, true))
+                .execute(&pool)
+                .await
+                .unwrap();
+            sqlx::query(&format!(
+                "CREATE TABLE {table}_default PARTITION OF {table} DEFAULT"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+            insert_legacy_mindex_row(&pool, table, "old.parquet").await;
+        }
+        handle_partitioned_tables(&pool).await.unwrap();
+        for table in tables {
+            let old: (i64, i64) = sqlx::query_as(&format!(
+                "SELECT index_size, mindex_size FROM {table}_default"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(old, (13, 0));
+            sqlx::query(&format!("UPDATE {table} SET mindex_size = 997"))
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        handle_partitioned_tables(&pool).await.unwrap();
+        for table in tables {
+            let value: i64 = sqlx::query_scalar(&format!("SELECT mindex_size FROM {table}"))
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            assert_eq!(value, 997);
+            sqlx::query(&format!("CREATE TABLE {table}_future_test PARTITION OF {table} FOR VALUES FROM ('2099/01/01/00') TO ('2099/01/02/00')"))
+                .execute(&pool).await.unwrap();
+            let nullable: String = sqlx::query_scalar("SELECT is_nullable FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'mindex_size'")
+                .bind(format!("{table}_future_test")).fetch_one(&pool).await.unwrap();
+            assert_eq!(nullable, "NO");
+            let default: String = sqlx::query_scalar("SELECT column_default FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'mindex_size'")
+                .bind(format!("{table}_future_test")).fetch_one(&pool).await.unwrap();
+            assert_eq!(default, "0");
+            insert_legacy_mindex_row(&pool, table, "old-writer.parquet").await;
+            let zero: i64 = sqlx::query_scalar(&format!(
+                "SELECT mindex_size FROM {table} WHERE file = 'old-writer.parquet'"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(zero, 0);
+        }
+        pool.close().await;
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+            .execute(&admin)
+            .await
+            .unwrap();
+        admin.close().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires an isolated PostgreSQL database with schema creation permission"]
+    async fn test_mindex_size_postgres_upgrade_rollback() {
+        let (admin, pool, schema) = mindex_test_schema().await;
+        for table in ["file_list", "file_list_history", "file_list_dump_stats"] {
+            sqlx::query(&legacy_mindex_ddl(table, false))
+                .execute(&pool)
+                .await
+                .unwrap();
+            insert_legacy_mindex_row(&pool, table, "old.parquet").await;
+            sqlx::query(&format!("CREATE TABLE {table}_default (id INTEGER)"))
+                .execute(&pool)
+                .await
+                .unwrap();
+            let result = if table == "file_list_dump_stats" {
+                migrate_dump_stats_table(&pool).await
+            } else {
+                migrate_file_list_table(&pool, table).await
+            };
+            assert!(result.is_err());
+            assert_eq!(
+                get_table_relkind(&pool, table).await.unwrap().as_deref(),
+                Some("r")
+            );
+            let columns: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'mindex_size'")
+                .bind(table).fetch_one(&pool).await.unwrap();
+            assert_eq!(
+                columns, 0,
+                "failed migration must roll back the column addition"
+            );
+            let rows: (i64, i64) = sqlx::query_as(&format!(
+                "SELECT COUNT(*), SUM(index_size)::BIGINT FROM {table}"
+            ))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(rows, (1, 13));
+        }
+        pool.close().await;
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+            .execute(&admin)
+            .await
+            .unwrap();
+        admin.close().await;
     }
 }

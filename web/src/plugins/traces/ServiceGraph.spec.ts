@@ -79,11 +79,14 @@ const mockSearchObj = reactive({
 });
 
 // Mock dependencies
-vi.mock("@/services/service_graph", () => ({
-  default: {
-    getCurrentTopology: vi.fn(),
-  },
-}));
+vi.mock("@/services/service_graph", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getCurrentTopology: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -106,17 +109,23 @@ vi.mock("vue-router", () => ({
 // fetchDatabaseEdges (called inside loadServiceGraph) hits streamService.schema
 // and searchService.search. Mock them so the call completes quickly without real
 // HTTP requests that never resolve in the test environment.
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: vi.fn().mockRejectedValue(new Error("No MSW handler for schema")),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: vi.fn().mockRejectedValue(new Error("No MSW handler for schema")),
+    },
+  });
+});
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+    },
+  });
+});
 
 // Mock @/utils/date so getEffectiveTimeRange returns deterministic values.
 // Must be declared before the component import so Vitest hoisting applies.

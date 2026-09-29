@@ -112,6 +112,7 @@ const useEnterpriseRoutes = () => {
       path: "iam",
       name: "iam",
       component: IdentityAccessManagement,
+      meta: { allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -215,7 +216,7 @@ const useEnterpriseRoutes = () => {
     path: "synthetics",
     name: "synthetics",
     component: () => import("@/views/SyntheticMonitoring.vue"),
-    meta: { titleKey: "menu.synthetic" },
+    meta: { titleKey: "menu.synthetic", allowOnEmptyData: true },
     beforeEnter(to: any, from: any, next: any) {
       syntheticsRouteGuard(to, from, next);
     },
@@ -226,7 +227,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetics/add",
       name: "synthetics-add",
       component: () => import("@/views/synthetics/CreateCheck.vue"),
-      meta: { titleKey: "routeTitles.addCheck" },
+      meta: { titleKey: "routeTitles.addCheck", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
@@ -235,7 +236,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetics/edit/:id",
       name: "synthetics-edit",
       component: () => import("@/views/synthetics/CreateCheck.vue"),
-      meta: { titleKey: "synthetics.results.editCheck" },
+      meta: { titleKey: "synthetics.results.editCheck", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
@@ -244,7 +245,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetics/status-pages/edit/:id",
       name: "synthetics-status-page-edit",
       component: () => import("@/views/synthetics/status-pages/StatusPageEditor.vue"),
-      meta: { titleKey: "statusPages.editTitle" },
+      meta: { titleKey: "statusPages.editTitle", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
@@ -253,7 +254,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetic/private-locations/:id",
       name: "synthetic-private-location",
       component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
-      meta: { titleKey: "synthetics.privateLocations.detail.title" },
+      meta: { titleKey: "synthetics.privateLocations.detail.title", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         privateLocationRouteGuard(to, from, next);
       },
@@ -262,7 +263,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetics/:id/results",
       name: "synthetic-monitor-results",
       component: () => import("@/views/synthetics/MonitorResults.vue"),
-      meta: { titleKey: "synthetics.results.title" },
+      meta: { titleKey: "synthetics.results.title", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
@@ -271,7 +272,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetics/:id/results/run/:runId/:executionId",
       name: "synthetics-run-detail",
       component: () => import("@/views/synthetics/RunDetail.vue"),
-      meta: { titleKey: "synthetics.runDetail.title" },
+      meta: { titleKey: "synthetics.runDetail.title", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
@@ -282,14 +283,13 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
-    // Seven on-call routes, one guard, one gate expression. `titleKey` rather
-    // than `title` so the browser tab is translated like everything else.
+    // On-call is configured before any data flows, so every route here stays open on an empty org.
     routes.push(
       {
         path: "oncall/responses",
         name: "onCallResponses",
         component: OnCallResponses,
-        meta: { titleKey: "oncall.responsesTitle" },
+        meta: { titleKey: "oncall.responsesTitle", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },
@@ -298,7 +298,7 @@ const useEnterpriseRoutes = () => {
         path: "oncall/responses/:responseId",
         name: "onCallResponseDetail",
         component: OnCallResponseDetail,
-        meta: { titleKey: "oncall.responseDetail" },
+        meta: { titleKey: "oncall.responseDetail", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },
@@ -316,7 +316,7 @@ const useEnterpriseRoutes = () => {
         path: "oncall/me",
         name: "onCallMine",
         component: OnCallMine,
-        meta: { titleKey: "oncall.mineTitle" },
+        meta: { titleKey: "oncall.mineTitle", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },
@@ -325,7 +325,7 @@ const useEnterpriseRoutes = () => {
         path: "oncall/teams",
         name: "onCallTeams",
         component: OnCallTeams,
-        meta: { titleKey: "oncall.teamsTitle" },
+        meta: { titleKey: "oncall.teamsTitle", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },
@@ -343,7 +343,7 @@ const useEnterpriseRoutes = () => {
         path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|escalation|ownership|routing)?",
         name: "onCallTeamDetail",
         component: OnCallTeamDetail,
-        meta: { titleKey: "oncall.teamDetail" },
+        meta: { titleKey: "oncall.teamDetail", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },
@@ -352,7 +352,7 @@ const useEnterpriseRoutes = () => {
         path: "oncall/policies",
         name: "onCallPolicies",
         component: OnCallPolicies,
-        meta: { titleKey: "oncall.policiesTitle" },
+        meta: { titleKey: "oncall.policiesTitle", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },
@@ -361,7 +361,7 @@ const useEnterpriseRoutes = () => {
         path: "oncall/routing",
         name: "onCallRouting",
         component: OnCallRouting,
-        meta: { titleKey: "oncall.routingTitle" },
+        meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },

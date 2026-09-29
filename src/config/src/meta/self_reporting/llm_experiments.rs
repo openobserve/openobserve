@@ -73,6 +73,8 @@ impl ExperimentSlotId {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExperimentExecutionStatus {
+    /// Work accepted for a manual Slot retry that the Provider has not seen.
+    Queued,
     #[default]
     /// A durable Provider attempt intent exists, but no terminal result does.
     Pending,
@@ -132,7 +134,10 @@ impl ExperimentExecutionRecord {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.status != ExperimentExecutionStatus::Pending
+        !matches!(
+            self.status,
+            ExperimentExecutionStatus::Queued | ExperimentExecutionStatus::Pending
+        )
     }
 
     pub fn init_for_reflection() -> Self {
@@ -224,18 +229,20 @@ mod tests {
     }
 
     #[test]
-    fn pending_attempt_is_non_terminal_and_backward_compatible() {
-        let pending: ExperimentExecutionRecord = serde_json::from_value(json!({
-            "experiment_id": "experiment-1",
-            "item_logical_id": "case-1",
-            "row_id": "row-1",
-            "trial_index": 0,
-            "status": "pending",
-            "task_fingerprint": "experiment-provider:experiment-1:row-1:0",
-            "_timestamp": 10
-        }))
-        .unwrap();
-        assert!(!pending.is_terminal());
+    fn queued_and_pending_attempts_are_non_terminal_and_backward_compatible() {
+        for status in ["queued", "pending"] {
+            let attempt: ExperimentExecutionRecord = serde_json::from_value(json!({
+                "experiment_id": "experiment-1",
+                "item_logical_id": "case-1",
+                "row_id": "row-1",
+                "trial_index": 0,
+                "status": status,
+                "task_fingerprint": "experiment-provider:experiment-1:row-1:0",
+                "_timestamp": 10
+            }))
+            .unwrap();
+            assert!(!attempt.is_terminal());
+        }
 
         let old_terminal: ExperimentExecutionRecord = serde_json::from_value(json!({
             "experiment_id": "experiment-1",

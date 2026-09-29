@@ -1,6 +1,10 @@
 //logs visualise page object
 //Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
 import { expect } from "@playwright/test";
+import DateTimeHelper from "./dashboard-time.js";
+
+// Long enough for the empty-state overlay to reappear if the panel is genuinely empty.
+const quietPeriodProbeMs = 3000;
 export default class LogsVisualise {
   constructor(page) {
     this.page = page;
@@ -65,20 +69,90 @@ export default class LogsVisualise {
     });
   }
 
+  // Visualize tab's root element. Rendered under v-show (Index.vue), so it is
+  // always attached but only *visible* when the Visualize tab is actually active.
+  getPanelEditorContainer() {
+    return this.page.locator('[data-test="panel-editor-container"]');
+  }
+
   // Open visualise tab and ensure table chart is selected when VRL is present
   async openVisualiseTabWithVrl() {
+    // Started before the toggle is clicked so the requests it fires cannot be missed.
+    const pipelineIdle = this.waitForVisualizePipelineIdle();
     await this.openVisualiseTab();
+    await pipelineIdle;
+    await this.ensureTableRendered();
+  }
 
-    // Ensure table chart is selected (VRL only works with table chart type)
-    const tableChartItem = this.page.locator('[data-test="selected-chart-table-item"]');
+  // Opening the visualise tab decides the chart type asynchronously off the result_schema response (auto-selection first, then the VRL table override), so nothing may touch the panel until that traffic has finished and stayed quiet, or the chart type still changes under the test.
+  async waitForVisualizePipelineIdle(quietMs = 2500, timeout = 60000) {
+    const isPipelineUrl = (url) =>
+      url.includes("/result_schema") || url.includes("/_search");
+    let inFlight = 0;
+    let sawRequest = false;
+    let lastEvent = Date.now();
+
+    const onRequest = (request) => {
+      if (!isPipelineUrl(request.url())) return;
+      inFlight += 1;
+      sawRequest = true;
+      lastEvent = Date.now();
+    };
+    const onRequestSettled = (request) => {
+      if (!isPipelineUrl(request.url())) return;
+      inFlight = Math.max(inFlight - 1, 0);
+      lastEvent = Date.now();
+    };
+
+    this.page.on("request", onRequest);
+    this.page.on("requestfinished", onRequestSettled);
+    this.page.on("requestfailed", onRequestSettled);
+
+    try {
+      const deadline = Date.now() + timeout;
+      // A visualize tab that reuses cached results issues no request at all, so stop waiting for one.
+      const firstRequestDeadline = Date.now() + 15000;
+      while (Date.now() < deadline) {
+        const idle = inFlight === 0 && Date.now() - lastEvent >= quietMs;
+        if (idle && (sawRequest || Date.now() >= firstRequestDeadline)) return;
+        await this.page.waitForTimeout(250);
+      }
+    } finally {
+      this.page.off("request", onRequest);
+      this.page.off("requestfinished", onRequestSettled);
+      this.page.off("requestfailed", onRequestSettled);
+    }
+  }
+
+  // The chart-type auto-selection wins over a table click issued while it is still running, and it can land even after the request wait above gives up (a loaded CI run can delay the tab's first request past that cap) - so re-select until the table renderer is on screen and has stayed there. VRL only works with the table chart type, so every caller needs that end state.
+  async ensureTableRendered({ timeout = 60000, quietMs = 1500 } = {}) {
+    const tableChartItem = this.getChartTypeItem("table");
+    const tablePanel = this.getTablePanel();
     await tableChartItem.waitFor({ state: "visible", timeout: 10000 });
 
-    const isTableSelected = await tableChartItem.getAttribute("data-selected");
-    if (isTableSelected !== "true") {
-      await tableChartItem.click();
+    const deadline = Date.now() + timeout;
+    let renderedSince = null;
+    while (Date.now() < deadline) {
+      const isSelected =
+        (await tableChartItem.getAttribute("data-selected").catch(() => null)) === "true";
+      const isRendered = await tablePanel.isVisible().catch(() => false);
+
+      if (!isSelected) {
+        await tableChartItem.click({ timeout: 5000 }).catch(() => {});
+        renderedSince = null;
+      } else if (!isRendered) {
+        renderedSince = null;
+      } else if (renderedSince === null) {
+        renderedSince = Date.now();
+      } else if (Date.now() - renderedSince >= quietMs) {
+        return;
+      }
+      await this.page.waitForTimeout(250);
     }
-    // The chart-type switch is reactive and lags the click; gate on it actually applying so downstream steps don't run against the wrong chart type.
-    await expect(tableChartItem).toHaveAttribute("data-selected", "true", { timeout: 10000 });
+
+    throw new Error(
+      "Visualise tab never settled on a rendered table chart (VRL requires the table type)"
+    );
   }
 
   //Apply: Logs
@@ -681,19 +755,47 @@ export default class LogsVisualise {
   }
 
   // Open query inspector from a panel dropdown
+  // metaData gating the Query Inspector item populates only on a non-empty query, so the panel has to come back with rows. The dashboard opens on its own 15m default whatever range the test used in logs, and the fixture is ingested once per worker, so by a late test it can sit outside that window - the panel is then empty however often it is refreshed. Widen the window first, unconditionally, so every run takes the same path instead of a recovery branch only CI ever exercises; the refreshes that follow cover rows that are not searchable yet (WAL lag under load).
+  async waitForPanelToLoadData({ refreshAttempts = 3, attemptTimeout = 10000 } = {}) {
+    const noData = this.page.locator('[data-test="no-data"]');
+    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
+
+    await new DateTimeHelper(this.page).setRelativeTimeRange("6-h");
+
+    // A refresh unmounts the empty-state overlay for as long as its query runs, so "absent
+    // right now" is not "the panel came back with rows" - it has to stay absent.
+    const hasData = async (timeout, quietMs = 1500) => {
+      const deadline = Date.now() + timeout;
+      let goneSince = null;
+      while (Date.now() < deadline) {
+        if (await noData.isVisible().catch(() => false)) {
+          goneSince = null;
+        } else if (goneSince === null) {
+          goneSince = Date.now();
+        } else if (Date.now() - goneSince >= quietMs) {
+          return true;
+        }
+        await this.page.waitForTimeout(250);
+      }
+      return false;
+    };
+
+    if (await hasData(quietPeriodProbeMs)) return;
+
+    for (let attempt = 0; attempt < refreshAttempts; attempt++) {
+      await refreshBtn.click({ timeout: 5000 }).catch(() => {});
+      if (await hasData(attemptTimeout)) return;
+    }
+
+    throw new Error(
+      "Dashboard panel still reports no data over a 6h window after refreshing"
+    );
+  }
+
   async openPanelQueryInspector(panelName) {
     // The Query Inspector item is v-if-gated on the panel's metaData, populated only after its query executes, so wait for the panel to render before opening the menu.
     await this.verifyChartRenders(this.page);
-
-    // The dashboard panel query can transiently return empty under CI load (WAL lag) though the data exists (it rendered in Visualize) — metaData gating the Query Inspector item only populates on a non-empty query, so refresh until the panel loads data.
-    const noData = this.page.locator('[data-test="no-data"]');
-    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
-    await expect(async () => {
-      if (await noData.isVisible().catch(() => false)) {
-        await refreshBtn.click({ timeout: 5000 }).catch(() => {});
-        await expect(noData).toBeHidden({ timeout: 5000 });
-      }
-    }).toPass({ timeout: 30000, intervals: [1000, 2000, 3000] });
+    await this.waitForPanelToLoadData();
 
     const dropdown = this.getPanelDropdown(panelName);
     await dropdown.waitFor({ state: "visible", timeout: 20000 });

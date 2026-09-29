@@ -34,7 +34,10 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: () => "uuid",
 }));
 
-vi.mock("@/services/workflows", () => ({ default: {} }));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
 
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { TRIGGER_META_VARS } from "@/plugins/workflows/alertFields";

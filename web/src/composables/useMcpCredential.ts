@@ -24,6 +24,10 @@ import {
   buildReadonlyPermissions,
   type RolePermission,
 } from "@/components/iam/roles/readonlyPreset";
+import { queryClient } from "@/composables/query/queryClient";
+import { serviceAccountKeys } from "@/services/service_accounts.querykeys";
+import { iamKeys } from "@/services/iam.querykeys";
+import { userKeys } from "@/services/users.querykeys";
 import { buildServiceAccountEmail } from "@/components/iam/serviceAccounts/AddServiceAccount.schema";
 
 // Underscore, not hyphen: create_role normalizes the name (non-[A-Za-z0-9_] → "_"), update_role does not.
@@ -144,8 +148,13 @@ export function useMcpCredential() {
       if (res?.data?.code !== 200 || !token) {
         throw new Error(res?.data?.message || t("ingestion.mcp.credential.error"));
       }
+      // Raw service calls, so the IAM lists would otherwise keep serving their cached rows.
+      void queryClient.invalidateQueries({ queryKey: serviceAccountKeys.all(org) });
 
       credential.value = { email, token, ...(await applyReadonlyRole(email, org)) };
+      // The role may exist even when a later step failed, so drop these regardless.
+      void queryClient.invalidateQueries({ queryKey: iamKeys.rolesAll(org) });
+      void queryClient.invalidateQueries({ queryKey: userKeys.users(org) });
       sessionCredentials.set(org, credential.value);
       return credential.value;
     } catch (err: any) {

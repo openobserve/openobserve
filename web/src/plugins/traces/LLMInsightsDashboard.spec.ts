@@ -37,7 +37,9 @@ const mockGetStreams = vi.fn().mockResolvedValue({
 });
 const mockRouterPush = vi.fn();
 
-import { ref } from "vue";
+import { reactive, ref } from "vue";
+
+const mockStoreState = reactive({ selectedOrganization: { identifier: "test-org" } });
 
 // Reactive refs the composable mock returns — tests can read these
 // after asserting on fetch behaviour.
@@ -104,11 +106,7 @@ vi.mock("vuex", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    useStore: () => ({
-      state: {
-        selectedOrganization: { identifier: "test-org" },
-      },
-    }),
+    useStore: () => ({ state: mockStoreState }),
   };
 });
 
@@ -157,6 +155,7 @@ beforeEach(() => {
   // Fresh mock state for every test.
   vi.clearAllMocks();
   kpiCache.clear();
+  mockStoreState.selectedOrganization = { identifier: "test-org" };
   mockKpi.value = {
     requestCount: 0,
     traceCount: 0,
@@ -287,6 +286,19 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     // Same window + selection, non-forced → served from the cache snapshot.
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  it("does not serve another org's KPI snapshot for the same stream and window", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
+    mockFetchAll.mockClear();
+    // An org switch keeps the module-level cache; only the org differs.
+    mockStoreState.selectedOrganization = { identifier: "other-org" };
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
   });
 
   it("refetches KPI after the time window changes", async () => {

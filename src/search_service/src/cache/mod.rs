@@ -1131,10 +1131,7 @@ pub fn apply_vrl_to_response(
                         .as_array()
                         .unwrap()
                         .iter()
-                        .filter_map(|v| {
-                            (!v.is_null())
-                                .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
-                        })
+                        .filter_map(|v| super::flatten_vrl_result(v.clone()))
                         .collect()
                 } else {
                     let mut error = "".to_string();
@@ -1155,8 +1152,7 @@ pub fn apply_vrl_to_response(
                             if let Some(e) = err {
                                 error = e;
                             }
-                            (!ret_val.is_null())
-                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                            super::flatten_vrl_result(ret_val)
                         })
                         .collect();
                     if !error.is_empty() {
@@ -1266,6 +1262,61 @@ pub async fn apply_regex_to_response(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_apply_vrl_to_response_preserves_hits_on_compile_failure() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"nested": {"value": 42}})],
+            ..Default::default()
+        };
+        let expected = response.hits.clone();
+        let hits = apply_vrl_to_response(
+            Some(". = [".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, expected);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_filters_null_per_record() {
+        let mut response = config::meta::search::Response {
+            hits: vec![
+                json::json!({"drop": true}),
+                json::json!({"drop": false, "nested": {"value": 42}}),
+            ],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("if .drop == true { . = null } else { del(.drop) }; .".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"nested_value": 42})]);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_filters_null_array_items() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"input": true})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(
+                "#ResultArray#SkipVRL#\n. = [null, {\"nested\": {\"value\": 42}}, null]"
+                    .to_string(),
+            ),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"nested_value": 42})]);
+    }
 
     #[test]
     fn test_is_result_array_skip_vrl() {

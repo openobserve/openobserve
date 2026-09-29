@@ -12,18 +12,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-// Validation schema for CreateBrowserTest.vue (create/edit browser check).
-// Built via a factory so error messages stay i18n-driven (pass useI18n's `t`).
-//
-// Field ownership:
-//   • name   — required.
-//   • url    — required + valid HTTP(S) URL.
 
 import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { isStorableAction } from "@/utils/synthetics/buildV2Steps";
 import { assertionNeedsExpected } from "@/constants/synthetics";
+import { isHttpUrlTemplate } from "@/components/synthetics/variables/placeholders";
 import type { AssertionKind } from "@/types/synthetics";
 
 /**
@@ -49,23 +43,28 @@ const locatorSchema = z.object({
   author_ordered: z.boolean().optional(),
 });
 
+const isPlainHttpUrl = (value: string): boolean => {
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+/** The Navigate-step rule: a plain http(s) URL, or a template the server's `check_http_url` accepts. */
+const httpUrlOrTemplate = (t: Translate) =>
+  z
+    .string()
+    .min(1, t("synthetics.validation.urlRequired"))
+    .refine((v) => isPlainHttpUrl(v) || (v.includes("{{") && isHttpUrlTemplate(v)), {
+      message: t("synthetics.validation.urlInvalid"),
+    });
+
 export const makeBrowserCheckGateSchema = (t: Translate) =>
   z.object({
     name: z.string().min(1, t("synthetics.validation.nameRequired")).trim(),
-    url: z
-      .string()
-      .min(1, t("synthetics.validation.urlRequired"))
-      .refine(
-        (v) => {
-          try {
-            const u = new URL(v);
-            return u.protocol === "http:" || u.protocol === "https:";
-          } catch {
-            return false;
-          }
-        },
-        { message: t("synthetics.validation.urlInvalid") },
-      ),
+    url: httpUrlOrTemplate(t),
   });
 
 export type BrowserCheckGateForm = z.infer<ReturnType<typeof makeBrowserCheckGateSchema>>;
@@ -79,20 +78,7 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
   z
     .object({
       name: z.string().min(1, t("synthetics.validation.nameRequired")).trim(),
-      url: z
-        .string()
-        .min(1, t("synthetics.validation.urlRequired"))
-        .refine(
-          (v) => {
-            try {
-              const u = new URL(v);
-              return u.protocol === "http:" || u.protocol === "https:";
-            } catch {
-              return false;
-            }
-          },
-          { message: t("synthetics.validation.urlInvalid") },
-        ),
+      url: httpUrlOrTemplate(t),
       locations: z.array(z.string()).min(1, t("synthetics.validation.locationsRequired")),
       journey: z
         .array(
@@ -170,11 +156,15 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
       for (let i = 0; i < val.journey.length; i++) {
         const step = val.journey[i];
 
-        if (step.action === "navigate" && !/^https?:\/\/\S+$/i.test(step.value ?? "")) {
+        if (
+          step.action === "navigate" &&
+          !/^https?:\/\/\S+$/i.test(step.value ?? "") &&
+          !((step.value ?? "").includes("{{") && isHttpUrlTemplate(step.value ?? ""))
+        ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "value"],
-            message: t("synthetics.validation.urlInvalid"),
+            message: t("synthetics.validation.navigateUrlInvalid"),
           });
         }
 

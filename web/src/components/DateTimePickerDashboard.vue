@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :initialTimezone="initialTimezone"
     :disable="disable"
     :hide-relative-timezone="hideRelativeTimezone"
+    :hide-range-shift="hideRangeShift"
     :menu-align="menuAlign"
     :variant="variant"
     @hide="onHide"
@@ -68,6 +69,11 @@ export default defineComponent({
       default: false,
     },
     hideRelativeTimezone: {
+      required: false,
+      default: false,
+      type: Boolean,
+    },
+    hideRangeShift: {
       required: false,
       default: false,
       type: Boolean,

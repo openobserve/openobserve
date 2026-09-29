@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <PanelBar
-        class="w-full flex-nowrap"
+        class="@container/panelbar w-full flex-nowrap"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
@@ -63,6 +63,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t(curatedBadge.key, curatedBadgeParams) }}
           <OTooltip :content="t('infra.curated.staleBadgeTooltip')" side="bottom" />
+        </OTag>
+        <OTag
+          v-if="
+            exemplarsEligible && exemplarsOn && PanleSchemaRendererRef?.exemplarsStatus === 'empty'
+          "
+          variant="default-soft"
+          size="sm"
+          class="shrink-0"
+          data-test="dashboard-panel-exemplars-empty"
+          :aria-label="t('dashboard.exemplars.empty')"
+        >
+          <span class="hidden @min-[32rem]/panelbar:inline">{{
+            t("dashboard.exemplars.empty")
+          }}</span>
+          <span class="@min-[32rem]/panelbar:hidden">{{
+            t("dashboard.exemplars.emptyShort")
+          }}</span>
+          <OTooltip :content="t('dashboard.exemplars.empty')" side="bottom" />
         </OTag>
         <div class="flex-1" />
 
@@ -142,6 +160,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
+        <ExemplarToggle
+          v-if="exemplarsEligible && !viewOnly"
+          :class="exemplarToggleAtRest ? '' : hoverRevealClass"
+          :on="exemplarsOn"
+          :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
+          :count="PanleSchemaRendererRef?.exemplarsCount ?? 0"
+          data-test="dashboard-panel-exemplars-toggle"
+          @toggle="setExemplarOverride(!exemplarsOn)"
+        />
         <OIcon
           v-if="!viewOnly && !simplifiedPanelView && props.data.description != ''"
           name="info-outline"
@@ -193,6 +220,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :isPanelLoading="isPanelLoading"
           :lastTriggeredAt="lastTriggeredAt"
           :viewOnly="viewOnly"
+          :exemplarError="exemplarErrorMessage"
+          @retry-exemplars="PanleSchemaRendererRef?.retryExemplars()"
         />
         <OButton
           v-if="!viewOnly && !simplifiedPanelView"
@@ -304,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.goToLogs") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
+            v-if="!simplifiedPanelView"
             data-test="dashboard-refresh-without-cache"
             @select="onPanelModifyClick('Refresh')"
             icon-left="cached"
@@ -335,12 +364,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="shrink-0">
+    <div class="drag-cancel shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
     <div
-      class="relative min-h-0 flex-1"
+      class="drag-cancel relative min-h-0 flex-1"
       :class="curatedBadge ? 'opacity-60' : undefined"
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
@@ -364,6 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderName="props.folderName"
         :viewOnly="viewOnly"
         :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
+        :exemplars-override="exemplarOverride"
         @loading-state-change="handleLoadingStateChange"
         @metadata-update="metaDataValue"
         @limit-number-of-series-warning-message-update="
@@ -388,6 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
         @series-data-update="onCuratedSeriesData"
+        @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
 
       <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
@@ -463,7 +494,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
-import { getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
+import { getUUID, processQueryMetadataErrors, b64EncodeUnicode } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -471,9 +502,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
-import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
-import config from "@/aws-exports";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -481,6 +510,12 @@ import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 import { durationParts } from "@/views/Infrastructure/curated/resolve";
 import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
+import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
+import {
+  exemplarOverrideKey,
+  useExemplarOverride,
+} from "@/composables/dashboard/useExemplarOverride";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -502,6 +537,7 @@ export default defineComponent({
     "onEditLayout",
     "update:runId",
     "contextmenu",
+    "sendToAiChat",
   ],
   props: [
     "data",
@@ -541,6 +577,7 @@ export default defineComponent({
     ODropdownItem,
     OTooltip,
     CreateAlertAction,
+    ExemplarToggle,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
@@ -580,6 +617,34 @@ export default defineComponent({
     });
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
+
+    const exemplarsEligible = computed(() => isExemplarEligible(props.data));
+    const exemplarKey = computed(() =>
+      exemplarOverrideKey(
+        store.state.selectedOrganization?.identifier ?? "",
+        props.dashboardId ?? "",
+        String(props.data?.id ?? ""),
+      ),
+    );
+    const {
+      override: exemplarOverride,
+      effective: exemplarsOn,
+      set: setExemplarOverride,
+    } = useExemplarOverride(
+      exemplarKey,
+      computed(() => props.data?.config?.show_exemplars),
+    );
+    // On, loading and errored toggles stay visible at rest so a viewer can see why markers are drawn.
+    const exemplarToggleAtRest = computed(
+      () =>
+        exemplarsOn.value ||
+        ["loading", "error"].includes(PanleSchemaRendererRef.value?.exemplarsStatus),
+    );
+    const exemplarErrorMessage = computed(() =>
+      exemplarsOn.value && PanleSchemaRendererRef.value?.exemplarsStatus === "error"
+        ? PanleSchemaRendererRef.value?.exemplarsError || ""
+        : "",
+    );
 
     // Counting `options.series` cannot answer this: for a `metric` panel — the very type the
     // curated tiles use — convertPromQLData emits exactly ONE synthetic rendering series whether
@@ -1053,6 +1118,12 @@ export default defineComponent({
 
     return {
       props,
+      exemplarsEligible,
+      exemplarOverride,
+      exemplarsOn,
+      setExemplarOverride,
+      exemplarToggleAtRest,
+      exemplarErrorMessage,
       curatedBadge,
       curatedBadgeParams,
       curatedNoData,
@@ -1085,7 +1156,6 @@ export default defineComponent({
       handleSparklineWarningUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
-      config,
       t,
       showLegendsDialog,
       currentPanelData,

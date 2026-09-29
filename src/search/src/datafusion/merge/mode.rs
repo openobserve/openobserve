@@ -28,7 +28,7 @@ use arrow_schema::Schema;
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
 use config::{
-    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
+    CompactMergeOutput, FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileKey, StreamType},
     utils::util::is_trace_time_index_stream,
 };
@@ -56,8 +56,7 @@ pub enum MergeMode {
     /// into size-split `hash-merged-v1-*` files in the same order, without `.midx`; the
     /// hour-end merge takes them once more.
     MetricsHashMerged,
-    /// Metrics index stream, closed hour: the whole hour merges into
-    /// size-split `indexed-v1-*` files in the same order.
+    /// Closed-hour metrics merge emits hash/time ordered `indexed-v1-*` files.
     MetricsIndexed,
     /// Metrics downsampling (enterprise): aggregate every series by the rule's
     /// step, size-split output files. Only for a closed hour, which is merged
@@ -224,11 +223,13 @@ impl fmt::Display for MergeMode {
 
 /// Where the merged file goes: file format and Parquet compression depend on
 /// whether the ingester or the compactor is writing.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct MergeOutput {
     pub file_format: FileFormat,
     /// Parquet compression override (`None` = configured default).
     pub parquet_compression: Option<&'static str>,
+    /// Ordinary single-file merges use this; metrics compaction always writes to disk.
+    pub sink: CompactMergeOutput,
 }
 
 impl MergeOutput {
@@ -241,14 +242,17 @@ impl MergeOutput {
                 .common
                 .feature_ingester_none_compression
                 .then_some("none"),
+            sink: CompactMergeOutput::Memory,
         }
     }
 
     /// Compactor: the configured format for the stream.
     pub fn for_compactor(stream_type: StreamType) -> Self {
+        let cfg = get_config();
         Self {
-            file_format: output_file_format(stream_type, false, get_config().common.file_format),
+            file_format: output_file_format(stream_type, false, cfg.common.file_format),
             parquet_compression: None,
+            sink: cfg.compact.merge_output,
         }
     }
 }

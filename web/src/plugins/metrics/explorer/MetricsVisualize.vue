@@ -60,7 +60,7 @@ import {
   watch,
   type PropType,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
@@ -69,7 +69,6 @@ import { normaliseMetricsBlobData } from "@/composables/metrics/metricsUrlState"
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
-import { raw } from "@/types/i18n";
 
 export default defineComponent({
   name: "MetricsVisualize",

@@ -282,9 +282,21 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(value(wrapper, "query-mode")).toBe(translated("alerts.anomaly.filters"));
     expect(value(wrapper, "detection-function")).toBe("avg(took)");
     expect(value(wrapper, "filters")).toBe("service = 'checkout'");
-    // 97 is the percentile scored against; the form shows its complement.
+    // 97 indexes TRAINING scores — shown as the percentile, never restated as a live anomaly rate.
     expect(value(wrapper, "sensitivity")).toBe(
-      translated("alerts.anomaly.summaryThresholdRate", { rate: 3 }),
+      translated("alerts.anomaly.summaryThresholdPercentile", { percentile: 97 }),
+    );
+  });
+
+  it("shows the enforced cap for a budget-mode config instead of the derived percentile", () => {
+    const wrapper = mountSummary({ ...anomalyConfig(), alert_budget_per_day: 2 });
+    expect(value(wrapper, "sensitivity")).toBe(
+      translated("alerts.anomaly.summaryBudgetPerDay", { count: 2 }),
+    );
+
+    const weekly = mountSummary({ ...anomalyConfig(), alert_budget_per_day: 1 / 7 });
+    expect(value(weekly, "sensitivity")).toBe(
+      translated("alerts.anomaly.summaryBudgetPerWeek", { count: 1 }),
     );
   });
 

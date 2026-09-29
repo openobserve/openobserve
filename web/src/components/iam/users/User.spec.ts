@@ -24,6 +24,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({
@@ -42,9 +43,18 @@ const i18n = createI18n({
 });
 
 // Mock services
-vi.mock("@/services/users");
-vi.mock("@/services/organizations");
-vi.mock("@/services/iam");
+vi.mock("@/services/users", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/services/segment_analytics");
 
 // Mock aws-exports config
@@ -475,6 +485,9 @@ describe("User Component", () => {
         { label: "member", value: "member" },
       ];
       mockUsersService.getRoles.mockResolvedValue({ data: mockRoles } as any);
+      // The mount already warmed this query, so without clearing it the
+      // override above would be a cache hit and never reach the service.
+      queryClient.clear();
 
       await wrapper.vm.getRoles();
 
@@ -486,6 +499,7 @@ describe("User Component", () => {
 
     it("should handle getRoles error gracefully", async () => {
       mockUsersService.getRoles.mockRejectedValue(new Error("API Error"));
+      queryClient.clear();
 
       await expect(wrapper.vm.getRoles()).resolves.toBe(true);
       expect(mockUsersService.getRoles).toHaveBeenCalled();
@@ -553,7 +567,7 @@ describe("User Component", () => {
       mockUsersService.orgUsers.mockResolvedValue({ data: { data: mockUsers } } as any);
       mockUsersService.invitedUsers.mockResolvedValue({ status: 200, data: [] } as any);
 
-      await wrapper.vm.getOrgMembers();
+      await wrapper.vm.getOrgMembers(true);
       await flushPromises();
 
       expect(mockUsersService.orgUsers).toHaveBeenCalledWith(
@@ -574,7 +588,7 @@ describe("User Component", () => {
       ];
       mockUsersService.orgUsers.mockResolvedValue({ data: { data: mockUsers } } as any);
 
-      await wrapper.vm.getOrgMembers();
+      await wrapper.vm.getOrgMembers(true);
 
       expect(wrapper.vm.currentUserRole).toBe("admin");
       expect(wrapper.vm.isCurrentUserInternal).toBe(true);
@@ -582,7 +596,7 @@ describe("User Component", () => {
 
     it("should handle getOrgMembers error", async () => {
       mockUsersService.orgUsers.mockRejectedValue(new Error("Fetch error"));
-      await expect(wrapper.vm.getOrgMembers()).rejects.toBe(false);
+      await expect(wrapper.vm.getOrgMembers(true)).rejects.toBe(false);
     });
   });
 

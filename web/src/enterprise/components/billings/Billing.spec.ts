@@ -55,11 +55,14 @@ vi.mock("vue-router", () => ({
 }));
 
 // Mock billing service - using factory function to avoid hoisting issues
-vi.mock("@/services/billings", () => ({
-  default: {
-    list_subscription: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_subscription: vi.fn(),
+    },
+  });
+});
 
 // Import after mocking
 import BillingService from "@/services/billings";

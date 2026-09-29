@@ -4,6 +4,7 @@
 
 import { expect } from "@playwright/test";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import testLogger from "../../playwright-tests/utils/test-logger.js";
 import {
   SELECTORS,
   getVariableSelector,
@@ -352,6 +353,43 @@ export default class DashboardVariablesScoped {
    */
   getVariableDropdown(variableName) {
     return this.page.locator(getVariableSelectorInner(variableName));
+  }
+
+  /**
+   * Wait for a variable selector to stop moving: OSelect renders a spinner while
+   * the variable's values query runs, and until it resolves the selector shows
+   * the "(No Data Found)" placeholder (VariableQueryValueSelector falls back to
+   * it whenever there are no options and nothing selected). A value read before
+   * then captures the placeholder rather than what the variable settles on —
+   * which may legitimately be the placeholder itself, so this waits for the
+   * rendered value to hold rather than for any particular value.
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 20000)
+   * @param {number} options.quietMs - How long the value must hold (default: 1500)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForVariableValueSettled(variableName, options = {}) {
+    const { timeout = 20000, quietMs = 1500 } = options;
+    const selector = this.getVariableSelectorLocator(variableName);
+    await selector.waitFor({ state: "visible", timeout });
+    const spinner = this.getVariableDropdown(variableName).locator('[role="status"]');
+
+    const deadline = Date.now() + timeout;
+    let lastText = null;
+    let stableSince = Date.now();
+    while (Date.now() < deadline) {
+      const isLoading = (await spinner.count().catch(() => 0)) > 0;
+      const text = await selector.innerText().catch(() => null);
+      if (isLoading || text === null || text !== lastText) {
+        lastText = text;
+        stableSince = Date.now();
+      } else if (Date.now() - stableSince >= quietMs) {
+        return selector;
+      }
+      await this.page.waitForTimeout(250);
+    }
+    return selector;
   }
 
   /**
@@ -2642,5 +2680,194 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
     await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${typeValue}"]`).click();
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  // ==========================================
+  // Dashboard Refresh Without Cache
+  // ==========================================
+
+  /**
+   * Open the dashboard refresh-options dropdown (the caret beside Refresh).
+   */
+  async openDashboardRefreshOptions() {
+    const trigger = this.page.locator('[data-test="dashboard-refresh-options-btn"]');
+    await trigger.waitFor({ state: "visible", timeout: 15000 });
+    // Disabled while any panel is loading.
+    await expect(trigger).toBeEnabled({ timeout: 30000 });
+    await trigger.click();
+  }
+
+  /**
+   * Locator for the dashboard-level "Refresh Cache & Reload" menu item.
+   * @returns {import('@playwright/test').Locator}
+   */
+  getRefreshWithoutCacheMenuItem() {
+    return this.page.locator('[data-test="dashboard-refresh-without-cache-btn"]');
+  }
+
+  /**
+   * Open the refresh-options dropdown, click "Refresh Cache & Reload", and wait
+   * for the resulting _search_stream request carrying clear_cache=true. Returns
+   * the matched request URL so the caller can assert the cache flag.
+   * @returns {Promise<URL>}
+   */
+  async clickRefreshWithoutCacheAndWaitForClearCache() {
+    const item = this.getRefreshWithoutCacheMenuItem();
+    const openItem = async () => {
+      await this.openDashboardRefreshOptions();
+      await item.waitFor({ state: "visible", timeout: 10000 });
+    };
+    // Reka UI dropdowns can drop a click that lands mid-animation — retry once.
+    try {
+      await openItem();
+    } catch {
+      await this.page.keyboard.press("Escape");
+      await item.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+      await openItem();
+    }
+
+    const [request] = await Promise.all([
+      this.page.waitForRequest(
+        (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
+        { timeout: 30000 }
+      ),
+      item.click(),
+    ]);
+    return new URL(request.url());
+  }
+
+  /**
+   * Locator for a panel's kebab dropdown button by its title.
+   * @param {string} title - Panel title
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelKebab(title) {
+    return this.page.locator(`[data-test="dashboard-edit-panel-${title}-dropdown"]`);
+  }
+
+  /**
+   * Locator for the panel-level "Refresh Cache & Reload" menu item.
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelRefreshWithoutCacheItem() {
+    return this.page.locator('[data-test="dashboard-refresh-without-cache"]');
+  }
+
+  /**
+   * Open a panel's kebab dropdown, click its "Refresh Cache & Reload" item, and
+   * wait for the resulting _search_stream request carrying clear_cache=true.
+   * @param {string} title - Panel title (kebab data-test suffix)
+   * @returns {Promise<URL>}
+   */
+  async clickPanelRefreshWithoutCacheAndWaitForClearCache(title) {
+    const kebab = this.getPanelKebab(title);
+    await kebab.waitFor({ state: "visible", timeout: 15000 });
+
+    // Reka UI dropdowns can drop a click that lands mid-animation — retry once.
+    const item = this.getPanelRefreshWithoutCacheItem();
+    const openItem = async () => {
+      await kebab.click();
+      await item.waitFor({ state: "visible", timeout: 10000 });
+    };
+    const clickAndWaitForClearCache = async (timeout) => {
+      try {
+        await openItem();
+      } catch {
+        await this.page.keyboard.press("Escape");
+        await openItem();
+      }
+      const [request] = await Promise.all([
+        this.page.waitForRequest(
+          (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
+          { timeout }
+        ),
+        item.click(),
+      ]);
+      return new URL(request.url());
+    };
+
+    try {
+      return await clickAndWaitForClearCache(15000);
+    } catch {
+      // onRefreshPanel() silently ignores the request while the panel is still loading.
+      testLogger.warn(`Panel "${title}" ignored Refresh Cache & Reload, retrying once idle`);
+      await this.page.keyboard.press("Escape");
+      await this.waitForPanelIdle(title);
+      return await clickAndWaitForClearCache(30000);
+    }
+  }
+
+  /**
+   * Locator for a panel container by its title.
+   * @param {string} title - Panel title
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelContainerByTitle(title) {
+    return this.page.locator(`${SELECTORS.PANEL_CONTAINER}[data-test-panel-title="${title}"]`);
+  }
+
+  /**
+   * Wait until the titled panel has no query in flight and stays that way for `stableMs`.
+   * @param {string} title - Panel title
+   * @param {{ timeout?: number, stableMs?: number }} [options]
+   */
+  async waitForPanelIdle(title, { timeout = 30000, stableMs = 2000 } = {}) {
+    const container = this.getPanelContainerByTitle(title);
+    await container.waitFor({ state: "visible", timeout });
+    // The panel's own refresh button is bound to :disabled="isPanelLoading".
+    const btn = container.locator(SELECTORS.PANEL_REFRESH_BTN);
+    const deadline = Date.now() + timeout;
+    let idleSince = null;
+    // A freshly mounted panel reads idle before its first query starts, so idle must hold.
+    while (idleSince === null || Date.now() - idleSince < stableMs) {
+      if (Date.now() > deadline) {
+        throw new Error(`Panel "${title}" did not settle within ${timeout}ms`);
+      }
+      const enabled = await btn.isEnabled().catch(() => false);
+      if (!enabled) idleSince = null;
+      else if (idleSince === null) idleSince = Date.now();
+      await this.page.waitForTimeout(250);
+    }
+  }
+
+  /**
+   * Record the panel_id of every search request fired during `action` plus `settleMs`.
+   * @param {() => Promise<void>} action
+   * @param {number} [settleMs=3000]
+   * @returns {Promise<string[]>} panel ids, one entry per request
+   */
+  async capturePanelQueryIds(action, settleMs = 3000) {
+    const panelIds = [];
+    const onRequest = (req) => {
+      const url = new URL(req.url());
+      const panelId = url.searchParams.get("panel_id");
+      if (url.pathname.includes("_search") && panelId) panelIds.push(panelId);
+    };
+    this.page.on("request", onRequest);
+    try {
+      await action();
+      await this.page.waitForTimeout(settleMs);
+    } finally {
+      this.page.off("request", onRequest);
+    }
+    return panelIds;
+  }
+
+  /**
+   * Click the standard dashboard Refresh (cache ON) and wait for the resulting
+   * _search_stream request, returning its URL so the caller can assert the
+   * clear_cache param is absent.
+   * @returns {Promise<URL>}
+   */
+  async clickDashboardRefreshAndWaitForSearch() {
+    await expect(this.page.locator(SELECTORS.REFRESH_BTN)).toBeEnabled({ timeout: 30000 });
+    const [request] = await Promise.all([
+      this.page.waitForRequest(
+        (req) => req.url().includes("_search_stream"),
+        { timeout: 30000 }
+      ),
+      this.clickDashboardRefresh(),
+    ]);
+    return new URL(request.url());
   }
 }

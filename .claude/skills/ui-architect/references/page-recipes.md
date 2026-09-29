@@ -175,9 +175,9 @@ for every list — don't ship a listing page without them.
       variant="outline"
       size="icon-sm"
       icon-left="refresh"
-      :loading="loading"
+      :loading="fetching"
       data-test="channels-refresh"
-      @click="fetchChannels"
+      @click="refreshChannels"
     >
       <OTooltip side="bottom" :content="t('channels.reload')" shortcut-id="channelsRefresh" />
     </OButton>
@@ -214,9 +214,30 @@ search-only lists with no other filters).
   needs extra controls (scope toggles, etc.). Set `:show-global-filter="false"`
   and drive the query yourself.
 
-**Refresh.** An `OButton size="icon-sm" icon-left="refresh" :loading` in the
-`#toolbar-trailing` slot, wired to the same fetch function the page uses on
-mount. Attach an `OTooltip` with `shortcut-id` so it advertises the `r` shortcut.
+**Refresh.** An `OButton size="icon-sm" icon-left="refresh"` in the
+`#toolbar-trailing` slot, with `:loading` bound to the query's `isFetching` (the
+table's `:loading` is `isPending`, the cold-read skeleton). Attach an `OTooltip`
+with `shortcut-id` so it advertises the `r` shortcut.
+
+The click goes to a **named handler that forces every read the page shows** —
+the list and any secondary read (counts, "Used by", dropdown options). Mount,
+paging and search read the cache; only a refresh is guaranteed to reach the
+server. Full rule: [data-fetching.md § The refresh rule](data-fetching.md#the-refresh-rule).
+
+```ts
+const orgId = useOrgId();
+const channelsList = useQuery(() =>
+  Object.assign(channelsQuery(orgId.value), { enabled: !!orgId.value }),
+);
+const rows = computed(() => channelsList.data.value ?? []);
+const loading = channelsList.isPending;
+const fetching = channelsList.isFetching;
+// Named handler: `@click="channelsList.refetch"` would pass the MouseEvent in.
+const refreshChannels = () => {
+  void channelsList.refetch();
+  void loadChannelUsage(true); // a secondary read on the same view is forced too
+};
+```
 
 **Column show/hide toggle.** `OTable` renders the column-visibility button
 **automatically** — but only when **all three** hold:
@@ -309,14 +330,31 @@ apart:
 <OTable :loading="loading" :forbidden="forbidden" ... />
 ```
 
+With `useQuery`, derive it from the query's own error — it follows every
+load path by construction:
+
+```ts
+const forbidden = computed(() => {
+  const e: any = channelsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+```
+
+With an imperative `queryClient.fetchQuery` loader, keep a ref and clear it at
+the start of every load:
+
 ```ts
 const forbidden = ref(false);
 
-const getAlerts = async () => {
+const getAlerts = async (folderId: string, force = false) => {
   loading.value = true;
   forbidden.value = false;                 // clear at the START of every load
   try {
-    rows.value = (await alertsService.list(org)).data.list;
+    const options = alertsListQuery(orgId.value, folderId);
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+    }
+    rows.value = await queryClient.fetchQuery(options);
   } catch (err: any) {
     forbidden.value = err?.response?.status === 403;
     // the grouped access toast already reports a 403; a second red toast adds nothing
@@ -369,9 +407,11 @@ visible data.
   [keyboard-shortcuts.md](keyboard-shortcuts.md)): `n` → create, `/` → focus
   search, `r` → refresh. Advertise `r` via the refresh button's `OTooltip
   shortcut-id`.
-- **Data flow** (see [SKILL.md § Where code goes](../SKILL.md)): fetch through a
-  domain service, org from `store.state.selectedOrganization`; hold the rows in a
-  local `ref` (or Vuex if shared); keep column defs local.
+- **Data flow** (see [data-fetching.md](data-fetching.md)): read the rows
+  through the domain's declared query (`services/<domain>.queries.ts`, reuse
+  one if it exists), org from `useOrgId()`; the rows are a `computed` over the
+  query's data — never a Vuex copy; writes are `mutationOptions()` that
+  invalidate the domain; keep column defs local.
 
 ---
 
@@ -403,8 +443,11 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
       (`:show-global-filter="false"`), or the built-in global filter for a
       search-only list.
 - [ ] **Refresh** button in `#toolbar-trailing` (`variant="outline"
-      size="icon-sm" icon-left="refresh"`), wired to the fetch fn, with an
-      `OTooltip shortcut-id`.
+      size="icon-sm" icon-left="refresh"`, `:loading` from `isFetching`), with an
+      `OTooltip shortcut-id`; its named handler **forces** the list and every
+      secondary read on the page.
+- [ ] Rows come from a declared query (`useQuery` or `fetchQuery`) — no raw
+      service/`http` call, no Vuex copy; writes invalidate the domain.
 - [ ] **Column show/hide toggle** present — i.e. `:persist-columns="true"` +
       `table-id` + at least one `hideable` column.
 - [ ] Non-essential columns **hidden by default** via `:column-visibility`.

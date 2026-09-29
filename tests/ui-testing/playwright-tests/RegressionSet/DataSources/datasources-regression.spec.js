@@ -3,6 +3,7 @@
  *
  * Bug fixes for Data Sources page functionality:
  * - #11682: On clicking on AI integration the credentials disappear
+ * - #11534: AI Frameworks & Agent datasources
  */
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
@@ -72,6 +73,32 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     ).toBeGreaterThan(0);
 
     testLogger.info('PASSED: AI Integration content persists on re-click');
+  });
+
+  // Asserts category slugs, not tab labels: labels go through i18n, slugs are in the route.
+  test("AI datasources should expose every integration category with browsable docs", {
+    tag: ['@bug-11534', '@P2', '@regression', '@datasourcesRegression']
+  }, async ({ page }) => {
+    testLogger.info('Test: AI datasource categories and docs (Feature #11534)');
+
+    await pm.dataPage.navigateToAIIntegrations(process.env.ZO_BASE_URL, process.env.ORGNAME);
+
+    const CATEGORIES = ['frameworks', 'model-providers', 'gateways', 'no-code', 'analytics', 'tools'];
+    for (const slug of CATEGORIES) {
+      await pm.dataPage.expectAiCategoryVisible(slug);
+    }
+    testLogger.info(`All ${CATEGORIES.length} AI categories present`);
+
+    // Frameworks is the category the issue asked for, so it gets the real assertions.
+    await pm.dataPage.openAiCategory('frameworks');
+    const itemCount = await pm.dataPage.expectAiIntegrationsListed(1);
+    testLogger.info(`Frameworks lists ${itemCount} integrations`);
+
+    await pm.dataPage.getAiIntegrationItems().first().click();
+    const docs = await pm.dataPage.verifyAIDetailRendered();
+    testLogger.info(`Framework doc pane rendered ${docs.length} chars`);
+
+    testLogger.info('✓ PASSED: AI datasource categories browsable with docs (#11534)');
   });
 
   test.afterEach(async () => {

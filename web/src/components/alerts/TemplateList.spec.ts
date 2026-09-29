@@ -18,6 +18,7 @@ import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
 import TemplateList from "./TemplateList.vue";
 import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
+import alertsFixture from "@/test/unit/mockData/alerts";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -105,12 +106,16 @@ describe("Alert List", async () => {
     const listTemplates = vi.spyOn(templateService, "list");
     let listCallsBeforeDelete = 0;
     beforeEach(async () => {
+      const templatesUrl = `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`;
       global.server.use(
-        http.delete(
-          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
-          () => {
-            return HttpResponse.json({ code: 200 });
-          },
+        http.delete(`${templatesUrl}/${template_name}`, () => {
+          return HttpResponse.json({ code: 200 });
+        }),
+        // The delete's invalidation refetches the list; the shared fixture would put the row back.
+        http.get(templatesUrl, () =>
+          HttpResponse.json(
+            alertsFixture.templates.get.filter((tpl: any) => tpl.name !== template_name),
+          ),
         ),
       );
       listCallsBeforeDelete = listTemplates.mock.calls.length;
@@ -132,9 +137,8 @@ describe("Alert List", async () => {
     });
 
     it("drops the deleted row in place, leaving the rest of the list alone", () => {
-      // No refetch: reloading the list would blank the table behind its skeleton
-      // and a loading toast for a row the server already confirmed gone.
-      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete);
+      // The mutation's invalidation refetches the mounted list in the background; the splice keeps the row gone meanwhile.
+      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete + 1);
       const body = wrapper
         .find('[data-test="alert-templates-list-table"]')
         .find('[data-test="o2-table-body"]');
@@ -147,7 +151,7 @@ describe("Alert List", async () => {
 
 // ── pagination restoration ────────────────────────────────────────────────
 // This spec mounts the real OTable (not stubbed), so the TanStack pageIndex
-// restoration itself (setTimeout(0) + table.setPageIndex) isn't exercised
+// restoration itself (setTimeout(0) + OTable restorePage) isn't exercised
 // end-to-end here. These tests cover what IS reachable: seeding currentPage
 // from the URL, and that navigating to/from the add/edit/clone/import views
 // preserves the `page` query param instead of stripping it.
@@ -170,10 +174,32 @@ describe("TemplateList pagination persistence", () => {
 
   it("seeds currentPage from the URL's page query param", async () => {
     (router as any).currentRoute.value.query = { page: "3" };
+    // Mocked so the clamp's own URL rewrite (covered below) never becomes a real navigation that leaks into later tests.
+    const replaceSpy = vi
+      .spyOn(router, "replace")
+      .mockImplementation((() => Promise.resolve()) as any);
     wrapper = mountComponent();
-    await flushPromises();
 
+    // Read before the fetch settles: once it does, a page past the end is clamped.
     expect((wrapper.vm as any).currentPage).toBe(3);
+
+    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
+    replaceSpy.mockRestore();
+  });
+
+  it("falls back to page 1 once the list loads shorter than the URL's page", async () => {
+    (router as any).currentRoute.value.query = { page: "3" };
+    const replaceSpy = vi
+      .spyOn(router, "replace")
+      .mockImplementation((() => Promise.resolve()) as any);
+    wrapper = mountComponent();
+    // The restore runs in a setTimeout(0) after the fetch lands, so poll rather than guess the delay.
+    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
+
+    expect(replaceSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ page: "1" }) }),
+    );
+    replaceSpy.mockRestore();
   });
 
   it("defaults currentPage to 1 when no page query param is present", async () => {

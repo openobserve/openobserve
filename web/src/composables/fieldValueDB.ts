@@ -45,6 +45,8 @@ export interface FieldValueRecord {
 // Cached IDB connection — opened once and reused across all calls.
 // null means not yet opened (or was closed and needs to be reopened).
 let _db: IDBDatabase | null = null;
+// In-flight open, so a burst of concurrent first calls shares one connection.
+let _openPromise: Promise<IDBDatabase> | null = null;
 
 /**
  * Opens the database lazily — returns the cached connection on subsequent calls.
@@ -58,7 +60,8 @@ let _db: IDBDatabase | null = null;
  */
 export const openDB = (): Promise<IDBDatabase> => {
   if (_db) return Promise.resolve(_db);
-  return new Promise((resolve, reject) => {
+  if (_openPromise) return _openPromise;
+  _openPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result;
@@ -76,15 +79,26 @@ export const openDB = (): Promise<IDBDatabase> => {
       // (e.g. another tab opens a newer DB version triggering a versionchange).
       _db.onclose = () => {
         _db = null;
+        _openPromise = null;
       };
       _db.onversionchange = () => {
         _db?.close();
         _db = null;
+        _openPromise = null;
       };
       resolve(_db!);
     };
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      _openPromise = null;
+      reject(req.error);
+    };
   });
+  // A failed open (including indexedDB being unavailable, which throws before
+  // onerror exists) must not be cached, otherwise every later call rejects.
+  _openPromise.catch(() => {
+    _openPromise = null;
+  });
+  return _openPromise;
 };
 
 /**
@@ -255,6 +269,85 @@ export const evictExpired = async (): Promise<number> => {
     };
     cursorReq.onerror = () => reject(cursorReq.error);
     tx.onerror = () => reject(tx.error);
+  });
+};
+
+/**
+ * Delete every record belonging to one org.
+ *
+ * Keys are "org|streamType|streamName|fieldName", so one org's records are a
+ * contiguous range — a bounded cursor, not a full-store scan. Called on org
+ * switch and logout: field values are user-visible data from the previous
+ * tenant and must not survive either.
+ */
+export const clearOrg = async (org: string): Promise<number> => {
+  if (!org) return 0;
+  let db: IDBDatabase;
+  try {
+    db = await openDB();
+  } catch {
+    return 0;
+  }
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const prefix = `${org}|`;
+    // Every key with this prefix sorts between `prefix` and `prefix + ￿`.
+    const range = IDBKeyRange.bound(prefix, prefix + "￿", false, false);
+    let deleted = 0;
+    const req = tx.objectStore(STORE_NAME).openCursor(range);
+    req.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        cursor.delete();
+        deleted++;
+        cursor.continue();
+      } else resolve(deleted);
+    };
+    req.onerror = () => resolve(deleted);
+  });
+};
+
+/** Drop every record NOT belonging to `keepOrg` — the org-switch sweep. */
+export const clearAllExceptOrg = async (keepOrg: string): Promise<number> => {
+  if (!keepOrg) return 0;
+  let db: IDBDatabase;
+  try {
+    db = await openDB();
+  } catch {
+    return 0;
+  }
+  const keepPrefix = `${keepOrg}|`;
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    let deleted = 0;
+    const req = tx.objectStore(STORE_NAME).openCursor();
+    req.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        if (!String(cursor.key).startsWith(keepPrefix)) {
+          cursor.delete();
+          deleted++;
+        }
+        cursor.continue();
+      } else resolve(deleted);
+    };
+    req.onerror = () => resolve(deleted);
+  });
+};
+
+/** Drop every record, for logout. */
+export const clearAll = async (): Promise<void> => {
+  let db: IDBDatabase;
+  try {
+    db = await openDB();
+  } catch {
+    return;
+  }
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const req = tx.objectStore(STORE_NAME).clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
   });
 };
 

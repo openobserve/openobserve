@@ -144,6 +144,7 @@ mod tests {
                 original_size: size,
                 compressed_size: size / 2,
                 index_size: size / 10,
+                mindex_size: 0,
                 flattened: false,
                 bloom_ver: 0,
             },

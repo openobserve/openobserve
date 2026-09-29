@@ -441,7 +441,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { classifyEntity } from "@/utils/traces/serviceClassification";
 import {
   b64EncodeUnicode,
@@ -459,6 +460,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
+import { resolveTraceStream } from "@/utils/traces/streamSelection";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -480,8 +482,9 @@ const P99_WARN_NS = 1_000_000_000;
 // Stream filter — synced from traces page selected stream
 const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
 const storedStreamFilter = localStorage.getItem("servicesCatalog_streamFilter");
-const streamFilter = ref(tracesStream || storedStreamFilter || "default");
+const streamFilter = ref(tracesStream || storedStreamFilter || "");
 const availableStreams = ref<string[]>([]);
+const streamsLoaded = ref(false);
 
 interface ServiceRow {
   id: string;
@@ -541,6 +544,9 @@ function serviceRowId(row: {
 }
 
 const isLoading = ref(false);
+// A search in flight with results still on screen — the spinner, not the
+// empty state.
+const isSearching = ref(false);
 // Epoch-ms of the last completed load, shown on the page header's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
@@ -931,10 +937,16 @@ function getTimeRange(): { start_time: number; end_time: number } {
 const loadAvailableStreams = async () => {
   try {
     const res: any = await getStreams("traces", false, false);
-    if (res?.list?.length > 0) {
-      availableStreams.value = res.list.map((stream: any) => stream.name);
-    }
+    const streams = res?.list ?? [];
+    availableStreams.value = streams.map((stream: any) => stream.name);
+    streamFilter.value = resolveTraceStream(streams, [
+      searchObj.data.stream.selectedStream.value,
+      storedStreamFilter,
+      streamFilter.value,
+    ]);
   } catch (e) {
+    availableStreams.value = [];
+    streamFilter.value = "";
     console.error("Error loading trace streams:", e);
   }
 };
@@ -959,8 +971,10 @@ async function loadServicesCatalog() {
     });
   }
 
-  isLoading.value = true;
-  services.value = [];
+  // Search-driven, so deliberately never cached — but the previous results
+  // stay on screen while the next search runs rather than the panel emptying.
+  isLoading.value = services.value.length === 0;
+  isSearching.value = true;
 
   const { start_time, end_time } = getTimeRange();
 
@@ -968,8 +982,10 @@ async function loadServicesCatalog() {
   if (hasInferColumns.value === null) {
     try {
       const org = searchObj.organizationIdentifier;
-      const schemaResponse = await streamService.schema(org, streamName, "traces");
-      const schemaFields = schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      const schemaPayload = await queryClient.fetchQuery(
+        streamSchemaQuery(org, streamName, "traces"),
+      );
+      const schemaFields = schemaPayload?.schema || schemaPayload?.fields || [];
       hasInferColumns.value = schemaFields.some((f: any) => f.name === "infer_service_name");
     } catch {
       // If schema check fails, default to false (use service_name only)
@@ -1080,14 +1096,17 @@ ORDER BY total_requests DESC`;
       },
       error: () => {
         isLoading.value = false;
+        isSearching.value = false;
       },
       complete: () => {
         isLoading.value = false;
+        isSearching.value = false;
         lastRunAt.value = Date.now();
       },
       reset: () => {
         services.value = [];
         isLoading.value = false;
+        isSearching.value = false;
       },
     },
   );
@@ -1111,7 +1130,6 @@ watch(
       streamFilter.value = newStream;
       localStorage.setItem("servicesCatalog_streamFilter", newStream);
       hasInferColumns.value = null;
-      loadServicesCatalog();
     }
   },
 );
@@ -1124,6 +1142,7 @@ watch(
     searchObj.data.datetime.relativeTimePeriod,
   ],
   () => {
+    if (!streamsLoaded.value) return;
     // This component only renders on its own route now, so no search-mode
     // guard is needed — if it is mounted, it is the visible view.
     loadServicesCatalog();
@@ -1132,6 +1151,7 @@ watch(
 
 onMounted(async () => {
   await loadAvailableStreams();
+  streamsLoaded.value = true;
   loadServicesCatalog();
 });
 

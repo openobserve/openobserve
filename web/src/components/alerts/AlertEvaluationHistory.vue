@@ -61,16 +61,14 @@
     </template>
 
     <template #toolbar-trailing>
-      <OButton
+      <ORefreshButton
+        layout="inline"
         variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+        :last-run-at="lastUpdatedAt"
         :loading="loading"
         data-test="alerts-alertevaluationhistory-refresh"
-        @click="fetchHistory"
-      >
-        <OTooltip side="bottom" :content="t('alerts.groups.refresh')" />
-      </OButton>
+        @click="refreshHistory"
+      />
     </template>
 
     <template #cell-timestamp="{ row }">
@@ -157,12 +155,14 @@
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
-import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -170,7 +170,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 
 const props = withDefaults(
@@ -183,6 +182,7 @@ const store = useStore();
 
 const history = ref<any[]>([]);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const totalCount = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(25);
@@ -220,14 +220,28 @@ const conditionText = (row: Record<string, unknown>): string => {
   return conditionSummary(row);
 };
 
-const fetchHistory = async () => {
+// Named handler: binding fetchHistory straight to @click would put the
+// MouseEvent in `force`.
+const refreshHistory = () => fetchHistory(true);
+
+const fetchHistory = async (force = false) => {
   const orgId = store.state.selectedOrganization?.identifier;
   if (!orgId || !props.alertId) return;
   loading.value = true;
   try {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
-    const res = await alertsService.getHistory(orgId, {
+    const read = <T,>(options: any): Promise<T> => {
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient.fetchQuery(options);
+    };
+    const opts = alertHistoryQuery(orgId, {
       // An anomaly id fails the endpoint's `alert_id` existence check outright.
       ...(props.isAnomaly ? { anomaly_id: props.alertId } : { alert_id: props.alertId }),
       start_time: startTime,
@@ -235,8 +249,11 @@ const fetchHistory = async () => {
       from: (currentPage.value - 1) * pageSize.value,
       size: pageSize.value,
     });
-    history.value = res.data?.hits || [];
-    totalCount.value = res.data?.total || 0;
+    const data = await read<any>(opts);
+    // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
+    history.value = data?.hits || [];
+    totalCount.value = data?.total || 0;
   } catch {
     history.value = [];
     totalCount.value = 0;

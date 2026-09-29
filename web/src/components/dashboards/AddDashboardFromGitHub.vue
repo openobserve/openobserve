@@ -597,7 +597,8 @@ export default defineComponent({
 
         show.value = false;
         showFolderSelection.value = false;
-        emit("added");
+        // The parent binds this straight to `getDashboards(force)`, so a bare emit reloads from the cache the import just made stale.
+        emit("added", true);
       } catch (err) {
         toast({
           variant: "error",

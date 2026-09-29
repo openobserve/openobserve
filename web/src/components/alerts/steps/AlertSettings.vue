@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="mb-4 flex items-start justify-start pb-3">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
@@ -77,8 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                scheduled version, intentionally no visual distinction — the
                backend stores and evaluates it for composite alerts too
                (handle_composite_alert_trigger). -->
-          <div v-if="isRealTime === 'composite'" class="mb-4 flex items-start justify-start pb-3">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            v-if="isRealTime === 'composite'"
+            class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.queryConfig.pendingPeriod") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
@@ -136,8 +139,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div ref="periodFieldRef" class="me-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            ref="periodFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
@@ -175,8 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div ref="silenceFieldRef" class="me-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            ref="silenceFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
@@ -217,8 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                tooltip as the composite version above, plus the
                not-a-multiple-of-Check-every warning (composite has no
                frequency to compare against, so it skips that row). -->
-          <div ref="pendingPeriodFieldRef" class="me-2 mb-4! flex items-start">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+          <div
+            ref="pendingPeriodFieldRef"
+            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.queryConfig.pendingPeriod") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
@@ -284,14 +296,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="mb-4! flex items-start">
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+        <div class="mb-4! flex items-start max-md:gap-3">
+          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
           <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
         </div>
+
+        <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
+        <template v-if="isRealTime === 'false'">
+          <div class="mb-4! flex items-start max-md:gap-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.notifyOnRecovery") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.notifyOnRecoveryTooltip')" side="right" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
+              <template v-if="formData?.notify_on_recovery">
+                <div
+                  v-for="row in recoveryPlan"
+                  :key="row.name"
+                  class="text-text-secondary text-xs"
+                  :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+                >
+                  {{ row.name }} — {{ row.action }}
+                </div>
+                <div
+                  v-if="hasChatRecovery"
+                  class="text-text-secondary text-xs"
+                  data-test="alert-notify-on-recovery-hint"
+                >
+                  {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <AlertDestinationsField
+            v-if="formData?.notify_on_recovery"
+            class="me-2 mb-4!"
+            :destinations="recoveryDestinations"
+            :workflows="[]"
+            :destination-options="formattedDestinations"
+            :label="t('alerts.alertSettings.recoveryDestinations')"
+            :required="false"
+            :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
+            :supports-workflows="false"
+            @update:destinations="$emit('update:recoveryDestinations', $event)"
+            @refresh="$emit('refresh:destinations')"
+          />
+
+          <!-- The hold delays on-call and incident closure too, not only the message. -->
+          <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.keepFiringFor") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
+            </div>
+            <div class="flex items-center">
+              <div class="w-21.75">
+                <OFormInput
+                  name="keep_firing_for"
+                  type="number"
+                  min="0"
+                  :debounce="300"
+                  data-test="alert-settings-keep-firing-for-input"
+                />
+              </div>
+              <div
+                class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+              >
+                {{ t("alerts.seconds") }}
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -299,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, inject, ref, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -308,6 +390,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
@@ -355,12 +438,25 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    // The org's destination OBJECTS (`destinations` above holds only the
+    // selected names). Read-only here — the recovery list needs each selected
+    // destination's platform, which lives on the object.
+    destinationObjects: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    // Empty = the recovery follows the firing's destinations.
+    recoveryDestinations: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: [
     "update:trigger",
     "update:aggregation",
     "update:isAggregationEnabled",
     "update:destinations",
+    "update:recoveryDestinations",
     "refresh:destinations",
     "update:workflows",
     "update:promqlCondition",
@@ -541,7 +637,58 @@ export default defineComponent({
       emit("update:trigger", nextTrigger);
     };
 
+    // ── Recovery ────────────────────────────────────────────────────────────
+    // Platform destinations are resolved by the server itself (it closes the
+    // incident/alert it opened); everything else gets an ordinary rendered
+    // message, so only those still depend on the user's template.
+    const { detectPrebuiltType } = usePrebuiltDestinations();
+    const platformRecoveryKeys: Record<string, I18nKey> = {
+      pagerduty: "alerts.alertSettings.recoveryResolvesIncident",
+      opsgenie: "alerts.alertSettings.recoveryClosesAlert",
+      servicenow: "alerts.alertSettings.recoveryResolvesIncident",
+    };
+
+    // `destination_type_name` first, because that is the field the server reads
+    // (`derive_channel_format`) when it decides to send a protocol resolve. A
+    // destination pointed at PagerDuty without going through the prebuilt
+    // wizard has no `prebuilt_type`, and saying "new Resolved message" for one
+    // would promise something the server does not do.
+    const platformOf = (destination: any): string =>
+      destination?.destination_type_name || detectPrebuiltType(destination) || "";
+
+    const platformKeyFor = (name: any): string | undefined => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      return destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
+    };
+
+    // Ticket closes always go to the firing's own destinations; only the message can be
+    // redirected, so an override lists both halves rather than replacing the first.
+    const recoveryPlan = computed(() => {
+      const redirected = props.recoveryDestinations.length > 0;
+      const rows = props.destinations
+        .filter((name: any) => !redirected || platformKeyFor(name))
+        .map((name: any) => {
+          const platformKey = platformKeyFor(name);
+          return {
+            name: String(name),
+            isPlatform: !!platformKey,
+            action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
+          };
+        });
+      if (!redirected) return rows;
+      return rows.concat(
+        props.recoveryDestinations.map((name: any) => ({
+          name: String(name),
+          isPlatform: false,
+          action: t("alerts.alertSettings.recoveryChatMessage"),
+        })),
+      );
+    });
+    const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
+
     return {
+      recoveryPlan,
+      hasChatRecovery,
       t,
       store,
       handlePeriodChange,

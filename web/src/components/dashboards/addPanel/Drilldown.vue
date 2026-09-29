@@ -57,14 +57,13 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, ref } from "vue";
+import { defineComponent, inject, ref, onBeforeMount } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",

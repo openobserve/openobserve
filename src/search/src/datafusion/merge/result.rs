@@ -43,10 +43,20 @@ impl MergeResult {
 pub enum MergedFile {
     /// Ordinary output, including logs, traces and downsampled metrics.
     Standard { data: Vec<u8>, meta: FileMeta },
+    /// Ordinary output spooled to local disk by the compactor.
+    StandardFile {
+        data_path: tempfile::TempPath,
+        meta: FileMeta,
+    },
     /// Metrics output ordered by `(__hash__, _timestamp)` and retained in memory.
     MetricsHashSorted { data: Vec<u8>, meta: FileMeta },
     /// Open-hour round output spooled to local disk, no `.midx`.
     MetricsHashMerged {
+        data_path: tempfile::TempPath,
+        meta: FileMeta,
+    },
+    /// Closed-hour output whose schema cannot be indexed.
+    MetricsIndexedNoIndex {
         data_path: tempfile::TempPath,
         meta: FileMeta,
     },
@@ -61,9 +71,10 @@ pub enum MergedFile {
 impl MergedFile {
     fn metrics_layout(&self) -> Option<MetricsFileLayout> {
         match self {
-            Self::Standard { .. } => None,
+            Self::Standard { .. } | Self::StandardFile { .. } => None,
             Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
             Self::MetricsHashMerged { .. } => Some(MetricsFileLayout::HashMerged),
+            Self::MetricsIndexedNoIndex { .. } => Some(MetricsFileLayout::Indexed),
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
         }
     }
@@ -90,11 +101,12 @@ impl MergedFile {
             Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
                 Ok((data, meta))
             }
-            Self::MetricsHashMerged { .. } | Self::MetricsIndexed { .. } => {
-                Err(DataFusionError::Execution(
-                    "ingester cannot consume compactor metrics output".to_string(),
-                ))
-            }
+            Self::StandardFile { .. }
+            | Self::MetricsHashMerged { .. }
+            | Self::MetricsIndexedNoIndex { .. }
+            | Self::MetricsIndexed { .. } => Err(DataFusionError::Execution(
+                "ingester cannot consume compactor spooled output".to_string(),
+            )),
         }
     }
 
@@ -106,18 +118,24 @@ impl MergedFile {
             Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
                 Ok((data, meta, None))
             }
-            Self::MetricsHashMerged { data_path, meta } => {
+            Self::StandardFile { data_path, meta }
+            | Self::MetricsHashMerged { data_path, meta }
+            | Self::MetricsIndexedNoIndex { data_path, meta } => {
                 Ok((tokio::fs::read(&data_path).await?, meta, None))
             }
             Self::MetricsIndexed {
                 data_path,
                 metrics_index_path,
                 meta,
-            } => Ok((
-                tokio::fs::read(&data_path).await?,
-                meta,
-                Some(metrics_index_path),
-            )),
+            } => {
+                let data = tokio::fs::read(&data_path).await?;
+                if meta.compressed_size <= 0 || meta.compressed_size as usize != data.len() {
+                    return Err(DataFusionError::Execution(
+                        "completed source size changed before upload".into(),
+                    ));
+                }
+                Ok((data, meta, Some(metrics_index_path)))
+            }
         }
     }
 }

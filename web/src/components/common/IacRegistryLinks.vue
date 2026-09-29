@@ -19,10 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   OpenObserve provider on that registry. Two separate logos rather than one
   combined badge: they are two distinct destinations, and the pair is also what
   tells a reader the exported configuration applies to either tool.
+
+  ONE caption labels the pair rather than one label per mark: two logos beside a
+  primary CTA have to stay quieter than it, and naming each one doubles the width
+  of a secondary affordance while saying the same thing twice. It names the
+  ARTIFACT ("Terraform provider" — what OpenTofu consumes too), never a registry,
+  since a registry name would mislabel whichever of the two marks it omits.
 -->
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import opentofuLogo from "@/assets/images/common/opentofu.svg";
@@ -32,7 +39,13 @@ import { useTheme } from "@/composables/useTheme";
 import { OPENTOFU_REGISTRY_URL, TERRAFORM_REGISTRY_URL } from "@/utils/terraform/provider";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-withDefaults(defineProps<{ dataTest?: string }>(), { dataTest: "iac-registry-links" });
+// `compact` drops the button text where the caller has no width for it; only the
+// call site knows, since the same pair sits inline on one page and inside the
+// header's "More" dropdown on another.
+const props = withDefaults(defineProps<{ dataTest?: string; compact?: boolean }>(), {
+  dataTest: "iac-registry-links",
+  compact: false,
+});
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
@@ -48,13 +61,15 @@ const { isDark } = useTheme();
 const REGISTRIES = computed(() => [
   {
     key: "terraform",
-    name: raw("Terraform Registry"),
+    name: raw("Terraform"),
+    registry: raw("Terraform Registry"),
     icon: `img:${terraformLogo}`,
     url: TERRAFORM_REGISTRY_URL,
   },
   {
     key: "opentofu",
-    name: raw("OpenTofu Registry"),
+    name: raw("OpenTofu"),
+    registry: raw("OpenTofu Registry"),
     icon: `img:${isDark.value ? opentofuLogoDark : opentofuLogo}`,
     url: OPENTOFU_REGISTRY_URL,
   },
@@ -63,22 +78,28 @@ const REGISTRIES = computed(() => [
 
 <template>
   <div class="flex items-center gap-2" :data-test="dataTest">
-    <a
+    <OButton
       v-for="registry in REGISTRIES"
       :key="registry.key"
+      :class="props.compact ? 'min-w-0! px-2! py-0!' : ''"
+      variant="outline"
+      size="sm"
+      as="a"
       :href="registry.url"
       target="_blank"
       rel="noopener noreferrer"
-      :aria-label="t('common.openProviderOnRegistry', { registry: registry.name })"
-      class="rounded-default hover:bg-surface-subtle-hover flex items-center p-1 opacity-80 transition-opacity hover:opacity-100"
+      :aria-label="t('common.openProviderOnRegistry', { registry: registry.registry })"
       :data-test="`${dataTest}-${registry.key}`"
     >
-      <OIcon :name="registry.icon" size="md" />
+      <!-- Slot, not `icon-left`: that prop is typed to the icon enum and these are brand art. -->
+      <template #icon-left><OIcon :name="registry.icon" size="sm" /></template>
+      <template v-if="!props.compact">{{ registry.name }}</template>
       <OTooltip
-        :content="t('common.openProviderOnRegistry', { registry: registry.name })"
+        v-if="props.compact"
+        :content="t('common.openProviderOnRegistry', { registry: registry.registry })"
         side="bottom"
         align="end"
       />
-    </a>
+    </OButton>
   </div>
 </template>

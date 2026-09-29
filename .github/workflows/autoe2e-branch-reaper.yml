@@ -1,0 +1,342 @@
+name: autoe2e Branch Reaper
+
+# Deletes the `autoe2e/*` branches the E2E Council leaves behind.
+#
+# WHERE THEY COME FROM: the Council pushes `autoe2e/pr-<n>` at its GENERATE step but only opens the
+# test PR at PR_BACK, gated on `heal_status == 'passing'`. Any run that dies in between leaves a
+# branch, and nothing deletes it — GitHub auto-deletes a head branch on MERGE, never on close. Of
+# 30 engine runs sampled over 4 days, 5 of the 6 that reached GENERATE died in VERIFY_HEAL, so a
+# failed heal is the dominant source. At the time of writing: 108 `autoe2e/*` branches, 100 of them
+# with no PR at all and 7 with a closed one.
+#
+# WHY A GRACE WINDOW RATHER THAN DELETING AT THE END OF A FAILED RUN: the branch is the Council's
+# own reuse surface. Re-running `/e2e` with clobber off REUSES it, so a spec the Sentinel blocked or
+# the Healer could not fix gets refined instead of regenerated from scratch — deleting on failure
+# would destroy exactly the branches that path is for. Reuse also needs the branch's
+# `e2e-source-sha` trailer to still match the feature head, so it dies the moment the author pushes
+# again; a window of days is therefore sufficient, and an unbounded one buys nothing.
+#
+# A CLOSED TEST PR NEEDS NO GRACE: a human ruled on those tests. That branch goes on the `closed`
+# event, and the sweep catches any the event missed.
+#
+# SAFETY: deletes ONLY refs matching `^autoe2e/`, and never one that is the head OR base of an open
+# PR. Three guards make that safe to run armed: the open-PR list must come back non-empty (an empty
+# one would make every branch look unreferenced, so it aborts instead), a single run may not exceed
+# `max_deletions`, and every deletion is logged with its SHA — restore with
+# `git push origin <sha>:refs/heads/<branch>`.
+#
+# KILL SWITCH: set vars.AUTOE2E_REAPER_DISABLED == 'true' to stop it. Armed by default, matching
+# stuck-run-reaper.yml (which force-cancels runs with no opt-in) and the Council's own
+# E2E_COUNCIL_DISABLED. A reaper that ships disarmed behind a variable nobody remembers to set is a
+# reaper that never runs.
+
+on:
+  schedule:
+    - cron: "30 2 * * *" # daily, off-peak
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report what would be deleted, but delete nothing"
+        type: boolean
+        default: false
+      grace_days:
+        description: "Minimum age (days since last commit) before a never-PR'd branch may be reaped"
+        type: string
+        default: "14"
+      max_deletions:
+        description: "Abort without deleting anything if a run selects more than this many branches"
+        type: string
+        default: "200"
+
+concurrency:
+  group: autoe2e-branch-reaper-${{ github.event.pull_request.number || 'sweep' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # delete refs under autoe2e/
+  pull-requests: read # resolve open PRs so a live branch is never reaped
+
+jobs:
+  reap-on-close:
+    name: Reap the branch of a closed test PR
+    # Merged PRs are excluded because the repo already auto-deletes a merged head branch; `closed`
+    # without a merge is the gap. The head-repo check keeps a fork PR from ever naming a ref here.
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'autoe2e/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete the head branch
+        uses: actions/github-script@v9
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REAPER_DISABLED: ${{ vars.AUTOE2E_REAPER_DISABLED }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const name = process.env.HEAD_REF;
+            // Re-assert in code what the `if:` already checked — this string becomes a delete.
+            if (!name || !name.startsWith('autoe2e/')) {
+              core.setFailed(`refusing to delete a non-autoe2e ref: ${name}`);
+              return;
+            }
+            const closedPr = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha;
+
+            // Closing one PR does not make the branch unreferenced: a second PR can share the head, and
+            // a stacked PR can sit on it as base — deleting would close that one too. Same invariant the
+            // sweep holds, enforced here as well.
+            const blockers = (await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
+            }, (res) => res.data)).filter(pr => pr.head.ref === name || pr.base.ref === name);
+            if (blockers.length) {
+              core.notice(`Keeping ${name} — still referenced by open PR(s) ${blockers.map(p => '#' + p.number).join(', ')}.`);
+              return;
+            }
+
+            if (process.env.REAPER_DISABLED === 'true') {
+              core.notice(`Reaper disabled: would have deleted ${name} at ${sha} (PR #${closedPr} closed unmerged).`);
+              return;
+            }
+            try {
+              await github.rest.git.deleteRef({ owner, repo, ref: `heads/${name}` });
+              core.notice(`Deleted ${name} at ${sha} — test PR #${closedPr} was closed without merging. Restore: git push origin ${sha}:refs/heads/${name}`);
+            } catch (e) {
+              core.warning(`Could not delete ${name}: ${e.message}`);
+            }
+
+  reap:
+    name: Sweep orphaned autoe2e branches
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Sweep autoe2e branches on OSS
+        id: reap
+        uses: actions/github-script@v9
+        env:
+          DEFAULT_GRACE_DAYS: "14"
+          DEFAULT_MAX_DELETIONS: "200"
+          BRANCH_PREFIX: "autoe2e/"
+          REAPER_DISABLED: ${{ vars.AUTOE2E_REAPER_DISABLED }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { owner, repo } = context.repo;
+            const inputs = context.payload.inputs || {};
+            const prefix = process.env.BRANCH_PREFIX;
+
+            const grace = parseInt(inputs.grace_days || process.env.DEFAULT_GRACE_DAYS, 10);
+            if (isNaN(grace) || grace <= 0) {
+              core.setFailed(`Invalid grace_days: "${inputs.grace_days}". Provide a positive integer number of days.`);
+              return;
+            }
+            const graceMs = grace * 24 * 60 * 60 * 1000;
+            const maxDeletions = parseInt(inputs.max_deletions || process.env.DEFAULT_MAX_DELETIONS, 10);
+            if (isNaN(maxDeletions) || maxDeletions <= 0) {
+              core.setFailed(`Invalid max_deletions: "${inputs.max_deletions}". Provide a positive integer.`);
+              return;
+            }
+            const explicitDryRun = inputs.dry_run === true || inputs.dry_run === "true";
+            const disabled = process.env.REAPER_DISABLED === 'true';
+            const dryRun = explicitDryRun || disabled;
+            const now = Date.now();
+
+            // A branch is live if an open PR points at it from EITHER end: head is the normal case,
+            // base catches a test PR that something else was stacked on top of.
+            const openPrs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
+            }, (res) => res.data);
+            // An empty list would leave every branch looking unreferenced, so treat it as a broken
+            // read rather than a repo with no open PRs — this is the one failure that could delete a
+            // live branch, and it is the reason the sweep can be trusted armed.
+            if (openPrs.length === 0) {
+              core.setFailed('Read back zero open PRs — refusing to sweep, since that would make every branch look orphaned.');
+              return;
+            }
+            const liveRefs = new Map();
+            for (const pr of openPrs) {
+              for (const ref of [pr.head && pr.head.ref, pr.base && pr.base.ref]) {
+                if (ref && !liveRefs.has(ref)) liveRefs.set(ref, pr.number);
+              }
+            }
+
+            // GraphQL, not listBranches: the REST branch list carries no commit date, so ageing 100+
+            // branches would cost one extra API call each. This pages names, dates and PR links at once.
+            // Scope with refPrefix, NEVER the `refs(query:)` filter — that one is a fuzzy search that
+            // silently caps at 100 hits, so it drops branches once the backlog passes 100 (verified: it
+            // returned 100 of 108). refPrefix reports a true totalCount and pages correctly.
+            const branches = [];
+            let cursor = null;
+            do {
+              const res = await github.graphql(`
+                query($owner:String!, $repo:String!, $refPrefix:String!, $cursor:String) {
+                  repository(owner:$owner, name:$repo) {
+                    refs(refPrefix:$refPrefix, first:100, after:$cursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        name
+                        target { ... on Commit { committedDate oid } }
+                      }
+                    }
+                  }
+                }`, { owner, repo, refPrefix: `refs/heads/${prefix}`, cursor });
+              const refs = res.repository.refs;
+              for (const n of refs.nodes) {
+                // refPrefix is stripped from the returned name, so put it back — and re-assert it,
+                // because every delete below is built from this string.
+                const name = `${prefix}${n.name}`;
+                if (!n.name || !name.startsWith(prefix)) continue;
+                branches.push({
+                  name,
+                  committedDate: n.target && n.target.committedDate,
+                  sha: (n.target && n.target.oid) || '',
+                });
+              }
+              cursor = refs.pageInfo.hasNextPage ? refs.pageInfo.endCursor : null;
+            } while (cursor);
+
+            // Resolve a branch's closed PR by HEAD REF, not via the ref's `associatedPullRequests`:
+            // that GraphQL field is commit-derived, so the Council's force-push breaks the link and it
+            // reported only 1 of the 7 branches that actually have a closed PR. Called ONLY for
+            // in-grace branches, since an aged-out one is deleted either way.
+            const closedPrFor = async (name) => {
+              try {
+                const res = await github.rest.pulls.list({
+                  owner, repo, state: 'closed', head: `${owner}:${name}`, per_page: 1,
+                });
+                return res.data[0] || null;
+              } catch (e) {
+                core.warning(`closed-PR lookup failed for ${name}: ${e.message}`);
+                return null;
+              }
+            };
+
+            // Select first and delete second, so the blast-radius cap below can abort the run before
+            // anything has been destroyed rather than halfway through.
+            const selected = [], kept = [], survivors = [];
+            for (const b of branches) {
+              const livePr = liveRefs.get(b.name);
+              if (livePr) { kept.push([b.name, `open PR #${livePr}`]); survivors.push(b.name); continue; }
+              if (!b.committedDate) { kept.push([b.name, 'no commit date — skipped defensively']); survivors.push(b.name); continue; }
+
+              const ageDays = Math.floor((now - Date.parse(b.committedDate)) / 86400000);
+              let why = `no PR, ${ageDays}d old`;
+              if (now - Date.parse(b.committedDate) < graceMs) {
+                // Inside the window the grace exists to protect the Council's reuse path — but a closed
+                // PR means a human already ruled on this spec, so there is nothing left to reuse.
+                const closed = await closedPrFor(b.name);
+                if (!closed) { kept.push([b.name, `${ageDays}d old — inside the ${grace}d grace window`]); survivors.push(b.name); continue; }
+                why = `PR #${closed.number} closed`;
+              }
+              selected.push({ ...b, why });
+            }
+
+            // A tripwire for a future logic regression, not for today's backlog: the sweep should be
+            // reaping a handful a day once the backlog clears, so a run that suddenly selects hundreds
+            // is a bug, and stopping costs nothing but a day.
+            if (selected.length > maxDeletions) {
+              core.setFailed(`Selected ${selected.length} branches, over the max_deletions cap of ${maxDeletions} — refusing to delete. Re-run with a higher cap if this is genuinely a backlog flush.`);
+              return;
+            }
+
+            const reaped = [];
+            for (const b of selected) {
+              // Record the SHA whatever happens: it is what makes a mistaken delete recoverable, via
+              // `git push origin <sha>:refs/heads/<branch>`.
+              const sha = (b.sha || '').slice(0, 12);
+              if (dryRun) { reaped.push([b.name, b.why, sha, 'would delete']); survivors.push(b.name); continue; }
+              // liveRefs was read before the per-branch closed-PR round-trips, so a branch can have
+              // gained a PR since — a Council run opening one mid-sweep is exactly that. Re-check
+              // against the ref itself immediately before deleting.
+              try {
+                const fresh = await github.rest.pulls.list({
+                  owner, repo, state: 'open', head: `${owner}:${b.name}`, per_page: 1,
+                });
+                if (fresh.data.length) {
+                  kept.push([b.name, `open PR #${fresh.data[0].number} appeared mid-sweep`]);
+                  survivors.push(b.name);
+                  continue;
+                }
+              } catch (e) {
+                // Could not confirm it is still unreferenced — keep it and try again tomorrow.
+                kept.push([b.name, `re-check failed, kept: ${e.message}`]);
+                survivors.push(b.name);
+                continue;
+              }
+              try {
+                await github.rest.git.deleteRef({ owner, repo, ref: `heads/${b.name}` });
+                reaped.push([b.name, b.why, sha, 'deleted']);
+                core.info(`Deleted ${b.name} at ${b.sha} (${b.why}). Restore: git push origin ${b.sha}:refs/heads/${b.name}`);
+              } catch (e) {
+                // A protected or already-deleted ref lands here; report it rather than failing the sweep.
+                kept.push([b.name, `delete failed: ${e.message}`]);
+                survivors.push(b.name);
+              }
+            }
+
+            // The ENT sweep keys off the SURVIVORS, not off what this run deleted, so it also catches
+            // a pair whose OSS side went earlier via the closed-PR event.
+            fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'survivors.txt'), survivors.join('\n'));
+            core.setOutput('dry_run', String(dryRun));
+
+            await core.summary
+              .addHeading(`🧹 autoe2e Branch Reaper — ${dryRun ? `dry-run (${reaped.length} would be deleted)` : `${reaped.length} deleted`}`)
+              .addRaw(`Scanned **${branches.length}** \`${prefix}*\` branches · grace window **${grace}d** · cap **${maxDeletions}** · deletion ${dryRun ? `**off**${explicitDryRun ? ' (dry-run requested)' : ' (`AUTOE2E_REAPER_DISABLED` is set)'}` : '**armed**'}`)
+              .addHeading('Reaped', 3)
+              .addRaw('Restore any of these with `git push origin <sha>:refs/heads/<branch>`.')
+              .addTable([
+                [{ data: 'Branch', header: true }, { data: 'Why', header: true }, { data: 'SHA', header: true }, { data: 'Action', header: true }],
+                ...(reaped.length ? reaped : [['(none)', '—', '—', '—']]),
+              ])
+              .addHeading('Kept', 3)
+              .addTable([
+                [{ data: 'Branch', header: true }, { data: 'Why', header: true }],
+                ...(kept.length ? kept : [['(none)', '—']]),
+              ])
+              .write();
+
+      - name: Sweep the paired branches on o2-enterprise
+        # o2-enterprise carries same-named `autoe2e/*` branches because ENT CI resolves the OSS spec
+        # branch BY NAME, so an ENT branch dies only once its OSS counterpart is gone — never while the
+        # pair is still live. Opt-in, and best-effort: the ORG_ADMIN_TOKEN is documented with
+        # Contents: R/W on openobserve but only Actions + Issues/PRs on o2-enterprise, so a 403 here
+        # is expected until that is widened, and must not fail the OSS sweep that already succeeded.
+        if: vars.AUTOE2E_REAPER_ENT == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ENT_REPO: openobserve/o2-enterprise
+          DRY_RUN: ${{ steps.reap.outputs.dry_run }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::ORG_ADMIN_TOKEN is not set — skipping the o2-enterprise sweep."
+            exit 0
+          fi
+          gh api "repos/${ENT_REPO}/branches?per_page=100" --paginate -q '.[].name' \
+            | grep '^autoe2e/' > "${RUNNER_TEMP}/ent.txt" || true
+          while IFS= read -r B; do
+            [ -n "$B" ] || continue
+            case "$B" in autoe2e/*) ;; *) echo "::warning::refusing non-autoe2e ref: $B"; continue ;; esac
+            if grep -Fxq "$B" "${RUNNER_TEMP}/survivors.txt"; then
+              echo "Keeping ENT $B — its OSS counterpart is still live."
+              continue
+            fi
+            PR=$(gh pr list --repo "$ENT_REPO" --head "$B" --state open --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+            if [ -n "$PR" ]; then
+              echo "Keeping ENT $B — open ENT PR #$PR."
+              continue
+            fi
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "Dry-run: would delete ENT $B."
+              continue
+            fi
+            gh api -X DELETE "repos/${ENT_REPO}/git/refs/heads/${B}" >/dev/null 2>&1 \
+              && echo "Deleted ENT $B." \
+              || echo "::warning::could not delete ENT $B (absent, protected, or PAT lacks Contents: R/W)."
+          done < "${RUNNER_TEMP}/ent.txt"

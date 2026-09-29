@@ -9,6 +9,7 @@ Reference for O2's text, selection, and choice form controls under `@/lib/forms/
 - [Input family](#input-family) — OInput, OTextarea, OFormInput, OFormTextarea
 - [Select family](#select-family) — OSelect, OSelectItem, OSelectGroup, OFormSelect
 - [Combobox family](#combobox-family) — OCombobox, OFormCombobox
+- [TemplateInput family](#templateinput-family) — OTemplateInput, OTemplateTextarea
 - [SearchInput](#searchinput) — OSearchInput
 - [Checkbox family](#checkbox-family) — OCheckbox, OCheckboxGroup, OFormCheckbox, OFormCheckboxGroup
 - [Radio family](#radio-family) — ORadio, ORadioGroup, OFormRadioGroup
@@ -37,6 +38,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ## Input family
 
 ### OInput
+
 **Import:** `@/lib/forms/Input/OInput.vue`
 **Use when:** A single-line (or, via `type="textarea"`, multi-line) free-text field — text, password, email, number, url, tel, search — with optional prefix/suffix, icons, clear button, mask, debounce, and character counter.
 **Don't use for:** Choosing from a fixed option list (use `OSelect`); typeahead over a suggestion list where free text is also allowed (use `OCombobox`); a pure filter/search box in a toolbar (use `OSearchInput`, which wraps this with a search icon).
@@ -44,6 +46,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip` (put a tooltip element inside — renders an info icon in the label). (`append` is also consumed in template.)
 **Emits:** `update:modelValue`, `clear`, `blur`, `focus`, `keydown`, `keyup`, `keypress`
 **Example:**
+
 ```vue
 <OInput
   v-model="host"
@@ -55,9 +58,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
   :error-message="hostError"
 />
 ```
+
 **Family:** Siblings `OTextarea` (dedicated multi-line), `OFormInput` (form wrapper). Headless — pair with `OFormInput` inside `<OForm>`.
 
 ### OTextarea
+
 **Import:** `@/lib/forms/Input/OTextarea.vue`
 **Use when:** A dedicated multi-line text field where you want first-class textarea props like `rows`, `autogrow`, or `fill` (stretch to parent height in a bounded flex container).
 **Don't use for:** Single-line input (use `OInput`). Note `OInput` can also render a textarea via `type="textarea"`; prefer `OTextarea` when you need `fill` or a textarea-only API surface.
@@ -65,12 +70,15 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `append` (block below the border), `tooltip` (info icon in label)
 **Emits:** `update:modelValue`, `blur`, `focus`, `keydown`
 **Example:**
+
 ```vue
 <OTextarea v-model="description" label="Description" :rows="5" autogrow />
 ```
+
 **Family:** Siblings `OInput`, `OFormTextarea` (form wrapper). Headless.
 
 ### OFormInput
+
 **Import:** `@/lib/forms/Input/OFormInput.vue`
 **Use when:** An `OInput` field inside `<OForm>` — value and validation errors bind automatically from the form field named by `name`.
 **Don't use for:** Standalone inputs with no `<OForm>` ancestor (use `OInput` + your own `v-model`).
@@ -78,14 +86,17 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** forwards `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip`, `append` to `OInput`.
 **Emits:** none you wire yourself — internally emits `update:modelValue`/`blur` into the form field.
 **Example:**
+
 ```vue
 <OForm :default-values="{ email: '' }" ...>
   <OFormInput name="email" type="email" label="Email" required />
 </OForm>
 ```
+
 **Family:** Form wrapper for `OInput`. Sibling wrapper `OFormTextarea`.
 
 ### OFormTextarea
+
 **Import:** `@/lib/forms/Input/OFormTextarea.vue`
 **Use when:** An `OTextarea` field inside `<OForm>` with auto-bound value and validation.
 **Don't use for:** Standalone multi-line input (use `OTextarea`).
@@ -93,9 +104,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** none forwarded (wraps `OTextarea` directly).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormTextarea name="notes" label="Notes" :rows="4" autogrow />
 ```
+
 **Family:** Form wrapper for `OTextarea`.
 
 ---
@@ -103,6 +116,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ## Select family
 
 ### OSelect
+
 **Import:** `@/lib/forms/Select/OSelect.vue`
 **Use when:** Choosing one or many values from a **known option list** — single or `multiple`, optionally `searchable` (built-in filter), `creatable`, grouped, virtualized, with chips, "Select All", and per-option icons.
 **Don't use for:** Free-text entry with suggestions where the typed text itself is the value (use `OCombobox`); a plain text field (use `OInput`); a small set of always-visible mutually-exclusive/multi options laid out inline (use `OOptionGroup` / `ORadioGroup` / `OCheckboxGroup`).
@@ -110,6 +124,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `default` (render `OSelectItem`/`OSelectGroup`), `trigger` (`{ value }`), `chip` (`{ label, value }`), `empty`, `before-options`, `after-options`, `icon-left`, `tooltip` (OSelect has `icon-left` only — no `icon-right`)
 **Emits:** `update:modelValue`, `clear`, `search`, `create`, `open`, `close`, `blur`, `change`, `keydown`
 **Example:**
+
 ```vue
 <OSelect
   v-model="stream"
@@ -120,9 +135,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
   clearable
 />
 ```
+
 **Family:** Siblings `OSelectItem`, `OSelectGroup` (slot children), `OFormSelect` (form wrapper). Headless.
 
 ### OSelectItem
+
 **Import:** `@/lib/forms/Select/OSelectItem.vue`
 **Use when:** Declaring a single custom option inside `OSelect`'s default slot — when you need custom label markup instead of the flat `options` array.
 **Don't use for:** Simple flat option lists (pass `options` to `OSelect` instead); grouping headers (wrap items in `OSelectGroup`).
@@ -130,15 +147,18 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `default` (custom option content — overrides `label`)
 **Emits:** none (selection is driven by parent `OSelect`)
 **Example:**
+
 ```vue
 <OSelect v-model="pick">
   <OSelectItem :value="1" label="One" />
   <OSelectItem :value="2"><b>Two</b></OSelectItem>
 </OSelect>
 ```
+
 **Family:** Child of `OSelect`; sibling `OSelectGroup`. Headless building block (no form wrapper of its own).
 
 ### OSelectGroup
+
 **Import:** `@/lib/forms/Select/OSelectGroup.vue`
 **Use when:** Grouping `OSelectItem`s under a visible heading inside `OSelect`'s default slot.
 **Don't use for:** Flat lists (use `options`); a single option (use `OSelectItem`).
@@ -146,6 +166,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `default` (the `OSelectItem` nodes)
 **Emits:** none
 **Example:**
+
 ```vue
 <OSelect v-model="pick">
   <OSelectGroup label="Fruit">
@@ -153,9 +174,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
   </OSelectGroup>
 </OSelect>
 ```
+
 **Family:** Child of `OSelect`; sibling `OSelectItem`. Headless building block.
 
 ### OFormSelect
+
 **Import:** `@/lib/forms/Select/OFormSelect.vue`
 **Use when:** An `OSelect` inside `<OForm>` — value and validation bind automatically.
 **Don't use for:** Standalone selects (use `OSelect`).
@@ -163,9 +186,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** forwards `default`, `empty`, `tooltip` to `OSelect`.
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormSelect name="stream" :options="streamOptions" label="Stream" required />
 ```
+
 **Family:** Form wrapper for `OSelect`.
 
 ---
@@ -173,13 +198,15 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ## Combobox family
 
 ### OCombobox
+
 **Import:** `@/lib/forms/Combobox/OCombobox.vue`
 **Use when:** A **typeahead text input with a suggestion dropdown** where the bound value is the **typed string** (free entry allowed) and picking a suggestion fills/transforms the text. Supports a `searchRegex` to extract a needle from the input and a `valueReplaceFn` to transform the chosen option before emit. This is the O2 replacement for `CommonAutoComplete`.
-**Don't use for:** Selecting from a fixed set where only listed values are valid (use `OSelect` — it emits the option's value, not free text, and supports multiple/groups/chips). Difference from `OSelect`: **OCombobox's model is the input string and free text is allowed**; **OSelect's model is a chosen option value from the list** and there is no free-text value (its `searchable`/`creatable` still commit list values or explicit created entries).
+**Don't use for:** Selecting from a fixed set where only listed values are valid (use `OSelect` — it emits the option's value, not free text, and supports multiple/groups/chips); a text field that stays a plain field until the user types `{{`, where the pick splices a `{{NAME}}` token at the caret instead of replacing the text (use `OTemplateInput` / `OTemplateTextarea`). Difference from `OSelect`: **OCombobox's model is the input string and free text is allowed**; **OSelect's model is a chosen option value from the list** and there is no free-text value (its `searchable`/`creatable` still commit list values or explicit created entries).
 **Key props:** `modelValue` (`string` — the text in the input), `items` (`ComboboxOption[]` = `{ label, value }`, default `[]`), `placeholder`, `label`, `searchRegex` (regex string; first non-undefined capture group becomes the search needle; whole input if omitted), `valueReplaceFn` (`(option) => string`, default `option => option.value`), `disabled` (default `false`), `required`, `size` (`"sm"` | `"md"` default), `error` (default `false`), `errorMessage`, `helpText`, `debounce` (ms, default `0`), `labelPosition` (`"inside"` | `"outside"` default), `id`, `name`.
 **Slots:** `label` (replaces `label` prop), `tooltip` (info icon next to label)
 **Emits:** `update:modelValue` (`string`), `select` (`string` — fired when an option is chosen)
 **Example:**
+
 ```vue
 <OCombobox
   v-model="query"
@@ -188,9 +215,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
   placeholder="Type or pick a field"
 />
 ```
+
 **Family:** Sibling `OFormCombobox` (form wrapper). Headless.
 
 ### OFormCombobox
+
 **Import:** `@/lib/forms/Combobox/OFormCombobox.vue`
 **Use when:** An `OCombobox` inside `<OForm>` with auto-bound value and validation.
 **Don't use for:** Standalone typeahead (use `OCombobox`); fixed-list form selection (use `OFormSelect`).
@@ -198,16 +227,76 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label`, `tooltip` (forwarded).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormCombobox name="field" :items="fieldSuggestions" label="Field" />
 ```
+
 **Family:** Form wrapper for `OCombobox`.
+
+---
+
+## TemplateInput family
+
+### OTemplateInput
+
+**Import:** `@/lib/forms/TemplateInput/OTemplateInput.vue`
+**Use when:** A single-line text or URL field whose value may hold `{{NAME}}` template tokens that are substituted later (a Synthetics starting URL or step value, an alert template). Wraps `OInput` unchanged; typing `{{` opens a portalled, virtualised list of `suggestions` filtered case-insensitively by what follows the braces, and Enter / Tab / a row click splice `{{NAME}}` (stored spelling) over the open token at the caret. ArrowUp/ArrowDown move with wrap, Escape and blur close, moving the caret away closes. With `values` set, the value of the closed token under the caret peeks above the field after 300 ms. Without `suggestions` it behaves as a plain `OInput`.
+**Don't use for:** Typeahead where the pick replaces the whole text and the list opens on focus (use `OCombobox`); a plain field with no template tokens (use `OInput`); multi-line prompt text (use `OTemplateTextarea`); `debounce`, `mask`, `modelModifiers`, `revealable`, or any `type` other than `"text"` / `"url"` — those desynchronise the caret from the emitted text and are omitted from the props type.
+**Key props:** `modelValue` (`string`), `suggestions` (`TemplateSuggestion[]` = `{ name }` plus any caller fields, display order preserved; absent or empty = plain field), `values` (`Record<string, string>`; present turns the peek on), `type` (`"text"` default | `"url"`), plus every other `OInput` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `prefix`, `suffix`, `clearable`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `size`, `width`, `labelPosition`, `id`, `name`, `autocomplete`). `$attrs` (`data-test`, `class`, undeclared listeners such as `@clear` / `@paste`) land on the field root, never on the wrapper.
+**Slots:** `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip`, `append` (forwarded to `OInput`); `suggestion` (scoped, `{ suggestion, active }`, generic over the suggestion type — default renders `{{name}}` in mono).
+**Emits:** `update:modelValue` (`string`), `select` (`string` — the inserted name), `focus`, `blur`, `keydown`
+**data-test:** the consumer's id on the field root, `-field` on the native input, `-suggest` on the popover content, `-suggest-item-{name}` per row (name as stored), `-peek` on the peek. Rows render in a portal — query `document.body`.
+**Example:**
+
+```vue
+<OTemplateInput
+  v-model="url"
+  type="url"
+  label="Starting URL"
+  data-test="synthetics-create-url-input"
+  :suggestions="variableSuggestions"
+  @blur="validateUrl"
+>
+  <template #prefix><OIcon name="link" size="sm" /></template>
+  <template #suggestion="{ suggestion, active }">
+    <VariableSuggestionRow :suggestion="suggestion" :active="active" />
+  </template>
+</OTemplateInput>
+```
+
+**Family:** Sibling `OTemplateTextarea` (multi-line). Shared sub-components `OTemplateOverlay` (peek box + list) and `OTemplateSuggestList`, plus the composable `useTemplateSuggest` (exports `CLOSED_TOKEN_RE`, `OPEN_TOKEN_RE`, `tokenAtCaret`, `tokenFor`), are internal to the family. Headless.
+
+### OTemplateTextarea
+
+**Import:** `@/lib/forms/TemplateInput/OTemplateTextarea.vue`
+**Use when:** A multi-line field with the same `{{` suggestion list and optional peek as `OTemplateInput` — an LLM prompt message with declared variables. Wraps `OTextarea` unchanged (`autogrow`, `maxRows`, `fill` all work).
+**Don't use for:** Single-line values (use `OTemplateInput`); free text with no template tokens (use `OTextarea`); JSON or code where an unrelated `{{` would open the list.
+**Key props:** `modelValue` (`string`), `suggestions`, `values` (as `OTemplateInput`), plus every `OTextarea` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `rows`, `autogrow`, `maxRows`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `size`, `width`, `fill`, `id`, `name`, `autocomplete`).
+**Slots:** `tooltip`, `append` (forwarded to `OTextarea`); `suggestion` (scoped, `{ suggestion, active }`).
+**Emits:** `update:modelValue` (`string`), `select` (`string`), `focus`, `blur`, `keydown`
+**Example:**
+
+```vue
+<OTemplateTextarea
+  v-model="message.content"
+  :rows="1"
+  :max-rows="5"
+  autogrow
+  :suggestions="promptVariables"
+  :values="variableValues"
+  :data-test="`ai-playground-message-input-${message.id}`"
+/>
+```
+
+**Family:** Sibling `OTemplateInput` (single-line). Headless.
 
 ---
 
 ## SearchInput
 
 ### OSearchInput
+
 **Import:** `@/lib/forms/SearchInput/OSearchInput.vue`
 **Use when:** A compact filter/search box (list filters, toolbar search) — an `OInput` preset with a search icon, clearable by default, and an extra `xs` size. Value is a plain string, no label/error surface.
 **Don't use for:** A general text field with label/validation (use `OInput`); selecting from options (use `OSelect`); typeahead suggestions (use `OCombobox`).
@@ -215,9 +304,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** none
 **Emits:** `update:modelValue`, `clear`
 **Example:**
+
 ```vue
 <OSearchInput v-model="filter" placeholder="Filter streams..." />
 ```
+
 **Family:** No form wrapper — it wraps `OInput` internally. Standalone/headless only.
 
 ---
@@ -225,6 +316,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ## Checkbox family
 
 ### OCheckbox
+
 **Import:** `@/lib/forms/Checkbox/OCheckbox.vue`
 **Use when:** A single boolean (or tri-state `indeterminate`) checkbox, or a member of an `OCheckboxGroup` (set `value`/`val` and it reads the group's checked array). Supports custom `trueValue`/`falseValue`/`indeterminateValue`.
 **Don't use for:** A set of related checkboxes with a shared array model (wrap them in `OCheckboxGroup`, or use `OOptionGroup type="checkbox"` for a list-driven layout); an on/off toggle switch (use `OSwitch`).
@@ -232,12 +324,15 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label` (custom label content — overrides `label` prop)
 **Emits:** `update:modelValue`, `change` (emits the item value when inside a group)
 **Example:**
+
 ```vue
 <OCheckbox v-model="agree" label="I agree to the terms" />
 ```
+
 **Family:** Siblings `OCheckboxGroup`, `OFormCheckbox`, `OFormCheckboxGroup`. Headless.
 
 ### OCheckboxGroup
+
 **Import:** `@/lib/forms/Checkbox/OCheckboxGroup.vue`
 **Use when:** Managing several `OCheckbox` children as one array-valued selection — it `provide()`s a group context so each child with a `value` toggles into/out of the shared `modelValue` array.
 **Don't use for:** A single boolean (use `OCheckbox`); a compact list-driven multi-select laid out from an options array (use `OOptionGroup type="checkbox"`).
@@ -245,15 +340,18 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `default` (the `OCheckbox` children)
 **Emits:** `update:modelValue` (the new checked-values array)
 **Example:**
+
 ```vue
 <OCheckboxGroup v-model="selected">
   <OCheckbox value="logs" label="Logs" />
   <OCheckbox value="metrics" label="Metrics" />
 </OCheckboxGroup>
 ```
+
 **Family:** Parent of `OCheckbox`; siblings `OFormCheckbox`, `OFormCheckboxGroup`. Headless.
 
 ### OFormCheckbox
+
 **Import:** `@/lib/forms/Checkbox/OFormCheckbox.vue`
 **Use when:** A single boolean checkbox bound to one `<OForm>` field.
 **Don't use for:** A multi-value checkbox set in a form (use `OFormCheckboxGroup`); standalone (use `OCheckbox`).
@@ -261,12 +359,15 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label` (per `OCheckbox`).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormCheckbox name="acceptTos" label="Accept terms" />
 ```
+
 **Family:** Form wrapper for `OCheckbox`.
 
 ### OFormCheckboxGroup
+
 **Import:** `@/lib/forms/Checkbox/OFormCheckboxGroup.vue`
 **Use when:** An array-valued checkbox group bound to one `<OForm>` field (unlike the other OForm wrappers this extends the full `CheckboxGroupProps` — `modelValue` still comes from the form).
 **Don't use for:** A single boolean (use `OFormCheckbox`).
@@ -274,12 +375,14 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `default` (the `OCheckbox` children).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormCheckboxGroup name="channels">
   <OCheckbox value="email" label="Email" />
   <OCheckbox value="slack" label="Slack" />
 </OFormCheckboxGroup>
 ```
+
 **Family:** Form wrapper for `OCheckboxGroup`.
 
 ---
@@ -287,6 +390,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ## Radio family
 
 ### ORadio
+
 **Import:** `@/lib/forms/Radio/ORadio.vue`
 **Use when:** A single radio button representing one `value` — **must** be used inside `ORadioGroup` (the group provides the RadioGroupRoot context and value map).
 **Don't use for:** Standalone use outside a group (it has no own model); a multi-select (use checkboxes); a compact options-array layout (use `OOptionGroup type="radio"`).
@@ -294,15 +398,18 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label` (custom label content)
 **Emits:** none (selection flows through the parent `ORadioGroup`)
 **Example:**
+
 ```vue
 <ORadioGroup v-model="mode">
   <ORadio value="auto" label="Auto" />
   <ORadio value="manual" label="Manual" />
 </ORadioGroup>
 ```
+
 **Family:** Child of `ORadioGroup`. Headless building block.
 
 ### ORadioGroup
+
 **Import:** `@/lib/forms/Radio/ORadioGroup.vue`
 **Use when:** A single-choice group of `ORadio` children with one selected value; controls orientation and shared name.
 **Don't use for:** Multi-select (use `OCheckboxGroup`); a list-driven layout from an options array (use `OOptionGroup type="radio"`).
@@ -310,15 +417,18 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `default` (the `ORadio` children)
 **Emits:** `update:modelValue`
 **Example:**
+
 ```vue
 <ORadioGroup v-model="mode" orientation="horizontal" label="Mode">
   <ORadio value="auto" label="Auto" />
   <ORadio value="manual" label="Manual" />
 </ORadioGroup>
 ```
+
 **Family:** Parent of `ORadio`; sibling `OFormRadioGroup`. Headless.
 
 ### OFormRadioGroup
+
 **Import:** `@/lib/forms/Radio/OFormRadioGroup.vue`
 **Use when:** A single-choice radio group bound to one `<OForm>` field.
 **Don't use for:** Standalone radios (use `ORadioGroup`).
@@ -326,12 +436,14 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `default` (the `ORadio` children).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormRadioGroup name="mode" label="Mode">
   <ORadio value="auto" label="Auto" />
   <ORadio value="manual" label="Manual" />
 </OFormRadioGroup>
 ```
+
 **Family:** Form wrapper for `ORadioGroup`.
 
 ---
@@ -339,6 +451,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ## Switch family
 
 ### OSwitch
+
 **Import:** `@/lib/forms/Switch/OSwitch.vue`
 **Use when:** An on/off toggle — instant enable/disable of a setting. Supports custom `checkedValue`/`uncheckedValue` and label placement.
 **Don't use for:** A checkbox in a list/form validation context (use `OCheckbox`); choosing among 3+ options (use `ORadioGroup`/`OOptionGroup`).
@@ -346,12 +459,15 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label` (custom label content — overrides prop), `tooltip` (info icon inline in label)
 **Emits:** `update:modelValue`, `change`
 **Example:**
+
 ```vue
 <OSwitch v-model="enabled" label="Enable alerts" />
 ```
+
 **Family:** Sibling `OFormSwitch`. Headless.
 
 ### OFormSwitch
+
 **Import:** `@/lib/forms/Switch/OFormSwitch.vue`
 **Use when:** An on/off toggle bound to one `<OForm>` field.
 **Don't use for:** Standalone toggles (use `OSwitch`).
@@ -359,9 +475,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label`, `tooltip` (per `OSwitch`).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormSwitch name="notifications" label="Email notifications" />
 ```
+
 **Family:** Form wrapper for `OSwitch`.
 
 ---
@@ -371,6 +489,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **What OptionGroup is:** `OOptionGroup` is a **single component that renders an inline group of radios OR checkboxes from an `options` array** (switch via `type`), with a shared label, help text, and error surface. Contrast with `ORadioGroup`/`OCheckboxGroup`, which are containers you fill with individual `ORadio`/`OCheckbox` **child elements** in the slot. Use `OOptionGroup` when the choices come from a data array and you want a compact, list-driven layout with built-in label/help/error; use the Radio/Checkbox groups when you need custom per-item markup as slot children.
 
 ### OOptionGroup
+
 **Import:** `@/lib/forms/OptionGroup/OOptionGroup.vue`
 **Use when:** Rendering a set of mutually-exclusive (`type="radio"`) or multi-select (`type="checkbox"`) choices from an options array, inline (horizontal/vertical), with label + help text + error styling.
 **Don't use for:** Choices needing custom child markup (use `ORadioGroup`/`OCheckboxGroup` with slot children); a dropdown of many options (use `OSelect`); a single toggle (use `OSwitch`/`OCheckbox`).
@@ -378,6 +497,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label` (custom label content), `tooltip` (info icon in label row)
 **Emits:** `update:modelValue`, `change`
 **Example:**
+
 ```vue
 <OOptionGroup
   v-model="severity"
@@ -389,9 +509,11 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
   label="Severity"
 />
 ```
+
 **Family:** Sibling `OFormOptionGroup`. Headless.
 
 ### OFormOptionGroup
+
 **Import:** `@/lib/forms/OptionGroup/OFormOptionGroup.vue`
 **Use when:** An option group (radio or checkbox) bound to one `<OForm>` field.
 **Don't use for:** Standalone option groups (use `OOptionGroup`).
@@ -399,6 +521,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Slots:** `label`, `tooltip` (per `OOptionGroup`).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
+
 ```vue
 <OFormOptionGroup
   name="severity"
@@ -418,7 +541,7 @@ When no O2 component fits your use case, **build a reusable control** instead of
 2. **Build the headless version first** — a plain component that owns its value via `v-model` (props `modelValue`, emits `update:modelValue`). No form knowledge.
 3. **Add the form wrapper** if it will go inside `<OForm>` — a sibling component that `inject(FORM_CONTEXT_KEY)`, renders the headless version inside a `<Field :name="...">`, and wires validation/value/blur to the field.
 
-**Illustrative example — a `SecretInput` control** *(hypothetical: there is no `SecretInput` in this repo; it only shows the shape of a headless control you'd build)*
+**Illustrative example — a `SecretInput` control** _(hypothetical: there is no `SecretInput` in this repo; it only shows the shape of a headless control you'd build)_
 
 Say you need a field that accepts a secret token with reveal/copy controls and nothing in O2 fits. The headless version owns its value via `v-model` and has no form knowledge:
 
@@ -495,6 +618,7 @@ const copyToClipboard = async () => {
 ```
 
 **To use outside a form:**
+
 ```vue
 <SecretInput
   :model-value="authToken"
