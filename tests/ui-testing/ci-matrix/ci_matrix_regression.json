@@ -42,7 +42,8 @@
       "alerts-measure-column-default.spec.js",
       "alerts-from-dashboard-panel.spec.js",
       "alerts-query-editor-search-endpoint.spec.js",
-      "alerts-13243-prebuilt-form-reuse.spec.js"
+      "alerts-13243-prebuilt-form-reuse.spec.js",
+      "alerts-14796-destination-usage.spec.js"
     ],
     "disabled": []
   },

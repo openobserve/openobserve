@@ -236,10 +236,12 @@ defineExpose({ focus });
 // OSelect); the inner input fills it via h-full. 34px control height per the
 // design system.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
+  xs: "h-7",
   sm: "h-[2.125rem]",
   md: "h-[2.125rem]",
 };
 const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
+  xs: "text-xs",
   sm: "text-sm",
   md: "text-sm",
 };

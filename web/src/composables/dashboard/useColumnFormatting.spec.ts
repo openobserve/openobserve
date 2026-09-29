@@ -14,14 +14,81 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+import type { TranslateFn } from "@/types/i18n";
 import {
   emptyColumnOverride,
   emptyConditionalRule,
+  getUnitOptions,
   serializeColumnOverride,
   serializeOverrides,
   loadAllFromRaw,
   type ColumnOverrideUI,
 } from "./useColumnFormatting";
+
+describe("getUnitOptions", () => {
+  const t = ((key: string) => key) as unknown as TranslateFn;
+  const pinned = (current?: string | null) =>
+    getUnitOptions(t, current).filter((o) => o.parentValue === "other-locale");
+
+  it("keeps Locale Format as the plain Auto option", () => {
+    expect(getUnitOptions(t)).toContainEqual({ label: "dashboard.localeFormat", value: "locale" });
+  });
+
+  it("follows Auto with the expandable Other Locale row, its locales, then Bytes", () => {
+    const options = getUnitOptions(t);
+    const values = options.map((o) => o.value);
+    const rowIndex = values.indexOf("other-locale");
+    const pinnedCount = pinned().length;
+    expect(options[rowIndex]).toEqual({
+      label: "dashboard.otherLocale",
+      value: "other-locale",
+      expandable: true,
+    });
+    expect(values[rowIndex - 1]).toBe("locale");
+    expect(values.slice(rowIndex + 1, rowIndex + 1 + pinnedCount)).toEqual(
+      pinned().map((o) => o.value),
+    );
+    expect(values[rowIndex + 1 + pinnedCount]).toBe("bytes");
+    expect(values.at(-1)).toBe("custom");
+    expect(options.filter((o) => o.expandable)).toHaveLength(1);
+  });
+
+  it("uses no group headers", () => {
+    expect(getUnitOptions(t).some((o) => "header" in o)).toBe(false);
+  });
+
+  it("pins each nested locale in the unit value, named as language - country (code)", () => {
+    const czech = pinned().find((o) => o.value === "locale:cs-CZ");
+    expect(czech?.label).toBe("Czech - CZ (cs_CZ)");
+    expect(pinned().some((o) => o.value === "locale:hi-IN")).toBe(true);
+    expect(pinned().every((o) => String(o.value).startsWith("locale:"))).toBe(true);
+  });
+
+  it("names the Arabic UI locale despite its Unicode extension", () => {
+    expect(pinned().find((o) => o.value === "locale:ar-SA-u-nu-latn")?.label).toBe(
+      "Arabic - SA (ar_SA)",
+    );
+  });
+
+  it("gives every nested locale a distinct name", () => {
+    const labels = pinned().map((o) => o.label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("appends a valid pinned locale that is not in the list", () => {
+    const options = getUnitOptions(t, "locale:sl-SI");
+    expect(options.filter((o) => o.value === "locale:sl-SI")).toHaveLength(1);
+    expect(pinned("locale:sl-SI").some((o) => o.value === "locale:sl-SI")).toBe(true);
+    expect(options).toHaveLength(getUnitOptions(t).length + 1);
+  });
+
+  it.each(["locale:cs-CZ", "locale:xx-ZZ", "locale", "bytes", null])(
+    "adds no entry for the current unit %j",
+    (current) => {
+      expect(getUnitOptions(t, current)).toHaveLength(getUnitOptions(t).length);
+    },
+  );
+});
 
 describe("useColumnFormatting", () => {
   describe("empty factories", () => {
@@ -156,6 +223,15 @@ describe("useColumnFormatting", () => {
         customUnit: "req/s",
       };
       const entry = serializeColumnOverride(original);
+      expect(loadAllFromRaw([entry])[0]).toEqual(original);
+    });
+
+    it("round-trips a pinned Locale Format unit", () => {
+      const original = { ...emptyColumnOverride("c"), unit: "locale:hi-IN" };
+      const entry = serializeColumnOverride(original);
+      expect(entry.config).toEqual([
+        { type: "unit", value: { unit: "locale:hi-IN", customUnit: null } },
+      ]);
       expect(loadAllFromRaw([entry])[0]).toEqual(original);
     });
   });

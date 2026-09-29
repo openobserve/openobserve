@@ -44,95 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DbmPageChrome title-data-test="dbm-table-health-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
-      <!-- W11 · Recommendations. Deterministic checks, each showing the
-           arithmetic that fired it. The rule line is one hover away rather
-           than in the primary reading path: a recommendation you cannot audit
-           is one readers learn to scroll past. -->
-      <!-- Gated on `!loading`, like every other verdict on this page: the
-           inner branches always have something to say (a list, or one of the
-           two empty states), and "All clear" on first paint would assert a
-           verdict before any data has answered. -->
-      <section
-        v-if="!loading"
-        class="border-border-subtle bg-surface-base px-page-edge flex flex-col gap-1.5 border-b py-2"
-        data-test="dbm-recommendations"
-      >
-        <div class="flex items-baseline gap-2">
-          <span class="text-text-heading text-xs font-semibold">
-            {{ t("dbm.recommendations.title") }}
-          </span>
-          <span class="text-text-secondary text-2xs">
-            {{ t("dbm.recommendations.subtitle") }}
-          </span>
-        </div>
-
-        <!-- ONE ROW PER RULE, not one per detected item. `buildRecommendations`
-             emits an entry for every blocker and every long-running session, so
-             a busy database produced dozens of list items and the strip stopped
-             being read at all. `collapseRecommendations` keeps the WORST item of
-             each rule and reports how many it stands for — the remainder is
-             disclosed in the row rather than dropped, because a strip that
-             quietly showed a subset would present itself as more complete than
-             it is. -->
-        <ul v-if="collapsedRecommendations.length" class="flex flex-col gap-1">
-          <li
-            v-for="entry in collapsedRecommendations"
-            :key="entry.rec.id"
-            class="flex items-center gap-2"
-            :data-test="`dbm-recommendation-${entry.rec.id}`"
-          >
-            <span
-              class="rounded-default grid size-4.5 shrink-0 place-items-center"
-              :class="DBM_SOFT_TONES[entry.rec.tone]"
-            >
-              <OIcon :name="DBM_TONE_ICONS[entry.rec.tone]" size="xs" />
-            </span>
-            <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
-              {{ t(`dbm.recommendations.${entry.rec.id}.title`) }}
-            </span>
-            <span class="text-text-secondary text-2xs">{{ recommendationBody(entry.rec) }}</span>
-            <!-- What the shown row stands for. Present ONLY when something is
-                 actually hidden, so it never claims a remainder that is not
-                 there. -->
-            <span
-              v-if="entry.hiddenCount > 0"
-              class="text-text-secondary text-2xs whitespace-nowrap italic"
-              :data-test="`dbm-recommendation-more-${entry.rec.id}`"
-            >
-              {{ t("dbm.recommendations.andMore", { count: entry.hiddenCount }) }}
-            </span>
-            <!-- The predicate, verbatim. Provenance out of the primary reading
-                 path but never out of reach. -->
-            <OTooltip side="bottom" :content="recommendationRule(entry.rec)" />
-          </li>
-        </ul>
-
-        <!-- The two empty states are NOT interchangeable. On an engine whose
-             index catalogs are never read, "nothing found" would be an
-             all-clear about a check that did not run. -->
-        <DbmDisclosureLine
-          v-else-if="recommendationsEmpty === 'engine-partial'"
-          data-test="dbm-recommendations-engine-partial"
-        >
-          <strong class="font-semibold">{{ t("dbm.recommendations.enginePartialTitle") }}</strong>
-          — {{ t("dbm.recommendations.enginePartialDescription") }}
-        </DbmDisclosureLine>
-        <DbmDisclosureLine v-else icon="check" data-test="dbm-recommendations-all-clear">
-          <strong class="font-semibold">{{ t("dbm.recommendations.allClearTitle") }}</strong>
-          — {{ t("dbm.recommendations.allClearDescription") }}
-        </DbmDisclosureLine>
-
-        <!-- Gated on the API's own flag: a build whose response omits it has
-             not told us the counters are cumulative, and asserting it anyway
-             would invent a disclosure. -->
-        <DbmDisclosureLine
-          v-if="indexCountersAreCumulative"
-          data-test="dbm-recommendations-cumulative"
-        >
-          {{ t("dbm.recommendations.countersCumulative") }}
-        </DbmDisclosureLine>
-      </section>
-
       <OTable
         :enable-column-resize="true"
         :data="rows"
@@ -140,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="rowKey"
         :loading="loading"
         :error="error"
+        :forbidden="forbidden"
         :frame="false"
         :toolbar-bordered="false"
         sorting="client"
@@ -207,22 +119,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :debounce="400"
             search-data-test="dbm-table-health-search"
           >
-            <DbmScopeFilters
-              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-              :filters="dimensionFilters"
-              @clear="clearScope"
-            />
+            <template #filters>
+              <DbmScopeFilters
+                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
+                :filters="dimensionFilters"
+                @clear="clearScope"
+              />
+            </template>
+            <div class="ms-auto flex min-w-0 items-center gap-3">
+              <!-- "Nothing found" and "not collected for this engine" stay apart: the second is no all-clear. -->
+              <DbmToolbarNote
+                v-if="!loading && !collapsedRecommendations.length"
+                v-bind="recommendationsNote"
+              />
+              <DbmToolbarNote
+                v-if="caveats.length"
+                :text="t('dbm.tableHealth.aboutNumbers')"
+                :detail="raw(caveats.join(' '))"
+                data-test="dbm-table-health-disclosures"
+              />
+            </div>
           </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DbmRefreshButton
-              mode="status"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-table-health-refresh"
-            />
             <DateTime
               auto-apply
               menu-align="end"
@@ -230,14 +151,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-table-health-date-time"
-              class="h-8"
+              class="h-8 max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
-            <DbmRefreshButton
-              mode="button"
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
               :loading="loading"
+              :last-run-at="lastRunAt"
               data-test="dbm-table-health-refresh"
-              @refresh="onRefresh"
+              @click="onRefresh()"
             />
           </div>
         </template>
@@ -246,15 +169,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              A reader who does not see them will read a lifetime counter as a
              per-window one. -->
         <template #subheader>
-          <div
-            v-if="disclosures.length"
-            class="border-border-default bg-surface-subtle px-page-edge flex flex-col gap-1 border-b py-2"
-            data-test="dbm-table-health-disclosures"
+          <!-- Gated on `!loading`: a verdict on first paint would assert one before any data answered. -->
+          <section
+            v-if="!loading && collapsedRecommendations.length"
+            class="border-border-subtle bg-surface-base px-page-edge flex flex-col gap-1.5 border-b py-2"
+            data-test="dbm-recommendations"
           >
-            <DbmDisclosureLine v-for="line in disclosures" :key="line">
-              {{ line }}
-            </DbmDisclosureLine>
-          </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-text-heading text-xs font-semibold">
+                {{ t("dbm.recommendations.title") }}
+              </span>
+              <span class="text-text-secondary text-2xs">
+                {{ t("dbm.recommendations.subtitle") }}
+              </span>
+            </div>
+            <!-- One row per rule: collapseRecommendations keeps each rule's worst item and discloses the rest. -->
+            <ul class="flex flex-col gap-1">
+              <li
+                v-for="entry in collapsedRecommendations"
+                :key="entry.rec.id"
+                class="flex items-center gap-2"
+                :data-test="`dbm-recommendation-${entry.rec.id}`"
+              >
+                <span
+                  class="rounded-default grid size-4.5 shrink-0 place-items-center"
+                  :class="DBM_SOFT_TONES[entry.rec.tone]"
+                >
+                  <OIcon :name="DBM_TONE_ICONS[entry.rec.tone]" size="xs" />
+                </span>
+                <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                  {{ t(`dbm.recommendations.${entry.rec.id}.title`) }}
+                </span>
+                <span class="text-text-secondary text-2xs">{{
+                  recommendationBody(entry.rec)
+                }}</span>
+                <span
+                  v-if="entry.hiddenCount > 0"
+                  class="text-text-secondary text-2xs whitespace-nowrap italic"
+                  :data-test="`dbm-recommendation-more-${entry.rec.id}`"
+                >
+                  {{ t("dbm.recommendations.andMore", { count: entry.hiddenCount }) }}
+                </span>
+                <OTooltip side="bottom" :content="recommendationRule(entry.rec)" />
+              </li>
+            </ul>
+          </section>
         </template>
 
         <template #bottom>
@@ -313,12 +272,11 @@ defineOptions({ name: "DbmTableHealthPage" });
 import { computed, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import DbmDisclosureLine from "@/components/dbm/DbmDisclosureLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -329,6 +287,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
+import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -377,6 +336,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,
@@ -580,6 +540,28 @@ const collapsedRecommendations = computed(() => collapseRecommendations(recommen
 const recommendationsEmpty = computed(() =>
   recommendationsEmptyCause(recommendations.value, hits.value[0]?.engine ?? ""),
 );
+
+const recommendationsNote = computed(() =>
+  recommendationsEmpty.value === "engine-partial"
+    ? {
+        tone: "warning" as const,
+        text: t("dbm.recommendations.enginePartialTitle"),
+        detail: t("dbm.recommendations.enginePartialDescription"),
+        dataTest: "dbm-recommendations-engine-partial",
+      }
+    : {
+        icon: "check-circle" as const,
+        text: t("dbm.recommendations.allClearTitle"),
+        detail: t("dbm.recommendations.allClearDescription"),
+        dataTest: "dbm-recommendations-all-clear",
+      },
+);
+
+// Each caveat is gated on the API's own flag: a build that omits one has not said the counters are cumulative.
+const caveats = computed(() => [
+  ...disclosures.value,
+  ...(indexCountersAreCumulative.value ? [t("dbm.recommendations.countersCumulative")] : []),
+]);
 
 /**
  * The headline sentence, with the numbers the rule measured. The switch is
