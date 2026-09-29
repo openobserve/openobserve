@@ -2195,8 +2195,28 @@ async fn process_function_node(
                         res
                     }
                 };
+                let Some(result_arr) = result.as_array() else {
+                    if let Err(send_err) = channels
+                        .error_sender
+                        .send((
+                            node.id.to_string(),
+                            node.node_type(),
+                            "FunctionNode VRL result array error: the function must return an array"
+                                .to_string(),
+                            Some(func_params.name.to_owned()),
+                            None,
+                        ))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} [inv={inv_id}]: FunctionNode failed sending errors for collection caused by: {send_err}",
+                            metadata.pipeline_name
+                        );
+                    }
+                    return count;
+                };
                 // since apply_vrl_fn can produce unflattened data
-                for record in result.as_array().unwrap().iter() {
+                for record in result_arr.iter() {
                     // use usize::MAX as a flag to disregard original_value
                     channels.send_output(&metadata, &node.id, record).await;
                     send_to_children(
@@ -5348,5 +5368,47 @@ mod tests {
         let body = read_body_capped(res, 4097).await;
         assert_eq!(body.len(), 4096);
         assert!(body.chars().all(|c| c == 'é'));
+    }
+
+    #[tokio::test]
+    async fn test_result_array_vrl_returning_non_array_reports_node_error() {
+        let vrl = transform::compile_vrl_function(". = {\"not\": \"an array\"}", "org-1").unwrap();
+        let runtime = CompiledFunctionRuntime::VRL(
+            Box::new(VRLResultResolver {
+                program: vrl.program,
+                fields: vec![],
+            }),
+            true,
+        );
+        let node = ExecutableNode {
+            id: "fn-1".to_string(),
+            node_data: NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                name: "result_array_fn".to_string(),
+                after_flatten: false,
+                num_args: 0,
+                raw_fn: None,
+            }),
+            children: vec![],
+            is_disabled: false,
+        };
+        let (input_tx, input_rx) = channel(8);
+        let (error_tx, mut error_rx) = channel(8);
+        let channels = ProcessChannels {
+            receiver: input_rx,
+            child_senders: vec![],
+            result_sender: None,
+            error_sender: error_tx,
+            inputs_sender: None,
+            outputs_sender: None,
+        };
+        send_records(&input_tx, vec![json::json!({"a": 1})]).await;
+        drop(input_tx);
+
+        let result =
+            process_node(dummy_metadata(1), node, Some(runtime), channels, Vec::new()).await;
+        assert!(result.is_ok());
+        let (node_id, _, message, ..) = error_rx.try_recv().expect("a node error is expected");
+        assert_eq!(node_id, "fn-1");
+        assert!(message.contains("array"), "{message}");
     }
 }
