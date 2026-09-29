@@ -831,6 +831,9 @@ pub struct UpdateStreamSettings {
     pub storage_type: Option<StorageType>,
     #[serde(default)]
     pub is_llm_stream: Option<bool>,
+    /// "hourly" or "daily"; see `StreamSettings::partition_time_level`.
+    #[serde(default)]
+    pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -1013,6 +1016,11 @@ pub struct StreamSettings {
     pub index_updated_at: i64,
     #[serde(default)]
     pub index_fields_updated_at: HashMap<String, i64>,
+    /// Per-stream partition time level override. Only `Daily` on metrics
+    /// streams is honoured, and only when ZO_METRICS_DAILY_PARTITION_ENABLED is
+    /// set; see `infra::schema::get_stream_partition_time_level`.
+    #[serde(default)]
+    pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
 impl Default for StreamSettings {
@@ -1039,6 +1047,7 @@ impl Default for StreamSettings {
             is_llm_stream: false,
             cross_links: Vec::new(),
             storage_type: StorageType::Normal,
+            partition_time_level: None,
         }
     }
 }
@@ -1122,6 +1131,14 @@ impl Serialize for StreamSettings {
             state.skip_field("cross_links")?;
         }
         state.serialize_field("storage_type", &self.storage_type)?;
+        match self.partition_time_level {
+            Some(level) if level != PartitionTimeLevel::Unset => {
+                state.serialize_field("partition_time_level", &level)?;
+            }
+            _ => {
+                state.skip_field("partition_time_level")?;
+            }
+        }
         state.end()
     }
 }
@@ -1291,6 +1308,11 @@ impl From<&str> for StreamSettings {
             .and_then(Value::as_str)
             .and_then(|s| s.parse::<StorageType>().ok())
             .unwrap_or_default();
+        let partition_time_level = settings
+            .get("partition_time_level")
+            .and_then(Value::as_str)
+            .map(PartitionTimeLevel::from)
+            .filter(|level| *level != PartitionTimeLevel::Unset);
         Self {
             partition_keys,
             full_text_search_keys,
@@ -1313,6 +1335,7 @@ impl From<&str> for StreamSettings {
             is_llm_stream,
             cross_links,
             storage_type,
+            partition_time_level,
         }
     }
 }
@@ -1484,6 +1507,35 @@ mod tests {
             assert!(crate::is_uds_internal_column(&column));
         }
         assert!(!crate::is_uds_internal_column("my_field"));
+    }
+
+    #[test]
+    fn test_stream_settings_partition_time_level_roundtrip() {
+        // absent: no override, and nothing is written back
+        let settings = StreamSettings::from("{}");
+        assert_eq!(settings.partition_time_level, None);
+        assert!(!json::to_string(&settings).unwrap().contains("partition_time_level"));
+
+        // daily survives serialize -> parse, the path settings take through schema metadata
+        let settings = StreamSettings {
+            partition_time_level: Some(PartitionTimeLevel::Daily),
+            ..Default::default()
+        };
+        let payload = json::to_string(&settings).unwrap();
+        assert!(payload.contains(r#""partition_time_level":"daily""#));
+        let parsed = StreamSettings::from(payload.as_str());
+        assert_eq!(parsed.partition_time_level, Some(PartitionTimeLevel::Daily));
+
+        // unset / unknown values mean "no override"
+        let parsed = StreamSettings::from(r#"{"partition_time_level":"unset"}"#);
+        assert_eq!(parsed.partition_time_level, None);
+        let parsed = StreamSettings::from(r#"{"partition_time_level":"weekly"}"#);
+        assert_eq!(parsed.partition_time_level, None);
+
+        // the settings update API accepts it
+        let update: UpdateStreamSettings =
+            json::from_str(r#"{"partition_time_level":"daily"}"#).unwrap();
+        assert_eq!(update.partition_time_level, Some(PartitionTimeLevel::Daily));
     }
 
     #[test]

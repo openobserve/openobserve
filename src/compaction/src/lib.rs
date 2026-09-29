@@ -25,9 +25,7 @@ use config::{
     utils::time::{hour_micros, now_micros, second_micros},
 };
 use infra::{
-    cluster::get_node_from_consistent_hash,
-    file_list as infra_file_list,
-    schema::{get_partition_time_level, get_settings},
+    cluster::get_node_from_consistent_hash, file_list as infra_file_list, schema::get_settings,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
@@ -298,7 +296,10 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let partition_time_level = get_partition_time_level(stream_type);
+        let partition_time_level = infra::schema::get_stream_partition_time_level(
+            stream_type,
+            Some(stream_settings.as_ref()),
+        );
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
             now - Duration::try_days(stream_settings.data_retention).unwrap()
@@ -451,4 +452,13 @@ pub(crate) fn is_past_hour(offset: i64) -> bool {
     let hour = hour_micros(1);
     let offset_hour_end = offset - offset % hour + hour;
     now - offset_hour_end > second_micros(get_config().limit.max_file_retention_time as i64) * 3
+}
+
+/// Whether a merge range that ends at `range_end` (last microsecond, see
+/// `merge::job::job_range_end`) can no longer receive files. For hourly
+/// streams this is exactly [`is_past_hour`]; for daily-partitioned streams it
+/// waits for the whole day, so the day is sealed (finalized, indexed) once.
+pub(crate) fn is_past_range_end(range_end: i64) -> bool {
+    now_micros() - (range_end + 1)
+        > second_micros(get_config().limit.max_file_retention_time as i64) * 3
 }

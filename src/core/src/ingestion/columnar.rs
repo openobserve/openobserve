@@ -48,8 +48,12 @@ pub struct ColumnarBuckets {
 
 impl ColumnarBuckets {
     pub fn new(stream_type: StreamType, schema: &Schema) -> Self {
+        // read the per-stream level before the metadata carrying the settings is dropped
+        let time_level = infra::schema::get_stream_partition_time_level(
+            stream_type,
+            infra::schema::unwrap_stream_settings(schema).as_ref(),
+        );
         let schema = Arc::new(schema.clone().with_metadata(HashMap::new()));
-        let time_level = get_partition_time_level(stream_type);
         Self {
             schema_key: schema.hash_key(),
             schema,
