@@ -723,6 +723,11 @@ async function loadQualityAgents(force = false) {
     }
     const response = await queryClient.fetchQuery(options);
     qualityAgents.value = response.agents;
+    const urlAgentName = qualityAgentNameFromUrl();
+    const urlAgent = urlAgentName
+      ? qualityAgents.value.find((agent) => agent.name === urlAgentName)
+      : null;
+    if (urlAgent) qualityAgentKey.value = agentFilterKey(urlAgent);
     if (
       qualityAgentKey.value !== ALL_AGENTS_VALUE &&
       !qualityAgents.value.some((agent) => agentFilterKey(agent) === qualityAgentKey.value)
@@ -736,6 +741,26 @@ async function loadQualityAgents(force = false) {
   } finally {
     qualityAgentsLoading.value = false;
   }
+}
+
+// Same `?type=agent&agent=<name>` convention LLM Insights uses, so links carry the agent between the two pages.
+function qualityAgentNameFromUrl(): string | null {
+  return route.query.type === "agent" && typeof route.query.agent === "string"
+    ? route.query.agent
+    : null;
+}
+
+function syncQualityAgentUrl() {
+  const query: Record<string, any> = { ...route.query };
+  const name = selectedQualityAgent.value?.name;
+  if (name) {
+    query.type = "agent";
+    query.agent = name;
+  } else {
+    delete query.agent;
+    if (query.type === "agent") delete query.type;
+  }
+  router.replace({ query }).catch(() => {});
 }
 
 function syncQualityDateWindow() {
@@ -770,6 +795,8 @@ async function reloadQuality(userRefresh = false) {
     await nextTick();
     syncQualityDateWindow();
     await loadQualityAgents(userRefresh);
+    // The agent key may have changed; let the `agent-filter` prop reach QualityPage before it queries.
+    await nextTick();
     await qualityPageRef.value?.refreshAll?.(userRefresh);
   } finally {
     qualityReloading.value = false;
@@ -802,6 +829,7 @@ watch(qualitySelectedDate, () => {
 // Org switch — reset the agent filter and reload from scratch.
 watch(orgId, () => {
   qualityAgentKey.value = ALL_AGENTS_VALUE;
+  syncQualityAgentUrl();
   void reloadQuality();
 });
 
@@ -811,6 +839,7 @@ watch(orgId, () => {
 // during reloadQuality() never double-fires a data reload.
 async function onQualityAgentChange(key: string) {
   qualityAgentKey.value = key;
+  syncQualityAgentUrl();
   // `selectedQualityAgent` → the `agent-filter` prop → the child's
   // `agentFilterRef` only update on the next render tick. Wait for it so
   // `refreshAll()` queries the newly selected agent, not the previous one.
