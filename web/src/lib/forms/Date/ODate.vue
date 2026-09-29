@@ -79,10 +79,7 @@ const stagedDate = ref<DateValue | undefined>(rekaValue.value) as Ref<DateValue 
 const rekaMin = computed(() => tryParse(props.min));
 const rekaMax = computed(() => tryParse(props.max));
 
-// reka-ui commits a partially-typed year segment (e.g. a single "4" typed
-// while replacing "2026") as a final value the moment focus moves on,
-// instead of waiting for all 4 digits. Left unguarded, that round-trips
-// through toString()/parseDate() as "0004-01-02" and renders as "1/2/4".
+// reka-ui commits a partially-typed year segment (e.g. a single "4" replacing "2026") as final on blur, which round-trips as "0004-01-02" and renders "1/2/4" unless guarded.
 function hasCompleteYear(value: DateValue): boolean {
   return value.year >= 1000 && value.year <= 9999;
 }

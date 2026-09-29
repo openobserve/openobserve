@@ -179,13 +179,7 @@
         </OTab>
       </OTabs>
 
-      <!-- `scroll` defaults to overflow-hidden, which silently clipped the
-           escalation policy so its lower priorities were unreachable.
-           `grow` alone only sets flex-1 — without min-h-0 a flex item still
-           refuses to shrink below its content, so this never actually hit
-           its own scrollbar: the whole page grew and shrank with whichever
-           tab was open instead, and Covers' `sticky bottom-0` below had no
-           bounded viewport to pin itself against. -->
+      <!-- `scroll` alone left the escalation policy clipped, and `grow` alone never shrinks below content without `min-h-0`, which is what lets Covers' `sticky bottom-0` below pin itself. -->
       <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y" class="min-h-0">
         <OTabPanel name="overview">
           <!-- Two blocks in one column. The demo read as a wall: five sortable
@@ -297,13 +291,7 @@
               @presets="presetsOpen = true"
             />
 
-            <!-- Under the calendar, because a cover is an exception to what
-                 the calendar draws — and until now the only trace of one was
-                 an "· override" annotation on a cell, with no reason, no whose
-                 shift, and no way to take it back. Pinned to the tab's own
-                 floor rather than left in flow: whether anyone is currently
-                 overriding the schedule is exactly the kind of fact that
-                 should not depend on how far the reader happened to scroll. -->
+            <!-- Pinned to the tab's own floor rather than left in flow, since whether anyone is overriding the schedule shouldn't depend on how far the reader scrolled. -->
             <OnCallCoverList
               ref="coverListRef"
               class="sticky bottom-0 z-1"
@@ -563,8 +551,7 @@ const coverOpen = ref(false);
 /// landed on the server and left the list under the calendar unchanged.
 const coverListRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 
-/// So the attention banner's "Add a member" can land the cursor in the
-/// picker even when switching to this tab is a no-op because it is already open.
+/// So the attention banner's "Add a member" can focus the picker even when switching to this tab is a no-op.
 const membersRef = ref<{ focusMemberPicker: () => void } | null>(null);
 
 /// Both things a written cover invalidates: the calendar, which the server
@@ -697,9 +684,7 @@ async function onAttentionAct(tab: string, rotation?: string | null) {
   const wasAlreadyThere = activeTab.value === tab;
   activeTab.value = tab;
   if (tab === "members") {
-    // Switching tabs is a no-op when already on Members, and the panel only
-    // mounts on the tick after switching from elsewhere — either way, the
-    // picker isn't necessarily there yet.
+    // The panel only mounts on the tick after switching tabs, so wait unless we were already there.
     if (!wasAlreadyThere) await nextTick();
     membersRef.value?.focusMemberPicker();
     return;
@@ -764,13 +749,22 @@ async function fetchAll(force = false) {
   const org = orgId.value;
   const id = teamId.value;
 
-  // The org-level list is the true entry probe: it exists in every on-call
-  // build regardless of whether this specific team id does, so only ITS
-  // failure means the feature itself is unavailable here.
-  let teamsRes: OnCallTeam[];
-  try {
-    teamsRes = await read<OnCallTeam[]>(oncallTeamsQuery(org), force);
-  } catch (err: any) {
+  // All six issued together, then branched on below — awaiting the org-level probe first
+  // turned every load into teams + max(the other five) instead of max(all six).
+  const [teamsSettled, teamSettled, memberSettled, scheduleSettled, policySettled, onCallSettled] =
+    await Promise.allSettled([
+      read<OnCallTeam[]>(oncallTeamsQuery(org), force),
+      read<OnCallTeam | null>(oncallTeamQuery(org, id), force),
+      read<OnCallTeamMember[]>(teamMembersQuery(org, id), force),
+      read<OnCallSchedule | null>(teamScheduleQuery(org, id), force),
+      read<OnCallPolicy | null>(teamPolicyQuery(org, id), force),
+      read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
+    ]);
+
+  // The org-level list is the true entry probe: it exists in every on-call build regardless
+  // of whether this specific team id does, so only its failure means the feature is unavailable.
+  if (teamsSettled.status === "rejected") {
+    const err: any = teamsSettled.reason;
     if (isOnCallUnavailable(err)) {
       oncallUnavailable.value = true;
       return;
@@ -779,56 +773,56 @@ async function fetchAll(force = false) {
     return;
   }
 
-  try {
-    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes] = await Promise.all([
-      read<OnCallTeam | null>(oncallTeamQuery(org, id), force),
-      read<OnCallTeamMember[]>(teamMembersQuery(org, id), force),
-      read<OnCallSchedule | null>(teamScheduleQuery(org, id), force),
-      read<OnCallPolicy | null>(teamPolicyQuery(org, id), force),
-      read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
-    ]);
-    team.value = teamRes;
-    teams.value = teamsRes;
-    members.value = memberRes;
-    schedule.value = scheduleRes;
-    policy.value = policyRes;
-    onCallNow.value = onCallRes;
-    // The oldest, so the age never claims the page is fresher than the stalest thing on it.
-    lastFetchedAt.value = Math.min(
-      ...[
-        oncallTeamQuery(org, id),
-        teamMembersQuery(org, id),
-        teamScheduleQuery(org, id),
-        teamPolicyQuery(org, id),
-        whoIsOnCallQuery(org, id),
-        oncallTeamsQuery(org),
-      ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
-    );
-    // Only on success, so a failed load never renders a team as uncovered.
-    if (!loaded.value) {
-      activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
-    }
-    loaded.value = true;
-    await Promise.allSettled([
-      fetchRuleCount(force),
-      fetchPages(force),
-      fetchInsights(force),
-      fetchPreview(force),
-    ]);
-  } catch (err: any) {
-    // The probe above already confirmed on-call is available here, so a 404
-    // past this point means this team id was deleted (e.g. from another tab,
-    // or by navigating Back after deleting it) — never "feature unavailable".
+  if (
+    teamSettled.status === "rejected" ||
+    memberSettled.status === "rejected" ||
+    scheduleSettled.status === "rejected" ||
+    policySettled.status === "rejected" ||
+    onCallSettled.status === "rejected"
+  ) {
+    const err: any = (
+      [teamSettled, memberSettled, scheduleSettled, policySettled, onCallSettled].find(
+        (settled) => settled.status === "rejected",
+      ) as PromiseRejectedResult
+    ).reason;
+    // The probe above already confirmed on-call is available, so a 404 here means this team
+    // id was deleted (e.g. from another tab, or by navigating Back after deleting it).
     if (err?.response?.status === 404) {
       teamNotFound.value = true;
       return;
     }
-    // The state, not a toast. With the load failed the page below renders a
-    // team with no members, no schedule and no policy — the exact look of a
-    // team somebody forgot to configure, on a screen whose job is to say
-    // whether a page would land.
     loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    return;
   }
+
+  team.value = teamSettled.value;
+  teams.value = teamsSettled.value;
+  members.value = memberSettled.value;
+  schedule.value = scheduleSettled.value;
+  policy.value = policySettled.value;
+  onCallNow.value = onCallSettled.value;
+  // The oldest, so the age never claims the page is fresher than the stalest thing on it.
+  lastFetchedAt.value = Math.min(
+    ...[
+      oncallTeamQuery(org, id),
+      teamMembersQuery(org, id),
+      teamScheduleQuery(org, id),
+      teamPolicyQuery(org, id),
+      whoIsOnCallQuery(org, id),
+      oncallTeamsQuery(org),
+    ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
+  );
+  // Only on success, so a failed load never renders a team as uncovered.
+  if (!loaded.value) {
+    activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
+  }
+  loaded.value = true;
+  await Promise.allSettled([
+    fetchRuleCount(force),
+    fetchPages(force),
+    fetchInsights(force),
+    fetchPreview(force),
+  ]);
 }
 
 // The count feeds a warning tile, so a failed lookup leaves it at zero-known
