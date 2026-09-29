@@ -255,7 +255,7 @@ pub(super) fn generate_downsampling_sql(schema: &Schema, rule: &DownsamplingRule
     };
 
     let sql = format!(
-        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
+        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('{origin}'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
         HASH_LABEL,
         step,
         TIMESTAMP_COL_NAME,
@@ -264,6 +264,7 @@ pub(super) fn generate_downsampling_sql(schema: &Schema, rule: &DownsamplingRule
         fun_str,
         HASH_LABEL,
         TIMESTAMP_ALIAS,
+        origin = config::meta::histogram_origin::ORIGIN_LITERAL,
     );
 
     let fields = schema

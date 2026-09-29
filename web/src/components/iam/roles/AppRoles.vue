@@ -26,6 +26,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("iam.addRole") }}
       </OButton>
     </template>
+    <!-- ?member=<email> (from the token popup's "Assign a role" link) drives the Assign column below. -->
+    <OBanner
+      v-if="assignTarget"
+      variant="info"
+      icon="shield"
+      inline-actions
+      dense
+      data-test="iam-roles-assign-banner"
+      class="mb-3"
+    >
+      {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
+      <template #actions>
+        <OButton
+          data-test="iam-roles-assign-banner-dismiss"
+          variant="ghost"
+          size="sm"
+          @click="clearAssignTarget"
+        >
+          {{ t("iam.rolesPage.assignBannerDone") }}
+        </OButton>
+      </template>
+    </OBanner>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable
@@ -36,11 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           :selected-ids="selectedRoleNames"
+          :assign-target="assignTarget"
+          :assigning-role-name="assigningRoleName"
+          :assigned-role-names="assignedRoleNames"
           @update:selected-ids="onSelectionChange"
           @edit="editRole"
           @delete="showConfirmDialog"
           @bulk-delete="openBulkDeleteDialog"
           @create="addRole"
+          @assign="assignMemberToRole"
         >
           <template #toolbar-trailing>
             <ORefreshButton
@@ -87,12 +113,14 @@ import { queryClient } from "@/composables/query/queryClient";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
-import { useRouter } from "vue-router";
-import { getRoleUsers } from "@/services/iam";
+import { useRoute, useRouter } from "vue-router";
+import { getRoleUsers, updateRole } from "@/services/iam";
+import users from "@/services/users";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
@@ -113,8 +141,69 @@ const showAddGroup = ref(false);
 const rows: any = ref([]);
 
 const router = useRouter();
+const route = useRoute();
 
 const store = useStore();
+
+// ?member=<email> from the token popup's "Assign a role" link; drives the Assign column in RoleTable.
+const assignTarget = computed(() => (route.query.member as string) || "");
+const assigningRoleName = ref<string | null>(null);
+const assignedRoleNames = ref<string[]>([]);
+
+const loadAssignedRoleNames = async () => {
+  if (!assignTarget.value) {
+    assignedRoleNames.value = [];
+    return;
+  }
+  try {
+    const res = await users.getUserRoles(
+      store.state.selectedOrganization.identifier,
+      assignTarget.value,
+    );
+    assignedRoleNames.value = Array.isArray(res.data) ? res.data : [];
+  } catch {
+    // Silent: worst case a role the member already holds still shows an
+    // actionable "Assign" button — a redundant add_users is a harmless no-op.
+    assignedRoleNames.value = [];
+  }
+};
+
+watch(assignTarget, loadAssignedRoleNames, { immediate: true });
+
+const clearAssignTarget = () => {
+  const { member: _member, ...rest } = route.query;
+  router.replace({ name: "roles", query: rest });
+};
+
+const assignMemberToRole = async (role: any) => {
+  if (!assignTarget.value || assigningRoleName.value) return;
+  assigningRoleName.value = role.role_name;
+  try {
+    await updateRole({
+      role_id: role.role_name,
+      org_identifier: store.state.selectedOrganization.identifier,
+      payload: { add: [], remove: [], add_users: [assignTarget.value], remove_users: [] },
+    });
+    assignedRoleNames.value = [...assignedRoleNames.value, role.role_name];
+    toast({
+      message: t("iam.rolesPage.assignSuccess", {
+        member: assignTarget.value,
+        role: role.role_name,
+      }),
+      variant: "success",
+    });
+    loadRoleUserCounts(true).then(applyRoleUserCounts);
+  } catch (err: any) {
+    if (err?.response?.status != 403) {
+      toast({
+        message: err?.response?.data?.message || t("iam.rolesPage.assignError"),
+        variant: "error",
+      });
+    }
+  } finally {
+    assigningRoleName.value = null;
+  }
+};
 
 const deleteConformDialog = ref({
   show: false,

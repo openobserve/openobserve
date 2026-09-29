@@ -49,9 +49,13 @@ pub mod model_pricing;
 pub mod oncall;
 pub mod organization;
 #[cfg(feature = "enterprise")]
+pub mod password_policy;
+#[cfg(feature = "enterprise")]
 pub mod playground;
 #[cfg(feature = "profiling")]
 pub mod profiling;
+#[cfg(feature = "enterprise")]
+pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]

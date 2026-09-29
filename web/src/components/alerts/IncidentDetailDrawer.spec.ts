@@ -1596,6 +1596,22 @@ describe("IncidentDetailDrawer.vue", () => {
       return w;
     };
 
+    /// The drawer is opened and closed over the same incident all day, and the
+    /// team catalogue behind it is read by nine other screens.
+    it("serves a reopened drawer's on-call panel from the cache", async () => {
+      wrapper = await withRecords([record()]);
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(1);
+      expect(oncallService.listTeams).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(1);
+      expect(oncallService.listTeams).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="incident-oncall-panel"]').text()).toContain("Payments");
+    });
+
     it("names the paged team rather than its id", async () => {
       wrapper = await withRecords([record()]);
       const panel = wrapper.find('[data-test="incident-oncall-panel"]');

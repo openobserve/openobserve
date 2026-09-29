@@ -20,6 +20,11 @@ use std::sync::{Arc, LazyLock as Lazy};
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use chrono::Utc;
+#[cfg(any(feature = "enterprise", test))]
+use config::{
+    META_ORG_ID,
+    meta::self_reporting::usage::{AUDIT_STREAM, USAGE_STREAM},
+};
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -45,7 +50,6 @@ use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "enterprise")]
 use {
-    config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM},
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
     std::collections::HashSet,
@@ -1069,8 +1073,7 @@ pub fn generate_search_schema_diff(
 pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
     {
-        // for meta org usage and audit stream, we should always allow search
-        if _org_id == META_ORG_ID && _stream == Some(USAGE_STREAM) || _stream == Some("audit") {
+        if is_license_exempt_stream(_org_id, _stream) {
             return Ok(());
         }
         // this is installation level limit for all orgs combined
@@ -1085,6 +1088,13 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
 
     #[cfg(not(feature = "enterprise"))]
     Ok(())
+}
+
+/// The meta org's own usage and audit streams must stay searchable to diagnose the license gate.
+#[cfg(any(feature = "enterprise", test))]
+#[inline]
+fn is_license_exempt_stream(org_id: &str, stream: Option<&str>) -> bool {
+    org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM))
 }
 
 fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
@@ -1209,9 +1219,26 @@ mod tests {
         assert!(err.to_string().contains("disk full"));
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[test]
     fn test_check_search_allowed_non_enterprise_always_ok() {
         assert!(check_search_allowed("myorg", None).is_ok());
         assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+    }
+
+    #[test]
+    fn test_is_license_exempt_stream_is_meta_org_only() {
+        assert!(is_license_exempt_stream(META_ORG_ID, Some(USAGE_STREAM)));
+        assert!(is_license_exempt_stream(META_ORG_ID, Some(AUDIT_STREAM)));
+        assert!(!is_license_exempt_stream(
+            "customer_org",
+            Some(AUDIT_STREAM)
+        ));
+        assert!(!is_license_exempt_stream(
+            "customer_org",
+            Some(USAGE_STREAM)
+        ));
+        assert!(!is_license_exempt_stream(META_ORG_ID, Some("logs")));
+        assert!(!is_license_exempt_stream(META_ORG_ID, None));
     }
 }

@@ -190,6 +190,11 @@ function makeResourceEvent(overrides: Record<string, any> = {}) {
   };
 }
 
+// A request made under the trace being viewed, as opposed to the view's other requests.
+function makeOwnRequest(overrides: Record<string, any> = {}) {
+  return makeResourceEvent({ _oo_trace_id: "trace-abc", ...overrides });
+}
+
 function makeErrorEvent(overrides: Record<string, any> = {}) {
   return {
     type: "error",
@@ -936,7 +941,11 @@ describe("useRumSpanBuilder", () => {
         tracedResources: [makeBrowserRequest()],
         viewEvents: [makeViewEvent()],
         actionEvents: [makeActionEvent()],
-        allViewEvents: [makeResourceEvent({ action_id: '["action-1"]' }), makeErrorEvent()],
+        allViewEvents: [
+          makeResourceEvent({ action_id: '["action-1"]' }),
+          makeErrorEvent(),
+          makeBrowserRequest(),
+        ],
       });
 
       const { fetchRumEventsForTrace, formatRumEventsAsSpans } = buildComposable(["_rumdata"]);
@@ -952,8 +961,9 @@ describe("useRumSpanBuilder", () => {
       expect(spans.map((s) => [s.span_id, s.reference_parent_span_id])).toEqual([
         ["rum_view_view-1", ""],
         ["rum_action_action-1", "rum_view_view-1"],
-        ["rum_resource_1100000", "rum_action_action-1"],
+        ["rum_collapsed_[1 other requests on this page]_view-1", "rum_view_view-1"],
         ["rum_error_err-1", "rum_view_view-1"],
+        ["span-root", "rum_action_action-1"],
       ]);
     });
   });
@@ -963,7 +973,7 @@ describe("useRumSpanBuilder", () => {
   // =========================================================================
 
   describe("formatRumEventsAsSpans — view spans", () => {
-    it("should return empty array when allViewEvents is empty", () => {
+    it("should return empty array when there are no RUM events at all", () => {
       const { formatRumEventsAsSpans } = buildComposable();
 
       const result = formatRumEventsAsSpans([], [], [], []);
@@ -1105,7 +1115,7 @@ describe("useRumSpanBuilder", () => {
       // The parent action must appear as an individual span, not collapsed
       const actionSpan = spans.find((s) => s.span_id === "rum_action_action-far");
       expect(actionSpan).toBeDefined();
-      const collapsedSpan = spans.find((s) => s._is_collapsed_group === true);
+      const collapsedSpan = spans.find((s) => s.rum_event_type === "collapsed_actions");
       expect(collapsedSpan).toBeUndefined();
     });
 
@@ -1128,7 +1138,7 @@ describe("useRumSpanBuilder", () => {
   describe("formatRumEventsAsSpans — resource spans", () => {
     it("should build a resource span with SPAN_KIND_CLIENT", () => {
       const traced = makeTracedResource();
-      const resource = makeResourceEvent({ resource_type: "fetch" });
+      const resource = makeOwnRequest({ resource_type: "fetch" });
       const { formatRumEventsAsSpans } = buildComposable();
 
       const spans = formatRumEventsAsSpans([traced], [], [], [resource]);
@@ -1141,7 +1151,7 @@ describe("useRumSpanBuilder", () => {
 
     it("should use _oo_span_id as span_id when resource has a trace bridge", () => {
       const traced = makeTracedResource();
-      const resource = makeResourceEvent({
+      const resource = makeOwnRequest({
         _oo_trace_id: "trace-abc",
         _oo_span_id: "backend-span-1",
         resource_type: "fetch",
@@ -1156,7 +1166,7 @@ describe("useRumSpanBuilder", () => {
     });
 
     it("should build a synthetic span_id for untraced resource events", () => {
-      const traced = makeTracedResource();
+      const traced = makeTracedResource({ _oo_trace_id: undefined });
       const resource = makeResourceEvent({
         resource_id: "res-42",
         resource_type: "fetch",
@@ -1172,7 +1182,7 @@ describe("useRumSpanBuilder", () => {
 
     it("should set span_status to ERROR for resource with status >= 400", () => {
       const traced = makeTracedResource();
-      const resource = makeResourceEvent({
+      const resource = makeOwnRequest({
         resource_status_code: 500,
         resource_type: "fetch",
       });
@@ -1186,7 +1196,7 @@ describe("useRumSpanBuilder", () => {
 
     it("should set span_status to OK for resource with status < 400", () => {
       const traced = makeTracedResource();
-      const resource = makeResourceEvent({
+      const resource = makeOwnRequest({
         resource_status_code: 200,
         resource_type: "fetch",
       });
@@ -1200,7 +1210,7 @@ describe("useRumSpanBuilder", () => {
 
     it("should fall back to 'Frontend' when service field is absent", () => {
       const traced = makeTracedResource();
-      const resource = makeResourceEvent({
+      const resource = makeOwnRequest({
         service: undefined,
         resource_type: "fetch",
       });
@@ -1215,7 +1225,7 @@ describe("useRumSpanBuilder", () => {
     it("should parent resource span to its action when action is fetched", () => {
       const traced = makeTracedResource();
       const action = makeActionEvent();
-      const resource = makeResourceEvent({
+      const resource = makeOwnRequest({
         action_id: '["action-1"]',
         resource_type: "fetch",
       });
@@ -1229,7 +1239,7 @@ describe("useRumSpanBuilder", () => {
 
     it("should fall back to view parent when no matching action exists", () => {
       const traced = makeTracedResource();
-      const resource = makeResourceEvent({
+      const resource = makeOwnRequest({
         action_id: '["action-ghost"]', // not in actionEvents
         view_id: "view-1",
         resource_type: "fetch",
@@ -1242,6 +1252,88 @@ describe("useRumSpanBuilder", () => {
 
       const resSpan = spans.find((s) => s.rum_event_type === "resource");
       expect(resSpan!.reference_parent_span_id).toBe("rum_view_view-1");
+    });
+  });
+
+  // =========================================================================
+  // formatRumEventsAsSpans — the view's other requests
+  // =========================================================================
+
+  describe("formatRumEventsAsSpans — the view's other requests", () => {
+    it("should show only the traced request and collapse the view's other requests", () => {
+      const traced = makeTracedResource();
+      const own = makeOwnRequest({ _oo_span_id: "span-root", resource_url: "/assigned-users" });
+      const others = [
+        makeResourceEvent({ resource_id: "res-1", _oo_trace_id: "trace-other" }),
+        makeResourceEvent({ resource_id: "res-2", date: 1_150_000 }),
+      ];
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [makeViewEvent()], [], [own, ...others]);
+
+      const requestSpans = spans.filter((s) => s.rum_event_type === "resource");
+      expect(requestSpans.map((s) => s.span_id)).toEqual(["span-root"]);
+      const collapsed = spans.find((s) => s.rum_event_type === "collapsed_requests");
+      expect(collapsed!.operation_name).toBe("[2 other requests on this page]");
+      expect(collapsed!.reference_parent_span_id).toBe("rum_view_view-1");
+      expect(collapsed!.start_time).toBe(1_100_000 * 1_000_000);
+      expect(collapsed!.end_time).toBe(1_150_000 * 1_000_000);
+    });
+
+    it("should match the traced request under a zero-stripped legacy trace id", () => {
+      const traced = makeTracedResource({ _oo_trace_id: "00000000000000000000000000abc123" });
+      const own = makeOwnRequest({ _oo_trace_id: "abc123", _oo_span_id: "span-own" });
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], [own]);
+
+      expect(spans.map((s) => s.span_id)).toEqual(["span-own"]);
+    });
+
+    it("should fall back to the traced request when the view's page missed it", () => {
+      const traced = makeTracedResource();
+      const sibling = makeResourceEvent({ resource_id: "res-1" });
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], [sibling]);
+
+      const requestSpans = spans.filter((s) => s.rum_event_type === "resource");
+      expect(requestSpans.map((s) => s.span_id)).toEqual(["span-root"]);
+      expect(spans.find((s) => s.rum_event_type === "collapsed_requests")).toBeDefined();
+    });
+
+    it("should still show the traced request when the view's page came back empty", () => {
+      const traced = makeTracedResource();
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], []);
+
+      const requestSpans = spans.filter((s) => s.rum_event_type === "resource");
+      expect(requestSpans.map((s) => s.span_id)).toEqual(["span-root"]);
+      expect(spans.find((s) => s.rum_event_type === "collapsed_requests")).toBeUndefined();
+    });
+
+    it("should add no collapsed row when the view made no other requests", () => {
+      const traced = makeTracedResource();
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], [makeOwnRequest()]);
+
+      expect(spans.find((s) => s.rum_event_type === "collapsed_requests")).toBeUndefined();
+    });
+
+    it("should keep every request when the browser request carries no trace id", () => {
+      const traced = makeTracedResource({ _oo_trace_id: undefined });
+      const requests = [
+        makeResourceEvent({ resource_id: "res-1" }),
+        makeResourceEvent({ resource_id: "res-2" }),
+      ];
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], requests);
+
+      expect(spans.filter((s) => s.rum_event_type === "resource")).toHaveLength(2);
+      expect(spans.find((s) => s.rum_event_type === "collapsed_requests")).toBeUndefined();
     });
   });
 
@@ -1332,7 +1424,9 @@ describe("useRumSpanBuilder", () => {
       const spans = formatRumEventsAsSpans([traced], [], [], assets);
 
       // All 3 are resource type
-      const assetSpans = spans.filter((s) => s.rum_event_type === "resource");
+      const assetSpans = spans.filter(
+        (s) => s.rum_event_type === "resource" && !s._is_trace_bridge,
+      );
       expect(assetSpans).toHaveLength(3);
       const collapsed = spans.find((s) => s._is_collapsed_group === true);
       expect(collapsed).toBeUndefined();
@@ -1347,7 +1441,9 @@ describe("useRumSpanBuilder", () => {
 
       const spans = formatRumEventsAsSpans([traced], [], [], assets);
 
-      const assetSpans = spans.filter((s) => s.rum_event_type === "resource");
+      const assetSpans = spans.filter(
+        (s) => s.rum_event_type === "resource" && !s._is_trace_bridge,
+      );
       expect(assetSpans).toHaveLength(3);
       const collapsed = spans.find((s) => s._is_collapsed_group === true);
       expect(collapsed).toBeDefined();
@@ -1497,6 +1593,71 @@ describe("useRumSpanBuilder", () => {
     });
   });
 
+  describe("formatRumEventsAsSpans — replay flag", () => {
+    const withReplay = { session_has_replay: true };
+
+    const buildAllKinds = (flag: Record<string, any>) => {
+      const traced = makeTracedResource({ date: 1_000_000, ...flag });
+      const view = makeViewEvent(flag);
+      const nearAction = makeActionEvent({ date: 1_000_000, ...flag });
+      const farAction = makeActionEvent({ action_id: "action-far", date: 5_000_000, ...flag });
+      const resource = makeResourceEvent({ resource_type: "fetch", ...flag });
+      const errors = [1, 2, 3, 4].map((i) =>
+        makeErrorEvent({ error_id: `err-${i}`, date: 1_200_000 + i, ...flag }),
+      );
+      const { formatRumEventsAsSpans } = buildComposable();
+      return formatRumEventsAsSpans(
+        [traced],
+        [view],
+        [nearAction, farAction],
+        [resource, ...errors],
+      );
+    };
+
+    // The gate needs both fields, so the flag is asserted wherever a session id is.
+    const sessionSpans = (spans: any[]) => spans.filter((s) => s.rum_session_id);
+
+    it("should mark every session-bearing span as replayable when the rows carry session_has_replay", () => {
+      const spans = sessionSpans(buildAllKinds(withReplay));
+
+      expect(spans.map((s) => s.rum_event_type)).toEqual(
+        expect.arrayContaining(["view", "action", "collapsed_actions", "resource", "error"]),
+      );
+      for (const span of spans) {
+        expect(span.rum_session_has_replay, span.span_id).toBe(true);
+      }
+    });
+
+    it("should mark every session-bearing span as not replayable when the rows lack session_has_replay", () => {
+      const spans = sessionSpans(buildAllKinds({}));
+
+      expect(spans.length).toBeGreaterThan(4);
+      for (const span of spans) {
+        expect(span.rum_session_has_replay, span.span_id).toBe(false);
+      }
+    });
+
+    it("should treat an explicit false session_has_replay as not replayable", () => {
+      const spans = sessionSpans(buildAllKinds({ session_has_replay: false }));
+
+      expect(spans.length).toBeGreaterThan(4);
+      for (const span of spans) {
+        expect(span.rum_session_has_replay, span.span_id).toBe(false);
+      }
+    });
+
+    it("should take a collapsed group's replay flag from the browser request", () => {
+      const traced = makeTracedResource({ date: 1_000_000, session_has_replay: true });
+      const farAction = makeActionEvent({ action_id: "action-far", date: 5_000_000 });
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [farAction], [makeResourceEvent()]);
+
+      const collapsed = spans.find((s) => s.rum_event_type === "collapsed_actions");
+      expect(collapsed!.rum_session_has_replay).toBe(true);
+    });
+  });
+
   // =========================================================================
   // formatRumEventsAsSpans — registerServiceColors
   // =========================================================================
@@ -1610,7 +1771,7 @@ describe("useRumSpanBuilder", () => {
   describe("resolveParentSpanId", () => {
     it("should return empty string when event has no action_id and no view_id", () => {
       const traced = makeTracedResource();
-      const event = makeResourceEvent({
+      const event = makeOwnRequest({
         action_id: undefined,
         view_id: undefined,
         resource_type: "fetch",
@@ -1625,7 +1786,7 @@ describe("useRumSpanBuilder", () => {
 
     it("should handle plain string (non-JSON) action_id falling back to view", () => {
       const traced = makeTracedResource();
-      const event = makeResourceEvent({
+      const event = makeOwnRequest({
         action_id: "plain-action-id", // not a JSON array
         view_id: "view-1",
         resource_type: "fetch",

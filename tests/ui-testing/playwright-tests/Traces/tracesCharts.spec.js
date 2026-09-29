@@ -7,6 +7,10 @@ const { ingestTraces } = require('../utils/trace-ingestion.js');
 
 // TracesMetricsDashboard.emitFiltersToQueryEditor writes duration filters as human-readable strings.
 const DURATION_FILTER_PATTERN = /duration\s*(>=|<=)\s*'[\d.]+(us|ms|s|m)'/;
+const DURATION_GTE_PATTERN = /duration\s*>=\s*'[\d.]+(us|ms|s|m)'/;
+const DURATION_LTE_PATTERN = /duration\s*<=\s*'[\d.]+(us|ms|s|m)'/;
+// A two-sided bound; a context-menu selection must be single-sided, never this.
+const DURATION_RANGE_PATTERN = /and\s+duration\s*(>=|<=)/;
 // The Insights query fails server-side when that string is not decoded back to µs.
 const CAST_ERROR_PATTERN = /Cannot cast string|simplify_expressions|Arrow error/i;
 const RED_PANELS = ['Rate', 'Errors', 'Duration'];
@@ -17,6 +21,7 @@ test.describe("Traces Charts testcases", () => {
   let pm;
 
   // The Errors panel plots an empty series unless the window holds at least one error span.
+  // Seeded spans are stamped "now" in the shared `default` stream, so they age out and need no teardown.
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
     const context = await browser.newContext({
@@ -262,6 +267,9 @@ test.describe("Traces Charts testcases", () => {
     await searchAndShowCharts();
 
     await pm.tracesPage.setTimeRange('1h');
+    await expect
+      .poll(() => pm.tracesPage.getTimeRangeLabel(), { timeout: 10000 })
+      .toContain('1 Hour');
     await pm.tracesPage.runTraceSearch();
     await pm.tracesPage.waitForTraceSearchResults();
 
@@ -282,6 +290,8 @@ test.describe("Traces Charts testcases", () => {
     test.skip(!badgeVisible, 'error-count badge absent — no error spans in this window');
 
     await pm.tracesPage.toggleErrorOnlyFilter();
+    expect(await pm.tracesPage.isErrorOnlyFilterActive(), 'Error-only filter must be active')
+      .toBeTruthy();
     await pm.tracesPage.runTraceSearch();
     await pm.tracesPage.waitForTraceSearchResults();
 
@@ -300,7 +310,7 @@ test.describe("Traces Charts testcases", () => {
 
     await searchAndShowCharts();
 
-    await page.locator('[data-test="traces-search-mode-spans-btn"]').click();
+    await pm.tracesPage.switchToSpansMode();
     await page.waitForTimeout(3000);
 
     const rendered = await pm.tracesPage.waitForMetricsPanels();
@@ -321,10 +331,9 @@ test.describe("Traces Charts testcases", () => {
     await pm.tracesPage.navigateToTracesUrl();
     await page.waitForTimeout(3000);
 
-    await expect(
-      page.locator('[data-test="traces-no-stream-select-stream-card"]'),
+    await pm.tracesPage.expectNoStreamCardHidden(
       'The no-stream state must not be shown when a default stream exists'
-    ).toBeHidden({ timeout: 15000 });
+    );
 
     const selectedStream = await pm.tracesPage.getSelectedStreamName();
     expect(selectedStream, 'The default stream must be selected after a reload').toBe('default');
@@ -473,5 +482,91 @@ test.describe("Traces Charts testcases", () => {
 
     testLogger.info('Page errors during chart interaction', { pageErrors });
     expect(pageErrors, `Uncaught errors: ${pageErrors.join(' | ')}`).toHaveLength(0);
+  });
+
+  // ─── Right-click Duration gte/lte context menu (Workflow 3) ────────────────
+
+  test("P1: Right-click Duration opens the gte/lte context menu and dismisses on Escape", {
+    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
+
+    await searchAndShowCharts();
+
+    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Duration');
+    expect(dispatched, 'Right-click must reach the Duration panel').toBeTruthy();
+    expect(opened, 'Duration right-click must open the gte/lte menu').toBeTruthy();
+
+    await pm.tracesPage.expectMetricsContextMenuVisible();
+    expect(await pm.tracesPage.isMetricsContextMenuItemVisible('gte'), 'gte item must render').toBeTruthy();
+    expect(await pm.tracesPage.isMetricsContextMenuItemVisible('lte'), 'lte item must render').toBeTruthy();
+
+    await pm.tracesPage.dismissMetricsContextMenu();
+    await pm.tracesPage.expectMetricsContextMenuHidden();
+  });
+
+  test("P1: Right-click Duration then gte writes a single-sided duration >= filter", {
+    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
+
+    await searchAndShowCharts();
+
+    const before = await pm.tracesPage.getQueryEditorContent();
+    expect(before, 'Editor must start without a duration filter').not.toMatch(DURATION_FILTER_PATTERN);
+
+    await pm.tracesPage.openMetricsContextMenu('Duration');
+    await pm.tracesPage.expectMetricsContextMenuVisible();
+    await pm.tracesPage.selectMetricsContextMenuItem('gte');
+
+    await expect
+      .poll(async () => pm.tracesPage.getQueryEditorContent(), { timeout: 8000 })
+      .toMatch(DURATION_GTE_PATTERN);
+
+    const after = await pm.tracesPage.getQueryEditorContent();
+    testLogger.info('Query editor after gte context-menu selection', { after });
+    expect(after, 'gte must write a single-sided bound (no upper bound)')
+      .not.toMatch(DURATION_RANGE_PATTERN);
+
+    const panelError = await pm.tracesPage.getMetricsPanelErrorText();
+    expect(panelError, 'No RED panel may error after a gte context-menu selection').toBe('');
+  });
+
+  test("P1: Right-click Duration then lte writes a single-sided duration <= filter", {
+    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
+
+    await searchAndShowCharts();
+
+    const before = await pm.tracesPage.getQueryEditorContent();
+    expect(before, 'Editor must start without a duration filter').not.toMatch(DURATION_FILTER_PATTERN);
+
+    await pm.tracesPage.openMetricsContextMenu('Duration');
+    await pm.tracesPage.expectMetricsContextMenuVisible();
+    await pm.tracesPage.selectMetricsContextMenuItem('lte');
+
+    await expect
+      .poll(async () => pm.tracesPage.getQueryEditorContent(), { timeout: 8000 })
+      .toMatch(DURATION_LTE_PATTERN);
+
+    const after = await pm.tracesPage.getQueryEditorContent();
+    testLogger.info('Query editor after lte context-menu selection', { after });
+    expect(after, 'lte must write a single-sided bound (no lower bound)')
+      .not.toMatch(DURATION_RANGE_PATTERN);
+
+    const panelError = await pm.tracesPage.getMetricsPanelErrorText();
+    expect(panelError, 'No RED panel may error after an lte context-menu selection').toBe('');
+  });
+
+  test("P2: Right-click Rate does not open the gte/lte context menu", {
+    tag: ['@tracesCharts', '@traces', '@edge', '@P2', '@all']
+  }, async ({ page }) => {
+
+    await searchAndShowCharts();
+
+    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Rate');
+    // Without this the assertion below would also pass on a right-click that missed the canvas.
+    expect(dispatched, 'Right-click must reach the Rate panel for this test to mean anything').toBeTruthy();
+    expect(opened, 'Rate must not open the Duration-only context menu').toBeFalsy();
+
+    await pm.tracesPage.expectMetricsContextMenuStaysHidden();
   });
 });

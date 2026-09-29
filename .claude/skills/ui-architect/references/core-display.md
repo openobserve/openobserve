@@ -16,6 +16,8 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - [OEmptyState](#oemptystate)
 - [OIcon](#oicon)
 - [OSeparator](#oseparator)
+- [OSettingRow](#osettingrow)
+- [OSettingRowPair](#osettingrowpair)
 - [OShortcut](#oshortcut)
 - [OText](#otext)
 - [OVirtualScroll](#ovirtualscroll)
@@ -397,6 +399,61 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 ```
 
 **Family:** Commonly used inside `OCard`. Standalone.
+
+---
+
+### OSettingRow
+**Import:** `@/lib/core/SettingRow/OSettingRow.vue`
+**Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own).
+**Don't use for:** Form fields with a label above the control — use `OFormInput` directly.
+**Key props:**
+- `label` (`I18nText`, required — the setting's name)
+- `description` (`I18nText` — one line saying what the setting does or what a special value means)
+- `disabled` (boolean, default `false` — renders the row muted only; the control owns its own disabled state)
+- `dataTest` (string)
+
+**Slots:** `default` — the control on the right
+**Emits:** none
+**Example:**
+```vue
+<OSettingRow
+  :label="t('passwordPolicy.minLength')"
+  :description="t('passwordPolicy.minLengthDesc')"
+  data-test="settings-password-policy-min-length"
+>
+  <OFormInput name="min_length" type="number" width="xs" />
+</OSettingRow>
+```
+**Family:** Pair with `OFormSection`, which supplies the card.
+
+---
+
+### OSettingRowPair
+**Import:** `@/lib/core/SettingRow/OSettingRowPair.vue`
+**Use when:** Two related settings — a min/max, a period and its warning — on one row; the pair owns the hairline and padding so the two cells read as one row.
+**Don't use for:** More than two controls, or unrelated settings that only happen to be adjacent.
+**Key props:**
+- `dataTest` (string)
+
+**Slots:** `default` — exactly two `OSettingRow`; `footer` — a full-width message under both cells (a cross-field validation error)
+**Emits:** none
+**Example:**
+```vue
+<OSettingRowPair data-test="settings-password-policy-pair-length">
+  <OSettingRow :label="t('passwordPolicy.minLength')" data-test="settings-password-policy-min-length">
+    <OFormInput name="min_length" type="number" width="xs" />
+  </OSettingRow>
+  <OSettingRow :label="t('passwordPolicy.maxLength')" data-test="settings-password-policy-max-length">
+    <OFormInput name="max_length" type="number" width="xs">
+      <template #error />
+    </OFormInput>
+  </OSettingRow>
+  <template v-if="maxLengthError" #footer>
+    <p class="text-input-error-text text-xs" role="alert">{{ maxLengthError }}</p>
+  </template>
+</OSettingRowPair>
+```
+**Family:** `OSettingRow`, `OFormSection`.
 
 ---
 

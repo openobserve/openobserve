@@ -23,6 +23,8 @@ use config::{
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
+use crate::scalar_param::ScalarParam;
+
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
 #[derive(Debug, Clone, PartialEq)]
 struct Bucket {
@@ -37,7 +39,11 @@ impl Bucket {
 }
 
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn histogram_quantile(
+    phi: &ScalarParam,
+    data: Value,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
     let start = std::time::Instant::now();
     let trace_id = &eval_ctx.trace_id;
 
@@ -57,7 +63,7 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
     // Always use range query path - compute all timestamps at once
     let timestamps = eval_ctx.timestamps();
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) started with {} series and {} time points",
+        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi:?}) started with {} series and {} time points",
         in_matrix.len(),
         timestamps.len()
     );
@@ -112,18 +118,18 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
                 {
                     *cursor += 1;
                 }
-                let sample = bucket_rv
+                if let Some(sample) = bucket_rv
                     .samples
                     .get(*cursor)
                     .filter(|sample| sample.timestamp == eval_ts)
-                    .or_else(|| bucket_rv.samples.first());
-                if let Some(sample) = sample {
+                {
                     buckets.push(Bucket::new(*upper_bound, sample.value));
                 }
             }
 
             if !buckets.is_empty() {
-                let quantile_value = bucket_quantile_sorted(phi, &mut buckets, &mut coalesced);
+                let quantile_value =
+                    bucket_quantile_sorted(phi.at(eval_ts), &mut buckets, &mut coalesced);
                 samples.push(Sample::new(eval_ts, quantile_value));
             }
         }
@@ -139,7 +145,7 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
     }
 
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) completed in {:?}, folded {group_count} groups into {} series",
+        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi:?}) completed in {:?}, folded {group_count} groups into {} series",
         start.elapsed(),
         range_values.len()
     );
@@ -310,12 +316,11 @@ mod tests {
                         {
                             *cursor += 1;
                         }
-                        let sample = bucket_rv
+                        if let Some(sample) = bucket_rv
                             .samples
                             .get(*cursor)
                             .filter(|sample| sample.timestamp == eval_ts)
-                            .or_else(|| bucket_rv.samples.first());
-                        if let Some(sample) = sample {
+                        {
                             buckets.push(Bucket::new(*upper_bound, sample.value));
                         }
                     }
@@ -709,7 +714,7 @@ mod tests {
             for phi in [f64::NAN, -1.0, -0.0, 0.5, 0.9, 1.0, 2.0] {
                 let input = Value::Matrix(rows.clone());
                 let expected = legacy::histogram_quantile(phi, input.clone(), &eval).unwrap();
-                let actual = histogram_quantile(phi, input, &eval).unwrap();
+                let actual = histogram_quantile(&ScalarParam::Const(phi), input, &eval).unwrap();
                 assert_eq!(
                     matrix_bits(actual),
                     matrix_bits(expected),
@@ -718,11 +723,11 @@ mod tests {
             }
         }
         assert!(matches!(
-            histogram_quantile(0.9, Value::None, &eval).unwrap(),
+            histogram_quantile(&ScalarParam::Const(0.9), Value::None, &eval).unwrap(),
             Value::None
         ));
         assert_eq!(
-            histogram_quantile(0.9, Value::Float(1.0), &eval)
+            histogram_quantile(&ScalarParam::Const(0.9), Value::Float(1.0), &eval)
                 .unwrap_err()
                 .to_string(),
             legacy::histogram_quantile(0.9, Value::Float(1.0), &eval)
@@ -745,14 +750,14 @@ mod tests {
             time_window: None,
         };
         let input = Value::Matrix(vec![
-            // Intentionally put +Inf before the finite bound. Timestamp 2 is
-            // absent, so the established fallback-to-first-sample behavior is
-            // exercised as well as the cursor fast path.
+            // +Inf comes first on purpose; no bucket has a sample at 2, and only +Inf at 3
             series("+Inf", vec![Sample::new(1, 10.0), Sample::new(3, 30.0)]),
-            series("1", vec![Sample::new(1, 5.0), Sample::new(3, 15.0)]),
+            series("1", vec![Sample::new(1, 5.0)]),
         ]);
 
-        let Value::Matrix(result) = histogram_quantile(0.5, input, &eval_ctx).unwrap() else {
+        let Value::Matrix(result) =
+            histogram_quantile(&ScalarParam::Const(0.5), input, &eval_ctx).unwrap()
+        else {
             panic!("expected matrix");
         };
         assert_eq!(result.len(), 1);
@@ -760,9 +765,9 @@ mod tests {
             result[0]
                 .samples
                 .iter()
-                .map(|sample| (sample.timestamp, sample.value))
+                .map(|sample| (sample.timestamp, sample.value.to_bits()))
                 .collect::<Vec<_>>(),
-            vec![(1, 1.0), (2, 1.0), (3, 1.0)],
+            vec![(1, 1.0f64.to_bits()), (3, f64::NAN.to_bits())],
         );
     }
 

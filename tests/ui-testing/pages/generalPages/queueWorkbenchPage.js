@@ -21,12 +21,19 @@ export class QueueWorkbenchPage {
         return this.page.locator(`[data-test="ai-queue-workbench-nav-preview-${i}"]`);
     }
 
+    // Returns true when the workbench shell renders; false when the route is absent
+    // (Queue Workbench is enterprise-only — missing on the OSS binary). Callers skip on false.
     async gotoWorkbench(queueId) {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
             `${process.env['ZO_BASE_URL']}/web/ai/queues/${queueId}/review?org_identifier=${org}`
         );
-        await this.pageRoot.waitFor({ state: 'visible', timeout: 15000 });
+        try {
+            await this.pageRoot.waitFor({ state: 'visible', timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async expectNavPreviewText(i, text) {

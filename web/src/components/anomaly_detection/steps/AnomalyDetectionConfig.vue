@@ -433,6 +433,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ detectionWindowError }}
               </div>
+              <span
+                v-if="lookBackWindowHint"
+                class="text-text-secondary pt-1 text-xs"
+                data-test="anomaly-detection-window-hint"
+              >
+                {{ lookBackWindowHint }}
+              </span>
+              <span
+                v-if="legacyWindowWarning"
+                class="text-status-warning-text pt-1 text-xs"
+                data-test="anomaly-detection-window-legacy-warning"
+              >
+                {{ legacyWindowWarning }}
+              </span>
             </div>
           </div>
         </div>
@@ -681,10 +695,14 @@ import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
+  anomalyIntervalSeconds,
+  formatAnomalySeconds,
   hasTimestampAliasInSql,
+  lookBackWindowFloorSeconds,
   makeAnomalyFilterRow,
   type AnomalyDetectionConfigForm,
   type AnomalyFilterRow,
+  type AnomalyStoredIntervals,
 } from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
@@ -711,6 +729,11 @@ export default defineComponent({
     previewSql: {
       type: String,
       default: "",
+    },
+    // From the edit fetch (useAlertForm.anomalyStoredIntervals), never derived from `config` (D4).
+    storedIntervals: {
+      type: Object as PropType<AnomalyStoredIntervals | null>,
+      default: null,
     },
   },
 
@@ -746,9 +769,12 @@ export default defineComponent({
       }),
     );
     const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
+    // One s/m/h/d grammar shared with the server's parse_interval (§4.5) — "90s" and "1d" must render.
     const intervalUnits = computed(() => [
+      { label: t("common.seconds"), value: "s" },
       { label: t("common.minutes"), value: "m" },
       { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
     ]);
     // Fixed enum labels, not dynamic counts — plain keys, no pluralization.
     const retrainIntervalOptions = computed(() => [
@@ -784,7 +810,11 @@ export default defineComponent({
     // The parent (useAlertForm.saveAnomalyDetection) owns the save + payload;
     // this step's submit exists purely to run the schema (the exposed
     // validate() drives form.handleSubmit()), so onSubmit is a no-op.
-    const anomalyDetectionConfigSchema = createAnomalyDetectionConfigSchema(t, getTimestampColumn);
+    const anomalyDetectionConfigSchema = createAnomalyDetectionConfigSchema(
+      t,
+      getTimestampColumn,
+      () => props.storedIntervals,
+    );
 
     const form = useOForm<AnomalyDetectionConfigForm>({
       defaultValues: anomalyDetectionConfigDefaults(props.config),
@@ -800,7 +830,10 @@ export default defineComponent({
     const detectionFunctionField = form.useStore((s: any) => s.values.detection_function_field);
     const histogramIntervalValue = form.useStore((s: any) => s.values.histogram_interval_value);
     const histogramIntervalUnit = form.useStore((s: any) => s.values.histogram_interval_unit);
+    const scheduleIntervalValue = form.useStore((s: any) => s.values.schedule_interval_value);
+    const scheduleIntervalUnit = form.useStore((s: any) => s.values.schedule_interval_unit);
     const detectionWindowValue = form.useStore((s: any) => s.values.detection_window_value);
+    const detectionWindowUnit = form.useStore((s: any) => s.values.detection_window_unit);
     const trainingWindowDays = form.useStore((s: any) => s.values.training_window_days);
     const threshold = form.useStore((s: any) => s.values.threshold);
     const sensitivityMode = form.useStore((s: any) => s.values.sensitivity_mode);
@@ -863,6 +896,59 @@ export default defineComponent({
       const pct = Number(threshold.value);
       if (!Number.isInteger(pct) || pct < 50 || pct > 99) return raw("");
       return t("alerts.anomaly.sensitivityHintPercentile", { percentile: pct });
+    });
+
+    // §4.6: the floor is computed locally from the form's own values — no server dependency.
+    const currentWindowFloor = computed(() =>
+      lookBackWindowFloorSeconds(
+        Number(scheduleIntervalValue.value),
+        String(scheduleIntervalUnit.value),
+        Number(histogramIntervalValue.value),
+        String(histogramIntervalUnit.value),
+      ),
+    );
+
+    // Suppressed while the field is in error, so the floor is stated once, not twice.
+    const lookBackWindowHint = computed(() => {
+      if (detectionWindowError.value) return raw("");
+      const floor = currentWindowFloor.value;
+      if (floor === null) return raw("");
+      return t("alerts.anomaly.lookBackWindowMinimum", {
+        min: formatAnomalySeconds(floor),
+        recommended: formatAnomalySeconds(2 * floor),
+      });
+    });
+
+    const storedTripleUntouched = computed(() => {
+      const stored = props.storedIntervals;
+      return (
+        stored !== null &&
+        Number(histogramIntervalValue.value) === stored.histogram.value &&
+        String(histogramIntervalUnit.value) === stored.histogram.unit &&
+        Number(scheduleIntervalValue.value) === stored.schedule.value &&
+        String(scheduleIntervalUnit.value) === stored.schedule.unit &&
+        Number(detectionWindowValue.value) === stored.window.value &&
+        String(detectionWindowUnit.value) === stored.window.unit
+      );
+    });
+
+    // §4.5: a grandfathered below-floor row saves verbatim but is warned; unparsable stored values stay warning-free.
+    const legacyWindowWarning = computed(() => {
+      const stored = props.storedIntervals;
+      if (!stored || !stored.schedule.parsed || !stored.histogram.parsed) return raw("");
+      if (!storedTripleUntouched.value) return raw("");
+      const floor = lookBackWindowFloorSeconds(
+        stored.schedule.value,
+        stored.schedule.unit,
+        stored.histogram.value,
+        stored.histogram.unit,
+      );
+      const windowSecs =
+        typeof stored.window.raw === "number"
+          ? stored.window.raw
+          : anomalyIntervalSeconds(stored.window.value, stored.window.unit);
+      if (floor === null || windowSecs === null || windowSecs >= floor) return raw("");
+      return t("alerts.anomaly.lookBackWindowLegacy", { min: formatAnomalySeconds(floor) });
     });
 
     // The save payload, the SQL preview and the chart all read props.config, so the form writes back into it
@@ -1153,6 +1239,8 @@ export default defineComponent({
       histogramIntervalError,
       scheduleIntervalError,
       detectionWindowError,
+      lookBackWindowHint,
+      legacyWindowWarning,
       thresholdError,
       sensitivityTiers,
       sensitivityHint,

@@ -275,6 +275,8 @@ pub struct StreamSummary {
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
     pub total_index_size: f64,
+    #[serde(default)]
+    pub total_mindex_size: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]

@@ -9,6 +9,12 @@ const PageManager = require('../../pages/page-manager.js');
 
 const ORG = () => process.env['ORGNAME'] || 'default';
 
+// Queue Workbench is enterprise-only — its route is absent on the OSS binary. Cache
+// availability so the ENT route is probed once, then skip immediately on OSS.
+const featureAvailable = {};
+const WORKBENCH_ENT_ONLY =
+    'AI Queue Workbench is an enterprise-only feature — absent in the OSS build';
+
 function queueFixture(queueId) {
     return {
         id: queueId,
@@ -81,7 +87,7 @@ async function stubWorkbenchApi(page, { queueId, items, detailItem }) {
     );
 }
 
-test.describe("LLM Annotation Queue Input Preview testcases", () => {
+test.describe("LLM Annotation Queue Input Preview testcases", { tag: '@enterprise' }, () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
@@ -101,8 +107,10 @@ test.describe("LLM Annotation Queue Input Preview testcases", () => {
         ];
         await stubWorkbenchApi(page, { queueId: 'fixture-queue-1', items });
 
+        if (featureAvailable.workbench === false) test.skip(true, WORKBENCH_ENT_ONLY);
         testLogger.info('Opening the Queue Workbench with two previewed items');
-        await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-1');
+        featureAvailable.workbench = await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-1');
+        test.skip(!featureAvailable.workbench, WORKBENCH_ENT_ONLY);
 
         await pm.queueWorkbenchPage.expectNavPreviewText(0, 'How do I rotate keys?');
         await pm.queueWorkbenchPage.expectNavItemContainsText(0, 'trace-a');
@@ -119,8 +127,10 @@ test.describe("LLM Annotation Queue Input Preview testcases", () => {
         ];
         await stubWorkbenchApi(page, { queueId: 'fixture-queue-2', items });
 
+        if (featureAvailable.workbench === false) test.skip(true, WORKBENCH_ENT_ONLY);
         testLogger.info('Opening the Queue Workbench with a null-preview item');
-        await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-2');
+        featureAvailable.workbench = await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-2');
+        test.skip(!featureAvailable.workbench, WORKBENCH_ENT_ONLY);
 
         await pm.queueWorkbenchPage.expectNavItemContainsText(0, 'trace-a');
         await pm.queueWorkbenchPage.expectNavPreviewAbsent(0);
@@ -143,8 +153,10 @@ test.describe("LLM Annotation Queue Input Preview testcases", () => {
             detailItem,
         });
 
+        if (featureAvailable.workbench === false) test.skip(true, WORKBENCH_ENT_ONLY);
         testLogger.info('Opening the Queue Workbench with a null-preview item whose detail carries a preview');
-        await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-3');
+        featureAvailable.workbench = await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-3');
+        test.skip(!featureAvailable.workbench, WORKBENCH_ENT_ONLY);
 
         await pm.queueWorkbenchPage.expectNavPreviewText(0, 'Why is the chart flat?');
         await pm.queueWorkbenchPage.expectNavItemContainsText(0, 'trace-old');
@@ -157,8 +169,10 @@ test.describe("LLM Annotation Queue Input Preview testcases", () => {
     }, async ({ page }) => {
         await stubWorkbenchApi(page, { queueId: 'fixture-queue-4', items: [] });
 
+        if (featureAvailable.workbench === false) test.skip(true, WORKBENCH_ENT_ONLY);
         testLogger.info('Opening the Queue Workbench with an empty queue');
-        await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-4');
+        featureAvailable.workbench = await pm.queueWorkbenchPage.gotoWorkbench('fixture-queue-4');
+        test.skip(!featureAvailable.workbench, WORKBENCH_ENT_ONLY);
 
         await pm.queueWorkbenchPage.expectEmptyVisible();
         await pm.queueWorkbenchPage.expectNavItemAbsent(0);

@@ -287,6 +287,17 @@ describe("labels", () => {
   it("leaves labels undefined on the schema-less landing load", () => {
     expect(buildMetricCards([fallback("m_total")])[0].labels).toBeUndefined();
   });
+
+  it("keeps the internal exemplars column out of the label list", () => {
+    const stream: MetricStream = {
+      ...fallback("m_bucket"),
+      schema: [
+        { name: "exemplars", type: "Utf8" },
+        { name: "job", type: "Utf8" },
+      ],
+    };
+    expect(buildMetricCards([stream])[0].labels).toEqual(["job"]);
+  });
 });
 
 describe("buildTypeFilterBuckets — the cheap pass must agree with the expensive one", () => {
