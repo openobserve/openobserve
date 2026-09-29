@@ -364,28 +364,7 @@ impl FileData {
         // update size
         self.cur_size += data_size;
         self.data.insert(file.to_string(), data_size);
-        // update metrics
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .inc();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
-                .add(data_size as i64);
-        } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "results"])
-                .add(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[columns[1]])
-                .add(data_size as i64);
-        } else if columns[0] == "aggregations" && columns.len() >= 3 {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "aggregations"])
-                .add(data_size as i64);
-        };
+        update_key_metrics(file, data_size as i64);
         Ok(())
     }
 
@@ -439,30 +418,9 @@ impl FileData {
             self.cur_size -= data_size;
             release_size += data_size;
 
-            // metrics
-            let columns = key.split('/').collect::<Vec<&str>>();
-            let is_metrics_key = columns[0] == "metrics_results";
-            let is_results_key = columns[0] == "results";
-            if columns[0] == "files" {
-                metrics::QUERY_DISK_CACHE_FILES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .dec();
-                metrics::QUERY_DISK_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .sub(data_size as i64);
-            } else if columns[0] == "results" {
-                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2], "results"])
-                    .sub(data_size as i64);
-            } else if columns[0] == "metrics_results" {
-                metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1]])
-                    .sub(data_size as i64);
-            } else if columns[0] == "aggregations" && columns.len() >= 3 {
-                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2], "aggregations"])
-                    .sub(data_size as i64);
-            }
+            update_key_metrics(&key, -(data_size as i64));
+            let is_metrics_key = key.starts_with("metrics_results/");
+            let is_results_key = key.starts_with("results/");
             if is_results_key {
                 remove_result_files.push(key);
             } else if is_metrics_key {
@@ -512,28 +470,7 @@ impl FileData {
         };
         self.cur_size -= data_size;
 
-        // metrics
-        let columns = key.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .dec();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
-                .sub(data_size as i64);
-        } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "results"])
-                .sub(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[columns[1]])
-                .sub(data_size as i64);
-        } else if columns[0] == "aggregations" && columns.len() >= 3 {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "aggregations"])
-                .sub(data_size as i64);
-        }
+        update_key_metrics(&key, -(data_size as i64));
 
         RemoveOutcome::Removed(trash_file)
     }
@@ -673,6 +610,39 @@ fn key_escapes(file: &str) -> bool {
     Path::new(file)
         .components()
         .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+}
+
+/// Applies `delta` bytes (and one file for `files/` keys, by sign) to the key's cache metrics.
+fn update_key_metrics(key: &str, delta: i64) {
+    let mut columns = key.split('/');
+    let (kind, org, stream_type) = (columns.next(), columns.next(), columns.next());
+    match (kind, org, stream_type) {
+        (Some("files"), Some(org), Some(stream_type)) => {
+            let files = metrics::QUERY_DISK_CACHE_FILES.with_label_values(&[org, stream_type]);
+            if delta >= 0 {
+                files.inc()
+            } else {
+                files.dec()
+            }
+            metrics::QUERY_DISK_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type])
+                .add(delta);
+        }
+        (Some("results"), Some(org), Some(stream_type)) => {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type, "results"])
+                .add(delta)
+        }
+        (Some("metrics_results"), Some(org), _) => metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+            .with_label_values(&[org])
+            .add(delta),
+        (Some("aggregations"), Some(org), Some(stream_type)) => {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type, "aggregations"])
+                .add(delta)
+        }
+        _ => log::warn!("disk cache key {key} has no metric labels, skipping metrics"),
+    }
 }
 
 #[inline]
@@ -928,6 +898,11 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
 pub async fn set_size(file: &str, data_size: usize) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
+    }
+    if key_escapes(file) {
+        return Err(anyhow::anyhow!(
+            "disk cache rejected key outside the cache root: {file}"
+        ));
     }
 
     // hash the file name and get the bucket index
@@ -1671,6 +1646,40 @@ mod tests {
                 .is_none()
         );
         assert!(file_data.safe_file_path("results/a/b.json").is_some());
+    }
+
+    #[tokio::test]
+    async fn set_size_rejects_key_escaping_cache_root() {
+        let key = "files/../../t9_set_size_escape.parquet";
+
+        let ret = set_size(key, 1).await;
+
+        assert!(ret.is_err(), "escaping key was indexed: {ret:?}");
+        assert!(!FILES[get_bucket_idx(key)].read().await.exist(key).await);
+    }
+
+    #[tokio::test]
+    async fn short_keys_do_not_panic_in_metrics() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        file_data.max_size = usize::MAX;
+        let keys = [
+            "files",
+            "files/org",
+            "results/org",
+            "metrics_results",
+            "aggregations/org",
+        ];
+        for key in keys {
+            file_data.set_size(key, 1).await.unwrap();
+        }
+
+        assert!(matches!(
+            file_data.remove("files").await,
+            RemoveOutcome::Removed(_)
+        ));
+        file_data.gc(keys.len()).await;
+        assert_eq!(file_data.size().1, 0);
     }
 
     #[tokio::test]
