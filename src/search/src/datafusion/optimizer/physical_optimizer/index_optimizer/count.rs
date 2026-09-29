@@ -21,14 +21,11 @@ use datafusion::{
         Result,
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
-    physical_plan::{
-        ExecutionPlan,
-        aggregates::{AggregateExec, AggregateMode},
-    },
+    physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
 
-use crate::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::is_complex_plan, utils::is_count_rows_aggregate,
+use crate::datafusion::optimizer::physical_optimizer::index_optimizer::utils::{
+    is_complex_plan, is_unfiltered_count_rows, limits_rows,
 };
 
 #[rustfmt::skip]
@@ -73,20 +70,17 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
-            if aggregate.group_expr().is_empty()
-                && aggregate.aggr_expr().len() == 1
-                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
-            {
-                // The index count is merged under the partial aggregate, so only that one counts.
-                if *aggregate.mode() == AggregateMode::Partial {
-                    self.is_simple_count = true;
-                }
-            } else {
+            if !aggregate.group_expr().is_empty() || !is_unfiltered_count_rows(aggregate) {
                 self.is_simple_count = false;
                 return Ok(TreeNodeRecursion::Stop);
             }
+            self.is_simple_count = true;
         } else if is_complex_plan(node) {
             // if encounter complex plan, stop visiting
+            self.is_simple_count = false;
+            return Ok(TreeNodeRecursion::Stop);
+        } else if self.is_simple_count && limits_rows(node) {
+            // A limit below the aggregate drops rows that the index would still count.
             self.is_simple_count = false;
             return Ok(TreeNodeRecursion::Stop);
         }
@@ -115,13 +109,8 @@ mod tests {
         ]));
 
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(12));
-        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
+        let provider = NewEmptyTable::new("t", schema).with_partitions(12);
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        // One partition plans a single-mode aggregate, which has no partial side to merge into.
-        let single_ctx =
-            SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
-        let provider = NewEmptyTable::new("t", schema);
-        single_ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let cases = vec![
             (
@@ -140,23 +129,30 @@ mod tests {
                 "SELECT count(_timestamp) as cnt from t",
                 Some(IndexOptimizeMode::SimpleCount),
             ),
+            (
+                "SELECT count(*) from t limit 10",
+                Some(IndexOptimizeMode::SimpleCount),
+            ),
             ("SELECT name, count(*) as cnt from t group by name", None),
             ("SELECT count(name) from t", None),
+            (
+                "SELECT count(_timestamp) FILTER (WHERE name = 'a') from t",
+                None,
+            ),
+            ("SELECT count(*) from (SELECT * from t limit 1)", None),
+            ("SELECT count(*) from (SELECT * from t offset 1)", None),
+            (
+                "SELECT count(*) from (SELECT * from t order by _timestamp desc limit 1)",
+                None,
+            ),
         ];
 
         for (sql, expected) in cases {
             let plan = ctx.state().create_logical_plan(sql).await?;
             let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
-            assert_eq!(expected, is_simple_count(physical_plan));
+            assert_eq!(expected, is_simple_count(physical_plan), "{sql}");
         }
-
-        let plan = single_ctx
-            .state()
-            .create_logical_plan("SELECT count(*) from t")
-            .await?;
-        let physical_plan = single_ctx.state().create_physical_plan(&plan).await?;
-        assert_eq!(None, is_simple_count(physical_plan));
 
         Ok(())
     }

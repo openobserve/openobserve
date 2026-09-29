@@ -429,7 +429,7 @@ fn split_file_list_by_time_range(
         file.meta.min_ts >= index_updated_at
             && file.meta.index_size > 0
             && time_range
-                .is_none_or(|(start, end)| file.meta.min_ts >= start && file.meta.max_ts <= end)
+                .is_none_or(|(start, end)| file.meta.min_ts >= start && file.meta.max_ts < end)
     })
 }
 
@@ -483,6 +483,21 @@ mod tests {
         let (tantivy, datafusion) = split_file_list_by_time_range(files, 500, None);
         assert!(tantivy.is_empty());
         assert_eq!(datafusion.len(), 1);
+    }
+
+    #[test]
+    fn test_split_file_list_distinct_range_excludes_end_boundary() {
+        let files = vec![
+            make_file(100, 199, 512), // fully in [100, 200)
+            make_file(100, 200, 512), // has a record at the exclusive end
+            make_file(99, 150, 512),  // starts before the range
+        ];
+
+        let (tantivy, datafusion) = split_file_list_by_time_range(files, 0, Some((100, 200)));
+
+        assert_eq!(tantivy.len(), 1);
+        assert_eq!(tantivy[0].meta.max_ts, 199);
+        assert_eq!(datafusion.len(), 2);
     }
 
     #[test]

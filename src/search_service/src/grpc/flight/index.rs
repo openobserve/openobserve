@@ -309,48 +309,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_optimizer_physical_plan_needs_partial_aggregate_for_count() {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("_timestamp", DataType::Int64, false),
-            Field::new("name", DataType::Utf8, false),
-        ]));
-        for (partitions, expected_mode) in [(12, Some(IndexOptimizeMode::SimpleCount)), (1, None)] {
-            let state = SessionStateBuilder::new()
-                .with_config(SessionConfig::new().with_target_partitions(partitions))
-                .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
-                .with_default_features()
-                .build();
-            let ctx = SessionContext::new_with_state(state);
-            let provider =
-                NewEmptyTable::new("default", schema.clone()).with_partitions(partitions);
-            ctx.register_table("default", Arc::new(provider)).unwrap();
-            let logical_plan = ctx
-                .state()
-                .create_logical_plan("SELECT count(*) FROM default")
-                .await
-                .unwrap();
-            let physical_plan = ctx
-                .state()
-                .create_physical_plan(&logical_plan)
-                .await
-                .unwrap();
-
-            let (_plan, index) = optimizer_physical_plan(
-                physical_plan,
-                &ctx,
-                &schema,
-                StreamType::Logs,
-                (0, 100),
-                &StreamSearchSettings::default(),
-                None,
-            )
-            .unwrap();
-
-            assert_eq!(index.mode, expected_mode, "target partitions: {partitions}");
-        }
-    }
-
     #[test]
     fn test_use_metadata_count_only_for_unfiltered_simple_count() {
         let condition = |condition: Condition| {

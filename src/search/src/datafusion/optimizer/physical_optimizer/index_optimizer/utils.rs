@@ -15,7 +15,12 @@
 
 use std::sync::Arc;
 
-use datafusion::{common::tree_node::TreeNode, physical_plan::ExecutionPlan};
+use datafusion::{
+    common::tree_node::TreeNode,
+    physical_plan::{ExecutionPlan, aggregates::AggregateExec, limit::GlobalLimitExec},
+};
+
+use crate::datafusion::optimizer::physical_optimizer::utils::is_count_rows_aggregate;
 
 // check if the plan contains join, union, interleave, unnest, partial sort(use for streaming
 // table), bounded window agg, window agg
@@ -36,6 +41,18 @@ pub fn is_complex_plan(node: &Arc<dyn ExecutionPlan>) -> bool {
             || plan.children().len() > 1)
     })
     .unwrap_or(true)
+}
+
+/// Whether the aggregate's only expression is a row count without a `FILTER` clause.
+pub fn is_unfiltered_count_rows(aggregate: &AggregateExec) -> bool {
+    aggregate.aggr_expr().len() == 1
+        && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
+        && aggregate.filter_expr().iter().all(Option::is_none)
+}
+
+/// Whether the node caps its output rows, so the index would count rows the query drops.
+pub fn limits_rows(node: &Arc<dyn ExecutionPlan>) -> bool {
+    node.fetch().is_some() || node.downcast_ref::<GlobalLimitExec>().is_some()
 }
 
 #[cfg(test)]
