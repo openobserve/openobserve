@@ -1,13 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
 // IAM domain — form validation E2E tests
 //
-// Covers: AddUpdateOrganization, AddGroup (@enterprise), AddRole (@enterprise),
+// Covers: AddGroup (@enterprise), AddRole (@enterprise),
 //         AddServiceAccount (format validation only — full CRUD in serviceAccount.spec.js)
 //
 // Cleanup notes:
-//   - Organisations created in happy-path tests follow the e2e_iam_org_* prefix.
-//     Delete them manually via IAM > Organizations if cleanup.spec.js does not yet
-//     support org deletion via API.
 //   - Groups/Roles follow e2e_iam_group_* / e2e_iam_role_* prefix.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
