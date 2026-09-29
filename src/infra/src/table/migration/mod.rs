@@ -195,6 +195,7 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260918_000001_create_oncall_response_reports;
 mod m20260920_000001_add_anomaly_level_half_width;
 mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
 mod m20260922_000001_add_password_policy_columns_to_users;
@@ -500,6 +501,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260923_000001_create_llm_prompts::Migration),
             Box::new(m20260924_000001_add_recovery_episode_columns::Migration),
             Box::new(m20260928_000001_add_alert_recovery_destinations::Migration),
+            Box::new(m20260918_000001_create_oncall_response_reports::Migration),
         ]
     }
 }
@@ -551,6 +553,7 @@ mod tests {
         (90, "m20260923_000001_create_llm_prompts"),
         (91, "m20260924_000001_add_recovery_episode_columns"),
         (92, "m20260928_000001_add_alert_recovery_destinations"),
+        (93, "m20260918_000001_create_oncall_response_reports"),
     ];
 
     #[test]

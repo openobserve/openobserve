@@ -69,28 +69,74 @@ const lastValid = (w: Wrapper) => {
 };
 
 describe("OnCallL0Editor", () => {
-  /// P1 and P4 are invariants of the engine, not settings — the server 400s
-  /// any other value. Rendering them as controls would offer a choice the
-  /// product does not have.
-  it("renders P1 and P4/P5 as facts, with controls only for P2 and P3", () => {
+  /// §4a: all four severities are dropdowns now, each restricted to its own
+  /// legal set — the same set the server enforces — so a choice offered here
+  /// can never be refused.
+  it("renders all four severities as dropdowns, each offering only its own legal modes", () => {
     const wrapper = render();
-    expect(wrapper.find('[data-test="oncall-l0-mode-p2"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-l0-mode-p3"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-l0-mode-p1"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-l0-mode-p4"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-l0-p1"]').text()).toContain("Alert immediately");
-    expect(wrapper.find('[data-test="oncall-l0-p4"]').text()).toContain(
-      "no notifications are sent",
-    );
+    const optionsOf = (testKey: string) =>
+      (
+        wrapper.findComponent(`[data-test="oncall-l0-mode-${testKey}"]`).props("options") as {
+          value: string;
+        }[]
+      ).map((o) => o.value);
+
+    expect(wrapper.find('[data-test="oncall-l0-mode-p1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-l0-mode-p4"]').exists()).toBe(true);
+    expect(optionsOf("p1")).toEqual(["parallel", "off"]);
+    expect(optionsOf("p2")).toEqual(["gate", "parallel", "off"]);
+    expect(optionsOf("p3")).toEqual(["gate", "parallel", "off"]);
+    expect(optionsOf("p4")).toEqual(["only", "off"]);
   });
 
-  it("emits the whole block when a mode changes, P1/P4 untouched", async () => {
+  it("emits the whole block when one severity's mode changes, the rest untouched", async () => {
     const wrapper = render();
     await wrapper
       .findComponent('[data-test="oncall-l0-mode-p2"]')
       .vm.$emit("update:modelValue", "parallel");
     const emitted = lastL0(wrapper);
     expect(emitted?.mode).toEqual({ P1: "parallel", P2: "parallel", P3: "gate", P4: "only" });
+  });
+
+  it("lets P1 and P4/P5 opt out of the agent by choosing off", async () => {
+    const wrapper = render();
+    await wrapper
+      .findComponent('[data-test="oncall-l0-mode-p1"]')
+      .vm.$emit("update:modelValue", "off");
+    expect(lastL0(wrapper)?.mode.P1).toBe("off");
+    await wrapper
+      .findComponent('[data-test="oncall-l0-mode-p4"]')
+      .vm.$emit("update:modelValue", "off");
+    expect(lastL0(wrapper)?.mode.P4).toBe("off");
+  });
+
+  /// The switch is a convenience over the four rows, not a fifth field: it
+  /// writes `off` everywhere and reads back "on" once any row leaves `off`.
+  describe("the AI triage switch", () => {
+    it("reads on when any row is not off, and off only when every row is off", () => {
+      const on = render().findComponent('[data-test="oncall-l0-ai-triage-toggle"]');
+      expect(on.props("modelValue")).toBe(true);
+
+      const allOff = l0({ mode: { P1: "off", P2: "off", P3: "off", P4: "off" } });
+      const off = render(allOff).findComponent('[data-test="oncall-l0-ai-triage-toggle"]');
+      expect(off.props("modelValue")).toBe(false);
+    });
+
+    it("turning it off writes off to every row and stores nothing of its own", async () => {
+      const wrapper = render();
+      await wrapper
+        .findComponent('[data-test="oncall-l0-ai-triage-toggle"]')
+        .vm.$emit("update:modelValue", false);
+      expect(lastL0(wrapper)?.mode).toEqual({ P1: "off", P2: "off", P3: "off", P4: "off" });
+    });
+
+    it("turning it back on restores the published defaults", async () => {
+      const wrapper = render(l0({ mode: { P1: "off", P2: "off", P3: "off", P4: "off" } }));
+      await wrapper
+        .findComponent('[data-test="oncall-l0-ai-triage-toggle"]')
+        .vm.$emit("update:modelValue", true);
+      expect(lastL0(wrapper)?.mode).toEqual({ P1: "parallel", P2: "gate", P3: "gate", P4: "only" });
+    });
   });
 
   /// The server REFUSES an out-of-range budget rather than clamping, so the
