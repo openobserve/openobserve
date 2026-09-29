@@ -249,6 +249,15 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
+    fn canonical_root(&self) -> Option<&PathBuf> {
+        if let Some(root) = self.canonical_root.get() {
+            return Some(root);
+        }
+        let root = std::fs::canonicalize(&self.root_dir).ok()?;
+        let _ = self.canonical_root.set(root);
+        self.canonical_root.get()
+    }
+
     /// Resolve a cache key to an on-disk path, returning `None` when it would
     /// escape `root_dir`. The cache namespace is flat, so a `..`/absolute key or
     /// any path that canonicalizes outside the cache root is a traversal attempt.
@@ -257,16 +266,28 @@ impl FileData {
             return None;
         }
         let path = self.get_file_path(file);
-        let canonical_root = match self.canonical_root.get() {
-            Some(root) => root,
-            None => {
-                let root = std::fs::canonicalize(&self.root_dir).ok()?;
-                let _ = self.canonical_root.set(root);
-                self.canonical_root.get()?
-            }
-        };
         let resolved = std::fs::canonicalize(&path).ok()?;
-        resolved.starts_with(canonical_root).then_some(path)
+        resolved.starts_with(self.canonical_root()?).then_some(path)
+    }
+
+    /// Like `safe_read_path`, but for a file that may not exist yet.
+    fn safe_file_path(&self, file: &str) -> Option<String> {
+        if key_escapes(file) {
+            return None;
+        }
+        let path = self.get_file_path(file);
+        let Some(existing) = Path::new(&path)
+            .ancestors()
+            .find(|p| p.symlink_metadata().is_ok())
+        else {
+            return Some(path);
+        };
+        // nothing under the root exists yet, so no symlink can redirect the path
+        if !existing.starts_with(&self.root_dir) {
+            return Some(path);
+        }
+        let resolved = std::fs::canonicalize(existing).ok()?;
+        resolved.starts_with(self.canonical_root()?).then_some(path)
     }
 
     async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
@@ -294,6 +315,13 @@ impl FileData {
         tmp_file: &str,
         data_size: usize,
     ) -> Result<(), anyhow::Error> {
+        let Some(file_path) = self.safe_file_path(file) else {
+            _ = std::fs::remove_file(tmp_file);
+            return Err(anyhow::anyhow!(
+                "[CacheType:{}] File disk cache rejected key outside the cache root: {file}",
+                self.file_type,
+            ));
+        };
         if self.cur_size + data_size >= self.max_size {
             log::info!(
                 "[CacheType:{}] File disk cache is full, can't cache extra {data_size} bytes",
@@ -312,7 +340,6 @@ impl FileData {
 
         // rename tmp file to real file
         let file_ops_start = std::time::Instant::now();
-        let file_path = self.get_file_path(file);
         std::fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
         // sync on purpose: the rename and the set_size index insert must be one uncancellable poll
         std::fs::rename(tmp_file, &file_path).map_err(|e| {
@@ -794,7 +821,7 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
 #[inline]
 pub fn get_file_path(file: &str) -> Option<String> {
     let files = get_file_reader(file)?;
-    Some(files.get_file_path(file))
+    files.safe_file_path(file)
 }
 
 #[inline]
@@ -1578,6 +1605,72 @@ mod tests {
         assert!(file_data.get_size(&evil).await.is_none());
         assert!(file_data.get("/etc/hosts", None).await.is_none());
         let _ = std::fs::remove_file(&secret);
+    }
+
+    #[test]
+    fn get_file_path_rejects_keys_escaping_cache_root() {
+        for evil in [
+            "../../etc/passwd",
+            "files/../../../etc/passwd",
+            "aggregations/../../../../etc/passwd",
+            "/etc/passwd",
+        ] {
+            let resolved = get_file_path(evil);
+            assert!(
+                resolved.is_none(),
+                "{evil} resolved outside the cache root: {resolved:?}"
+            );
+        }
+        let legit = "aggregations/default/logs/t/hash/1000_2000.arrow";
+        let resolved = get_file_path(legit).unwrap();
+        assert!(resolved.ends_with(legit));
+    }
+
+    fn temp_root_file_data(tmp: &tempfile::TempDir) -> FileData {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
+        let root = tmp.path().join("cache");
+        std::fs::create_dir_all(&root).unwrap();
+        file_data.root_dir = format!("{}/", root.display());
+        file_data.multi_dir.clear();
+        file_data
+    }
+
+    #[tokio::test]
+    async fn set_rejects_key_escaping_cache_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("evil")).await.unwrap();
+
+        let ret = file_data.set("files/../../x", &tmp_file, 4).await;
+
+        assert!(ret.is_err(), "escaping key was written: {ret:?}");
+        assert!(!tmp.path().join("x").exists());
+        assert!(!file_data.exist("files/../../x").await);
+        assert!(!std::path::Path::new(&tmp_file).exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn set_rejects_parent_resolving_outside_cache_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, tmp.path().join("cache").join("files")).unwrap();
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("evil")).await.unwrap();
+
+        let ret = file_data
+            .set("files/default/logs/x.parquet", &tmp_file, 4)
+            .await;
+
+        assert!(ret.is_err(), "write followed a symlink out of the root");
+        assert!(!outside.join("default/logs/x.parquet").exists());
+        assert!(
+            file_data
+                .safe_file_path("files/default/logs/x.parquet")
+                .is_none()
+        );
+        assert!(file_data.safe_file_path("results/a/b.json").is_some());
     }
 
     #[tokio::test]
