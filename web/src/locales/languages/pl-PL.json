@@ -17977,7 +17977,34 @@
     },
     "samples": {
       "logOffTitle": "Twoje bazy danych nie rejestrują jeszcze wolnych instrukcji.",
-      "logOffDescription": "Nic nie prześledziło tych wywołań, więc zapytaliśmy bazy danych o ich własne najwolniejsze instrukcje — a one nie rejestrują żadnych. Ta lista pochodzi z dziennika instrukcji PostgreSQL (log_min_duration_statement), który jest domyślnie wyłączony — krok logowania w karcie konfiguracji włącza go. Przechwytywanie pojedynczych instrukcji jest obecnie dostępne tylko dla PostgreSQL, więc MySQL i MariaDB nie mogą jeszcze zasilać tej listy. Najczęstsze zapytania nadal pokazują, co działa najczęściej, ponieważ odczytują tabele liczników.",
+      "notCollecting": {
+        "description": "Nic nie prześledziło tych wywołań, więc zapytaliśmy bazy danych o ich własne najwolniejsze instrukcje — a one nie rejestrują żadnych. Sprawdzamy cztery rzeczy.",
+        "checklistTitle": "Co sprawdziliśmy",
+        "setUp": "Skonfiguruj logowanie instrukcji",
+        "checks": {
+          "queries": {
+            "ok": "Dane zapytań docierają",
+            "okDetail": "{queries} z {databases} — karta Top queries działa",
+            "okDetailNoFleet": "{queries} — karta Top queries działa",
+            "no": "Żadne dane zapytań również nie docierają",
+            "noDetail": "Zacznij od karty Top queries — nic do nas jeszcze nie dociera z tych baz danych."
+          },
+          "enabled": {
+            "ok": "Monitorowanie bazy danych jest włączone",
+            "okDetail": "dla tej organizacji",
+            "no": "Monitorowanie bazy danych jest wyłączone",
+            "noDetail": "Włącz je w Ustawieniach, aby rozpocząć zbieranie."
+          },
+          "log": {
+            "no": "Wolne instrukcje nie są rejestrowane",
+            "noDetail": "Ta lista pochodzi z dziennika instrukcji PostgreSQL (log_min_duration_statement), który jest domyślnie wyłączony — krok logowania w karcie konfiguracji włącza go."
+          },
+          "engines": {
+            "title": "Na razie tylko PostgreSQL",
+            "detail": "Przechwytywanie pojedynczych instrukcji jest obecnie dostępne tylko dla PostgreSQL, więc MySQL i MariaDB nie mogą jeszcze zasilać tej listy. Najczęstsze zapytania nadal pokazują, co działa najczęściej, ponieważ odczytują tabele liczników."
+          }
+        }
+      },
       "searchPlaceholder": "Szukaj tekstu zapytania, usługi lub bazy danych…",
       "columns": {
         "query": "Zapytanie",
@@ -18431,6 +18458,7 @@
       "never": "Nigdy",
       "countersCumulative": "Liczby skanowań i próżni to sumy całkowite od ostatniego resetu statystyk, a nie liczby dla wybranego zakresu czasu.",
       "tuplesEstimated": "Liczby wierszy i procent rozrostu to szacunki statystyczne z silnika bazy danych, a nie dokładne liczby.",
+      "aboutNumbers": "O tych liczbach",
       "notCollectingTitle": "Brak jeszcze statystyk tabel",
       "notCollectingDescription": "Nic nie zgłosiło statystyk tabel w tym zakresie czasu. Ten sygnał jest dostarczany jako osobny przepis kolektora.",
       "engineUnsupportedTitle": "Nie zbierane dla tego silnika",

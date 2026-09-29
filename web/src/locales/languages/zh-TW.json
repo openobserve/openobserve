@@ -17972,7 +17972,34 @@
     },
     "samples": {
       "logOffTitle": "您的資料庫尚未記錄慢速陳述式。",
-      "logOffDescription": "沒有任何追蹤涵蓋這些呼叫，所以我們向資料庫查詢它們自己的最慢陳述式——但它們沒有記錄任何項目。此清單來自 PostgreSQL 的陳述式日誌 (log_min_duration_statement)，該日誌預設為關閉——設定卡中的記錄步驟會將其開啟。目前僅 PostgreSQL 支援逐陳述式擷取，因此 MySQL 和 MariaDB 尚無法提供此清單的資料。Top queries 仍可向您顯示哪些查詢最常執行，因為它改為讀取計數器資料表。",
+      "notCollecting": {
+        "description": "沒有任何追蹤涵蓋這些呼叫，所以我們向資料庫查詢它們自己的最慢陳述式——但它們沒有記錄任何項目。我們檢查四件事。",
+        "checklistTitle": "我們檢查了什麼",
+        "setUp": "設定陳述式記錄",
+        "checks": {
+          "queries": {
+            "ok": "你的查詢資料正在送達",
+            "okDetail": "{queries} 來自 {databases} — 熱門查詢標籤頁正常運作",
+            "okDetailNoFleet": "{queries} — 熱門查詢標籤頁正常運作",
+            "no": "也沒有任何查詢資料送達",
+            "noDetail": "先從熱門查詢標籤頁開始——目前還沒有任何來自這些資料庫的資料到達我們這裡。"
+          },
+          "enabled": {
+            "ok": "資料庫監控已開啟",
+            "okDetail": "對這個組織",
+            "no": "資料庫監控已關閉",
+            "noDetail": "在設定中將它開啟以開始收集。"
+          },
+          "log": {
+            "no": "未記錄慢速陳述式",
+            "noDetail": "此清單來自 PostgreSQL 的陳述式日誌 (log_min_duration_statement)，該日誌預設為關閉——設定卡中的記錄步驟會將其開啟。"
+          },
+          "engines": {
+            "title": "目前僅支援 PostgreSQL",
+            "detail": "目前僅 PostgreSQL 支援逐陳述式擷取，因此 MySQL 和 MariaDB 尚無法提供此清單的資料。Top queries 仍可向您顯示哪些查詢最常執行，因為它改為讀取計數器資料表。"
+          }
+        }
+      },
       "searchPlaceholder": "搜尋查詢文字、服務或資料庫…",
       "columns": {
         "query": "查詢",
@@ -18426,6 +18453,7 @@
       "never": "從未",
       "countersCumulative": "掃描和 vacuum 計數是自上次統計重設以來的生命週期總計，而非所選時間範圍內的計數。",
       "tuplesEstimated": "列數和膨脹百分比是資料庫引擎的統計估計值，而非精確計數。",
+      "aboutNumbers": "關於這些數字",
       "notCollectingTitle": "尚無資料表統計資料",
       "notCollectingDescription": "此時間範圍內沒有回報資料表統計資料。此訊號以獨立的收集器配方提供。",
       "engineUnsupportedTitle": "未對此引擎收集",

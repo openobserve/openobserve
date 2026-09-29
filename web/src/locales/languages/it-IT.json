@@ -17977,7 +17977,34 @@
     },
     "samples": {
       "logOffTitle": "I tuoi database non registrano ancora istruzioni lente.",
-      "logOffDescription": "Nessuna traccia ha catturato queste chiamate, quindi abbiamo chiesto ai database le loro istruzioni più lente — e non ne registrano nessuna. Questa lista proviene dal log delle istruzioni di PostgreSQL (log_min_duration_statement), che è disattivato per impostazione predefinita — il passaggio di logging della scheda di configurazione lo attiva. La cattura per istruzione è attualmente solo per PostgreSQL, quindi MySQL e MariaDB non possono ancora alimentare questa lista. Le query principali possono comunque mostrarti cosa viene eseguito di più, perché legge invece le tabelle dei contatori.",
+      "notCollecting": {
+        "description": "Nessuna traccia ha catturato queste chiamate, quindi abbiamo chiesto ai database le loro istruzioni più lente — e non ne registrano nessuna. Controlliamo quattro cose.",
+        "checklistTitle": "Cosa abbiamo controllato",
+        "setUp": "Configura il logging delle istruzioni",
+        "checks": {
+          "queries": {
+            "ok": "I dati delle tue query stanno arrivando",
+            "okDetail": "{queries} da {databases} — la scheda Top queries funziona",
+            "okDetailNoFleet": "{queries} — la scheda Top queries funziona",
+            "no": "Nemmeno i dati delle query stanno arrivando",
+            "noDetail": "Inizia dalla scheda Top queries — non sta arrivando ancora nulla da questi database."
+          },
+          "enabled": {
+            "ok": "Il monitoraggio del database è attivo",
+            "okDetail": "per questa organizzazione",
+            "no": "Il monitoraggio del database è disattivato",
+            "noDetail": "Attivalo nelle Impostazioni per iniziare a raccogliere."
+          },
+          "log": {
+            "no": "Le istruzioni lente non vengono registrate",
+            "noDetail": "Questa lista proviene dal log delle istruzioni di PostgreSQL (log_min_duration_statement), che è disattivato per impostazione predefinita — il passaggio di logging della scheda di configurazione lo attiva."
+          },
+          "engines": {
+            "title": "Solo PostgreSQL, per ora",
+            "detail": "La cattura per istruzione è attualmente solo per PostgreSQL, quindi MySQL e MariaDB non possono ancora alimentare questa lista. Le query principali possono comunque mostrarti cosa viene eseguito di più, perché legge invece le tabelle dei contatori."
+          }
+        }
+      },
       "searchPlaceholder": "Cerca testo query, servizio o database…",
       "columns": {
         "query": "Query",
@@ -18431,6 +18458,7 @@
       "never": "Mai",
       "countersCumulative": "I conteggi di scan e vacuum sono totali cumulativi dall'ultimo ripristino delle statistiche, non conteggi per l'intervallo di tempo selezionato.",
       "tuplesEstimated": "Il numero di righe e la percentuale di bloat sono stime statistiche del motore del database, non conteggi esatti.",
+      "aboutNumbers": "Informazioni su questi numeri",
       "notCollectingTitle": "Nessuna statistica di tabella ancora",
       "notCollectingDescription": "Nulla ha segnalato statistiche di tabella in questo intervallo di tempo. Questo segnale viene fornito come una ricetta del collector separata.",
       "engineUnsupportedTitle": "Non raccolto per questo motore",
