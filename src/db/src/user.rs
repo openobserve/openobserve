@@ -189,12 +189,32 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     })
 }
 
+/// Refresh the local `USERS` cache entry for one user from the DB row.
+///
+/// `add`/`update` call this right after their DB write so the local node's own next read sees the
+/// change immediately, instead of waiting on the coordinator round trip that `watch()` also relies
+/// on to update other nodes' caches.
+async fn refresh_cached_user(user_email: &str) -> Result<(), anyhow::Error> {
+    let item_value = get_user_record(user_email).await?;
+    USERS.insert(user_email.to_lowercase(), item_value.clone());
+    if item_value.is_root {
+        let mut root = ROOT_USER.get_mut("root").unwrap();
+        root.first_name = item_value.first_name.clone();
+        root.last_name = item_value.last_name.clone();
+        root.password = item_value.password.clone();
+        root.salt = item_value.salt.clone();
+        root.password_ext = item_value.password_ext.clone();
+    }
+    Ok(())
+}
+
 pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
     let key = format!("{USER_RECORD_KEY}{}", db_user.email);
     let user = users::UserRecord::from(db_user);
     users::add(user.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Error adding user: {e}"))?;
+    refresh_cached_user(&db_user.email).await?;
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
     // Add user to orgs
@@ -238,6 +258,7 @@ pub async fn update(
     )
     .await
     .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
+    refresh_cached_user(user_email).await?;
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
     #[cfg(feature = "enterprise")]
