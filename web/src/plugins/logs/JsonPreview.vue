@@ -102,13 +102,7 @@
             </OButton>
           </template>
           <ODropdownItem
-            v-if="
-              !hideSearchTermActions &&
-              searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                item.name === key ? item.isSchemaField : '',
-              ) &&
-              multiStreamFields.includes(key)
-            "
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
             data-test="log-details-include-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'include')"
           >
@@ -116,13 +110,7 @@
             {{ t("common.includeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="
-              !hideSearchTermActions &&
-              searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                item.name === key ? item.isSchemaField : '',
-              ) &&
-              multiStreamFields.includes(key)
-            "
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
             data-test="log-details-exclude-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'exclude')"
           >
@@ -283,6 +271,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 
 export default {
   name: "JsonPreview",
@@ -678,6 +667,12 @@ export default {
       }
     };
 
+    // `_stream_name` is in no schema; a filter on it is rewritten per stream.
+    const canFilterOnField = (key: string) =>
+      key === STREAM_NAME_FIELD ||
+      (isFilterableLogField(key, searchObj.data.stream.selectedStreamFields) &&
+        multiStreamFields.value.includes(key));
+
     const updateMultiStreamFields = () => {
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
         if (item.streams?.length == searchObj.data.stream.selectedStream.length) {
@@ -871,6 +866,7 @@ export default {
       store,
       searchObj,
       multiStreamFields,
+      canFilterOnField,
       redirectToTraces,
       openCorrelation,
       filteredTracesStreamOptions,
