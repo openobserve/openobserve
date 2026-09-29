@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::LazyLock};
 
 use axum::{
     Json,
@@ -24,14 +24,14 @@ use axum::{
 use base64::Engine;
 #[cfg(feature = "enterprise")]
 use common::meta::user::AuthTokensExt;
-use common::{
-    infra::config::PASSWORD_HASH,
-    meta::user::{AuthTokens, UserOrgRole},
-};
+use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
     meta::user::UserRole,
     utils::{hash::get_passcode_hash, json},
 };
+use lru::LruCache;
+use parking_lot::Mutex;
+use sha2::{Digest, Sha256};
 #[cfg(feature = "enterprise")]
 use {
     crate::users::get_user, db::user::is_root_user, jsonwebtoken::TokenData,
@@ -41,6 +41,11 @@ use {
 
 pub const V2_API_PREFIX: &str = "v2";
 pub const SESSION_AUTH_MARKER: &str = "Session::";
+const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();
+
+// Every login attempt inserts, so it must stay bounded, and it must never key by the plaintext.
+static PASSWORD_HASH: LazyLock<Mutex<LruCache<String, String>>> =
+    LazyLock::new(|| Mutex::new(LruCache::new(PASSWORD_HASH_CACHE_CAPACITY)));
 
 #[cfg(feature = "enterprise")]
 pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
@@ -118,16 +123,13 @@ pub fn is_ofga_object_visible(
 }
 
 pub fn get_hash(pass: &str, salt: &str) -> String {
-    let key = format!("{pass}{salt}");
-    let hash = PASSWORD_HASH.get(&key);
-    match hash {
-        Some(ret_hash) => ret_hash.value().to_string(),
-        None => {
-            let password_hash = get_passcode_hash(pass, salt);
-            PASSWORD_HASH.insert(key, password_hash.clone());
-            password_hash
-        }
+    let key = password_hash_cache_key(pass, salt);
+    if let Some(hash) = PASSWORD_HASH.lock().get(&key) {
+        return hash.clone();
     }
+    let password_hash = get_passcode_hash(pass, salt);
+    PASSWORD_HASH.lock().put(key, password_hash.clone());
+    password_hash
 }
 
 #[cfg(feature = "enterprise")]
@@ -460,6 +462,15 @@ where
 
         Err(AuthExtractorRejection::unauthorized("Unauthorized Access"))
     }
+}
+
+// The separator keeps `("ab", "c")` and `("a", "bc")` from sharing an entry.
+fn password_hash_cache_key(pass: &str, salt: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(salt.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(pass.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 // Only server-side session resolution may emit the marker; from a client it is a forged trust
@@ -933,6 +944,35 @@ mod tests {
         println!(
             "http://localhost:5080/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
         );
+    }
+
+    #[test]
+    fn password_hash_cache_never_holds_the_plaintext() {
+        let (pass, salt) = ("plaintext-marker-pass", "plaintext-marker-salt");
+        let hash = get_hash(pass, salt);
+        let key = password_hash_cache_key(pass, salt);
+        assert!(!key.contains(pass) && !key.contains(salt));
+        assert_eq!(PASSWORD_HASH.lock().peek(&key), Some(&hash));
+        assert!(
+            PASSWORD_HASH
+                .lock()
+                .iter()
+                .all(|(k, _)| !k.contains(pass) && !k.contains(salt))
+        );
+    }
+
+    #[test]
+    fn password_hash_cache_stays_bounded() {
+        let cap = PASSWORD_HASH_CACHE_CAPACITY.get();
+        let hash = get_passcode_hash("bounded", "bounded-salt");
+        for i in 0..cap + 50 {
+            PASSWORD_HASH.lock().put(
+                password_hash_cache_key(&format!("guess-{i}"), "bounded-salt"),
+                hash.clone(),
+            );
+        }
+        get_hash("one-more-guess", "bounded-salt");
+        assert!(PASSWORD_HASH.lock().len() <= cap);
     }
 
     #[test]
