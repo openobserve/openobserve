@@ -60,7 +60,9 @@ mod tests {
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST};
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
-    use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
+    use openobserve_api_grpc::handler::grpc::{
+        auth::check_internal_auth, flight::FlightServiceImpl,
+    };
     use openobserve_api_http::handler::http::router::{
         basic_routes, config_routes, service_routes,
     };
@@ -185,7 +187,7 @@ mod tests {
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
-            .layer(tonic::service::InterceptorLayer::new(check_auth))
+            .layer(tonic::service::InterceptorLayer::new(check_internal_auth))
             .add_service(search_svc)
             .add_service(flight_svc)
             .serve(gaddr)
