@@ -354,6 +354,10 @@
       "title": "找不到追蹤",
       "description": "沒有追蹤符合選定的服務與時間範圍。請嘗試放寬時間範圍或選擇其他服務。"
     },
+    "noProfiles": {
+      "title": "找不到效能剖析",
+      "description": "您的時間範圍內沒有此串流的任何效能剖析資料。請嘗試擴大時間範圍或選擇其他服務。"
+    },
     "noServiceGraph": {
       "title": "無服務圖資料",
       "description": "請嘗試查詢更長的時間範圍，或確認您的服務正在發出 span 指標。"
@@ -421,6 +425,7 @@
       "alerts": "警示",
       "incidents": "事件",
       "traces": "追蹤",
+      "profiles": "效能剖析",
       "discoveryItems": "不健康的項目",
       "datasetItems": "項目",
       "searches": "搜尋",
@@ -1306,6 +1311,8 @@
     "tagKey": "標籤鍵",
     "tagValue": "標籤值",
     "addFilter": "新增篩選條件",
+    "removeFilter": "移除篩選條件 {key}={value}",
+    "searchFrames": "搜尋框架",
     "runQuery": "執行查詢",
     "timeSeriesTitle": "剖析值隨時間變化",
     "resultTitle": "剖析結果",
@@ -1314,14 +1321,28 @@
     "viewTree": "堆疊樹",
     "self": "自身",
     "total": "總計",
+    "share": "分享",
     "cpuDuration": "CPU 持續時間",
     "percent": "%",
+    "sortBySelf": "依自身時間排序",
+    "sortByTotal": "依總計排序",
     "noStreams": "沒有可用的剖析串流",
-    "noSeries": "此範圍內沒有時間序列資料",
-    "noResults": "此範圍內沒有剖析結果",
+    "noSeries": "沒有資料",
+    "noResults": "找不到效能剖析",
+    "noProfilesFound": "找不到效能剖析",
+    "noProfilesFoundDesc": "您的時間範圍內沒有此串流的任何效能剖析資料。請嘗試擴大時間範圍或選擇其他服務。",
+    "loading": "載入效能剖析中…",
     "filters": "篩選條件",
     "expand": "展開",
     "collapse": "收合",
+    "resetFocus": "重設焦點",
+    "labelAlign": "標籤對齊",
+    "alignLeft": "靠左對齊",
+    "alignRight": "靠右對齊",
+    "inverted": "反轉",
+    "copyFunctionName": "複製函式名稱",
+    "focusBlock": "聚焦區塊",
+    "focusOfTotal": "佔總計 {percent}%",
     "errors": {
       "loadFailed": "載入剖析資料失敗"
     }
@@ -1568,6 +1589,7 @@
     "actionOperation": "動作：{type} 於 {target}",
     "viewOperation": "檢視：{page}",
     "collapsedOtherActions": "[{count} 個其他動作]",
+    "collapsedOtherRequests": "[此頁面上的 {count} 個其他請求]",
     "collapsedMoreErrors": "[另外 {count} 個錯誤]",
     "collapsedStaticAssets": "[{count} 個靜態資源]",
     "collapsedLongTasks": "[{count} 個長任務]",
@@ -2771,6 +2793,13 @@
         "node": "警示觸發器",
         "desc": "當警示觸發時執行",
         "intro": "當連結的警示觸發時，每個下游步驟都會收到此負載。"
+      },
+      "alertResolved": {
+        "label": "警示已解決",
+        "tab": "已解決",
+        "node": "警示已解決觸發條件",
+        "desc": "當觸發中的警示恢復時執行",
+        "intro": "當已觸發的警示恢復時，每個下游步驟都會收到此承載資料。"
       },
       "incidentEvent": {
         "label": "事故事件",
@@ -7430,6 +7459,8 @@
         "streamName": "警示監看的串流名稱",
         "alertName": "警示名稱",
         "alertType": "警示類型（例如：排程、即時）",
+        "alertStatus": "觸發中或已解決 — 讓恢復訊息讀起來與新警示不同",
+        "episodeId": "此觸發的唯一 ID，會與其恢復共用。會自動傳送至 PagerDuty、Opsgenie 和 ServiceNow，以便解決警示。",
         "alertPeriod": "評估視窗（分鐘）",
         "alertOperator": "閾值比較運算子（>、<、=）",
         "alertThreshold": "設定的閾值",
@@ -7444,7 +7475,19 @@
         "alertTriggerTimeSeconds": "觸發時間（epoch 秒）",
         "alertTriggerTimeStr": "觸發時間（可讀格式）",
         "rows": "所有符合的列，由列範本格式化"
-      }
+      },
+      "notifyOnRecovery": "恢復時通知",
+      "notifyOnRecoveryTooltip": "當此警示停止觸發時，傳送一則訊息至上述目標。",
+      "notifyOnRecoveryTemplateHint": "重用您範本的目標必須包含 {'{'}alert_status{'}'}，否則恢復訊息會看起來像新的警示。",
+      "recoveryDestinations": "恢復目標",
+      "recoveryDestinationsTooltip": "留空時，會在原警示觸發的位置宣告恢復。在此選擇目標可改為傳送至其他位置。PagerDuty、Opsgenie 和 ServiceNow 仍會關閉其觸發時所開啟的工單。",
+      "recoveryResolvesIncident": "解決事件",
+      "recoveryClosesAlert": "關閉警示",
+      "recoveryChatMessage": "新的「已解決」訊息",
+      "keepFiringFor": "持續觸發時間",
+      "keepFiringForTooltip": "條件解除後等待這麼久才恢復。0 表示立即恢復。",
+      "keepFiringForInvalid": "請輸入 0 秒或以上",
+      "keepFiringForTooLong": "最多輸入 86400 秒 (24 小時)"
     },
     "advanced": {
       "addVariable": "新增變數",
@@ -7675,6 +7718,8 @@
       "servicenowPasswordHelp": "ServiceNow 密碼或 API 權杖",
       "servicenowAssignmentGroup": "指派群組（選填）",
       "servicenowAssignmentGroupHelp": "要指派事件的群組（例如：IT 營運團隊）",
+      "servicenowResolutionCode": "解決代碼 (選填)",
+      "servicenowResolutionCodeHelp": "必須符合您 ServiceNow 執行個體上的有效解決代碼。當 OpenObserve 解決事件時使用。預設為 Solved (Permanently)。",
       "usernameRequired": "使用者名稱為必填",
       "passwordRequired": "密碼為必填",
       "emailRecipients": "收件人電子郵件地址",
@@ -7971,7 +8016,8 @@
     "sloKind": "條件類型",
     "sloLongWindow": "長視窗",
     "sloShortWindow": "短視窗",
-    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。"
+    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。",
+    "seconds": "秒"
   },
   "alert_dependencies": {
     "actionOpen": "開啟",
@@ -8169,6 +8215,7 @@
     "filterPrebuilt": "預先建置",
     "filterCustom": "自訂",
     "variableRowsDescription": "多行資料列範本",
+    "variableEpisodeIdDescription": "此觸發的唯一 ID。會自動加入 PagerDuty、Opsgenie 和 ServiceNow 的承載資料中，以便解決警示。",
     "variableStreamFields": "所有串流欄位皆為變數。",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} 用於限制資料列或字串長度。",
     "variableTimezoneNote": "時間戳變數 ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) 會以伺服器的本地時區呈現。",
@@ -13091,6 +13138,7 @@
       "promptLabel": "評審提示",
       "includeReasoningLabel": "包含推理",
       "includeReasoningHint": "評審解釋為何給出該分數，並與每個結果一起儲存。",
+      "decisionProviderNote": "決策模型僅回傳分數與推理結果，因此無法提供額外欄位。",
       "extraFieldsLabel": "額外中繼資料欄位（選用）",
       "extraFieldsHint": "要求評審隨每個分數返回額外值 — 例如類別或信心度。",
       "extraFields": {
@@ -19544,6 +19592,8 @@
     "unroutedDismissedTag": "已忽略",
     "notAvailableTitle": "此部署不提供值班功能",
     "notAvailableDescription": "連結本身沒有問題 — 此組建未在此處提供值班功能。沒有任何失敗，也不需要重試。",
+    "teamNotFoundTitle": "找不到團隊",
+    "teamNotFoundDescription": "此團隊已不存在，可能已被刪除。",
     "unroutedPagedNobody": "未通知任何人",
     "unroutedLoadFailed": "無法載入未路由的佇列",
     "routingLoadFailed": "無法載入歸屬與路由設定",

@@ -354,6 +354,10 @@
       "title": "Brak trace",
       "description": "Żadne trace nie pasują do wybranej usługi i zakresu czasu. Spróbuj szerszego zakresu czasu lub innej usługi."
     },
+    "noProfiles": {
+      "title": "Nie znaleziono profili",
+      "description": "Twój przedział czasu nie zawiera żadnych danych profilowych z tego strumienia. Spróbuj szerszego zakresu czasu lub innej usługi."
+    },
     "noServiceGraph": {
       "title": "Brak danych grafu usług",
       "description": "Spróbuj zapytać o dłuższy zakres czasu lub upewnij się, że Twoje usługi emitują metryki span."
@@ -421,6 +425,7 @@
       "alerts": "alerty",
       "incidents": "incydenty",
       "traces": "trace",
+      "profiles": "profile",
       "discoveryItems": "niezdrowe elementy",
       "datasetItems": "elementy",
       "searches": "wyszukiwania",
@@ -1306,6 +1311,8 @@
     "tagKey": "Klucz tagu",
     "tagValue": "Wartość tagu",
     "addFilter": "Dodaj filtr",
+    "removeFilter": "Usuń filtr {key}={value}",
+    "searchFrames": "Przeszukaj ramki",
     "runQuery": "Uruchom zapytanie",
     "timeSeriesTitle": "Wartości profilu w czasie",
     "resultTitle": "Wynik profilu",
@@ -1314,14 +1321,28 @@
     "viewTree": "Drzewo stosu",
     "self": "Własne",
     "total": "Łączne",
+    "share": "Udostępnij",
     "cpuDuration": "Czas CPU",
     "percent": "%",
+    "sortBySelf": "Sortuj według Self",
+    "sortByTotal": "Sortuj według sumy",
     "noStreams": "Brak dostępnych strumieni profili",
-    "noSeries": "Brak danych szeregów czasowych w tym zakresie",
-    "noResults": "Brak wyników profilu w tym zakresie",
+    "noSeries": "Brak danych",
+    "noResults": "Nie znaleziono profili",
+    "noProfilesFound": "Nie znaleziono profili",
+    "noProfilesFoundDesc": "Twój przedział czasu nie zawiera żadnych danych profilowych z tego strumienia. Spróbuj szerszego zakresu czasu lub innej usługi.",
+    "loading": "Ładowanie profili…",
     "filters": "Filtry",
     "expand": "Rozwiń",
     "collapse": "Zwiń",
+    "resetFocus": "Zresetuj fokus",
+    "labelAlign": "Wyrównanie etykiety",
+    "alignLeft": "Wyrównaj do lewej",
+    "alignRight": "Wyrównaj do prawej",
+    "inverted": "Odwrócony",
+    "copyFunctionName": "Kopiuj nazwę funkcji",
+    "focusBlock": "Fokus na bloku",
+    "focusOfTotal": "{percent}% całości",
     "errors": {
       "loadFailed": "Nie udało się wczytać danych profilu"
     }
@@ -1568,6 +1589,7 @@
     "actionOperation": "Akcja: {type} na {target}",
     "viewOperation": "Widok: {page}",
     "collapsedOtherActions": "[{count} innych akcji]",
+    "collapsedOtherRequests": "[{count} innych żądań na tej stronie]",
     "collapsedMoreErrors": "[{count} więcej błędów]",
     "collapsedStaticAssets": "[{count} statycznych zasobów]",
     "collapsedLongTasks": "[{count} długich zadań]",
@@ -2771,6 +2793,13 @@
         "node": "Wyzwalacz alertu",
         "desc": "Uruchom, gdy alert się wyzwoli",
         "intro": "Gdy powiązany alert się wyzwoli, każdy kolejny krok otrzyma ten ładunek."
+      },
+      "alertResolved": {
+        "label": "Alert rozwiązany",
+        "tab": "Rozwiązany",
+        "node": "Wyzwalacz rozwiązania alertu",
+        "desc": "Uruchom, gdy alert w stanie alarmu zostanie przywrócony",
+        "intro": "Gdy alert, który został wywołany, zostanie przywrócony, każdy dalszy krok otrzymuje ten ładunek."
       },
       "incidentEvent": {
         "label": "Zdarzenie incydentu",
@@ -7435,6 +7464,8 @@
         "streamName": "Nazwa strumienia obserwowanego przez alert",
         "alertName": "Nazwa alertu",
         "alertType": "Typ alertu (np. zaplanowany, w czasie rzeczywistym)",
+        "alertStatus": "w stanie alarmu lub rozwiązany — pozwala, aby komunikat o przywróceniu wyglądał inaczej niż nowy alert",
+        "episodeId": "Unikalny identyfikator tego wystąpienia alarmu, współdzielony z jego przywróceniem. Wysyłany automatycznie do PagerDuty, Opsgenie i ServiceNow, aby alert mógł zostać rozwiązany.",
         "alertPeriod": "Okno oceny (w minutach)",
         "alertOperator": "Operator porównania progu (>, <, =)",
         "alertThreshold": "Skonfigurowana wartość progu",
@@ -7449,7 +7480,19 @@
         "alertTriggerTimeSeconds": "Czas wyzwolenia w sekundach epoch",
         "alertTriggerTimeStr": "Czas wyzwolenia (czytelny dla człowieka)",
         "rows": "Wszystkie pasujące wiersze, sformatowane według szablonu wiersza"
-      }
+      },
+      "notifyOnRecovery": "Powiadom o przywróceniu",
+      "notifyOnRecoveryTooltip": "Wyślij jedną wiadomość do powyższych celów, gdy ten alert przestanie być w stanie alarmu.",
+      "notifyOnRecoveryTemplateHint": "Cele, które ponownie wykorzystują twój szablon, muszą zawierać {'{'}alert_status{'}'}, w przeciwnym razie komunikat o przywróceniu będzie wyglądał jak nowy alert.",
+      "recoveryDestinations": "Cel przywrócenia",
+      "recoveryDestinationsTooltip": "Pozostaw puste, aby ogłosić przywrócenie wszędzie tam, gdzie alert wystąpił. Wybierz tutaj cele, aby wysłać je gdzie indziej. PagerDuty, Opsgenie i ServiceNow nadal zamkną zgłoszenie otwarte przez ich własne wystąpienie alarmu.",
+      "recoveryResolvesIncident": "rozwiązuje incydent",
+      "recoveryClosesAlert": "zamyka alert",
+      "recoveryChatMessage": "nowa wiadomość \"Rozwiązany\"",
+      "keepFiringFor": "Utrzymuj stan alarmu przez",
+      "keepFiringForTooltip": "Odczekaj tak długo po ustąpieniu warunku przed przywróceniem. 0 przywraca natychmiast.",
+      "keepFiringForInvalid": "Wprowadź 0 lub więcej sekund",
+      "keepFiringForTooLong": "Wprowadź maksymalnie 86400 sekund (24 godziny)"
     },
     "advanced": {
       "addVariable": "Dodaj zmienną",
@@ -7680,6 +7723,8 @@
       "servicenowPasswordHelp": "Hasło ServiceNow lub token API",
       "servicenowAssignmentGroup": "Grupa przypisania (opcjonalna)",
       "servicenowAssignmentGroupHelp": "Grupa, do której przypisywane są incydenty (np. Dział IT)",
+      "servicenowResolutionCode": "Kod rozwiązania (opcjonalnie)",
+      "servicenowResolutionCodeHelp": "Musi pasować do prawidłowego kodu rozwiązania w Twojej instancji ServiceNow. Używany, gdy OpenObserve rozwiązuje incydent. Domyślnie ustawiony na Solved (Permanently).",
       "usernameRequired": "Nazwa użytkownika jest wymagana",
       "passwordRequired": "Hasło jest wymagane",
       "emailRecipients": "Adresy e-mail odbiorców",
@@ -7976,7 +8021,8 @@
     "sloKind": "Typ warunku",
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
-    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować."
+    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
+    "seconds": "Sekundy"
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",
@@ -8174,6 +8220,7 @@
     "filterPrebuilt": "Wbudowany",
     "filterCustom": "Niestandardowy",
     "variableRowsDescription": "wiele wierszy szablonu wiersza",
+    "variableEpisodeIdDescription": "Unikalny identyfikator tego wystąpienia alarmu. Dodawany automatycznie do ładunków PagerDuty, Opsgenie i ServiceNow, aby alert mógł zostać rozwiązany.",
     "variableStreamFields": "Wszystkie pola strumienia są zmiennymi.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} używane do ograniczenia liczby wierszy lub długości ciągu.",
     "variableTimezoneNote": "Zmienne czasu ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) są wyświetlane w lokalnej strefie czasowej serwera.",
@@ -13096,6 +13143,7 @@
       "promptLabel": "Monit oceniający",
       "includeReasoningLabel": "Uwzględnij uzasadnienie",
       "includeReasoningHint": "Oceniający wyjaśnia, dlaczego przyznał tę ocenę, zapisaną z każdym wynikiem.",
+      "decisionProviderNote": "Modele decyzyjne zwracają tylko wynik i uzasadnienie, dlatego dodatkowe pola są niedostępne.",
       "extraFieldsLabel": "Dodatkowe pola metadanych (opcjonalne)",
       "extraFieldsHint": "Poproś oceniającego o zwrócenie dodatkowych wartości z każdą oceną — na przykład kategorii lub poziomu ufności.",
       "extraFields": {
@@ -19549,6 +19597,8 @@
     "unroutedDismissedTag": "odrzucone",
     "notAvailableTitle": "Dyżury nie są dostępne w tym wdrożeniu",
     "notAvailableDescription": "Link jest prawidłowy — ta kompilacja nie oferuje tu dyżurów. Nic nie zawiodło i nie ma czego ponawiać.",
+    "teamNotFoundTitle": "Nie znaleziono zespołu",
+    "teamNotFoundDescription": "Ten zespół już nie istnieje. Mógł zostać usunięty.",
     "unroutedPagedNobody": "Nikogo nie powiadomiono",
     "unroutedLoadFailed": "Nie udało się wczytać kolejki nieprzypisanych",
     "routingLoadFailed": "Nie udało się wczytać własności i routingu",

@@ -354,6 +354,10 @@
       "title": "未发现任何追踪",
       "description": "没有与所选服务和时间范围相匹配的追踪。尝试更宽的时间范围或其他服务。"
     },
+    "noProfiles": {
+      "title": "未找到性能分析",
+      "description": "您的时间窗口中没有该数据流的任何性能分析数据。请尝试扩大时间范围或选择其他服务。"
+    },
     "noServiceGraph": {
       "title": "没有服务图数据",
       "description": "尝试查询更长的时间范围，或确保您的服务正在发出 Span 指标。"
@@ -421,6 +425,7 @@
       "alerts": "告警",
       "incidents": "事件",
       "traces": "追踪",
+      "profiles": "性能分析",
       "discoveryItems": "不健康项",
       "datasetItems": "项",
       "searches": "搜索",
@@ -1306,6 +1311,8 @@
     "tagKey": "标签键",
     "tagValue": "标签值",
     "addFilter": "添加过滤条件",
+    "removeFilter": "移除过滤器 {key}={value}",
+    "searchFrames": "搜索帧",
     "runQuery": "运行查询",
     "timeSeriesTitle": "性能值时间序列",
     "resultTitle": "分析结果",
@@ -1314,14 +1321,28 @@
     "viewTree": "调用栈树",
     "self": "自身",
     "total": "总量",
+    "share": "分享",
     "cpuDuration": "CPU 时长",
     "percent": "%",
+    "sortBySelf": "按自身排序",
+    "sortByTotal": "按总计排序",
     "noStreams": "暂无性能分析数据流",
-    "noSeries": "当前时间范围内无时间序列数据",
-    "noResults": "当前时间范围内无分析结果",
+    "noSeries": "无数据",
+    "noResults": "未找到性能分析",
+    "noProfilesFound": "未找到性能分析",
+    "noProfilesFoundDesc": "您的时间窗口中没有该数据流的任何性能分析数据。请尝试扩大时间范围或选择其他服务。",
+    "loading": "正在加载性能分析…",
     "filters": "过滤条件",
     "expand": "展开",
     "collapse": "收起",
+    "resetFocus": "重置聚焦",
+    "labelAlign": "标签对齐",
+    "alignLeft": "左对齐",
+    "alignRight": "右对齐",
+    "inverted": "反转",
+    "copyFunctionName": "复制函数名称",
+    "focusBlock": "聚焦块",
+    "focusOfTotal": "占总计的 {percent}%",
     "errors": {
       "loadFailed": "加载性能分析数据失败"
     }
@@ -1568,6 +1589,7 @@
     "actionOperation": "操作：{type} 在 {target} 上",
     "viewOperation": "视图：{page}",
     "collapsedOtherActions": "[{count} 个其他操作]",
+    "collapsedOtherRequests": "[此页面上的 {count} 个其他请求]",
     "collapsedMoreErrors": "[{count} 个更多错误]",
     "collapsedStaticAssets": "[{count} 个静态资源]",
     "collapsedLongTasks": "[{count} 个长任务]",
@@ -2771,6 +2793,13 @@
         "node": "告警触发器",
         "desc": "当告警触发时运行",
         "intro": "当关联的告警触发时，每个下游步骤都会收到此载荷。"
+      },
+      "alertResolved": {
+        "label": "告警已恢复",
+        "tab": "已恢复",
+        "node": "告警恢复触发器",
+        "desc": "当触发中的告警恢复时运行",
+        "intro": "当已触发的告警恢复时，每个下游步骤都会收到此负载。"
       },
       "incidentEvent": {
         "label": "故障事件",
@@ -7435,6 +7464,8 @@
         "streamName": "告警监视的流名称",
         "alertName": "告警名称",
         "alertType": "告警类型（例如：定时、实时）",
+        "alertStatus": "触发中或已恢复 — 让恢复消息与新的告警区分开来",
+        "episodeId": "此次触发的唯一 ID，其恢复共用该 ID。会自动发送到 PagerDuty、Opsgenie 和 ServiceNow，以便告警可被解决。",
         "alertPeriod": "评估窗口（分钟）",
         "alertOperator": "阈值比较运算符（>, <, =）",
         "alertThreshold": "已配置的阈值",
@@ -7449,7 +7480,19 @@
         "alertTriggerTimeSeconds": "触发时间（epoch 秒）",
         "alertTriggerTimeStr": "人类可读的触发时间",
         "rows": "所有匹配行，按行模板格式化"
-      }
+      },
+      "notifyOnRecovery": "恢复时通知",
+      "notifyOnRecoveryTooltip": "当此告警停止触发时，向上述目标发送一条消息。",
+      "notifyOnRecoveryTemplateHint": "复用您模板的目标必须包含 {'{'}alert_status{'}'}，否则恢复消息会看起来像新的告警。",
+      "recoveryDestinations": "恢复目标",
+      "recoveryDestinationsTooltip": "留空则在告警触发的位置宣告恢复。在此选择目标可将恢复消息发送到其他地方。PagerDuty、Opsgenie 和 ServiceNow 仍会关闭其自身触发所创建的工单。",
+      "recoveryResolvesIncident": "解决该事件",
+      "recoveryClosesAlert": "关闭该告警",
+      "recoveryChatMessage": "新的“已恢复”消息",
+      "keepFiringFor": "持续触发时长",
+      "keepFiringForTooltip": "条件清除后等待此时长再恢复。0 表示立即恢复。",
+      "keepFiringForInvalid": "请输入 0 或更大的秒数",
+      "keepFiringForTooLong": "最多输入 86400 秒（24 小时）"
     },
     "advanced": {
       "addVariable": "添加变量",
@@ -7680,6 +7723,8 @@
       "servicenowPasswordHelp": "ServiceNow 密码或 API 令牌",
       "servicenowAssignmentGroup": "分配组（可选）",
       "servicenowAssignmentGroupHelp": "事件分配到的组（例如，IT Operations）",
+      "servicenowResolutionCode": "解决代码（可选）",
+      "servicenowResolutionCodeHelp": "必须与您 ServiceNow 实例上的有效解决代码匹配。在 OpenObserve 解决事件时使用。默认为 Solved (Permanently)。",
       "usernameRequired": "用户名是必填项",
       "passwordRequired": "密码是必填项",
       "emailRecipients": "收件人电子邮件地址",
@@ -7976,7 +8021,8 @@
     "sloKind": "条件类型",
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
-    "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。"
+    "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。",
+    "seconds": "秒"
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -8174,6 +8220,7 @@
     "filterPrebuilt": "预建的",
     "filterCustom": "自定义",
     "variableRowsDescription": "多行行模板",
+    "variableEpisodeIdDescription": "此次触发的唯一 ID。会自动添加到 PagerDuty、Opsgenie 和 ServiceNow 负载中，以便告警可被解决。",
     "variableStreamFields": "所有流字段都是变量。",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} 用于限制行数或字符串长度。",
     "variableTimezoneNote": "时间戳变量 ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) 在服务器的本地时区中渲染。",
@@ -13096,6 +13143,7 @@
       "promptLabel": "评判提示词",
       "includeReasoningLabel": "包含推理",
       "includeReasoningHint": "评估者解释为何给出该分数，并随每个结果一起保存。",
+      "decisionProviderNote": "决策模型仅返回分数和推理说明，因此没有其他字段可用。",
       "extraFieldsLabel": "额外元数据字段（可选）",
       "extraFieldsHint": "要求评估者随每个分数返回额外值 — 例如类别或置信度。",
       "extraFields": {
@@ -19549,6 +19597,8 @@
     "unroutedDismissedTag": "已忽略",
     "notAvailableTitle": "此部署中不提供值班功能",
     "notAvailableDescription": "链接没有问题——此构建未提供值班功能。没有发生错误,无需重试。",
+    "teamNotFoundTitle": "未找到团队",
+    "teamNotFoundDescription": "该团队已不存在，可能已被删除。",
     "unroutedPagedNobody": "无人收到通知",
     "unroutedLoadFailed": "无法加载未路由队列",
     "routingLoadFailed": "无法加载归属与路由",

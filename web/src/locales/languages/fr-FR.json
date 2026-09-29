@@ -354,6 +354,10 @@
       "title": "Aucune trace trouvée",
       "description": "Aucune trace ne correspond au service et à la plage temporelle sélectionnés. Essayez une plage temporelle plus large ou un autre service."
     },
+    "noProfiles": {
+      "title": "Aucun profil trouvé",
+      "description": "Votre plage temporelle ne contient aucune donnée de profil provenant de ce flux. Essayez une plage plus large ou un autre service."
+    },
     "noServiceGraph": {
       "title": "Aucune donnée graphique de service",
       "description": "Essayez d'interroger une plage temporelle plus longue, ou assurez-vous que vos services émettent des métriques de spans."
@@ -421,6 +425,7 @@
       "alerts": "alertes",
       "incidents": "incidents",
       "traces": "traces",
+      "profiles": "profils",
       "discoveryItems": "éléments anormaux",
       "datasetItems": "éléments",
       "searches": "recherches",
@@ -1306,6 +1311,8 @@
     "tagKey": "Clé de tag",
     "tagValue": "Valeur de tag",
     "addFilter": "Ajouter un filtre",
+    "removeFilter": "Supprimer le filtre {key}={value}",
+    "searchFrames": "Rechercher des frames",
     "runQuery": "Exécuter la requête",
     "timeSeriesTitle": "Valeurs de profil dans le temps",
     "resultTitle": "Résultat du profil",
@@ -1314,14 +1321,28 @@
     "viewTree": "Arborescence de pile",
     "self": "Propre",
     "total": "Total",
+    "share": "Partager",
     "cpuDuration": "Durée CPU",
     "percent": "%",
+    "sortBySelf": "Trier par Self",
+    "sortByTotal": "Trier par Total",
     "noStreams": "Aucun flux de profils disponible",
-    "noSeries": "Aucune donnée de série temporelle dans cette plage",
-    "noResults": "Aucun résultat de profil dans cette plage",
+    "noSeries": "Aucune donnée",
+    "noResults": "Aucun profil trouvé",
+    "noProfilesFound": "Aucun profil trouvé",
+    "noProfilesFoundDesc": "Votre plage temporelle ne contient aucune donnée de profil provenant de ce flux. Essayez une plage plus large ou un autre service.",
+    "loading": "Chargement des profils…",
     "filters": "Filtres",
     "expand": "Développer",
     "collapse": "Réduire",
+    "resetFocus": "Réinitialiser le focus",
+    "labelAlign": "Alignement des libellés",
+    "alignLeft": "Aligner à gauche",
+    "alignRight": "Aligner à droite",
+    "inverted": "Inversé",
+    "copyFunctionName": "Copier le nom de la fonction",
+    "focusBlock": "Cibler le bloc",
+    "focusOfTotal": "{percent} % du total",
     "errors": {
       "loadFailed": "Échec du chargement des données de profil"
     }
@@ -1568,6 +1589,7 @@
     "actionOperation": "Action : {type} sur {target}",
     "viewOperation": "Vue : {page}",
     "collapsedOtherActions": "[{count} autres actions]",
+    "collapsedOtherRequests": "[{count} autres requêtes sur cette page]",
     "collapsedMoreErrors": "[{count} autres erreurs]",
     "collapsedStaticAssets": "[{count} ressources statiques]",
     "collapsedLongTasks": "[{count} tâches longues]",
@@ -2771,6 +2793,13 @@
         "node": "Déclencheur d'alerte",
         "desc": "Exécuter lorsqu'une alerte se déclenche",
         "intro": "Lorsqu'une alerte liée se déclenche, chaque étape en aval reçoit cette charge utile."
+      },
+      "alertResolved": {
+        "label": "Alerte résolue",
+        "tab": "Résolue",
+        "node": "Déclencheur Alerte résolue",
+        "desc": "S'exécute lorsqu'une alerte déclenchée se rétablit",
+        "intro": "Lorsqu'une alerte déclenchée se rétablit, chaque étape en aval reçoit cette charge utile."
       },
       "incidentEvent": {
         "label": "Événement d'incident",
@@ -7435,6 +7464,8 @@
         "streamName": "Nom du flux surveillé par l'alerte",
         "alertName": "Nom de l'alerte",
         "alertType": "Type d'alerte (ex. planifiée, temps réel)",
+        "alertStatus": "déclenchée ou résolue — permet à un message de rétablissement de se distinguer d'une nouvelle alerte",
+        "episodeId": "Identifiant unique de ce déclenchement, partagé par son rétablissement. Envoyé automatiquement à PagerDuty, Opsgenie et ServiceNow afin que l'alerte puisse être résolue.",
         "alertPeriod": "Fenêtre d'évaluation, en minutes",
         "alertOperator": "Opérateur de comparaison de seuil (>, <, =)",
         "alertThreshold": "Valeur de seuil configurée",
@@ -7449,7 +7480,19 @@
         "alertTriggerTimeSeconds": "Heure de déclenchement en secondes epoch",
         "alertTriggerTimeStr": "Heure de déclenchement lisible",
         "rows": "Toutes les lignes correspondantes, formatées selon le modèle de ligne"
-      }
+      },
+      "notifyOnRecovery": "Notifier lors du rétablissement",
+      "notifyOnRecoveryTooltip": "Envoyer un message aux destinations ci-dessus lorsque cette alerte cesse de se déclencher.",
+      "notifyOnRecoveryTemplateHint": "Les destinations qui réutilisent votre modèle doivent inclure {'{'}alert_status{'}'}, sinon le message de rétablissement ressemblera à une nouvelle alerte.",
+      "recoveryDestinations": "Destination de rétablissement",
+      "recoveryDestinationsTooltip": "Laissez vide pour annoncer le rétablissement là où l'alerte s'est déclenchée. Sélectionnez des destinations ici pour l'envoyer ailleurs à la place. PagerDuty, Opsgenie et ServiceNow ferment toujours le ticket ouvert par leur propre déclenchement.",
+      "recoveryResolvesIncident": "résout l'incident",
+      "recoveryClosesAlert": "clôt l'alerte",
+      "recoveryChatMessage": "nouveau message « Résolu »",
+      "keepFiringFor": "Maintenir le déclenchement pendant",
+      "keepFiringForTooltip": "Attendez cette durée après la disparition de la condition avant de rétablir. 0 rétablit immédiatement.",
+      "keepFiringForInvalid": "Saisissez 0 seconde ou plus",
+      "keepFiringForTooLong": "Saisissez au maximum 86400 secondes (24 heures)"
     },
     "advanced": {
       "addVariable": "Ajouter une variable",
@@ -7680,6 +7723,8 @@
       "servicenowPasswordHelp": "Mot de passe ServiceNow ou jeton API",
       "servicenowAssignmentGroup": "Groupe d'affectation (facultatif)",
       "servicenowAssignmentGroupHelp": "Groupe auquel attribuer les incidents (ex. : Opérations IT)",
+      "servicenowResolutionCode": "Code de résolution (facultatif)",
+      "servicenowResolutionCodeHelp": "Doit correspondre à un code de résolution valide sur votre instance ServiceNow. Utilisé lorsque OpenObserve résout l'incident. La valeur par défaut est Solved (Permanently).",
       "usernameRequired": "Le nom d'utilisateur est requis",
       "passwordRequired": "Le mot de passe est requis",
       "emailRecipients": "Adresses e-mail des destinataires",
@@ -7976,7 +8021,8 @@
     "sloKind": "Type de condition",
     "sloLongWindow": "Fenêtre longue",
     "sloShortWindow": "Fenêtre courte",
-    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici."
+    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
+    "seconds": "Secondes"
   },
   "alert_dependencies": {
     "actionOpen": "Ouvrir",
@@ -8174,6 +8220,7 @@
     "filterPrebuilt": "Préconstruit",
     "filterCustom": "Personnalisé",
     "variableRowsDescription": "plusieurs lignes du modèle de ligne",
+    "variableEpisodeIdDescription": "Identifiant unique de ce déclenchement. Ajouté automatiquement aux charges utiles PagerDuty, Opsgenie et ServiceNow afin que l'alerte puisse être résolue.",
     "variableStreamFields": "Tous les champs du flux sont des variables.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} utilisé pour limiter les lignes ou la longueur de la chaîne.",
     "variableTimezoneNote": "Les variables de timestamp ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) sont rendues dans le fuseau horaire local du serveur.",
@@ -13096,6 +13143,7 @@
       "promptLabel": "Juge vite",
       "includeReasoningLabel": "Inclure le raisonnement",
       "includeReasoningHint": "Le juge explique pourquoi il a attribué ce score, enregistré avec chaque résultat.",
+      "decisionProviderNote": "Les modèles de décision ne renvoient qu'un score et un raisonnement, les champs supplémentaires ne sont donc pas disponibles.",
       "extraFieldsLabel": "Champs de métadonnées supplémentaires (optionnel)",
       "extraFieldsHint": "Demandez au juge de renvoyer des valeurs supplémentaires avec chaque score — une catégorie ou un niveau de confiance, par exemple.",
       "extraFields": {
@@ -19549,6 +19597,8 @@
     "unroutedDismissedTag": "ignoré",
     "notAvailableTitle": "L'astreinte n'est pas disponible sur ce déploiement",
     "notAvailableDescription": "Le lien est correct — cette version ne propose pas l'astreinte ici. Rien n'a échoué et il n'y a rien à réessayer.",
+    "teamNotFoundTitle": "Équipe introuvable",
+    "teamNotFoundDescription": "Cette équipe n'existe plus. Elle a peut-être été supprimée.",
     "unroutedPagedNobody": "Personne n'a été notifié",
     "unroutedLoadFailed": "Impossible de charger la file des alertes non routées",
     "routingLoadFailed": "Impossible de charger la propriété et le routage",

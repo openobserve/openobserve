@@ -259,7 +259,9 @@
       "connectDataSourcePopup.spec.js",
       "otableSelectCell.spec.js",
       "theme.spec.js",
-      "passwordPolicy.spec.js"
+      "passwordPolicy.spec.js",
+      "ingestion-passcode-forbidden.spec.js",
+      "dateTime.spec.js"
     ],
     "disabled": []
   },
@@ -326,7 +328,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "searchPatternsMultiStream.spec.js"
     ],
     "disabled": [
       {

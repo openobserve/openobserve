@@ -27,11 +27,12 @@ use regex::Regex;
 use tower::{Layer, Service};
 
 /// Request headers whose value is a credential and is never written to the log.
-const REDACTED_REQUEST_HEADERS: [&str; 4] = [
+const REDACTED_REQUEST_HEADERS: [&str; 5] = [
     "authorization",
     "proxy-authorization",
     "cookie",
     "x-api-key",
+    "x-o2-mcp",
 ];
 
 /// Returns the HTTP access log format string based on configuration.

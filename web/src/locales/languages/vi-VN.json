@@ -354,6 +354,10 @@
       "title": "Không tìm thấy trace nào.",
       "description": "Không có trace nào khớp với dịch vụ và khoảng thời gian đã chọn. Hãy thử khoảng thời gian rộng hơn hoặc dịch vụ khác."
     },
+    "noProfiles": {
+      "title": "Không tìm thấy Profiles",
+      "description": "Khoảng thời gian của bạn không chứa dữ liệu profile nào từ stream này. Hãy thử mở rộng khoảng thời gian hoặc chọn dịch vụ khác."
+    },
     "noServiceGraph": {
       "title": "Không có dữ liệu đồ thị dịch vụ",
       "description": "Hãy thử truy vấn khoảng thời gian dài hơn, hoặc đảm bảo các dịch vụ của bạn đang phát ra chỉ số span."
@@ -421,6 +425,7 @@
       "alerts": "cảnh báo",
       "incidents": "sự cố",
       "traces": "trace",
+      "profiles": "profiles",
       "discoveryItems": "mục bất ổn",
       "datasetItems": "mục",
       "searches": "tìm kiếm",
@@ -1306,6 +1311,8 @@
     "tagKey": "Khóa tag",
     "tagValue": "Giá trị tag",
     "addFilter": "Thêm bộ lọc",
+    "removeFilter": "Xóa bộ lọc {key}={value}",
+    "searchFrames": "Tìm kiếm frame",
     "runQuery": "Chạy truy vấn",
     "timeSeriesTitle": "Giá trị profile theo thời gian",
     "resultTitle": "Kết quả profile",
@@ -1314,14 +1321,28 @@
     "viewTree": "Cây stack",
     "self": "Riêng",
     "total": "Tổng",
+    "share": "Chia sẻ",
     "cpuDuration": "Thời lượng CPU",
     "percent": "%",
+    "sortBySelf": "Sắp xếp theo Self",
+    "sortByTotal": "Sắp xếp theo Tổng",
     "noStreams": "Không có stream profile nào",
-    "noSeries": "Không có dữ liệu chuỗi thời gian trong khoảng này",
-    "noResults": "Không có kết quả profile trong khoảng này",
+    "noSeries": "Không có dữ liệu",
+    "noResults": "Không tìm thấy Profiles",
+    "noProfilesFound": "Không tìm thấy Profiles",
+    "noProfilesFoundDesc": "Khoảng thời gian của bạn không chứa dữ liệu profile nào từ stream này. Hãy thử mở rộng khoảng thời gian hoặc chọn dịch vụ khác.",
+    "loading": "Đang tải profiles…",
     "filters": "Bộ lọc",
     "expand": "Mở rộng",
     "collapse": "Thu gọn",
+    "resetFocus": "Đặt lại tiêu điểm",
+    "labelAlign": "Căn chỉnh nhãn",
+    "alignLeft": "Căn trái",
+    "alignRight": "Căn phải",
+    "inverted": "Đảo ngược",
+    "copyFunctionName": "Sao chép tên hàm",
+    "focusBlock": "Tập trung vào khối",
+    "focusOfTotal": "{percent}% tổng",
     "errors": {
       "loadFailed": "Không tải được dữ liệu profile"
     }
@@ -1568,6 +1589,7 @@
     "actionOperation": "Hành động: {type} trên {target}",
     "viewOperation": "Trang: {page}",
     "collapsedOtherActions": "[{count} hành động khác]",
+    "collapsedOtherRequests": "[{count} yêu cầu khác trên trang này]",
     "collapsedMoreErrors": "[{count} lỗi khác]",
     "collapsedStaticAssets": "[{count} tài nguyên tĩnh]",
     "collapsedLongTasks": "[{count} tác vụ dài]",
@@ -2771,6 +2793,13 @@
         "node": "Kích hoạt cảnh báo",
         "desc": "Chạy khi một cảnh báo được kích hoạt",
         "intro": "Khi một cảnh báo được liên kết kích hoạt, mọi bước hạ nguồn đều nhận được payload này."
+      },
+      "alertResolved": {
+        "label": "Cảnh báo đã giải quyết",
+        "tab": "Đã giải quyết",
+        "node": "Trigger Cảnh báo đã giải quyết",
+        "desc": "Chạy khi một cảnh báo đang kích hoạt được khôi phục",
+        "intro": "Khi một cảnh báo đã kích hoạt được khôi phục, mọi bước phía sau sẽ nhận payload này."
       },
       "incidentEvent": {
         "label": "Sự kiện sự cố",
@@ -7435,6 +7464,8 @@
         "streamName": "Tên stream mà cảnh báo theo dõi",
         "alertName": "Tên của cảnh báo",
         "alertType": "Loại cảnh báo (ví dụ: theo lịch, thời gian thực)",
+        "alertStatus": "firing hoặc resolved — cho phép thông báo khôi phục được đọc khác với cảnh báo mới",
+        "episodeId": "ID duy nhất cho lần kích hoạt này, được chia sẻ với lần khôi phục tương ứng. Được gửi tự động tới PagerDuty, Opsgenie và ServiceNow để có thể giải quyết cảnh báo.",
         "alertPeriod": "Cửa sổ đánh giá, tính bằng phút",
         "alertOperator": "Toán tử so sánh ngưỡng (>, <, =)",
         "alertThreshold": "Giá trị ngưỡng đã cấu hình",
@@ -7449,7 +7480,19 @@
         "alertTriggerTimeSeconds": "Thời gian kích hoạt theo epoch giây",
         "alertTriggerTimeStr": "Thời gian kích hoạt, dễ đọc cho con người",
         "rows": "Tất cả các hàng khớp, được định dạng theo mẫu hàng"
-      }
+      },
+      "notifyOnRecovery": "Thông báo khi khôi phục",
+      "notifyOnRecoveryTooltip": "Gửi một thông báo tới các đích ở trên khi cảnh báo này ngừng kích hoạt.",
+      "notifyOnRecoveryTemplateHint": "Các đích dùng lại template của bạn phải bao gồm {'{'}alert_status{'}'}, nếu không thông báo khôi phục sẽ trông giống như cảnh báo mới.",
+      "recoveryDestinations": "Đích khôi phục",
+      "recoveryDestinationsTooltip": "Để trống để thông báo khôi phục ở mọi nơi cảnh báo đã kích hoạt. Chọn đích tại đây để gửi đến nơi khác thay vào đó. PagerDuty, Opsgenie và ServiceNow vẫn đóng ticket do lần kích hoạt của chúng mở ra.",
+      "recoveryResolvesIncident": "giải quyết sự cố",
+      "recoveryClosesAlert": "đóng cảnh báo",
+      "recoveryChatMessage": "thông báo \"Đã giải quyết\" mới",
+      "keepFiringFor": "Tiếp tục kích hoạt trong",
+      "keepFiringForTooltip": "Chờ khoảng thời gian này sau khi điều kiện không còn đúng trước khi khôi phục. 0 sẽ khôi phục ngay lập tức.",
+      "keepFiringForInvalid": "Nhập 0 giây hoặc nhiều hơn",
+      "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)"
     },
     "advanced": {
       "addVariable": "Thêm biến",
@@ -7680,6 +7723,8 @@
       "servicenowPasswordHelp": "Mật khẩu ServiceNow hoặc mã thông báo API",
       "servicenowAssignmentGroup": "Nhóm phân công (tùy chọn)",
       "servicenowAssignmentGroupHelp": "Nhóm để phân công sự cố (ví dụ: IT Operations)",
+      "servicenowResolutionCode": "Mã giải quyết (tùy chọn)",
+      "servicenowResolutionCodeHelp": "Phải khớp với một mã giải quyết hợp lệ trên ServiceNow instance của bạn. Được dùng khi OpenObserve giải quyết sự cố. Mặc định là Solved (Permanently).",
       "usernameRequired": "Tên người dùng là bắt buộc",
       "passwordRequired": "Mật khẩu là bắt buộc",
       "emailRecipients": "Địa chỉ email người nhận",
@@ -7976,7 +8021,8 @@
     "sloKind": "Loại điều kiện",
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
-    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây."
+    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
+    "seconds": "Giây"
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -8174,6 +8220,7 @@
     "filterPrebuilt": "Dựng sẵn",
     "filterCustom": "Tùy chỉnh",
     "variableRowsDescription": "nhiều dòng của mẫu hàng",
+    "variableEpisodeIdDescription": "ID duy nhất cho lần kích hoạt này. Được tự động thêm vào payload của PagerDuty, Opsgenie và ServiceNow để có thể giải quyết cảnh báo.",
     "variableStreamFields": "Tất cả các trường luồng đều là biến.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} được sử dụng để giới hạn hàng hoặc độ dài chuỗi.",
     "variableTimezoneNote": "Các biến thời gian ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) hiển thị theo múi giờ cục bộ của máy chủ.",
@@ -13096,6 +13143,7 @@
       "promptLabel": "Lời nhắc của người đánh giá",
       "includeReasoningLabel": "Bao gồm lý luận",
       "includeReasoningHint": "Người đánh giá giải thích lý do cho điểm đó, được lưu kèm mỗi kết quả.",
+      "decisionProviderNote": "Mô hình quyết định chỉ trả về điểm số và lý do, nên các trường bổ sung không khả dụng.",
       "extraFieldsLabel": "Trường Metadata Bổ sung (Tùy chọn)",
       "extraFieldsHint": "Yêu cầu người đánh giá trả về các giá trị bổ sung cùng mỗi điểm — ví dụ như danh mục hoặc độ tin cậy.",
       "extraFields": {
@@ -19549,6 +19597,8 @@
     "unroutedDismissedTag": "đã bỏ qua",
     "notAvailableTitle": "Trực on-call không khả dụng trên bản triển khai này",
     "notAvailableDescription": "Liên kết vẫn ổn — bản dựng này không cung cấp tính năng trực on-call ở đây. Không có gì lỗi và cũng không có gì để thử lại.",
+    "teamNotFoundTitle": "Không tìm thấy nhóm",
+    "teamNotFoundDescription": "Nhóm này không còn tồn tại. Có thể nhóm đã bị xóa.",
     "unroutedPagedNobody": "Không ai được thông báo",
     "unroutedLoadFailed": "Không thể tải hàng đợi chưa định tuyến",
     "routingLoadFailed": "Không thể tải quyền sở hữu và định tuyến",

@@ -354,6 +354,10 @@
       "title": "Nessuna traccia trovata",
       "description": "Nessuna traccia corrisponde al servizio e all'intervallo di tempo selezionati. Prova un intervallo di tempo più ampio o un servizio diverso."
     },
+    "noProfiles": {
+      "title": "Nessun profilo trovato",
+      "description": "La finestra temporale non contiene dati di profilo da questo stream. Prova un intervallo di tempo più ampio o un servizio diverso."
+    },
     "noServiceGraph": {
       "title": "Nessun dato del grafico del servizio",
       "description": "Prova a interrogare un intervallo di tempo più lungo o assicurati che i tuoi servizi stiano emettendo metriche span."
@@ -421,6 +425,7 @@
       "alerts": "avvisi",
       "incidents": "incidenti",
       "traces": "tracce",
+      "profiles": "profili",
       "discoveryItems": "elementi non sani",
       "datasetItems": "elementi",
       "searches": "ricerche",
@@ -1306,6 +1311,8 @@
     "tagKey": "Chiave tag",
     "tagValue": "Valore tag",
     "addFilter": "Aggiungi filtro",
+    "removeFilter": "Rimuovi filtro {key}={value}",
+    "searchFrames": "Cerca frame",
     "runQuery": "Esegui query",
     "timeSeriesTitle": "Valori dei profili nel tempo",
     "resultTitle": "Risultato del profilo",
@@ -1314,14 +1321,28 @@
     "viewTree": "Albero degli stack",
     "self": "Self",
     "total": "Totale",
+    "share": "Condividi",
     "cpuDuration": "Durata CPU",
     "percent": "%",
+    "sortBySelf": "Ordina per Self",
+    "sortByTotal": "Ordina per Totale",
     "noStreams": "Nessuno stream di profili disponibile",
-    "noSeries": "Nessun dato delle serie temporali in questo intervallo",
-    "noResults": "Nessun risultato del profilo in questo intervallo",
+    "noSeries": "Nessun dato",
+    "noResults": "Nessun profilo trovato",
+    "noProfilesFound": "Nessun profilo trovato",
+    "noProfilesFoundDesc": "La finestra temporale non contiene dati di profilo da questo stream. Prova un intervallo di tempo più ampio o un servizio diverso.",
+    "loading": "Caricamento profili…",
     "filters": "Filtri",
     "expand": "Espandi",
     "collapse": "Comprimi",
+    "resetFocus": "Reimposta focus",
+    "labelAlign": "Allineamento etichetta",
+    "alignLeft": "Allinea a sinistra",
+    "alignRight": "Allinea a destra",
+    "inverted": "Invertito",
+    "copyFunctionName": "Copia nome funzione",
+    "focusBlock": "Focus sul blocco",
+    "focusOfTotal": "{percent}% del totale",
     "errors": {
       "loadFailed": "Impossibile caricare i dati del profilo"
     }
@@ -1568,6 +1589,7 @@
     "actionOperation": "Azione: {type} su {target}",
     "viewOperation": "Vista: {page}",
     "collapsedOtherActions": "[{count} altre azioni]",
+    "collapsedOtherRequests": "[{count} altre richieste in questa pagina]",
     "collapsedMoreErrors": "[{count} altri errori]",
     "collapsedStaticAssets": "[{count} risorse statiche]",
     "collapsedLongTasks": "[{count} attività lunghe]",
@@ -2771,6 +2793,13 @@
         "node": "Trigger di avviso",
         "desc": "Esegui quando un avviso scatta",
         "intro": "Quando un avviso collegato scatta, ogni step a valle riceve questo payload."
+      },
+      "alertResolved": {
+        "label": "Avviso risolto",
+        "tab": "Risolto",
+        "node": "Trigger avviso risolto",
+        "desc": "Esegui quando un avviso attivo si risolve",
+        "intro": "Quando un avviso che si è attivato si risolve, ogni passaggio a valle riceve questo payload."
       },
       "incidentEvent": {
         "label": "Evento di incidente",
@@ -7435,6 +7464,8 @@
         "streamName": "Nome dello stream controllato dall'avviso",
         "alertName": "Il nome dell'avviso",
         "alertType": "Tipo di avviso (es. pianificato, in tempo reale)",
+        "alertStatus": "attivo o risolto — permette di distinguere un messaggio di ripristino da un nuovo avviso",
+        "episodeId": "ID univoco per questa attivazione, condiviso con il suo ripristino. Inviato automaticamente a PagerDuty, Opsgenie e ServiceNow così che l'avviso possa essere risolto.",
         "alertPeriod": "Finestra di valutazione, in minuti",
         "alertOperator": "Operatore di confronto della soglia (>, <, =)",
         "alertThreshold": "Il valore di soglia configurato",
@@ -7449,7 +7480,19 @@
         "alertTriggerTimeSeconds": "Orario di attivazione in secondi epoch",
         "alertTriggerTimeStr": "Orario di attivazione, leggibile",
         "rows": "Tutte le righe corrispondenti, formattate dal modello di riga"
-      }
+      },
+      "notifyOnRecovery": "Notifica al ripristino",
+      "notifyOnRecoveryTooltip": "Invia un messaggio alle destinazioni sopra quando questo avviso smette di essere attivo.",
+      "notifyOnRecoveryTemplateHint": "Le destinazioni che riutilizzano il tuo template devono includere {'{'}alert_status{'}'}, altrimenti il messaggio di ripristino sembrerà un nuovo avviso.",
+      "recoveryDestinations": "Destinazione di ripristino",
+      "recoveryDestinationsTooltip": "Lascia vuoto per annunciare il ripristino ovunque l'avviso si sia attivato. Seleziona qui le destinazioni per inviarlo altrove. PagerDuty, Opsgenie e ServiceNow chiudono comunque il ticket aperto dalla loro attivazione.",
+      "recoveryResolvesIncident": "risolve l'incidente",
+      "recoveryClosesAlert": "chiude l'avviso",
+      "recoveryChatMessage": "nuovo messaggio \"Risolto\"",
+      "keepFiringFor": "Mantieni attivo per",
+      "keepFiringForTooltip": "Attendi questo tempo dopo che la condizione è cessata prima di ripristinare. 0 ripristina immediatamente.",
+      "keepFiringForInvalid": "Inserisci 0 o più secondi",
+      "keepFiringForTooLong": "Inserisci al massimo 86400 secondi (24 ore)"
     },
     "advanced": {
       "addVariable": "Aggiungi variabile",
@@ -7680,6 +7723,8 @@
       "servicenowPasswordHelp": "Password o token API di ServiceNow",
       "servicenowAssignmentGroup": "Gruppo di assegnazione (opzionale)",
       "servicenowAssignmentGroupHelp": "Gruppo a cui assegnare gli incidenti (es., IT Operations)",
+      "servicenowResolutionCode": "Codice di risoluzione (facoltativo)",
+      "servicenowResolutionCodeHelp": "Deve corrispondere a un codice di risoluzione valido sulla tua istanza ServiceNow. Usato quando OpenObserve risolve l'incidente. Valore predefinito: Solved (Permanently).",
       "usernameRequired": "Il nome utente è obbligatorio",
       "passwordRequired": "La password è obbligatoria",
       "emailRecipients": "Indirizzi email dei destinatari",
@@ -7976,7 +8021,8 @@
     "sloKind": "Tipo di condizione",
     "sloLongWindow": "Finestra lunga",
     "sloShortWindow": "Finestra breve",
-    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui."
+    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
+    "seconds": "Secondi"
   },
   "alert_dependencies": {
     "actionOpen": "Apri",
@@ -8174,6 +8220,7 @@
     "filterPrebuilt": "Precostruito",
     "filterCustom": "Personalizzato",
     "variableRowsDescription": "più righe del modello di riga",
+    "variableEpisodeIdDescription": "ID univoco per questa attivazione. Aggiunto automaticamente ai payload di PagerDuty, Opsgenie e ServiceNow così che l'avviso possa essere risolto.",
     "variableStreamFields": "Tutti i campi dello stream sono variabili.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} usato per limitare righe o lunghezza della stringa.",
     "variableTimezoneNote": "Le variabili timestamp ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) vengono visualizzate nel fuso orario locale del server.",
@@ -13096,6 +13143,7 @@
       "promptLabel": "Richiesta del giudice",
       "includeReasoningLabel": "Includi ragionamento",
       "includeReasoningHint": "Il giudice spiega perché ha assegnato quel punteggio, salvato con ogni risultato.",
+      "decisionProviderNote": "I modelli di decisione restituiscono solo un punteggio e una motivazione, quindi i campi aggiuntivi non sono disponibili.",
       "extraFieldsLabel": "Campi Metadati Extra (Opzionale)",
       "extraFieldsHint": "Chiedi al giudice di restituire valori extra con ogni punteggio — ad esempio una categoria o un livello di confidenza.",
       "extraFields": {
@@ -19549,6 +19597,8 @@
     "unroutedDismissedTag": "ignorato",
     "notAvailableTitle": "On-call non è disponibile in questa distribuzione",
     "notAvailableDescription": "Il link è corretto — questa versione non offre on-call in questo ambiente. Non è fallito nulla e non c'è nulla da riprovare.",
+    "teamNotFoundTitle": "Team non trovato",
+    "teamNotFoundDescription": "Questo team non esiste più. Potrebbe essere stato eliminato.",
     "unroutedPagedNobody": "Nessuno è stato avvisato",
     "unroutedLoadFailed": "Impossibile caricare la coda degli avvisi senza instradamento",
     "routingLoadFailed": "Impossibile caricare la proprietà e l'instradamento",

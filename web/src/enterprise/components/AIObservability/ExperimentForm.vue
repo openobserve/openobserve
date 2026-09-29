@@ -594,6 +594,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
 import { type RemoteTask } from "@/services/remote-tasks.service";
+import { chatProviders } from "@/services/llm-playground.service";
 import { remoteTasksListQuery } from "@/services/llm-experiments.queries";
 import {
   cloneExperimentMutation,
@@ -932,7 +933,7 @@ async function refreshProviders() {
   if (!orgId.value) return;
   refreshingProviders.value = true;
   try {
-    providers.value = await onlineEvalsService.providers.list(orgId.value);
+    providers.value = chatProviders(await onlineEvalsService.providers.list(orgId.value));
   } catch {
     toast({
       variant: "error",
@@ -1141,6 +1142,7 @@ onMounted(async () => {
   }
   // Registry reads are best-effort until their task type is selected.
   await Promise.all([loadRemoteTasks(), loadPrompts()]);
+  providers.value = chatProviders(providers.value);
   if (cloning.value) await loadCloneSource();
   const preselected = providers.value.find((p) => p.isDefault ?? p.is_default);
   if (preselected && !providerId.value) form.setFieldValue("providerId", preselected.id);

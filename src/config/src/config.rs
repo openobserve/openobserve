@@ -87,7 +87,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 88: add iam password policy tables.
 // 89: add level_half_width_seconds to anomaly_detection_config.
 // 90: create the Prompt registry, webhook outbox, and Experiment attribution columns.
-pub const DB_SCHEMA_VERSION: u64 = 90;
+// 91: add firing-episode columns for alert recovery.
+// 92: add recovery_destinations to alerts.
+pub const DB_SCHEMA_VERSION: u64 = 92;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1714,18 +1716,6 @@ pub struct Search {
         help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_SELECTION_CACHE_ENABLED",
-        default = false,
-        help = "Cache per-file PromQL metric selections: block IDs for MIDX block reads, or source row ranges for Parquet/Vortex reads."
-    )]
-    pub metrics_selection_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
-        default = 256,
-        help = "Maximum memory size in MB of the metrics index selection cache."
-    )]
-    pub metrics_index_selection_cache_max_size: usize,
     #[env_config(
         name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
