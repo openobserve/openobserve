@@ -69,11 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.detail.copySummary") }}
         <OTooltip side="bottom" :content="t('dbm.detail.copySummaryHint')" />
       </OButton>
-      <DbmRefreshButton
+      <ORefreshButton
+        layout="inline"
+        variant="outline"
         :loading="loading"
         :last-run-at="lastRunAt"
         data-test="dbm-detail-refresh"
-        @refresh="load"
+        @click="load()"
       />
     </template>
 
@@ -1187,7 +1189,6 @@ import DbmMetricTiles, { type DbmMetricTile } from "@/components/dbm/DbmMetricTi
 import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -1198,6 +1199,7 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DateTime from "@/components/DateTime.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

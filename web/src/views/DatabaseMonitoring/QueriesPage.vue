@@ -171,12 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:column-visibility="setColumnVisibility"
           @reset:column-sizes="tableRef?.resetColumnSizes?.()"
         />
-        <DbmRefreshButton
-          mode="status"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-queries-refresh"
-        />
         <DateTime
           auto-apply
           menu-align="end"
@@ -187,11 +181,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-8 max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
-        <DbmRefreshButton
-          mode="button"
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
           :loading="loading"
+          :last-run-at="lastRunAt"
           data-test="dbm-queries-refresh"
-          @refresh="onRefresh"
+          @click="onRefresh()"
         />
       </div>
 
@@ -590,7 +586,6 @@ import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -599,6 +594,7 @@ import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

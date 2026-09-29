@@ -86,12 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:column-visibility="setColumnVisibility"
           @reset:column-sizes="tableRef?.resetColumnSizes?.()"
         />
-        <DbmRefreshButton
-          mode="status"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-samples-refresh"
-        />
         <DateTime
           auto-apply
           menu-align="end"
@@ -102,11 +96,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-8 max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
-        <DbmRefreshButton
-          mode="button"
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
           :loading="loading"
+          :last-run-at="lastRunAt"
           data-test="dbm-samples-refresh"
-          @refresh="onRefresh"
+          @click="onRefresh()"
         />
       </div>
 
@@ -353,7 +349,6 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
@@ -362,6 +357,7 @@ import DbmLockEmptyState, {
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

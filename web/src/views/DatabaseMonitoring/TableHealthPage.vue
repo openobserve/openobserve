@@ -142,12 +142,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DbmRefreshButton
-              mode="status"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-table-health-refresh"
-            />
             <DateTime
               auto-apply
               menu-align="end"
@@ -158,11 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-8"
               @on:date-change="onDateChange"
             />
-            <DbmRefreshButton
-              mode="button"
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
               :loading="loading"
+              :last-run-at="lastRunAt"
               data-test="dbm-table-health-refresh"
-              @refresh="onRefresh"
+              @click="onRefresh()"
             />
           </div>
         </template>
@@ -277,8 +273,8 @@ import { useRoute, useRouter } from "vue-router";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
