@@ -404,6 +404,7 @@ async fn write_logs(
     }
 
     if config::get_config().db_monitoring.enabled
+        && crate::db_monitoring::server_vantage::is_dbm_server_stream(stream_name)
         && crate::db_monitoring::server_vantage::batch_has_dbm_records(
             json_data.iter().map(|(_, record)| record),
         )
