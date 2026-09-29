@@ -146,6 +146,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     pages: ["shortcuts.pages.functions", "shortcuts.pages.enrichmentTables"],
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
+  { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
   {
     titleKey: "shortcuts.modules.iam",
     title: "IAM",
@@ -735,6 +736,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       {
         id: "syntheticsTokensFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+    ],
+  },
+
+  // ── Synthetics — Journey editor ─────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.syntheticsJourney",
+    scope: "synthetics-journey",
+    shortcuts: [
+      {
+        id: "syntheticsJourneyFocusSearch",
         key: "/",
         descriptionKey: "shortcuts.actions.focusSearch",
       },

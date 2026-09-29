@@ -97,6 +97,10 @@ const store = createStore({
       // written against. The specs that cover the OSS shape set it to false
       // themselves.
       synthetics_private_locations_enabled: true,
+      // Subtests default on in the fixture; specs for the flag off set it themselves.
+      synthetics_subtests_enabled: true,
+      // The server's configurable step cap; specs covering an override set it themselves.
+      synthetics_browser_max_steps: 50,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",

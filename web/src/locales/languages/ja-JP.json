@@ -14143,6 +14143,7 @@
       "removeVariable": "変数 {name} を削除",
       "secretTooltip": "シークレット — 値はマスクされ、安全に送信されます。",
       "collapsePanel": "変数を折りたたむ",
+      "closePanel": "変数を閉じる",
       "openPanel": "変数を表示",
       "removeTitle": "変数を削除しますか？",
       "removeBody": "{name} はこのチェックから削除されます。",
@@ -14187,6 +14188,7 @@
       "namePlaceholder": "マイブラウザチェック",
       "removeTag": "タグ {tag} を削除",
       "startingUrl": "開始URL",
+      "startingUrlNotOpened": "開かれていません — 最初のステップがナビゲートします。",
       "startingUrlPlaceholder": "https://example.com",
       "tagPlaceholder": "タグを追加してEnterキーを押す",
       "tags": "タグ",
@@ -14250,6 +14252,12 @@
       "deleteSingleTitle": "チェックを削除",
       "duplicateTitle": "チェックを複製"
     },
+    "delete": {
+      "blockedTitle": "「{name}」は他のテストで使われています",
+      "blockedBulkTitle": "選択した {count} 件のテストが、この選択の外のテストで使われています",
+      "blockedBody": "先にそれらの参照を削除するか、テストをまとめて削除してください。",
+      "hiddenReferences": "アクセス権のないテスト {count} 件"
+    },
     "empty": {
       "browserTests": "ブラウザテストが見つかりません。",
       "checks": "チェックが見つかりません。フィルターを調整するか、最初のチェックを作成してください。"
@@ -14280,6 +14288,41 @@
       "checks": "チェック"
     },
     "journey": {
+      "extract": {
+        "action": "サブテストに抽出",
+        "title": "{count} 個のステップを新しいテストに抽出",
+        "subtitle": "ステップは今作成される新しいブラウザーテストへ移動します。このジャーニーはその場所にサブテスト参照を保持します — 保持するにはこのテストを保存してください。",
+        "confirm": "抽出",
+        "nameLabel": "テスト名",
+        "folderLabel": "フォルダー",
+        "labelThisTest": "このテスト",
+        "nameTooLong": "名前は 256 バイト未満にしてください",
+        "steps": "ステップ {first} · {path} から開始 | ステップ {first} – {last} · {path} から開始",
+        "thisTest": "抽出後 {authored} ステップ · 同じ {executed} ステップを実行",
+        "thisTestAuthored": "抽出後 {authored} ステップ",
+        "schedule": "{locations} · {frequency}（このテストと同じ）",
+        "status": "一時停止で作成されます。有効化するまで、このテストの一部としてのみ実行されます。",
+        "variablesCopied": "新しいテストにコピーされました: {names}。",
+        "variablesToDefine": "単独で実行する前に新しいテストで定義してください: {names}。",
+        "every": "{n} {unit}ごと",
+        "unit": {
+          "minutes": "分",
+          "hours": "時間"
+        },
+        "historyNotice": "ステップ履歴はリセットされます。これらのステップは新しいテストで新しい ID を受け取るため、ステップごとのグラフは今日から分かれます。",
+        "created": "「{name}」を作成しました。参照を保持するにはこのテストを保存してください。",
+        "orphan": "「{name}」を作成しましたが、このジャーニーを更新できませんでした。新しいテストを開くか削除してください。",
+        "folderForbidden": "「{folder}」にはテストを作成できません。別のフォルダーを選択してください。",
+        "reason": {
+          "not-contiguous": "隣り合ったステップを選択してください",
+          "not-contiguous-filtered": "隣り合ったステップを選択してください — フィルターを解除すると全リストが表示されます",
+          "contains-subtest": "サブテストは別のサブテストを含められません",
+          "referenced": "このテストは他のテストからサブテストとして使われているため、サブテストを持てません",
+          "referenced-pending": "このテストの使用箇所を確認しています…",
+          "referenced-unknown": "このテストの使用箇所を確認できませんでした",
+          "undefined-placeholder": "抽出する前に変数で {name} を定義してください"
+        }
+      },
       "actionLabels": {
         "navigate": "ナビゲート",
         "click": "クリック",
@@ -14293,7 +14336,8 @@
         "scroll": "スクロール",
         "wait": "待機",
         "assert": "アサート",
-        "screenshot": "スクリーンショット"
+        "screenshot": "スクリーンショット",
+        "subtest": "サブテスト"
       },
       "clickTypeLabel": "クリックの種類",
       "clickTypeHelp": "右クリックでコンテキストメニューが開きます。ダブルクリックでは 2 回のクリックが送信されます。",
@@ -14414,7 +14458,6 @@
       "advancedSettleHeading": "アクション実行後 — ページを安定させる",
       "advancedTimeoutHeading": "アクション実行中 — この時間で諦める",
       "advancedFailureHeading": "失敗した場合",
-      "addStep": "ステップを追加",
       "addStepManually": "手動でステップを追加",
       "bulkDeleteStepsBody": "{count} ステップを削除しますか？この操作は元に戻せません。 | {count} ステップを削除しますか？この操作は元に戻せません。",
       "bulkDeleteStepsTitle": "ステップを削除",
@@ -14474,6 +14517,13 @@
       "stepNamePurposePlaceholder": "有効な認証情報でサインイン",
       "stepNumberAria": "ステップ {number} {state}",
       "steps": "ステップ",
+      "stepCount": {
+        "caption": "{count} ステップ | {count} ステップ",
+        "captionWithSubtests": "{steps} ステップ（{count} サブテストを含む） | {steps} ステップ（{count} サブテストを含む）",
+        "tooltip": "{breakdown}。このテストは許可されている {limit} 件のうち {count} 件を実行します。",
+        "tooltipOwn": "このテストの {count} ステップ | このテストの {count} ステップ",
+        "tooltipSubtest": "\"{name}\" から {count}"
+      },
       "stop": "停止",
       "stopping": "停止中…",
       "timeoutBelowDefaultWarning": "このステップのデフォルト {default} ms を下回っています。アプリケーションの実際の応答時間より短いタイムアウトは、誤った失敗の最も一般的な原因です。",
@@ -14481,7 +14531,137 @@
       "valueFallback": "値",
       "showSetupSteps": "セットアップ手順を表示",
       "waitingForActions": "ブラウザでのアクションを待機中...",
-      "unboundVariables": "{names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。 | {names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。"
+      "unboundVariables": "{names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。 | {names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。",
+      "subtest": {
+        "pickLabel": "ここで実行するテスト",
+        "delta": "「{name}」を追加すると、このテストの実行ステップは {before} → {after} になります。上限は {limit} です。",
+        "lastRun": "前回の実行は許容 {budget} 秒のうち {seconds} 秒かかりました。",
+        "deltaUnknown": "ステップへの影響は不明です — 参照先のテストを読み込めませんでした。",
+        "lastRunUnknown": "時間への影響は不明です — このテストはまだ実行を完了していません。",
+        "raiseBudget": "途中で打ち切られるようになったら、このテストの実行時間の許容値を増やしてください。",
+        "stepsBadge": "{count} ステップ",
+        "ignoredEnv": "その開始 URL、変数、認証、Cookie はここでは無視されます — 親テストの設定が適用されます。",
+        "noAccess": "「{name}」へのアクセス権がないため、そのステップをここに表示できません。",
+        "noAccessToast": "このテストが参照しているテストのいずれかへのアクセス権がありません。",
+        "progressAria": "{total} 個中 {done} 個のサブステップが完了",
+        "previewLabel": "ここで実行されるステップ",
+        "openChild": "「{name}」を開く",
+        "noAccessRemedy": "そのフォルダーへの読み取りアクセスを依頼するか、参照を削除してください。",
+        "disabledTooltip": "このデプロイではサブテストが有効になっていません。",
+        "loadFailed": "このサブテストを読み込めなかったため、ステップとステップ数は不明です。",
+        "missing": "このサブテストはもう存在しません。参照を削除するか、別のテストを選択してください。",
+        "noAccessBadge": "アクセス不可",
+        "pickNested": "すでにサブテストを含んでいます — ネストは 1 階層までです",
+        "pickGroupUsable": "ここで使用可能",
+        "pickGroupBlocked": "ここでは使用できません",
+        "pickUsedBy": "{count} 件のテストで使用中",
+        "pickSteps": "{count} ステップ",
+        "pickLastRun": "{status} {ago}",
+        "pickEmpty": "この組織にはまだ他のブラウザーテストがありません。",
+        "pickLoadFailed": "ブラウザーテストの一覧を読み込めませんでした。もう一度お試しください。",
+        "undefinedVariable": "「{name}」は、このテストで定義されていない {variable} を使用しています。",
+        "undefinedVariableAction": "変数に追加する",
+        "failedAt": "{number} — {step}",
+        "notRun": "未実行",
+        "capTitle": "このテストは {total} ステップを実行します — 上限は {limit} です。",
+        "capOwn": "自身の {count}",
+        "capChild": "「{name}」から {count}",
+        "capRemedy": "サブテストを削除するか、このテスト自身のステップを短くしてください。"
+      },
+      "subtestMenu": {
+        "help": "共有フローを再利用します。編集すると、それを使用するすべてのテストが更新されます。",
+        "searchPlaceholder": "テストを検索",
+        "loading": "テストを読み込み中…",
+        "noMatch": "\"{query}\" に一致するテストはありません",
+        "addRow": "\"{name}\" をサブテストとして追加",
+        "blockedGroup": "ネストできません",
+        "tip": "ヒント: ステップを選択し、「サブテストとして抽出」でサブテストを作成します。",
+        "pickFailed": "{name} を追加できませんでした。もう一度お試しください。"
+      },
+      "replayValues": {
+        "secretUnreadable": "{name} は {environment} のシークレットです。リプレイはブラウザで実行されるため、保存されたシークレットを読み取れません。",
+        "recordUnresolved": "記録を開始できません: {name} には {environment} の値がありません。",
+        "global": "グローバル",
+        "saveFailed": "値を保存できませんでした"
+      },
+      "missingValue": {
+        "title": "{name} は {environment} で定義されていません",
+        "body": "ステップ {steps} は {placeholder} を使用しています。{environment}、グローバル、このテストのいずれにも値がないため、{environment} でのスケジュール実行も失敗します。 | ステップ {steps} は {placeholder} を使用しています。{environment}、グローバル、このテストのいずれにも値がないため、{environment} でのスケジュール実行も失敗します。",
+        "bodyStartingUrl": "開始 URL は {placeholder} を使用しています。{environment}、グローバル、このテストのいずれにも値がないため、{environment} でのスケジュール実行も失敗します。",
+        "valueLabel": "{environment} の {name} の値",
+        "valueRequired": "値を入力",
+        "storeAsSecret": "シークレットとして保存",
+        "sharedWarning": "{environment} は {count} 個のチェックで共有されています。値はすぐに保存され、すべてで使用されます。「保存して終了」を待ちません。 | {environment} は {count} 個のチェックで共有されています。値はすぐに保存され、すべてで使用されます。「保存して終了」を待ちません。",
+        "globalWarning": "グローバル値はすべてのチェックに適用されます。値はすぐに保存され、すべてで使用されます。「保存して終了」を待ちません。",
+        "replayAnyway": "そのままリプレイ",
+        "saveAndReplay": "保存してリプレイ",
+        "bodyGlobal": "ステップ {steps} は {placeholder} を使用しています。グローバルとこのテストのいずれにも値がないため、スケジュール実行も失敗します。 | ステップ {steps} は {placeholder} を使用しています。グローバルとこのテストのいずれにも値がないため、スケジュール実行も失敗します。",
+        "bodyStartingUrlGlobal": "開始 URL は {placeholder} を使用しています。グローバルとこのテストのいずれにも値がないため、スケジュール実行も失敗します。",
+        "kindLockedSecret": "この変数はすでにシークレットとして保存されています。",
+        "kindLockedPlain": "この変数はすでにプレーンテキストとして保存されています。"
+      },
+      "startPill": {
+        "urlAria": "開始 URL: {url}。編集",
+        "editUrl": "開始 URL を編集",
+        "editEnvironments": "環境を変更",
+        "noUrl": "開始 URL を設定",
+        "urlTitle": "開始 URL",
+        "urlHelp": "ステップ 1 の前に開きます。変数を使用して環境ごとに変更できます。",
+        "opensIn": "このテストの環境で開きます:",
+        "envAria": "環境: なし、グローバル値のみ。変更 | 環境: {count} 件選択中。変更 | 環境: {count} 件選択中。変更",
+        "envTitle": "テスト環境",
+        "envHelp": "テストとともに保存されます。各スケジュール実行は環境とロケーションごとに 1 回実行され、次を開きます:",
+        "noAccess": "アクセス権なし",
+        "capLine": "{cap} 中 {count} · グローバル値は常に適用されます",
+        "runsIn": "実行環境",
+        "envOverflow": "{first} +{count}",
+        "urlNotChanged": "開始 URL は変更されませんでした: {reason}"
+      },
+      "replayEnv": {
+        "buttonLabel": "リプレイ · {environment}",
+        "menuAria": "リプレイ環境",
+        "menuTitle": "リプレイと記録先",
+        "sessionOnly": "このセッションのみ — テストには保存されません。",
+        "inTest": "選択した環境",
+        "notInTest": "その他の環境",
+        "selected": "選択済み",
+        "inLabel": "テスト対象",
+        "triggerAria": "リプレイ環境: {environment}"
+      },
+      "replaySecrets": {
+        "title": "{environment} でのこのリプレイのシークレット",
+        "fieldLabel": "{name} · {environment} のシークレット · ステップ {steps} で使用 | {name} · {environment} のシークレット · ステップ {steps} で使用",
+        "valueRequired": "シークレットの値を入力してください",
+        "why": "スケジュール実行では保存されたシークレットを使用します。リプレイはブラウザーで実行されるため、保存されたシークレットを読み取れません。",
+        "memoryOnly": "このタブを閉じるまでメモリに保持されます。保存されることはありません。",
+        "lastFailed": "前回のリプレイはこの値でステップ {step} に失敗しました。",
+        "forget": "値を破棄",
+        "replayIn": "{environment} でリプレイ",
+        "saveAndRerun": "保存して再実行",
+        "menuItem": "シークレット · {needed} 件中 {entered} 件入力済み",
+        "menuAria": "{environment} のリプレイ用シークレット: {needed} 件中 {entered} 件入力済み。編集",
+        "usesTyped": "リプレイ · {environment} — 入力したシークレットを使用",
+        "passedNote": "入力したシークレットを使用しました。保存されたシークレットはテストされていません。",
+        "failedTitle": "{environment} でのリプレイは {total} ステップ中 {failed} で失敗しました",
+        "failedNote": "ステップ {step} では、このセッションで入力したシークレット {name} を使用しました。",
+        "changeValue": "値を変更"
+      },
+      "addMenu": {
+        "addStep": "ステップを追加",
+        "stepHint": "単一のアクション",
+        "subtestHint": "共有フローを再利用",
+        "addSubtest": "サブテストを追加"
+      },
+      "usedBy": {
+        "aria": "これを使用するテスト",
+        "help": "これらのステップはそれぞれのページで実行されます。このテストの開始 URL、環境、シークレットはそこでは使用されません。",
+        "viewAll": "{count} 件のテストをすべて表示",
+        "subtitle": "{folder} · {count} 件のテストで使用 | {folder} · {count} 件のテストで使用",
+        "subtitleNoFolder": "{count} 件のテストで使用 | {count} 件のテストで使用"
+      },
+      "recordingIn": "{environment} で記録中",
+      "needsDesktopRecorder": "デスクトップレコーダー拡張機能が必要",
+      "moreActions": "その他のアクション"
     },
     "labels": {
       "copyOf": "{name} のコピー",
@@ -14815,9 +14995,11 @@
       "detailSelector": "セレクタ",
       "downloadTrace": "{filename}をダウンロード",
       "errorFullscreenTitle": "ステップ {id}: {action} - エラー",
+      "failedAtStartLoad": "開始 URL を開けませんでした",
       "failedAtStep": "ステップ {step} で失敗",
       "failedCount": "{count} 失敗",
       "failureScreenshot": "失敗スクリーンショット",
+      "startLoadLabel": "{url} を開く",
       "lightboxTitle": "ステップ {id}: {action}",
       "loadFailed": "実行データの読み込みに失敗しました",
       "locations": "ロケーション",
@@ -14915,6 +15097,12 @@
       "windowMinutes": "過去{minutes}分",
       "filteringByErrorLabel": "エラーでフィルタリング:",
       "errorPatternsWindowDesc": "{window}で正規化 · 行をクリックして実行をフィルタリング"
+    },
+    "save": {
+      "usedByTitle": "「{name}」を使う {count} 件のテストが失敗するようになります",
+      "usedByBody": "この変更で {names} が追加されます。上記のテストはこれを定義していないため、次回の実行で未解決のままになります。",
+      "blockedBody": "保存できませんでした。先にそれらの参照を削除してから、もう一度保存してください。",
+      "usedByCount": "{count} 件のテストで使用中"
     },
     "scheduleAlert": {
       "addNewDestination": "新規宛先を追加",
@@ -15032,13 +15220,17 @@
       "statusUp": "✓ アップ",
       "steps": "ステップ",
       "stepsCount": "{count} ステップ",
+      "subtestMissing": "サブテストがありません",
+      "subtestNested": "サブテストがサブテストを含んでいます",
       "testName": "テスト名",
       "timeout": "タイムアウト",
       "trigger": "トリガー",
       "triggering": "トリガー中...",
       "type": "タイプ",
       "uptime": "稼働率 7日",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "使用元",
+      "usedByCount": "{count} 件のテスト"
     },
     "tabs": {
       "all": "すべて",
@@ -15085,9 +15277,10 @@
       "updateFailed": "チェックの更新に失敗しました。"
     },
     "validation": {
-      "firstStepMustNavigate": "最初のステップは「ナビゲート」である必要があります。",
       "locationsRequired": "少なくとも1つのロケーションを選択してください",
       "nameRequired": "名前は必須です",
+      "startUrlHostMismatch": "このテストは {host} を開きますが、ステップは {other} へナビゲートします。",
+      "stepIdReserved": "このステップ ID は実行の開始 URL 用に予約されています",
       "locatorRequired": "このステップが操作する要素を認識できるように、ロケーターを少なくとも1つ追加してください",
       "selectorRequired": "「{step}」は操作する要素を指定していません",
       "stepNameRequired": "このステップに名前を付けてください — 実行結果に表示されます",
@@ -15098,9 +15291,13 @@
       "urlRequired": "開始 URL は必須です",
       "fixHighlightedFields": "保存する前にハイライトされたフィールドを修正してください",
       "retiredAction": "「{action}」はサポートされなくなりました — 「{step}」を削除または置換してください",
+      "subtestRequired": "ここで実行するテストを選択してください",
+      "subtestFlags": "サブテストは任意実行や常時実行にできません — その失敗は常にこのテストを失敗させます",
       "runBudgetExceeded": "このチェックは実行ごとに最大 {worstCase} かかり、制限の {limit} を超えます。ブラウザ/デバイスの組み合わせを削除するか、再試行回数を減らしてください。({combos} コンボ × {attempts} 試行 × {perAttempt} ずつ。)",
       "runBudgetRetriesHint": "再試行回数を減らすと、このチェックは {limit} の実行制限内に戻ります。",
-      "folderUnavailable": "フォルダ「{folder}」はこの組織で利用できません — デフォルトフォルダに保存します。"
+      "folderUnavailable": "フォルダ「{folder}」はこの組織で利用できません — デフォルトフォルダに保存します。",
+      "compositionChildFailed": "「{name}」は保存時の検証に失敗しました — 開いて修正が必要なステップを確認してください。",
+      "subtestCap": "実行ステップが多すぎます — ステップ上部の通知をご覧ください。"
     },
     "privateLocations": {
       "searchPlaceholder": "ロケーションを検索...",
@@ -15433,7 +15630,8 @@
       "actions": "[アクション]",
       "rum": "RUM",
       "runningQueries": "クエリの実行",
-      "oncall": "オンコール"
+      "oncall": "オンコール",
+      "synthetics": "合成モニタリング"
     },
     "pages": {
       "global": "グローバル",
@@ -15484,7 +15682,8 @@
       "rumSessions": "{product} — セッション",
       "sourceMaps": "RUM — ソースマップ",
       "oncall": "オンコール",
-      "oncallDetail": "オンコールページ"
+      "oncallDetail": "オンコールページ",
+      "syntheticsJourney": "合成モニタリングジャーニー"
     },
     "actions": {
       "openCheatsheet": "キーボードショートカットのチートシートを開く",
