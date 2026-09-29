@@ -45,7 +45,7 @@ use infra::{
 use ingestion_common::{
     AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
     IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
-    IngestionValueType, KinesisFHIngestionResponse, RecordStatus, StreamStatus,
+    IngestionValueType, KinesisFHIngestionResponse, KinesisFHRequest, RecordStatus, StreamStatus,
 };
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -1062,41 +1062,7 @@ impl IngestionDataExt for IngestionData {
                 }
             }
             IngestionData::KinesisFH(request) => {
-                let mut events = Vec::with_capacity(request.records.len());
-                let request_id = &request.request_id;
-                let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
-
-                let limit = config::get_config().limit.req_payload_limit;
-                for record in &request.records {
-                    match decode_and_decompress_to_vec(&record.data, limit) {
-                        Err(err) => {
-                            return IngestionDataIterator(IngestionDataIter::KinesisFH(
-                                events.into_iter(),
-                                Some(KinesisFHIngestionResponse {
-                                    request_id: request_id.to_string(),
-                                    error_message: Some(err.to_string()),
-                                    timestamp: req_timestamp,
-                                }),
-                            ));
-                        }
-                        Ok(decompressed_data) => {
-                            match deserialize_aws_record_from_vec(decompressed_data, request_id) {
-                                Ok(parsed_events) => events.extend(parsed_events),
-                                Err(err) => {
-                                    return IngestionDataIterator(IngestionDataIter::KinesisFH(
-                                        events.into_iter(),
-                                        Some(KinesisFHIngestionResponse {
-                                            request_id: request_id.to_string(),
-                                            error_message: Some(err.to_string()),
-                                            timestamp: req_timestamp,
-                                        }),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-                IngestionDataIter::KinesisFH(events.into_iter(), None)
+                kinesis_fh_iter(&request, config::get_config().limit.req_payload_limit)
             }
         };
         IngestionDataIterator(iter)
@@ -1145,6 +1111,39 @@ pub fn get_size_of_var_int_header(bytes: &[u8]) -> Option<usize> {
     }
 
     None
+}
+
+fn kinesis_fh_iter(request: &KinesisFHRequest, limit: usize) -> IngestionDataIter {
+    let mut events = Vec::with_capacity(request.records.len());
+    let request_id = &request.request_id;
+    let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
+
+    // one budget for the whole request, or N records could each expand to `limit`
+    let mut remaining = limit;
+    for record in &request.records {
+        let parsed = decode_and_decompress_to_vec(&record.data, remaining)
+            .map_err(|e| e.to_string())
+            .and_then(|data| {
+                remaining = remaining
+                    .checked_sub(data.len())
+                    .ok_or_else(|| "decompressed records exceed the size limit".to_string())?;
+                deserialize_aws_record_from_vec(data, request_id).map_err(|e| e.to_string())
+            });
+        match parsed {
+            Ok(parsed_events) => events.extend(parsed_events),
+            Err(err) => {
+                return IngestionDataIter::KinesisFH(
+                    events.into_iter(),
+                    Some(KinesisFHIngestionResponse {
+                        request_id: request_id.to_string(),
+                        error_message: Some(err),
+                        timestamp: req_timestamp,
+                    }),
+                );
+            }
+        }
+    }
+    IngestionDataIter::KinesisFH(events.into_iter(), None)
 }
 
 fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Vec<json::Value>> {
@@ -1867,5 +1866,50 @@ mod tests {
         };
         let mut iterator = IngestionData::GCP(request).iter();
         assert!(iterator.next().unwrap().is_err());
+    }
+
+    fn kinesis_request(records: &[&[u8]]) -> ingestion_common::KinesisFHRequest {
+        ingestion_common::KinesisFHRequest {
+            records: records
+                .iter()
+                .map(|raw| ingestion_common::KFHRecordRequest {
+                    data: gzip_base64(raw),
+                })
+                .collect(),
+            request_id: "req1".to_string(),
+            timestamp: Some(0),
+        }
+    }
+
+    fn json_record(len: usize) -> Vec<u8> {
+        let mut record = br#"{"m":""#.to_vec();
+        record.resize(len - 2, b'a');
+        record.extend_from_slice(br#""}"#);
+        record
+    }
+
+    #[test]
+    fn kinesis_records_share_one_decompressed_budget() {
+        let limit = 1000;
+        let record = json_record(600);
+        let request = kinesis_request(&[&record, &record, &record]);
+        let IngestionDataIter::KinesisFH(_, err) = kinesis_fh_iter(&request, limit) else {
+            unreachable!()
+        };
+        assert!(
+            err.is_some(),
+            "1800 decompressed bytes accepted under a 1000-byte budget"
+        );
+    }
+
+    #[test]
+    fn kinesis_records_under_the_budget_all_decode() {
+        let record = json_record(300);
+        let request = kinesis_request(&[&record, &record, &record]);
+        let IngestionDataIter::KinesisFH(events, err) = kinesis_fh_iter(&request, 1000) else {
+            unreachable!()
+        };
+        assert!(err.is_none(), "{err:?}");
+        assert_eq!(events.count(), 3);
     }
 }
