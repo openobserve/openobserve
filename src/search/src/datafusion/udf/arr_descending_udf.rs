@@ -384,16 +384,28 @@ mod tests {
 
         let mut values: Vec<json::Value> = Vec::with_capacity(200);
         for i in 0..200 {
-            values.push(match i % 5 {
+            values.push(match i % 7 {
                 0 => json::Value::from(i as i64),
                 1 => json::Value::from(i as f64 + 0.5),
                 2 => json::Value::from(format!("s{i}")),
                 3 => json::Value::Bool(i % 2 == 0),
-                _ => json::Value::Null,
+                4 => json::Value::Null,
+                // arbitrary_precision numbers with no f64 representation, one per sign.
+                5 => json::from_str::<json::Value>(&format!("{i}e400")).unwrap(),
+                _ => json::from_str::<json::Value>(&format!("-{i}e400")).unwrap(),
             });
         }
         values.shuffle(&mut rand::rng());
         let json_array = json::to_string(&values).unwrap();
         call_arr_descending(&json_array);
+    }
+
+    #[test]
+    fn test_arr_descending_with_overflow_numbers_is_deterministic_and_ordered() {
+        let result = call_arr_descending(r#"[1e400,-1e400,100.0,50,2e300,-3]"#);
+        assert_eq!(result, "[1e+400,2e+300,100.0,50,-3,-1e+400]");
+
+        let result2 = call_arr_descending(r#"[50,-1e400,2e300,-3,1e400,100.0]"#);
+        assert_eq!(result, result2);
     }
 }

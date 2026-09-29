@@ -47,6 +47,45 @@ pub static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
+/// One JSON number's place in [`number_total_cmp`]'s order: negative-overflow, a finite value
+/// (by its own total order below), or positive-overflow, giving exactly
+/// `NegOverflow < Finite(negative) < Finite(zero) < Finite(positive) < PosOverflow`.
+enum NumberOrderClass {
+    NegOverflow(std::cmp::Reverse<String>),
+    // f64 has no Eq/Ord (NaN), but JSON numbers are never NaN, so this type's own Eq/Ord below
+    // (via total_cmp) are hand-written rather than derived.
+    Finite(f64),
+    PosOverflow(String),
+}
+
+impl PartialEq for NumberOrderClass {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for NumberOrderClass {}
+
+impl Ord for NumberOrderClass {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::NegOverflow(a), Self::NegOverflow(b)) => a.cmp(b),
+            (Self::Finite(a), Self::Finite(b)) => a.total_cmp(b),
+            (Self::PosOverflow(a), Self::PosOverflow(b)) => a.cmp(b),
+            (Self::NegOverflow(_), _) => Ordering::Less,
+            (_, Self::NegOverflow(_)) => Ordering::Greater,
+            (Self::Finite(_), Self::PosOverflow(_)) => Ordering::Less,
+            (Self::PosOverflow(_), Self::Finite(_)) => Ordering::Greater,
+        }
+    }
+}
+
+impl PartialOrd for NumberOrderClass {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// arrsort function for datafusion
 pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     log::debug!("Inside arrsort");
@@ -107,15 +146,34 @@ fn type_rank(value: &json::Value) -> u8 {
 /// Total order over arbitrary JSON values, shared by `arrsort` and `arr_descending`.
 pub(crate) fn json_total_cmp(a: &json::Value, b: &json::Value) -> Ordering {
     match (a, b) {
-        (json::Value::Number(a), json::Value::Number(b)) => match (a.as_f64(), b.as_f64()) {
-            (Some(a), Some(b)) => a.total_cmp(&b),
-            // arbitrary_precision numbers with no f64 representation: compare their text form.
-            _ => a.to_string().cmp(&b.to_string()),
-        },
+        (json::Value::Number(a), json::Value::Number(b)) => number_total_cmp(a, b),
         (json::Value::String(a), json::Value::String(b)) => a.cmp(b),
         (json::Value::Bool(a), json::Value::Bool(b)) => a.cmp(b),
         (json::Value::Null, json::Value::Null) => Ordering::Equal,
         _ => type_rank(a).cmp(&type_rank(b)),
+    }
+}
+
+/// Compares two JSON numbers under one f64-compatible total order, even when one or both are
+/// `arbitrary_precision` numbers with no f64 representation: those are ordered as signed
+/// infinity (larger in magnitude than every finite f64), so the relation stays transitive
+/// against numbers that do have an f64. Two negative-overflow numbers are ordered so the more
+/// negative (longer digit string) sorts first, via `Reverse` on their canonical text.
+fn number_total_cmp(a: &json::Number, b: &json::Number) -> Ordering {
+    number_order_class(a).cmp(&number_order_class(b))
+}
+
+fn number_order_class(n: &json::Number) -> NumberOrderClass {
+    match n.as_f64() {
+        Some(f) => NumberOrderClass::Finite(f),
+        None => {
+            let text = n.to_string();
+            if text.starts_with('-') {
+                NumberOrderClass::NegOverflow(std::cmp::Reverse(text))
+            } else {
+                NumberOrderClass::PosOverflow(text)
+            }
+        }
     }
 }
 
@@ -411,16 +469,73 @@ mod tests {
 
         let mut values: Vec<json::Value> = Vec::with_capacity(200);
         for i in 0..200 {
-            values.push(match i % 5 {
+            values.push(match i % 7 {
                 0 => json::Value::from(i as i64),
                 1 => json::Value::from(i as f64 + 0.5),
                 2 => json::Value::from(format!("s{i}")),
                 3 => json::Value::Bool(i % 2 == 0),
-                _ => json::Value::Null,
+                4 => json::Value::Null,
+                // arbitrary_precision numbers with no f64 representation, one per sign.
+                5 => json::from_str::<json::Value>(&format!("{i}e400")).unwrap(),
+                _ => json::from_str::<json::Value>(&format!("-{i}e400")).unwrap(),
             });
         }
         values.shuffle(&mut rand::rng());
         let json_array = json::to_string(&values).unwrap();
         call_arr_sort(&json_array);
+    }
+
+    fn parse_number(text: &str) -> json::Number {
+        match json::from_str::<json::Value>(text).unwrap() {
+            json::Value::Number(n) => n,
+            other => panic!("expected a number, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_number_total_cmp_orders_overflow_against_finite_correctly() {
+        // Regression for a transitivity break: comparing an overflowed number (no f64
+        // representation) against a finite one by raw JSON text put 100.0 < 1e400 < 50 < 100.0.
+        let a = parse_number("100.0");
+        let b = parse_number("1e400");
+        let c = parse_number("50");
+
+        assert_eq!(number_total_cmp(&a, &b), Ordering::Less, "100.0 < 1e400");
+        assert_eq!(number_total_cmp(&b, &c), Ordering::Greater, "1e400 > 50");
+        assert_eq!(number_total_cmp(&a, &c), Ordering::Greater, "100.0 > 50");
+    }
+
+    #[test]
+    fn test_number_total_cmp_is_transitive_over_all_triples() {
+        let texts = [
+            "1e400", "-1e400", "100.0", "50", "-3", "2e300", "-2e300", "0", "-0.5", "0.5",
+        ];
+        let numbers: Vec<json::Number> = texts.iter().map(|t| parse_number(t)).collect();
+
+        for a in &numbers {
+            for b in &numbers {
+                for c in &numbers {
+                    let ab = number_total_cmp(a, b);
+                    let bc = number_total_cmp(b, c);
+                    let ac = number_total_cmp(a, c);
+                    if ab == Ordering::Less && bc == Ordering::Less {
+                        assert_eq!(ac, Ordering::Less, "a<b<c but a vs c was {ac:?}");
+                    }
+                    if ab == Ordering::Greater && bc == Ordering::Greater {
+                        assert_eq!(ac, Ordering::Greater, "a>b>c but a vs c was {ac:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_arr_sort_with_overflow_numbers_is_deterministic_and_ordered() {
+        let result = call_arr_sort(r#"[1e400,-1e400,100.0,50,2e300,-3]"#);
+        assert_eq!(result, "[-1e+400,-3,50,100.0,2e+300,1e+400]");
+
+        // Sorting again from a different input order must yield the same order (determinism).
+        let result2 = call_arr_sort(r#"[50,-1e400,2e300,-3,1e400,100.0]"#);
+        assert_eq!(result, result2);
     }
 }
