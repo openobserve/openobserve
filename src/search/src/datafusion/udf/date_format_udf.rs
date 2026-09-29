@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    fmt::Write as _,
     iter::zip,
     sync::{Arc, LazyLock as Lazy},
 };
@@ -72,15 +73,14 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
                 // in arrow, any value can be null.
                 // Here we decide to make our UDF to return null when either argument is null.
                 (Some(timestamp), (Some(format), Some(timezone))) => {
-                    let timestamp = time::parse_i64_to_timestamp_micros(timestamp);
-                    let t = Utc.timestamp_nanos(timestamp * 1000);
-                    let offset = time::parse_timezone_to_offset(timezone) as i32;
-                    let result = if offset == 0 {
-                        t.format(format).to_string()
-                    } else {
-                        let t = t.with_timezone(&FixedOffset::east_opt(offset).unwrap());
-                        t.format(format).to_string()
-                    };
+                    let timestamp_micros = time::parse_i64_to_timestamp_micros(timestamp);
+                    let t = Utc.timestamp_nanos(timestamp_micros * 1000);
+                    let offset = time::parse_timezone_to_offset_at(timezone, timestamp_micros)?;
+                    let offset = i32::try_from(offset).ok()?;
+                    let fixed_offset = FixedOffset::east_opt(offset)?;
+                    let formatted = t.with_timezone(&fixed_offset);
+                    let mut result = String::new();
+                    write!(result, "{}", formatted.format(format)).ok()?;
                     Some(result)
                 }
                 _ => None,
@@ -95,7 +95,7 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::{Int64Array, StringArray};
+    use arrow::array::{Array, Int64Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -114,6 +114,49 @@ mod tests {
         let arr = Int64Array::from(vec![0i64]);
         let args = [ColumnarValue::Array(Arc::new(arr))];
         assert!(date_format_expr_impl(&args).is_err());
+    }
+
+    fn call_date_format(timestamp: i64, format: &str, timezone: &str) -> StringArray {
+        let args = [
+            ColumnarValue::Array(Arc::new(Int64Array::from(vec![timestamp]))),
+            ColumnarValue::Array(Arc::new(StringArray::from(vec![format]))),
+            ColumnarValue::Array(Arc::new(StringArray::from(vec![timezone]))),
+        ];
+        let result = date_format_expr_impl(&args).unwrap();
+        match result {
+            ColumnarValue::Array(out) => {
+                out.as_any().downcast_ref::<StringArray>().unwrap().clone()
+            }
+            _ => panic!("expected array result"),
+        }
+    }
+
+    #[test]
+    fn test_date_format_named_timezone_is_supported() {
+        let ts = time::parse_str_to_timestamp_micros("2021-06-15T12:00:00.000Z").unwrap();
+        let out = call_date_format(ts, "%Y-%m-%d %H:%M:%S", "Asia/Tokyo");
+        assert!(!out.is_null(0));
+    }
+
+    #[test]
+    fn test_date_format_unknown_timezone_returns_null_not_panic() {
+        let ts = time::parse_str_to_timestamp_micros("2021-06-15T12:00:00.000Z").unwrap();
+        let out = call_date_format(ts, "%Y-%m-%d", "Nope/Zone");
+        assert!(out.is_null(0));
+    }
+
+    #[test]
+    fn test_date_format_invalid_strftime_returns_null_not_panic() {
+        let ts = time::parse_str_to_timestamp_micros("2021-06-15T12:00:00.000Z").unwrap();
+        let out = call_date_format(ts, "%Q", "UTC");
+        assert!(out.is_null(0));
+    }
+
+    #[test]
+    fn test_date_format_out_of_range_offset_returns_null_not_panic() {
+        let ts = time::parse_str_to_timestamp_micros("2021-06-15T12:00:00.000Z").unwrap();
+        let out = call_date_format(ts, "%Y-%m-%d", "+25:00");
+        assert!(out.is_null(0));
     }
 
     #[test]
