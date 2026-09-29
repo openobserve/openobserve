@@ -46,6 +46,11 @@ impl IndexOptimizeMode {
         }
     }
 
+    /// Whether the index answers the whole aggregate instead of selecting rows.
+    pub fn is_aggregate(&self) -> bool {
+        !matches!(self, IndexOptimizeMode::SimpleSelect(..))
+    }
+
     pub fn to_rule_string(&self) -> String {
         match self {
             IndexOptimizeMode::SimpleSelect(limit, ascend) => format!("s(l:{limit},a:{ascend})"),
