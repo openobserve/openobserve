@@ -8014,8 +8014,35 @@
       "disclosureShort": "66c4324089c3d8ba",
       "failed": "031a8f0f659df890",
       "failedWithCode": "6d189b23e24e6596",
-      "logOffDescription": "9fc30e52775d668a",
       "logOffTitle": "8c392c7b99e3bd05",
+      "notCollecting": {
+        "checklistTitle": "cf26b983696fd931",
+        "checks": {
+          "enabled": {
+            "no": "df63a906ffbd7b2a",
+            "noDetail": "d4c1b2fa1954e764",
+            "ok": "8a29bf0d8d275108",
+            "okDetail": "a02ed7fb0d2d3ba3"
+          },
+          "engines": {
+            "detail": "b74cc3c72d2bb4b5",
+            "title": "811ae958923a6662"
+          },
+          "log": {
+            "no": "942e43bb7cc84bca",
+            "noDetail": "195ec9d4b36193db"
+          },
+          "queries": {
+            "no": "c10332291ac3e0f6",
+            "noDetail": "2fa43a9d37b44283",
+            "ok": "c5cc18c005b6fab6",
+            "okDetail": "bde2d8554cd2c8b5",
+            "okDetailNoFleet": "2348118686e3a894"
+          }
+        },
+        "description": "68c0740812479341",
+        "setUp": "964528d19350b08d"
+      },
       "partial": "53bd06c2fc71c2e1",
       "scatterOk": "22a970d2e5b1cc23",
       "searchPlaceholder": "2f1ab6dcc2354e7e",
@@ -8036,6 +8063,7 @@
       "viewTrace": "0e2865ffff2d46c0"
     },
     "tableHealth": {
+      "aboutNumbers": "80de192bf1f53c9d",
       "checkGrant": "19f3f8c09a666413",
       "checkRange": "dd65ff216640bb12",
       "checkRecipe": "ff4d64a63b3fbc94",
