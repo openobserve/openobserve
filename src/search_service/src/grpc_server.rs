@@ -202,6 +202,12 @@ impl Search for Searcher {
         req: Request<DeleteResultRequest>,
     ) -> Result<Response<DeleteResultResponse>, Status> {
         let paths = req.into_inner().paths;
+        if paths
+            .iter()
+            .any(|path| !crate::search_jobs::is_search_job_result_path(path))
+        {
+            return Err(Status::invalid_argument("invalid result path"));
+        }
         let paths = paths
             .iter()
             .map(|path| ("", path.as_str()))
@@ -577,5 +583,39 @@ mod tests {
 
         assert!(res.is_ok(), "own org sourcemap path was rejected: {res:?}");
         let _ = infra::storage::del(vec![("", path)]).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_delete_result_rejects_non_result_paths() {
+        let searcher = Searcher::new();
+        let req = Request::new(DeleteResultRequest {
+            paths: vec![
+                "result/2026/09/29/abc123/final.result.json".to_string(),
+                "files/otherorg/secret.result.json".to_string(),
+            ],
+        });
+        let err = searcher
+            .delete_result(req)
+            .await
+            .expect_err("a request mixing a valid and an invalid path was accepted");
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_delete_result_accepts_result_paths() {
+        let searcher = Searcher::new();
+        let path = "result/2026/09/29/abc123/final.result.json";
+        infra::storage::put("", path, Vec::new().into())
+            .await
+            .unwrap();
+
+        let req = Request::new(DeleteResultRequest {
+            paths: vec![path.to_string()],
+        });
+        let res = searcher.delete_result(req).await;
+
+        assert!(res.is_ok(), "result path was rejected: {res:?}");
     }
 }
