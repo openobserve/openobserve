@@ -28,6 +28,8 @@ export class IamPage {
         // open at a time, so we target by the common slug rather than the
         // (different) parent slugs of delete vs. refresh dialogs.
         this.addServiceAccountButton = page.locator('[data-test="service-accounts-add-btn"]');
+        // Service accounts list client-side search (OInput → auto-derived `-field`).
+        this.serviceAccountSearchInput = page.locator('[data-test="iam-service-accounts-search-input-field"]');
         // Service accounts are created from a NAME (lowercase slug); the UI
         // synthesizes the identifier as `<name>.<org>@sa.internal`
         // (see AddServiceAccount.schema.ts).
@@ -223,6 +225,43 @@ export class IamPage {
 
     }
 
+    /**
+     * Assert the post-creation token reveal dialog has closed.
+     */
+    async verifyTokenDialogClosed() {
+        await expect(this.tokenDialog).toBeHidden({ timeout: 10000 });
+    }
+
+    /**
+     * Assert the Add/Update service account drawer has closed (e.g. after Cancel).
+     */
+    async verifyServiceAccountDrawerClosed() {
+        await expect(this.addServiceAccountDialog).toBeHidden({ timeout: 10000 });
+    }
+
+    /**
+     * Filter the service accounts list by the given text (client-side global filter).
+     */
+    async searchServiceAccount(text) {
+        await this.serviceAccountSearchInput.waitFor({ state: 'visible', timeout: 15000 });
+        await this.serviceAccountSearchInput.click();
+        await this.serviceAccountSearchInput.fill(text);
+    }
+
+    /**
+     * Assert a service account row (keyed by its synthesized email) is present.
+     */
+    async verifyServiceAccountInList(emailName) {
+        await expect(this.emailCellByEmail(emailName).first()).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * Assert a service account row (keyed by its synthesized email) is absent.
+     */
+    async verifyServiceAccountNotInList(emailName) {
+        await expect(this.emailCellByEmail(emailName)).toHaveCount(0, { timeout: 15000 });
+    }
+
     async waitResEmailServiceAccount(emailName) {
         const orgName = process.env.ORGNAME || 'default';
         await this.page.waitForResponse(
@@ -238,6 +277,19 @@ export class IamPage {
         // dialog's own data-test attribute instead.
         await this.tokenCopyButton.click();
 
+    }
+
+    /**
+     * Copies the raw service-account token from the reveal dialog and returns it,
+     * stripping any "Basic " prefix. Mirrors the clipboard read used in
+     * Streams/ingestionTokens.spec.js (the reveal dialog's copy button writes
+     * the raw `serviceToken`, not the Basic credential).
+     */
+    async captureServiceAccountToken() {
+        await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+        await this.clickCopyToken();
+        const token = await this.page.evaluate(() => navigator.clipboard.readText());
+        return (token || '').replace(/^Basic\s+/i, '');
     }
 
 

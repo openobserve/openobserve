@@ -270,6 +270,53 @@ describe("OnCallMembers", () => {
     );
   });
 
+  /// Both reads span the whole org, and the tab is reopened every time somebody
+  /// switches away and back — a revisit that repeats them pays for an answer
+  /// nothing has changed. A write is the one thing that has.
+  ///
+  /// The clock is pinned because the absence and schedule keys bucket their
+  /// `Date.now()` window: a minute rolling over mid-test would fork the key and
+  /// fail a component that is behaving.
+  it("serves a revisit from the cache and re-reads after an absence is written", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-18T10:30:00Z"));
+    oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
+
+    const first = render([member("ana@o2.ai")]);
+    await flushPromises();
+    expect(oncall.listUnavailability).toHaveBeenCalledTimes(1);
+    expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = render([member("ana@o2.ai")]);
+    await flushPromises();
+    expect(oncall.listUnavailability).toHaveBeenCalledTimes(1);
+    expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(1);
+
+    await second.find('[data-test="oncall-members-mark-away-ana@o2.ai"]').trigger("click");
+    await second.find('[data-test="oncall-members-away-from-date"] input').setValue("2026-09-20");
+    await second.find('[data-test="oncall-members-away-from-time"] input').setValue("09:00");
+    await second.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-09-27");
+    await second.find('[data-test="oncall-members-away-to-time"] input').setValue("09:00");
+    await second.find('[data-test="oncall-members-away-save"]').trigger("click");
+    await flushPromises();
+
+    expect(oncall.listUnavailability).toHaveBeenCalledTimes(2);
+    expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  // The org's users are the IAM list's own cache entry, so a revisit of this tab costs nothing.
+  it("serves the org's users to a remount from the cache", async () => {
+    render([]).unmount();
+    await flushPromises();
+    const second = render([]);
+    await flushPromises();
+
+    expect(users.orgUsers).toHaveBeenCalledTimes(1);
+    expect(second.find('[data-test="oncall-members-user-select"]').text()).toContain("Ana Sharma");
+  });
+
   /// C5/C6: the rota already SKIPS an away member; the table says so where
   /// the people are listed, before somebody asks why the order changed.
   describe("absences", () => {

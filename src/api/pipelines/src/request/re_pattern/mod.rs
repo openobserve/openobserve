@@ -570,7 +570,11 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
         let inputs = req.test_records;
         // Default to Redact if policy not specified for backward compatibility
         let policy = req.policy.as_deref().unwrap_or("Redact");
-        let policy = PatternPolicy::from(policy);
+        // Strict here: a lossy coercion would preview a redaction the caller did not ask for.
+        let policy = match PatternPolicy::parse_strict(policy) {
+            Ok(policy) => policy,
+            Err(e) => return MetaHttpResponse::bad_request(format!("invalid policy: {e}")),
+        };
 
         let mut ret = Vec::with_capacity(inputs.len());
         for i in inputs {

@@ -167,6 +167,8 @@ pub async fn process_association_changes(
         return Ok(());
     }
 
+    validate_associations_to_add(org, stream, stype, &update.add)?;
+
     let mgr = get_pattern_manager().await?;
 
     // An unknown id is caller input, so it must not surface as a server error.
@@ -198,7 +200,8 @@ pub async fn process_association_changes(
             stream_type: stype,
             field: item.field,
             pattern_id: item.pattern_id,
-            policy: PatternPolicy::from(item.policy),
+            policy: PatternPolicy::from(&item.policy),
+            policy_repr: Some(item.policy),
             apply_at: ApplyPolicy::from(item.apply_at),
         })
         .collect();
@@ -212,7 +215,8 @@ pub async fn process_association_changes(
             stream_type: stype,
             field: item.field,
             pattern_id: item.pattern_id,
-            policy: PatternPolicy::from(item.policy),
+            policy: PatternPolicy::from(&item.policy),
+            policy_repr: Some(item.policy),
             apply_at: ApplyPolicy::from(item.apply_at),
         })
         .collect();
@@ -364,7 +368,7 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                     }
                 };
 
-                let updates: UpdateSettingsWrapper<PatternAssociation> =
+                let mut updates: UpdateSettingsWrapper<PatternAssociation> =
                     match serde_json::from_slice(v) {
                         Ok(v) => v,
                         Err(e) => {
@@ -374,6 +378,8 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                             continue;
                         }
                     };
+
+                degrade_unsupported_policies(org, stream, stype, &mut updates.add);
 
                 let mgr = get_pattern_manager().await?;
                 mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;
@@ -389,6 +395,73 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                 mgr.remove_stream_associations(org, stype, stream);
             }
             _ => {}
+        }
+    }
+}
+
+/// Add-list only: rejecting a remove would strand a bad row, and an edit is a remove plus an add.
+fn validate_associations_to_add(
+    org: &str,
+    stream: &str,
+    stype: StreamType,
+    add: &[PatternAssociation],
+) -> Result<(), errors::Error> {
+    for item in add.iter() {
+        let policy = PatternPolicy::parse_strict(&item.policy).map_err(|e| {
+            errors::Error::ErrorCode(errors::ErrorCodes::InvalidParams(format!(
+                "invalid policy for field {}: {e}",
+                item.field
+            )))
+        })?;
+        ApplyPolicy::parse_strict(&item.apply_at).map_err(|e| {
+            errors::Error::ErrorCode(errors::ErrorCodes::InvalidParams(format!(
+                "invalid apply_at for field {}: {e}",
+                item.field
+            )))
+        })?;
+        if policy == PatternPolicy::Detect {
+            log::warn!(
+                "[SDR] accepting Detect association for {org}/{stype}/{stream} field {} pattern {}; this propagates cluster-wide and a node predating Detect will stop redacting this field",
+                item.field,
+                item.pattern_id
+            );
+        }
+    }
+    Ok(())
+}
+
+/// The row already exists in the DB, so refusing it would only leave this node's map stale.
+pub fn degrade_unsupported_policies(
+    org: &str,
+    stream: &str,
+    stype: StreamType,
+    add: &mut [PatternAssociation],
+) {
+    for item in add.iter_mut() {
+        if !PatternPolicy::is_recognised(&item.policy) {
+            log::error!(
+                "[SDR] replicated association {org}/{stype}/{stream} field {} pattern {} carries policy {:?}, which this build cannot decode; degrading it to Detect, so this field is counted but NOT redacted on this node",
+                item.field,
+                item.pattern_id,
+                item.policy
+            );
+            item.policy = PatternPolicy::Detect.to_string();
+        } else if item.policy == PatternPolicy::Detect.to_string()
+            && !config::get_config().common.sdr_detect_policy_enabled
+        {
+            log::warn!(
+                "[SDR] replicated association {org}/{stype}/{stream} field {} pattern {} uses Detect while ZO_SDR_DETECT_POLICY_ENABLED is false here; the flag gates authoring only, so this node honours it as count-only",
+                item.field,
+                item.pattern_id
+            );
+        }
+        if let Err(e) = ApplyPolicy::parse_strict(&item.apply_at) {
+            log::error!(
+                "[SDR] replicated association {org}/{stype}/{stream} field {} pattern {} carries apply_at {e}; applying it at ingestion",
+                item.field,
+                item.pattern_id
+            );
+            item.apply_at = ApplyPolicy::AtIngestion.to_string();
         }
     }
 }
@@ -410,5 +483,43 @@ mod tests {
     #[test]
     fn test_prefixes_are_distinct() {
         assert_ne!(RE_PATTERN_PREFIX, RE_PATTERN_ASSOCIATIONS_PREFIX);
+    }
+
+    fn association(policy: &str, apply_at: &str) -> PatternAssociation {
+        PatternAssociation {
+            field: "message".to_string(),
+            pattern_name: "card".to_string(),
+            description: String::new(),
+            pattern: "[0-9]{16}".to_string(),
+            pattern_id: "p1".to_string(),
+            policy: policy.to_string(),
+            apply_at: apply_at.to_string(),
+        }
+    }
+
+    #[test]
+    fn a_replicated_undecodable_policy_is_degraded_before_it_reaches_the_manager() {
+        let mut add = vec![association("SomeFuturePolicy", "AtIngestion")];
+        degrade_unsupported_policies("org", "logs", StreamType::Logs, &mut add);
+        assert_eq!(add[0].policy, "Detect");
+        assert_ne!(add[0].policy, "Redact");
+    }
+
+    #[test]
+    fn a_replicated_supported_policy_is_passed_through_untouched() {
+        for policy in ["DropField", "Redact", "Hash", "Detect"] {
+            let mut add = vec![association(policy, "Both")];
+            degrade_unsupported_policies("org", "logs", StreamType::Logs, &mut add);
+            assert_eq!(add[0].policy, policy);
+            assert_eq!(add[0].apply_at, "Both");
+        }
+    }
+
+    #[test]
+    fn a_replicated_undecodable_apply_at_falls_back_to_ingestion() {
+        let mut add = vec![association("Redact", "SomeFutureTime")];
+        degrade_unsupported_policies("org", "logs", StreamType::Logs, &mut add);
+        assert_eq!(add[0].apply_at, "AtIngestion");
+        assert_eq!(add[0].policy, "Redact");
     }
 }

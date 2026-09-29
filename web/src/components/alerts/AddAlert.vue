@@ -85,6 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="anomalyConfig.status"
                 />
               </OTooltip>
+              <!-- §4.8 health badge: its own element keyed off notice_class, never folded into the status tag. -->
+              <OTooltip v-if="anomalyNoticeBadge" :content="anomalyNoticeTooltip">
+                <OTag
+                  variant="warning-quiet"
+                  :label="anomalyNoticeBadge.label"
+                  data-test="anomaly-notice-badge"
+                />
+              </OTooltip>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="text-2xs text-text-secondary whitespace-nowrap"
@@ -348,13 +356,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="filteredColumns"
                     :isAggregationEnabled="isAggregationEnabled"
                     :destinations="formData.destinations"
+                    :recoveryDestinations="formData.recovery_destinations"
                     :formattedDestinations="getFormattedDestinations"
+                    :destinationObjects="destinations"
                     :workflows="formData.workflows"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
                     @update:promqlCondition="updatePromqlCondition"
                     @update:destinations="updateDestinations"
+                    @update:recoveryDestinations="updateRecoveryDestinations"
                     @refresh:destinations="refreshDestinations"
                     @update:workflows="updateWorkflows"
                   />
@@ -420,6 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="anomalyStep2Ref"
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
+                  :stored-intervals="anomalyStoredIntervals"
                 />
               </div>
 
@@ -603,6 +615,7 @@ import AnomalyDataPreview from "@/components/anomaly_detection/AnomalyDataPrevie
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
+import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -693,6 +706,16 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
+
+    // §4.8: keyed off the config API's notice_class field alone.
+    const anomalyNoticeBadge = computed(() => {
+      const keys = anomalyNoticeBadgeKeys(alertForm.anomalyConfig.value.notice_class);
+      return keys ? { label: alertForm.t(keys.labelKey as any) } : null;
+    });
+    const anomalyNoticeTooltip = computed(() => {
+      const keys = anomalyNoticeBadgeKeys(alertForm.anomalyConfig.value.notice_class);
+      return raw(keys ? keys.tooltipKeys.map((k) => alertForm.t(k as any)).join(" ") : "");
+    });
     const isCompositeMode = computed(() => alertForm.formData.value.is_real_time === "composite");
     const availableCompositeChildren = ref<any[]>([]);
 
@@ -898,6 +921,8 @@ export default defineComponent({
       alertAutoName,
       headerModeLabel,
       isAnomalyDetectionEnabled,
+      anomalyNoticeBadge,
+      anomalyNoticeTooltip,
       alertTypeOptions,
       alertTabs,
       activeFolderName,

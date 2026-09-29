@@ -48,28 +48,79 @@ const SPAN_KIND_CLIENT: i32 = 3;
 const SPAN_KIND_PRODUCER: i32 = 4;
 const SPAN_KIND_CONSUMER: i32 = 5;
 
-const PEER_HOST_KEYS: [&str; 3] = ["server.address", "net.peer.name", "http.host"];
-const PEER_ADDR_KEYS: [&str; 4] = [
-    "peer.address",
-    "net.peer.ip",
-    "network.peer.address",
-    "net.sock.peer.addr",
+/// An attribute name in every spelling a lookup probes, written once so no probe allocates.
+#[derive(Debug)]
+pub struct AttrKey {
+    pub(crate) dotted: &'static str,
+    pub(crate) flat: &'static str,
+    pub(crate) service_dotted: &'static str,
+    pub(crate) service_flat: &'static str,
+}
+
+macro_rules! attr_key {
+    ($dotted:literal, $flat:literal) => {
+        AttrKey {
+            dotted: $dotted,
+            flat: $flat,
+            service_dotted: concat!("service_", $dotted),
+            service_flat: concat!("service_", $flat),
+        }
+    };
+}
+
+const SERVER_ADDRESS: AttrKey = attr_key!("server.address", "server_address");
+const SERVER_PORT: AttrKey = attr_key!("server.port", "server_port");
+const NET_PEER_NAME: AttrKey = attr_key!("net.peer.name", "net_peer_name");
+const NET_PEER_IP: AttrKey = attr_key!("net.peer.ip", "net_peer_ip");
+const NET_PEER_PORT: AttrKey = attr_key!("net.peer.port", "net_peer_port");
+const NET_SOCK_PEER_ADDR: AttrKey = attr_key!("net.sock.peer.addr", "net_sock_peer_addr");
+const NETWORK_PEER_ADDRESS: AttrKey = attr_key!("network.peer.address", "network_peer_address");
+const PEER_ADDRESS: AttrKey = attr_key!("peer.address", "peer_address");
+const HTTP_HOST: AttrKey = attr_key!("http.host", "http_host");
+const NET_HOST_NAME: AttrKey = attr_key!("net.host.name", "net_host_name");
+const NET_HOST_PORT: AttrKey = attr_key!("net.host.port", "net_host_port");
+const NET_HOST_IP: AttrKey = attr_key!("net.host.ip", "net_host_ip");
+const NET_SOCK_HOST_ADDR: AttrKey = attr_key!("net.sock.host.addr", "net_sock_host_addr");
+const NETWORK_LOCAL_ADDRESS: AttrKey = attr_key!("network.local.address", "network_local_address");
+const K8S_POD_IP: AttrKey = attr_key!("k8s.pod.ip", "k8s_pod_ip");
+const URL_FULL: AttrKey = attr_key!("url.full", "url_full");
+const HTTP_URL: AttrKey = attr_key!("http.url", "http_url");
+const PEER_SERVICE: AttrKey = attr_key!("peer.service", "peer_service");
+const DB_SYSTEM_NAME: AttrKey = attr_key!("db.system.name", "db_system_name");
+const DB_SYSTEM: AttrKey = attr_key!("db.system", "db_system");
+const DB_NAMESPACE: AttrKey = attr_key!("db.namespace", "db_namespace");
+const DB_NAME: AttrKey = attr_key!("db.name", "db_name");
+const MESSAGING_SYSTEM: AttrKey = attr_key!("messaging.system", "messaging_system");
+const MESSAGING_DESTINATION_NAME: AttrKey =
+    attr_key!("messaging.destination.name", "messaging_destination_name");
+const MESSAGING_DESTINATION: AttrKey = attr_key!("messaging.destination", "messaging_destination");
+const RPC_SYSTEM: AttrKey = attr_key!("rpc.system", "rpc_system");
+const RPC_SERVICE: AttrKey = attr_key!("rpc.service", "rpc_service");
+const HTTP_REQUEST_METHOD: AttrKey = attr_key!("http.request.method", "http_request_method");
+const HTTP_METHOD: AttrKey = attr_key!("http.method", "http_method");
+
+const PEER_HOST_KEYS: [AttrKey; 3] = [SERVER_ADDRESS, NET_PEER_NAME, HTTP_HOST];
+const PEER_ADDR_KEYS: [AttrKey; 4] = [
+    PEER_ADDRESS,
+    NET_PEER_IP,
+    NETWORK_PEER_ADDRESS,
+    NET_SOCK_PEER_ADDR,
 ];
-const PEER_PORT_KEYS: [&str; 2] = ["server.port", "net.peer.port"];
-const PEER_IP_KEYS: [&str; 5] = [
-    "net.peer.ip",
-    "network.peer.address",
-    "net.sock.peer.addr",
-    "peer.address",
-    "server.address",
+const PEER_PORT_KEYS: [AttrKey; 2] = [SERVER_PORT, NET_PEER_PORT];
+const PEER_IP_KEYS: [AttrKey; 5] = [
+    NET_PEER_IP,
+    NETWORK_PEER_ADDRESS,
+    NET_SOCK_PEER_ADDR,
+    PEER_ADDRESS,
+    SERVER_ADDRESS,
 ];
-const SELF_HOST_KEYS: [&str; 3] = ["server.address", "net.host.name", "http.host"];
-const SELF_PORT_KEYS: [&str; 2] = ["server.port", "net.host.port"];
-const SELF_IP_KEYS: [&str; 4] = [
-    "k8s.pod.ip",
-    "net.host.ip",
-    "net.sock.host.addr",
-    "network.local.address",
+const SELF_HOST_KEYS: [AttrKey; 3] = [SERVER_ADDRESS, NET_HOST_NAME, HTTP_HOST];
+const SELF_PORT_KEYS: [AttrKey; 2] = [SERVER_PORT, NET_HOST_PORT];
+const SELF_IP_KEYS: [AttrKey; 4] = [
+    K8S_POD_IP,
+    NET_HOST_IP,
+    NET_SOCK_HOST_ADDR,
+    NETWORK_LOCAL_ADDRESS,
 ];
 
 /// An uninstrumented dependency inferred from a span's peer attributes.
@@ -148,28 +199,28 @@ where
 
     // Look up by semconv (dotted) name, falling back to the flattened
     // (underscore) form; blank values are treated as absent.
-    let attr = |key: &str| -> Option<String> {
-        get_attr(key)
-            .or_else(|| get_attr(&key.replace('.', "_")))
+    let attr = |key: &AttrKey| -> Option<String> {
+        get_attr(key.dotted)
+            .or_else(|| get_attr(key.flat))
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty())
     };
 
     // Host-like attributes may carry ports and IPs; strip the port and drop
     // bare IPs so they never become entity names.
-    let host_attr = |key: &str| -> Option<String> {
+    let host_attr = |key: &AttrKey| -> Option<String> {
         attr(key)
             .map(|v| strip_port(&v).to_string())
             .filter(|host| !host.is_empty() && !is_ip_address(host))
     };
 
     let fallback_host = || {
-        host_attr("server.address")
-            .or_else(|| host_attr("net.peer.name"))
-            .or_else(|| host_attr("http.host"))
+        host_attr(&SERVER_ADDRESS)
+            .or_else(|| host_attr(&NET_PEER_NAME))
+            .or_else(|| host_attr(&HTTP_HOST))
             .or_else(|| {
-                attr("url.full")
-                    .or_else(|| attr("http.url"))
+                attr(&URL_FULL)
+                    .or_else(|| attr(&HTTP_URL))
                     .and_then(|u| url::Url::parse(&u).ok())
                     .and_then(|u| match u.host() {
                         Some(url::Host::Domain(d)) => Some(d.to_string()),
@@ -179,11 +230,11 @@ where
     };
 
     // Explicit peer.service overrides every naming rule.
-    let peer_service = attr("peer.service");
+    let peer_service = attr(&PEER_SERVICE);
 
     // database
-    let db_system = attr("db.system.name").or_else(|| attr("db.system"));
-    let db_name = attr("db.namespace").or_else(|| attr("db.name"));
+    let db_system = attr(&DB_SYSTEM_NAME).or_else(|| attr(&DB_SYSTEM));
+    let db_name = attr(&DB_NAMESPACE).or_else(|| attr(&DB_NAME));
     if db_system.is_some() || db_name.is_some() {
         let name = peer_service
             .or(db_name)
@@ -197,8 +248,8 @@ where
     }
 
     // queue
-    let messaging_system = attr("messaging.system");
-    let destination = attr("messaging.destination.name").or_else(|| attr("messaging.destination"));
+    let messaging_system = attr(&MESSAGING_SYSTEM);
+    let destination = attr(&MESSAGING_DESTINATION_NAME).or_else(|| attr(&MESSAGING_DESTINATION));
     if messaging_system.is_some() || destination.is_some() {
         let name = peer_service
             .or(destination)
@@ -212,8 +263,8 @@ where
     }
 
     // rpc
-    let rpc_system = attr("rpc.system");
-    let rpc_service = attr("rpc.service");
+    let rpc_system = attr(&RPC_SYSTEM);
+    let rpc_service = attr(&RPC_SERVICE);
     if rpc_system.is_some() || rpc_service.is_some() {
         let name = peer_service
             .or(rpc_service)
@@ -228,10 +279,10 @@ where
 
     // external (http or generic network peer)
     let name = peer_service.or_else(fallback_host)?;
-    let is_http = attr("http.request.method")
-        .or_else(|| attr("http.method"))
-        .or_else(|| attr("url.full"))
-        .or_else(|| attr("http.url"))
+    let is_http = attr(&HTTP_REQUEST_METHOD)
+        .or_else(|| attr(&HTTP_METHOD))
+        .or_else(|| attr(&URL_FULL))
+        .or_else(|| attr(&HTTP_URL))
         .is_some();
     Some(InferredService {
         name,
@@ -241,9 +292,9 @@ where
 }
 
 /// Peer join keys of a CLIENT/PRODUCER span: host chain, url host, then `PEER_ADDR_KEYS`.
-pub fn derive_peer_keys<F>(span_kind: i32, get_attr: F) -> Option<PeerKeys>
+pub(crate) fn derive_peer_keys<F>(span_kind: i32, get_attr: F) -> Option<PeerKeys>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&AttrKey) -> Option<String>,
 {
     if span_kind != SPAN_KIND_CLIENT && span_kind != SPAN_KIND_PRODUCER {
         return None;
@@ -261,9 +312,9 @@ where
 }
 
 /// Self join keys of a SERVER/CONSUMER span; `get_attr` must also resolve resource attributes.
-pub fn derive_self_keys<F>(span_kind: i32, get_attr: F) -> Option<SelfKeys>
+pub(crate) fn derive_self_keys<F>(span_kind: i32, get_attr: F) -> Option<SelfKeys>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&AttrKey) -> Option<String>,
 {
     if span_kind != SPAN_KIND_SERVER && span_kind != SPAN_KIND_CONSUMER {
         return None;
@@ -277,19 +328,18 @@ where
     (key.is_some() || port.is_some() || ip.is_some()).then_some(SelfKeys { key, port, ip })
 }
 
-fn lookup<F>(get_attr: &F, key: &str) -> Option<String>
+fn lookup<F>(get_attr: &F, key: &AttrKey) -> Option<String>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&AttrKey) -> Option<String>,
 {
     get_attr(key)
-        .or_else(|| get_attr(&key.replace('.', "_")))
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
 }
 
-fn first_host_key<F>(get_attr: &F, keys: &[&str]) -> Option<HostKey>
+fn first_host_key<F>(get_attr: &F, keys: &[AttrKey]) -> Option<HostKey>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&AttrKey) -> Option<String>,
 {
     keys.iter()
         .find_map(|key| lookup(get_attr, key).and_then(|value| normalize_host(&value)))
@@ -298,9 +348,9 @@ where
 // IP hosts are kept here, unlike in the display-name chain
 fn url_host_key<F>(get_attr: &F) -> Option<HostKey>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&AttrKey) -> Option<String>,
 {
-    let raw = lookup(get_attr, "url.full").or_else(|| lookup(get_attr, "http.url"))?;
+    let raw = lookup(get_attr, &URL_FULL).or_else(|| lookup(get_attr, &HTTP_URL))?;
     let parsed = url::Url::parse(&raw).ok()?;
     let host = match parsed.host()? {
         url::Host::Domain(domain) => domain.to_string(),
@@ -326,9 +376,9 @@ fn url_authority(raw: &str) -> Option<&str> {
     )
 }
 
-fn first_ip_key<F>(get_attr: &F, keys: &[&str]) -> Option<String>
+fn first_ip_key<F>(get_attr: &F, keys: &[AttrKey]) -> Option<String>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&AttrKey) -> Option<String>,
 {
     keys.iter().find_map(|key| {
         lookup(get_attr, key)
@@ -339,9 +389,9 @@ where
 }
 
 // a present explicit attribute wins even when invalid, so a bad port omits the column
-fn resolve_port<F>(get_attr: &F, keys: &[&str], host: Option<&HostKey>) -> Option<i64>
+fn resolve_port<F>(get_attr: &F, keys: &[AttrKey], host: Option<&HostKey>) -> Option<i64>
 where
-    F: Fn(&str) -> Option<String>,
+    F: Fn(&AttrKey) -> Option<String>,
 {
     match keys.iter().find_map(|key| lookup(get_attr, key)) {
         Some(explicit) => parse_port(&explicit),
@@ -414,7 +464,9 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        derive_peer_keys(span_kind, |key| map.get(key).cloned())
+        derive_peer_keys(span_kind, |key| {
+            map.get(key.dotted).or_else(|| map.get(key.flat)).cloned()
+        })
     }
 
     fn self_keys(span_kind: i32, attrs: &[(&str, &str)]) -> Option<SelfKeys> {
@@ -422,7 +474,58 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        derive_self_keys(span_kind, |key| map.get(key).cloned())
+        derive_self_keys(span_kind, |key| {
+            map.get(key.dotted).or_else(|| map.get(key.flat)).cloned()
+        })
+    }
+
+    #[test]
+    fn test_attr_key_spellings_match_their_dotted_name() {
+        let keys = [
+            SERVER_ADDRESS,
+            SERVER_PORT,
+            NET_PEER_NAME,
+            NET_PEER_IP,
+            NET_PEER_PORT,
+            NET_SOCK_PEER_ADDR,
+            NETWORK_PEER_ADDRESS,
+            PEER_ADDRESS,
+            HTTP_HOST,
+            NET_HOST_NAME,
+            NET_HOST_PORT,
+            NET_HOST_IP,
+            NET_SOCK_HOST_ADDR,
+            NETWORK_LOCAL_ADDRESS,
+            K8S_POD_IP,
+            URL_FULL,
+            HTTP_URL,
+            PEER_SERVICE,
+            DB_SYSTEM_NAME,
+            DB_SYSTEM,
+            DB_NAMESPACE,
+            DB_NAME,
+            MESSAGING_SYSTEM,
+            MESSAGING_DESTINATION_NAME,
+            MESSAGING_DESTINATION,
+            RPC_SYSTEM,
+            RPC_SERVICE,
+            HTTP_REQUEST_METHOD,
+            HTTP_METHOD,
+        ];
+        let tables = PEER_HOST_KEYS
+            .iter()
+            .chain(&PEER_ADDR_KEYS)
+            .chain(&PEER_PORT_KEYS)
+            .chain(&PEER_IP_KEYS)
+            .chain(&SELF_HOST_KEYS)
+            .chain(&SELF_PORT_KEYS)
+            .chain(&SELF_IP_KEYS);
+        for key in keys.iter().chain(tables) {
+            let flat = key.dotted.replace('.', "_");
+            assert_eq!(key.flat, flat, "{}", key.dotted);
+            assert_eq!(key.service_dotted, format!("service_{}", key.dotted));
+            assert_eq!(key.service_flat, format!("service_{flat}"));
+        }
     }
 
     fn peer_key(attrs: &[(&str, &str)]) -> Option<String> {
@@ -1117,11 +1220,14 @@ mod tests {
                 HashMap::from([("net.host.name".to_string(), "pod-7".to_string())]);
             let resource: HashMap<String, String> =
                 HashMap::from([(resource_key.to_string(), "10.42.0.7".to_string())]);
-            let keys = derive_self_keys(SPAN_KIND_SERVER, |key| {
+            let probe = |key: &str| {
                 span.get(key)
                     .or_else(|| resource.get(key))
                     .or_else(|| resource.get(&format!("service_{key}")))
                     .cloned()
+            };
+            let keys = derive_self_keys(SPAN_KIND_SERVER, |key| {
+                probe(key.dotted).or_else(|| probe(key.flat))
             })
             .unwrap();
             assert_eq!(keys.key.as_deref(), Some("pod-7"));

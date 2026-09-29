@@ -173,9 +173,9 @@ describe("PrebuiltDestinationForm - rendering per type", () => {
     expect(wrapper.find('[data-test="servicenow-password-input"]').exists()).toBe(true);
   });
 
-  it("renders email recipients input", () => {
+  it("renders email recipients select", () => {
     wrapper = mountComp({ destinationType: "email" });
-    expect(wrapper.find('[data-test="email-recipients-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="email-recipients-select"]').exists()).toBe(true);
   });
 
   it("keeps type=password on sensitive inputs", () => {

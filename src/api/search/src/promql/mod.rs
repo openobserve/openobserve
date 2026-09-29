@@ -1088,7 +1088,7 @@ async fn labels(
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
     summary = "Get label values",
-    description = "Returns all possible values for a specific label name within the specified time range. Optionally filter by series selector to get values for specific metrics. Essential for building filters and understanding label cardinality.",
+    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to identify a metric; requests without a metric return 400 because querying all metrics streams is unsupported.",
     security(
         ("Authorization"= [])
     ),
@@ -1107,6 +1107,7 @@ async fn labels(
                "prometheus"
             ]
         })),
+        (status = 400, description = "Invalid parameters or match[] does not identify a metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1164,18 +1165,19 @@ pub async fn label_values(
         start,
         end,
     } = req;
-    let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
-        Ok(v) => v,
-        Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
-                    e, None,
-                )),
-            )
-                .into_response();
-        }
-    };
+    let (selector, start, end) =
+        match validate_label_values_params(&label_name, matcher, start, end) {
+            Ok(v) => v,
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e, None,
+                    )),
+                )
+                    .into_response();
+            }
+        };
     match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
         Ok(resp) => (
             StatusCode::OK,
@@ -1196,6 +1198,19 @@ pub async fn label_values(
     }
 }
 
+fn validate_label_values_params(
+    label_name: &str,
+    matcher: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
+    let (selector, start, end) = validate_metadata_params(matcher, start, end)?;
+    if label_name != config::meta::promql::NAME_LABEL {
+        metrics::prom::label_values_metric_name(selector.as_ref()).map_err(|e| e.to_string())?;
+    }
+    Ok((selector, start, end))
+}
+
 fn validate_metadata_params(
     matcher: Option<String>,
     start: Option<String>,
@@ -1210,13 +1225,8 @@ fn validate_metadata_params(
                 return Err(err);
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
-                let err = if sel.name.is_none()
-                    && sel
-                        .matchers
-                        .find_matchers(config::meta::promql::NAME_LABEL)
-                        .is_empty()
-                {
-                    Some("match[] argument must start with a metric name, e.g. `match[]=up`")
+                let err = if metrics::prom::try_into_metric_name(&sel).is_none() {
+                    Some("match[] must specify a metric name or a non-empty exact __name__ matcher")
                 } else if sel.offset.is_some() {
                     Some("match[]: unexpected offset modifier")
                 } else if sel.at.is_some() {
@@ -1726,7 +1736,98 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 mod tests {
     use super::*;
 
-    // --- search_timeout ---
+    #[test]
+    fn test_validate_label_values_params() {
+        assert!(validate_label_values_params("__name__", None, None, None).is_ok());
+        assert!(validate_label_values_params("job", None, None, None).is_err());
+        for matcher in [
+            "",
+            r#"{job="prometheus"}"#,
+            r#"{__name__=~"up.*"}"#,
+            r#"{__name__!="up",job="prometheus"}"#,
+            r#"{__name__!~"up.*",job="prometheus"}"#,
+            r#"{__name__="",job="prometheus"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_err(),
+                "{matcher}"
+            );
+        }
+        for matcher in [
+            "up",
+            r#"{__name__="up"}"#,
+            r#"up{job="prometheus" or job="other"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_ok(),
+                "{matcher}"
+            );
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_label_values_missing_metric_returns_bad_request() {
+        let response = label_values(
+            Path(("default".to_owned(), "job".to_owned())),
+            Query(config::meta::promql::RequestLabelValues {
+                matcher: None,
+                start: None,
+                end: None,
+            }),
+            Headers(UserEmail {
+                user_id: "test@example.com".to_owned(),
+            }),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["status"], "error");
+        assert_eq!(body["errorType"], "bad_data");
+        assert!(body["error"].as_str().unwrap().contains("match[]"));
+    }
+
+    #[test]
+    fn test_validate_metadata_params_rejects_non_exact_metric_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+            r#"{job="x"}"#,
+        ] {
+            let err = validate_metadata_params(Some(query.to_string()), None, None).unwrap_err();
+            assert_eq!(
+                err, "match[] must specify a metric name or a non-empty exact __name__ matcher",
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_metadata_params_accepts_exact_metric_names() {
+        for query in ["up", r#"up{job="x"}"#, r#"{__name__="up",job="x"}"#] {
+            let (selector, ..) =
+                validate_metadata_params(Some(query.to_string()), None, None).unwrap();
+            assert_eq!(
+                selector
+                    .as_ref()
+                    .and_then(metrics::prom::try_into_metric_name),
+                Some("up".to_string()),
+                "{query}"
+            );
+        }
+        assert!(
+            validate_metadata_params(None, None, None)
+                .unwrap()
+                .0
+                .is_none()
+        );
+    }
 
     #[test]
     fn test_search_timeout_none() {

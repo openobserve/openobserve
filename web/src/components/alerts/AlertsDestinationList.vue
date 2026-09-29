@@ -608,7 +608,7 @@ export default defineComponent({
     const getDestinations = (force = false) => {
       const org = store.state.selectedOrganization.identifier;
       // Only a cold read spins and toasts — the rows stay put on a refresh.
-      const warm = queryClient.getQueryData(destinationKeys.list(org, "alert")) !== undefined;
+      const warm = queryClient.getQueryData(destinationKeys.list(org, "alert", true)) !== undefined;
       const dismiss = warm
         ? () => {}
         : toast({
@@ -617,7 +617,8 @@ export default defineComponent({
             timeout: 0,
           });
 
-      const options = destinationsQuery(org, "alert");
+      // includeUsage=true: same key loadDepGraph asks for below, so the two share one request.
+      const options = destinationsQuery(org, "alert", true);
       const applyRows = (list: any[]) => {
         const rows = list.filter(
           (destination: any) => destination.type == "http" || destination.type == "email",

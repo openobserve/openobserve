@@ -295,7 +295,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
-import oncallService from "@/services/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 export interface Variable {
@@ -422,10 +423,9 @@ export default defineComponent({
     onMounted(async () => {
       if (!oncallEnabled.value) return;
       try {
-        const res = await oncallService.listTeams({
-          org_identifier: store.state.selectedOrganization.identifier,
-        });
-        oncallTeams.value = res.data ?? [];
+        oncallTeams.value = await queryClient.fetchQuery(
+          oncallTeamsQuery(store.state.selectedOrganization.identifier),
+        );
       } catch {
         oncallTeams.value = [];
       }

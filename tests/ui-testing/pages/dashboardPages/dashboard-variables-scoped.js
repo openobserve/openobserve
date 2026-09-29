@@ -4,6 +4,7 @@
 
 import { expect } from "@playwright/test";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import testLogger from "../../playwright-tests/utils/test-logger.js";
 import {
   SELECTORS,
   getVariableSelector,
@@ -2691,6 +2692,8 @@ export default class DashboardVariablesScoped {
   async openDashboardRefreshOptions() {
     const trigger = this.page.locator('[data-test="dashboard-refresh-options-btn"]');
     await trigger.waitFor({ state: "visible", timeout: 15000 });
+    // Disabled while any panel is loading.
+    await expect(trigger).toBeEnabled({ timeout: 30000 });
     await trigger.click();
   }
 
@@ -2709,9 +2712,19 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<URL>}
    */
   async clickRefreshWithoutCacheAndWaitForClearCache() {
-    await this.openDashboardRefreshOptions();
     const item = this.getRefreshWithoutCacheMenuItem();
-    await item.waitFor({ state: "visible", timeout: 10000 });
+    const openItem = async () => {
+      await this.openDashboardRefreshOptions();
+      await item.waitFor({ state: "visible", timeout: 10000 });
+    };
+    // Reka UI dropdowns can drop a click that lands mid-animation — retry once.
+    try {
+      await openItem();
+    } catch {
+      await this.page.keyboard.press("Escape");
+      await item.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+      await openItem();
+    }
 
     const [request] = await Promise.all([
       this.page.waitForRequest(
@@ -2756,21 +2769,88 @@ export default class DashboardVariablesScoped {
       await kebab.click();
       await item.waitFor({ state: "visible", timeout: 10000 });
     };
-    try {
-      await openItem();
-    } catch {
-      await this.page.keyboard.press("Escape");
-      await openItem();
-    }
+    const clickAndWaitForClearCache = async (timeout) => {
+      try {
+        await openItem();
+      } catch {
+        await this.page.keyboard.press("Escape");
+        await openItem();
+      }
+      const [request] = await Promise.all([
+        this.page.waitForRequest(
+          (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
+          { timeout }
+        ),
+        item.click(),
+      ]);
+      return new URL(request.url());
+    };
 
-    const [request] = await Promise.all([
-      this.page.waitForRequest(
-        (req) => req.url().includes("_search_stream") && req.url().includes("clear_cache=true"),
-        { timeout: 30000 }
-      ),
-      item.click(),
-    ]);
-    return new URL(request.url());
+    try {
+      return await clickAndWaitForClearCache(15000);
+    } catch {
+      // onRefreshPanel() silently ignores the request while the panel is still loading.
+      testLogger.warn(`Panel "${title}" ignored Refresh Cache & Reload, retrying once idle`);
+      await this.page.keyboard.press("Escape");
+      await this.waitForPanelIdle(title);
+      return await clickAndWaitForClearCache(30000);
+    }
+  }
+
+  /**
+   * Locator for a panel container by its title.
+   * @param {string} title - Panel title
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelContainerByTitle(title) {
+    return this.page.locator(`${SELECTORS.PANEL_CONTAINER}[data-test-panel-title="${title}"]`);
+  }
+
+  /**
+   * Wait until the titled panel has no query in flight and stays that way for `stableMs`.
+   * @param {string} title - Panel title
+   * @param {{ timeout?: number, stableMs?: number }} [options]
+   */
+  async waitForPanelIdle(title, { timeout = 30000, stableMs = 2000 } = {}) {
+    const container = this.getPanelContainerByTitle(title);
+    await container.waitFor({ state: "visible", timeout });
+    // The panel's own refresh button is bound to :disabled="isPanelLoading".
+    const btn = container.locator(SELECTORS.PANEL_REFRESH_BTN);
+    const deadline = Date.now() + timeout;
+    let idleSince = null;
+    // A freshly mounted panel reads idle before its first query starts, so idle must hold.
+    while (idleSince === null || Date.now() - idleSince < stableMs) {
+      if (Date.now() > deadline) {
+        throw new Error(`Panel "${title}" did not settle within ${timeout}ms`);
+      }
+      const enabled = await btn.isEnabled().catch(() => false);
+      if (!enabled) idleSince = null;
+      else if (idleSince === null) idleSince = Date.now();
+      await this.page.waitForTimeout(250);
+    }
+  }
+
+  /**
+   * Record the panel_id of every search request fired during `action` plus `settleMs`.
+   * @param {() => Promise<void>} action
+   * @param {number} [settleMs=3000]
+   * @returns {Promise<string[]>} panel ids, one entry per request
+   */
+  async capturePanelQueryIds(action, settleMs = 3000) {
+    const panelIds = [];
+    const onRequest = (req) => {
+      const url = new URL(req.url());
+      const panelId = url.searchParams.get("panel_id");
+      if (url.pathname.includes("_search") && panelId) panelIds.push(panelId);
+    };
+    this.page.on("request", onRequest);
+    try {
+      await action();
+      await this.page.waitForTimeout(settleMs);
+    } finally {
+      this.page.off("request", onRequest);
+    }
+    return panelIds;
   }
 
   /**
@@ -2780,6 +2860,7 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<URL>}
    */
   async clickDashboardRefreshAndWaitForSearch() {
+    await expect(this.page.locator(SELECTORS.REFRESH_BTN)).toBeEnabled({ timeout: 30000 });
     const [request] = await Promise.all([
       this.page.waitForRequest(
         (req) => req.url().includes("_search_stream"),
@@ -2788,5 +2869,119 @@ export default class DashboardVariablesScoped {
       this.clickDashboardRefresh(),
     ]);
     return new URL(request.url());
+  }
+
+  /**
+   * Get the "Select All"/"All" separator inside a variable's popover. The master
+   * row renders above this divider only while the values query has populated options.
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectAllSeparatorLocator(variableName) {
+    return this.getVariablePopoverLocator(variableName).locator(
+      '[data-test="dashboard-variable-all-separator"]'
+    );
+  }
+
+  /**
+   * Get the multi-select "Select All" master checkbox. It is the only
+   * `role="checkbox"` in the popover: the master row lives in OSelect's
+   * #before-options slot above the option list, and each option renders an
+   * aria-hidden indicator rather than a real checkbox.
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectAllCheckboxLocator(variableName) {
+    return this.getVariablePopoverLocator(variableName).locator('[role="checkbox"]');
+  }
+
+  /**
+   * Get the single-select "All" master row (plain text, no checkbox) inside a
+   * variable's popover.
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableAllTextLocator(variableName) {
+    return this.getVariablePopoverLocator(variableName).getByText("All", { exact: true });
+  }
+
+  /**
+   * Open a variable's dropdown and wait for its "Select All"/"All" master row to
+   * render (the separator below it turns visible once options hydrate). Retries the
+   * open because freshly-ingested values can lag indexing, and the master row is
+   * gated on options existing.
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Options
+   * @param {number} options.timeout - Overall budget in ms (default: 30000)
+   */
+  async openVariableSelectAllDropdown(variableName, options = {}) {
+    const { timeout = 30000 } = options;
+    const trigger = this.getVariableTriggerLocator(variableName);
+    const popover = this.getVariablePopoverLocator(variableName);
+    const separator = this.getVariableSelectAllSeparatorLocator(variableName);
+
+    await expect
+      .poll(
+        async () => {
+          if (await separator.isVisible().catch(() => false)) return true;
+          if (!(await popover.isVisible().catch(() => false))) {
+            await trigger.click().catch(() => {});
+          }
+          await popover.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+          return await separator.isVisible().catch(() => false);
+        },
+        { timeout, intervals: [500, 1000, 1500, 2000, 2000] }
+      )
+      .toBe(true);
+  }
+
+  /**
+   * Toggle the multi-select "Select All" master row (selects all, or clears
+   * when already all-selected). Clicks the row text rather than the OCheckbox
+   * button: the checkbox is a controlled visual indicator whose own click does
+   * not toggle back off (the parent div's @click.stop=toggleSelectAll is the
+   * handler that actually toggles both ways).
+   * @param {string} variableName - Variable name
+   */
+  async toggleVariableSelectAll(variableName) {
+    await this.getVariablePopoverLocator(variableName)
+      .getByText("Select All", { exact: true })
+      .click();
+  }
+
+  /**
+   * Click the single-select "All" master row.
+   * @param {string} variableName - Variable name
+   */
+  async clickVariableAll(variableName) {
+    await this.getVariableAllTextLocator(variableName).click();
+  }
+
+  /**
+   * Individually select every option in an open multi-select variable's popover,
+   * skipping any already checked (a fresh query_values variable pre-selects its
+   * first option). Multi-select defers the model emit to popup-hide, so the popover
+   * stays open and each click just toggles that option's checkbox.
+   * @param {string} variableName - Variable name
+   */
+  async selectEveryOptionIndividually(variableName) {
+    const options = this.getVariableInnerOption(variableName);
+    const count = await options.count();
+    for (let i = 0; i < count; i++) {
+      const option = options.nth(i);
+      const isChecked = (await option.locator('[data-select-checkbox] svg').count()) > 0;
+      if (!isChecked) {
+        await option.click();
+      }
+    }
+  }
+
+  /**
+   * Click a single option in an open multi-select variable's popover by index.
+   * @param {string} variableName - Variable name
+   * @param {number} index - 0-based option index
+   */
+  async clickVariableOptionByIndex(variableName, index) {
+    await this.getVariableInnerOption(variableName).nth(index).click();
   }
 }

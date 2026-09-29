@@ -80,14 +80,25 @@ describe("W6 server metrics section wiring", () => {
   it("labels both vantages in the markup", () => {
     expect(page).toContain("dbm.detail.serverMetrics.subtitle");
     expect(page).toContain("dbm.detail.serverMetrics.clientSubtitle");
-    expect(messages.dbm.detail.serverMetrics.subtitle).toBe("Server-side — all clients");
-    // The client label carries the NFR-5 standing disclosure: client-vantage
-    // figures cover completed calls only. Stated always, not as a conditional
-    // insight card — the bias is always true, so a heuristic must not gate it.
-    expect(messages.dbm.detail.serverMetrics.clientSubtitle).toBe(
-      "Client-observed — instrumented callers only, finished calls only. " +
-        "A query still running, or one that hung, isn't in these numbers.",
+    expect(messages.dbm.detail.serverMetrics.subtitle).toBe(
+      "From your database — every app that connects",
     );
+    // The client label carries the NFR-5 standing disclosure: trace figures
+    // cover completed calls. Stated always, not as a conditional insight card —
+    // the bias is always true, so a heuristic must not gate it.
+    expect(messages.dbm.detail.serverMetrics.clientSubtitle).toBe(
+      "Marked figures are measured from your application's traces — the calls your apps completed in this window",
+    );
+    expect(messages.dbm.detail.serverMetrics.clientSubtitle).not.toMatch(/client-observed/i);
+  });
+
+  /** The trace tiles carry the app-source glyph, keyed by the legend above them. */
+  it("marks the trace tiles and keys the glyph with a visible legend", () => {
+    expect(page).toContain(":label=\"t('dbm.detail.serverMetrics.clientSubtitle')\"");
+    expect(page).toContain("<DbmAppSourceLegend");
+    expect(page).toContain('v-if="tile.fromApp"');
+    expect(page).toContain('fromApp: databaseTime.value.source === "client"');
+    expect(page).toContain('fromApp: callCount.value.source === "client"');
   });
 
   /**

@@ -85,6 +85,7 @@ pub fn incr_stream_stats(key: &str, val: &FileMeta) -> Result<(), anyhow::Error>
     stats.storage_size += val.original_size as f64;
     stats.compressed_size += val.compressed_size as f64;
     stats.index_size += val.index_size as f64;
+    stats.mindex_size += val.mindex_size as f64;
 
     Ok(())
 }
@@ -110,6 +111,7 @@ mod tests {
             storage_size: 200.0,
             compressed_size: 3.0,
             index_size: 120000.0,
+            mindex_size: 0.0,
         };
 
         set_stream_stats("nexus", "default", StreamType::Logs, val.clone());
@@ -131,6 +133,7 @@ mod tests {
             storage_size: 200.0,
             compressed_size: 3.0,
             index_size: 120000.0,
+            mindex_size: 0.0,
         };
 
         set_stream_stats("nexus", "default", StreamType::Logs, val.clone());
@@ -187,5 +190,35 @@ mod tests {
             &meta,
         );
         assert!(result.is_ok());
+    }
+    #[test]
+    fn mindex_size_cache_tracks_separate_addition_and_deletion() {
+        let org = "mindex_cache_test";
+        let key = format!("files/{org}/metrics/m/2026/09/22/00/test.parquet");
+        incr_stream_stats(
+            &key,
+            &FileMeta {
+                records: 1,
+                index_size: 7,
+                mindex_size: 19,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let stats = get_stream_stats(org, "m", StreamType::Metrics);
+        assert_eq!((stats.index_size, stats.mindex_size), (7.0, 19.0));
+        incr_stream_stats(
+            &key,
+            &FileMeta {
+                records: -1,
+                index_size: -7,
+                mindex_size: -19,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let stats = get_stream_stats(org, "m", StreamType::Metrics);
+        assert_eq!((stats.index_size, stats.mindex_size), (0.0, 0.0));
+        remove_stream_stats(org, "m", StreamType::Metrics);
     }
 }
