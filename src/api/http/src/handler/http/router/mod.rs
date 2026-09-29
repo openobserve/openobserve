@@ -73,7 +73,9 @@ use crate::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
             validator_rum,
         },
-        router::middlewares::{blocked_orgs_middleware, password_policy_middleware},
+        router::middlewares::{
+            blocked_orgs_middleware, password_policy_middleware, root_only_middleware,
+        },
     },
 };
 
@@ -646,24 +648,7 @@ pub fn basic_routes() -> Router {
         .route("/invites/{token}", delete(users::decline_invitation));
     router = router.nest("/auth", auth_routes);
 
-    // Node routes with auth
-    let mut node_routes = Router::new()
-        .route("/status", get(status::cache_status))
-        .route("/enable", put(status::enable_node))
-        .route("/flush", put(status::flush_node))
-        .route("/reload", get(status::cache_reload))
-        .route("/list", get(status::list_node))
-        .route("/metrics", get(status::node_metrics));
-
-    #[cfg(feature = "enterprise")]
-    {
-        node_routes = node_routes.route("/drain_status", get(status::drain_status));
-    }
-
-    node_routes = node_routes
-        .route("/consistent_hash", post(status::consistent_hash))
-        .route("/refresh_nodes_list", get(status::refresh_nodes_list))
-        .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+    let node_routes = node_routes()
         // Listed first, so it wraps closer to the route and runs after authentication.
         .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware));
@@ -2173,6 +2158,26 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     outer
 }
 
+/// Root-only node management routes, before the authentication layers `basic_routes` adds.
+fn node_routes() -> Router {
+    let node_routes = Router::new()
+        .route("/status", get(status::cache_status))
+        .route("/enable", put(status::enable_node))
+        .route("/flush", put(status::flush_node))
+        .route("/reload", get(status::cache_reload))
+        .route("/list", get(status::list_node))
+        .route("/metrics", get(status::node_metrics));
+
+    #[cfg(feature = "enterprise")]
+    let node_routes = node_routes.route("/drain_status", get(status::drain_status));
+
+    node_routes
+        .route("/consistent_hash", post(status::consistent_hash))
+        .route("/refresh_nodes_list", get(status::refresh_nodes_list))
+        .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+        .layer(middleware::from_fn(root_only_middleware))
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
@@ -3256,6 +3261,42 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    fn node_request(user_id: &str) -> Request<Body> {
+        Request::builder()
+            .uri("/metrics")
+            .header("user_id", user_id)
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn node_routes_refuse_a_non_root_caller() {
+        let response = node_routes()
+            .oneshot(node_request("member@node-routes.test"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn node_routes_serve_the_root_user() {
+        let root = "root@node-routes.test";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
     }
 }
