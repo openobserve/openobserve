@@ -259,7 +259,8 @@
       "connectDataSourcePopup.spec.js",
       "otableSelectCell.spec.js",
       "theme.spec.js",
-      "passwordPolicy.spec.js"
+      "passwordPolicy.spec.js",
+      "ingestion-passcode-forbidden.spec.js"
     ],
     "disabled": []
   },
