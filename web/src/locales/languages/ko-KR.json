@@ -4090,6 +4090,7 @@
       "oracleTagline": "OpenTelemetry Collector로 Oracle DB 메트릭을 수집하고 OpenObserve로 전송하세요.",
       "otlpFixBody": "익스포터를 정의하는 것만으로는 충분하지 않습니다 — 파이프라인에 나열되어야 합니다. 올바르게 보이는 구성이 아무것도 보내지 않는 가장 흔한 이유입니다:",
       "otlpFixTitle": "익스포터가 실제로 파이프라인에 연결되어 있는지 확인",
+      "otlpGrpcCloudNote": "OpenObserve Cloud의 공개 gRPC 게이트웨이 — 많은 Span 볼륨에서 HTTP보다 오버헤드가 낮으며, 구성할 자체 호스팅 네트워킹이 없습니다.",
       "otlpGrpcNote": "높은 스팬 볼륨에서 HTTP보다 오버헤드가 낮습니다. 포트 5081은 컬렉터에서 도달 가능해야 합니다.",
       "otlpHttpNote": "OpenTelemetry Collector의 기본값 — 프록시 및 로드 밸런서 뒤를 포함한 모든 곳에서 작동합니다.",
       "otlpSdkEnvNote": "표준 OTEL_* 환경 변수 — 모든 OpenTelemetry SDK가 이를 읽으므로 코드 변경이 필요 없습니다.",
@@ -17977,7 +17978,34 @@
     },
     "samples": {
       "logOffTitle": "데이터베이스가 아직 느린 문장을 기록하지 않고 있습니다",
-      "logOffDescription": "이 호출들을 추적한 것이 없어 데이터베이스에 자체 가장 느린 문장을 요청했지만 로그가 없습니다. 이 목록은 PostgreSQL의 문장 로그(log_min_duration_statement)에서 가져오며 기본적으로 꺼져 있습니다 — 설정 카드의 로깅 단계에서 켭니다. 문장별 캡처는 현재 PostgreSQL 전용이므로 MySQL과 MariaDB는 아직 이 목록을 제공할 수 없습니다. 상위 쿼리는 카운터 테이블을 읽으므로 가장 많이 실행되는 것을 계속 보여줄 수 있습니다.",
+      "notCollecting": {
+        "description": "이 호출들을 추적한 것이 없어 데이터베이스에 자체 가장 느린 문장을 요청했지만 로그가 없습니다. 네 가지를 확인합니다.",
+        "checklistTitle": "확인한 항목",
+        "setUp": "문장 로깅 설정",
+        "checks": {
+          "queries": {
+            "ok": "쿼리 데이터가 도착하고 있습니다",
+            "okDetail": "{databases}에서 {queries} — Top queries 탭이 작동합니다",
+            "okDetailNoFleet": "{queries} — Top queries 탭이 작동합니다",
+            "no": "쿼리 데이터도 도착하지 않습니다",
+            "noDetail": "Top queries 탭부터 시작하세요 — 이 데이터베이스에서 아직 아무것도 도달하지 않았습니다."
+          },
+          "enabled": {
+            "ok": "데이터베이스 모니터링이 켜져 있습니다",
+            "okDetail": "이 조직에 대해",
+            "no": "데이터베이스 모니터링이 꺼져 있습니다",
+            "noDetail": "수집을 시작하려면 설정에서 켜세요."
+          },
+          "log": {
+            "no": "느린 문장이 기록되지 않고 있습니다",
+            "noDetail": "이 목록은 PostgreSQL의 문장 로그(log_min_duration_statement)에서 가져오며 기본적으로 꺼져 있습니다 — 설정 카드의 로깅 단계에서 켭니다."
+          },
+          "engines": {
+            "title": "현재는 PostgreSQL 전용",
+            "detail": "문장별 캡처는 현재 PostgreSQL 전용이므로 MySQL과 MariaDB는 아직 이 목록을 제공할 수 없습니다. 상위 쿼리는 카운터 테이블을 읽으므로 가장 많이 실행되는 것을 계속 보여줄 수 있습니다."
+          }
+        }
+      },
       "searchPlaceholder": "쿼리 텍스트, 서비스 또는 데이터베이스 검색…",
       "columns": {
         "query": "쿼리",
@@ -18431,6 +18459,7 @@
       "never": "없음",
       "countersCumulative": "스캔 및 진공 횟수는 마지막 통계 초기화 이후의 누적 총계이며 선택한 기간 동안의 횟수가 아닙니다.",
       "tuplesEstimated": "행 수와 블로트 백분율은 데이터베이스 엔진의 통계 추정치이지 정확한 수치가 아닙니다.",
+      "aboutNumbers": "이 수치에 대하여",
       "notCollectingTitle": "테이블 통계가 아직 없습니다",
       "notCollectingDescription": "이 시간 범위에서 테이블 통계를 보고한 항목이 없습니다. 이 신호는 별도의 수집기 레시피로 제공됩니다.",
       "engineUnsupportedTitle": "이 엔진에 대해 수집되지 않음",

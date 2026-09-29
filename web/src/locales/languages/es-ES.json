@@ -4090,6 +4090,7 @@
       "oracleTagline": "Recopile métricas de Oracle DB con el OpenTelemetry Collector y envíelas a OpenObserve.",
       "otlpFixBody": "Definir un exportador no es suficiente — debe estar listado en un pipeline. Esta es la razón más común por la que una configuración de aspecto correcto no envía nada:",
       "otlpFixTitle": "Verifica que el exportador esté realmente integrado en el pipeline",
+      "otlpGrpcCloudNote": "La puerta de enlace gRPC pública de OpenObserve Cloud: menor sobrecarga que HTTP para grandes volúmenes de spans, sin necesidad de configurar redes propias.",
       "otlpGrpcNote": "Menos sobrecarga que HTTP para volúmenes altos de spans. El puerto 5081 debe ser accesible desde el collector.",
       "otlpHttpNote": "El valor predeterminado para OpenTelemetry Collector — funciona en todas partes, incluso detrás de proxies y balanceadores de carga.",
       "otlpSdkEnvNote": "Variables de entorno OTEL_* estándar — todo SDK de OpenTelemetry las lee, por lo que no se necesita ningún cambio de código.",
@@ -17977,7 +17978,34 @@
     },
     "samples": {
       "logOffTitle": "Sus bases de datos aún no registran declaraciones lentas",
-      "logOffDescription": "Nada rastreó estas llamadas, así que preguntamos a las bases de datos por sus propias declaraciones más lentas — y no registran ninguna. Esta lista proviene del registro de declaraciones de PostgreSQL (log_min_duration_statement), que está desactivado por defecto — el paso de registro de la tarjeta de configuración lo activa. La captura por declaración actualmente es solo de PostgreSQL, por lo que MySQL y MariaDB no pueden alimentar esta lista aún. Las consultas principales pueden mostrarle qué se ejecuta más, porque leen las tablas de contadores en su lugar.",
+      "notCollecting": {
+        "description": "Nada rastreó estas llamadas, así que preguntamos a las bases de datos por sus propias declaraciones más lentas — y no registran ninguna. Comprobamos cuatro cosas.",
+        "checklistTitle": "Lo que comprobamos",
+        "setUp": "Configurar el registro de declaraciones",
+        "checks": {
+          "queries": {
+            "ok": "Tus datos de consulta están llegando",
+            "okDetail": "{queries} de {databases} — la pestaña de Consultas principales funciona",
+            "okDetailNoFleet": "{queries} — la pestaña de Consultas principales funciona",
+            "no": "Tampoco están llegando datos de consulta",
+            "noDetail": "Empieza con la pestaña de Consultas principales — nada nos está llegando de estas bases de datos todavía."
+          },
+          "enabled": {
+            "ok": "El monitoreo de bases de datos está activado",
+            "okDetail": "para esta organización",
+            "no": "El monitoreo de bases de datos está desactivado",
+            "noDetail": "Actívalo en Configuración para comenzar a recopilar."
+          },
+          "log": {
+            "no": "Las declaraciones lentas no se están registrando",
+            "noDetail": "Esta lista proviene del registro de declaraciones de PostgreSQL (log_min_duration_statement), que está desactivado por defecto — el paso de registro de la tarjeta de configuración lo activa."
+          },
+          "engines": {
+            "title": "Solo PostgreSQL, por ahora",
+            "detail": "La captura por declaración actualmente es solo de PostgreSQL, por lo que MySQL y MariaDB no pueden alimentar esta lista aún. Las consultas principales pueden mostrarle qué se ejecuta más, porque leen las tablas de contadores en su lugar."
+          }
+        }
+      },
       "searchPlaceholder": "Buscar texto de consulta, servicio o base de datos…",
       "columns": {
         "query": "Consulta",
@@ -18431,6 +18459,7 @@
       "never": "Nunca",
       "countersCumulative": "Los recuentos de escaneo y vacuum son totales de por vida desde el último restablecimiento de estadísticas, no recuentos del rango de tiempo seleccionado.",
       "tuplesEstimated": "Los recuentos de filas y el porcentaje de bloat son estimaciones estadísticas del motor de la base de datos, no recuentos exactos.",
+      "aboutNumbers": "Sobre estas cifras",
       "notCollectingTitle": "Aún no hay estadísticas de tabla",
       "notCollectingDescription": "Nada ha informado estadísticas de tabla en este rango de tiempo. Esta señal se envía como una receta de recopilador separada.",
       "engineUnsupportedTitle": "No recopilado para este motor",

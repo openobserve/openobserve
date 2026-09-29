@@ -4090,6 +4090,7 @@
       "oracleTagline": "使用 OpenTelemetry Collector 收集 Oracle DB 指标并将其发送到 OpenObserve。",
       "otlpFixBody": "仅定义导出器是不够的 — 它必须列在 pipeline 中。这是看起来正确的配置不发送任何内容的唯一最常见原因：",
       "otlpFixTitle": "检查导出器是否确实已接入 pipeline",
+      "otlpGrpcCloudNote": "OpenObserve Cloud 的公共 gRPC 网关 — 在高 Span 量下比 HTTP 开销更低，无需配置自托管网络。",
       "otlpGrpcNote": "对于高 span 量，比 HTTP 开销更低。端口 5081 必须可从收集器访问。",
       "otlpHttpNote": "OpenTelemetry Collector 的默认设置 — 适用于任何地方，包括代理和负载均衡器后面。",
       "otlpSdkEnvNote": "标准 OTEL_* 环境变量 — 每个 OpenTelemetry SDK 都会读取它们，因此无需更改代码。",
@@ -17977,7 +17978,34 @@
     },
     "samples": {
       "logOffTitle": "您的数据库尚未记录慢语句",
-      "logOffDescription": "目前没有追踪到这些调用，因此我们向数据库询问其自身最慢的语句——但它们没有记录任何内容。此列表来自 PostgreSQL 的语句日志（log_min_duration_statement），该日志默认关闭——设置卡中的日志记录步骤会将其打开。目前仅 PostgreSQL 支持按语句捕获，因此 MySQL 和 MariaDB 还无法提供此列表。热门查询仍然可以显示哪些内容运行最多，因为它改为读取计数器表。",
+      "notCollecting": {
+        "description": "目前没有追踪到这些调用，因此我们向数据库询问其自身最慢的语句——但它们没有记录任何内容。我们检查四件事。",
+        "checklistTitle": "我们检查了什么",
+        "setUp": "设置语句日志记录",
+        "checks": {
+          "queries": {
+            "ok": "您的查询数据正在到达",
+            "okDetail": "{queries} 来自 {databases} — 热门查询标签页工作正常",
+            "okDetailNoFleet": "{queries} — 热门查询标签页工作正常",
+            "no": "也没有查询数据到达",
+            "noDetail": "从热门查询标签页开始——这些数据库还没有任何数据到达我们。"
+          },
+          "enabled": {
+            "ok": "数据库监控已开启",
+            "okDetail": "对于此组织",
+            "no": "数据库监控已关闭",
+            "noDetail": "在设置中开启它以开始采集。"
+          },
+          "log": {
+            "no": "未记录慢语句",
+            "noDetail": "此列表来自 PostgreSQL 的语句日志（log_min_duration_statement），该日志默认关闭——设置卡中的日志记录步骤会将其打开。"
+          },
+          "engines": {
+            "title": "目前仅支持 PostgreSQL",
+            "detail": "目前仅 PostgreSQL 支持按语句捕获，因此 MySQL 和 MariaDB 还无法提供此列表。热门查询仍然可以显示哪些内容运行最多，因为它改为读取计数器表。"
+          }
+        }
+      },
       "searchPlaceholder": "搜索查询文本、服务或数据库…",
       "columns": {
         "query": "查询",
@@ -18431,6 +18459,7 @@
       "never": "从未",
       "countersCumulative": "扫描和 vacuum 计数是自上次统计重置以来的累计总数，而不是所选时间范围内的计数。",
       "tuplesEstimated": "行数和膨胀百分比是数据库引擎的统计估算值，不是精确计数。",
+      "aboutNumbers": "关于这些数字",
       "notCollectingTitle": "尚无表统计信息",
       "notCollectingDescription": "在此时间范围内没有报告表统计信息。此信号作为单独的采集器配方提供。",
       "engineUnsupportedTitle": "未为此引擎收集",

@@ -4090,6 +4090,7 @@
       "oracleTagline": "使用 OpenTelemetry Collector 收集 Oracle DB 指標，並將它們傳送至 OpenObserve。",
       "otlpFixBody": "僅定義匯出器還不夠 — 它必須列在管線中。這是外觀正確的設定檔卻沒有傳送任何資料的最常見原因：",
       "otlpFixTitle": "檢查匯出器是否確實已接入管線",
+      "otlpGrpcCloudNote": "OpenObserve Cloud 的公開 gRPC 閘道——對於大量 Span，比 HTTP 的開銷更低，且無需設定自架網路。",
       "otlpGrpcNote": "在高區段量下，比 HTTP 的開銷更低。collector 必須能連到連接埠 5081。",
       "otlpHttpNote": "OpenTelemetry Collector 的預設值 — 可在任何地方運作，包括代理伺服器和負載平衡器後面。",
       "otlpSdkEnvNote": "標準的 OTEL_* 環境變數 — 每個 OpenTelemetry SDK 都會讀取這些變數，因此不需要修改程式碼。",
@@ -17972,7 +17973,34 @@
     },
     "samples": {
       "logOffTitle": "您的資料庫尚未記錄慢速陳述式。",
-      "logOffDescription": "沒有任何追蹤涵蓋這些呼叫，所以我們向資料庫查詢它們自己的最慢陳述式——但它們沒有記錄任何項目。此清單來自 PostgreSQL 的陳述式日誌 (log_min_duration_statement)，該日誌預設為關閉——設定卡中的記錄步驟會將其開啟。目前僅 PostgreSQL 支援逐陳述式擷取，因此 MySQL 和 MariaDB 尚無法提供此清單的資料。Top queries 仍可向您顯示哪些查詢最常執行，因為它改為讀取計數器資料表。",
+      "notCollecting": {
+        "description": "沒有任何追蹤涵蓋這些呼叫，所以我們向資料庫查詢它們自己的最慢陳述式——但它們沒有記錄任何項目。我們檢查四件事。",
+        "checklistTitle": "我們檢查了什麼",
+        "setUp": "設定陳述式記錄",
+        "checks": {
+          "queries": {
+            "ok": "你的查詢資料正在送達",
+            "okDetail": "{queries} 來自 {databases} — 熱門查詢標籤頁正常運作",
+            "okDetailNoFleet": "{queries} — 熱門查詢標籤頁正常運作",
+            "no": "也沒有任何查詢資料送達",
+            "noDetail": "先從熱門查詢標籤頁開始——目前還沒有任何來自這些資料庫的資料到達我們這裡。"
+          },
+          "enabled": {
+            "ok": "資料庫監控已開啟",
+            "okDetail": "對這個組織",
+            "no": "資料庫監控已關閉",
+            "noDetail": "在設定中將它開啟以開始收集。"
+          },
+          "log": {
+            "no": "未記錄慢速陳述式",
+            "noDetail": "此清單來自 PostgreSQL 的陳述式日誌 (log_min_duration_statement)，該日誌預設為關閉——設定卡中的記錄步驟會將其開啟。"
+          },
+          "engines": {
+            "title": "目前僅支援 PostgreSQL",
+            "detail": "目前僅 PostgreSQL 支援逐陳述式擷取，因此 MySQL 和 MariaDB 尚無法提供此清單的資料。Top queries 仍可向您顯示哪些查詢最常執行，因為它改為讀取計數器資料表。"
+          }
+        }
+      },
       "searchPlaceholder": "搜尋查詢文字、服務或資料庫…",
       "columns": {
         "query": "查詢",
@@ -18426,6 +18454,7 @@
       "never": "從未",
       "countersCumulative": "掃描和 vacuum 計數是自上次統計重設以來的生命週期總計，而非所選時間範圍內的計數。",
       "tuplesEstimated": "列數和膨脹百分比是資料庫引擎的統計估計值，而非精確計數。",
+      "aboutNumbers": "關於這些數字",
       "notCollectingTitle": "尚無資料表統計資料",
       "notCollectingDescription": "此時間範圍內沒有回報資料表統計資料。此訊號以獨立的收集器配方提供。",
       "engineUnsupportedTitle": "未對此引擎收集",
