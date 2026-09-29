@@ -385,6 +385,10 @@ pub async fn validate_credentials(
     method: &Method,
     from_session: bool,
 ) -> Result<TokenValidationResponse, AuthError> {
+    // A NULL `password_ext` or an empty token is blank, so blank input must never be compared.
+    if user_password.is_empty() {
+        return Ok(TokenValidationResponse::default());
+    }
     // Strip leading slash if present
     let path = path.strip_prefix('/').unwrap_or(path);
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
@@ -662,22 +666,6 @@ pub async fn validate_credentials(
         return Ok(build_token_validation_response(&user));
     }
 
-    // An empty password on an ingestion request is never valid (blocks
-    // anonymous ingestion). Classified against the ingestion-route table so it
-    // fires for real ingestion endpoints only, not any path that merely
-    // contains an ingestion word.
-    if is_ingestion_path && user_password.is_empty() {
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            user_name: "".to_string(),
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
-    }
-
     // A regular (non-service-account) user's static token is an ingestion-only
     // credential: it authenticates only on ingestion requests (writes + the ES
     // handshake stubs). Using the route table here — instead of "any path
@@ -723,8 +711,7 @@ pub async fn validate_credentials(
                 || user
                     .password_ext
                     .as_deref()
-                    .unwrap_or_default()
-                    .eq(user_password)
+                    .is_some_and(|ext| !ext.is_empty() && ext == user_password)
         })
         .await;
     // A lockout is the one refusal that carries an answer, so it is the one that does not collapse
@@ -978,6 +965,9 @@ async fn validate_user_from_db(
     exp_in: i64,
     password_ext_salt: &str,
 ) -> Result<TokenValidationResponse, AuthError> {
+    if user_password.is_empty() {
+        return Err(AuthError::Forbidden("Not allowed".to_string()));
+    }
     // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(mut user) => {
@@ -1998,8 +1988,82 @@ mod tests {
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
 
+        exercise_empty_password_rejected(org_id).await;
+
         #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
+    }
+
+    // NULL `password_ext`, exactly as the SRE-agent service-account migration writes it.
+    async fn seed_user_without_password_ext(org_id: &str, email: &str, role: UserRole, pwd: &str) {
+        let salt = "no-ext-salt";
+        infra::table::users::add(infra::table::users::UserRecord {
+            email: email.to_string(),
+            first_name: "No".to_string(),
+            last_name: "Ext".to_string(),
+            password: get_hash(pwd, salt),
+            salt: salt.to_string(),
+            is_root: false,
+            password_ext: None,
+            user_type: UserType::Internal,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        db::org_users::add_with_flags(org_id, email, role, &format!("tok-{email}"), None, true)
+            .await
+            .unwrap();
+    }
+
+    // Folded into `test_validate`: a standalone test clearing the same user tables would race it.
+    async fn exercise_empty_password_rejected(org_id: &str) {
+        let pwd = "Complexpass#123";
+        let sre_agent = "o2-sre-agent.org-default@openobserve.internal";
+        let plain_user = "no-ext-user@example.com";
+        seed_user_without_password_ext(org_id, sre_agent, UserRole::SreAgent, pwd).await;
+        seed_user_without_password_ext(org_id, plain_user, UserRole::Admin, pwd).await;
+
+        assert!(
+            validate_credentials(plain_user, pwd, "default/streams", &Method::GET, false)
+                .await
+                .unwrap()
+                .is_valid,
+            "the seeded user must still sign in with its real password"
+        );
+        let mut accepted = vec![];
+        for email in [sre_agent, plain_user] {
+            for (path, method) in [
+                ("default/streams", Method::GET),
+                ("default/_search", Method::POST),
+                ("default/users", Method::GET),
+            ] {
+                let res = validate_credentials(email, "", path, &method, false).await;
+                if res.is_ok_and(|r| r.is_valid) {
+                    accepted.push(format!("validate_credentials {email} {method} /{path}"));
+                }
+            }
+        }
+        for email in [sre_agent, plain_user] {
+            let credentials = base64::encode(&format!("{email}:"));
+            let req_data = RequestData {
+                uri: "/api/default/streams".parse().unwrap(),
+                method: Method::GET,
+                headers: HeaderMap::new(),
+            };
+            let auth_info = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
+            if oo_validator(&req_data, &auth_info).await.is_ok() {
+                accepted.push(format!("oo_validator Basic {email}:"));
+            }
+        }
+        assert!(
+            accepted.is_empty(),
+            "empty password accepted: {accepted:#?}"
+        );
     }
 
     /// Root survives any number of wrong passwords, and a locked-out user is refused even once they
