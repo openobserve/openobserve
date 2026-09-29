@@ -512,6 +512,57 @@ describe("OnCallPolicyEditor", () => {
   });
 });
 
+/// **Five reads went out on every re-open.** The drawer stays mounted between
+/// visits, so the roster and the rotation were paid for again each time the
+/// reader flipped back. The team channel is the exception on purpose: the draft
+/// beside it is seeded from that answer and saved back, so it must not be stale.
+describe("re-opening the drawer", () => {
+  beforeEach(() => {
+    __resetOnCallRoutingConfig();
+    vi.clearAllMocks();
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: [], source: "policy" },
+    } as any);
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
+    service.listMembers.mockResolvedValue({ data: [{ user_email: "ana@o2.ai" }] } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    destinations.list.mockResolvedValue({ data: [{ name: "slack-eng" }] } as any);
+  });
+
+  // The picker reads the alert destinations list the alert form already caches.
+  it("serves the destination picker from the cache on a re-open", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(destinations.list).toHaveBeenCalledTimes(1);
+    expect(destinations.list).toHaveBeenCalledWith(expect.objectContaining({ module: "alert" }));
+  });
+
+  it("serves the roster from the cache and still re-reads the team channel", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    expect(service.listMembers).toHaveBeenCalledTimes(1);
+    expect(service.whoIsOnCall).toHaveBeenCalledTimes(1);
+    expect(service.getTeamChannel).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(service.listMembers).toHaveBeenCalledTimes(1);
+    expect(service.whoIsOnCall).toHaveBeenCalledTimes(1);
+    expect(service.getTeamChannel).toHaveBeenCalledTimes(2);
+  });
+});
+
 /// **The three targets a rung could not name.** `TARGET_KINDS` offered five of
 /// eight, so from 2026-08-18 — when every ≥2-person rotation gained a derived
 /// secondary slot — there was a real, staffed, coverable position that no rung

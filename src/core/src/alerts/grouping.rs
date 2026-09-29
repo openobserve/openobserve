@@ -156,9 +156,10 @@ pub fn add_to_batch(
                 }
             } else {
                 log::warn!(
-                    "[grouping] Failed to add alert '{}' to batch {} (already full)",
+                    "[grouping] Failed to add alert '{}' to batch {} (already full), org_id: {}",
                     alert.name,
-                    fingerprint
+                    fingerprint,
+                    org_id
                 );
             }
         })
@@ -411,6 +412,7 @@ pub async fn send_grouped_notification(
             // part of that fingerprint, so the whole batch is one group.
             batch.group_labels.as_ref(),
             &[],
+            None,
         )
         .await
     {
@@ -418,7 +420,8 @@ pub async fn send_grouped_notification(
             let (success_msg, err_msg) = (outcome.success_message, outcome.error_message);
             if !err_msg.is_empty() {
                 log::error!(
-                    "[alert_grouping_worker] Some destinations failed for grouped notification (fingerprint: {}): {}",
+                    "[alert_grouping_worker] Some destinations failed for grouped notification (org_id: {}, fingerprint: {}): {}",
+                    batch.org_id,
                     batch.fingerprint,
                     err_msg
                 );
@@ -454,7 +457,8 @@ pub async fn send_grouped_notification(
         }
         Err(e) => {
             log::error!(
-                "[alert_grouping_worker] Failed to send grouped notification (fingerprint: {}): {}",
+                "[alert_grouping_worker] Failed to send grouped notification (org_id: {}, fingerprint: {}): {}",
+                batch.org_id,
                 batch.fingerprint,
                 e
             );

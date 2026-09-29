@@ -9,7 +9,7 @@
  *
  *   1. Upload the fixture sourcemaps group (API, in beforeAll — the Upload
  *      FORM itself, required-field validation and the upload happy path are
- *      already covered by GeneralTests/rum-form-validation.spec.js and are
+ *      already covered by RUM/rum-form-validation.spec.js and are
  *      NOT repeated here).
  *   2. Verify the Source Maps list shows the group; verify the backend
  *      contracts unique to this suite: invalid-zip rejection and duplicate
@@ -191,7 +191,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     );
 
     // Upload the main fixture group once via the API. The Upload FORM happy
-    // path is covered by GeneralTests/rum-form-validation.spec.js.
+    // path is covered by RUM/rum-form-validation.spec.js.
     const page = await browser.newPage();
     await uploadFixtureGroup(page, SERVICE);
     await page.close();

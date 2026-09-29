@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'workflow-runs-back',
       }"
       class="border-border-default border-b px-4"
+      overflow-first
     >
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
@@ -51,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <BetaBadge />
         </span>
       </template>
-      <template #actions>
+      <template #actions-overflow>
         <!-- Test is a read-only dry-run (it never edits the workflow), so it's
              offered here too — no need to switch to the editor just to test. -->
         <OButton variant="outline" data-test="workflow-runs-test" @click="onTest">
@@ -60,9 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
           {{ t("workflow.runs.edit") }}
         </OButton>
-        <!-- Only meaningful once a run is selected — it is the run that gets
-             carried over. Without one there is nothing to debug, so it stays
-             hidden rather than rendering as a dead control. -->
         <!-- Replaying is only possible for a run the backend persisted input for,
              so a Test/Retry run offers no button rather than a failing one. -->
         <OButton
@@ -74,6 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("workflow.history.retry") }}
         </OButton>
+      </template>
+      <template #actions>
+        <!-- Only meaningful once a run is selected — it is the run that gets
+             carried over. Without one there is nothing to debug, so it stays
+             hidden rather than rendering as a dead control. -->
         <OButton
           v-if="selectedRunId"
           variant="primary"

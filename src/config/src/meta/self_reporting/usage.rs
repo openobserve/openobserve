@@ -33,7 +33,7 @@ pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
 
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
-/// are rejected.
+/// are rejected. OTLP has no guard: collectors write `_o2_dbm_server` there.
 pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
     stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
 }

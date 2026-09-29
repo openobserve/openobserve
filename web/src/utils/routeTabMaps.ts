@@ -119,6 +119,8 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     fluentbit: "fluentbit",
     fluentd: "fluentd",
     vector: "vector",
+    kinesisfirehose: "kinesisfirehose",
+    gcpLogs: "gcpLogs",
     ingestLogsFromOtel: "ingestLogsFromOtel",
     logstash: "logstash",
     syslogNg: "syslogNg",

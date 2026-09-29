@@ -24,6 +24,7 @@ import {
   mapWireSteps,
   substituteVariables,
 } from "./mapRecordedStep";
+import { buildV2Step } from "./buildV2Steps";
 
 describe("mapRecordedStep", () => {
   it("should map a navigate wire step using the url as value", () => {
@@ -565,5 +566,26 @@ describe("substituteVariables", () => {
     const out = substituteVariables(step({ value: "{{constructor}}" }), { USER: "alice" });
 
     expect(out.value).toBe("{{constructor}}");
+  });
+});
+
+describe("subtest steps", () => {
+  it("survives a save-and-reload round trip with the reference intact", () => {
+    const journey: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+      { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+    ];
+    // buildV2Step is what we store; mapWireStep is what the editor loads back.
+    const reloaded = mapWireSteps(journey.map(buildV2Step) as unknown as WireStep[]);
+    expect(reloaded[1].action).toBe("subtest");
+    expect(reloaded[1].subtest).toEqual({ id: "login-test" });
+  });
+
+  it("refuses to build wire steps from an unexpanded subtest", () => {
+    const steps: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+      { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+    ];
+    expect(() => journeyToWireSteps(steps)).toThrow(/expanded before replay/);
   });
 });

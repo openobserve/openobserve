@@ -407,7 +407,7 @@ pub async fn ingest(
                 stream_skipped: false,
             });
         } else {
-            log::error!("Metrics ingestion error: {e}");
+            log::error!("[METRICS:JSON] Metrics ingestion error: org_id: {org_id}, error: {e}");
             return Ok(IngestionResponse {
                 code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
                 status: vec![],
@@ -445,7 +445,9 @@ pub async fn ingest(
 
     // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
-        log::warn!("[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted");
+        log::warn!(
+            "[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
+        );
     }
 
     let (pipeline_outputs, failures) = ingest::run_pipelines(
