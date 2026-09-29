@@ -187,6 +187,8 @@ pub enum ActionKind {
     Scale,
     Restart,
     Runbook,
+    // Display-only, so a kind the model invents must not veto the page recommendation beside it.
+    #[serde(other)]
     Other,
 }
 
@@ -885,7 +887,11 @@ pub fn parse_report(rca_content: &str) -> ParsedReport<'_> {
     ParsedReport {
         // The input, unchanged, in every case: a malformed verdict can never lose a report.
         report: rca_content,
-        verdict: last_verdict_block(rca_content).and_then(|b| serde_json::from_str(&b).ok()),
+        verdict: last_verdict_block(rca_content).and_then(|b| {
+            serde_json::from_str(&b)
+                .inspect_err(|e| log::warn!("[ONCALL] L0 verdict block did not parse: {e}"))
+                .ok()
+        }),
     }
 }
 
@@ -3067,6 +3073,17 @@ mod tests {
             assert_eq!(parsed.report, content, "{name}: the report was altered");
             assert_eq!(parsed.verdict, None, "{name}: garbage parsed as a verdict");
         }
+    }
+
+    #[test]
+    fn test_an_unknown_action_kind_reads_as_other_and_keeps_the_verdict() {
+        let block = "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"page_recommendation\": { \"action\": \"suppress\", \"reason\": \"r\" }, \"proposed_actions\": [{ \"title\": \"t\", \"kind\": \"config_change\", \"detail\": \"d\" }], \"report_ref\": \"r\" }";
+        let content = report_with(block);
+        let v = parse_report(&content)
+            .verdict
+            .expect("an invented action kind must not drop the verdict");
+        assert_eq!(v.page_recommendation.action, PageAction::Suppress);
+        assert_eq!(v.proposed_actions[0].kind, ActionKind::Other);
     }
 
     /// The deployment that has RCA switched off, and the model that forgot the
