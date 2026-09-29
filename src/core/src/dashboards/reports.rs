@@ -37,8 +37,12 @@ use cron::Schedule;
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
+    dashboards::dashboard_in_org,
 };
-use futures::{StreamExt, future::try_join_all};
+use futures::{
+    StreamExt,
+    future::{self, try_join_all},
+};
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table,
@@ -51,6 +55,8 @@ use lettre::{
 use reqwest::Client;
 
 use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz, short_url};
+
+const REPORT_SECRET_HEADER: &str = "x-o2-report-secret";
 
 /// Errors that can occur when interacting with reports.
 #[derive(Debug, thiserror::Error)]
@@ -357,12 +363,14 @@ pub async fn trigger(org_id: &str, folder_id: &str, name: &str) -> Result<(), Re
             return Err(ReportError::ReportNotFound);
         }
     };
+    ensure_dashboards_readable(org_id, &report.dashboards).await?;
     report.send_subscribers().await?;
     Ok(())
 }
 
 pub async fn trigger_by_id(org_id: &str, report_id: &str) -> Result<(), ReportError> {
     let (_, report) = get_by_id(org_id, report_id).await?;
+    ensure_dashboards_readable(org_id, &report.dashboards).await?;
     report.send_subscribers().await?;
     Ok(())
 }
@@ -450,6 +458,7 @@ pub async fn update_by_id(
     }) {
         return Err(ReportError::InlineAttachmentTypeNotSupportedForPdf);
     }
+    ensure_dashboards_readable(org_id, &report.dashboards).await?;
 
     let (curr_folder, old_report) = get_by_id(org_id, report_id).await?;
     report.owner = old_report.owner;
@@ -589,17 +598,17 @@ impl SendReport for Report {
                 cfg.common.report_server_url, self.org_id, self.name
             ))
             .unwrap();
-            match Client::builder()
+            let mut req = Client::builder()
                 .danger_accept_invalid_certs(cfg.common.report_server_skip_tls_verify)
                 .build()
                 .unwrap()
                 .put(url)
                 .query(&[("timezone", &self.timezone)])
-                .header("Content-Type", "application/json")
-                .json(&report_data)
-                .send()
-                .await
-            {
+                .header("Content-Type", "application/json");
+            if !cfg.report_server.secret.is_empty() {
+                req = req.header(REPORT_SECRET_HEADER, &cfg.report_server.secret);
+            }
+            match req.json(&report_data).send().await {
                 Ok(resp) => {
                     if !resp.status().is_success() {
                         return Err(SendReportError::ReportServerErrorRepsponse(
@@ -755,7 +764,10 @@ async fn generate_report(
     let tab_id = &dashboard.tabs[0];
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
-        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+        dashb_vars = format!(
+            "{dashb_vars}&{}",
+            format_dashb_var(&variable.key, &variable.value)
+        );
     }
 
     log::info!("launching browser for dashboard {dashboard_id}");
@@ -956,6 +968,16 @@ async fn generate_report(
     Ok((pdf_data, email_dashb_url))
 }
 
+/// Percent-encodes the key and value so a variable containing `&`, `#` or `"` cannot inject
+/// extra query parameters or break out of the dashboard URL.
+fn format_dashb_var(key: &str, value: &str) -> String {
+    format!(
+        "var-{}={}",
+        urlencoding::encode(key),
+        urlencoding::encode(value)
+    )
+}
+
 async fn wait_for_panel_data_load(page: &Page) -> Result<(), GenerateReportError> {
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(get_config().chrome.chrome_sleep_secs.into());
@@ -988,6 +1010,30 @@ fn sanitize_filename(filename: &str) -> String {
             }
         })
         .collect()
+}
+
+/// Confirms every dashboard a report renders still belongs to the report's own org — the same
+/// existence-scoped check the dashboards GET handler uses — so a report can't be repointed at,
+/// or outlive a move of, a dashboard in another org.
+async fn ensure_dashboards_readable(
+    org_id: &str,
+    dashboards: &[ReportDashboard],
+) -> Result<(), ReportError> {
+    let checks = dashboards
+        .iter()
+        .map(|d| dashboard_in_org(org_id, &d.dashboard));
+    let results = future::join_all(checks).await;
+    if all_dashboards_readable(&results) {
+        Ok(())
+    } else {
+        Err(ReportError::DashboardTabNotFound)
+    }
+}
+
+/// A report with zero dashboards has nothing to withhold, so it passes trivially; that case is
+/// already rejected earlier by [`ReportError::NoDashboards`].
+fn all_dashboards_readable(results: &[bool]) -> bool {
+    results.iter().all(|readable| *readable)
 }
 
 /// Anchors a report to the org it was addressed to, rejecting a body that names a different one.
@@ -1168,5 +1214,28 @@ mod tests {
         };
         assert!(bind_to_path_org(&mut report, "org_a").is_ok());
         assert_eq!(report.org_id, "org_a");
+    }
+
+    #[test]
+    fn format_dashb_var_encodes_special_characters() {
+        let encoded = format_dashb_var("k", "a&b#c\"d");
+        assert_eq!(encoded, "var-k=a%26b%23c%22d");
+        let decoded_value = urlencoding::decode(encoded.strip_prefix("var-k=").unwrap()).unwrap();
+        assert_eq!(decoded_value, "a&b#c\"d");
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_true_when_every_check_passed() {
+        assert!(all_dashboards_readable(&[true, true, true]));
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_false_if_any_dashboard_is_not_in_org() {
+        assert!(!all_dashboards_readable(&[true, false, true]));
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_true_for_no_dashboards() {
+        assert!(all_dashboards_readable(&[]));
     }
 }
