@@ -49,7 +49,8 @@ pub enum FolderType {
     Reports,
     Synthetics,
     Workflows,
-    Downtimes,
+    Prompts = 5,
+    Downtimes = 6,
 }
 
 pub const DEFAULT_FOLDER: &str = "default";

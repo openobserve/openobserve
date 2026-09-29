@@ -72,6 +72,7 @@ struct PendingMigrations {
     llm_workbench: bool,
     workflow_folders: bool,
     synthetic_environments: bool,
+    prompts: bool,
     downtimes: bool,
 }
 
@@ -515,6 +516,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.synthetic_environments {
         keys.push("synthetic_environment");
     }
+    if pending.prompts {
+        keys.extend(["prompts", "prompt_labels"]);
+    }
     if pending.downtimes {
         keys.extend(["downtime_folders", "downtimes"]);
     }
@@ -555,7 +559,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
     let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
     let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
-    let v0_0_49 = version_compare::Version::from("0.0.49").unwrap();
+    let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
+    let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -661,7 +666,12 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] synthetic environments permissions migration needed");
         pending.synthetic_environments = true;
     }
-    if existing_model_version < v0_0_49 {
+    // 0.0.49 shipped `prompt` without a back-fill; 0.0.50 covers it and `prompt_label`.
+    if existing_model_version < v0_0_50 {
+        log::info!("[OFGA:Local] prompt permissions migration needed");
+        pending.prompts = true;
+    }
+    if existing_model_version < v0_0_51 {
         log::info!("[OFGA:Local] downtimes permissions migration needed");
         pending.downtimes = true;
     }

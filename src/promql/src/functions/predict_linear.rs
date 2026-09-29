@@ -18,12 +18,12 @@ use std::time::Duration;
 use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::{common::linear_regression, functions::RangeFunc};
+use crate::{common::linear_regression, functions::RangeFunc, scalar_param::ScalarParam};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
 pub(crate) fn predict_linear(
     data: Value,
-    duration: f64,
+    duration: ScalarParam,
     eval_ctx: &EvalContext,
     pinned: Option<i64>,
 ) -> Result<Value> {
@@ -31,11 +31,11 @@ pub(crate) fn predict_linear(
 }
 
 pub struct PredictLinearFunc {
-    duration: f64,
+    duration: ScalarParam,
 }
 
 impl PredictLinearFunc {
-    pub fn new(duration: f64) -> Self {
+    pub fn new(duration: ScalarParam) -> Self {
         PredictLinearFunc { duration }
     }
 }
@@ -53,7 +53,7 @@ impl RangeFunc for PredictLinearFunc {
             return None;
         }
         let (slope, intercept) = linear_regression(samples, eval_ts / 1000)?;
-        Some(slope * self.duration + intercept)
+        Some(slope * self.duration.at(eval_ts) + intercept)
     }
 }
 
@@ -68,7 +68,7 @@ mod tests {
     // Test helper
     fn predict_linear_test_helper(data: Value, duration: f64) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
-        predict_linear(data, duration, &eval_ctx, None)
+        predict_linear(data, ScalarParam::Const(duration), &eval_ctx, None)
     }
 
     #[test]
@@ -109,7 +109,7 @@ mod tests {
     fn test_predict_linear_describes_the_same_series_as_deriv() {
         // Both read a trend out of the same regression, so they must agree on which series
         // they can read one from.
-        let predict = PredictLinearFunc::new(10.0);
+        let predict = PredictLinearFunc::new(ScalarParam::Const(10.0));
         let derive = crate::functions::deriv::DerivFunc;
         let describes = |samples: &[Sample]| {
             (

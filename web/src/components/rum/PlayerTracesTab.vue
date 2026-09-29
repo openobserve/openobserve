@@ -187,6 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ formatTraceTimestamp(row.metadata?.start_time) }}
             </span>
           </template>
+          <template #cell-page="{ row }">
+            <span class="block truncate font-mono text-xs" :title="pageRoute(row)">
+              {{ pageRoute(row) }}
+            </span>
+          </template>
           <template #cell-route="{ row }">
             <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
               {{ traceDisplayName(row) }}
@@ -294,6 +299,16 @@ const traceColumns = computed(() => [
     meta: { align: "left" },
   },
   {
+    // The browser page each request was made from; the route column names the request itself.
+    id: "page",
+    header: t("rum.errorDetail.facetPage"),
+    accessorFn: (row: any) => pageRoute(row),
+    size: 160,
+    minSize: 80,
+    maxSize: 400,
+    meta: { align: "left" },
+  },
+  {
     id: "route",
     header: t("rum.route"),
     accessorFn: (row: any) => traceDisplayName(row),
@@ -330,10 +345,16 @@ function traceRowClass(row: any): string {
 function shortRoute(url: string): string {
   try {
     const u = new URL(url);
+    // Hash-routed SPAs keep the route after `#`, so the pathname alone is `/` for every page.
+    if (u.hash.startsWith("#/")) return u.pathname + u.search + u.hash;
     return u.pathname + u.search || "/";
   } catch {
     return url;
   }
+}
+
+function pageRoute(trace: any): string {
+  return trace.route ? shortRoute(trace.route) : "";
 }
 
 function traceDisplayName(trace: any): string {

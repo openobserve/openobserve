@@ -57,6 +57,12 @@ pub enum AssociationDeleteEvent {
 pub enum WorkflowTriggerType {
     #[default]
     AlertFired,
+    /// Its own type rather than an event_type on AlertFired, or every workflow built to page on a
+    /// firing would page on the recovery too.
+    // TODO: not reachable yet — associating a workflow with an alert hardcodes AlertFired, so no
+    // row is ever written with this type. Needs a trigger-type choice on the link, then a consumer
+    // in `alerts::recovery::dispatch_recovery`, then `enabled: true` on the UI card.
+    AlertResolved,
     IncidentEvent,
     Webhook,
     Manual,
@@ -74,6 +80,7 @@ impl From<&str> for WorkflowTriggerType {
     fn from(value: &str) -> Self {
         match value {
             "AlertFired" => Self::AlertFired,
+            "AlertResolved" => Self::AlertResolved,
             "IncidentEvent" => Self::IncidentEvent,
             "Webhook" => Self::Webhook,
             "Manual" => Self::Manual,
@@ -88,6 +95,7 @@ impl std::fmt::Display for WorkflowTriggerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AlertFired => write!(f, "AlertFired"),
+            Self::AlertResolved => write!(f, "AlertResolved"),
             Self::IncidentEvent => write!(f, "IncidentEvent"),
             Self::Webhook => write!(f, "Webhook"),
             Self::Manual => write!(f, "Manual"),
@@ -623,6 +631,7 @@ mod tests {
     fn known_trigger_types_round_trip_through_the_history_key() {
         for ty in [
             WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::AlertResolved,
             WorkflowTriggerType::IncidentEvent,
             WorkflowTriggerType::Webhook,
         ] {

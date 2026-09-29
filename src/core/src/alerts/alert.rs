@@ -80,6 +80,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            platform::{self, platform_of},
             render,
             render::slack as slack_render,
             resolve_content,
@@ -89,6 +90,11 @@ use crate::{
     common::{infra::config::ORGANIZATIONS, meta::authz::Authz, utils::ssrf_guard::SsrfGuard},
     short_url,
 };
+
+/// Ceiling for `keep_firing_for`, in seconds. A day is far past any real
+/// flap-damping window, and short enough that a milliseconds-for-seconds typo
+/// is refused rather than stored.
+pub const KEEP_FIRING_FOR_MAX_SECS: i64 = 24 * 60 * 60;
 
 /// Errors that can occur when interacting with alerts.
 #[derive(Debug, thiserror::Error)]
@@ -297,6 +303,39 @@ pub enum AlertError {
     PendingPeriodOnRealtimeAlert,
     #[error("Alert pending period must be >= 0")]
     NegativePendingPeriod,
+    #[error("Alert keep_firing_for must be between 0 and {KEEP_FIRING_FOR_MAX_SECS} seconds")]
+    KeepFiringForOutOfRange,
+    #[error("Realtime alerts cannot notify on recovery or keep firing")]
+    RecoveryOnRealtimeAlert,
+    #[error("recovery destinations were set without notify_on_recovery, so nothing would use them")]
+    RecoveryDestinationsWithoutRecovery,
+    #[error(
+        "recovery destination '{destination}' is {platform}, which recovers by closing the ticket its own firing opened — add it to the alert's destinations instead"
+    )]
+    RecoveryDestinationIsPlatform {
+        destination: String,
+        platform: String,
+    },
+    #[error(
+        "Multi-alerts keep per-group state and open no recovery episode, so notify_on_recovery would never fire"
+    )]
+    RecoveryOnMultiAlert,
+    #[error(
+        "notification grouping batches several alerts into one message, which cannot carry this alert's correlation key — turn off one of grouping or notify_on_recovery"
+    )]
+    RecoveryWithNotificationGrouping,
+    #[error(
+        "destination '{destination}' is {platform}, which is resolved by updating the alert the firing opened. That needs the firing payload to be a JSON object, and template '{template}' does not render one"
+    )]
+    RecoveryNeedsJsonPayload {
+        destination: String,
+        platform: String,
+        template: String,
+    },
+    #[error(
+        "destination '{destination}' has no PagerDuty integration key, and a resolve sent without one is discarded — add it to the destination, or turn off notify_on_recovery"
+    )]
+    RecoveryNeedsRoutingKey { destination: String },
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
 }
@@ -387,6 +426,105 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
         return Err(AlertError::InvalidMultiAlert(
             config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
         ));
+    }
+    Ok(())
+}
+
+/// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
+/// malformed still fails at send. A CONTENT template always renders an object.
+fn platform_body_is_addressable(kind: TemplateKind, body: &str) -> bool {
+    kind != TemplateKind::Custom || body.trim_start().starts_with('{')
+}
+
+/// Refuse a recovery that could not be delivered as one, at save rather than at 3am.
+async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
+    if !alert.notify_on_recovery {
+        // Stored without the switch it would silently do nothing, and read as if it would.
+        if !alert.recovery_destinations.is_empty() {
+            return Err(AlertError::RecoveryDestinationsWithoutRecovery);
+        }
+        return Ok(());
+    }
+
+    // A resolve carries the key of the trigger that opened the ticket, so it can only be sent where
+    // the firing went; a platform here would be selected and then never used.
+    for dest_name in alert.recovery_destinations.iter() {
+        if alert.destinations.contains(dest_name) {
+            continue;
+        }
+        if let Ok((destination, _)) = destinations::get_with_template(org_id, dest_name).await
+            && let Module::Alert {
+                destination_type, ..
+            } = &destination.module
+            && let Some(platform) = platform_of(destination_type)
+        {
+            return Err(AlertError::RecoveryDestinationIsPlatform {
+                destination: dest_name.clone(),
+                platform: format!("{platform:?}"),
+            });
+        }
+    }
+
+    // Both keep the alert out of the single-row path that owns the episode, so recovery would be
+    // stored and then silently never sent.
+    if alert.query_condition.multi_alert_enabled() {
+        return Err(AlertError::RecoveryOnMultiAlert);
+    }
+    if alert
+        .deduplication
+        .as_ref()
+        .and_then(|d| d.grouping.as_ref())
+        .is_some_and(|g| g.enabled)
+    {
+        return Err(AlertError::RecoveryWithNotificationGrouping);
+    }
+
+    let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
+        Some(name) => db::alerts::templates::get(org_id, name).await.ok(),
+        None => None,
+    };
+
+    for dest_name in alert.destinations.iter() {
+        let Ok((destination, dest_template)) =
+            destinations::get_with_template(org_id, dest_name).await
+        else {
+            continue;
+        };
+        let Module::Alert {
+            destination_type, ..
+        } = &destination.module
+        else {
+            continue;
+        };
+        let Some(platform) = platform_of(destination_type) else {
+            continue;
+        };
+        // The resolve is sent by us, so it reads the key off the destination
+        // rather than out of the template. A firing that hardcoded its own key
+        // would still page, and then never resolve — silently, because
+        // PagerDuty answers 202 to a resolve it discards.
+        if platform == platform::Platform::PagerDuty
+            && let DestinationType::Http(endpoint) = destination_type
+            && !endpoint
+                .metadata
+                .get("routing_key")
+                .is_some_and(|key| !key.is_empty())
+        {
+            return Err(AlertError::RecoveryNeedsRoutingKey {
+                destination: dest_name.clone(),
+            });
+        }
+        let Some(template) = choose_template(alert_template.as_ref(), dest_template.as_ref())
+        else {
+            continue;
+        };
+        if !platform_body_is_addressable(template.kind, &template.body) {
+            return Err(AlertError::RecoveryNeedsJsonPayload {
+                destination: dest_name.clone(),
+                platform: format!("{platform:?}"),
+                template: template.name.clone(),
+            });
+        }
     }
     Ok(())
 }
@@ -680,6 +818,20 @@ async fn prepare_alert(
         return Err(AlertError::NegativePendingPeriod);
     }
 
+    // Seconds, and the units are the whole reason for the ceiling: 300000 typed
+    // for "5 minutes in milliseconds" is three and a half days of an alert that
+    // cannot recover, cannot close its on-call record, and so cannot page again.
+    if !(0..=KEEP_FIRING_FOR_MAX_SECS).contains(&alert.keep_firing_for) {
+        return Err(AlertError::KeepFiringForOutOfRange);
+    }
+
+    // A realtime alert persists no state (D12), so it never opens an episode and
+    // neither field can ever act — stored, they would only promise a recovery
+    // that cannot arrive.
+    if alert.is_real_time && (alert.notify_on_recovery || alert.keep_firing_for != 0) {
+        return Err(AlertError::RecoveryOnRealtimeAlert);
+    }
+
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
     // an unreachable warning level can never reach the evaluator.
     //
@@ -791,6 +943,8 @@ async fn prepare_alert(
     }
 
     validate_multi_alert_config(alert)?;
+
+    validate_recovery_templates(org_id, alert).await?;
 
     // PromQL carries a third threshold family: the condition value baked into
     // the query. Its warning needs the same §4.5 direction check, measured
@@ -2063,6 +2217,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             None,
             None,
             skip_destinations,
+            None,
         )
         .await?;
     let (success_message, err_message) = (outcome.success_message, outcome.error_message);
@@ -2158,6 +2313,7 @@ pub async fn trigger_by_name(
             None,
             None,
             skip_destinations,
+            None,
         )
         .await?;
     let (success_message, err_message) = (outcome.success_message, outcome.error_message);
@@ -2231,6 +2387,9 @@ pub trait AlertExt: Sync + Send + 'static {
         // Destinations already delivered on a PRIOR attempt (Task 11's retry
         // ledger). Skipped here so a retry cannot double-page them.
         skip_destinations: &[String],
+        // The firing episode this notification opens or continues. Carried on
+        // the trigger so the later resolve has a key PagerDuty recognises.
+        episode_id: Option<String>,
     ) -> Result<NotificationOutcome, AlertError>;
 }
 
@@ -2283,6 +2442,7 @@ impl AlertExt for Alert {
         actual_value: Option<f64>,
         group_labels: Option<&std::collections::BTreeMap<String, String>>,
         skip_destinations: &[String],
+        episode_id: Option<String>,
     ) -> Result<NotificationOutcome, AlertError> {
         let mut outcome = NotificationOutcome::default();
         let mut err_message = "".to_string();
@@ -2434,6 +2594,8 @@ impl AlertExt for Alert {
                         level,
                         actual_value,
                         group_labels,
+                        episode_id.clone(),
+                        false,
                     )
                     .await,
                 );
@@ -2637,6 +2799,8 @@ async fn build_send_context(
     level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
     group_labels: Option<&std::collections::BTreeMap<String, String>>,
+    episode_id: Option<String>,
+    resolved: bool,
 ) -> NotificationContext {
     let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
         org.name.clone()
@@ -2668,10 +2832,132 @@ async fn build_send_context(
             is_email: false,
             level,
             actual_value,
+            episode_id,
+            resolved,
         },
         group_labels,
     )
     .await
+}
+
+/// The MESSAGE goes to `recovery_destinations` when set, otherwise to the firing's own. A ticket
+/// close is not a message: it must quote the key of the trigger that opened it, so it is never
+/// redirected and always visits the firing's destinations.
+pub async fn send_recovery_notification(
+    alert: &Alert,
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), AlertError> {
+    let rows: Vec<Map<String, Value>> = Vec::new();
+    let mut ctx = build_send_context(
+        alert,
+        &rows,
+        event.recovered_at,
+        Some(event.opened_at),
+        event.recovered_at,
+        Some(config::meta::alerts::level::AlertLevel::Ok),
+        None,
+        None,
+        Some(event.episode_id.clone()),
+        true,
+    )
+    .await;
+
+    let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
+        Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
+        None => None,
+    };
+
+    let message_destinations = if alert.recovery_destinations.is_empty() {
+        &alert.destinations
+    } else {
+        &alert.recovery_destinations
+    };
+
+    let mut failures = String::new();
+    let mut visited = hashbrown::HashSet::new();
+    for dest_name in alert.destinations.iter().chain(message_destinations) {
+        if !visited.insert(dest_name) {
+            continue;
+        }
+        let (destination_type, dest_template) =
+            match destinations::get_with_template(&alert.org_id, dest_name).await {
+                Ok((dest, tpl)) => match dest.module {
+                    Module::Alert {
+                        destination_type, ..
+                    } => (destination_type, tpl),
+                    _ => continue,
+                },
+                Err(e) => {
+                    failures = format!("{failures} destination {dest_name}: {e};");
+                    continue;
+                }
+            };
+        // A platform resolve is protocol, not a message, so the template is never rendered for it.
+        if let (Some(platform), DestinationType::Http(endpoint)) =
+            (platform_of(&destination_type), &destination_type)
+        {
+            // Only the firing's own: a resolve quotes the key of the trigger that opened the
+            // ticket, so sending one somewhere that never got a trigger closes nothing.
+            if !alert.destinations.contains(dest_name) {
+                log::warn!(
+                    "[RECOVERY] {}/{} recovery destination {dest_name} is {platform:?}, which has \
+                     no ticket from this alert to close",
+                    alert.org_id,
+                    alert.name
+                );
+                continue;
+            }
+            match platform::send_resolve(platform, endpoint, &event.episode_id).await {
+                Ok(resp) => {
+                    log::info!(
+                        "[RECOVERY] {}/{} episode {} destination {dest_name} closed on {platform:?}",
+                        alert.org_id,
+                        alert.name,
+                        event.episode_id
+                    );
+                    // Body only at debug: a ServiceNow close returns the whole incident record,
+                    // caller and assignee included.
+                    log::debug!("[RECOVERY] destination {dest_name} responded: {resp}");
+                }
+                Err(e) => failures = format!("{failures} destination {dest_name}: {e};"),
+            }
+            continue;
+        }
+
+        // Redirected away by `recovery_destinations`: it got the firing, not the recovery.
+        if !message_destinations.contains(dest_name) {
+            continue;
+        }
+
+        let explicit = choose_template(alert_template.as_ref(), dest_template.as_ref()).cloned();
+        let effective = crate::alerts::notifications::org_default::resolve_effective_template(
+            &alert.org_id,
+            explicit,
+        )
+        .await;
+        // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
+        // 202 to one it drops. Body at debug only: it can carry recipient data.
+        match send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await {
+            Ok(resp) => {
+                log::info!(
+                    "[RECOVERY] {}/{} episode {} destination {dest_name} sent",
+                    alert.org_id,
+                    alert.name,
+                    event.episode_id
+                );
+                log::debug!("[RECOVERY] destination {dest_name} responded: {resp}");
+            }
+            Err(e) => failures = format!("{failures} destination {dest_name}: {e};"),
+        }
+    }
+
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(AlertError::SendNotificationError {
+            error_message: failures,
+        })
+    }
 }
 
 /// Render and dispatch one notification to one destination.
@@ -2714,6 +3000,39 @@ async fn build_chart_asset(
     Some((url, payload))
 }
 
+/// Carry the episode id into a platform's own correlation field, so the resolve
+/// this module sends later can find what the firing opened.
+///
+/// A body we cannot parse is left alone and logged: saving the alert already
+/// refused this combination, so reaching here means the template changed after
+/// the fact, and dropping the firing would be the worse failure.
+fn stamp_platform_key(
+    dest_type: &DestinationType,
+    ctx: &NotificationContext,
+    msg: String,
+) -> String {
+    let (Some(platform), Some(episode_id)) = (platform_of(dest_type), ctx.episode_id.as_deref())
+    else {
+        return msg;
+    };
+    let empty = hashbrown::HashMap::new();
+    let metadata = match dest_type {
+        DestinationType::Http(endpoint) => &endpoint.metadata,
+        _ => &empty,
+    };
+    match platform::stamp_key(platform, &msg, episode_id, metadata) {
+        Ok(stamped) => stamped,
+        Err(e) => {
+            log::warn!(
+                "[ALERT] {} payload has no place for {}: {e} — it will not be resolvable",
+                ctx.alert_name,
+                platform.key_field()
+            );
+            msg
+        }
+    }
+}
+
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
@@ -2737,6 +3056,7 @@ async fn send_to_destination(
         TemplateKind::Custom => {
             // Unchanged legacy path — byte-identical output.
             let msg = apply_custom_template(&template.body, ctx, is_email);
+            let msg = stamp_platform_key(dest_type, ctx, msg);
             let email_subject = if let TemplateType::Email { title } = &template.template_type {
                 apply_custom_template(title, ctx, is_email)
             } else {
@@ -2772,6 +3092,7 @@ async fn send_to_destination(
                     {
                         send_discord_with_attachment(endpoint, body, png).await
                     } else {
+                        let body = stamp_platform_key(dest_type, ctx, body);
                         send_http_notification(endpoint, body).await
                     }
                 }
@@ -3315,6 +3636,12 @@ struct ProcessTemplateOptions {
     pub level: Option<config::meta::alerts::level::AlertLevel>,
     /// Exact evaluated observation (T-9); `{alert_count}` for count alerts.
     pub actual_value: Option<f64>,
+    /// The firing episode this render belongs to. Both halves carry it: the
+    /// resolve only matches a trigger PagerDuty saw the same key on.
+    pub episode_id: Option<String>,
+    /// True for the resolve half. Drives `{alert_status}` and PagerDuty's
+    /// `event_action`.
+    pub resolved: bool,
 }
 
 /// Numeric `alert_count` for workflow metadata; a workflow Branch compares it
@@ -3405,6 +3732,8 @@ async fn build_notification_context(
         is_email: _,
         level,
         actual_value,
+        episode_id,
+        resolved,
     } = options;
     // {alert_count}: for count-family alerts, the EXACT evaluated count —
     // hybrid evaluation (§4.4c) samples only PAYLOAD_SAMPLE_ROWS rows for the
@@ -3609,6 +3938,13 @@ async fn build_notification_context(
         alert_count,
         alert_agg_value: format_agg_value(actual_value),
         alert_level: level.map(|l| l.to_string()).unwrap_or_default(),
+        alert_status: if resolved {
+            crate::alerts::notifications::STATUS_RESOLVED
+        } else {
+            crate::alerts::notifications::STATUS_FIRING
+        }
+        .to_string(),
+        episode_id,
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
         alert_threshold_crit: fmt_observed(family_crit),
@@ -4369,6 +4705,45 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// Calls the production predicate, not a copy of it: a resolve updates the record the firing
+    /// opened, so the firing body must have somewhere to carry the correlation key.
+    #[test]
+    fn a_platform_firing_payload_must_be_a_json_object() {
+        for body in [
+            r#"{"payload": {"summary": "{alert_name}"}}"#,
+            "\n  {\"message\": \"{alert_name}\"}",
+            // No `{alert_status}` anywhere, and still fine: the resolve does
+            // not come from this body.
+            r#"{"short_description": "{alert_name}"}"#,
+        ] {
+            assert!(
+                platform_body_is_addressable(TemplateKind::Custom, body),
+                "{body} is a JSON object and must be accepted"
+            );
+        }
+
+        for body in ["Alert: {alert_name}", r#"[{"message": "x"}]"#] {
+            assert!(
+                !platform_body_is_addressable(TemplateKind::Custom, body),
+                "{body} has nowhere to put a correlation key"
+            );
+        }
+
+        // A content template is rendered into an object by the renderer, so its own body shape is
+        // never the question.
+        assert!(platform_body_is_addressable(
+            TemplateKind::Content,
+            "Alert: {alert_name}"
+        ));
+    }
+
+    /// `keep_firing_for` is seconds, so 300000 typed for "5 minutes in milliseconds" would be three
+    /// and a half days an alert cannot recover, close its on-call record, or page again.
+    #[test]
+    fn keep_firing_for_is_capped_at_a_day() {
+        assert_eq!(KEEP_FIRING_FOR_MAX_SECS, 86_400);
+    }
 
     /// Live proof of the Slack image fallback: posts a payload whose image
     /// URL Slack's proxy cannot fetch (private IP), expects Slack's
@@ -5297,6 +5672,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -5346,6 +5723,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -5389,6 +5768,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -5438,6 +5819,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -5527,6 +5910,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -5585,6 +5970,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -5630,6 +6017,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -6162,6 +6551,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -6198,6 +6589,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -6233,6 +6626,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: Some(48213.0), // exact COUNT(*)
+            episode_id: None,
+            resolved: false,
         };
         let result = process_dest_template(
             "test_org",
@@ -6263,6 +6658,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
         let result = process_dest_template(
             "test_org",
@@ -6293,6 +6690,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
         let result = process_dest_template(
             "test_org",
@@ -6321,6 +6720,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
         let result = process_dest_template(
             "test_org",
@@ -6362,6 +6763,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: Some(91.2),
+            episode_id: None,
+            resolved: false,
         };
         let result = process_dest_template(
             "test_org",
@@ -6403,6 +6806,8 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                episode_id: None,
+                resolved: false,
             },
             &hashbrown::HashMap::new(),
             Some(&labels),
@@ -6440,6 +6845,8 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                episode_id: None,
+                resolved: false,
             },
             &hashbrown::HashMap::new(),
             Some(&labels),
@@ -6480,6 +6887,8 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                episode_id: None,
+                resolved: false,
             },
             &hashbrown::HashMap::new(),
             Some(&labels),
@@ -6502,6 +6911,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         };
 
         let result = process_dest_template(
@@ -6559,6 +6970,8 @@ mod tests {
                 is_email: false,
                 level: None,
                 actual_value: None,
+                episode_id: None,
+                resolved: false,
             },
             &hashbrown::HashMap::new(),
             None,
@@ -6630,6 +7043,8 @@ mod tests {
             is_email: false,
             level: None,
             actual_value: None,
+            episode_id: None,
+            resolved: false,
         }
     }
 

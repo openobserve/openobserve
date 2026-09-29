@@ -956,6 +956,69 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
+/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
+/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
+pub async fn resolve_alert_firing(
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let Some(incident_id) = event.incident_id.as_deref() else {
+        return Ok(());
+    };
+    infra::table::alert_incidents::resolve_alert_firings(
+        incident_id,
+        &event.alert_id,
+        event.recovered_at,
+    )
+    .await?;
+
+    // Published even when this region updated no rows: the receiver runs the same idempotent update
+    // against its own replica, which may still be behind.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
+            &event.org_id,
+            incident_id,
+            &event.alert_id,
+            event.recovered_at,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
+    }
+
+    let Some(incident) = infra::table::alert_incidents::get(&event.org_id, incident_id).await?
+    else {
+        return Ok(());
+    };
+    if incident.status == "resolved" {
+        return Ok(());
+    }
+    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
+        return Ok(());
+    }
+
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+        return Ok(());
+    }
+
+    update_status(
+        &event.org_id,
+        incident_id,
+        "resolved",
+        "system@openobserve.ai",
+    )
+    .await?;
+    log::info!(
+        "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
+        links.len()
+    );
+    Ok(())
+}
+
 /// Auto-resolve the open incident containing `external.id`, but only once every
 /// other `External`-kind alert already linked to that incident is also resolved
 /// in `external_alerts` — a single source clearing shouldn't close an incident
@@ -2395,6 +2458,20 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
+    // I20: the run must be refused here — before the billable agent call below — or `Off` only
+    // stops the ladder from waiting while the agent still runs and still bills.
+    if o2_enterprise::enterprise::alerts::rca_service::l0_off_for_incident(&org_id, &incident_id)
+        .await
+    {
+        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, skipping trigger");
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
+        return Ok(());
+    }
+
     // When the caller already emitted Begin synchronously, skip the guards and Begin emission
     // to avoid a DB race where the spawned task can't yet see the freshly-init'd events row.
     if !begin_already_emitted {
@@ -2520,30 +2597,29 @@ pub async fn trigger_rca_for_incident(
     }
 
     // Analyze incident
-    // §7: the agent is told how loudly this pages, and stops rendering
-    // `Severity: Unknown` on every automatic run.
-    let severity = o2_enterprise::enterprise::alerts::rca_service::paging_severity_for_incident(
+    // `build_on_previous` opts into continuity: the prior report is sent so the
+    // agent extends it rather than starting over. Extracted via typed
+    // `IncidentTopology` (same deserialization path used by `save_rca_result`)
+    // so field renames are caught at compile time.
+    let previous_analysis: Option<String> = if build_on_previous {
+        incident
+            .topology_context
+            .as_ref()
+            .and_then(|v| serde_json::from_value::<IncidentTopology>(v.clone()).ok())
+            .and_then(|t| t.suggested_root_cause)
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+    // §7/C1: the single builder, so this and the manual endpoint cannot tell
+    // the agent different things about the same incident.
+    let context = o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
         &org_id,
         &incident_id,
+        previous_analysis,
     )
     .await;
-    // §7: what this same subject turned out to be the last few times, which is
-    // the cross-incident memory the agent otherwise has none of.
-    let past_causes = o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
-        &org_id,
-        &incident_id,
-    )
-    .await;
-    match client
-        .analyze_incident(
-            &incident,
-            &auth_header,
-            build_on_previous,
-            severity,
-            past_causes,
-        )
-        .await
-    {
+    match client.analyze_incident(context, &auth_header).await {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",

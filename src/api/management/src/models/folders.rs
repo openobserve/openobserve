@@ -56,6 +56,7 @@ pub enum FolderType {
     Reports,
     Synthetics,
     Workflows,
+    Prompts,
     Downtimes,
 }
 
@@ -110,6 +111,7 @@ impl From<FolderType> for config::meta::folder::FolderType {
             FolderType::Reports => Self::Reports,
             FolderType::Synthetics => Self::Synthetics,
             FolderType::Workflows => Self::Workflows,
+            FolderType::Prompts => Self::Prompts,
             FolderType::Downtimes => Self::Downtimes,
         }
     }

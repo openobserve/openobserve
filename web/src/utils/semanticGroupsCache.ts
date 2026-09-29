@@ -43,8 +43,10 @@ export async function loadSemanticGroups(
 ): Promise<FieldAlias[]> {
   // Fresh-hit fast path: `fetchQuery` resolves only after the client's own scheduling, and the traces field pipeline awaits this inline.
   const state = queryClient.getQueryState<FieldAlias[]>(serviceStreamKeys.semanticGroups(org));
+  // An invalidated entry is stale whatever its age, or a group save's invalidation never reaches this path.
   if (
     state?.data !== undefined &&
+    !state.isInvalidated &&
     Date.now() - state.dataUpdatedAt < SEMANTIC_GROUPS_CACHE_TTL_MS
   ) {
     return state.data;

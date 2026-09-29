@@ -883,6 +883,10 @@ pub fn resolve_group_update(
         groups_firing_is_lower_bound: prev.groups_firing_is_lower_bound,
         silenced_until: prev.silenced_until,
         last_notified_level: prev.last_notified_level,
+        episode_id: prev.episode_id.clone(),
+        episode_opened_at: prev.episode_opened_at,
+        episode_incident_id: prev.episode_incident_id.clone(),
+        recovering_since: prev.recovering_since,
     };
 
     // An already-Ok group that vanished changes nothing on either axis, so no
@@ -1544,6 +1548,10 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         }
     }
 
@@ -1567,6 +1575,10 @@ mod tests {
             groups_firing_is_lower_bound: None,
             silenced_until: None,
             last_notified_level: None,
+            episode_id: None,
+            episode_opened_at: None,
+            episode_incident_id: None,
+            recovering_since: None,
         }
     }
 

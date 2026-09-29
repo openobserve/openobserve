@@ -79,7 +79,13 @@ const stagedDate = ref<DateValue | undefined>(rekaValue.value) as Ref<DateValue 
 const rekaMin = computed(() => tryParse(props.min));
 const rekaMax = computed(() => tryParse(props.max));
 
+// reka-ui commits a partially-typed year segment (e.g. a single "4" replacing "2026") as final on blur, which round-trips as "0004-01-02" and renders "1/2/4" unless guarded.
+function hasCompleteYear(value: DateValue): boolean {
+  return value.year >= 1000 && value.year <= 9999;
+}
+
 function handleDateChange(value: DateValue | null | undefined) {
+  if (value && !hasCompleteYear(value)) return;
   stagedDate.value = value ?? undefined;
   if (props.autoApply !== false) {
     const str = value ? value.toString() : "";
@@ -89,6 +95,7 @@ function handleDateChange(value: DateValue | null | undefined) {
 }
 
 function handleApply() {
+  if (stagedDate.value && !hasCompleteYear(stagedDate.value)) return;
   const str = stagedDate.value ? stagedDate.value.toString() : "";
   emit("update:modelValue", str);
   emit("change", str);
@@ -232,7 +239,7 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 border p-3 shadow-md"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 border p-3 shadow-md"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
           <DatePickerHeader class="mb-3 flex items-center justify-between">
