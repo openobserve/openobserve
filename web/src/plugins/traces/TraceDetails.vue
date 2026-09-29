@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Standalone (routed) header: shared OPageHeader -->
         <OPageHeader
           v-if="mode === 'standalone'"
-          :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
-          title-data-test="trace-details-operation-name"
+          title-overflow="visible"
           :back="
             showBackButton
               ? {
@@ -47,6 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class=""
         >
+          <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
+          <template #title>
+            <span
+              data-test="trace-details-operation-name"
+              class="block truncate"
+              :title="traceTree[0]?.operationName"
+            >
+              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+            </span>
+          </template>
+
           <template #subtitle>
             <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
               <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
@@ -98,7 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-text-label h-4 w-px py-0" />
               <!-- Span Count Badge -->
               <span class="inline-flex">
-                <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
+                <!-- sm + py-1! keeps both count chips at 1.1875rem: anything over the header's fixed 1.25rem subtitle band grows into the title's descenders. -->
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  size="sm"
+                  data-test="trace-details-spans-count"
+                  class="py-1!"
+                >
                   <span data-test="span-count-text">
                     {{ formatLargeNumber(effectiveSpanList.length) }}
                     {{ t("traces.spansLabel") }}
@@ -114,7 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   type="logsResultChip"
                   value="error"
+                  size="sm"
                   data-test="trace-details-error-spans-count"
+                  class="py-1!"
                 >
                   <span
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
@@ -518,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <OButton
-              v-if="hasRumSessionId && !hideSessionReplayButton"
+              v-if="hasReplaySession && !hideSessionReplayButton"
               data-test="trace-details-view-session-replay-btn"
               variant="outline"
               size="sm"
@@ -899,12 +918,17 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
-import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
+import {
+  formatTimeWithSuffix,
+  getImageURL,
+  b64EncodeUnicode,
+  formatLargeNumber,
+} from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
-import { resolveSessionId } from "./traceDetails.utils";
+import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
@@ -917,17 +941,18 @@ import {
   type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { spanWindowUs } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
 import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
@@ -1432,16 +1457,9 @@ export default defineComponent({
       return store.state.zoConfig.service_streams_enabled !== false;
     });
 
-    // Check if any RUM span has a session_id
-    const hasRumSessionId = computed(() => {
-      return spanList.value.some((span: any) => span.rum_session_id);
-    });
-
-    // Get the first RUM event with session_id for navigation
-    const firstRumSessionData = computed(() => {
-      const rumSpan = spanList.value.find((span: any) => span.rum_session_id);
-      return rumSpan || null;
-    });
+    // Gate and target share one span so the button never links to a session with nothing to play.
+    const replaySpan = computed(() => resolveReplaySpan(spanList.value));
+    const hasReplaySession = computed(() => replaySpan.value !== null);
 
     // Computed properties for mode-based priority logic
     const effectiveTraceId = computed(() => {
@@ -1472,10 +1490,10 @@ export default defineComponent({
         };
       }
       // Standalone mode - get from URL
-      return {
-        from: Number(router.currentRoute.value.query.from),
-        to: Number(router.currentRoute.value.query.to),
-      };
+      return resolveUrlTimeRange(
+        router.currentRoute.value.query.from,
+        router.currentRoute.value.query.to,
+      );
     });
 
     const effectiveOrgIdentifier = computed(() => {
@@ -2010,10 +2028,11 @@ export default defineComponent({
         if (props.spanListProp.length > 0) {
           const firstSpan = props.spanListProp[0];
           const serviceNames = extractServiceNames(props.spanListProp);
+          const traceWindow = spanWindowUs(props.spanListProp);
           (searchObj.data.traceDetails.selectedTrace as any) = {
             trace_id: props.traceIdProp || firstSpan.trace_id,
-            trace_start_time: Math.min(...props.spanListProp.map((s) => s.start_time / 1000)),
-            trace_end_time: Math.max(...props.spanListProp.map((s) => s.end_time / 1000)),
+            trace_start_time: traceWindow?.start ?? 0,
+            trace_end_time: traceWindow?.end ?? 0,
             service_name: serviceNames,
             services: {},
           };
@@ -2200,8 +2219,8 @@ export default defineComponent({
         if (effectiveStart !== data.from || effectiveEnd !== data.to) {
           updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
         }
-        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
         const traceSpans = traceRes.data.hits;
+        const rumData = await fetchRumEventsForTrace(data.trace_id, traceSpans);
         const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
         const rumSpans = formatRumEventsAsSpans(
           tracedResources,
@@ -2229,10 +2248,11 @@ export default defineComponent({
     };
 
     const updateSelectedTrace = (traceId: string, spans: any[]) => {
+      const traceWindow = spanWindowUs(spans);
       searchObj.data.traceDetails.selectedTrace = {
         trace_id: traceId,
-        trace_start_time: Math.floor(Math.min(...spans.map((span) => span.start_time)) / 1000),
-        trace_end_time: Math.ceil(Math.max(...spans.map((span) => span.end_time)) / 1000),
+        trace_start_time: traceWindow?.start ?? 0,
+        trace_end_time: traceWindow?.end ?? 0,
         service_name: extractServiceNames(spans),
         services: {},
       };
@@ -2755,7 +2775,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${escapeSingleQuotes(String(spanList.value[0]["trace_id"]))}'`,
       );
 
       router.push({
@@ -2794,19 +2814,18 @@ export default defineComponent({
     };
 
     const redirectToSessionReplay = () => {
-      if (!firstRumSessionData.value || !firstRumSessionData.value.rum_session_id) {
-        return;
-      }
+      const span = replaySpan.value;
+      if (!span) return;
 
       router.push({
         name: "SessionViewer",
         params: {
-          id: firstRumSessionData.value.rum_session_id,
+          id: span.rum_session_id,
         },
         query: {
-          start_time: Math.floor(firstRumSessionData.value.start_time / 1000) - 1000000,
-          end_time: Math.ceil(firstRumSessionData.value.end_time / 1000) + 1000000,
-          event_time: firstRumSessionData.value.rum_date,
+          start_time: Math.floor(span.start_time / 1000) - 1000000,
+          end_time: Math.ceil(span.end_time / 1000) + 1000000,
+          event_time: span.rum_date,
         },
       });
     };
@@ -3048,8 +3067,7 @@ export default defineComponent({
       redirectToLogs,
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
-      hasRumSessionId,
-      firstRumSessionData,
+      hasReplaySession,
       filteredStreamOptions,
       filterStreamFn,
       streamSearchValue,

@@ -30,8 +30,14 @@ use serde::{
 
 use crate::{
     FxIndexMap,
-    meta::{promql::NAME_LABEL, search::SearchEventType},
-    utils::{json, sort::sort_float},
+    meta::{
+        promql::NAME_LABEL,
+        search::{SearchEventContext, SearchEventType},
+    },
+    utils::{
+        json,
+        sort::{sort_float, sort_float_nan_last},
+    },
 };
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -180,7 +186,7 @@ impl Serialize for Sample {
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&(self.timestamp / 1_000_000))?;
-        seq.serialize_element(&self.value.to_string())?;
+        seq.serialize_element(&SampleValueDisplay(self.value))?;
         seq.end()
     }
 }
@@ -238,6 +244,68 @@ impl Sample {
     }
 }
 
+/// A sample value in the text Prometheus' `jsonutil.MarshalFloat` writes.
+struct SampleValueDisplay(f64);
+
+impl fmt::Display for SampleValueDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = self.0;
+        if value.is_nan() {
+            return f.write_str("NaN");
+        }
+        if value.is_infinite() {
+            return f.write_str(if value > 0.0 { "+Inf" } else { "-Inf" });
+        }
+        let abs = value.abs();
+        if abs == 0.0 || (1e-6..1e21).contains(&abs) {
+            return write!(f, "{value}");
+        }
+        // Go signs the exponent and pads it to two digits: 1e+21, 1e-07
+        let mut text = FloatText::default();
+        fmt::Write::write_fmt(&mut text, format_args!("{value:e}"))?;
+        let (mantissa, exponent) = text.as_str()?.split_once('e').ok_or(fmt::Error)?;
+        let (sign, digits) = match exponent.strip_prefix('-') {
+            Some(digits) => ('-', digits),
+            None => ('+', exponent),
+        };
+        write!(f, "{mantissa}e{sign}{digits:0>2}")
+    }
+}
+
+impl Serialize for SampleValueDisplay {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+/// Stack space for one `{:e}` float; the longest, `-2.2250738585072014e-308`, is 24 bytes.
+#[derive(Default)]
+struct FloatText {
+    bytes: [u8; 32],
+    len: usize,
+}
+
+impl FloatText {
+    fn as_str(&self) -> Result<&str, fmt::Error> {
+        std::str::from_utf8(&self.bytes[..self.len]).map_err(|_| fmt::Error)
+    }
+}
+
+impl fmt::Write for FloatText {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let end = self.len + s.len();
+        self.bytes
+            .get_mut(self.len..end)
+            .ok_or(fmt::Error)?
+            .copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Exemplar {
     /// Time in microseconds
@@ -258,7 +326,7 @@ impl Serialize for Exemplar {
             .map(|l| (l.name.as_str(), l.value.as_str()))
             .collect::<FxIndexMap<_, _>>();
         seq.serialize_field("timestamp", &(self.timestamp / 1_000_000))?;
-        seq.serialize_field("value", &self.value.to_string())?;
+        seq.serialize_field("value", &SampleValueDisplay(self.value))?;
         seq.serialize_field("labels", &labels_map)?;
         seq.end()
     }
@@ -453,6 +521,7 @@ pub struct QueryContext {
     pub use_cache: bool,
     pub timeout: u64, // seconds, query timeout
     pub search_event_type: Option<SearchEventType>,
+    pub search_event_context: Option<SearchEventContext>,
     pub regions: Vec<String>,
     pub clusters: Vec<String>,
     pub is_super_cluster: bool,
@@ -945,6 +1014,13 @@ impl Value {
         }
     }
 
+    /// Orders an instant vector the way PromQL `sort`/`sort_desc` does.
+    pub fn sort_by_value(&mut self, descending: bool) {
+        if let Value::Vector(v) = self {
+            v.sort_by(|a, b| sort_float_nan_last(&a.sample.value, &b.sample.value, descending));
+        }
+    }
+
     /// Checks if the vector or matrix types contain duplicated label set or
     /// not. This is an undefined condition, hence caller should raise an
     /// error in case this evaluates to `true`.
@@ -994,10 +1070,19 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| !exclude_names.contains(&name))
+}
+
+/// [`signature`] of only the labels named in `include_names`.
+pub fn signature_with_labels(labels: &Labels, include_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| include_names.contains(&name))
+}
+
+fn hash_labels(labels: &Labels, include: impl Fn(&str) -> bool) -> u64 {
     let mut hasher = crate::utils::hash::gxhash::new_hasher();
     labels
         .iter()
-        .filter(|item| !exclude_names.contains(&item.name.as_str()))
+        .filter(|item| include(item.name.as_str()))
         .for_each(|item| {
             hasher.write(item.name.as_bytes());
             hasher.write(item.value.as_bytes());
@@ -1012,6 +1097,21 @@ mod tests {
     use float_cmp::approx_eq;
 
     use super::*;
+
+    // The serializer before Prometheus formatting; plain decimals must keep its exact text.
+    struct LegacySample<'a>(&'a Sample);
+
+    impl Serialize for LegacySample<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut seq = serializer.serialize_seq(Some(2))?;
+            seq.serialize_element(&(self.0.timestamp / 1_000_000))?;
+            seq.serialize_element(&self.0.value.to_string())?;
+            seq.end()
+        }
+    }
 
     fn generate_test_labels() -> Labels {
         let labels: Labels = vec![
@@ -1052,6 +1152,16 @@ mod tests {
         assert_eq!(
             sig_without_ac,
             signature_without_labels(&labels, &["a", "c"])
+        );
+
+        let kept: Labels = labels
+            .iter()
+            .filter(|label| label.name == "a" || label.name == "c")
+            .cloned()
+            .collect();
+        assert_eq!(
+            signature_with_labels(&labels, &["a", "c"]),
+            signature(&kept)
         );
     }
 
@@ -1408,6 +1518,147 @@ mod tests {
         let sample = Sample::new(1_609_459_200_000_000, 42.5); // 2021-01-01 00:00:00 UTC in microseconds
         let json = serde_json::to_string(&sample).unwrap();
         assert_eq!(json, "[1609459200,\"42.5\"]");
+    }
+
+    /// Plain decimals keep the legacy text; infinities and exponent forms follow Prometheus.
+    fn assert_sample_display(sample: Sample) {
+        let context = format!(
+            "timestamp={}, value bits={:016x}",
+            sample.timestamp,
+            sample.value.to_bits()
+        );
+        let text = serde_json::to_string(&sample).unwrap();
+        let legacy = serde_json::to_string(&LegacySample(&sample)).unwrap();
+        let (timestamp, value): (i64, String) = serde_json::from_str(&text).unwrap();
+        let (legacy_timestamp, legacy_value): (i64, String) =
+            serde_json::from_str(&legacy).unwrap();
+        assert_eq!(timestamp, legacy_timestamp, "{context}");
+        let abs = sample.value.abs();
+        if sample.value.is_nan() || abs == 0.0 || (1e-6..1e21).contains(&abs) {
+            assert_eq!(text, legacy, "{context}");
+        } else if sample.value.is_infinite() {
+            let expected = if sample.value > 0.0 { "+Inf" } else { "-Inf" };
+            assert_eq!(value, expected, "{context}");
+        } else {
+            let (_, exponent) = value.split_once('e').expect(&context);
+            assert!(
+                exponent.starts_with(['+', '-']) && exponent.len() >= 3,
+                "{context}: {value}"
+            );
+            assert_ne!(value, legacy_value, "{context}");
+            assert_eq!(
+                value.parse::<f64>().unwrap().to_bits(),
+                sample.value.to_bits(),
+                "{context}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sample_display_exact_edge_case_text() {
+        let bits = [
+            0,
+            1,
+            0x8000_0000_0000_0000, // negative zero
+            0x8000_0000_0000_0001, // negative smallest subnormal
+            0x000f_ffff_ffff_ffff, // largest subnormal
+            0x0010_0000_0000_0000, // smallest normal
+            0x7fef_ffff_ffff_ffff, // largest finite
+            0xffef_ffff_ffff_ffff,
+            f64::INFINITY.to_bits(),
+            f64::NEG_INFINITY.to_bits(),
+            0x7ff0_0000_0000_0001, // signaling NaN payload
+            0x7ff8_0000_0000_0001,
+            0x7ff8_0000_0000_0042,
+            0xfff8_0000_0000_0042,
+            1.0f64.to_bits(),
+            (-1.0f64).to_bits(),
+            0.1f64.to_bits(),
+            f64::EPSILON.to_bits(),
+            1e-7f64.to_bits(),
+            1e20f64.to_bits(),
+        ];
+        let timestamps = [
+            i64::MIN,
+            -1_000_001,
+            -1_000_000,
+            -999_999,
+            -1,
+            0,
+            1,
+            999_999,
+            1_000_000,
+            1_000_001,
+            1_609_459_200_000_000,
+            i64::MAX,
+        ];
+        for timestamp in timestamps {
+            for bits in bits {
+                assert_sample_display(Sample::new(timestamp, f64::from_bits(bits)));
+            }
+        }
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, -0.0)).unwrap(),
+            "[0,\"-0\"]"
+        );
+        for (value, expected) in [
+            (f64::INFINITY, "+Inf"),
+            (f64::NEG_INFINITY, "-Inf"),
+            (1e21, "1e+21"),
+            (-1.5e21, "-1.5e+21"),
+            (1e-7, "1e-07"),
+            (1.5e300, "1.5e+300"),
+            (5e-324, "5e-324"),
+            (1e20, "100000000000000000000"),
+            (1e-6, "0.000001"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&Sample::new(0, value)).unwrap(),
+                format!("[0,\"{expected}\"]")
+            );
+            let parsed: Sample = serde_json::from_str(&format!("[0,\"{expected}\"]")).unwrap();
+            assert_eq!(parsed.value.to_bits(), value.to_bits(), "{expected}");
+        }
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, f64::NAN)).unwrap(),
+            "[0,\"NaN\"]"
+        );
+    }
+
+    #[test]
+    fn test_sample_display_exact_random_finite_text() {
+        // Deterministic bit-pattern coverage, independent of rand versions.
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut checked = 0;
+        while checked < 10_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let value = f64::from_bits(state);
+            if value.is_finite() {
+                assert_sample_display(Sample::new(state.rotate_left(19) as i64, value));
+                checked += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn test_sample_display_preserves_point_order_and_pretty_json() {
+        let samples = vec![
+            Sample::new(1_000_000, 0.0),
+            Sample::new(-1_000_001, -0.0),
+            Sample::new(1_000_000, f64::NAN),
+            Sample::new(0, 1.5),
+            Sample::new(i64::MAX, 12_345.678),
+        ];
+        let legacy: Vec<_> = samples.iter().map(LegacySample).collect();
+        let mut direct = Vec::new();
+        serde_json::to_writer(&mut direct, &samples).unwrap();
+        assert_eq!(direct, serde_json::to_vec(&legacy).unwrap());
+        assert_eq!(
+            serde_json::to_string_pretty(&samples).unwrap(),
+            serde_json::to_string_pretty(&legacy).unwrap()
+        );
     }
 
     #[test]

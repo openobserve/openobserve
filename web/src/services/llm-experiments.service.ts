@@ -39,6 +39,19 @@ export type ExperimentTask =
       params?: Record<string, unknown> | null;
     }
   | {
+      type: "prompt_ref";
+      /** Stable logical Prompt entity ID, never the physical version row ID. */
+      id: string;
+      version: number;
+      providerId: string;
+      paramsOverrides?: {
+        model?: string | null;
+        params?: Record<string, unknown> | null;
+        tools?: unknown;
+        responseFormat?: unknown;
+      } | null;
+    }
+  | {
       type: "remote";
       /** A published Remote Task pinned as `name` plus its version. Never latest. */
       taskRef: string;
@@ -151,6 +164,12 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   isBaseline: boolean;
   createdBy: string;
   createdAt: number;
+  /** Stable managed Prompt evidence. Present only for PromptRef runs. */
+  promptId?: string | null;
+  promptName?: string | null;
+  promptVersion?: number | null;
+  /** Present for both PromptRef and content-matched InlinePrompt runs. */
+  promptContentHash?: string | null;
   /**
    * Present only when fetched with `includeSummary` (list) or via `get()`
    * (always summarized). Lets the browse table read cost/progress/scores
@@ -159,6 +178,8 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   scoringStatus?: string | null;
   executionProgress?: ExperimentProgress | null;
   scoringProgress?: ExperimentProgress | null;
+  taskOutcomes?: ExperimentTaskOutcomes | null;
+  scoreOutcomes?: ExperimentScoreOutcomes | null;
   scoreSummaries?: ExperimentScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary | null;
 }
@@ -174,7 +195,7 @@ export interface ExperimentExecution {
   itemLogicalId: string;
   rowId: string;
   trialIndex: number;
-  status: "pending" | "ok" | "error" | "skipped";
+  status: "queued" | "pending" | "ok" | "error" | "skipped";
   skipReason?: "no_reference" | "no_trace" | null;
   output: unknown | null;
   errorMessage: string | null;
@@ -214,6 +235,8 @@ export interface ExperimentResultRow {
   expectedOutput: unknown | null;
   trialCount: number;
   status: ExperimentSlotStatus;
+  taskOutcomes?: ExperimentTaskOutcomes;
+  scoreOutcomes?: ExperimentScoreOutcomes;
   output: unknown | null;
   scoreSummaries: ExperimentScoreSummary[];
   p50LatencyMs: number | null;
@@ -258,6 +281,8 @@ export interface ExperimentResults {
   pagination?: ExperimentResultPagination;
   taskProgress?: ExperimentProgress;
   scoringProgress?: ExperimentProgress;
+  taskOutcomes?: ExperimentTaskOutcomes;
+  scoreOutcomes?: ExperimentScoreOutcomes;
   skipSummary?: ExperimentSkipSummary;
   scoreSummaries?: ExperimentScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary;
@@ -278,7 +303,7 @@ export type ExperimentSlotStatus =
 export interface ExperimentResultSlot extends ExperimentSlot {
   /** Single lifecycle rollup of task and score evidence — the list-surface field. */
   status: ExperimentSlotStatus;
-  taskStatus: "pending" | "in_progress" | "ok" | "skipped" | "error";
+  taskStatus: "pending" | "queued" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
 }
@@ -306,6 +331,24 @@ export interface ExperimentProgress {
   completed: number;
   total: number;
   skipped: number;
+}
+
+export interface ExperimentTaskOutcomes {
+  total: number;
+  succeeded: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+}
+
+export interface ExperimentScoreOutcomes {
+  completed: number;
+  total: number;
+  scored: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+  unscored: number;
 }
 
 export interface ExperimentSkipSummary {
@@ -422,7 +465,14 @@ export interface ExperimentResultQuery {
   resultPageSize?: number;
 }
 
-const TASK_RESULT_STATUSES = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+const TASK_RESULT_STATUSES = [
+  "pending",
+  "queued",
+  "in_progress",
+  "ok",
+  "skipped",
+  "error",
+] as const;
 const SCORE_RESULT_STATUSES = ["pending", "in_progress", "success", "skipped", "error"] as const;
 const SLOT_STATUSES = [
   "pending",
@@ -439,7 +489,7 @@ function deriveSlotStatus(
   taskStatus: ExperimentResultSlot["taskStatus"],
   scores: ExperimentResultScore[],
 ): ExperimentSlotStatus {
-  if (taskStatus === "pending") return "pending";
+  if (taskStatus === "pending" || taskStatus === "queued") return "pending";
   if (taskStatus === "in_progress") return "running";
   if (taskStatus === "error") return "task_failed";
   if (taskStatus === "skipped") return "skipped";
@@ -581,12 +631,22 @@ function normalizeExperiment(input: any): LlmExperiment {
     isBaseline: value<boolean>(input, "isBaseline", "is_baseline", false) === true,
     createdBy: value(input, "createdBy", "created_by", ""),
     createdAt: Number(value(input, "createdAt", "created_at", 0)),
+    promptId: value(input, "promptId", "prompt_id", null),
+    promptName: value(input, "promptName", "prompt_name", null),
+    promptVersion: numberOrNull(value(input, "promptVersion", "prompt_version", null)),
+    promptContentHash: value(input, "promptContentHash", "prompt_content_hash", null),
     scoringStatus: value(input, "scoringStatus", "scoring_status", undefined),
     executionProgress: hasSummaryField(input, "executionProgress", "execution_progress")
       ? normalizeProgress(value<any>(input, "executionProgress", "execution_progress", {}))
       : undefined,
     scoringProgress: hasSummaryField(input, "scoringProgress", "scoring_progress")
       ? normalizeProgress(value<any>(input, "scoringProgress", "scoring_progress", {}))
+      : undefined,
+    taskOutcomes: hasSummaryField(input, "taskOutcomes", "task_outcomes")
+      ? normalizeTaskOutcomes(value<any>(input, "taskOutcomes", "task_outcomes", {}))
+      : undefined,
+    scoreOutcomes: hasSummaryField(input, "scoreOutcomes", "score_outcomes")
+      ? normalizeScoreOutcomes(value<any>(input, "scoreOutcomes", "score_outcomes", {}))
       : undefined,
     scoreSummaries: hasSummaryField(input, "scoreSummaries", "score_summaries")
       ? value<any[]>(input, "scoreSummaries", "score_summaries", []).map(normalizeScoreSummary)
@@ -603,6 +663,28 @@ function hasSummaryField(input: any, camel: string, snake: string): boolean {
 
 function numberOrNull(input: unknown): number | null {
   return input === null || input === undefined || input === "" ? null : Number(input);
+}
+
+function normalizeTaskOutcomes(input: any): ExperimentTaskOutcomes {
+  return {
+    total: Number(input?.total ?? 0),
+    succeeded: Number(input?.succeeded ?? 0),
+    failed: Number(input?.failed ?? 0),
+    pending: Number(input?.pending ?? 0),
+    skipped: Number(input?.skipped ?? 0),
+  };
+}
+
+function normalizeScoreOutcomes(input: any): ExperimentScoreOutcomes {
+  return {
+    completed: Number(input?.completed ?? 0),
+    total: Number(input?.total ?? 0),
+    scored: Number(input?.scored ?? 0),
+    failed: Number(input?.failed ?? 0),
+    pending: Number(input?.pending ?? 0),
+    skipped: Number(input?.skipped ?? 0),
+    unscored: Number(input?.unscored ?? 0),
+  };
 }
 
 function normalizeAggregateSummary(aggregateSummary: any): ExperimentAggregateSummary {
@@ -639,6 +721,18 @@ function normalizeResults(input: any, experimentSummary: any = {}): ExperimentRe
     "scoring_progress",
     value<any>(input, "scoringProgress", "scoring_progress", {}),
   );
+  const taskOutcomes = value<any>(
+    experimentSummary,
+    "taskOutcomes",
+    "task_outcomes",
+    value<any>(input, "taskOutcomes", "task_outcomes", undefined),
+  );
+  const scoreOutcomes = value<any>(
+    experimentSummary,
+    "scoreOutcomes",
+    "score_outcomes",
+    value<any>(input, "scoreOutcomes", "score_outcomes", undefined),
+  );
   const skipSummary = value<any>(input, "skipSummary", "skip_summary", {});
   const pagination = value<any>(input, "pagination", "pagination", {});
   const aggregateSummary = value<any>(
@@ -669,6 +763,8 @@ function normalizeResults(input: any, experimentSummary: any = {}): ExperimentRe
     },
     taskProgress: normalizeProgress(taskProgress),
     scoringProgress: normalizeProgress(scoringProgress),
+    taskOutcomes: taskOutcomes === undefined ? undefined : normalizeTaskOutcomes(taskOutcomes),
+    scoreOutcomes: scoreOutcomes === undefined ? undefined : normalizeScoreOutcomes(scoreOutcomes),
     skipSummary: {
       fullySkippedSlots: Number(value(skipSummary, "fullySkippedSlots", "fully_skipped_slots", 0)),
       partiallySkippedSlots: Number(
@@ -775,6 +871,12 @@ export function normalizeExperimentResultRowPage(input: any): ExperimentResultRo
       expectedOutput: value(row, "expectedOutput", "expected_output", null),
       trialCount: Number(value(row, "trialCount", "trial_count", 0)),
       status: row?.status as ExperimentSlotStatus,
+      taskOutcomes: hasSummaryField(row, "taskOutcomes", "task_outcomes")
+        ? normalizeTaskOutcomes(value<any>(row, "taskOutcomes", "task_outcomes", {}))
+        : undefined,
+      scoreOutcomes: hasSummaryField(row, "scoreOutcomes", "score_outcomes")
+        ? normalizeScoreOutcomes(value<any>(row, "scoreOutcomes", "score_outcomes", {}))
+        : undefined,
       output: row?.output ?? null,
       scoreSummaries: value<any[]>(row, "scoreSummaries", "score_summaries", []).map(
         normalizeScoreSummary,
@@ -916,11 +1018,20 @@ const llmExperimentsService = {
    */
   async list(
     orgId: string,
-    options: { includeSummary?: boolean; datasetId?: string } = {},
+    options: {
+      includeSummary?: boolean;
+      datasetId?: string;
+      promptId?: string;
+      promptVersion?: number;
+      contentHash?: string;
+    } = {},
   ): Promise<LlmExperiment[]> {
     const params = {
       ...(options.includeSummary ? { includeSummary: true } : {}),
       ...(options.datasetId ? { datasetId: options.datasetId } : {}),
+      ...(options.promptId ? { promptId: options.promptId } : {}),
+      ...(options.promptVersion == null ? {} : { promptVersion: options.promptVersion }),
+      ...(options.contentHash ? { contentHash: options.contentHash } : {}),
     };
     const response = await http().get(base(orgId), {
       params: Object.keys(params).length ? params : undefined,

@@ -40,6 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
+    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+      <OEmptyState size="hero" preset="no-access" data-test="discovered-services-forbidden" />
+    </div>
+
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="flex flex-1 items-center justify-center">
       <OEmptyState
@@ -161,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="refreshing ? [] : flatRows"
             :columns="columns"
             :loading="refreshing"
+            :forbidden="forbidden"
             row-key="id"
             pagination="client"
             :page-size="pageSize"
@@ -306,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom -->
             <template #bottom>
               <div class="flex h-9 w-full items-center justify-between">
-                <div class="w-[15.625rem] text-xs font-normal">
+                <div class="w-[15.625rem] text-xs font-normal max-md:hidden">
                   {{
                     t("settings.correlation.serviceCountSingular", {
                       count: filteredGroupCount,
@@ -489,6 +494,8 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -535,6 +542,7 @@ interface ServiceGroup {
 const store = useStore();
 
 const loading = ref(true);
+const forbidden = ref(false);
 const refreshing = ref(false);
 const resetting = ref(false);
 const error = ref<string | null>(null);
@@ -798,6 +806,7 @@ const loadServices = async (isRefresh = false) => {
     loading.value = true;
   }
   error.value = null;
+  forbidden.value = false;
 
   try {
     const orgId = store.state.selectedOrganization?.identifier;
@@ -815,7 +824,10 @@ const loadServices = async (isRefresh = false) => {
     }));
   } catch (err: any) {
     console.error("Failed to load services:", err);
-    error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
+    forbidden.value = err?.response?.status === 403;
+    if (!forbidden.value) {
+      error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
+    }
   } finally {
     loading.value = false;
     refreshing.value = false;
@@ -837,6 +849,8 @@ const doResetServices = async () => {
     }
 
     const response = await serviceStreamsService.resetServices(orgId);
+    // The reset deletes the rows the cached services list and analytics are built from.
+    void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(orgId) });
     const { deleted_count } = response.data;
 
     toast({

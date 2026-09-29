@@ -27,6 +27,7 @@ import {
   EC2_IAM_NOTE_KEY,
   agentCode,
   agentUninstall,
+  dashboardReadyStep,
   envIcons,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
@@ -91,6 +92,7 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
           t("common.network"),
         ],
       },
+      dashboardReadyStep(t),
     ],
     detect: hostMetricsDetect,
     extras: {

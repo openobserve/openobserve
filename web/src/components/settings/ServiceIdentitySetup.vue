@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
                           'bg-badge-success-solid-bg': st === 'metrics',
+                          'bg-badge-purple-solid-bg': st === 'profiles',
                         }"
                         :title="st"
                       />
@@ -140,6 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-1">
                       <span class="bg-badge-success-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInMetrics") }}
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <span class="bg-badge-purple-solid-bg h-1.5 w-1.5 rounded-full" />
+                      {{ t("settings.correlation.foundInProfiles") }}
                     </div>
                     <div v-if="unseenServiceFields.length > 0" class="flex items-center gap-1">
                       <span class="border-grey-4 h-1.5 w-1.5 rounded-full border border-dashed" />
@@ -637,6 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
                           'bg-badge-success-solid-bg': st === 'metrics',
+                          'bg-badge-purple-solid-bg': st === 'profiles',
                         }" /></span
                   ></span>
                   <ODropdown
@@ -676,6 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'bg-badge-blue-solid-bg': st === 'logs',
                               'bg-badge-orange-solid-bg': st === 'traces',
                               'bg-badge-success-solid-bg': st === 'metrics',
+                              'bg-badge-purple-solid-bg': st === 'profiles',
                             }" /></span
                       ></span>
                     </div>
@@ -698,6 +705,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
               <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInMetrics") }}</span>
+            </div>
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-purple-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
+              <span>{{ t("settings.correlation.foundInProfiles") }}</span>
             </div>
           </div>
         </div>
@@ -1001,7 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span>{{
                   selectedStreamType ||
-                  ["logs", "metrics", "traces"].find(
+                  ["logs", "metrics", "traces", "profiles"].find(
                     (t) => selectedFieldAnalytics?.sample_values[t],
                   )
                 }}</span>
@@ -1036,7 +1047,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
                 <template v-else>
                   <template
-                    v-for="(typeName, typeIdx) in ['logs', 'metrics', 'traces'].filter(
+                    v-for="(typeName, typeIdx) in ['logs', 'metrics', 'traces', 'profiles'].filter(
                       (t) => selectedFieldAnalytics?.sample_values[t],
                     )"
                     :key="typeName"
@@ -1130,6 +1141,8 @@ import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -2878,6 +2891,8 @@ async function saveConfig() {
     // (logs/traces correlation) pick up the new config immediately instead of
     // waiting up to 5 minutes for the TTL to expire.
     clearIdentityConfigCache(props.orgIdentifier);
+    // The server builds the discovered-services list from this config.
+    void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(props.orgIdentifier) });
 
     // Sync baseline so isDirty resets to false
     currentIdentityConfig.value = payload;

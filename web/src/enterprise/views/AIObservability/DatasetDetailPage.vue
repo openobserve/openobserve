@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="refresh"
                 :loading="loading"
                 data-test="ai-dataset-detail-refresh-btn"
-                @click="refresh"
+                @click="refresh(true)"
               >
                 <OTooltip side="bottom" :content="t('common.refresh')" />
               </OButton>
@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   icon-left="edit"
+                  class="max-md:hidden"
                   :data-test="`ai-dataset-detail-item-edit-${row.id}`"
                   @click.stop="openEditItem(row)"
                 >
@@ -192,11 +193,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-sm"
                   icon-left="delete"
+                  class="max-md:hidden"
                   :data-test="`ai-dataset-detail-item-delete-${row.id}`"
                   @click.stop="removeItem(row)"
                 >
                   <OTooltip side="bottom" :content="t('common.delete')" />
                 </OButton>
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="ai-dataset-detail-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`ai-dataset-detail-item-edit-${row.id}-menu`"
+                    @select="openEditItem(row)"
+                  >
+                    <span>{{ t("common.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`ai-dataset-detail-item-delete-${row.id}-menu`"
+                    @select="removeItem(row)"
+                  >
+                    <span>{{ t("common.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
           </OTable>
@@ -213,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               compact
               @open-filtered="openExperiments"
-              @refresh="refreshExperiments"
+              @refresh="refreshExperiments(true)"
               @baseline-changed="onBaselineChanged"
             />
           </OContent>
@@ -356,6 +387,8 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -380,7 +413,15 @@ import llmDatasetsService, {
   type LlmDatasetItem,
   type LlmDatasetItemSource,
 } from "@/services/llm-datasets.service";
-import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  importDatasetItemsMutation,
+  removeDatasetItemMutation,
+  saveDatasetItemMutation,
+} from "@/services/llm-datasets.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
@@ -494,7 +535,7 @@ function sourceVariant(source: LlmDatasetItemSource): BadgeVariant {
   return source === "trace" ? "blue-soft" : source === "annotation" ? "purple-soft" : "orange-soft";
 }
 
-async function refresh() {
+async function refresh(force = false) {
   if (!orgId.value || !datasetId.value) return;
   loading.value = true;
   try {
@@ -508,7 +549,7 @@ async function refresh() {
     dataset.value = ds;
     items.value = page.items;
     totalItems.value = page.total;
-    await refreshExperiments();
+    await refreshExperiments(force);
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.detail.loadError") });
   } finally {
@@ -524,12 +565,25 @@ function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string
   });
 }
 
-async function refreshExperiments() {
+// `refresh` only re-reads this page; the datasets list's item count comes from the mutations' scope drop.
+const saveItemWrite = useMutation(() =>
+  saveDatasetItemMutation(orgId.value, () => editingItemId.value),
+);
+const removeItemWrite = useMutation(() => removeDatasetItemMutation(orgId.value));
+const importItems = useMutation(() => importDatasetItemsMutation(orgId.value));
+
+// `force` is for the Refresh buttons: experiments made elsewhere never expire this tab's cached list.
+async function refreshExperiments(force = false) {
   try {
-    experiments.value = await llmExperimentsService.list(orgId.value, {
-      includeSummary: true,
-      datasetId: datasetId.value,
-    });
+    const options = experimentsListQuery(orgId.value, datasetId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    experiments.value = await queryClient.fetchQuery(options);
   } catch {
     experiments.value = [];
   }
@@ -581,11 +635,10 @@ async function importCsv() {
   if (isImporting.value || !orgId.value || !datasetId.value || !importFile.value) return;
   isImporting.value = true;
   try {
-    const result = await llmDatasetsService.importItems(
-      orgId.value,
-      datasetId.value,
-      importFile.value,
-    );
+    const result = await importItems.mutateAsync({
+      datasetId: datasetId.value,
+      file: importFile.value,
+    });
     toast({
       variant: "success",
       message: t("aiObservability.datasets.detail.csvImport.success", {
@@ -673,16 +726,7 @@ async function saveItem(values: DatasetItemForm) {
     tags: values.tags,
   };
   try {
-    if (editingItemId.value) {
-      await llmDatasetsService.updateItem(
-        orgId.value,
-        dataset.value.id,
-        editingItemId.value,
-        payload,
-      );
-    } else {
-      await llmDatasetsService.addItem(orgId.value, dataset.value.id, payload);
-    }
+    await saveItemWrite.mutateAsync({ datasetId: dataset.value.id, payload });
     toast({ variant: "success", message: t("aiObservability.datasets.detail.addItem.success") });
     itemOpen.value = false;
     await refresh();
@@ -701,7 +745,7 @@ async function removeItem(row: LlmDatasetItem): Promise<boolean> {
   });
   if (!ok) return false;
   try {
-    await llmDatasetsService.removeItem(orgId.value, dataset.value.id, row.id);
+    await removeItemWrite.mutateAsync({ datasetId: dataset.value.id, itemId: row.id });
     toast({ variant: "success", message: t("aiObservability.datasets.detail.deleteItemSuccess") });
     await refresh();
     return true;

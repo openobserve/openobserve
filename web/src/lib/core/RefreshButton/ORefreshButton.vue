@@ -12,6 +12,9 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   loading: false,
   disabled: false,
   variant: "ghost",
+  layout: "split",
+  dataTest: "refresh-button",
+  shortcutId: undefined,
 });
 
 const emit = defineEmits<RefreshButtonEmits>();
@@ -84,7 +87,35 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="inline-flex items-center gap-1.5">
+  <!-- `h-8!` beats sm-toolbar's own 30px, so this matches the 32px icon-sm buttons beside it. -->
+  <OButton
+    v-if="layout === 'inline'"
+    :variant="variant"
+    size="sm-toolbar"
+    class="h-8!"
+    icon-left="refresh"
+    :loading="loading"
+    :disabled="disabled"
+    :data-test="dataTest"
+    @click="handleClick"
+  >
+    <!-- The age drops below md so a toolbar keeps search, columns and refresh on one phone row. -->
+    <span
+      v-if="lastRunAt"
+      class="bg-border-default h-4 w-px shrink-0 max-md:hidden"
+      aria-hidden="true"
+    />
+    <!-- No colour class: here the age is the button's label, not the loose caption `split` renders. -->
+    <span
+      v-if="lastRunAt"
+      class="inline-block min-w-12 text-left text-xs tabular-nums max-md:hidden"
+    >
+      {{ relativeTime || t("refreshButton.justNow") }}
+    </span>
+    <OTooltip :content="exactTime" :shortcut-id="shortcutId" />
+  </OButton>
+
+  <div v-else class="inline-flex items-center gap-1.5">
     <!-- staleness dot -->
     <span :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]">
       <OTooltip :content="dotTitle" />
@@ -92,7 +123,7 @@ function handleClick(e: MouseEvent) {
     <!-- relative timestamp -->
     <span
       v-if="lastRunAt"
-      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none max-md:hidden"
     >
       {{ relativeTime || t("refreshButton.justNow") }}
       <OTooltip :content="exactTime" />
@@ -103,10 +134,10 @@ function handleClick(e: MouseEvent) {
       icon-left="refresh"
       :loading="loading"
       :disabled="disabled"
-      data-test="refresh-button"
+      :data-test="dataTest"
       @click="handleClick"
     >
-      <OTooltip :content="exactTime" />
+      <OTooltip :content="exactTime" :shortcut-id="shortcutId" />
     </OButton>
   </div>
 </template>

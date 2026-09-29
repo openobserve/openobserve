@@ -410,6 +410,51 @@ describe("RenderDashboardCharts", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
+
+    // Per-tab narrowing (`curatedTabs`) is deliberately NOT applied here: this
+    // list decides whether the selector mounts at all, and an off-tab variable
+    // must still load because panels on other tabs read its value. The narrowing
+    // is applied at render time inside VariablesValueSelector, which is where it
+    // is pinned. This holds the loading list complete.
+    describe("curatedTabs does NOT narrow the loading list", () => {
+      const withCuratedTabs = () => ({
+        ...defaultProps.dashboardData,
+        variables: {
+          showDynamicFilters: false,
+          list: [
+            { name: "cluster", type: "query_values", scope: "global", curatedTabs: ["overview"] },
+            { name: "pod", type: "query_values", scope: "global", curatedTabs: ["workloads"] },
+            { name: "always", type: "query_values", scope: "global" },
+          ],
+        },
+        tabs: [
+          { tabId: "overview", name: "Overview", panels: [] },
+          { tabId: "workloads", name: "Workloads", panels: [] },
+        ],
+      });
+
+      const namesFor = (tabId: string) => {
+        wrapper = shallowMount(RenderDashboardCharts, {
+          props: { ...defaultProps, dashboardData: withCuratedTabs() },
+          global: {
+            plugins: [i18n, store, router],
+            provide: { selectedTabId: ref(tabId) },
+            mocks: {
+              $t: (key) => key,
+              $route: { params: {}, query: {} },
+              $router: { push: vi.fn(), replace: vi.fn() },
+            },
+            stubs: { ODialog: ODialogStub },
+          },
+        });
+        return wrapper.vm.globalVariables.map((v: any) => v.name);
+      };
+
+      it("keeps every global variable on every tab so all of them still load", () => {
+        expect(namesFor("overview")).toEqual(["cluster", "pod", "always"]);
+        expect(namesFor("workloads")).toEqual(["cluster", "pod", "always"]);
+      });
+    });
   });
 
   describe("Tab Management", () => {
@@ -448,6 +493,29 @@ describe("RenderDashboardCharts", () => {
     it("should pass correct tab data to components", () => {
       wrapper = createWrapper({ showTabs: true });
       expect(wrapper.exists()).toBe(true);
+    });
+
+    // Variables scope the ACTIVE tab, so rendering them above the strip made them
+    // read as page chrome and moved the tab bar whenever their height changed.
+    it("renders the global variables strip BELOW the tab list, not above it", () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        dashboardData: {
+          ...defaultProps.dashboardData,
+          variables: {
+            showDynamicFilters: true,
+            list: [{ name: "cluster", type: "query_values", scope: "global", value: [] }],
+          },
+        },
+      });
+
+      const html = wrapper.html();
+      const tabsAt = html.indexOf("tab-list");
+      const varsAt = html.indexOf("global-variables-selector");
+
+      expect(tabsAt).toBeGreaterThan(-1);
+      expect(varsAt).toBeGreaterThan(-1);
+      expect(tabsAt).toBeLessThan(varsAt);
     });
   });
 

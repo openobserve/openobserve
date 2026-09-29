@@ -28,15 +28,18 @@ import i18n from "@/locales";
 // exercise the actual schema wiring — an empty required field must block submit
 // and NOT call the service (the gap that let the AddToDashboard bug ship).
 
-vi.mock("@/services/cipher_keys", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-    get_by_name: vi.fn(),
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/cipher_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+      get_by_name: vi.fn(),
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 // toast returns a dismiss() fn — keep it a no-op so the loading toast teardown
 // in the save handlers doesn't blow up.

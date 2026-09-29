@@ -51,6 +51,32 @@ pub const REQUIRED_LLM_FIELDS: &[&str] = &[
 /// Optional fields for the legacy (llm_*) schema.
 pub const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output", "llm_usage_tokens_total"];
 
+/// Derived at ingest, already flattened; a same-named user attribute gets an `attr_` prefix.
+pub const INFER_SERVICE_NAME: &str = "infer_service_name";
+pub const INFER_SERVICE_TYPE: &str = "infer_service_type";
+pub const INFER_SERVICE_SYSTEM: &str = "infer_service_system";
+
+/// Service-graph join keys; unlike `infer_service_*` they keep IP literals, to join on.
+pub const INFER_PEER_KEY: &str = "infer_peer_key";
+pub const INFER_PEER_PORT: &str = "infer_peer_port";
+pub const INFER_PEER_IP: &str = "infer_peer_ip";
+pub const INFER_SELF_KEY: &str = "infer_self_key";
+pub const INFER_SELF_PORT: &str = "infer_self_port";
+pub const INFER_SELF_IP: &str = "infer_self_ip";
+
+/// Every derived identity column; they are keys, so a user-defined schema always keeps them.
+pub const ALL_INFER_FIELDS: [&str; 9] = [
+    INFER_SERVICE_NAME,
+    INFER_SERVICE_TYPE,
+    INFER_SERVICE_SYSTEM,
+    INFER_PEER_KEY,
+    INFER_PEER_PORT,
+    INFER_PEER_IP,
+    INFER_SELF_KEY,
+    INFER_SELF_PORT,
+    INFER_SELF_IP,
+];
+
 pub mod session {
     use std::collections::HashSet;
 
@@ -58,6 +84,7 @@ pub mod session {
     use serde_json::Value;
 
     use crate::TIMESTAMP_COL_NAME;
+    pub use crate::utils::sql::{escape_sql_string, quote_identifier, quote_sql_string};
 
     pub const SESSION_ID_COLUMNS: &[&str] = &[
         "session_id",
@@ -150,18 +177,6 @@ pub mod session {
             ingest_cutoff_predicate(ingest_cutoff_us),
             quote_identifier(TIMESTAMP_COL_NAME),
         )
-    }
-
-    pub fn quote_identifier(value: &str) -> String {
-        format!("\"{}\"", value.replace('"', "\"\""))
-    }
-
-    pub fn quote_sql_string(value: &str) -> String {
-        format!("'{}'", escape_sql_string(value))
-    }
-
-    pub fn escape_sql_string(value: &str) -> String {
-        value.replace('\'', "''")
     }
 
     #[cfg(test)]

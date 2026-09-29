@@ -16,6 +16,7 @@
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { type SQLContext } from "../shared/types";
 import { chartColor } from "../../../chartTheme";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Applies chart-specific options for:
@@ -126,30 +127,34 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
             // if have than bold it
             if (it?.seriesName == ctx.hoveredSeriesState?.value?.hoveredSeriesName)
               hoverText.push(
-                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
+                `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                  formatUnitValue(
+                    getUnitValue(
+                      it.data,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
                   ),
                 )} </strong>`,
               );
             // else normal text
             else
               hoverText.push(
-                `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
+                `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                  formatUnitValue(
+                    getUnitValue(
+                      it.data,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
                   ),
                 )}`,
               );
           }
         });
-        return `${name?.[0]?.name} <br/> ${hoverText.join("<br/>")}`;
+        return `${escapeHtml(name?.[0]?.name)} <br/> ${hoverText.join("<br/>")}`;
       } catch (error) {
         return "";
       }

@@ -19,7 +19,7 @@ use arrow::{
     datatypes::DataType,
     ipc::{
         MessageHeader,
-        writer::{CompressionContext, DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
+        writer::{DictionaryTracker, IpcDataGenerator, IpcWriteContext, IpcWriteOptions},
     },
 };
 use arrow_flight::{FlightData, error::Result};
@@ -36,7 +36,7 @@ pub struct FlightDataEncoder {
     max_flight_data_size: usize,
     /// Reused across chunks; lazily initialised, so a custom-message-only encoder never allocates
     /// it.
-    compression_context: CompressionContext,
+    compression_context: IpcWriteContext,
     /// Whether the chunk schema contains any Dictionary column
     schema_has_dict: Option<bool>,
 }
@@ -46,7 +46,7 @@ impl FlightDataEncoder {
         Self {
             options,
             max_flight_data_size,
-            compression_context: CompressionContext::default(),
+            compression_context: IpcWriteContext::default(),
             schema_has_dict: None,
         }
     }

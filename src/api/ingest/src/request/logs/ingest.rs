@@ -38,12 +38,28 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+    common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+        otlp::{otlp_error_response, otlp_rejection_response},
+    },
+    request::logs::otlp_utf8::sanitize_invalid_utf8,
     service::{
         ingestion::get_thread_id,
         logs::{self, otlp::handle_request},
     },
 };
+
+/// Matches on a prefix so a parameterised media type such as `application/json; charset=utf-8` is
+/// still recognised.
+fn otlp_request_type_from_content_type(content_type: &str) -> Option<OtlpRequestType> {
+    if content_type.starts_with(CONTENT_TYPE_PROTO) {
+        Some(OtlpRequestType::HttpProtobuf)
+    } else if content_type.starts_with(CONTENT_TYPE_JSON) {
+        Some(OtlpRequestType::HttpJson)
+    } else {
+        None
+    }
+}
 
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
@@ -81,11 +97,7 @@ pub async fn bulk(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time
@@ -163,11 +175,7 @@ pub async fn multi(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time
@@ -251,11 +259,7 @@ pub async fn json(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time
@@ -336,11 +340,7 @@ pub async fn handle_kinesis_request(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     let request_time = post_data
@@ -403,11 +403,7 @@ pub async fn handle_gcp_request(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     match logs::ingest::ingest(
@@ -455,10 +451,13 @@ pub async fn handle_gcp_request(
     description = "Ingests log data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
                    content types for OTLP log ingestion. This is the standard endpoint for OpenTelemetry SDK and \
                    collector integrations to send structured log data with trace correlation.",
-    request_body(content = String, description = "ExportLogsServiceRequest", content_type = "application/x-protobuf"),
+    request_body(description = "ExportLogsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+        (status = 200, description = "ExportLogsServiceResponse, encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, ingestion refused (e.g. stream being deleted), or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 503, description = "google.rpc.Status: ingester overloaded or unavailable, or ingestion not allowed (cloud)", content(("application/x-protobuf"), (Object = "application/json"))),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -482,46 +481,72 @@ pub async fn otlp_logs_write(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        let req_type = otlp_request_type_from_content_type(content_type)
+            .unwrap_or(OtlpRequestType::HttpProtobuf);
+        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            StatusCode::TOO_MANY_REQUESTS
+        } else {
+            StatusCode::SERVICE_UNAVAILABLE
+        };
+        return otlp_rejection_response(req_type, status, e.to_string());
     }
 
-    let (request, request_type) = match content_type {
-        CONTENT_TYPE_PROTO => match ExportLogsServiceRequest::decode(body) {
-            Ok(req) => (req, OtlpRequestType::HttpProtobuf),
-            Err(e) => {
-                log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::BAD_REQUEST,
-                        format!("Invalid proto: {e}"),
-                    )),
-                )
-                    .into_response();
+    let (request, request_type) = match otlp_request_type_from_content_type(content_type) {
+        Some(OtlpRequestType::HttpProtobuf) => {
+            match ExportLogsServiceRequest::decode(body.clone()) {
+                Ok(req) => (req, OtlpRequestType::HttpProtobuf),
+                Err(e) => {
+                    // invalid utf8 in one record must not 400 the whole collector batch
+                    let mut sanitized = body.to_vec();
+                    let replaced = sanitize_invalid_utf8(&mut sanitized);
+                    let retried = if replaced > 0 {
+                        ExportLogsServiceRequest::decode(sanitized.as_slice()).ok()
+                    } else {
+                        None
+                    };
+                    match retried {
+                        Some(req) => {
+                            log::warn!(
+                                "[LOGS:OTLP] replaced {replaced} invalid utf8 bytes: org_id: {org_id} stream: {in_stream_name:?}"
+                            );
+                            (req, OtlpRequestType::HttpProtobuf)
+                        }
+                        None => {
+                            log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
+                            return otlp_error_response(
+                                OtlpRequestType::HttpProtobuf,
+                                StatusCode::BAD_REQUEST,
+                                3, // INVALID_ARGUMENT
+                                format!("Invalid proto: {e}"),
+                            );
+                        }
+                    }
+                }
             }
-        },
-        CONTENT_TYPE_JSON => {
-            match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
+        }
+        Some(OtlpRequestType::HttpJson) => {
+            match config::utils::json::from_slice_lenient_floats::<ExportLogsServiceRequest>(
+                body.as_ref(),
+            ) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
                 Err(e) => {
                     log::error!("[LOGS:OTLP] Invalid json: org_id: {org_id} {e}");
-                    return (
+                    return otlp_error_response(
+                        OtlpRequestType::HttpJson,
                         StatusCode::BAD_REQUEST,
-                        Json(MetaHttpResponse::error(
-                            StatusCode::BAD_REQUEST,
-                            format!("Invalid json: {e}"),
-                        )),
-                    )
-                        .into_response();
+                        3, // INVALID_ARGUMENT
+                        format!("Invalid json: {e}"),
+                    );
                 }
             }
         }
         _ => {
-            return MetaHttpResponse::bad_request("Bad Request");
+            return otlp_error_response(
+                OtlpRequestType::HttpJson,
+                StatusCode::BAD_REQUEST,
+                3, // INVALID_ARGUMENT
+                "Bad Request: Content-Type must be application/json or application/x-protobuf",
+            );
         }
     };
 
@@ -543,19 +568,12 @@ pub async fn otlp_logs_write(
                     "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
                 );
             }
-            if matches!(e, infra::errors::Error::ResourceError(_)) {
-                (
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    Json(MetaHttpResponse::error(StatusCode::SERVICE_UNAVAILABLE, e)),
-                )
-                    .into_response()
-            } else {
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response()
-            }
+            let status = match e {
+                infra::errors::Error::ResourceError(_) => StatusCode::SERVICE_UNAVAILABLE,
+                infra::errors::Error::TrialPeriodExpired => StatusCode::TOO_MANY_REQUESTS,
+                _ => StatusCode::BAD_REQUEST,
+            };
+            otlp_rejection_response(request_type, status, e.to_string())
         }
     }
 }
@@ -596,11 +614,7 @@ pub async fn hec(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(StatusCode::TOO_MANY_REQUESTS, e)),
-        )
-            .into_response();
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     // log start processing time
@@ -631,4 +645,60 @@ pub async fn hec(
     insert_process_time_header(process_time, resp.headers_mut());
 
     resp
+}
+
+// cloud builds run check_ingestion_allowed first, which needs a live org
+#[cfg(all(test, not(feature = "cloud")))]
+mod tests {
+    use axum::http::header::CONTENT_TYPE;
+    use config::utils::json;
+
+    use super::*;
+
+    async fn call_otlp_logs_write(
+        content_type: &str,
+        body: &'static [u8],
+    ) -> (StatusCode, HeaderMap, json::Value) {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, content_type.parse().unwrap());
+        let resp = otlp_logs_write(
+            Path("default".to_string()),
+            Headers(UserEmail {
+                user_id: "a@a.com".to_string(),
+            }),
+            headers,
+            Bytes::from_static(body),
+        )
+        .await;
+        let status = resp.status();
+        let resp_headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, resp_headers, json::from_slice(&body).unwrap())
+    }
+
+    #[tokio::test]
+    async fn test_otlp_logs_invalid_json_is_rpc_status() {
+        let (status, headers, body) = call_otlp_logs_write(CONTENT_TYPE_JSON, b"{not json").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(headers[CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("Invalid json:")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_otlp_logs_unsupported_content_type_is_rpc_status() {
+        let (status, headers, body) = call_otlp_logs_write("text/plain", b"hello").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(headers[CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        let message = body["message"].as_str().unwrap();
+        assert!(message.contains(CONTENT_TYPE_JSON) && message.contains(CONTENT_TYPE_PROTO));
+    }
 }

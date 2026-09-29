@@ -840,6 +840,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
+    fg: "--color-schedule-band-solid-text",
+    bg: "--color-schedule-band-4-solid-bg",
+    category: "pending",
+    why: "a schedule band's own solid fill, painted on it directly, never on the page — amber falls short of AA for this shared white label",
+    issue: "WCAG-AA colour remediation (follow-up PR)",
+  },
+  {
     fg: "--color-select-border-focus",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -1344,6 +1351,36 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-syntax-bg",
     category: "text",
     why: "syntax colours are painted on the code block, not the page",
+  },
+  {
+    fg: "--color-query-syntax-keyword",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-function",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-string",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-number",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-comment",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
   },
   {
     fg: "--color-text-inverse",

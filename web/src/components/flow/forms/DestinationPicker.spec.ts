@@ -23,9 +23,12 @@ const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => mockToast(...a) }));
 
 const mockList = vi.fn();
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: (...args: any[]) => mockList(...args) },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...args: any[]) => mockList(...args) },
+  });
+});
 
 const OSelectStub = {
   name: "OSelect",
@@ -342,7 +345,7 @@ describe("DestinationPicker", () => {
     await flushPromises();
     const opts = (wrapper.vm as any).destinationOptions;
     expect(opts.map((o: any) => o.value)).toEqual(["splunk-hec", "webhook", "legacy"]);
-    expect(opts[0].subLabel).toBe("Unsupported Type — Workflows Support Custom Destinations Only");
+    expect(opts[0].subLabel).toBe("Unsupported type — workflows support custom destinations only");
   });
 
   it("still resolves the retained non-custom destination on submit", async () => {

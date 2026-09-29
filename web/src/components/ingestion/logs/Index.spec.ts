@@ -131,6 +131,7 @@ describe("IngestLogs Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ]);
     });

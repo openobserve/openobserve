@@ -24,6 +24,11 @@ vi.mock("./shared/useIngestionRoutes", () => ({
   default: vi.fn(() => mockIngestionRoutes),
 }));
 
+const mockRouteGuard = vi.fn();
+vi.mock("@/utils/zincutils", () => ({
+  routeGuard: (...args: unknown[]) => mockRouteGuard(...args),
+}));
+
 import useOSRoutes from "./router";
 import useIngestionRoutes from "./shared/useIngestionRoutes";
 
@@ -37,20 +42,65 @@ describe("useOSRoutes", () => {
     expect(parentRoutes).toEqual([]);
   });
 
-  it("homeChildRoutes contains the routes returned by useIngestionRoutes", () => {
+  it("homeChildRoutes starts with the routes returned by useIngestionRoutes", () => {
     const { homeChildRoutes } = useOSRoutes();
-    expect(homeChildRoutes).toEqual(mockIngestionRoutes);
+    expect(homeChildRoutes.slice(0, mockIngestionRoutes.length)).toEqual(mockIngestionRoutes);
   });
 
-  it("homeChildRoutes has the same length as the mocked ingestion routes", () => {
+  it("homeChildRoutes has one extra route (the AI Monitor shell) beyond the mocked ingestion routes", () => {
     const { homeChildRoutes } = useOSRoutes();
-    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length);
+    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length + 1);
   });
 
   it("homeChildRoutes items match the mocked route objects", () => {
     const { homeChildRoutes } = useOSRoutes();
     expect(homeChildRoutes[0]).toEqual({ path: "ingestion", name: "ingestion" });
     expect(homeChildRoutes[1]).toEqual({ path: "ingestion/logs", name: "ingestLogs" });
+  });
+
+  it("registers the AI Monitor shell with only LLM Insights + Sessions as children", () => {
+    const { homeChildRoutes } = useOSRoutes();
+    const aiRoute = homeChildRoutes.find((r: any) => r.path === "ai");
+    expect(aiRoute).toBeDefined();
+    expect(aiRoute.children.map((c: any) => c.name)).toEqual([
+      "aiObservability",
+      "aiLLMInsights",
+      "aiSessions",
+    ]);
+  });
+
+  describe("the AI Monitor shell route", () => {
+    function aiRoute() {
+      const { homeChildRoutes } = useOSRoutes();
+      return homeChildRoutes.find((r: any) => r.path === "ai") as any;
+    }
+
+    it("redirects the bare /ai path to aiLLMInsights, same as the enterprise tree", () => {
+      const redirectChild = aiRoute().children[0];
+      expect(redirectChild).toEqual({
+        path: "",
+        name: "aiObservability",
+        redirect: { name: "aiLLMInsights" },
+      });
+    });
+
+    it("calls routeGuard from the shell's own beforeEnter, same as every other OSS route", () => {
+      const next = vi.fn();
+      aiRoute().beforeEnter({ path: "/ai" }, {}, next);
+      expect(mockRouteGuard).toHaveBeenCalledWith({ path: "/ai" }, {}, next);
+    });
+
+    it("lazy-loads each child's component rather than importing it eagerly", () => {
+      const [, llmInsightsChild, sessionsChild] = aiRoute().children;
+      expect(typeof llmInsightsChild.component).toBe("function");
+      expect(typeof sessionsChild.component).toBe("function");
+    });
+
+    it("gives llm-insights and sessions their own distinct paths under /ai", () => {
+      const [, llmInsightsChild, sessionsChild] = aiRoute().children;
+      expect(llmInsightsChild.path).toBe("llm-insights");
+      expect(sessionsChild.path).toBe("sessions");
+    });
   });
 
   it("useIngestionRoutes is called when the composable is invoked", () => {
@@ -91,6 +141,6 @@ describe("useOSRoutes", () => {
     vi.mocked(useIngestionRoutes).mockReturnValueOnce(customRoutes as any);
 
     const { homeChildRoutes } = useOSRoutes();
-    expect(homeChildRoutes).toEqual(customRoutes);
+    expect(homeChildRoutes.slice(0, customRoutes.length)).toEqual(customRoutes);
   });
 });

@@ -6,7 +6,7 @@
 // These tests pin that behavior so the service stops silently returning []
 // if the API contract changes.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockGet: vi.fn(),
@@ -24,7 +24,6 @@ vi.mock("@/services/http", () => ({
   }),
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import onlineEvalsService from "./online-evals.service";
 
 beforeEach(() => {
@@ -131,7 +130,6 @@ describe("URL construction", () => {
       providerId: "provider-1",
     });
   });
-
   it("providers.list hits /api/{orgId}/providers", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.providers.list("acme");

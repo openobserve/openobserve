@@ -19,7 +19,14 @@ import {
   buildAnomalyDeviationQuery,
   buildAnomalyMetricQuery,
   buildAnomalyScoreQuery,
+  type AnomalyKindColumns,
 } from "@/utils/alerts/anomalyChartQuery";
+
+const ALL_KINDS: AnomalyKindColumns = {
+  isAbsence: true,
+  isPartialDrop: true,
+  expectedValue: true,
+};
 
 describe("buildAnomalyMetricQuery", () => {
   it("draws the metric and the flagged buckets as two separate series", () => {
@@ -84,14 +91,70 @@ describe("buildAnomalyScoreQuery", () => {
 });
 
 describe("buildAnomalyDeviationQuery", () => {
-  it("projects the per-bucket overshoot", () => {
-    expect(buildAnomalyDeviationQuery("cfg1", "5m")).toContain(
-      "max(deviation_percent) AS deviation_value",
+  it("keeps the legacy single series when the stream has no kind columns", () => {
+    // A stream without the flag columns has never written a drop or absence
+    // row, so every record is score-space and the plain max is exact — and
+    // referencing a column the stream lacks would fail the whole query.
+    const sql = buildAnomalyDeviationQuery("cfg1", "5m") as string;
+    expect(sql).toContain("max(deviation_percent) AS deviation_value");
+    expect(sql).not.toContain("is_absence");
+    expect(sql).not.toContain("is_partial_drop");
+    expect(sql).not.toContain("drop_value");
+  });
+
+  it("never folds score-space and value-space records into one max", () => {
+    // deviation_percent is score-% for scored points but value-% for drops;
+    // one max() over both picks whichever space happens to be larger.
+    const sql = buildAnomalyDeviationQuery("cfg1", "5m", ALL_KINDS) as string;
+    expect(sql).toContain(
+      "max(CASE WHEN is_absence IS NOT TRUE AND is_partial_drop IS NOT TRUE " +
+        "THEN deviation_percent END) AS deviation_value",
     );
+    expect(sql).toContain(
+      "max(CASE WHEN is_partial_drop IS TRUE THEN deviation_percent END) AS drop_value",
+    );
+    expect(sql).not.toContain("max(deviation_percent)");
+  });
+
+  it("excludes absence rows from every series — their 100.0 is a sentinel, not a measurement", () => {
+    const sql = buildAnomalyDeviationQuery("cfg1", "5m", ALL_KINDS) as string;
+    expect(sql).toContain("is_absence IS NOT TRUE");
+    expect(sql).not.toContain("is_absence IS TRUE");
+  });
+
+  it("tolerates legacy rows where the flags are NULL — they stay in the scored series", () => {
+    // Records written before the flags existed deserialize with no flag at
+    // all; `IS NOT TRUE` is the null-tolerant form (`= false` drops them).
+    const sql = buildAnomalyDeviationQuery("cfg1", "5m", ALL_KINDS) as string;
+    expect(sql).not.toContain("= false");
+    expect(sql).not.toContain("= FALSE");
+  });
+
+  it("splits per column independently when only one kind column exists", () => {
+    const sql = buildAnomalyDeviationQuery("cfg1", "5m", {
+      isAbsence: true,
+      isPartialDrop: false,
+      expectedValue: false,
+    }) as string;
+    expect(sql).toContain(
+      "max(CASE WHEN is_absence IS NOT TRUE THEN deviation_percent END) AS deviation_value",
+    );
+    expect(sql).not.toContain("is_partial_drop");
+    expect(sql).not.toContain("drop_value");
   });
 
   it("returns null with no config id", () => {
     expect(buildAnomalyDeviationQuery(undefined, "5m")).toBeNull();
+  });
+});
+
+describe("expected-value series on the metric chart", () => {
+  it("adds the expected series only when the stream carries the column", () => {
+    const withExpected = buildAnomalyMetricQuery("cfg1", "5m", ALL_KINDS) as string;
+    expect(withExpected).toContain("max(expected_value) AS expected_value");
+
+    const without = buildAnomalyMetricQuery("cfg1", "5m") as string;
+    expect(without).not.toContain("expected_value");
   });
 });
 

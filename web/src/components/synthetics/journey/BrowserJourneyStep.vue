@@ -171,7 +171,7 @@ function toggleExpanded() {
     >
       <!-- Drag handle — visibility:hidden during replay to preserve layout -->
       <span
-        class="text-text-muted absolute left-[-0.1rem] shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-100"
+        class="text-text-muted absolute left-[-0.1rem] shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
         :class="{ invisible: replayDotState }"
         data-test="synthetics-journey-step-drag-handle"
         aria-hidden="true"

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::stream::StreamType;
-use datafusion::sql::TableReference;
+use datafusion::common::TableReference;
 
 #[derive(Debug)]
 pub struct QueryParams {

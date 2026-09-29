@@ -83,6 +83,7 @@ export const EMOJI_GROUPS: readonly EmojiGroup[] = [
       { token: "o2:apache", keywords: ["apache", "httpd"] },
       { token: "o2:iis", keywords: ["iis"] },
       { token: "o2:cloudflare", keywords: ["cloudflare"] },
+      { token: "o2:splunk", keywords: ["splunk", "hec"] },
       { token: "o2:syslog", keywords: ["syslog"] },
       { token: "o2:netflow", keywords: ["netflow"] },
       { token: "o2:openvpn", keywords: ["openvpn", "vpn"] },

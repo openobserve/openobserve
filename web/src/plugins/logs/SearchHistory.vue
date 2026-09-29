@@ -31,7 +31,7 @@
         <OTooltip :content="t('search.messageWrapContent')" />
       </OButton>
       <div
-        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2"
+        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2 max-md:hidden"
       >
         <OIcon name="info" class="me-1" size="sm" />
         <div>
@@ -39,11 +39,13 @@
         </div>
       </div>
       <div class="[&_#date-time-button]:h-9!">
+        <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <DateTime
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
           auto-apply
           menu-align="end"
+          :hide-range-shift="isMobile"
           :default-type="searchObj.data.datetime.type"
           @on:date-change="updateDateTime"
         />
@@ -67,6 +69,14 @@
         </OButton>
       </div>
     </template>
+    <div
+      class="text-status-warning-text border-border-default flex shrink-0 items-center border-b px-3 py-1.5 text-xs md:hidden"
+    >
+      <OIcon name="info" class="me-1 shrink-0" size="sm" />
+      <div>
+        {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
+      </div>
+    </div>
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
         :frame="false"
@@ -74,6 +84,7 @@
         :columns="columnsToBeRendered"
         row-key="uuid"
         :loading="isLoading"
+        :forbidden="forbidden"
         pagination="client"
         :page-size="pageSize"
         :page-size-options="pageSizeOptions"
@@ -168,7 +179,7 @@
               </div>
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
+                  class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
                            as the dashboard Query Inspector. Falls back to plain
@@ -214,7 +225,7 @@
 
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-s-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
+                  class="border-border-default border-s-function-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <pre
                     v-if="colorizedFunction[row.uuid]"
@@ -253,7 +264,7 @@
 
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal">
+            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
               {{ resultTotal }} {{ t("search_history.results") }}
             </div>
             <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
@@ -289,17 +300,17 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, onMounted, computed, onUnmounted } from "vue";
+import { ref, onMounted, computed, onUnmounted, defineAsyncComponent, defineComponent } from "vue";
 import { timestampToTimezoneDate, b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { defineAsyncComponent, defineComponent } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
 
@@ -355,6 +366,7 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
     const { searchObj } = searchState();
@@ -368,6 +380,7 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
+    const forbidden = ref(false);
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
@@ -449,6 +462,7 @@ export default defineComponent({
           router.currentRoute.value.query.org_identifier ||
           store.state.selectedOrganization.identifier;
         isLoading.value = true;
+        forbidden.value = false;
         if (dateTimeToBeSent.value.valueType === "relative") {
           const convertedData = extractTimestamps(dateTimeToBeSent.value.relativeTimePeriod);
           dateTimeToBeSent.value.startTime = convertedData.from * 1000;
@@ -525,12 +539,16 @@ export default defineComponent({
         });
         dataToBeLoaded.value = filteredHits;
         isLoading.value = false;
-      } catch (error) {
-        toast({
-          variant: "error",
-          message: t("logs.searchHistory.fetchFailed"),
-          timeout: 5000,
-        });
+      } catch (error: any) {
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("logs.searchHistory.fetchFailed"),
+            timeout: 5000,
+          });
+        }
         console.log(error, "error");
         isLoading.value = false;
       } finally {
@@ -738,6 +756,7 @@ export default defineComponent({
       getManager()?.setScope("logs");
     });
     return {
+      isMobile,
       searchObj,
       activeStreamType,
       activeStreamName,
@@ -749,6 +768,7 @@ export default defineComponent({
       t,
       route,
       isLoading,
+      forbidden,
       updateDateTime,
       searchDateTimeRef,
       expandedIds,
@@ -774,14 +794,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
-   v-html, so these can't be template utilities. Every colour but .mtk1 comes
-   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
-   we point back at the block's own colour so the query inherits our theme
-   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
-.o2-colorized-query :deep(.mtk1) {
-  color: inherit;
-}
-</style>

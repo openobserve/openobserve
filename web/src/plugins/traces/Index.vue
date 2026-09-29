@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'z-auto overflow-visible max-h-[3.125rem]!'
+            ? 'z-auto overflow-visible max-h-[3.125rem]! max-md:h-auto! max-md:max-h-none!'
             : 'z-auto overflow-visible'
         "
         @update:model-value="onSplitterUpdate"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Note: Splitter max-height to be dynamically calculated with JS -->
               <OSplitter
                 v-model="searchObj.config.splitterModel"
-                :limits="searchObj.config.splitterLimit"
+                :limits="isMobile ? [0, 0] : searchObj.config.splitterLimit"
                 separatorClass="w-px"
                 @update:model-value="onSplitterUpdate"
                 class="h-full w-full"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #before>
                   <div class="border-border-default bg-surface-panel h-full border-e">
                     <IndexList
-                      v-show="searchObj.meta.showFields"
+                      v-show="searchObj.meta.showFields && !isMobile"
                       ref="indexListRef"
                       :field-list="searchObj.data.stream.selectedStreamFields"
                       :active-include-field-values="activeIncludeFilterValues"
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="pt-4"
                       />
                     </div>
-                    <div v-else-if="!isStreamSelected">
+                    <div v-else-if="!isStreamSelected" class="max-lg:h-full">
                       <TracesNoStreamState
                         :org-id="store.state.selectedOrganization?.identifier"
                         data-test="traces-no-stream-selected-text"
@@ -263,6 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error-only-toggled="onErrorOnlyToggled"
                         @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
+                        @open-mobile-fields="mobileFieldsOpen = true"
                       />
                     </div>
                   </div>
@@ -273,6 +274,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <ODrawer
+      v-if="isMobile"
+      v-model:open="mobileFieldsOpen"
+      side="left"
+      size="sm"
+      bleed
+      seamless
+      anchor="#tracesThirdLevel"
+      data-test="traces-mobile-fields-drawer"
+    >
+      <div class="flex h-full flex-col overflow-hidden pt-2.5">
+        <IndexList
+          :field-list="searchObj.data.stream.selectedStreamFields"
+          :active-include-field-values="activeIncludeFilterValues"
+          :active-exclude-field-values="activeExcludeFilterValues"
+          data-test="traces-search-index-list-mobile"
+          class="h-full"
+          :key="searchObj.data.stream.streamLists"
+          @update:changeStream="onChangeStream"
+          @update:selectedFields="updateFieldVisibility"
+        />
+      </div>
+    </ODrawer>
 
     <ODialog
       v-model:open="streamChangeDialog.show"
@@ -341,12 +366,15 @@ import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/tr
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
+import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -408,6 +436,42 @@ const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
 const fieldValues = ref({});
+
+const { isMobile, isTablet } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
+watch(
+  isMobile,
+  (mobile, wasMobile) => {
+    if (mobile) {
+      searchObj.config.splitterModel = 0;
+      splitterModel.value = 150;
+    } else if (wasMobile) {
+      if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
+        searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+      }
+      splitterModel.value = 90;
+    }
+  },
+  { immediate: true },
+);
+// md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+let preTabletSplitter: number | null = null;
+watch(
+  isTablet,
+  (tablet, wasTablet) => {
+    if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+      preTabletSplitter = searchObj.config.splitterModel;
+      searchObj.config.splitterModel = 30;
+    } else if (wasTablet && !tablet && !isMobile.value && preTabletSplitter !== null) {
+      // Back on a laptop: undo the floor unless the reader dragged the pane since.
+      if (searchObj.config.splitterModel === 30) {
+        searchObj.config.splitterModel = preTabletSplitter;
+      }
+      preTabletSplitter = null;
+    }
+  },
+  { immediate: true },
+);
 const { showErrorNotification } = useNotifications();
 const disableMoreErrorDetails = ref(false);
 const toggleErrorDetails = () => {
@@ -437,14 +501,8 @@ let currentSearchTraceId: string | null = null;
 let currentCountTraceId: string | null = null;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
-/**
- * Tracks per-request streaming partition state.
- * Each backend partition emits a search_response_metadata event; each chunk
- * within that partition emits a search_response_hits event.
- * We decide replace vs append using the same pattern as useSearchResponseHandler.
- */
-const tracesPartitionMap: Record<string, { partition: number; chunks: Record<number, number> }> =
-  {};
+// A page's stream can open with an empty batch, so only an actual write may end the replace phase.
+const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
@@ -533,60 +591,34 @@ function loadStreamLists() {
   try {
     const queryParams = router.currentRoute.value.query;
     const previouslySelectedStream = searchObj.data.stream.selectedStream.value;
-    const persistedStream =
-      store.state.zoConfig?.auto_query_enabled && !queryParams.stream
-        ? restoreTracesStream(store.state.selectedOrganization.identifier)
-        : "";
-    searchObj.data.stream.streamLists = [];
-    if (searchObj.data.streamResults.list.length > 0) {
-      let selectedStreamItemObj = {};
-      let foundPriorityMatch = false;
-      searchObj.data.streamResults.list.map((item: any) => {
-        let itemObj = {
-          label: item.name,
-          value: item.name,
-        };
-        searchObj.data.stream.streamLists.push(itemObj);
+    const persistedStream = restoreTracesStream(store.state.selectedOrganization.identifier);
+    const streams = searchObj.data.streamResults.list;
+    searchObj.data.stream.streamLists = streams.map((item: any) => ({
+      label: item.name,
+      value: item.name,
+    }));
 
-        if (queryParams.stream === item.name) {
-          selectedStreamItemObj = itemObj;
-          foundPriorityMatch = true;
-        } else if (
-          !foundPriorityMatch &&
-          !queryParams.stream &&
-          previouslySelectedStream === item.name
-        ) {
-          selectedStreamItemObj = itemObj;
-          foundPriorityMatch = true;
-        } else if (
-          !foundPriorityMatch &&
-          !queryParams.stream &&
-          !previouslySelectedStream &&
-          persistedStream === item.name
-        ) {
-          selectedStreamItemObj = itemObj;
-          foundPriorityMatch = true;
-        }
-      });
+    const selectedStream = resolveTraceStream(streams, [
+      typeof queryParams.stream === "string" ? queryParams.stream : "",
+      previouslySelectedStream,
+      persistedStream,
+    ]);
 
-      if (selectedStreamItemObj.label != undefined) {
-        searchObj.data.stream.selectedStream = selectedStreamItemObj;
-      } else {
-        searchObj.data.stream.selectedStream = {
-          label: "",
-          value: "",
-        };
-        searchObj.loading = false;
-        searchObj.data.queryResults = {};
-        searchObj.data.sortedQueryResults = [];
-        searchObj.data.stream.selectedStreamFields = [];
-        searchObj.data.histogram = {
-          layout: {},
-          data: [],
-        };
-      }
+    if (selectedStream) {
+      searchObj.data.stream.selectedStream = {
+        label: selectedStream,
+        value: selectedStream,
+      };
     } else {
+      searchObj.data.stream.selectedStream = { label: "", value: "" };
       searchObj.loading = false;
+      searchObj.data.queryResults = {};
+      searchObj.data.sortedQueryResults = [];
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.histogram = {
+        layout: {},
+        data: [],
+      };
     }
   } catch (e) {
     searchObj.loading = false;
@@ -840,7 +872,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
-      if (tracesPartitionMap[currentSearchTraceId]) delete tracesPartitionMap[currentSearchTraceId];
+      if (tracesRequestState[currentSearchTraceId]) delete tracesRequestState[currentSearchTraceId];
 
       cancelStreamQueryBasedOnRequestId({
         trace_id: currentSearchTraceId,
@@ -852,7 +884,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     // Generate a unique ID for this search request
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
-    tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
+    tracesRequestState[searchTraceId] = { hasWritten: false };
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
@@ -914,21 +946,13 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
       },
       {
         data: (_payload: any, response: any) => {
-          // Each metadata event signals a new backend partition — advance the counter
-          if (response.type === "search_response_metadata") {
-            tracesPartitionMap[searchTraceId].partition++;
-          }
-
           if (
             response.type === "search_response_metadata" ||
             response.type === "search_response_hits"
           ) {
-            // Track individual hit chunks within the current partition
-            if (response.type === "search_response_hits") {
-              const p = tracesPartitionMap[searchTraceId].partition;
-              tracesPartitionMap[searchTraceId].chunks[p] =
-                (tracesPartitionMap[searchTraceId].chunks[p] ?? 0) + 1;
-            }
+            // A missing entry means a newer request owns the grid now.
+            const requestState = tracesRequestState[searchTraceId];
+            if (!requestState) return;
 
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
@@ -953,12 +977,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             //   }
             // }
 
-            const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
-            const chunkCount = tracesPartitionMap[searchTraceId]?.chunks[partition] ?? 0;
-            const isChunkedHits = chunkCount > 1;
-            // appendResult: true when on a later partition or a later chunk within
-            // the current partition (mirrors useSearchResponseHandler logic)
-            const appendResult = partition > 1 || isChunkedHits;
+            const isFirstWrite = !requestState.hasWritten;
 
             const formattedHits =
               searchObj.meta.searchMode === "traces" ? formatTracesMetaData(rawHits) : rawHits;
@@ -968,12 +987,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             }
 
             isLLMSpanPresent.value =
-              (!appendResult ? false : isLLMSpanPresent.value) ||
+              (isFirstWrite ? false : isLLMSpanPresent.value) ||
               formattedHits.some((hit: any) => isLLMTrace(hit));
 
-            // Replace hits on the first partition of a pagination fetch (clears the
-            // previous page) or on the very first data chunk of a fresh search
-            if ((isPagination && partition === 1) || !appendResult) {
+            if (isFirstWrite) {
               searchObj.data.queryResults.hits = formattedHits;
             } else {
               searchObj.data.queryResults.hits = [
@@ -981,6 +998,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
                 ...formattedHits,
               ];
             }
+            requestState.hasWritten = true;
             searchObj.data.queryResults.from = queryReq.query.from;
 
             updateFieldValues(rawHits);
@@ -993,6 +1011,12 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           }
         },
         error: (_payload: any, err: any) => {
+          // Mirrors the `data` handler's guard: a missing entry means a newer
+          // search already superseded this one, so a late error for the
+          // cancelled request must not clobber the errorMsg a subsequent,
+          // successful search just cleared (o2-enterprise#2643).
+          if (!tracesRequestState[searchTraceId]) return;
+
           searchObj.loading = false;
 
           const errData = err?.content || err;
@@ -1027,12 +1051,18 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           });
 
           currentSearchTraceId = null;
-          delete tracesPartitionMap[searchTraceId];
+          // Logs keeps the last rows under an error banner, so a failed page must not blank here.
+          delete tracesRequestState[searchTraceId];
         },
         complete: (_payload: any) => {
           searchObj.loading = false;
           currentSearchTraceId = null;
-          delete tracesPartitionMap[searchTraceId];
+          // An exhausted page must not leave the previous page under the new page number.
+          if (tracesRequestState[searchTraceId]?.hasWritten === false) {
+            searchObj.data.queryResults.hits = [];
+            isLLMSpanPresent.value = false;
+          }
+          delete tracesRequestState[searchTraceId];
           if (!isPagination) {
             fetchTracesCount();
           }
@@ -1082,6 +1112,8 @@ const cancelSearch = () => {
     trace_id: currentSearchTraceId,
     org_id: searchObj.organizationIdentifier,
   });
+  // Cancelling tears down the listeners, so no terminal event will release this entry.
+  delete tracesRequestState[currentSearchTraceId];
   currentSearchTraceId = null;
   searchObj.loading = false;
 };
@@ -1563,6 +1595,16 @@ const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
 };
 
 const onSelectTracesStream = () => {
+  // < md the stream selector lives in the fields drawer, so it must open before the trigger can focus.
+  if (isMobile.value) {
+    mobileFieldsOpen.value = true;
+    setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-test="log-search-index-list-select-stream"] button')
+        ?.click();
+    }, 300);
+    return;
+  }
   const trigger = document.querySelector<HTMLElement>(
     '[data-test="log-search-index-list-select-stream"] button',
   );
@@ -1895,7 +1937,7 @@ const moveSplitter = computed(() => {
 watch(
   () => searchObj.data.stream.selectedStream.value,
   (streamValue: string) => {
-    if (store.state.zoConfig?.auto_query_enabled && streamValue) {
+    if (streamValue) {
       saveTracesStream(store.state.selectedOrganization.identifier, streamValue);
     }
   },

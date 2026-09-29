@@ -40,6 +40,7 @@ pub mod grouping;
 pub mod incidents;
 pub mod level;
 pub mod priority;
+pub mod recovery;
 pub mod state;
 pub mod state_level;
 pub mod tags;
@@ -147,9 +148,8 @@ impl TriggerCondition {
             _ => 0,
         };
         let start_utc = start_from.map_or(Ok(Utc::now()), |from| {
-            chrono::DateTime::<Utc>::from_timestamp_micros(from).ok_or(anyhow::anyhow!(
-                "Error converting start_from value to timestamp"
-            ))
+            chrono::DateTime::<Utc>::from_timestamp_micros(from)
+                .ok_or_else(|| anyhow::anyhow!("Error converting start_from value to timestamp"))
         })?;
 
         if self.frequency_type == FrequencyType::Cron {

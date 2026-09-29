@@ -143,8 +143,9 @@ export default class DashboardImport {
    *   resolve their row with `.first()`, so one test could assert on, or delete,
    *   another test's dashboard. Giving each run its own title removes the overlap
    *   without touching the shared fixture on disk.
+   * @param {(json: object) => void} [options.transform] - mutate the parsed JSON in place before upload.
    */
-  async uploadDashboardFile(fileContentPath, { title } = {}) {
+  async uploadDashboardFile(fileContentPath, { title, transform } = {}) {
     // The old version wrapped this in a try/catch commented "tab might already
     // be active" — but an already-active tab makes these waits SUCCEED, not
     // throw. All the catch did was hide a lost click, leaving the wait below to
@@ -154,10 +155,11 @@ export default class DashboardImport {
     // When a title override is requested, upload an in-memory copy rather than
     // the fixture path, so the file on disk is never mutated.
     let payload = fileContentPath;
-    if (title !== undefined) {
+    if (title !== undefined || transform !== undefined) {
       const absolutePath = path.resolve(process.cwd(), fileContentPath);
       const json = JSON.parse(fs.readFileSync(absolutePath, "utf-8"));
-      json.title = title;
+      if (title !== undefined) json.title = title;
+      if (transform) transform(json);
       payload = {
         name: path.basename(absolutePath),
         mimeType: "application/json",

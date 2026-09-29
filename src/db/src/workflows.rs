@@ -18,6 +18,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
+use config::meta::folder::{DEFAULT_FOLDER, FolderType};
 use infra::{
     coordinator::get_coordinator,
     db::Event,
@@ -56,6 +57,12 @@ pub enum AssociationDeleteEvent {
 pub enum WorkflowTriggerType {
     #[default]
     AlertFired,
+    /// Its own type rather than an event_type on AlertFired, or every workflow built to page on a
+    /// firing would page on the recovery too.
+    // TODO: not reachable yet — associating a workflow with an alert hardcodes AlertFired, so no
+    // row is ever written with this type. Needs a trigger-type choice on the link, then a consumer
+    // in `alerts::recovery::dispatch_recovery`, then `enabled: true` on the UI card.
+    AlertResolved,
     IncidentEvent,
     Webhook,
     Manual,
@@ -63,6 +70,9 @@ pub enum WorkflowTriggerType {
     Retry,
     // A trigger type written by a newer node. Decoding to a real variant instead would
     // relabel it as that trigger, and run history is searched across regions.
+    // `other` covers the JSON envelope too: without it an unknown tag fails the whole
+    // `WorkflowTrigger` parse, so one new variant stops an old node reading any trigger.
+    #[serde(other)]
     Unknown,
 }
 
@@ -70,6 +80,7 @@ impl From<&str> for WorkflowTriggerType {
     fn from(value: &str) -> Self {
         match value {
             "AlertFired" => Self::AlertFired,
+            "AlertResolved" => Self::AlertResolved,
             "IncidentEvent" => Self::IncidentEvent,
             "Webhook" => Self::Webhook,
             "Manual" => Self::Manual,
@@ -84,6 +95,7 @@ impl std::fmt::Display for WorkflowTriggerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AlertFired => write!(f, "AlertFired"),
+            Self::AlertResolved => write!(f, "AlertResolved"),
             Self::IncidentEvent => write!(f, "IncidentEvent"),
             Self::Webhook => write!(f, "Webhook"),
             Self::Manual => write!(f, "Manual"),
@@ -119,6 +131,92 @@ pub async fn get_workflow(
             .insert(workflow_id.to_string(), workflow.clone());
     }
     Ok(workflow)
+}
+
+/// Canonical form of a user-facing folder slug.
+///
+/// Trimmed, because the trimmed and padded spellings have to name the same
+/// folder: the lookup is by exact name, so returning the untrimmed slug here
+/// sends " default " to the database and reports the org's default folder as
+/// missing. An empty or absent slug means the default folder, which is what
+/// every pre-folders client sends.
+pub fn normalize_folder_slug(folder_slug: &str) -> &str {
+    let slug = folder_slug.trim();
+    if slug.is_empty() {
+        DEFAULT_FOLDER
+    } else {
+        slug
+    }
+}
+
+/// Translates a user-facing folder slug into the folder primary key stored on
+/// `workflows.folder_id`, creating the org's default folder on first use.
+pub async fn resolve_folder_pk(org_id: &str, folder_slug: &str) -> Result<String, anyhow::Error> {
+    let slug = normalize_folder_slug(folder_slug);
+
+    if slug == DEFAULT_FOLDER {
+        crate::folders::ensure_default_folder(org_id, FolderType::Workflows)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    }
+
+    infra::table::folders::get_pk_by_name(org_id, slug, FolderType::Workflows)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("folder not found: {slug}"))
+}
+
+/// Lists an org's workflows in one folder, or across the org when `folder_slug`
+/// is `None`, optionally restricted to rows matching `search_substring`.
+pub async fn list_workflows(
+    org_id: &str,
+    folder_slug: Option<&str>,
+    search_substring: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    match folder_slug {
+        Some(slug) => {
+            let pk = resolve_folder_pk(org_id, slug).await?;
+            infra::table::workflows::list_by_org_folder(org_id, Some(&pk), search_substring).await
+        }
+        None => infra::table::workflows::list_by_org_folder(org_id, None, search_substring).await,
+    }
+}
+
+/// Moves workflows into another folder. `dst_folder_slug` is the user-facing id.
+pub async fn move_workflows(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_slug: &str,
+) -> Result<(), anyhow::Error> {
+    // Normalized once so the existence check and the pk lookup cannot disagree.
+    let dst_slug = normalize_folder_slug(dst_folder_slug);
+    if !infra::table::folders::exists(org_id, dst_slug, FolderType::Workflows).await? {
+        return Err(anyhow::anyhow!("destination folder not found"));
+    }
+    let pk = resolve_folder_pk(org_id, dst_slug).await?;
+    infra::table::workflows::move_to_folder(org_id, workflow_ids, &pk).await?;
+
+    // The cache keys on workflow id and now holds a stale folder, so drop the
+    // moved entries rather than trying to patch them.
+    let mut cache = CACHE.write().await;
+    for id in workflow_ids {
+        cache.remove(id);
+    }
+    Ok(())
+}
+
+/// Lists an org's drafts in one folder, or across the org when `folder_slug` is
+/// `None`.
+pub async fn list_drafts(
+    org_id: &str,
+    folder_slug: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    match folder_slug {
+        Some(slug) => {
+            let pk = resolve_folder_pk(org_id, slug).await?;
+            infra::table::workflows::list_drafts_by_org(org_id, Some(&pk)).await
+        }
+        None => infra::table::workflows::list_drafts_by_org(org_id, None).await,
+    }
 }
 
 pub async fn get_draft(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
@@ -485,6 +583,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_padded_slug_names_the_same_folder_as_the_trimmed_one() {
+        // The lookup is by exact name, so an untrimmed slug reports a folder that exists as
+        // missing.
+        assert_eq!(normalize_folder_slug(" default "), DEFAULT_FOLDER);
+        assert_eq!(normalize_folder_slug("  incidents  "), "incidents");
+        assert_eq!(normalize_folder_slug("incidents"), "incidents");
+    }
+
+    #[test]
+    fn a_blank_slug_means_the_default_folder() {
+        for blank in ["", "   ", "\t\n"] {
+            assert_eq!(normalize_folder_slug(blank), DEFAULT_FOLDER);
+        }
+    }
+
+    #[test]
     fn unknown_trigger_type_does_not_decode_to_a_real_one() {
         // A type a NEWER node wrote. Decoding it to a real variant would relabel the run
         // as that trigger, and run history is searched across regions.
@@ -500,9 +614,24 @@ mod tests {
     }
 
     #[test]
+    fn an_unknown_trigger_type_decodes_from_json_rather_than_failing_the_envelope() {
+        // `From<&str>` covers the database and the history key. The envelope is what
+        // crosses regions, and one unknown tag used to fail the whole `WorkflowTrigger`.
+        assert_eq!(
+            serde_json::from_str::<WorkflowTriggerType>(r#""AlertResolved""#).unwrap(),
+            WorkflowTriggerType::Unknown
+        );
+        assert_eq!(
+            serde_json::from_str::<WorkflowTriggerType>(r#""AlertFired""#).unwrap(),
+            WorkflowTriggerType::AlertFired
+        );
+    }
+
+    #[test]
     fn known_trigger_types_round_trip_through_the_history_key() {
         for ty in [
             WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::AlertResolved,
             WorkflowTriggerType::IncidentEvent,
             WorkflowTriggerType::Webhook,
         ] {

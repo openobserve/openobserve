@@ -96,6 +96,17 @@ describe("ONavbar", () => {
       expect(nav.attributes("role")).toBe("navigation");
       expect(nav.attributes("aria-label")).toBe("Main navigation");
     });
+
+    it("renders no tiles — not even the standalone Infra group — while linksList is empty", () => {
+      // Regression: MainLayout keeps `visible` at its default `true` and drives
+      // content purely through `linksList`, holding it at `[]` until config
+      // settles (menuReady). Infra's default children carry no `requires`, so
+      // before the navGroups.ts empty-input guard it would still render alone
+      // on refresh — every other group needs an absorbed item to be present.
+      wrapper = mountNavbar({ linksList: [] });
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(0);
+      expect(wrapper.findAll('[data-test^="nav-group-"]')).toHaveLength(0);
+    });
   });
 
   describe("grouping", () => {
@@ -136,11 +147,13 @@ describe("ONavbar", () => {
 
       // Alerts brings Destinations/Templates with it, so it is a group tile
       // rather than a bare link; Dashboards is absent so Reports stays a link.
+      // On-Call rides in the same group with its own three entries — Pages,
+      // Teams and Routing — since a storeless mount has every gate open.
       expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(false);
       const reliability = wrapper.find('[data-test="nav-group-reliability"]');
       expect(reliability.exists()).toBe(true);
       expect(reliability.attributes("data-children")).toBe(
-        "alertList,alertDestinations,alertTemplates,alertLibrary",
+        "alertList,alertDestinations,alertTemplates,alertLibrary,onCallResponses,onCallTeams,onCallRouting",
       );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });

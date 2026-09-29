@@ -35,7 +35,7 @@ pub async fn emit_put_event(
     cluster_coordinator
         .put(
             &key,
-            bytes::Bytes::from(folder_id.unwrap_or("default".to_string())),
+            bytes::Bytes::from(folder_id.unwrap_or_else(|| "default".to_string())),
             true,
             None,
         )

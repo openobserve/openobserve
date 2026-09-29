@@ -703,4 +703,60 @@ describe("useVariablesManager", () => {
       expect(tabVars.map((v) => v.name)).toEqual(["globalVar", "tabVar"]);
     });
   });
+
+  // A chained child is fast-tracked to pending when EVERY parent loads without
+  // an API call, because then there is nothing to wait for. `loadOptionsWithAllDefault`
+  // breaks that premise: it makes an all-sentinel parent genuinely fetch its
+  // options, so a child pre-marked pending races the parent's response and ships
+  // its filter with the parent placeholder never substituted — observed on the
+  // wire as `... WHERE "k8s_namespace_name" IN ('$namespace')`, which returns no
+  // values and leaves the child picker permanently empty.
+  describe("chained loading order when the all-default parent still fetches", () => {
+    const chained = (parentExtra: Record<string, unknown>): VariableConfig[] =>
+      [
+        {
+          name: "namespace",
+          type: "query_values",
+          scope: "global",
+          value: "",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          query_data: { stream: "k8s_pod_memory_usage", field: "k8s_namespace_name" },
+          ...parentExtra,
+        },
+        {
+          name: "pod",
+          type: "query_values",
+          scope: "global",
+          value: "",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          query_data: {
+            stream: "k8s_pod_memory_usage",
+            field: "k8s_pod_name",
+            filter: [{ name: "k8s_namespace_name", operator: "IN", value: "$namespace" }],
+          },
+        },
+      ] as VariableConfig[];
+
+    const pendingByName = (config: VariableConfig[]) => {
+      const manager = useVariablesManager(gt);
+      manager.initialize(config, {});
+      return Object.fromEntries(
+        manager.variablesData.global.map((v) => [v.name, v.isVariableLoadingPending]),
+      );
+    };
+
+    it("does NOT pre-mark the child when the all-default parent fetches its options", () => {
+      const pending = pendingByName(chained({ loadOptionsWithAllDefault: true }));
+      expect(pending.namespace).toBe(true);
+      expect(pending.pod).toBe(false);
+    });
+
+    it("still pre-marks the child for a pure all-default parent that never fetches", () => {
+      const pending = pendingByName(chained({}));
+      expect(pending.namespace).toBe(false);
+      expect(pending.pod).toBe(true);
+    });
+  });
 });

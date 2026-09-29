@@ -19,11 +19,14 @@ import { createStore } from "vuex";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import incidentsService from "@/services/incidents";
 
-vi.mock("@/services/incidents", () => ({
-  default: {
-    getExternalAlertPayload: vi.fn(),
-  },
-}));
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getExternalAlertPayload: vi.fn(),
+    },
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Helpers & factories

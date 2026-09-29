@@ -24,6 +24,8 @@ import ExperimentForm from "./ExperimentForm.vue";
 import { MAX_TRIAL_COUNT } from "./ExperimentForm.schema";
 import llmExperimentsService from "@/services/llm-experiments.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import llmPromptsService from "@/services/llm-prompts.service";
+import remoteTasksService from "@/services/remote-tasks.service";
 import onlineEvalsService from "@/services/online-evals.service";
 import i18n from "@/locales";
 
@@ -43,6 +45,12 @@ vi.mock("@/services/llm-experiments.service", () => ({
 vi.mock("@/services/llm-datasets.service", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/services/online-evals.service", () => ({
   default: { scorers: { list: vi.fn() }, providers: { list: vi.fn() } },
+}));
+vi.mock("@/services/llm-prompts.service", () => ({
+  default: { list: vi.fn(), resolve: vi.fn() },
+}));
+vi.mock("@/services/remote-tasks.service", () => ({
+  default: { list: vi.fn() },
 }));
 
 const store = createStore({
@@ -73,6 +81,7 @@ const provider = {
   id: "pe-1",
   name: "Production OpenAI",
   providerType: "openai",
+  resolvedEndpoint: "https://api.openai.com/v1/chat/completions",
   availableModels: ["gpt-4o"],
 };
 
@@ -130,6 +139,8 @@ describe("ExperimentForm", () => {
     (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
     (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
     (llmExperimentsService.preview as any).mockResolvedValue(previewResult);
+    vi.mocked(llmPromptsService.list).mockResolvedValue([]);
+    vi.mocked(remoteTasksService.list).mockResolvedValue([]);
     (llmExperimentsService.create as any).mockResolvedValue({
       experiment: { id: "exp-1" },
       preview: previewResult,
@@ -345,7 +356,7 @@ describe("ExperimentForm", () => {
     await flushPromises();
     const summary = wrapper.find('[data-test="ai-experiment-form-provider-summary"]');
     expect(summary.exists()).toBe(true);
-    expect(summary.text()).toContain("api.openai.com");
+    expect(summary.text()).toContain("https://api.openai.com/v1/chat/completions");
   });
 
   it("re-fetches the provider list from the refresh button", async () => {
@@ -399,7 +410,9 @@ describe("ExperimentForm — clone", () => {
     (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
     (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
     (llmExperimentsService.preview as any).mockResolvedValue(previewResult);
+    vi.mocked(llmPromptsService.list).mockResolvedValue([]);
     (llmExperimentsService.get as any).mockResolvedValue({ experiment: source });
+    vi.mocked(remoteTasksService.list).mockResolvedValue([]);
     (llmExperimentsService.clone as any).mockResolvedValue({ id: "exp-copy" });
   });
 

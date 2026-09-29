@@ -187,7 +187,6 @@ describe("DatasetDetailPage experiments", () => {
     });
   });
 });
-
 describe("DatasetDetailPage item writes", () => {
   // The update endpoint replaces the row, so an edit that omits metadata wipes
   // the item's subset-filter dimensions.

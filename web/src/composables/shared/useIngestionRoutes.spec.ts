@@ -143,6 +143,12 @@ describe("useIngestionRoutes", () => {
       expect(Array.isArray(mainRoute.children)).toBe(true);
     });
 
+    // Ingestion is where an empty org gets data, so the empty-data gate must not block it.
+    it("should flag the ingestion route as allowOnEmptyData", () => {
+      const routes = useIngestionRoutes();
+      expect(routes[0].meta?.allowOnEmptyData).toBe(true);
+    });
+
     it("should have all expected main child routes", () => {
       const routes = useIngestionRoutes();
       const mainRoute = routes[0];
@@ -251,6 +257,30 @@ describe("useIngestionRoutes", () => {
 
       expect(traceRouteNames).toContain("tracesOTLP");
       expect(traceRouteNames).toContain("ingestTracesFromOtel");
+    });
+
+    it("should have profiles routes under custom", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const profilesRoute = customRoute.children.find(
+        (child: any) => child.name === "ingestProfiles",
+      );
+
+      expect(profilesRoute).toBeDefined();
+      expect(profilesRoute.path).toBe("profiles");
+      expect(profilesRoute.name).toBe("ingestProfiles");
+      expect(typeof profilesRoute.beforeEnter).toBe("function");
+    });
+
+    it("should have all profiles ingestion routes", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const profilesRoute = customRoute.children.find(
+        (child: any) => child.name === "ingestProfiles",
+      );
+      const profileRouteNames = profilesRoute.children.map((child: any) => child.name);
+
+      expect(profileRouteNames).toContain("profilesOtelCollector");
     });
   });
 
@@ -961,6 +991,22 @@ describe("useIngestionRoutes", () => {
       expect(otlpRoute.path).toBe("opentelemetry");
       expect(otlpRoute.component).toBeDefined();
       expect(typeof otlpRoute.beforeEnter).toBe("function");
+    });
+
+    it("should have profiles OTEL collector route with correct configuration", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const profilesRoute = customRoute.children.find(
+        (child: any) => child.name === "ingestProfiles",
+      );
+      const profilesOtelRoute = profilesRoute.children.find(
+        (child: any) => child.name === "profilesOtelCollector",
+      );
+
+      expect(profilesOtelRoute).toBeDefined();
+      expect(profilesOtelRoute.path).toBe("otelcollector");
+      expect(profilesOtelRoute.component).toBeDefined();
+      expect(typeof profilesOtelRoute.beforeEnter).toBe("function");
     });
 
     it("should have AWS config route with correct configuration", () => {

@@ -665,11 +665,7 @@ pub(crate) async fn read_deadlocks_body(
             "start_time must be before end_time",
         ));
     }
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
+    let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     let shared_prologue = prologue.filter(|p| p.stream == stream);
     // Server-vantage events live in a LOGS stream (`_o2_dbm_server` by default),
     // not a trace stream — the permission is checked against the type actually
@@ -1536,7 +1532,7 @@ mod tests {
         );
 
         // ...and over a batch, one row in is one event out.
-        let batch = vec![
+        let batch = [
             both,
             json!({
                 "_timestamp": 1_786_166_303_139_900i64,
@@ -1583,7 +1579,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_raw_mysql_sides_and_verdict_stitch_into_one_flagged_event() {
-        let rows = vec![
+        let rows = [
             json!({
                 "_timestamp": 1_786_166_303_139_783i64, "o2_my_event": "deadlock",
                 "my_trx_side": "1", "my_trx_id": "4589", "my_trx_thread": "89",
@@ -1656,7 +1652,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_innodb_lock_records_fold_into_the_side_they_describe() {
-        let rows = vec![
+        let rows = [
             json!({
                 "_timestamp": 1_786_166_303_139_783i64, "o2_my_event": "deadlock",
                 "my_trx_side": "1", "my_trx_id": "4589", "my_trx_thread": "89",
@@ -1738,7 +1734,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_raw_pg_detail_row_yields_one_two_participant_event_unstitched() {
-        let rows = vec![
+        let rows = [
             // banner — dropped
             json!({
                 "_timestamp": 1_786_843_262_880_000i64, "o2_pg_event": "deadlock",
@@ -2285,7 +2281,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_rank_deadlock_shapes_groups_and_ranks() {
-        let rows = vec![
+        let rows = [
             pg_row(
                 300,
                 11,
@@ -2328,7 +2324,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_mysql_merges_two_sides() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_150, 42, "trxB", "bbb", true),
         ];
@@ -2344,7 +2340,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_leaves_postgres_untouched() {
-        let rows = vec![
+        let rows = [
             pg_row(
                 1_000_000,
                 11,
@@ -2367,7 +2363,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_never_merges_across_engines() {
-        let rows = vec![
+        let rows = [
             pg_row(
                 1_000_000,
                 11,
@@ -2505,7 +2501,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_leaves_far_apart_sides_separate() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             // 3 s > the 2 s window.
             my_row(4_000_000, 42, "trxB", "bbb", true),
@@ -2533,7 +2529,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_handles_three_way_pileup() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_100, 42, "trxB", "bbb", false),
             my_row(1_000_200, 43, "trxC", "ccc", true),
@@ -2549,7 +2545,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_repeated_transaction_id_starts_new_event() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_100, 42, "trxB", "bbb", true),
             // Same trxA again, still inside the window.
@@ -2566,7 +2562,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_identical_timestamps_tie() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_000, 42, "trxB", "bbb", true),
         ];
@@ -2607,7 +2603,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_rank_shapes_counts_stitched_mysql_once() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_100, 42, "trxB", "bbb", true),
             my_row(5_000_000, 43, "trxC", "aaa", false),

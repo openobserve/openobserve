@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
+      // Safe centering keeps the top reachable once the stack overflows its pane and scrolls.
       'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
+      'max-lg:justify-center-safe max-lg:overflow-x-hidden max-lg:overflow-y-auto',
       '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },
@@ -49,11 +51,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="dotGridStyle"
     />
 
+    <!-- max-w-full: the stack otherwise sizes to its widest child (the no-wrap action-card row). -->
     <div
-      :class="['relative flex w-full min-w-0 flex-col items-center text-center', sizeClass.stack]"
+      :class="[
+        'relative flex w-full max-w-full min-w-0 flex-col items-center text-center',
+        sizeClass.stack,
+      ]"
     >
       <!-- illustration (hero/block) — preset/illustration prop or slot -->
-      <div v-if="hasIllustration" class="shrink-0">
+      <div v-if="hasIllustration" :class="['shrink-0', sizeClass.illustration]">
         <slot name="illustration">
           <component
             :is="illustrationComponent"
@@ -97,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           props.columns
             ? 'flex flex-wrap justify-center'
-            : 'flex flex-nowrap items-stretch justify-center',
+            : 'flex flex-wrap items-stretch justify-center',
           sizeClass.actions,
         ]"
       >
@@ -322,33 +328,38 @@ const SIZE_MAP: Record<
     title: I18nText;
     description: I18nText;
     illustrationWidth: number;
+    illustration: string;
     iconWrap: string;
   }
 > = {
+  // The max-md: half shrinks each size so the whole state, action included, fits one phone screen.
   hero: {
-    root: "w-full h-full min-h-80 px-6 py-12",
-    stack: "gap-7",
-    copy: "gap-2.5",
-    actions: "gap-3 pt-1",
-    extra: "w-full flex flex-col items-center gap-3 pt-2",
-    title: raw("text-2xl!"),
-    description: raw("text-base"),
+    root: "w-full h-full min-h-80 px-6 py-12 max-md:min-h-0 max-md:px-4 max-md:py-5",
+    stack: "gap-7 max-md:gap-3.5",
+    copy: "gap-2.5 max-md:gap-1.5",
+    actions: "gap-3 pt-1 max-md:gap-2 max-md:pt-0",
+    extra: "w-full flex flex-col items-center gap-3 pt-2 max-md:gap-2 max-md:pt-0",
+    title: raw("text-2xl! max-md:text-lg!"),
+    description: raw("text-base max-md:text-sm"),
     illustrationWidth: 300,
+    // CSS width beats the SVG width attribute; h-auto keeps the viewBox ratio.
+    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-36",
     iconWrap: "",
   },
   block: {
-    root: "w-full min-h-65 px-6 py-10",
-    stack: "gap-5",
-    copy: "gap-2",
-    actions: "gap-2.5 pt-0.5",
-    extra: "w-full flex flex-col items-center gap-2 pt-1",
-    title: raw("text-lg!"),
+    root: "w-full min-h-65 px-6 py-10 max-md:min-h-0 max-md:px-4 max-md:py-5",
+    stack: "gap-5 max-md:gap-3",
+    copy: "gap-2 max-md:gap-1",
+    actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
+    extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
+    title: raw("text-lg! max-md:text-base!"),
     description: raw("text-sm"),
     illustrationWidth: 150,
+    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
     iconWrap: "",
   },
   inline: {
-    root: "w-full min-h-40 px-4 py-8",
+    root: "w-full min-h-40 px-4 py-8 max-md:min-h-0 max-md:py-5",
     stack: "gap-3",
     copy: "gap-1",
     actions: "gap-2 pt-1",
@@ -356,6 +367,7 @@ const SIZE_MAP: Record<
     title: raw("text-sm!"),
     description: raw("text-xs"),
     illustrationWidth: 0,
+    illustration: "",
     iconWrap: "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
   },
 };

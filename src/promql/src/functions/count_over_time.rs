@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct CountOverTimeFunc;
 
-impl CountOverTimeFunc {
-    pub fn new() -> Self {
-        CountOverTimeFunc {}
-    }
-}
-
 impl RangeFunc for CountOverTimeFunc {
     fn name(&self) -> &'static str {
         "count_over_time"
@@ -50,7 +44,7 @@ mod tests {
     use super::*;
 
     fn count_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, CountOverTimeFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, CountOverTimeFunc, eval_ctx)
     }
     // Test helper
     fn count_over_time_test_helper(data: Value) -> Result<Value> {
@@ -72,7 +66,7 @@ mod tests {
 
     #[test]
     fn test_count_over_time_exec_empty_samples_returns_none() {
-        let func = CountOverTimeFunc::new();
+        let func = CountOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

@@ -11,6 +11,8 @@ pub struct Model {
     pub usage_limit: Option<i64>,
     pub updated_at: i64,
     pub notified_checkpoint: i16,
+    /// `0` is a lifetime row. A monthly pool carries the `YYYYMM` its count belongs to.
+    pub period: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -31,10 +33,12 @@ mod tests {
             usage_limit: Some(1_000),
             updated_at: 1000,
             notified_checkpoint: 0,
+            period: 0,
         };
         assert_eq!(m.org_id, "org");
         assert_eq!(m.usage_count, 100);
         assert_eq!(m.usage_limit, Some(1_000));
         assert_eq!(m.notified_checkpoint, 0);
+        assert_eq!(m.period, 0);
     }
 }

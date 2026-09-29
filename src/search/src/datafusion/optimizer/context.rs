@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{datafusion::request::Request, meta::cluster::NodeInfo};
-use datafusion::{physical_optimizer::PhysicalOptimizerRule, sql::TableReference};
+use datafusion::{common::TableReference, physical_optimizer::PhysicalOptimizerRule};
 use hashbrown::HashMap;
 use infra::errors::Error;
 use parking_lot::Mutex;

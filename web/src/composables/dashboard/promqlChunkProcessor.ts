@@ -18,7 +18,7 @@
  *
  * Handles efficient merging of streaming PromQL chunks with:
  * - O(1) metric lookup using Map-based signatures
- * - Early series limiting to reduce memory usage
+ * - A render cap applied by point count, so arrival order never decides what survives
  * - Performance monitoring and logging
  */
 
@@ -30,6 +30,9 @@ export interface PromQLChunkProcessorOptions {
 export interface ProcessingStats {
   chunkCount: number;
   totalMetricsReceived: number;
+  // Distinct series, so a series arriving in ten chunks counts once. totalMetricsReceived
+  // sums per-chunk arrivals, so only this can tell a drop from a re-delivery.
+  uniqueSeriesSeen: number;
   metricsStored: number;
   valuesAppended: number;
   startTime: number;
@@ -41,13 +44,25 @@ export interface ProcessingStats {
 export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions) {
   const { maxSeries, enableLogging = true } = options;
 
-  // Fast O(1) metric lookup using hash-based signatures
-  const metricIndexMap = new Map<string, number>();
+  // Partitions stream oldest-first, so a series born mid-window is absent from the
+  // early chunks. Admitting by arrival order spends the cap on whatever existed
+  // first — including series that died in partition 1 — so candidates are held here
+  // and the cap is applied by point count once the whole window has been seen.
+  const candidates = new Map<string, any>();
+
+  /** The cap exists to bound what the chart renders; keep the series carrying the most data. */
+  function selectWithinCap(): any[] {
+    if (candidates.size <= maxSeries) return [...candidates.values()];
+    return [...candidates.values()]
+      .sort((a, b) => (b.values?.length ?? 0) - (a.values?.length ?? 0))
+      .slice(0, maxSeries);
+  }
 
   // Statistics tracking
   const stats: ProcessingStats = {
     chunkCount: 0,
     totalMetricsReceived: 0,
+    uniqueSeriesSeen: 0,
     metricsStored: 0,
     valuesAppended: 0,
     startTime: performance.now(),
@@ -71,33 +86,30 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     const metricsCount = newData?.result?.length || 0;
     stats.totalMetricsReceived += metricsCount;
 
-    // Limit the first chunk to maxSeries
-    const limitedResult = newData?.result ? newData.result.slice(0, maxSeries) : [];
-
-    // Build metric index map for fast lookups
-    if (limitedResult && Array.isArray(limitedResult)) {
-      limitedResult.forEach((metric: any, index: number) => {
-        const signature = getMetricSignature(metric.metric);
-        metricIndexMap.set(signature, index);
-      });
+    if (Array.isArray(newData?.result)) {
+      for (const metric of newData.result) {
+        candidates.set(getMetricSignature(metric.metric), metric);
+      }
     }
 
-    stats.metricsStored = limitedResult.length;
+    const selected = selectWithinCap();
+    stats.uniqueSeriesSeen = candidates.size;
+    stats.metricsStored = selected.length;
 
     if (enableLogging) {
       if (metricsCount > maxSeries) {
         console.log(
-          `[PromQL Chunk] ⚠️ First chunk limited from ${metricsCount} to ${limitedResult.length} metrics`,
+          `[PromQL Chunk] ⚠️ First chunk limited from ${metricsCount} to ${selected.length} metrics`,
         );
       }
       console.log(
-        `[PromQL Chunk] Built index for ${limitedResult.length} metrics in ${(performance.now() - startTime).toFixed(1)}ms`,
+        `[PromQL Chunk] Built index for ${selected.length} metrics in ${(performance.now() - startTime).toFixed(1)}ms`,
       );
     }
 
     return {
       ...newData,
-      result: limitedResult,
+      result: selected,
     };
   }
 
@@ -122,32 +134,29 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
       return newData;
     }
 
-    const mergedResult = currentResult.result;
     let newMetricsAdded = 0;
     let valuesAppended = 0;
 
     newData.result.forEach((newMetric: any) => {
       const signature = getMetricSignature(newMetric.metric);
-      const existingIndex = metricIndexMap.get(signature);
+      const existing = candidates.get(signature);
 
-      if (existingIndex !== undefined && existingIndex < mergedResult.length) {
-        // Existing metric - append values
-        if (Array.isArray(mergedResult[existingIndex].values) && Array.isArray(newMetric.values)) {
-          mergedResult[existingIndex].values.push(...newMetric.values);
+      if (existing) {
+        if (Array.isArray(existing.values) && Array.isArray(newMetric.values)) {
+          existing.values.push(...newMetric.values);
           valuesAppended += newMetric.values.length;
         }
-      } else if (mergedResult.length < maxSeries) {
-        // New metric - add only if under limit
-        const newIndex = mergedResult.length;
-        mergedResult.push(newMetric);
-        metricIndexMap.set(signature, newIndex);
+      } else {
+        // Held whole: a series is either kept with every point it reported or dropped.
+        candidates.set(signature, newMetric);
         newMetricsAdded++;
       }
-      // else: Skip - we've reached the series limit
     });
 
+    const selected = selectWithinCap();
     stats.valuesAppended += valuesAppended;
-    stats.metricsStored = mergedResult.length;
+    stats.uniqueSeriesSeen = candidates.size;
+    stats.metricsStored = selected.length;
 
     if (enableLogging) {
       console.log(
@@ -158,7 +167,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
     return {
       ...newData,
-      result: mergedResult,
+      result: selected,
     };
   }
 

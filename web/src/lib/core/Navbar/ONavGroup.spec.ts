@@ -114,6 +114,63 @@ describe("ONavGroup", () => {
     expect(flyout().exists()).toBe(true);
   });
 
+  /**
+   * A dropdown is portaled after this flyout and sits on a higher layer, so it
+   * paints over the menu the pointer is on. Escape is what reka's dismissable
+   * layers listen for; the flyout sends it before showing itself.
+   */
+  it("closes an open dropdown before showing the flyout", async () => {
+    const popper = document.createElement("div");
+    popper.setAttribute("data-reka-popper-content-wrapper", "");
+    document.body.appendChild(popper);
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    popper.remove();
+    expect(keys).toContain("Escape");
+    expect(flyout().exists()).toBe(true);
+  });
+
+  // Nothing to dismiss must stay silent: a stray Escape would close whatever
+  // else is listening, and hovering the rail is not a dismissal gesture.
+  it("sends no Escape when no dropdown is open", async () => {
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    expect(keys).not.toContain("Escape");
+  });
+
+  // A dialog or drawer owns Escape while it is open, and the rail stays
+  // reachable beside a drawer — so the flyout must not fire the key there.
+  it("leaves an open dialog alone", async () => {
+    const popper = document.createElement("div");
+    popper.setAttribute("data-reka-popper-content-wrapper", "");
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-test", "o-dialog-overlay");
+    document.body.append(popper, overlay);
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    popper.remove();
+    overlay.remove();
+    expect(keys).not.toContain("Escape");
+  });
+
   it("positions the flyout after the rail in LTR", async () => {
     document.documentElement.dir = "ltr";
     wrapper = mountGroup();
@@ -238,6 +295,162 @@ describe("ONavGroup", () => {
         children: [{ titleKey: "menu.ghost", icon: "x", name: "notARoute" }] as SubnavChild[],
       });
       expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);
+    });
+  });
+
+  // Anchor-child tile link (4.7/§6): the child resolving to parentLink wins; gated out ⇒ first visible child.
+  describe("Infra tile with workload children (Hosts first)", () => {
+    // Exposes the resolved tile link so the anchor-child rule is assertable.
+    const linkedTileStub = {
+      template:
+        '<a data-test="tile" href="#" :data-link="link" @click.prevent="$emit(\'click\')">{{ title }}</a>',
+      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+      emits: ["click", "keydown"],
+    };
+
+    const infraChildren = (): SubnavChild[] => [
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
+      {
+        titleKey: "menu.databases",
+        icon: "database",
+        name: "dbmDatabases",
+        gate: "databaseMonitoring",
+      },
+      { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+    ];
+
+    function infraRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/infra/hosts", name: "infraHosts", component: { template: "<div />" } },
+          { path: "/infra/databases", name: "dbmDatabases", component: { template: "<div />" } },
+          {
+            path: "/infra/kubernetes",
+            name: "infraKubernetes",
+            component: { template: "<div />" },
+          },
+          { path: "/streams", name: "logstreams", component: { template: "<div />" } },
+          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
+        ],
+      });
+    }
+
+    function infraStore(dbmEnabled: boolean, hiddenMenus = "") {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: {
+            database_monitoring_enabled: dbmEnabled,
+            custom_hide_menus: hiddenMenus,
+          },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    function mountInfraTile(
+      dbmEnabled: boolean,
+      { hiddenMenus = "", children = infraChildren(), parentLink = "/infra/databases" } = {},
+    ) {
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children,
+          parentItem: { link: parentLink, title: "Infra", icon: "dns", name: "infra" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    const tileLink = () => wrapper.find('[data-test="tile"]').attributes("data-link");
+
+    async function hoverOpenInfra() {
+      await wrapper.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+    }
+
+    it("keeps the Infra tile with the ungated children when DBM is off", async () => {
+      wrapper = mountInfraTile(false);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      await hoverOpenInfra();
+      const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+      expect(fly.find('[data-test="nav-group-item-infraHosts"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraKubernetes"]').exists()).toBe(true);
+      // Databases stays behind its runtime gate.
+      expect(fly.find('[data-test="nav-group-item-dbmDatabases"]').exists()).toBe(false);
+    });
+
+    it("lands the tile on /infra/hosts when the anchor child gates out (DBM off)", () => {
+      // The static parentLink would bounce off the DBM route guard onto Traces.
+      wrapper = mountInfraTile(false);
+      expect(tileLink()).toBe("/infra/hosts");
+    });
+
+    it("keeps /infra/databases as the tile link when DBM is on, despite Hosts being declared first", () => {
+      // Ungated Hosts always survives, so keying on "first declared" would re-break DBM-off.
+      wrapper = mountInfraTile(true);
+      expect(tileLink()).toBe("/infra/databases");
+    });
+
+    it.each(["infraHosts", "infraKubernetes"])(
+      "custom_hide_menus can hide %s by route name",
+      async (name) => {
+        wrapper = mountInfraTile(true, { hiddenMenus: name });
+        await hoverOpenInfra();
+        const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+        expect(fly.find(`[data-test="nav-group-item-${name}"]`).exists()).toBe(false);
+      },
+    );
+
+    it("keeps parentLink verbatim for a group with no child resolving to it", () => {
+      wrapper = mountInfraTile(true, { parentLink: "/somewhere-else" });
+      expect(tileLink()).toBe("/somewhere-else");
+    });
+
+    it("retargets a NON-infra tile to its first visible child when its anchor child is hidden", () => {
+      // The anchor-child rule applies to every group: hiding the child that resolves
+      // to parentLink (custom_hide_menus) retargets the tile — release-noted behavior change.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true, "logstreams"), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/pipelines");
+    });
+
+    it("leaves every other group's tile link byte-identical to its parentLink", () => {
+      // The anchor child survives in every existing group, so they render bit-identically.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/streams");
     });
   });
 

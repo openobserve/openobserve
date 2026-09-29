@@ -92,6 +92,43 @@ async function clear() {
   return false;
 }
 
+/** Drain to a stable-empty sink: a prior serial test's async SMTP delivery can land after clear(),
+ *  and with only one valid org recipient the count cannot be scoped by address, so wait until the
+ *  sink has stayed empty for `stableMs` (re-clearing any late arrival) before sending the next message. */
+async function waitUntilEmptyStable(stableMs = 3000, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  let emptySince = null;
+  while (Date.now() < deadline) {
+    if ((await count()) === 0) {
+      if (emptySince === null) emptySince = Date.now();
+      else if (Date.now() - emptySince >= stableMs) return true;
+    } else {
+      await clear();
+      emptySince = null;
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return false;
+}
+
+/** The message count once it has stopped changing for `stableMs` — a count read the moment the first message lands cannot tell one message apart from one still in flight, so "exactly N" callers must settle first. */
+async function countAfterSettle(stableMs = 4000, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = await count();
+  let stableSince = Date.now();
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const now = await count();
+    if (now !== last) {
+      last = now;
+      stableSince = Date.now();
+    } else if (Date.now() - stableSince >= stableMs) {
+      return last;
+    }
+  }
+  return last;
+}
+
 async function waitForCount(n, timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs;
   let last = 0;
@@ -143,4 +180,4 @@ async function latest() {
   return null;
 }
 
-module.exports = { available, unavailableReason, backend, list, count, clear, waitForCount, latest };
+module.exports = { available, unavailableReason, backend, list, count, clear, waitUntilEmptyStable, countAfterSettle, waitForCount, latest };

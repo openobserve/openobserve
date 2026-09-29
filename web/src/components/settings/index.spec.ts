@@ -27,9 +27,11 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+const mockIsMetaOrg = vi.hoisted(() => ({ value: true }));
+
 vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({
-    isMetaOrg: { value: true },
+    isMetaOrg: mockIsMetaOrg,
   }),
 }));
 
@@ -68,9 +70,7 @@ const router = createRouter({
 
 // Mock the router methods we need to test
 const mockRouterPush = vi.fn();
-const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 router.push = mockRouterPush;
-router.replace = mockRouterReplace;
 
 const createWrapper = (props = {}, options = {}) => {
   return mount(SettingsIndex, {
@@ -124,8 +124,8 @@ describe("SettingsIndex", () => {
     mockStore.state.theme = "light";
     mockStore.state.selectedOrganization = { identifier: "test-org" };
     mockStore.state.zoConfig = { service_streams_enabled: true };
+    mockIsMetaOrg.value = true;
     mockRouterPush.mockClear();
-    mockRouterReplace.mockClear();
 
     // Set up router state
     await router.push("/");
@@ -238,24 +238,6 @@ describe("SettingsIndex", () => {
   });
 
   describe("Router integration", () => {
-    it("should redirect to /settings/general on settings root route", () => {
-      createWrapper();
-      expect(mockRouterReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "/settings/general",
-        }),
-      );
-    });
-
-    it("should include org_identifier in redirect query", () => {
-      createWrapper();
-      expect(mockRouterReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: { org_identifier: "test-org" },
-        }),
-      );
-    });
-
     it("should map syntheticsLocations route to synthetics_locations tab", () => {
       // Save the original route reference so we can restore it after the test
       // (router.push is mocked and won't reset currentRoute on its own).
@@ -393,12 +375,6 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       expect(wrapper.vm.settingsTab).toBe("general");
     });
-
-    it("should expose isHub computed property", () => {
-      const wrapper = createWrapper();
-      // On '/' route named 'settings', isHub is true
-      expect(typeof wrapper.vm.isHub).toBe("boolean");
-    });
   });
 
   describe("Edge cases", () => {
@@ -450,6 +426,55 @@ describe("SettingsIndex", () => {
             path: "/settings/general",
             query: { org_identifier: "test-org" },
           }),
+        );
+      });
+    });
+
+    const onQueryManagementRoute = (run: () => void) => {
+      const originalRoute = router.currentRoute.value;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        name: "query_management",
+        path: "/query_management",
+      } as any;
+      try {
+        run();
+      } finally {
+        router.currentRoute.value = originalRoute;
+      }
+    };
+
+    it("should redirect query_management to general after switching to a non-meta org", async () => {
+      mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+      mockIsMetaOrg.value = false;
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "true";
+
+      onQueryManagementRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: "/settings/general",
+            query: { org_identifier: "test-org" },
+          }),
+        );
+      });
+    });
+
+    it("should NOT redirect query_management inside the meta org", async () => {
+      mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+      mockIsMetaOrg.value = true;
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "true";
+
+      onQueryManagementRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/settings/general" }),
         );
       });
     });

@@ -10,6 +10,12 @@ const logData = require('../../../fixtures/log.json');
 // on top of the query carried in the URL, and the re-applied query was silently dropped.
 // The regression only shows up when the logs page has already been used in the session —
 // that is what puts the stale query in the cache — hence the two searches in beforeEach.
+//
+// ENTERPRISE ONLY. #14316 made the usage stream enterprise-only, and SearchHistory.vue is
+// gated on `zoConfig.usage_enabled`, which an OSS build now hardcodes false — the page
+// renders its "enable usage reporting" placeholder and no query can ever be re-applied.
+// This spec therefore runs from the ENT overlay (ci_matrix_regression.ent.json), not from
+// the OSS base matrix.
 test.describe('Regression: Search History re-apply retains the query (#14283)', () => {
   test.describe.configure({ mode: 'serial' });
 

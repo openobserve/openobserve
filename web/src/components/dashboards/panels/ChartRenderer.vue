@@ -82,6 +82,7 @@ import {
   inject,
 } from "vue";
 import { useStore } from "vuex";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
@@ -144,6 +145,9 @@ echarts.use([
   SVGRenderer,
 ]);
 
+// Right-click reads a y-axis value, so only cartesian series types can answer it
+const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
 export default defineComponent({
   name: "ChartRenderer",
   emits: [
@@ -156,6 +160,7 @@ export default defineComponent({
     "mouseout",
     "contextmenu",
     "domcontextmenu",
+    "finished",
   ],
   props: {
     data: {
@@ -317,8 +322,7 @@ export default defineComponent({
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
@@ -381,8 +385,7 @@ export default defineComponent({
       await nextTick();
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
@@ -490,6 +493,10 @@ export default defineComponent({
 
       chart?.on("mouseover", function (params: any) {
         emit("mouseover", params);
+      });
+
+      chart?.on("finished", () => {
+        emit("finished");
       });
 
       window.removeEventListener("resize", windowResizeEventCallback);
@@ -643,6 +650,35 @@ export default defineComponent({
       zeroSizeReinitObserver.observe(chartRef.value);
     };
 
+    // < lg the window resize listener misses container-only size changes (rails collapsing, stacked panes).
+    let containerResizeObserver: ResizeObserver | null = null;
+    let containerResizeRaf = 0;
+    const { lgUp } = useBreakpoint();
+    let lastObservedSize = { w: 0, h: 0 };
+    const resizeToContainer = () => {
+      containerResizeRaf = 0;
+      if (!chartRef.value) return;
+      const w = chartRef.value.clientWidth;
+      const h = chartRef.value.clientHeight;
+      if (w > 0 && h > 0 && (w !== lastObservedSize.w || h !== lastObservedSize.h)) {
+        lastObservedSize = { w, h };
+        chart?.resize();
+      }
+    };
+    const observeContainerResize = () => {
+      if (!chartRef.value || containerResizeObserver) return;
+      lastObservedSize = {
+        w: chartRef.value.clientWidth,
+        h: chartRef.value.clientHeight,
+      };
+      // Coalesced to one resize per frame: drawer and splitter animations notify every frame.
+      containerResizeObserver = new ResizeObserver(() => {
+        if (lgUp.value) return;
+        if (!containerResizeRaf) containerResizeRaf = requestAnimationFrame(resizeToContainer);
+      });
+      containerResizeObserver.observe(chartRef.value);
+    };
+
     onMounted(async () => {
       try {
         await nextTick();
@@ -661,6 +697,7 @@ export default defineComponent({
           if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
             reinitWhenSized();
           }
+          observeContainerResize();
         }
         chart?.setOption(withChartFont(props?.data?.options || {}), {
           lazyUpdate: true,
@@ -681,6 +718,11 @@ export default defineComponent({
       // Clean up the zero-size re-init observer
       zeroSizeReinitObserver?.disconnect();
       zeroSizeReinitObserver = null;
+
+      containerResizeObserver?.disconnect();
+      containerResizeObserver = null;
+      cancelAnimationFrame(containerResizeRaf);
+      containerResizeRaf = 0;
 
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();

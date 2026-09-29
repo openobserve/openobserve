@@ -80,8 +80,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 items-center gap-2 py-1.5">
-        <div class="w-64 shrink-0">
+      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
+        <DbmScopeFilters
+          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
+          :filters="dimensionFilters"
+          :insight-chip="activeInsightChip"
+          @clear="clearScope"
+          @clear-insight="activeInsightId = null"
+        />
+        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.queries.searchPlaceholder')"
@@ -91,13 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onSearchInput"
           />
         </div>
-        <DbmScopeFilters
-          class="min-w-0 flex-1"
-          :filters="dimensionFilters"
-          :insight-chip="activeInsightChip"
-          @clear="clearScope"
-          @clear-insight="activeInsightId = null"
-        />
         <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
         <span
           class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="stmtClass"
             true-value="all"
             false-value="query"
+            data-test="dbm-queries-stmt-class-checkbox"
             size="sm"
             :label="t('dbm.queries.stmtClass.overheadLabel')"
             @update:model-value="onStmtClassChange"
@@ -123,21 +124,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dbm-queries-baseline"
           @update:model-value="onBaselineChange"
         >
-          <OToggleGroupItem value="previous" size="sm">
+          <OToggleGroupItem value="previous" size="sm" data-test="dbm-queries-baseline-previous">
             {{ t("dbm.insights.baseline.previousShort") }}
             <OTooltip side="bottom" :content="t('dbm.insights.baseline.previousHint')" />
           </OToggleGroupItem>
-          <OToggleGroupItem value="yesterday" size="sm">
+          <OToggleGroupItem value="yesterday" size="sm" data-test="dbm-queries-baseline-yesterday">
             {{ t("dbm.insights.baseline.yesterdayShort") }}
             <OTooltip side="bottom" :content="t('dbm.insights.baseline.yesterdayHint')" />
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <DbmRefreshButton
-          mode="status"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-queries-refresh"
+        <!-- Icons only: at 1280 any text here would take the filter chips' last room. Each follows the list on screen. -->
+        <DbmCoverageLine
+          v-if="!serverListShown"
+          inline
+          compact
+          :freshness="freshness"
+          :hits="rows"
+          :other="other"
+          :top-n-subset="topNSubset"
+          :error-count="errorCount"
+          :filter-label="narrowingFilterLabel"
+          data-test="dbm-queries-coverage"
+        />
+        <DbmCoverageLine
+          v-else
+          inline
+          compact
+          :freshness="freshness"
+          :hits="serverCoverageHits"
+          :top-n-subset="serverTruncated"
+          :filter-label="narrowingFilterLabel"
+          data-test="dbm-server-queries-coverage"
+        />
+        <DbmAppSourceLegend
+          v-if="hasAppSourcedRows && !serverListShown"
+          compact
+          data-test="dbm-queries-app-source-legend"
+        />
+        <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
+        <OTableColumnToggle
+          v-if="!serverListShown"
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+          @update:column-visibility="setColumnVisibility"
+          @reset:column-sizes="tableRef?.resetColumnSizes?.()"
         />
         <DateTime
           auto-apply
@@ -146,14 +178,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
           :default-relative-time="range.relativeTimePeriod ?? undefined"
           data-test-name="dbm-queries-date-time"
-          class="h-8"
+          class="h-8 max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
-        <DbmRefreshButton
-          mode="button"
+        <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
+          class="ms-auto"
           :loading="loading"
+          :last-run-at="lastRunAt"
           data-test="dbm-queries-refresh"
-          @refresh="onRefresh"
+          @click="onRefresh()"
         />
       </div>
 
@@ -176,9 +212,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :sort-by="sortBy"
         sort-order="desc"
         :show-global-filter="false"
-        :column-visibility="defaultColumnVisibility"
+        :column-visibility="columnVisibility"
         :persist-columns="true"
         table-id="dbm-queries"
+        :footer-title="t('dbm.queries.stmtClass.query')"
         :enable-column-resize="true"
         :row-class="rowClass"
         :get-row-style="rowStyle"
@@ -194,17 +231,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <DbmSubheaderBand data-test="dbm-queries-summary">
-            <OStatStrip :items="visibleSummaryStats" :loading="loading" />
+            <OStatStrip
+              :items="visibleSummaryStats"
+              :loading="loading"
+              selectable
+              :selected-key="statFilter"
+              default-key="queries"
+              @select="onStatSelect"
+            />
           </DbmSubheaderBand>
-          <DbmCoverageLine
-            :freshness="freshness"
-            :hits="rows"
-            :other="other"
-            :top-n-subset="topNSubset"
-            :error-count="errorCount"
-            :filter-label="narrowingFilterLabel"
-            data-test="dbm-queries-coverage"
-          />
           <DbmInsightStrip
             v-if="!insightsHidden && stripInsights.length"
             :insights="stripInsights"
@@ -480,23 +515,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DbmSubheaderBand data-test="dbm-server-queries-summary">
               <OStatStrip :items="visibleSummaryStats" :loading="loading" />
             </DbmSubheaderBand>
-            <!-- Coverage follows the TABLE too, for the same reason the stat
-                 band above does. It used to live only in the client table's
-                 subheader, so freshness, the top-N truncation disclosure and
-                 the "counted to" timestamp all vanished at exactly the moment
-                 the numbers changed vantage — the one moment a reader most
-                 needs to be told what they are looking at. `hits` is the
-                 fallback list, so the line counts the rows actually on screen;
-                 the error count is withheld because the server feed carries
-                 none, and a `0` there would read as an all-clear nobody
-                 measured. -->
-            <DbmCoverageLine
-              :freshness="freshness"
-              :hits="serverCoverageHits"
-              :top-n-subset="serverTruncated"
-              :filter-label="narrowingFilterLabel"
-              data-test="dbm-server-queries-coverage"
-            />
           </template>
           <template #cell-query="{ row }">
             <DbmQueryCell
@@ -561,6 +579,7 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmDeltaCell from "@/components/dbm/DbmDeltaCell.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
@@ -570,7 +589,6 @@ import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -579,9 +597,13 @@ import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -628,6 +650,7 @@ import {
   type DbmServerCounters,
 } from "@/utils/dbm/overlapJoin";
 import {
+  APP_SOURCE_QUALIFIER,
   resolveCalls,
   resolveDatabaseTime,
   type DbmOverlapMetric,
@@ -753,8 +776,8 @@ const serverTruncated = ref(false);
  * the fallback deliberately skips.
  *
  * A failed read is not an observation: it leaves the map empty, every row
- * falls back to its client figure, and each one says `client-observed` rather
- * than the page silently presenting traced numbers as the database's.
+ * falls back to its client figure, marked as traced, rather than the page
+ * silently presenting traced numbers as the database's.
  */
 const serverCounters = shallowRef<Map<string, DbmServerCounters>>(new Map());
 
@@ -784,7 +807,7 @@ const serverTimeQualifier = (row: ServerQueryRow): string =>
 
 const clientOnlyMetric = (value: number | null | undefined): DbmOverlapMetric =>
   typeof value === "number" && Number.isFinite(value)
-    ? { value, source: "client", qualifierKey: "clientObserved" }
+    ? { value, source: "client", qualifierKey: APP_SOURCE_QUALIFIER }
     : { value: null, source: null, qualifierKey: null };
 
 // `loadServerQueries` lived here — a second, sequential request to
@@ -939,7 +962,12 @@ const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
  * does not type-check — OTable is a generic component, so its instance type has
  * no construct signature to instantiate.
  */
-const tableRef = ref<{ scrollToTop?: () => void; $el?: HTMLElement } | null>(null);
+const tableRef = ref<{
+  scrollToTop?: () => void;
+  $el?: HTMLElement;
+  hasResizedColumns?: boolean;
+  resetColumnSizes?: () => void;
+} | null>(null);
 const stmtClass = ref<string>("query");
 const sortBy = ref<QuerySortKey>("total_time_ns");
 
@@ -1065,14 +1093,18 @@ const overlapTotals = computed(() => {
           source: "server" as const,
           qualifierKey: "serverCounted",
         }
-      : { value: totalCalls.value, source: "client" as const, qualifierKey: "clientObserved" },
+      : { value: totalCalls.value, source: "client" as const, qualifierKey: APP_SOURCE_QUALIFIER },
     time: everyTimeServed
       ? {
           value: list.reduce((acc, row) => acc + (row.overlapTime.value ?? 0), 0),
           source: "server" as const,
           qualifierKey: uniformTimeQualifier(list.map((row) => row.overlapTime.qualifierKey)),
         }
-      : { value: scopeTotalTime.value, source: "client" as const, qualifierKey: "clientObserved" },
+      : {
+          value: scopeTotalTime.value,
+          source: "client" as const,
+          qualifierKey: APP_SOURCE_QUALIFIER,
+        },
   };
 });
 
@@ -1106,16 +1138,31 @@ const fallbackTimeQualifier = computed(() =>
  * database time with no word for WHICH time it is reads as execution time on a
  * MySQL fleet, whether it sits in a cell or a tile.
  */
+// The Failed tile narrows the table to the queries with a failed call; Calls and Database time are totals, not rows.
+const statFilter = ref<"failed" | null>(null);
+const onStatSelect = (key: string) => {
+  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
+};
+
 const summaryStats = computed<StatItem[]>(() => {
   const totals = overlapTotals.value;
   const qualifier = (key: string | null): I18nText =>
-    key === null ? raw("") : t(`dbm.list.overlap.${key}` as "dbm.list.overlap.serverWait");
+    key === null
+      ? raw("")
+      : key === APP_SOURCE_QUALIFIER
+        ? t("dbm.appSource.marker")
+        : t(`dbm.list.overlap.${key}` as "dbm.list.overlap.serverWait");
+  // An app-sourced total shows the traces glyph; `sub` becomes its accessible name.
+  const qualifierIcon = (key: string | null): { subIcon?: IconName; subTooltip?: I18nText } =>
+    key === APP_SOURCE_QUALIFIER
+      ? { subIcon: "account-tree", subTooltip: t("dbm.appSource.markerHint") }
+      : {};
 
   // Whether the vantage these totals were summed from produced ANY row. A sum
   // cannot say so itself — `[].reduce(+, 0)` is the same 0 as a row that
   // genuinely ran zero calls — so the population signal is read from the list
-  // the total was taken over. Without it the strip printed `0us
-  // client-observed` on a fleet whose trace vantage measured nothing.
+  // the total was taken over. Without it the strip printed a traced `0us`
+  // on a fleet whose trace vantage measured nothing.
   const measured = serverListShown.value
     ? filteredServerRows.value.length > 0
     : rows.value.length > 0 || other.value.length > 0;
@@ -1145,18 +1192,24 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("dbm.queries.summary.calls"),
       value: calls.value ?? raw("—"),
       // D2: the qualifier renders only alongside a value it can qualify.
-      ...(calls.qualified ? { sub: qualifier(totals.calls.qualifierKey) } : {}),
+      ...(calls.qualified
+        ? { sub: qualifier(totals.calls.qualifierKey), ...qualifierIcon(totals.calls.qualifierKey) }
+        : {}),
       icon: "bar-chart",
       tone: "info",
+      selectable: false,
       dataTest: "dbm-queries-summary-calls",
     },
     {
       key: "time",
       label: t("dbm.queries.summary.time"),
       value: time.value ?? raw("—"),
-      ...(time.qualified ? { sub: qualifier(totals.time.qualifierKey) } : {}),
+      ...(time.qualified
+        ? { sub: qualifier(totals.time.qualifierKey), ...qualifierIcon(totals.time.qualifierKey) }
+        : {}),
       icon: "timer",
       tone: "teal",
+      selectable: false,
       dataTest: "dbm-queries-summary-time",
     },
     // TRACE-ONLY: the server feed carries no error counts. In fallback mode
@@ -1168,6 +1221,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-queries-summary-failed",
     },
   ];
@@ -1192,7 +1246,8 @@ const isFiltered = computed(
     !!namespaceFilter.value ||
     !!envFilter.value ||
     !!serviceFilter.value ||
-    activeInsightId.value !== null,
+    activeInsightId.value !== null ||
+    statFilter.value !== null,
 );
 
 /**
@@ -1380,7 +1435,7 @@ const load = () =>
  * Deliberately NOT awaited into the failure path of the page: this read is an
  * IMPROVEMENT to two columns, not the page's data. A logs-stream permission
  * the reader lacks, or a stream that never carried counters, must leave the
- * table exactly as it was — client figures, each labelled `client-observed` —
+ * table exactly as it was — client figures, each marked as traced —
  * rather than failing a load that otherwise succeeded. So the catch clears the
  * map and says nothing.
  */
@@ -1785,11 +1840,15 @@ const tableRows = computed<QueryRow[]>(() => {
   // An insight filter is already a narrowing, so nothing folds inside it: the
   // user asked for exactly these rows and hiding some would answer a different
   // question than the one they clicked.
+  const failedOnly = statFilter.value === "failed";
   const base = active
     ? rows.value.filter((row) => active.fingerprints.includes(row.fingerprint))
-    : foldedRows.value;
+    : failedOnly
+      ? rows.value
+      : foldedRows.value;
 
   // The remainder is suppressed while filtering: it does not reconcile a subset.
+  if (failedOnly) return base.filter((row) => (row.errors ?? 0) > 0);
   if (active || !other.value.length) return base;
 
   const scopeTotal = scopeTotalTime.value;
@@ -1819,6 +1878,13 @@ const tableRows = computed<QueryRow[]>(() => {
   }));
   return [...base, ...remainder];
 });
+
+/** Whether any row on screen carries the app-source marker, so the legend explains it. */
+const hasAppSourcedRows = computed(() =>
+  tableRows.value.some(
+    (row) => row.overlapCalls.source === "client" || row.overlapTime.source === "client",
+  ),
+);
 
 /**
  * Only two row tints, and neither washes the row: a left rail. Amber marks a
@@ -2120,6 +2186,8 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
 /** The extra percentiles are available but off: the mockup's column set is
  *  what fits without horizontal scrolling at 1440. */
 const defaultColumnVisibility = { p99_ns: false, max_ns: false, services: false };
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-queries");
+if (!Object.keys(columnVisibility.value).length) columnVisibility.value = defaultColumnVisibility;
 
 /**
  * The table emits the column id; the ids of sortable columns are deliberately
@@ -2246,6 +2314,7 @@ const clearScope = () => {
   serviceFilter.value = null;
   search.value = "";
   activeInsightId.value = null;
+  statFilter.value = null;
   syncUrl();
   load();
 };
@@ -2292,7 +2361,7 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
       });
       return;
     case "clear-filters":
-      // clearScope() drops search and the active insight too.
+      // clearScope() drops search, the active insight and the Failed tile too.
       clearScope();
       return;
     case "reload":

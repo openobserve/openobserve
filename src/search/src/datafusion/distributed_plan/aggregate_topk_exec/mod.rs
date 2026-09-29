@@ -17,9 +17,9 @@ use std::{fmt::Debug, sync::Arc};
 
 use arrow::datatypes::SchemaRef;
 use datafusion::{
-    common::Result,
+    common::{Result, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::EquivalenceProperties,
+    physical_expr::{EquivalenceProperties, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
         PlanProperties,
@@ -128,6 +128,13 @@ impl DisplayAs for AggregateTopkExec {
 }
 
 impl ExecutionPlan for AggregateTopkExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "AggregateTopkExec"
     }

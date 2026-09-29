@@ -55,8 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="splitterModel"
           :limits="hideTestPanel ? [100, 100] : [30, 100]"
           class="w-full overflow-hidden"
-          :horizontal="false"
-          :separator-class="hideTestPanel ? 'hidden' : 'w-[0.0625rem] bg-card-glass-border'"
+          :horizontal="isMobile"
+          :separator-class="
+            hideTestPanel
+              ? 'hidden'
+              : isMobile
+                ? 'h-[0.0625rem] bg-card-glass-border'
+                : 'w-[0.0625rem] bg-card-glass-border'
+          "
         >
           <template v-slot:before>
             <!-- Workflows (hideTestPanel): drop the horizontal padding so the editor
@@ -193,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { saveFunctionMutation } from "@/services/jstransform.queries";
 import {
   defineComponent,
   ref,
@@ -204,7 +211,6 @@ import {
   nextTick,
 } from "vue";
 
-import jsTransformService from "../../services/jstransform";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -213,16 +219,18 @@ import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
-import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -300,6 +308,7 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const store: any = useStore();
     const router = useRouter();
+    const { isMobile } = useBreakpoint();
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
@@ -367,6 +376,12 @@ export default defineComponent({
     });
 
     const beingUpdated = computed(() => props.isUpdated);
+
+    // Create vs update is the caller's decision; the cache consequence is not.
+    const orgId = useOrgId();
+    const saveFunction = useMutation(() =>
+      saveFunctionMutation(orgId.value, () => beingUpdated.value),
+    );
 
     // AddFunction OWNS the <OForm> but also reads form state (transType drives
     // the Monaco editor language + placeholder) and writes it (the editor's
@@ -482,9 +497,9 @@ export default defineComponent({
       forceSkipBeforeUnloadListener = true;
 
       try {
-        const res = beingUpdated.value
-          ? await jsTransformService.update(store.state.selectedOrganization.identifier, payload)
-          : await jsTransformService.create(store.state.selectedOrganization.identifier, payload);
+        // The write no longer knows what it invalidates — `saveFunctionMutation`
+        // declares that beside the endpoint, and the mutation cache applies it.
+        const res = await saveFunction.mutateAsync(payload);
 
         const _formData: any = { ...payload };
         formData.value = { ...defaultValue() };
@@ -665,6 +680,7 @@ export default defineComponent({
       handleFunctionError,
       vrlFunctionError,
       splitterModel,
+      isMobile,
       closeAddFunction,
       confirmDialogMeta,
       transformTypeOptions,

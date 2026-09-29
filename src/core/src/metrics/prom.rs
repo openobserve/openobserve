@@ -14,14 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
-    sync::Arc,
 };
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use config::{
-    FxIndexMap, TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -31,41 +31,72 @@ use config::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamStats, StreamType},
     },
-    metrics,
     utils::{
-        flatten::format_label_name,
+        flatten::format_label_name_cow,
         json,
         schema::format_stream_name,
-        schema_ext::SchemaExt,
+        sql::{quote_identifier, quote_sql_string},
         time::{now_micros, parse_i64_to_timestamp_micros},
     },
 };
 use datafusion::arrow::datatypes::Schema;
-use db;
+use db::{self, alerts::alert::cache_stream_key};
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::{SchemaCache, get_partition_time_level},
+    schema::SchemaCache,
 };
 use ingestion_common::IngestUser;
 use promql_parser::{label::MatchOp, parser};
-use prost::Message;
 use proto::prometheus_rpc;
-use schema::{check_for_schema, stream_schema_exists};
+use schema::stream_schema_exists;
 use search_service;
 
-use super::native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram};
+use super::{
+    columnar, ingest,
+    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, ExpansionLimits, expand_native_histogram},
+    prom_decode,
+};
 use crate::{
-    alerts::alert::AlertExt,
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::stream::SchemaRecords,
     },
-    ingestion::{
-        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
-    },
+    ingestion::{TriggerAlertData, check_ingestion_allowed},
     pipeline::batch_execution::ExecutablePipeline,
 };
+
+/// A record waiting for the write path, with the series hash when this handler computed it.
+type PendingRecord = (json::Map<String, json::Value>, i64, Option<u64>);
+
+type JsonDataByStream = HashMap<String, Vec<PendingRecord>>;
+
+struct RecordSink<'a> {
+    pipelines: &'a HashMap<String, Vec<ExecutablePipeline>>,
+    user_defined_schema: &'a HashMap<String, Option<HashSet<String>>>,
+    pipeline_inputs: &'a mut HashMap<String, Vec<(json::Value, i64)>>,
+    json_data_by_stream: &'a mut JsonDataByStream,
+}
+
+/// HA replica election, run once per request at the first record that will actually be written.
+struct HaGate<'a> {
+    first_line: &'a mut bool,
+    armed: bool,
+    cluster_name: &'a str,
+    replica_label: &'a str,
+    interval: i64,
+}
+
+impl HaGate<'_> {
+    /// `false` once this replica has lost leadership; the request must then write nothing.
+    async fn admit(&mut self) -> bool {
+        if !self.armed || !*self.first_line {
+            return true;
+        }
+        *self.first_line = false;
+        run_ha_election(self.cluster_name, self.replica_label, self.interval).await
+    }
+}
 
 pub async fn remote_write(
     org_id: &str,
@@ -84,7 +115,6 @@ pub async fn remote_write(
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
 
     // Start get user defined schema
@@ -104,8 +134,8 @@ pub async fn remote_write(
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
         .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {e}"))?;
-    let request = prometheus_rpc::WriteRequest::decode(bytes::Bytes::from(decoded))
-        .map_err(|e| anyhow::anyhow!("Invalid protobuf: {e}"))?;
+    let request =
+        prom_decode::decode(&decoded).map_err(|e| anyhow::anyhow!("Invalid protobuf: {e}"))?;
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
@@ -119,7 +149,7 @@ pub async fn remote_write(
         let metric_name = format_stream_name(item.metric_family_name.to_string());
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
-            .unwrap_or(Schema::empty());
+            .unwrap_or_else(|_| Schema::empty());
         if schema.metadata().contains_key(METADATA_LABEL) {
             // already has metadata, skip
             continue;
@@ -140,33 +170,13 @@ pub async fn remote_write(
             db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
                 .await
         {
-            log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
+            log::error!("Error updating metadata for stream: {org_id}/{metric_name}, err: {e}");
         }
     }
 
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
-        let time = start.elapsed().as_secs_f64();
-        metrics::HTTP_RESPONSE_TIME
-            .with_label_values(&[
-                "/prometheus/api/v1/write",
-                "200",
-                org_id,
-                StreamType::Metrics.as_str(),
-                "",
-                "",
-            ])
-            .observe(time);
-        metrics::HTTP_INCOMING_REQUESTS
-            .with_label_values(&[
-                "/prometheus/api/v1/write",
-                "200",
-                org_id,
-                StreamType::Metrics.as_str(),
-                "",
-                "",
-            ])
-            .inc();
+        ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
         return Ok(());
     }
 
@@ -175,23 +185,31 @@ pub async fn remote_write(
     let mut first_line = true;
 
     // Detailed performance tracking
-    let mut sample_processing_time = 0u128;
     let mut event_count = 0;
     let mut sample_count = 0;
 
     // Pre-load all configurations for unique metrics to avoid repeated queries
     let preload_start = std::time::Instant::now();
     let mut unique_metrics = HashSet::new();
+    // a request carries far more series than distinct metric names, so each is formatted once
+    let mut formatted_names: HashMap<String, String> = HashMap::new();
     for event in &request.timeseries {
-        if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
-            let metric_name = format_stream_name(name_label.value.to_string());
+        if let Some((_, raw_name)) = event.labels.iter().find(|(name, _)| *name == NAME_LABEL) {
+            let metric_name = match formatted_names.get(*raw_name) {
+                Some(name) => name.clone(),
+                None => {
+                    let name = format_stream_name(raw_name.to_string());
+                    formatted_names.insert(raw_name.to_string(), name.clone());
+                    unique_metrics.insert(name.clone());
+                    name
+                }
+            };
             if !event.histograms.is_empty() {
                 // native histograms degrade into classic streams; preload those too
                 for suffix in CLASSIC_HISTOGRAM_SUFFIXES {
                     unique_metrics.insert(format!("{metric_name}{suffix}"));
                 }
             }
-            unique_metrics.insert(metric_name);
         }
     }
 
@@ -270,37 +288,63 @@ pub async fn remote_write(
     }
     let total_preload_time = preload_start.elapsed().as_micros();
 
-    for mut event in request.timeseries {
+    let mut columnar_streams = columnar::plan_columnar_streams(
+        org_id,
+        &unique_metrics,
+        &metric_schema_map,
+        &stream_executable_pipelines,
+        &user_defined_schema_map,
+        &stream_alerts_map,
+        &stream_partitioning_map,
+    );
+
+    let mut sink = RecordSink {
+        pipelines: &stream_executable_pipelines,
+        user_defined_schema: &user_defined_schema_map,
+        pipeline_inputs: &mut stream_pipeline_inputs,
+        json_data_by_stream: &mut json_data_by_stream,
+    };
+    for event in request.timeseries {
         event_count += 1;
         // get labels
-        let mut replica_label = String::new();
+        let mut replica_label = "";
 
-        let mut labels: FxIndexMap<String, String> = event
-            .labels
-            .drain(..)
-            .filter(|label| {
-                if label.name == cfg.prom.ha_replica_label {
-                    replica_label = label.value.clone();
-                    false
-                } else if label.name == cfg.prom.ha_cluster_label {
-                    if cluster_name.is_empty() {
-                        cluster_name = format!("{}/{}", org_id, label.value.clone());
-                    }
-                    false
-                } else {
-                    true
+        // a label spelled correctly on the wire is borrowed; only the JSON path copies labels
+        let mut label_pairs: Vec<(Cow<'_, str>, Cow<'_, str>)> =
+            Vec::with_capacity(event.labels.len());
+        // allocated only for a series wide enough that `push_label`'s scan would go quadratic
+        let mut label_index: HashMap<String, usize> = HashMap::new();
+        for (name, value) in event.labels {
+            if name == cfg.prom.ha_replica_label {
+                replica_label = value;
+                continue;
+            }
+            if name == cfg.prom.ha_cluster_label {
+                if cluster_name.is_empty() {
+                    cluster_name = format!("{}/{}", org_id, value);
                 }
-            })
-            .map(|label| (format_label_name(&label.name), label.value))
-            .collect();
+                continue;
+            }
+            columnar::push_label(
+                &mut label_pairs,
+                &mut label_index,
+                (format_label_name_cow(name), Cow::Borrowed(value)),
+            );
+        }
 
-        let metric_name = match labels.get_mut(NAME_LABEL) {
-            Some(v) => {
-                // store the formatted name back so the `__name__` column always
-                // equals the stream name; otherwise `{__name__="..."}` selectors
-                // can never match the rows (same policy as the OTLP writer)
-                let name = format_stream_name(std::mem::take(v));
-                v.clone_from(&name);
+        let metric_name = match label_pairs
+            .iter_mut()
+            .find(|(name, _)| name.as_ref() == NAME_LABEL)
+        {
+            // `__name__` must equal the stream name or `{__name__="..."}` can never match
+            Some((_, v)) => {
+                let name = match formatted_names.get(v.as_ref()) {
+                    Some(name) => name.clone(),
+                    None => format_stream_name(v.to_string()),
+                };
+                if v.as_ref() != name.as_str() {
+                    *v = Cow::Owned(name.clone());
+                }
                 name
             }
             None => continue,
@@ -329,9 +373,57 @@ pub async fn remote_write(
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
+        let mut gate = HaGate {
+            first_line: &mut first_line,
+            armed: dedup_enabled && !cluster_name.is_empty(),
+            cluster_name: &cluster_name,
+            replica_label,
+            interval: election_interval,
+        };
+
+        // every sample of a series shares its labels, so the identity is loop-invariant
+        let series_hash = super::signature_of_series_labels(&label_pairs);
+
+        // a label the schema has not seen goes down the JSON path, which evolves the schema
+        if event.histograms.is_empty()
+            && let Some(columnar) = columnar_streams.get_mut(&metric_name)
+            && let Some(label_bytes) = columnar.resolve_columns(&label_pairs)
+        {
+            sample_count += event.samples.len();
+            // no iterator may live across this await, or the handler loses axum's `Handler` bound
+            let has_writable = event
+                .samples
+                .iter()
+                .any(|s| super::sanitize_metric_value(s.value).is_some());
+            if has_writable && !gate.admit().await {
+                ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                return Ok(());
+            }
+            for sample in &event.samples {
+                if let Some(value) = super::sanitize_metric_value(sample.value) {
+                    let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+                    columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
+                }
+            }
+            continue;
+        }
+
+        let mut labels: json::Map<String, json::Value> =
+            json::Map::with_capacity(label_pairs.len() + 3);
+        for (name, value) in label_pairs {
+            labels.insert(name.into_owned(), json::Value::String(value.into_owned()));
+        }
+        // a pipeline rewrites the labels the identity derives from, UDS trimming drops some of them
+        let known_hash = (!stream_executable_pipelines
+            .get(&metric_name)
+            .is_some_and(|v| !v.is_empty())
+            && !matches!(user_defined_schema_map.get(&metric_name), Some(Some(_))))
+        .then_some(series_hash);
+
         // parse samples
-        let sample_start = std::time::Instant::now();
-        for sample in event.samples {
+        let sample_total = event.samples.len();
+        let can_move_labels = event.histograms.is_empty();
+        for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
             // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
             // writer so the two ingestion paths cannot drift apart on this.
@@ -339,367 +431,131 @@ pub async fn remote_write(
                 continue;
             };
 
-            // HA election runs at the first record that will actually be written, so a
-            // replica sending only unusable data cannot retain leadership
-            if first_line && dedup_enabled && !cluster_name.is_empty() {
-                first_line = false;
-                if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
-                    // do not accept any entries for this request
-                    observe_rejected_request(org_id, &start);
-                    return Ok(());
-                }
+            if !gate.admit().await {
+                // do not accept any entries for this request
+                ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                return Ok(());
             }
 
-            let metric = Metric {
-                labels: &labels,
-                value: sample_val,
-            };
-
-            let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-            value.as_object_mut().unwrap().insert(
-                TIMESTAMP_COL_NAME.to_string(),
-                json::Value::Number(timestamp.into()),
-            );
+            // the last sample owns the label set outright; nothing reads it afterwards
+            let value = if can_move_labels && sample_idx + 1 == sample_total {
+                build_metric_record(std::mem::take(&mut labels), sample_val, timestamp)
+            } else {
+                build_metric_record(labels.clone(), sample_val, timestamp)
+            };
 
             // ready to be buffered for downstream processing
             buffer_metric_record(
                 &metric_name,
-                value,
+                json::Value::Object(value),
                 timestamp,
-                &stream_executable_pipelines,
-                &user_defined_schema_map,
-                &mut stream_pipeline_inputs,
-                &mut json_data_by_stream,
+                known_hash,
+                &mut sink,
             );
         }
 
-        // native histograms degrade into classic `_count`/`_sum`/`le` `_bucket`
-        // records so existing PromQL works on them unchanged
         if !event.histograms.is_empty() {
-            // one stream name + label template per derived stream, shared by every
-            // record of the event instead of cloned per record
-            let mut derived_streams = CLASSIC_HISTOGRAM_SUFFIXES.map(|suffix| {
-                let mut hist_labels = labels.clone();
-                if let Some(name) = hist_labels.get_mut(NAME_LABEL) {
-                    name.push_str(suffix);
-                }
-                (format!("{metric_name}{suffix}"), hist_labels)
-            });
-            for hp in &event.histograms {
-                sample_count += 1;
-                let records = expand_native_histogram(hp, cfg.prom.native_histogram_max_buckets);
-                if records.is_empty() {
-                    // unsupported schema or stale marker: nothing will be written
-                    continue;
-                }
-
-                // same first-writable-record election as the samples loop
-                if first_line && dedup_enabled && !cluster_name.is_empty() {
-                    first_line = false;
-                    if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
-                        observe_rejected_request(org_id, &start);
-                        return Ok(());
-                    }
-                }
-
-                let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
-                for (suffix, le, value) in records {
-                    let Some(value) = super::sanitize_metric_value(value) else {
-                        continue;
-                    };
-                    let idx = CLASSIC_HISTOGRAM_SUFFIXES
-                        .iter()
-                        .position(|s| *s == suffix)
-                        .unwrap();
-                    let (stream_name, hist_labels) = &mut derived_streams[idx];
-                    if let Some(le) = le {
-                        hist_labels.insert(BUCKET_LABEL.to_string(), le);
-                    }
-                    let metric = Metric {
-                        labels: hist_labels,
-                        value,
-                    };
-                    let mut value: json::Value = json::to_value(&metric).unwrap();
-                    value.as_object_mut().unwrap().insert(
-                        TIMESTAMP_COL_NAME.to_string(),
-                        json::Value::Number(timestamp.into()),
-                    );
-                    buffer_metric_record(
-                        stream_name,
-                        value,
-                        timestamp,
-                        &stream_executable_pipelines,
-                        &user_defined_schema_map,
-                        &mut stream_pipeline_inputs,
-                        &mut json_data_by_stream,
-                    );
+            match buffer_native_histograms(
+                &event.histograms,
+                &labels,
+                &metric_name,
+                ExpansionLimits::from_config(&cfg),
+                &mut gate,
+                &mut sink,
+            )
+            .await
+            {
+                Some(counted) => sample_count += counted,
+                None => {
+                    ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                    return Ok(());
                 }
             }
         }
-        sample_processing_time += sample_start.elapsed().as_micros();
     }
 
     // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
-        log::warn!("[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted");
+        log::warn!(
+            "[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
+        );
     }
 
     let parse_timeseries_ms = step_start.elapsed().as_millis();
 
     // Detailed performance logging
     if parse_timeseries_ms > 200 {
-        let total_accounted = total_preload_time + sample_processing_time;
         let parse_timeseries_us = parse_timeseries_ms * 1000;
-        let other_time = parse_timeseries_us.saturating_sub(total_accounted);
+        let other_time = parse_timeseries_us.saturating_sub(total_preload_time);
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
-            preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, alerts={:.1}ms), sample_proc={:.1}ms, other={:.1}ms",
+            preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, alerts={:.1}ms), other={:.1}ms",
             unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
             preload_pipeline_time as f64 / 1000.0,
             preload_uds_time as f64 / 1000.0,
             preload_schema_time as f64 / 1000.0,
             preload_alerts_time as f64 / 1000.0,
-            sample_processing_time as f64 / 1000.0,
             other_time as f64 / 1000.0,
         );
     }
 
-    // process records buffered for pipeline processing
-    for (stream_name, pipelines) in &stream_executable_pipelines {
-        if pipelines.is_empty() {
-            continue;
-        }
-        let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
-            log::error!(
-                "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
-            );
-            continue;
-        };
-        let (records, timestamps): (Vec<json::Value>, Vec<i64>) =
-            pipeline_inputs.into_iter().unzip();
-        let has_user_pipeline = pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-
-        for exec_pl in pipelines {
-            match exec_pl
-                .process_batch(org_id, records.clone(), Some(stream_name.clone()))
-                .await
-            {
-                Err(e) => {
-                    log::error!(
-                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
-                    );
-                    continue;
-                }
-                Ok(pl_results) => {
-                    for (stream_params, stream_pl_results) in pl_results {
-                        if stream_params.stream_type != StreamType::Metrics {
-                            continue;
-                        }
-
-                        let destination_stream = stream_params.stream_name.to_string();
-
-                        // add partition keys
-                        if !stream_partitioning_map.contains_key(&destination_stream) {
-                            let partition_det = crate::ingestion::get_stream_partition_keys(
-                                org_id,
-                                &StreamType::Metrics,
-                                &destination_stream,
-                            )
-                            .await;
-                            stream_partitioning_map
-                                .insert(destination_stream.clone(), partition_det.clone());
-                        }
-                        for (idx, mut res) in stream_pl_results {
-                            // get json object
-                            let mut local_val = match res.take() {
-                                json::Value::Object(v) => v,
-                                _ => unreachable!(),
-                            };
-
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&destination_stream)
-                            {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
-                            }
-
-                            // buffer to downstream processing directly
-                            json_data_by_stream
-                                .entry(destination_stream.clone())
-                                .or_default()
-                                .push((local_val, timestamps[idx]));
-                        }
-                    }
-                }
-            }
-        }
-
-        if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
-            for (mut value, timestamp) in records.into_iter().zip(timestamps) {
-                let mut local_val = match value.take() {
-                    json::Value::Object(val) => val,
-                    _ => unreachable!(),
-                };
-
-                if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
-                }
-
-                json_data_by_stream
-                    .entry(stream_name.clone())
-                    .or_default()
-                    .push((local_val, timestamp));
-            }
-        }
+    let (pipeline_outputs, _) = ingest::run_pipelines(
+        org_id,
+        &stream_executable_pipelines,
+        stream_pipeline_inputs,
+        &user_defined_schema_map,
+        &mut stream_partitioning_map,
+    )
+    .await;
+    for (stream_name, records) in pipeline_outputs {
+        // a pipeline rewrote the labels, so the series hash is recomputed from its output
+        json_data_by_stream.entry(stream_name).or_default().extend(
+            records
+                .into_iter()
+                .map(|(record, timestamp)| (record, timestamp, None)),
+        );
     }
 
     let step_start = std::time::Instant::now();
-    for (stream_name, json_data) in json_data_by_stream {
-        // get partition keys
-        let partition_keys = stream_partitioning_map
-            .get(&stream_name)
-            .cloned()
-            .unwrap_or_default();
-        let partition_time_level = get_partition_time_level(StreamType::Metrics);
-
-        let cur_stream_alerts = stream_alerts_map.get(&format!(
-            "{}/{}/{}",
+    for (stream_name, mut json_data) in json_data_by_stream {
+        #[cfg(feature = "vectorscan")]
+        apply_redaction(org_id, &stream_name, &mut json_data).await;
+        finish_identity_columns(&mut json_data);
+        let has_uds = matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)));
+        let min_timestamp = json_data.iter().map(|(_, ts, _)| *ts).min().unwrap_or(0);
+        let record_refs: Vec<&json::Map<String, json::Value>> =
+            json_data.iter().map(|(record, ..)| record).collect();
+        let (schema, schema_key) = ingest::resolve_batch_schema(
             org_id,
-            StreamType::Metrics,
-            stream_name
-        ));
-        let mut triggers: TriggerAlertData =
-            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        // Constant across every sample in the stream, so built once.
-        let alert_keys: Vec<String> = cur_stream_alerts
-            .map(|alerts| {
-                alerts
-                    .iter()
-                    .map(|alert| {
-                        format!(
-                            "{}/{}/{}/{}",
-                            org_id,
-                            StreamType::Metrics,
-                            alert.stream_name,
-                            alert.get_unique_key()
-                        )
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
+            &stream_name,
+            &mut metric_schema_map,
+            &record_refs,
+            min_timestamp,
+            has_uds,
+        )
+        .await?;
+        drop(record_refs);
 
-        for (mut val_map, timestamp) in json_data {
-            let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
-            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-            val_map.insert(
-                TIMESTAMP_COL_NAME.to_string(),
-                json::Value::Number(timestamp.into()),
-            );
-            let value_str = config::utils::json::to_string(&val_map).unwrap();
-
-            // check for schema evolution
-            let schema_fields = match metric_schema_map.get(&stream_name) {
-                Some(schema) => schema
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name())
-                    .collect::<HashSet<_>>(),
-                None => HashSet::default(),
-            };
-            let mut need_schema_check = !schema_evolved.contains_key(&stream_name);
-            for key in val_map.keys() {
-                if !schema_fields.contains(&key) {
-                    need_schema_check = true;
-                    break;
-                }
-            }
-            drop(schema_fields);
-            if need_schema_check {
-                let (schema_evolution, _infer_schema) = check_for_schema(
-                    org_id,
-                    &stream_name,
-                    StreamType::Metrics,
-                    &mut metric_schema_map,
-                    vec![&val_map],
-                    timestamp,
-                    false, // is_derived is false for metrics
-                )
-                .await?;
-                if schema_evolution.is_schema_changed {
-                    schema_evolved.insert(stream_name.clone(), true);
-                }
-            }
-
-            let schema = metric_schema_map
-                .get(&stream_name)
-                .unwrap()
-                .schema()
-                .as_ref()
-                .clone()
-                .with_metadata(HashMap::new());
-            let schema_key = schema.hash_key();
-
-            // get hour key
-            let hour_key = crate::ingestion::get_write_partition_key(
-                timestamp,
-                &partition_keys,
-                partition_time_level,
-                &val_map,
-                Some(&schema_key),
-            );
-            let buf = metric_data_map.entry(stream_name.to_owned()).or_default();
-            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                schema_key,
-                schema: Arc::new(schema),
-                records: vec![],
-                records_size: 0,
-            });
-            hour_buf
-                .records
-                .push(Arc::new(json::Value::Object(val_map.to_owned())));
-            hour_buf.records_size += value_str.len();
-
-            // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts {
-                let end_time = now_micros();
-                let dedup = super::series_signature(&val_map);
-                for (alert, key) in alerts.iter().zip(alert_keys.iter()) {
-                    // One row per label set: a series repeats its labels on
-                    // every sample, and only distinct sets reach the template.
-                    if !super::trigger_wants_labels(&trigger_slots, key, dedup) {
-                        continue;
-                    }
-                    match alert.evaluate(Some(&val_map), (None, end_time), None).await {
-                        Ok(trigger_results) if trigger_results.data.is_some() => {
-                            super::merge_trigger_rows(
-                                &mut triggers,
-                                &mut trigger_slots,
-                                key,
-                                dedup,
-                                alert,
-                                trigger_results.data.unwrap(),
-                            );
-                        }
-                        Ok(_) => {
-                            // the data doesn't satisfy the alert condition
-                        }
-                        Err(e) => {
-                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
-                        }
-                    }
-                }
-            }
-            // end check for alert triggers
-        }
-
-        if !triggers.is_empty() {
-            stream_trigger_map.insert(stream_name.clone(), Some(triggers));
+        let alerts =
+            stream_alerts_map.get(&cache_stream_key(org_id, StreamType::Metrics, &stream_name));
+        let partition_keys = stream_partitioning_map.get(&stream_name);
+        let triggers = ingest::buffer_stream_records(
+            org_id,
+            json_data
+                .into_iter()
+                .map(|(record, timestamp, _)| (record, timestamp)),
+            &schema,
+            &schema_key,
+            partition_keys,
+            alerts,
+            metric_data_map.entry(stream_name.clone()).or_default(),
+        )
+        .await;
+        if triggers.is_some() {
+            stream_trigger_map.insert(stream_name, triggers);
         }
     }
     let elapsed_ms = step_start.elapsed().as_millis();
@@ -711,123 +567,42 @@ pub async fn remote_write(
 
     // write data to wal
     let step_start = std::time::Instant::now();
-    let mut stream_count = 0;
-    let mut get_writer_time = 0u128;
-    let mut write_file_time = 0u128;
-    let mut report_stats_time = 0u128;
-    let mut deletion_check_time = 0u128;
 
-    for (stream_name, stream_data) in metric_data_map {
-        // stream_data could be empty if metric value is nan, check it
-        if stream_data.is_empty() {
-            continue;
-        }
+    let entries_by_stream = ingest::entries_by_stream(org_id, metric_data_map, columnar_streams)?;
 
-        // check if we are allowed to ingest
-        let t = std::time::Instant::now();
-        if db::compact::retention::is_deleting_stream(
-            org_id,
-            StreamType::Metrics,
-            &stream_name,
-            None,
-        ) {
-            log::warn!("stream [{stream_name}] is being deleted");
-            continue;
-        }
-        deletion_check_time += t.elapsed().as_micros();
-
-        stream_count += 1;
-
-        // write to file
-        let t = std::time::Instant::now();
-        let writer = ingester::get_writer(
-            get_thread_id(),
-            org_id,
-            StreamType::Metrics.as_str(),
-            &stream_name,
-        )
-        .await;
-        get_writer_time += t.elapsed().as_micros();
-
-        // for performance issue, we will flush all when the app shutdown
-        let fsync = false;
-        let t = std::time::Instant::now();
-        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
-        write_file_time += t.elapsed().as_micros();
-
-        let fns_length: usize = stream_executable_pipelines
-            .get(&stream_name)
-            .map_or(0, |pipelines| {
-                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
-            });
-        req_stats.response_time = start.elapsed().as_secs_f64();
-        let email_str = user.to_email();
-        req_stats.user_email = if email_str.is_empty() {
-            None
-        } else {
-            Some(email_str)
-        };
-        let t = std::time::Instant::now();
-        usage_reporting::report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            UsageType::PrometheusRemoteWrite,
-            fns_length as u16,
-            started_at,
-        )
-        .await;
-        report_stats_time += t.elapsed().as_micros();
-    }
+    let timings = ingest::write_streams(
+        org_id,
+        entries_by_stream,
+        &stream_executable_pipelines,
+        &user,
+        UsageType::PrometheusRemoteWrite,
+        &start,
+        started_at,
+    )
+    .await?;
     let elapsed_ms = step_start.elapsed().as_micros();
     if elapsed_ms > 200_000 {
         let other_time = elapsed_ms
-            - get_writer_time
-            - write_file_time
-            - report_stats_time
-            - deletion_check_time;
+            - timings.get_writer_micros
+            - timings.write_micros
+            - timings.report_stats_micros
+            - timings.deletion_check_micros;
 
         log::info!(
-            "[remote_write] org: {org_id}, write to WAL took: {} ms (streams: {stream_count}) | \
+            "[remote_write] org: {org_id}, write to WAL took: {} ms (streams: {}) | \
             breakdown: deletion_check={:.1}ms, get_writer={:.1}ms, write_file={:.1}ms, report_stats={:.1}ms, other={:.1}ms",
             elapsed_ms as f64 / 1000.0,
-            deletion_check_time as f64 / 1000.0,
-            get_writer_time as f64 / 1000.0,
-            write_file_time as f64 / 1000.0,
-            report_stats_time as f64 / 1000.0,
+            timings.streams,
+            timings.deletion_check_micros as f64 / 1000.0,
+            timings.get_writer_micros as f64 / 1000.0,
+            timings.write_micros as f64 / 1000.0,
+            timings.report_stats_micros as f64 / 1000.0,
             other_time as f64 / 1000.0,
         );
     }
 
-    let time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/prometheus/api/v1/write",
-            "200",
-            org_id,
-            StreamType::Metrics.as_str(),
-            "",
-            "",
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/prometheus/api/v1/write",
-            "200",
-            org_id,
-            StreamType::Metrics.as_str(),
-            "",
-            "",
-        ])
-        .inc();
-
-    // only one trigger per request; notification/db work must not block ingestion
-    for (_, entry) in stream_trigger_map {
-        if let Some(entry) = entry {
-            tokio::spawn(evaluate_trigger(entry));
-        }
-    }
+    ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+    ingest::spawn_triggers(stream_trigger_map);
 
     let total_ms = start.elapsed().as_millis();
     if total_ms > 1000 {
@@ -925,6 +700,8 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
 /// jobs) discoverable while bounding the query cost.
 const DEFAULT_SERIES_LOOKBACK_MICROS: i64 = 24 * 3600 * 1_000_000;
 
+const WRITE_ENDPOINT: &str = "/prometheus/api/v1/write";
+
 fn normalize_series_time_range(start: i64, end: i64) -> (i64, i64) {
     let end = if end <= 0 { now_micros() } else { end };
     let start = if start <= 0 {
@@ -955,51 +732,9 @@ pub async fn get_series(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
-    // Comma-separated list of label names
-    let label_names = schema
-        .fields()
-        .iter()
-        .map(|f| f.name().as_str())
-        .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
-        .collect::<Vec<_>>()
-        .join("\", \"");
-    if label_names.is_empty() {
+    let Some(sql) = series_sql(&metric_name, &schema, selector.as_ref()) else {
         return Ok(vec![]);
-    }
-
-    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), \"{label_names}\" FROM {metric_name}");
-    let mut sql_where = Vec::new();
-    if let Some(selector) = selector {
-        for mat in selector.matchers.matchers.iter() {
-            // `__name__` already picked the stream; the stored column may hold the
-            // pre-`format_stream_name` metric name, so filtering on it drops all rows.
-            if mat.name == TIMESTAMP_COL_NAME
-                || mat.name == VALUE_LABEL
-                || mat.name == NAME_LABEL
-                || schema.field_with_name(&mat.name).is_err()
-            {
-                continue;
-            }
-            match &mat.op {
-                MatchOp::Equal => {
-                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
-                }
-                MatchOp::NotEqual => {
-                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
-                }
-                MatchOp::Re(_re) => {
-                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
-                }
-                MatchOp::NotRe(_re) => {
-                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
-                }
-            }
-        }
-        if !sql_where.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&sql_where.join(" AND "));
-        }
-    }
+    };
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1023,7 +758,7 @@ pub async fn get_series(
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
-            log::error!("search series error: {err}");
+            log::error!("search series error: org_id: {org_id}, error: {err}");
             return Err(err);
         }
         Ok(resp) => resp
@@ -1157,14 +892,7 @@ pub async fn get_label_values(
         return Ok(label_values);
     }
 
-    let metric_name = match opt_metric_name {
-        Some(name) => name,
-        None => {
-            // HACK: in the ideal world we would have queried all the metric streams
-            // and collected label names from them.
-            return Ok(vec![]);
-        }
-    };
+    let metric_name = label_values_metric_name(selector.as_ref())?;
 
     let schema = infra::schema::get(org_id, &metric_name, stream_type)
         .await
@@ -1177,40 +905,7 @@ pub async fn get_label_values(
         return Ok(vec![]);
     }
 
-    // Build SQL query with optional WHERE clause based on selector matchers
-    let mut sql = format!("SELECT DISTINCT({label_name}) FROM {metric_name}");
-    let mut sql_where = Vec::new();
-
-    if let Some(selector) = selector {
-        for mat in selector.matchers.matchers.iter() {
-            // Skip special fields and fields that don't exist in the schema
-            if mat.name == TIMESTAMP_COL_NAME
-                || mat.name == VALUE_LABEL
-                || mat.name == NAME_LABEL
-                || schema.field_with_name(&mat.name).is_err()
-            {
-                continue;
-            }
-            match &mat.op {
-                MatchOp::Equal => {
-                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
-                }
-                MatchOp::NotEqual => {
-                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
-                }
-                MatchOp::Re(_re) => {
-                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
-                }
-                MatchOp::NotRe(_re) => {
-                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
-                }
-            }
-        }
-        if !sql_where.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&sql_where.join(" AND "));
-        }
-    }
+    let sql = metadata_sql(&metric_name, &[&label_name], &schema, selector.as_ref());
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1240,7 +935,7 @@ pub async fn get_label_values(
             .map(|v| v.as_str().unwrap().to_string())
             .collect::<Vec<_>>(),
         Err(err) => {
-            log::error!("search values error: {err:?}");
+            log::error!("search values error: org_id: {org_id}, error: {err:?}");
             return Err(err);
         }
     };
@@ -1249,46 +944,183 @@ pub async fn get_label_values(
     Ok(label_values)
 }
 
+pub fn label_values_metric_name(selector: Option<&parser::VectorSelector>) -> Result<String> {
+    let metric_name = selector.and_then(try_into_metric_name);
+    metric_name.ok_or_else(|| {
+        Error::Message(
+            "match[] must specify a metric for label values, e.g. match[]=up; querying all metrics streams is not supported"
+                .to_owned(),
+        )
+    })
+}
+
 pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
-    match &selector.name {
-        Some(name) => {
-            // `match[]` argument contains a metric name, e.g.
-            // `match[]=zo_response_code{method="GET"}`
-            Some(name.clone())
+    if let Some(name) = &selector.name {
+        return (!name.is_empty()).then(|| name.clone());
+    }
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|matcher| matches!(matcher.op, MatchOp::Equal) && !matcher.value.is_empty())
+        .map(|matcher| matcher.value)
+}
+
+fn series_sql(
+    metric_name: &str,
+    schema: &Schema,
+    selector: Option<&parser::VectorSelector>,
+) -> Option<String> {
+    let mut columns = vec![HASH_LABEL];
+    columns.extend(
+        schema
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .filter(|&name| {
+                name != TIMESTAMP_COL_NAME && name != VALUE_LABEL && name != HASH_LABEL
+            }),
+    );
+    (columns.len() > 1).then(|| metadata_sql(metric_name, &columns, schema, selector))
+}
+
+fn metadata_sql(
+    metric_name: &str,
+    columns: &[&str],
+    schema: &Schema,
+    selector: Option<&parser::VectorSelector>,
+) -> String {
+    let columns = columns
+        .iter()
+        .map(|name| quote_identifier(name))
+        .collect::<Vec<_>>();
+    let mut sql = format!(
+        "SELECT DISTINCT {} FROM {}",
+        columns.join(", "),
+        quote_identifier(metric_name)
+    );
+    let predicates = selector
+        .into_iter()
+        .flat_map(|selector| &selector.matchers.matchers)
+        .filter(|mat| {
+            // The stored metric name can differ from the stream selected by __name__.
+            mat.name != TIMESTAMP_COL_NAME
+                && mat.name != VALUE_LABEL
+                && mat.name != NAME_LABEL
+                && schema.field_with_name(&mat.name).is_ok()
+        })
+        .map(|mat| {
+            let name = quote_identifier(&mat.name);
+            let value = quote_sql_string(&mat.value);
+            match &mat.op {
+                MatchOp::Equal => format!("{name} = {value}"),
+                MatchOp::NotEqual => format!("{name} != {value}"),
+                MatchOp::Re(_) => format!("re_match({name}, {value})"),
+                MatchOp::NotRe(_) => format!("re_not_match({name}, {value})"),
+            }
+        })
+        .collect::<Vec<_>>();
+    if !predicates.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&predicates.join(" AND "));
+    }
+    sql
+}
+
+/// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
+/// Redacts a stream's pending records and drops the series hash computed from the raw labels.
+#[cfg(feature = "vectorscan")]
+async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
+    if json_data.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            config::meta::stream::StreamType::Metrics,
+        )
+    {
+        return;
+    }
+    let mut rows: Vec<(i64, json::Map<String, json::Value>)> = json_data
+        .iter_mut()
+        .map(|(record, timestamp, _)| (*timestamp, std::mem::take(record)))
+        .collect();
+    match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(pattern_manager) => {
+            if let Err(e) = pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Metrics,
+                stream_name,
+                &mut rows,
+            ) {
+                log::error!(
+                    "[METRICS] error applying SDR patterns for stream {org_id}/{stream_name}: {e}"
+                );
+            }
         }
-        None => {
-            // `match[]` argument does not contain a metric name.
-            // Check if there is `__name__` among the matchers,
-            // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .map(|m| m.value.clone())
+        Err(e) => {
+            log::error!(
+                "[METRICS] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                org_id,
+                StreamType::Metrics,
+                std::iter::once((stream_name, rows.as_slice())),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+            )
+            .await;
         }
+    }
+    for ((record, _, known_hash), (_, redacted)) in json_data.iter_mut().zip(rows) {
+        *record = redacted;
+        // the pre-computed hash identifies the unredacted labels, so it must be recomputed
+        *known_hash = None;
     }
 }
 
-/// Per-stream buffer of records ready for the write path, keyed by stream name.
-type JsonDataByStream = HashMap<String, Vec<(json::Map<String, json::Value>, i64)>>;
+/// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
+fn finish_identity_columns(json_data: &mut [PendingRecord]) {
+    for (val_map, timestamp, known_hash) in json_data.iter_mut() {
+        // a `__hash__` the handler did not compute is an input field and gets overwritten
+        let hash =
+            known_hash.unwrap_or_else(|| super::signature_without_labels(val_map, &[VALUE_LABEL]));
+        val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+        val_map.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number((*timestamp).into()),
+        );
+    }
+}
 
-/// Routes one metric record either into its stream's pipeline input buffer or, with UDS
-/// trimming applied, directly into the per-stream write buffer.
+fn build_metric_record(
+    mut record: json::Map<String, json::Value>,
+    value: f64,
+    timestamp: i64,
+) -> json::Map<String, json::Value> {
+    record.insert(
+        VALUE_LABEL.to_string(),
+        json::Number::from_f64(value).map_or(json::Value::Null, json::Value::Number),
+    );
+    record.insert(
+        TIMESTAMP_COL_NAME.to_string(),
+        json::Value::Number(timestamp.into()),
+    );
+    record
+}
+
 fn buffer_metric_record(
     metric_name: &str,
     mut value: json::Value,
     timestamp: i64,
-    stream_executable_pipelines: &HashMap<String, Vec<ExecutablePipeline>>,
-    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
-    stream_pipeline_inputs: &mut HashMap<String, Vec<(json::Value, i64)>>,
-    json_data_by_stream: &mut JsonDataByStream,
+    known_hash: Option<u64>,
+    sink: &mut RecordSink<'_>,
 ) {
-    if stream_executable_pipelines
+    if sink
+        .pipelines
         .get(metric_name)
         .is_some_and(|v| !v.is_empty())
     {
         // buffer to pipeline for batch processing
-        stream_pipeline_inputs
+        sink.pipeline_inputs
             .entry(metric_name.to_owned())
             .or_default()
             .push((value, timestamp));
@@ -1299,16 +1131,70 @@ fn buffer_metric_record(
             _ => unreachable!(),
         };
 
-        if let Some(Some(fields)) = user_defined_schema_map.get(metric_name) {
+        if let Some(Some(fields)) = sink.user_defined_schema.get(metric_name) {
             local_val = crate::ingestion::refactor_map(local_val, fields);
         }
 
         // buffer to downstream processing directly
-        json_data_by_stream
+        sink.json_data_by_stream
             .entry(metric_name.to_owned())
             .or_default()
-            .push((local_val, timestamp));
+            .push((local_val, timestamp, known_hash));
     }
+}
+
+/// `None` means this replica lost the HA election, so the request must write nothing.
+async fn buffer_native_histograms(
+    histograms: &[prometheus_rpc::Histogram],
+    labels: &json::Map<String, json::Value>,
+    metric_name: &str,
+    limits: ExpansionLimits,
+    gate: &mut HaGate<'_>,
+    sink: &mut RecordSink<'_>,
+) -> Option<usize> {
+    // one stream name + label template per derived stream, not one per record
+    let mut derived_streams = CLASSIC_HISTOGRAM_SUFFIXES.map(|suffix| {
+        let mut hist_labels = labels.clone();
+        if let Some(json::Value::String(name)) = hist_labels.get_mut(NAME_LABEL) {
+            name.push_str(suffix);
+        }
+        (format!("{metric_name}{suffix}"), hist_labels)
+    });
+    let mut counted = 0;
+    for hp in histograms {
+        counted += 1;
+        let records = expand_native_histogram(hp, limits);
+        if records.is_empty() {
+            // unsupported schema or stale marker: nothing will be written
+            continue;
+        }
+        if !gate.admit().await {
+            return None;
+        }
+        let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
+        for (suffix, le, value) in records {
+            let Some(value) = super::sanitize_metric_value(value) else {
+                continue;
+            };
+            let idx = CLASSIC_HISTOGRAM_SUFFIXES
+                .iter()
+                .position(|s| *s == suffix)
+                .unwrap();
+            let (stream_name, hist_labels) = &mut derived_streams[idx];
+            if let Some(le) = le {
+                hist_labels.insert(BUCKET_LABEL.to_string(), json::Value::String(le));
+            }
+            let record = build_metric_record(hist_labels.clone(), value, timestamp);
+            buffer_metric_record(
+                stream_name,
+                json::Value::Object(record),
+                timestamp,
+                None,
+                sink,
+            );
+        }
+    }
+    Some(counted)
 }
 
 /// Looks up the current leader state and runs leader election for this replica.
@@ -1332,30 +1218,6 @@ async fn run_ha_election(cluster_name: &str, replica_label: &str, election_inter
 }
 
 /// Records the request metrics for a write rejected by HA election.
-fn observe_rejected_request(org_id: &str, start: &std::time::Instant) {
-    let time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/prometheus/api/v1/write",
-            "200",
-            org_id,
-            StreamType::Metrics.as_str(),
-            "",
-            "",
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/prometheus/api/v1/write",
-            "200",
-            org_id,
-            StreamType::Metrics.as_str(),
-            "",
-            "",
-        ])
-        .inc();
-}
-
 async fn prom_ha_handler(
     has_entry: bool,
     cluster_name: &str,
@@ -1429,12 +1291,207 @@ async fn prom_ha_handler(
 
 #[cfg(test)]
 mod tests {
+    use config::utils::flatten::format_label_name_owned;
     use promql_parser::{
         label::{MatchOp, Matcher, Matchers},
         parser::VectorSelector,
     };
 
     use super::*;
+
+    #[test]
+    fn metadata_sql_round_trips_matcher_values() {
+        use datafusion::sql::sqlparser::{
+            ast::{Expr, Value, visit_expressions_mut},
+            dialect::{Dialect, GenericDialect, PostgreSqlDialect},
+            parser::Parser,
+        };
+
+        let schema = Schema::new(vec![datafusion::arrow::datatypes::Field::new(
+            "job",
+            datafusion::arrow::datatypes::DataType::Utf8,
+            true,
+        )]);
+        let values = [
+            "worker's",
+            r"worker\\path",
+            r"worker\d+'s.*",
+            "x' OR '1'='1",
+            "x'; SELECT 'other' --",
+            "x' UNION SELECT 'other",
+        ];
+        for op in ["=", "!=", "=~", "!~"] {
+            for value in values {
+                let promql = format!("up{{job{op}{}}}", serde_json::to_string(value).unwrap());
+                let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
+                    panic!("expected a vector selector");
+                };
+                // The parser retains escape text, so SQL must preserve Matcher.value verbatim.
+                let encoded = serde_json::to_string(value).unwrap();
+                let parsed_value = &encoded[1..encoded.len() - 1];
+                assert_eq!(selector.matchers.matchers[0].value, parsed_value);
+                for (sql, projection) in [
+                    (
+                        metadata_sql("up", &["job"], &schema, Some(&selector)),
+                        "\"job\"",
+                    ),
+                    (
+                        series_sql("up", &schema, Some(&selector)).unwrap(),
+                        "\"__hash__\", \"job\"",
+                    ),
+                ] {
+                    for dialect in [&GenericDialect {} as &dyn Dialect, &PostgreSqlDialect {}] {
+                        let mut statements = Parser::parse_sql(dialect, &sql).unwrap();
+                        assert_eq!(statements.len(), 1);
+                        let mut literals = 0;
+                        let _ = visit_expressions_mut(&mut statements, |expr| {
+                            if let Expr::Value(literal) = expr {
+                                assert_eq!(
+                                    literal.value,
+                                    Value::SingleQuotedString(parsed_value.into())
+                                );
+                                literal.value = Value::SingleQuotedString(String::new());
+                                literals += 1;
+                            }
+                            std::ops::ControlFlow::<()>::Continue(())
+                        });
+                        assert_eq!(literals, 1);
+                        let predicate = match op {
+                            "=" => "\"job\" = ''",
+                            "!=" => "\"job\" <> ''",
+                            "=~" => "re_match(\"job\", '')",
+                            "!~" => "re_not_match(\"job\", '')",
+                            _ => unreachable!(),
+                        };
+                        assert_eq!(
+                            statements[0].to_string(),
+                            format!("SELECT DISTINCT {projection} FROM \"up\" WHERE {predicate}")
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_sql_executes_matchers_without_changing_selected_rows() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            arrow::{array::StringArray, record_batch::RecordBatch},
+            common::TableReference,
+            prelude::SessionContext,
+        };
+        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+
+        for (op, pattern, matching) in [
+            ("=", "x' OR '1'='1", "x' OR '1'='1"),
+            ("!=", r"worker's\path", r"worker's\\path"),
+            ("=~", r"worker\\path's.*", r"worker\\path'suffix"),
+            ("!~", r"worker\\path's.*", r"worker\\path'suffix"),
+        ] {
+            let ctx = SessionContext::new();
+            ctx.register_udf(REGEX_MATCH_UDF.clone());
+            ctx.register_udf(REGEX_NOT_MATCH_UDF.clone());
+            let batch = RecordBatch::try_from_iter(vec![
+                (HASH_LABEL, Arc::new(StringArray::from(vec!["a", "b"])) as _),
+                (
+                    "job",
+                    Arc::new(StringArray::from(vec![matching, "other"])) as _,
+                ),
+            ])
+            .unwrap();
+            let schema = batch.schema();
+            ctx.register_batch(TableReference::bare("metric\"name"), batch)
+                .unwrap();
+            let promql = format!(
+                "{{__name__='metric\"name',job{op}{}}}",
+                serde_json::to_string(pattern).unwrap()
+            );
+            let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            let metric = try_into_metric_name(&selector).unwrap();
+            for sql in [
+                metadata_sql(&metric, &["job"], &schema, Some(&selector)),
+                series_sql(&metric, &schema, Some(&selector)).unwrap(),
+            ] {
+                let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+                let values = batches
+                    .iter()
+                    .flat_map(|batch| {
+                        batch
+                            .column_by_name("job")
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                            .iter()
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    values,
+                    vec![Some(if op.starts_with('!') {
+                        "other"
+                    } else {
+                        matching
+                    })],
+                    "{sql}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_sql_quotes_identifiers_and_preserves_field_selection() {
+        use datafusion::{
+            arrow::datatypes::{DataType, Field},
+            sql::sqlparser::{dialect::GenericDialect, parser::Parser},
+        };
+
+        let parser::Expr::VectorSelector(selector) = parser::parse(
+            r#"{__name__='metric"name',job="ok",missing="skip",_timestamp="skip",value="skip"}"#,
+        )
+        .unwrap() else {
+            panic!("expected a vector selector");
+        };
+        let metric = try_into_metric_name(&selector).unwrap();
+        assert_eq!(metric, "metric\"name");
+        let schema = Schema::new(
+            [
+                HASH_LABEL,
+                TIMESTAMP_COL_NAME,
+                VALUE_LABEL,
+                NAME_LABEL,
+                "job",
+                "label\"field",
+                "select",
+            ]
+            .into_iter()
+            .map(|name| Field::new(name, DataType::Utf8, true))
+            .collect::<Vec<_>>(),
+        );
+        for (sql, expected) in [
+            (
+                metadata_sql(&metric, &["label\"field"], &schema, Some(&selector)),
+                r#"SELECT DISTINCT "label""field" FROM "metric""name" WHERE "job" = 'ok'"#,
+            ),
+            (
+                series_sql(&metric, &schema, Some(&selector)).unwrap(),
+                r#"SELECT DISTINCT "__hash__", "__name__", "job", "label""field", "select" FROM "metric""name" WHERE "job" = 'ok'"#,
+            ),
+        ] {
+            let statements = Parser::parse_sql(&GenericDialect {}, &sql).unwrap();
+            assert_eq!(statements.len(), 1);
+            assert_eq!(statements[0].to_string(), expected);
+        }
+        assert!(series_sql(&metric, &Schema::empty(), Some(&selector)).is_none());
+        assert_eq!(
+            metadata_sql(&metric, &["select"], &schema, None),
+            r#"SELECT DISTINCT "select" FROM "metric""name""#
+        );
+    }
 
     fn schema_with_metadata(blob: &str) -> Schema {
         Schema::empty().with_metadata(
@@ -1637,6 +1694,26 @@ mod tests {
     }
 
     #[test]
+    fn test_try_into_metric_name_rejects_non_exact_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected vector selector: {query}");
+            };
+            assert_eq!(try_into_metric_name(&selector), None, "{query}");
+            assert!(
+                label_values_metric_name(Some(&selector)).is_err(),
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
     fn test_try_into_metric_name_none_when_no_name_or_name_label() {
         let sel = VectorSelector {
             name: None,
@@ -1694,5 +1771,86 @@ mod tests {
     fn test_normalize_series_time_range_explicit_values_untouched() {
         let (start, end) = normalize_series_time_range(1_000, 2_000);
         assert_eq!((start, end), (1_000, 2_000));
+    }
+
+    #[test]
+    fn test_push_label_collapses_formatted_collisions_like_the_json_map() {
+        let mut label_pairs: Vec<(String, String)> = Vec::new();
+        let mut label_index = HashMap::new();
+        for (name, value) in [("__name__", "m"), ("foo.bar", "a"), ("foo-bar", "b")] {
+            columnar::push_label(
+                &mut label_pairs,
+                &mut label_index,
+                (format_label_name_owned(name.to_string()), value.to_string()),
+            );
+        }
+
+        assert_eq!(
+            label_pairs,
+            vec![
+                (NAME_LABEL.to_string(), "m".to_string()),
+                ("foo_bar".to_string(), "b".to_string()),
+            ]
+        );
+        let mut labels = json::Map::new();
+        for (name, value) in &label_pairs {
+            labels.insert(name.clone(), json::Value::String(value.clone()));
+        }
+        let record = build_metric_record(labels, 1.5, 1_700_000_000_000_000);
+        assert_eq!(
+            crate::metrics::signature_of_series_labels(&label_pairs),
+            crate::metrics::signature_without_labels(&record, &[VALUE_LABEL])
+        );
+    }
+
+    #[test]
+    fn test_finish_identity_columns_overwrites_a_hash_it_did_not_compute() {
+        let mut labels = json::Map::new();
+        labels.insert(NAME_LABEL.to_string(), json::json!("http_requests"));
+        labels.insert(HASH_LABEL.to_string(), json::json!("sent by the client"));
+        let record = build_metric_record(labels, 1.0, 5);
+        let recomputed = crate::metrics::signature_without_labels(&record, &[VALUE_LABEL]);
+        let mut json_data = vec![(record.clone(), 5_i64, None), (record, 5_i64, Some(7_u64))];
+
+        finish_identity_columns(&mut json_data);
+
+        assert_eq!(
+            json_data[0].0.get(HASH_LABEL),
+            Some(&json::json!(recomputed))
+        );
+        assert_eq!(json_data[1].0.get(HASH_LABEL), Some(&json::json!(7_u64)));
+    }
+
+    #[test]
+    fn test_label_values_metric_name() {
+        assert!(label_values_metric_name(None).is_err());
+        let parser::Expr::VectorSelector(selector) =
+            parser::parse(r#"{job="prometheus"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        assert!(label_values_metric_name(Some(&selector)).is_err());
+        for (matcher, expected) in [
+            ("up", "up"),
+            (r#"up{job="prometheus"}"#, "up"),
+            (r#"{__name__="up"}"#, "up"),
+            (r#"{__name__=~"up.*",__name__="up"}"#, "up"),
+            (r#"up{job="prometheus" or job="other"}"#, "up"),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(matcher).unwrap() else {
+                panic!("expected vector selector");
+            };
+            assert_eq!(
+                label_values_metric_name(Some(&selector)).unwrap(),
+                expected,
+                "{matcher}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_label_values_requires_metric() {
+        let result = get_label_values("default", "job".to_owned(), None, 0, 1).await;
+        assert!(result.unwrap_err().to_string().contains("match[]"));
     }
 }

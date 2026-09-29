@@ -7,8 +7,11 @@ vi.mock("@/services/http", () => ({ attemptTokenRefresh: vi.fn() }));
 
 import {
   PlaygroundRunError,
+  chatProviders,
   dropsResponseSchema,
+  isDecisionOnlyProvider,
   providerDropsResponseSchema,
+  responseSchemaSupport,
   runPlayground,
   type PlaygroundRunRequest,
 } from "./llm-playground.service";
@@ -378,6 +381,54 @@ describe("runPlayground — live adapter", () => {
     expect(providerDropsResponseSchema(" anthropic ")).toBe(true);
     expect(providerDropsResponseSchema("openai")).toBe(false);
     expect(providerDropsResponseSchema(undefined)).toBe(false);
+  });
+
+  // DeepSeek answers `json_schema` with a 400; the server degrades it, the UI only warns ahead.
+  it("grades how far each provider kind honours a schema", () => {
+    expect(responseSchemaSupport("openai")).toBe("native");
+    expect(responseSchemaSupport("ollama")).toBe("native");
+    expect(responseSchemaSupport(undefined)).toBe("native");
+    expect(responseSchemaSupport("DeepSeek")).toBe("approximated");
+    expect(responseSchemaSupport(" deepseek ")).toBe("approximated");
+    expect(responseSchemaSupport("anthropic")).toBe("dropped");
+  });
+
+  // System One answers typed decisions only; the server refuses it any chat call.
+  it("keeps decision-only providers out of chat pickers", () => {
+    const kept = chatProviders([
+      { id: "a", providerType: "openai" },
+      { id: "b", providerType: "systemone" },
+      { id: "c", provider_type: "SystemOne" },
+      { id: "d" },
+    ]);
+    expect(kept.map((p) => p.id)).toEqual(["a", "d"]);
+  });
+
+  it("recognises decision-only providers by either type spelling", () => {
+    expect(isDecisionOnlyProvider({ providerType: "systemone" })).toBe(true);
+    expect(isDecisionOnlyProvider({ provider_type: " SystemOne " })).toBe(true);
+    expect(isDecisionOnlyProvider({ providerType: "openai" })).toBe(false);
+    expect(isDecisionOnlyProvider(null)).toBe(false);
+  });
+
+  // The server owns the DeepSeek downgrade; only Anthropic is shaped away client-side.
+  it("still sends the json_schema shape to a provider that approximates it", async () => {
+    const fetchMock = stubFetch(
+      streamingResponse([frame({ type: "done", latencyMs: 1, usage: {} })]),
+    );
+    await runPlayground(
+      "org",
+      request({ providerType: "deepseek", responseSchema: { type: "object" } }),
+      { onDelta: () => {} },
+    );
+    const column = sentBody(fetchMock).column;
+    expect(column.responseFormat).toEqual({
+      type: "json_schema",
+      json_schema: { name: "playground_response", schema: { type: "object" }, strict: false },
+    });
+    expect(dropsResponseSchema(request({ providerType: "deepseek", responseSchema: {} }))).toBe(
+      false,
+    );
   });
 
   it("reports a drop only when a schema was asked for", () => {

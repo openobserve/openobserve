@@ -85,6 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="anomalyConfig.status"
                 />
               </OTooltip>
+              <!-- §4.8 health badge: its own element keyed off notice_class, never folded into the status tag. -->
+              <OTooltip v-if="anomalyNoticeBadge" :content="anomalyNoticeTooltip">
+                <OTag
+                  variant="warning-quiet"
+                  :label="anomalyNoticeBadge.label"
+                  data-test="anomaly-notice-badge"
+                />
+              </OTooltip>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="text-2xs text-text-secondary whitespace-nowrap"
@@ -159,11 +167,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="flex min-h-0 flex-1">
+      <div class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
-            'flex min-h-0 min-w-0 flex-col gap-2 py-2',
+            'flex min-h-0 min-w-0 flex-col gap-2 py-2 max-lg:flex-none',
             isCompositeMode ? 'flex-1' : 'flex-[6.5]',
           ]"
         >
@@ -180,7 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OToggleGroup
                 :model-value="formData.is_real_time"
                 :disabled="beingUpdated || anomalyEditMode"
-                class="shrink-0"
+                class="min-w-0"
+                mobile-dropdown
                 data-test="add-alert-type-tabs"
                 @update:model-value="onAlertTypeChange"
               >
@@ -198,7 +207,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
-            <div v-if="!isCompositeMode" class="flex items-center gap-4 px-3 py-2">
+            <div
+              v-if="!isCompositeMode"
+              class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
+            >
               <!-- Stream Type -->
               <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
@@ -219,7 +231,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div v-if="!isCompositeMode" class="flex min-w-0 flex-1 items-center gap-1.5">
+              <div
+                v-if="!isCompositeMode"
+                class="flex min-w-0 flex-1 items-center gap-1.5 max-md:basis-full"
+              >
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -242,7 +257,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- TIER 3: Configuration Tabs -->
-          <div class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col">
+          <div
+            class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none"
+          >
             <!-- Tab Headers -->
             <OToggleGroup
               :model-value="activeTab"
@@ -271,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
 
             <!-- Tab Content -->
-            <div class="flex-1 overflow-auto">
+            <div class="flex-1 overflow-auto max-lg:flex-none max-lg:overflow-visible">
               <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
               <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
                invalid field and bring it forward before focusing it. -->
@@ -339,13 +356,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="filteredColumns"
                     :isAggregationEnabled="isAggregationEnabled"
                     :destinations="formData.destinations"
+                    :recoveryDestinations="formData.recovery_destinations"
                     :formattedDestinations="getFormattedDestinations"
+                    :destinationObjects="destinations"
                     :workflows="formData.workflows"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
                     @update:promqlCondition="updatePromqlCondition"
                     @update:destinations="updateDestinations"
+                    @update:recoveryDestinations="updateRecoveryDestinations"
                     @refresh:destinations="refreshDestinations"
                     @update:workflows="updateWorkflows"
                   />
@@ -411,6 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="anomalyStep2Ref"
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
+                  :stored-intervals="anomalyStoredIntervals"
                 />
               </div>
 
@@ -456,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -594,6 +615,7 @@ import AnomalyDataPreview from "@/components/anomaly_detection/AnomalyDataPrevie
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
+import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -684,6 +706,16 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
+
+    // §4.8: keyed off the config API's notice_class field alone.
+    const anomalyNoticeBadge = computed(() => {
+      const keys = anomalyNoticeBadgeKeys(alertForm.anomalyConfig.value.notice_class);
+      return keys ? { label: alertForm.t(keys.labelKey as any) } : null;
+    });
+    const anomalyNoticeTooltip = computed(() => {
+      const keys = anomalyNoticeBadgeKeys(alertForm.anomalyConfig.value.notice_class);
+      return raw(keys ? keys.tooltipKeys.map((k) => alertForm.t(k as any)).join(" ") : "");
+    });
     const isCompositeMode = computed(() => alertForm.formData.value.is_real_time === "composite");
     const availableCompositeChildren = ref<any[]>([]);
 
@@ -889,6 +921,8 @@ export default defineComponent({
       alertAutoName,
       headerModeLabel,
       isAnomalyDetectionEnabled,
+      anomalyNoticeBadge,
+      anomalyNoticeTooltip,
       alertTypeOptions,
       alertTabs,
       activeFolderName,

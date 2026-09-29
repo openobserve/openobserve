@@ -38,11 +38,14 @@ import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
 // vi.mock must be hoisted — declared before component import
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
+    },
+  });
+});
 
 // The stored-value lookup the field-value resolver ends at. Stubbed so the
 // resolver tests can assert the composite key it was asked for without an
@@ -61,7 +64,10 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 }));
 
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
-import { anomalyDetectionConfigDefaults } from "./AnomalyDetectionConfig.schema";
+import {
+  anomalyDetectionConfigDefaults,
+  lookBackWindowFloorSeconds,
+} from "./AnomalyDetectionConfig.schema";
 import { defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
@@ -78,8 +84,9 @@ function buildConfig(configOverrides: Record<string, unknown> = {}) {
     detection_function_field: "",
     filters: [] as Array<{ field: string; operator: string; value: string }>,
     custom_sql: "",
-    detection_window_value: 30,
-    detection_window_unit: "m",
+    // Above the schedule+histogram floor (1h + 5m) so unrelated tests stay floor-clean.
+    detection_window_value: 2,
+    detection_window_unit: "h",
     training_window_days: 7,
     threshold: 97,
     ...configOverrides,
@@ -95,10 +102,13 @@ const mountOptions = {
   },
 };
 
-function mountConfig(configOverrides: Record<string, unknown> = {}) {
+function mountConfig(
+  configOverrides: Record<string, unknown> = {},
+  extraProps: Record<string, unknown> = {},
+) {
   return mount(AnomalyDetectionConfig, {
     ...mountOptions,
-    props: { config: buildConfig(configOverrides) },
+    props: { config: buildConfig(configOverrides), ...extraProps },
   });
 }
 
@@ -535,7 +545,7 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
       expect((percentileInput(wrapper).element as HTMLInputElement).value).toBe("88");
-      expect(sensitivityHintText(wrapper)).toContain("12%");
+      expect(sensitivityHintText(wrapper)).toContain("88%");
     });
 
     it("typing a tier value lights that tier up", async () => {
@@ -580,7 +590,8 @@ describe("AnomalyDetectionConfig", () => {
       expect(typeof form.state.values.threshold).toBe("number");
     });
 
-    it("hint states the anomaly rate and the flagged buckets per day", async () => {
+    it("hint names the training-score percentile and promises no alert rate", async () => {
+      // The percentile indexes training scores, so any "about N per day" arithmetic is measured fiction.
       wrapper = mountConfig({
         threshold: 97,
         histogram_interval_value: 5,
@@ -590,55 +601,40 @@ describe("AnomalyDetectionConfig", () => {
 
       const hint = sensitivityHintText(wrapper);
       expect(hint).toBeDefined();
-      expect(hint).toContain("3%");
-      expect(hint).toContain("9 per day");
-      // Without this an implementation that drops `resolution` from the named
-      // params renders "... at  resolution." and still passes.
-      expect(hint).toContain("5m");
+      expect(hint).toContain("97%");
+      expect(hint).toContain("training");
+      for (const promise of ["per day", "per week", "about", "3%", "resolution"]) {
+        expect(hint).not.toContain(promise);
+      }
     });
 
-    it("hint rounds before branching — 0.96/day is 'per day', not 'one every 1 days'", async () => {
-      wrapper = mountConfig({
-        threshold: 99,
-        histogram_interval_value: 15,
-        histogram_interval_unit: "m",
-      });
-      await flushPromises();
-
-      const hint = sensitivityHintText(wrapper);
-      expect(hint).toBeDefined();
-      expect(hint).toContain("1 per day");
-      expect(hint).not.toContain("every");
-      expect(hint).toContain("15m");
-    });
-
-    it("hint switches to 'one every N days' below one flagged bucket a day", async () => {
-      wrapper = mountConfig({
-        threshold: 99,
-        histogram_interval_value: 1,
-        histogram_interval_unit: "h",
-      });
-      await flushPromises();
-
-      const hint = sensitivityHintText(wrapper);
-      expect(hint).toBeDefined();
-      expect(hint).toContain("every 4");
-      expect(hint).toContain("1h");
-    });
-
-    it("hint is suppressed when the detection resolution is empty", async () => {
+    it("hint no longer varies with the detection resolution", async () => {
+      // The per-day arithmetic read the resolution; the honest hint has no
+      // rate to derive from it.
       wrapper = mountConfig({
         threshold: 97,
         histogram_interval_value: 5,
         histogram_interval_unit: "m",
       });
+      await flushPromises();
+      const before = sensitivityHintText(wrapper);
+      expect(before).toBeDefined();
+
+      getForm(wrapper).setFieldValue("histogram_interval_value", 60);
+      await flushPromises();
+      await nextTick();
+      expect(sensitivityHintText(wrapper)).toBe(before);
+    });
+
+    it("hint is suppressed while the percentile is out of range", async () => {
+      wrapper = mountConfig({ threshold: 97 });
       await flushPromises();
       // Sanity first: without it, "absent" would also be satisfied by the whole
       // row failing to render.
       expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
 
-      for (const bad of ["", 0, -5]) {
-        getForm(wrapper).setFieldValue("histogram_interval_value", bad);
+      for (const bad of ["", 40, 99.5]) {
+        getForm(wrapper).setFieldValue("threshold", bad);
         await flushPromises();
         await nextTick();
         expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
@@ -775,6 +771,159 @@ describe("AnomalyDetectionConfig", () => {
 
     it("the schema default threshold is 97 when the config carries none", () => {
       expect(anomalyDetectionConfigDefaults(undefined).threshold).toBe(97);
+    });
+  });
+
+  describe("sensitivity — percentile row alignment", () => {
+    it("keeps the toggle bar and the percentile box on one centred row", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // A stacked label here would push the whole row below the Sensitivity heading.
+      // Walk up from the input to the row that also holds the tier toggle: that
+      // shared ancestor is the one whose cross-axis alignment sets the row's top.
+      let row: HTMLElement | null = wrapper.find('[data-test="anomaly-sensitivity-percentile"]')
+        .element as HTMLElement;
+      while (row && !row.querySelector('[data-test="anomaly-sensitivity-tier"]')) {
+        row = row.parentElement;
+      }
+      expect(row).not.toBeNull();
+      expect(row?.className).toContain("items-center");
+      expect(row?.className).not.toContain("items-end");
+    });
+
+    it("keeps the percentile label out of the narrow numeric column", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // The label renders as a sibling span, never inside OInput's own field column.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"] label').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile-info"]').exists()).toBe(true);
+    });
+  });
+
+  // Wire contract: `alert_budget_per_day` absent/invalid = percentile mode; while set, `threshold` is API-derived and must never render or be written.
+  describe("sensitivity — budget mode", () => {
+    it("a config with no budget renders the percentile controls only", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-budget-count"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-budget-tiers"]').exists()).toBe(false);
+    });
+
+    it("a stored budget replaces the percentile control with the budget control", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-budget-count"] input').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-97"]').exists()).toBe(false);
+      expect(
+        (wrapper.find('[data-test="anomaly-budget-count"] input').element as HTMLInputElement)
+          .value,
+      ).toBe("2");
+    });
+
+    it("a sub-daily budget is surfaced as alerts per week", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 1 / 7 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+    });
+
+    it("the budget tiers map to 1/week, 1/day and 4/day", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-budget-tier-1_week"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+
+      await wrapper.find('[data-test="anomaly-budget-tier-4_day"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(4);
+      expect(form.state.values.budget_period).toBe("day");
+    });
+
+    it("writes the budget back as a per-day number and never touches threshold", async () => {
+      const { wrapper: w, config } = mountReturning({
+        alert_budget_per_day: 2,
+        threshold: 96.4,
+      });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 3);
+      form.setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(config.alert_budget_per_day).toBeCloseTo(3 / 7, 10);
+      // Controller-derived display value — the UI must not write it back.
+      expect(config.threshold).toBe(96.4);
+    });
+
+    it("an invalid count blocks submit and does not clobber the stored budget", async () => {
+      const { wrapper: w, config } = mountReturning({ alert_budget_per_day: 2 });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 0);
+      await flushPromises();
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "budget_count")).toBe("Enter a number greater than 0");
+      // Writing undefined here would silently flip the config to percentile mode.
+      expect(config.alert_budget_per_day).toBe(2);
+    });
+
+    it("a fractional controller-written percentile does not block a budget-mode submit", async () => {
+      // In budget mode `threshold` carries the controller's derived display
+      // percentile, which may be fractional; the percentile-mode integer rule
+      // must not judge it.
+      wrapper = mountConfig({ alert_budget_per_day: 1, threshold: 96.4 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("budget-mode hint states the ceiling, never a ranking or a promise of importance", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("2");
+      expect(hint).toContain("per day");
+      for (const claim of ["most important", "most unusual", "highest", "top", "rank"]) {
+        expect(hint!.toLowerCase()).not.toContain(claim);
+      }
+    });
+
+    it("switching the period to week switches the hint", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      getForm(wrapper).setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(sensitivityHintText(wrapper)).toContain("per week");
     });
   });
 
@@ -971,6 +1120,169 @@ describe("AnomalyDetectionConfig", () => {
         "level",
       );
       expect(values).toEqual(["ERROR", "INFO"]);
+    });
+  });
+
+  // §4.3/§4.6: floor = Check Every + one Detection Resolution, computed locally — no settle margin.
+  describe("look back window floor (schedule + histogram)", () => {
+    const submitted = async (
+      overrides: Record<string, unknown>,
+      extraProps: Record<string, unknown> = {},
+    ): Promise<VueWrapper> => {
+      const w = mountConfig(overrides, extraProps);
+      await flushPromises();
+      await getForm(w).handleSubmit();
+      await nextTick();
+      return w;
+    };
+
+    it("is Check Every plus one Detection Resolution", () => {
+      expect(lookBackWindowFloorSeconds(1, "h", 5, "m")).toBe(3900);
+      expect(lookBackWindowFloorSeconds(5, "m", 5, "m")).toBe(600);
+      expect(lookBackWindowFloorSeconds(90, "s", 30, "s")).toBe(120);
+      expect(lookBackWindowFloorSeconds(1, "d", 1, "h")).toBe(90000);
+    });
+
+    it("is absent when either governing value is not a positive s/m/h/d interval", () => {
+      expect(lookBackWindowFloorSeconds(0, "m", 5, "m")).toBeNull();
+      expect(lookBackWindowFloorSeconds(5, "x", 5, "m")).toBeNull();
+      expect(lookBackWindowFloorSeconds(5, "m", Number.NaN, "m")).toBeNull();
+    });
+
+    it("rejects the live broken shape: 5m window on a 5m schedule and 5m buckets", async () => {
+      wrapper = await submitted({
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        detection_window_value: 5,
+        detection_window_unit: "m",
+      });
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("10m");
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    it("accepts exactly the floor and refuses one bucket under it", async () => {
+      const shape = {
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        detection_window_unit: "m",
+      };
+      wrapper = await submitted({ ...shape, detection_window_value: 10 });
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      wrapper.unmount();
+
+      wrapper = await submitted({ ...shape, detection_window_value: 9 });
+      expect(fieldError(wrapper, "detection_window_value")).toBeDefined();
+    });
+
+    it("states the minimum and the 2x recommendation at the field", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      const hint = wrapper.find('[data-test="anomaly-detection-window-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("1h 5m");
+      expect(hint.text()).toContain("2h 10m");
+    });
+  });
+
+  // D4/N11: suppression by value vs the fetched triple, never touched-flags; bytes are pinned in the payload spec.
+  describe("client grandfathering of legacy rows (D4/N11/N12)", () => {
+    // A stored below-floor row: window 10m against a 1h schedule + 5m buckets (floor 1h 5m).
+    const storedBelowFloor = () => ({
+      histogram: { raw: "5m", value: 5, unit: "m", parsed: true },
+      schedule: { raw: "1h", value: 1, unit: "h", parsed: true },
+      window: { raw: 600, value: 10, unit: "m", parsed: true },
+    });
+    // The form state the stored triple seeds (schedule 1h is the mount default).
+    const matchingConfig = {
+      histogram_interval_value: 5,
+      histogram_interval_unit: "m",
+      detection_window_value: 10,
+      detection_window_unit: "m",
+    };
+
+    const mountStored = async (stored: Record<string, unknown>) => {
+      const w = mountConfig(matchingConfig, { storedIntervals: stored });
+      await flushPromises();
+      return w;
+    };
+
+    it("an untouched below-floor triple passes: a description-only edit saves", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      await getForm(wrapper).handleSubmit();
+      await nextTick();
+
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(getForm(wrapper).state.isValid).toBe(true);
+    });
+
+    it("a below-floor window EDIT is rejected", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      getForm(wrapper).setFieldValue("detection_window_value", 20);
+      await getForm(wrapper).handleSubmit();
+      await nextTick();
+
+      expect(fieldError(wrapper, "detection_window_value")).toContain("1h 5m");
+    });
+
+    it("edit-and-revert is clean again (value comparison, not touched-flags)", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      const form = getForm(wrapper);
+      form.setFieldValue("detection_window_value", 20);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeDefined();
+
+      form.setFieldValue("detection_window_value", 10);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("unparsable stored values: no floor, no warning -- but W>0 still enforced (N12)", async () => {
+      const stored = storedBelowFloor();
+      stored.schedule = { raw: "1x", value: 1, unit: "h", parsed: false };
+      wrapper = await mountStored(stored);
+      const form = getForm(wrapper);
+
+      // The window edit cannot be floored against an unparsable schedule.
+      form.setFieldValue("detection_window_value", 6);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBeUndefined();
+      expect(wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]').exists()).toBe(
+        false,
+      );
+
+      // N12: tolerance never waives W > 0.
+      form.setFieldValue("detection_window_value", 0);
+      await form.handleSubmit();
+      await nextTick();
+      expect(fieldError(wrapper, "detection_window_value")).toBe("Field is required!");
+    });
+
+    it("warns on a grandfathered below-floor row, stating the correctly parsed minimum", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+
+      const warning = wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]');
+      expect(warning.exists()).toBe(true);
+      expect(warning.text()).toContain("1h 5m");
+    });
+
+    it("clears the legacy warning once the triple is edited", async () => {
+      wrapper = await mountStored(storedBelowFloor());
+      getForm(wrapper).setFieldValue("detection_window_value", 70);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]').exists()).toBe(
+        false,
+      );
     });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { usePanelCache } from "./usePanelCache";
+import { queryClient } from "@/composables/query/queryClient";
 // Import the module to ensure window functions are defined
 import "./usePanelCache";
 
@@ -17,9 +18,11 @@ const createMockRequest = (result: any = null) => ({
 
 const mockObjectStore = {
   put: (value: any) => {
-    const request = createMockRequest(value.id);
+    const request = createMockRequest(value.key);
     if (!shouldThrowError) {
-      mockData.set(value.id, value);
+      // Real IndexedDB structured-clones on write; the store relies on that for
+      // isolation now that it no longer JSON round-trips.
+      mockData.set(value.key, structuredClone(value));
     }
     // Use microtask to simulate async behavior
     queueMicrotask(() => {
@@ -120,8 +123,8 @@ describe("usePanelCache", () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
-    delete (window as any)._o2_removeDashboardCache;
-    delete (window as any)._o2_getDashboardCache;
+    // The module assigns window._o2_* once on import; deleting them here left
+    // every later test in this file with no globals to assert against.
   });
 
   describe("when required parameters are missing", () => {
@@ -201,8 +204,8 @@ describe("usePanelCache", () => {
 
       await cache.savePanelCache(key, data, cacheTimeRange);
 
-      // Retrieve it
-      const result = await cache.getPanelCache();
+      // Retrieve it — the same key selects the entry it was saved under.
+      const result = await cache.getPanelCache(key);
 
       expect(result).toBeDefined();
       expect(result.key).toEqual(key);
@@ -231,9 +234,9 @@ describe("usePanelCache", () => {
       await cache2.savePanelCache("key2", data2, {});
       await cache3.savePanelCache("key3", data3, {});
 
-      const result1 = await cache1.getPanelCache();
-      const result2 = await cache2.getPanelCache();
-      const result3 = await cache3.getPanelCache();
+      const result1 = await cache1.getPanelCache("key1");
+      const result2 = await cache2.getPanelCache("key2");
+      const result3 = await cache3.getPanelCache("key3");
 
       expect(result1.value).toEqual(data1);
       expect(result2.value).toEqual(data2);
@@ -253,8 +256,9 @@ describe("usePanelCache", () => {
       data.nested.value = 99;
       cacheTimeRange.start = 99;
 
-      // Retrieved data should not be affected
-      const result = await cache.getPanelCache();
+      // Retrieved data should not be affected. The key is read back with its
+      // pre-mutation shape, which is also what the digest was built from.
+      const result = await cache.getPanelCache({ query: "test", nested: { value: 1 } });
       expect(result.key.nested.value).toBe(1);
       expect(result.value.nested.value).toBe(2);
       expect(result.cacheTimeRange.start).toBe(1000);
@@ -266,7 +270,7 @@ describe("usePanelCache", () => {
       await cache.savePanelCache("key1", { value: 1 }, {});
       await cache.savePanelCache("key2", { value: 2 }, {});
 
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("key2");
       expect(result.key).toBe("key2");
       expect(result.value).toEqual({ value: 2 });
     });
@@ -280,8 +284,10 @@ describe("usePanelCache", () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
       const result = await cache.getPanelCache();
 
+      // The persister swallows its own storage failures, so an unreachable
+      // store reads as a plain miss and the panel fetches — which is what a
+      // cache that cannot answer should do.
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error getting panel cache:", expect.any(Error));
     });
 
     it("should handle save errors gracefully", async () => {
@@ -290,9 +296,11 @@ describe("usePanelCache", () => {
       shouldThrowError = true;
       errorType = "save";
 
-      await cache.savePanelCache("key", "data", "range");
+      await expect(cache.savePanelCache("key", "data", "range")).resolves.toBeUndefined();
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error saving panel cache:", expect.any(Error));
+      // A disk write that fails still leaves the value in memory, so the panel
+      // it belongs to survives its own remount even with storage broken.
+      expect(await cache.getPanelCache("key")).toMatchObject({ key: "key", value: "data" });
     });
 
     it("should handle get errors gracefully", async () => {
@@ -304,56 +312,13 @@ describe("usePanelCache", () => {
       const result = await cache.getPanelCache();
 
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error getting panel cache:", expect.any(Error));
     });
   });
 
   describe("global cache management", () => {
-    beforeEach(() => {
-      // Manually define the global functions to simulate the module import
-      // These match the original implementation exactly
-      (window as any)._o2_removeDashboardCache = async () => {
-        try {
-          // Simulate performTransaction
-          const request = mockObjectStore.clear();
-          await new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(undefined);
-            request.onerror = () => reject(request.error);
-          });
-        } catch (error) {
-          console.error("Error clearing dashboard cache:", error);
-          // Original function doesn't rethrow, just logs the error
-        }
-      };
-
-      (window as any)._o2_getDashboardCache = async () => {
-        try {
-          // Simulate performTransaction
-          const request = mockObjectStore.getAll();
-          const allRecords = await new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
-
-          const cache: any = {};
-          (allRecords as any[]).forEach((record: any) => {
-            const [folderId, dashboardId, panelId] = record.id.split(":");
-            if (!cache[folderId]) cache[folderId] = {};
-            if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
-            cache[folderId][dashboardId][panelId] = {
-              key: record.key,
-              value: record.value,
-              cacheTimeRange: record.cacheTimeRange,
-              timestamp: record.timestamp,
-            };
-          });
-          return cache;
-        } catch (error) {
-          console.error("Error getting dashboard cache:", error);
-          return {};
-        }
-      };
-    });
+    // The real window._o2_* helpers are asserted here, not a copy of them: the
+    // previous stubs reimplemented the old `<ns>|<org>|…` storage and kept
+    // passing after the cache moved onto the query layer.
 
     it("should define global cache management functions", () => {
       expect(window._o2_removeDashboardCache).toBeDefined();
@@ -368,7 +333,7 @@ describe("usePanelCache", () => {
 
       await window._o2_removeDashboardCache();
 
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("key");
       expect(result).toBeNull();
     });
 
@@ -393,30 +358,21 @@ describe("usePanelCache", () => {
       shouldThrowError = true;
       errorType = "clear";
 
-      // The global function should catch and log the error, not rethrow
-      await window._o2_removeDashboardCache();
-
-      // The function should have logged the error
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Error clearing dashboard cache:",
-        expect.any(Error),
-      );
+      // Never rethrows: a debug helper must not take the console down with it.
+      // The persister absorbs its own storage failures, so the common case is a
+      // clean resolve even when the store is unreachable.
+      await expect(window._o2_removeDashboardCache()).resolves.toBeUndefined();
     });
 
     it("should handle get all cache errors", async () => {
       shouldThrowError = true;
       errorType = "getAll";
 
+      // Reads the in-memory query cache, so an unreachable store cannot fail
+      // it — it reports whatever is currently held, and never throws.
       const result = await window._o2_getDashboardCache();
 
-      // Function should return empty object on error
-      expect(result).toEqual({});
-
-      // Function should have logged the error
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Error getting dashboard cache:",
-        expect.any(Error),
-      );
+      expect(result).toBeTypeOf("object");
     });
   });
 
@@ -429,8 +385,8 @@ describe("usePanelCache", () => {
       await cache2.savePanelCache("key", "data2", {});
 
       // Should overwrite since same cache key
-      const result1 = await cache1.getPanelCache();
-      const result2 = await cache2.getPanelCache();
+      const result1 = await cache1.getPanelCache("key");
+      const result2 = await cache2.getPanelCache("key");
 
       expect(result1.value).toBe("data2");
       expect(result2.value).toBe("data2");
@@ -440,7 +396,7 @@ describe("usePanelCache", () => {
       const cache = usePanelCache("folder:1", "dashboard:1", "panel:1");
 
       await cache.savePanelCache("key", "data", {});
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("key");
 
       expect(result.value).toBe("data");
     });
@@ -462,7 +418,7 @@ describe("usePanelCache", () => {
       };
 
       await cache.savePanelCache("", complexData, "");
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("");
 
       expect(result.key).toBe("");
       expect(result.value).toEqual(complexData);
@@ -474,13 +430,15 @@ describe("usePanelCache", () => {
 
       // Test with undefined/null values
       await cache.savePanelCache(undefined, null, undefined);
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache(undefined);
 
       // When result is successful, it should have the stored data
       if (result) {
-        expect(result.key).toBe(null); // JSON.parse(JSON.stringify(undefined)) = null
+        // structuredClone preserves undefined, where the old JSON round-trip
+        // turned it into null.
+        expect(result.key).toBeUndefined();
         expect(result.value).toBe(null);
-        expect(result.cacheTimeRange).toBe(null);
+        expect(result.cacheTimeRange).toBeUndefined();
       } else {
         // If result is null, it means the cache returned null for undefined key
         expect(result).toBeNull();
@@ -495,7 +453,26 @@ describe("usePanelCache", () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
       await cache.savePanelCache("test", "data", {});
 
-      expect(mockData.has("folder1:dashboard1:panel1")).toBe(true);
+      // Rooted at ["org", …] like every other query, which is what lets the
+      // org-switch and logout purges reach panel results by prefix.
+      // Asserted on the query key, not a storage key: the persister has no
+      // IndexedDB under jsdom, so a save here is memory-only. The key is what
+      // matters anyway — being rooted at ["org", …] is what lets the org-switch
+      // and logout purges reach panel results by prefix.
+      const keys = queryClient
+        .getQueryCache()
+        .getAll()
+        .map((query) => query.queryKey);
+      expect(
+        keys.some(
+          (key) =>
+            key[0] === "org" &&
+            key[2] === "panels" &&
+            key[3] === "folder1" &&
+            key[4] === "dashboard1" &&
+            key[5] === "panel1",
+        ),
+      ).toBe(true);
     });
 
     it("should handle database upgrade path", () => {

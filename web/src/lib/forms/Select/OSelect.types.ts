@@ -54,6 +54,10 @@ export interface SelectOption {
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
   header?: boolean;
+  /** Makes this a non-selectable row that shows or hides the options whose `parentValue` is its `value`. */
+  expandable?: boolean;
+  /** Nests this option under the `expandable` row with this value. */
+  parentValue?: SelectValue;
   [key: string]: unknown;
 }
 
@@ -160,7 +164,11 @@ export interface SelectProps {
    *   and closes the dropdown), while clicking the checkbox still toggles it.
    */
   rowClickSingleSelect?: boolean;
-  /** When true, shows the full option label as a native tooltip on hover (useful when labels are truncated). */
+  /**
+   * @deprecated No longer needed — the trigger and option labels now show a
+   * tooltip with the full value automatically whenever they're truncated.
+   * Kept only so existing call sites don't break; has no effect.
+   */
   optionTooltip?: boolean;
 }
 

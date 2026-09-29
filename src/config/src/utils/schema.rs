@@ -281,6 +281,21 @@ pub fn format_partition_key(input: &str) -> String {
 
 // format stream name
 pub fn format_stream_name(stream_name: String) -> String {
+    // the regex dominates this call, and one byte scan settles the common untouched name
+    if stream_name
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b':')
+    {
+        if crate::get_config().common.format_stream_name_to_lower
+            && stream_name.bytes().any(|b| b.is_ascii_uppercase())
+        {
+            let mut owned = stream_name;
+            owned.make_ascii_lowercase();
+            return owned;
+        }
+        return stream_name;
+    }
+
     let replaced = RE_CORRECT_STREAM_NAME.replace_all(&stream_name, "_");
 
     // Check if any replacements were made

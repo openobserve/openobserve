@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::synthetics_variables::{placeholder_names, substitute_placeholders};
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
@@ -165,6 +169,9 @@ pub struct Synthetic {
     /// Key-value variables injected into the probe environment.
     #[serde(default)]
     pub variables: Vec<SyntheticVariable>,
+    /// Environments this check runs against, by id.
+    #[serde(default)]
+    pub environments: Vec<String>,
     /// Unix epoch microseconds — when to first run the check ("schedule later").
     /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -521,6 +528,8 @@ pub struct SyntheticSettings {
     pub session_replay: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub environments: Vec<String>,
 }
 
 fn default_wait_before_retry_secs_i32() -> i32 {
@@ -565,6 +574,26 @@ pub struct SyntheticListItem {
     pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
+    /// Executed (expanded) steps, browser only: what bills and draws down the pool (§5.11).
+    pub steps: Option<i32>,
+    /// How many checks embed this one as a subtest.
+    pub referenced_by: i32,
+    /// Subtest steps this browser check holds; None for protocol checks.
+    pub references: Option<i32>,
+    /// Omitted for a check that holds no subtest reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_state: Option<ReferenceState>,
+}
+
+/// Whether a parent's subtest references can run as stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReferenceState {
+    Ok,
+    /// A referenced child has no row in this region.
+    Missing,
+    /// A referenced child holds a subtest of its own.
+    Nested,
 }
 
 // ── Query params / responses ──────────────────────────────────────────────────
@@ -778,6 +807,13 @@ pub struct StepAssertion {
     pub attribute: Option<String>,
 }
 
+/// The browser check whose steps replace a `subtest` step at expansion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SubtestRef {
+    pub id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BrowserStepV2 {
@@ -821,6 +857,9 @@ pub struct BrowserStepV2 {
     /// is a deliberate author choice, validated into 100..=60000.
     #[serde(default)]
     pub timeout_ms: Option<u32>,
+    /// Present only on a `subtest` step; never reaches a browser (expansion removes it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtest: Option<SubtestRef>,
 }
 
 /// A (browser, device) pair for browser check fan-out.
@@ -1160,6 +1199,25 @@ pub fn device_viewport(device_id: &str) -> Option<(u32, u32)> {
         .map(|d| (d.width, d.height))
 }
 
+pub fn is_composition_action(action: &str) -> bool {
+    V2_COMPOSITION_ACTIONS.contains(&action)
+}
+
+/// Runs the per-step rules over an already-expanded journey (no `subtest` may remain).
+pub fn validate_expanded_steps(steps: &[serde_json::Value]) -> Result<(), String> {
+    validate_v2_steps(steps)?;
+    if let Some(i) = steps.iter().position(|s| {
+        s.get("action")
+            .and_then(|a| a.as_str())
+            .is_some_and(is_composition_action)
+    }) {
+        return Err(format!(
+            "config.steps[{i}]: a composition action survived expansion"
+        ));
+    }
+    Ok(())
+}
+
 /// Worst-case wall clock for one leased job, in milliseconds.
 ///
 /// Retries happen INSIDE the leased job, so the lease has to cover the whole
@@ -1254,22 +1312,7 @@ fn validate_net_retry_budget(
     Ok(())
 }
 
-/// The complete v2 action vocabulary — exactly Playwright's recorder action
-/// model, minus what a check cannot use.
-///
-/// Deliberately excludes `scroll`, `wait`/`waitFor` and `screenshot`: upstream
-/// `ActionName` has no counterpart for any of them, so the recorder never
-/// emitted one and the extension player could never replay one. They entered
-/// journeys only through the manual step editor, and using one aborted replay
-/// entirely. `type` and `keydown` are dropped as redundant aliases of `fill`
-/// and `press`.
-///
-/// `hover` joined in Playwright 1.56, which added it to the recorder action
-/// model and made it reachable from the action picker. It is executed by
-/// `Locator.hover` in the probe and `Frame.hover` in the extension player.
-///
-/// Because this set is drawn from Playwright's own model, every stored v2 step
-/// is executable by both the probe and the extension player by construction.
+/// Recorder actions a check can replay; `subtest` is not one, as expansion removes it first.
 const V2_STEP_ACTIONS: &[&str] = &[
     "navigate", "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
@@ -1278,6 +1321,12 @@ const V2_STEP_ACTIONS: &[&str] = &[
 const V2_ELEMENT_ACTIONS: &[&str] = &[
     "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
+
+/// Stored-only actions: expansion replaces them before any browser sees a journey.
+pub const V2_COMPOSITION_ACTIONS: &[&str] = &["subtest"];
+
+/// Row ids the results UI owns ("no step" sentinel, start load row 0); a step may not claim them.
+const STEP_ID_RESERVED: &[&str] = &["__unattributed__", "_start"];
 
 /// The closed set of assertion kinds (spec P5.1).
 ///
@@ -1299,7 +1348,6 @@ const V2_VISIBILITY_ASSERTION_KINDS: &[&str] = &["element_visible", "element_not
 /// Kinds that describe the page rather than an element, and so need no locator.
 const V2_PAGE_LEVEL_ASSERTION_KINDS: &[&str] = &["url_matches", "page_title"];
 
-const MAX_STEPS: usize = 50;
 /// A step carries up to 5 locator candidates and 5 settle patterns. A maximal
 /// 50-step journey lands near 60KB; the cap is set well clear of that. The
 /// `config` column is already JSON (jsonb on PostgreSQL), and steps travel over
@@ -1346,7 +1394,10 @@ pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
 const MAX_TEST_ID_ATTR_LEN: usize = 64;
 const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
-const MAX_VARIABLES: usize = 50;
+pub const MAX_VARIABLES: usize = 50;
+
+/// Environments one check may fan out over.
+pub const MAX_ENVIRONMENTS_PER_CHECK: usize = 5;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
 /// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
@@ -1356,14 +1407,66 @@ const MIN_INTERVAL_SECS: i64 = 1;
 /// one Lambda invocation per location per browser×device combo.
 const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 
-fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+/// Stand-in for a placeholder while validating a templated URL's shape.
+const TEMPLATE_PROBE_TOKEN: &str = "placeholder";
+
+/// Validates a URL that may be templated.
+pub fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, true)
+}
+
+/// The same rule as [`validate_http_url`], with errors that never quote the value.
+pub fn validate_http_url_quietly(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, false)
+}
+
+/// A templated or resolved URL with no scheme is read as https, at save time and at run time.
+pub fn with_default_scheme(value: &str) -> String {
+    if value.contains("://") {
+        value.to_string()
+    } else {
+        format!("https://{value}")
+    }
+}
+
+/// `echo` decides whether an error quotes the value; a resolved URL may hold a secret.
+fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
+    let quoted = |sep: &str| {
+        if echo {
+            format!("{sep}'{value}'")
+        } else {
+            String::new()
+        }
+    };
+    if value.contains("{{") {
+        if value.chars().any(char::is_whitespace) {
+            return Err(format!(
+                "{field}: must not contain whitespace{}",
+                quoted(": ")
+            ));
+        }
+        let tokens: HashMap<String, String> = placeholder_names(value)
+            .into_iter()
+            .map(|name| (name, TEMPLATE_PROBE_TOKEN.to_string()))
+            .collect();
+        let probe = substitute_placeholders(value, &tokens);
+        if probe.contains("{{") {
+            return Err(format!(
+                "{field}: unclosed or invalid '{{{{'{}",
+                quoted(" in ")
+            ));
+        }
+        return check_http_url(field, &with_default_scheme(&probe), echo);
+    }
     let parsed =
-        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL '{value}': {e}"))?;
+        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL{}: {e}", quoted(" ")))?;
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return Err(format!(
-            "{field}: URL scheme must be http or https, got '{}'",
-            parsed.scheme()
-        ));
+        let got = if echo {
+            format!(", got '{}'", parsed.scheme())
+        } else {
+            String::new()
+        };
+        return Err(format!("{field}: URL scheme must be http or https{got}"));
     }
     if parsed.host_str().is_none_or(str::is_empty) {
         return Err(format!("{field}: URL has no host"));
@@ -1632,8 +1735,31 @@ impl Synthetic {
                     v.name
                 ));
             }
+            if crate::meta::synthetics_variables::has_reserved_prefix(&v.name) {
+                return Err(format!(
+                    "variables: '{}' is reserved for credentials the probe injects itself",
+                    crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX
+                ));
+            }
             if !seen_vars.insert(v.name.as_str()) {
                 return Err(format!("variables: duplicate name '{}'", v.name));
+            }
+        }
+
+        // ── environments ───────────────────────────────────────────────────
+        if self.environments.len() > MAX_ENVIRONMENTS_PER_CHECK {
+            return Err(format!(
+                "environments: too many ({} > {MAX_ENVIRONMENTS_PER_CHECK})",
+                self.environments.len()
+            ));
+        }
+        let mut seen_envs = std::collections::HashSet::new();
+        for env in &self.environments {
+            if env.trim().is_empty() {
+                return Err("environments: empty environment id not allowed".to_string());
+            }
+            if !seen_envs.insert(env.as_str()) {
+                return Err(format!("environments: duplicate environment '{env}'"));
             }
         }
 
@@ -1913,9 +2039,7 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
         let step: BrowserStepV2 =
             serde_json::from_value(raw.clone()).map_err(|e| format!("config.steps[{i}]: {e}"))?;
 
-        if step.id.is_empty() {
-            return Err(format!("config.steps[{i}]: 'id' must not be empty"));
-        }
+        validate_step_id(i, &step.id)?;
         if !seen_ids.insert(step.id.clone()) {
             return Err(format!(
                 "config.steps[{i}]: duplicate step id '{}'",
@@ -1923,7 +2047,8 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             ));
         }
 
-        if !V2_STEP_ACTIONS.contains(&step.action.as_str()) {
+        if !V2_STEP_ACTIONS.contains(&step.action.as_str()) && !is_composition_action(&step.action)
+        {
             return Err(format!(
                 "config.steps[{i}]: action '{}' is not valid (valid: {}). scroll, wait and \
                  screenshot have no equivalent in the recorder's action model and cannot be \
@@ -1933,10 +2058,13 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             ));
         }
 
-        // The probe opens about:blank and never auto-navigates.
-        if i == 0 && step.action != "navigate" {
+        if is_composition_action(&step.action) {
+            validate_subtest_step(i, &step)?;
+            continue;
+        }
+        if step.subtest.is_some() {
             return Err(format!(
-                "config.steps[0]: first step must be 'navigate', got '{}'",
+                "config.steps[{i}]: 'subtest' is only valid on a 'subtest' step, not on '{}'",
                 step.action
             ));
         }
@@ -2053,6 +2181,56 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_step_id(i: usize, id: &str) -> Result<(), String> {
+    if id.is_empty() {
+        return Err(format!("config.steps[{i}]: 'id' must not be empty"));
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(format!(
+            "config.steps[{i}]: step id '{id}' may only contain letters, digits, '-' and '_'"
+        ));
+    }
+    if STEP_ID_RESERVED.contains(&id) {
+        return Err(format!("config.steps[{i}]: step id '{id}' is reserved"));
+    }
+    Ok(())
+}
+
+fn validate_subtest_step(i: usize, step: &BrowserStepV2) -> Result<(), String> {
+    let target = step.subtest.as_ref().filter(|s| !s.id.trim().is_empty());
+    if target.is_none() {
+        return Err(format!(
+            "config.steps[{i}]: a 'subtest' step requires 'subtest.id'"
+        ));
+    }
+    if step.optional || step.always_run {
+        return Err(format!(
+            "config.steps[{i}]: 'optional' and 'always_run' are not valid on a 'subtest' step \
+             — a subtest failure always fails the parent"
+        ));
+    }
+    // Every optional field of `BrowserStepV2` except `name`: a reference is the reference.
+    let carries_more = step.url.is_some()
+        || step.locator.is_some()
+        || step.value.is_some()
+        || step.key.is_some()
+        || step.files.is_some()
+        || step.assertion.is_some()
+        || step.settle.is_some()
+        || step.button.is_some()
+        || step.click_count.is_some()
+        || step.timeout_ms.is_some();
+    if carries_more {
+        return Err(format!(
+            "config.steps[{i}]: a 'subtest' step carries only 'subtest' (and 'name')"
+        ));
+    }
+    Ok(())
+}
+
 fn validate_browser_config(
     cfg: &BrowserConfig,
     frequency: &SyntheticFrequency,
@@ -2149,9 +2327,10 @@ fn validate_browser_config(
     if cfg.steps.is_empty() {
         return Err("config.steps: at least one step is required".to_string());
     }
-    if cfg.steps.len() > MAX_STEPS {
+    let browser_max_steps = crate::get_config().synthetics.browser_max_steps;
+    if cfg.steps.len() > browser_max_steps {
         return Err(format!(
-            "config.steps: too many steps ({} > {MAX_STEPS})",
+            "config.steps: too many steps ({} > {browser_max_steps})",
             cfg.steps.len()
         ));
     }
@@ -2692,6 +2871,151 @@ mod tests {
             config: serde_json::json!({ "port": 5432, "timeout_ms": 10000 }),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn the_probes_own_credential_prefix_is_reserved_on_the_check_tier_too() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        for name in ["_AUTH_COOKIES", "_auth_token", "_Auth_Token"] {
+            s.variables = vec![SyntheticVariable {
+                name: name.to_string(),
+                value: "x".to_string(),
+                secure: false,
+                example: String::new(),
+            }];
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("reserved"), "{name}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_templated_target_validates_on_its_shape() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        for target in [
+            "{{BASE_URL}}/login",
+            "https://{{TENANT}}.shop.test/login",
+            "{{BASE_URL}}",
+        ] {
+            s.target = target.to_string();
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{target} should validate"
+            );
+        }
+    }
+
+    #[test]
+    fn a_templated_target_still_has_to_look_like_a_url() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        // Permitting templates must not turn the field into a free-text box.
+        s.target = "{{BASE_URL}} /login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "whitespace");
+
+        s.target = "{{BASE_URL/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "unclosed");
+
+        s.target = "ftp://{{HOST}}/x".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "scheme");
+    }
+
+    #[test]
+    fn an_untemplated_target_validates_exactly_as_before() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        s.target = "https://shop.test/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        s.target = "not-a-url".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err());
+    }
+
+    #[test]
+    fn a_quiet_url_error_names_the_field_and_never_the_value() {
+        for bad in [
+            "file:///etc/hunter2",
+            "https://hunter2 x",
+            "hunter2",
+            "https://",
+            "{{A}} hunter2",
+            "{{A/hunter2",
+        ] {
+            let quiet = validate_http_url_quietly("target", bad).unwrap_err();
+            assert!(quiet.starts_with("target: "), "{quiet}");
+            assert!(!quiet.contains("hunter2"), "{quiet}");
+            assert!(validate_http_url("target", bad).is_err(), "{bad}");
+        }
+        assert!(validate_http_url_quietly("target", "https://shop.test/login").is_ok());
+    }
+
+    #[test]
+    fn a_url_without_a_scheme_is_read_as_https() {
+        assert_eq!(
+            with_default_scheme("shop.test/login"),
+            "https://shop.test/login"
+        );
+        assert_eq!(with_default_scheme("http://shop.test"), "http://shop.test");
+    }
+
+    #[test]
+    fn a_check_may_fan_out_over_several_environments() {
+        let (locs, brs, devs) = allowed();
+
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec![];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-2".to_string()];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn the_environment_count_is_bounded_because_it_multiplies_jobs() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = (0..=MAX_ENVIRONMENTS_PER_CHECK)
+            .map(|i| format!("env-{i}"))
+            .collect();
+
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("environments: too many"), "{err}");
+    }
+
+    #[test]
+    fn a_duplicate_environment_is_rejected_not_collapsed() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-1".to_string()];
+
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("duplicate environment"), "{err}");
+    }
+
+    #[test]
+    fn environments_survive_the_settings_round_trip() {
+        let legacy: SyntheticSettings =
+            serde_json::from_value(serde_json::json!({ "retries": 2 })).unwrap();
+        assert!(legacy.environments.is_empty());
+
+        let packed = serde_json::to_value(SyntheticSettings {
+            environments: vec!["env-1".to_string()],
+            ..Default::default()
+        })
+        .unwrap();
+        let round_tripped: SyntheticSettings = serde_json::from_value(packed).unwrap();
+        assert_eq!(round_tripped.environments, vec!["env-1".to_string()]);
     }
 
     #[test]
@@ -3615,12 +3939,167 @@ mod tests {
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
+    /// The start load opens the Starting URL, so the first step may be any action.
     #[test]
-    fn test_v2_first_step_must_be_navigate() {
+    fn a_journey_may_start_with_click() {
         let (locs, brs, devs) = allowed();
         let s = v2_synthetic(serde_json::json!([v2_click_step()]));
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    /// The expanded parent runs the same rules, so it may also open on a non-navigate step.
+    #[test]
+    fn an_expanded_parent_may_open_on_a_non_navigate_step() {
+        let mut first = v2_click_step();
+        first["id"] = serde_json::json!("r0_c0");
+        let mut second = v2_click_step();
+        second["id"] = serde_json::json!("r0_c1");
+        validate_expanded_steps(&[first, second]).unwrap();
+    }
+
+    fn subtest_journey() -> serde_json::Value {
+        serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s2", "action": "subtest", "name": "Log in (shared)",
+                  "subtest": { "id": "login-test" } },
+                { "id": "s3", "action": "click", "name": "Logs",
+                  "locator": { "candidates": [ { "kind": "css", "value": "#logs" } ] } }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        })
+    }
+
+    #[test]
+    fn a_subtest_step_is_accepted_by_the_stored_vocabulary() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = subtest_journey();
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    #[test]
+    fn a_subtest_step_may_open_the_journey() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [ { "id": "s1", "action": "subtest", "subtest": { "id": "login-test" } } ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    #[test]
+    fn a_subtest_step_must_name_a_check() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s2", "action": "subtest" }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("navigate"), "{err}");
+        assert!(err.contains("requires 'subtest.id'"), "{err}");
+    }
+
+    #[test]
+    fn optional_and_always_run_are_rejected_on_a_subtest_step() {
+        let (locs, brs, devs) = allowed();
+        for flag in ["optional", "always_run"] {
+            let mut s = valid_browser_synthetic();
+            let mut cfg = subtest_journey();
+            cfg["steps"][1][flag] = serde_json::json!(true);
+            s.config = cfg;
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains(flag), "{flag}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_subtest_step_carries_nothing_but_the_reference() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        let mut cfg = subtest_journey();
+        cfg["steps"][1]["url"] = serde_json::json!("https://example.com");
+        s.config = cfg;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("carries only"), "{err}");
+    }
+
+    #[test]
+    fn a_subtest_step_rejects_every_execution_field() {
+        let (locs, brs, devs) = allowed();
+        for (field, value) in [
+            ("timeout_ms", serde_json::json!(5000)),
+            ("button", serde_json::json!("right")),
+            ("click_count", serde_json::json!(2)),
+            ("value", serde_json::json!("x")),
+            ("key", serde_json::json!("Tab")),
+        ] {
+            let mut s = valid_browser_synthetic();
+            let mut cfg = subtest_journey();
+            cfg["steps"][1][field] = value;
+            s.config = cfg;
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("carries only"), "{field}: {err}");
+        }
+    }
+
+    #[test]
+    fn the_subtest_field_is_rejected_on_an_ordinary_step() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        let mut cfg = subtest_journey();
+        cfg["steps"][2]["subtest"] = serde_json::json!({ "id": "login-test" });
+        s.config = cfg;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("only valid on a 'subtest' step"), "{err}");
+    }
+
+    #[test]
+    fn step_ids_are_restricted_to_the_composed_id_alphabet() {
+        let (locs, brs, devs) = allowed();
+        for bad in ["s/1", "s,1", "s 1", "__unattributed__", "_start"] {
+            let mut s = valid_browser_synthetic();
+            s.config = serde_json::json!({
+                "steps": [ { "id": bad, "action": "navigate", "url": "https://example.com" } ],
+                "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+            });
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("step id"), "{bad}: {err}");
+        }
+    }
+
+    /// `_start` is the start load's row id; a real step claiming it would collide with row 0.
+    #[test]
+    fn the_start_load_id_is_reserved_alongside_the_unattributed_sentinel() {
+        for reserved in ["_start", "__unattributed__"] {
+            let err = validate_step_id(0, reserved).unwrap_err();
+            assert_eq!(
+                err,
+                format!("config.steps[0]: step id '{reserved}' is reserved")
+            );
+        }
+        for ok in ["start", "r0_start", "_s1"] {
+            assert!(validate_step_id(0, ok).is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn duplicate_step_ids_are_rejected() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s1", "action": "navigate", "url": "https://example.com/2" }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("duplicate step id 's1'"), "{err}");
     }
 
     #[test]
@@ -3966,24 +4445,46 @@ mod tests {
         assert!(err.contains("at least one step"), "{err}");
     }
 
+    /// The cap is read through `get_config()` at validation time, which is the
+    /// whole reason `ZO_SYNTHETICS_BROWSER_MAX_STEPS` is hot: a reload has to
+    /// change what the next save accepts, with no restart.
     #[test]
-    fn test_validate_first_step_must_navigate() {
+    fn the_step_cap_follows_the_configured_value() {
         let (locs, brs, devs) = allowed();
+        let mut steps = vec![serde_json::json!({
+            "id": "s1", "action": "navigate", "url": "https://example.com"
+        })];
+        for i in 2..=6 {
+            steps.push(serde_json::json!({
+                "id": format!("s{i}"),
+                "action": "click",
+                "name": "Sign in",
+                "locator": { "candidates": [ { "kind": "css", "value": "#login" } ] }
+            }));
+        }
         let mut s = valid_browser_synthetic();
         s.config = serde_json::json!({
-            "steps": [
-                {
-                    "id": "s1",
-                    "action": "click",
-                    "name": "Sign in",
-                    "locator": { "candidates": [ { "kind": "css", "value": "#x" } ] }
-                }
-            ],
-            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ],
-            "timeout_ms": 30000
+            "steps": steps,
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
         });
+
+        let install = |cap: usize| {
+            let mut cfg = crate::Config::init().unwrap();
+            cfg.synthetics.browser_max_steps = cap;
+            crate::CONFIG.store(std::sync::Arc::new(cfg));
+        };
+        let saved = crate::CONFIG.load_full();
+
+        install(5);
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("first step must be 'navigate'"), "{err}");
+        assert!(err.contains("too many steps (6 > 5)"), "{err}");
+
+        // Second read, no restart in between.
+        install(6);
+        let accepted = s.validate(&locs, &brs, &devs, true);
+
+        crate::CONFIG.store(saved);
+        assert!(accepted.is_ok(), "{accepted:?}");
     }
 
     #[test]
@@ -4115,5 +4616,54 @@ mod tests {
         s.check_type = SyntheticType::Http;
         s.config = serde_json::json!({ "method": "GET" });
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn reference_state_is_snake_case_and_omitted_without_a_reference() {
+        assert_eq!(
+            serde_json::to_value([
+                ReferenceState::Ok,
+                ReferenceState::Missing,
+                ReferenceState::Nested
+            ])
+            .unwrap(),
+            serde_json::json!(["ok", "missing", "nested"])
+        );
+        let item = SyntheticListItem {
+            id: "c".into(),
+            org_id: "o".into(),
+            folder_id: "default".into(),
+            name: "c".into(),
+            description: String::new(),
+            tags: vec![],
+            check_type: SyntheticType::Browser,
+            target: String::new(),
+            frequency: SyntheticFrequency {
+                frequency_type: SyntheticFrequencyType::Minutes,
+                interval: 5,
+                cron: String::new(),
+                timezone: None,
+            },
+            locations: vec![],
+            enabled: true,
+            created_at: 0,
+            updated_at: 0,
+            last_triggered_at: 0,
+            status: SyntheticStatus::Unknown,
+            last_check_at: None,
+            last_response_ms: None,
+            steps: Some(1),
+            referenced_by: 0,
+            references: Some(0),
+            reference_state: None,
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(json.get("reference_state").is_none(), "{json}");
+        let json = serde_json::to_value(SyntheticListItem {
+            reference_state: Some(ReferenceState::Missing),
+            ..item
+        })
+        .unwrap();
+        assert_eq!(json["reference_state"], "missing");
     }
 }

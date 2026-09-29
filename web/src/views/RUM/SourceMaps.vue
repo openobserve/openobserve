@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="source-maps-container bg-card-glass-bg flex h-full flex-col overflow-hidden">
     <!-- Filters Section -->
     <div class="px-page-edge bg-surface-base py-3">
-      <div class="flex items-end justify-between">
-        <div class="flex items-end gap-4">
+      <!-- Below lg the filters and actions share one wrapping row (filters two-up on phones) instead of running off the edge. -->
+      <div class="flex items-end justify-between max-lg:flex-wrap max-lg:gap-2">
+        <div class="flex items-end gap-4 max-lg:contents">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -29,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Service Filter -->
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Environment Filter -->
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Apply Button -->
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Columns + Refresh + Upload Buttons -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 max-lg:ms-auto">
           <OTableColumnToggle
             :columns="columns"
             :column-visibility="columnVisibility"
@@ -101,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="columnVisibility"
         row-key="id"
         :loading="isLoading"
+        :forbidden="forbidden"
         pagination="client"
         :page-size="selectedPerPage"
         :page-size-options="perPageOptionsList"
@@ -274,6 +276,7 @@ const fetchFilterValues = async () => {
 
 // State
 const isLoading = ref(false);
+const forbidden = ref(false);
 const sourceMaps = ref<any[]>([]);
 const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
@@ -343,6 +346,7 @@ const perPageOptionsList = [20, 50, 100, 250];
 // Fetch source maps
 const fetchSourceMaps = async () => {
   isLoading.value = true;
+  forbidden.value = false;
 
   try {
     const params: any = {};
@@ -360,8 +364,9 @@ const fetchSourceMaps = async () => {
 
     // Group source maps by service, version, and environment
     groupSourceMaps();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching source maps:", error);
+    forbidden.value = error?.response?.status === 403;
     sourceMaps.value = [];
     groupedSourceMaps.value = [];
   } finally {

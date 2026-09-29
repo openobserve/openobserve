@@ -22,8 +22,11 @@
 import { type I18nKey, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
-import type { CardSubstitutions, RichCardDetect, RichCardExtras } from "../types";
+import type { CardSubstitutions, RichCardDetect, RichCardExtras, RichCardStep } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
+
+/** Slugs whose detection triggers the Host Metrics dashboard auto-import. */
+export const HOST_AGENT_SLUGS = new Set(["linux", "windows", "macos"]);
 
 /** Base of the agent install scripts, e.g. `${AGENTS_REPO}/linux/install.sh`. */
 export const AGENTS_REPO = "https://raw.githubusercontent.com/openobserve/agents/main";
@@ -54,20 +57,30 @@ export function agentCode(template: string, subs: CardSubstitutions, lang: strin
   };
 }
 
-/**
- * Host metrics land as one stream per metric (`system_cpu_time`, …), so — like
- * the database cards — detection is keyword/existence based rather than a COUNT
- * over one stream.
- *
- * TODO(detect): confirm the agent's emitted metric prefix on the ingest side;
- * this assumes the OTel hostmetrics receiver's `system.*` naming.
- */
+// OTLP ingest names streams format_stream_name(metric.name), so hostmetrics' system.* metrics land as system_* streams (otlp.rs:193, schema.rs:283-284)
 export const hostMetricsDetect: RichCardDetect = {
   streamType: "metrics",
   match: "keyword",
-  streamName: "system",
+  streamName: "system_",
   filter: "",
 };
+
+/** Step 3 of the host-agent cards: ticks on detect, its button opens the auto-imported dashboard. */
+export function dashboardReadyStep(t: TranslateFn): RichCardStep {
+  return {
+    id: "dashboard",
+    titleKey: "ingestion.setupCard.dashboardReadyTitle",
+    descriptionKey: "ingestion.setupCard.dashboardReadyDesc",
+    chip: { kind: "run", labelKey: "ingestion.setupCard.chipDashboard" },
+    completeOn: "detect",
+    action: {
+      id: "view-host-dashboard",
+      label: t("ingestion.setupCard.viewHostDashboard"),
+      icon: "dashboard",
+      showOnDetect: true,
+    },
+  };
+}
 
 // The agents repo ships a single uninstall script per OS — there is no EC2-specific
 // one — so an EC2 install is removed by the same command as a generic one.

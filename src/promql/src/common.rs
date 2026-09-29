@@ -15,69 +15,40 @@
 
 use config::{meta::promql::value::Sample, utils::sort::sort_float};
 
-/// Calculate mean over a slice of f64s
-fn mean(data: &[f64]) -> Option<f64> {
-    let sum = data.iter().sum::<f64>();
-    let count = data.len();
-
-    match count {
-        positive if positive > 0 => Some(sum / count as f64),
-        _ => None,
-    }
-}
-
-/// Calculate std deviation over a slice of f64
 pub fn std_deviation(data: &[f64]) -> Option<f64> {
-    std_variance(data).map(|var| var.sqrt())
+    std_variance(data).map(f64::sqrt)
 }
 
-/// Calculate std deviation over a slice of f64
-pub fn std_deviation2(data: &[f64], mean: f64, length: i64) -> Option<f64> {
-    std_variance2(data, mean, length).map(|var| var.sqrt())
-}
-
-/// Calculate std variance over a slice of f64
 pub fn std_variance(data: &[f64]) -> Option<f64> {
-    match (mean(data), data.len()) {
-        (Some(data_mean), count) if count > 0 => {
-            let variance = data
-                .iter()
-                .map(|value| {
-                    let diff = data_mean - *value;
-
-                    diff * diff
-                })
-                .sum::<f64>()
-                / count as f64;
-
-            Some(variance)
-        }
-        _ => None,
-    }
+    variance(data.iter().copied())
 }
 
-/// Calculate std variance over a slice of f64
-pub fn std_variance2(data: &[f64], mean: f64, length: i64) -> Option<f64> {
-    match (mean, length) {
-        (data_mean, count) if count > 0 => {
-            let variance = data
-                .iter()
-                .map(|value| {
-                    let diff = data_mean - *value;
-
-                    diff * diff
-                })
-                .sum::<f64>()
-                / count as f64;
-
-            Some(variance)
-        }
-        _ => None,
+pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64> + Clone) -> Option<f64> {
+    let count = values.len() as i64;
+    if count == 0 {
+        return None;
     }
+    let mean = values.clone().sum::<f64>() / count as f64;
+    Some(
+        values
+            .map(|value| {
+                let diff = mean - value;
+                diff * diff
+            })
+            .sum::<f64>()
+            / count as f64,
+    )
 }
 
 pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
-    if quantile < 0 as f64 || quantile > 1_f64 || quantile.is_nan() {
+    if data.is_empty() || !(0.0..=1.0).contains(&quantile) {
+        return quantile_in_place(&mut [], quantile);
+    }
+    quantile_in_place(&mut data.to_vec(), quantile)
+}
+
+pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> {
+    if !(0.0..=1.0).contains(&quantile) {
         let value = match quantile.signum() as i32 {
             1 => f64::INFINITY,
             -1 => f64::NEG_INFINITY,
@@ -89,18 +60,17 @@ pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
         return None;
     }
 
-    let mut sorted_data = data.to_vec();
-    sorted_data.sort_by(sort_float);
+    data.sort_by(sort_float);
 
-    let n = sorted_data.len();
+    let n = data.len();
     let index = (quantile * (n - 1) as f64) as usize;
 
     if index == n - 1 {
-        return Some(sorted_data[index]);
+        return Some(data[index]);
     }
 
-    let lower = sorted_data[index];
-    let upper = sorted_data[index + 1];
+    let lower = data[index];
+    let upper = data[index + 1];
 
     let fraction = quantile * (n - 1) as f64 - index as f64;
     let quantile_value = lower + (upper - lower) * fraction;
@@ -178,6 +148,40 @@ pub fn kahan_sum_increment(increment: f64, sum: f64, c: f64) -> (f64, f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_variance_over_sample_values_preserves_edge_cases() {
+        for (values, expected) in [
+            (vec![], None),
+            (vec![5.0], Some(0.0)),
+            (vec![1.0, 5.0], Some(4.0)),
+            (vec![f64::MAX, f64::MAX], Some(f64::INFINITY)),
+            (vec![f64::INFINITY, 1.0], Some(f64::NAN)),
+            (vec![f64::NAN, 1.0], Some(f64::NAN)),
+        ] {
+            let samples: Vec<_> = values.iter().map(|&value| Sample::new(1, value)).collect();
+            let actual = variance(samples.iter().map(|sample| sample.value));
+            if expected.is_some_and(f64::is_nan) {
+                assert!(actual.unwrap().is_nan());
+            } else {
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_quantile_in_place_preserves_input_contract_and_edges() {
+        let values = [5.0, 1.0, 3.0];
+        assert_eq!(quantile(&values, 0.5), Some(3.0));
+        assert_eq!(values, [5.0, 1.0, 3.0]);
+        let mut mutable = values;
+        assert_eq!(quantile_in_place(&mut mutable, 0.5), Some(3.0));
+        assert_eq!(mutable, [1.0, 3.0, 5.0]);
+        assert_eq!(quantile_in_place(&mut [], 0.5), None);
+        assert_eq!(quantile_in_place(&mut [], -1.0), Some(f64::NEG_INFINITY));
+        assert_eq!(quantile_in_place(&mut [], 2.0), Some(f64::INFINITY));
+        assert!(quantile_in_place(&mut [], f64::NAN).unwrap().is_nan());
+    }
 
     #[test]
     fn test_quantile() {
@@ -352,29 +356,6 @@ mod tests {
     }
 
     #[test]
-    fn test_mean() {
-        // Test normal case
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let result = mean(&data);
-        assert_eq!(result, Some(3.0));
-
-        // Test empty slice
-        let data: Vec<f64> = vec![];
-        let result = mean(&data);
-        assert_eq!(result, None);
-
-        // Test single value
-        let data = vec![42.0];
-        let result = mean(&data);
-        assert_eq!(result, Some(42.0));
-
-        // Test negative values
-        let data = vec![-1.0, -2.0, -3.0];
-        let result = mean(&data);
-        assert_eq!(result, Some(-2.0));
-    }
-
-    #[test]
     fn test_std_variance() {
         // Test normal case
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
@@ -395,26 +376,6 @@ mod tests {
     }
 
     #[test]
-    fn test_std_variance2() {
-        // Test normal case
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let mean_val = 3.0;
-        let length = 5;
-        let result = std_variance2(&data, mean_val, length);
-        assert!(result.is_some());
-        // Variance should be 2.0 for this data
-        assert!((result.unwrap() - 2.0).abs() < 1e-10);
-
-        // Test with zero length
-        let result = std_variance2(&data, mean_val, 0);
-        assert_eq!(result, None);
-
-        // Test with negative length
-        let result = std_variance2(&data, mean_val, -1);
-        assert_eq!(result, None);
-    }
-
-    #[test]
     fn test_std_deviation() {
         // Test normal case
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
@@ -426,22 +387,6 @@ mod tests {
         // Test empty slice
         let data: Vec<f64> = vec![];
         let result = std_deviation(&data);
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_std_deviation2() {
-        // Test normal case
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let mean_val = 3.0;
-        let length = 5;
-        let result = std_deviation2(&data, mean_val, length);
-        assert!(result.is_some());
-        // Standard deviation should be sqrt(2.0) for this data
-        assert!((result.unwrap() - 2.0_f64.sqrt()).abs() < 1e-10);
-
-        // Test with zero length
-        let result = std_deviation2(&data, mean_val, 0);
         assert_eq!(result, None);
     }
 

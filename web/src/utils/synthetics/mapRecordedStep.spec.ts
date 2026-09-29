@@ -22,7 +22,9 @@ import {
   journeyToWireSteps,
   mapWireStep,
   mapWireSteps,
+  substituteVariables,
 } from "./mapRecordedStep";
+import { buildV2Step } from "./buildV2Steps";
 
 describe("mapRecordedStep", () => {
   it("should map a navigate wire step using the url as value", () => {
@@ -524,5 +526,66 @@ describe("stored journeys with mid-journey navigates", () => {
       "https://app.test/",
       "https://app.test/home",
     ]);
+  });
+});
+
+describe("substituteVariables", () => {
+  const step = (over: Partial<WireStep>): WireStep => ({ action: "fill", ...over }) as WireStep;
+
+  it("substitutes a bound placeholder in every string field", () => {
+    const out = substituteVariables(
+      step({ value: "{{USER}}", url: "https://app.test/{{PATH}}", key: "{{KEY}}" }),
+      { USER: "alice", PATH: "home", KEY: "Enter" },
+    );
+
+    expect(out.value).toBe("alice");
+    expect(out.url).toBe("https://app.test/home");
+    expect(out.key).toBe("Enter");
+  });
+
+  it("leaves an unbound placeholder verbatim", () => {
+    const out = substituteVariables(step({ value: "{{TYPO}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("{{TYPO}}");
+  });
+
+  it("substitutes a bound name alongside an unbound one in the same string", () => {
+    const out = substituteVariables(step({ value: "{{USER}}/{{TYPO}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("alice/{{TYPO}}");
+  });
+
+  it("still substitutes a bound name whose value is empty", () => {
+    // Distinct from unbound: the author set it, the value is just blank.
+    const out = substituteVariables(step({ value: "{{BLANK}}" }), { BLANK: "" });
+
+    expect(out.value).toBe("");
+  });
+
+  it("never reads a name off the object prototype", () => {
+    const out = substituteVariables(step({ value: "{{constructor}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("{{constructor}}");
+  });
+});
+
+describe("subtest steps", () => {
+  it("survives a save-and-reload round trip with the reference intact", () => {
+    const journey: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+      { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+    ];
+    // buildV2Step is what we store; mapWireStep is what the editor loads back.
+    const reloaded = mapWireSteps(journey.map(buildV2Step) as unknown as WireStep[]);
+    expect(reloaded[1].action).toBe("subtest");
+    expect(reloaded[1].subtest).toEqual({ id: "login-test" });
+  });
+
+  it("refuses to build wire steps from an unexpanded subtest", () => {
+    const steps: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+      { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+    ];
+    expect(() => journeyToWireSteps(steps)).toThrow(/expanded before replay/);
   });
 });

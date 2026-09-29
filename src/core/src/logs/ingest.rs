@@ -16,15 +16,16 @@
 use std::{
     collections::{HashMap, HashSet},
     io::{BufRead, Cursor, Read},
+    sync::{LazyLock, Mutex},
+    time::{Duration, Instant},
 };
 
 use axum::http;
 use chrono::Utc;
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
+        db_monitoring::is_dbm_server_stream,
         self_reporting::usage::{UsageType, is_internal_rollup_stream},
         stream::{StreamParams, StreamType},
     },
@@ -44,7 +45,7 @@ use infra::{
 use ingestion_common::{
     AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
     IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
-    IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
+    IngestionValueType, KinesisFHIngestionResponse, RecordStatus, StreamStatus,
 };
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -56,13 +57,23 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use transform::TRANSFORM_FAILED;
 
-use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{
+    IngestJsonData, bulk::TS_PARSE_FAILED, columnar::JsonColumnar, ingestion_log_enabled,
+    log_failed_record,
+};
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
     service::get_formatted_stream_name,
 };
 
-type LogDataByStream = HashMap<String, (Vec<(i64, json::Map<String, json::Value>)>, Option<usize>)>;
+/// A misbehaving client can wholly fail thousands of batches a second per stream.
+const DISCARD_WARN_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Last wholly-discarded warn per `org/stream`, so the log stays one line a minute each.
+static DISCARD_WARN_AT: LazyLock<Mutex<HashMap<String, Instant>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+type LogDataByStream = HashMap<String, IngestJsonData>;
 
 struct FinalizeRecordContext<'a> {
     stream_name: &'a str,
@@ -76,8 +87,17 @@ struct FinalizeRecordContext<'a> {
     streams_need_all_values_map: &'a HashMap<String, bool>,
     need_usage_report: bool,
     log_ingestion_errors: bool,
+    dbm_enabled: bool,
     stream_status: &'a mut StreamStatus,
     json_data_by_stream: &'a mut LogDataByStream,
+}
+
+/// Why a record could not be prepared for writing.
+pub enum PrepareRecordError {
+    /// Flattening failed; the record is unusable.
+    Flatten(anyhow::Error),
+    /// Timestamp unresolvable or window-rejected; carries the flattened record.
+    Timestamp(json::Value, anyhow::Error),
 }
 
 /// The `_o2_` write-guard predicate (design §5.3): true when a logs ingest
@@ -91,6 +111,16 @@ fn is_blocked_internal_rollup_write(
     is_derived: bool,
 ) -> bool {
     is_internal_rollup_stream(stream_name) && !is_derived && matches!(user, IngestUser::User(_))
+}
+
+/// Keyed on the destination: gRPC relabels forwarded customer writes as `InternalGrpc`.
+#[cfg(any(feature = "vectorscan", test))]
+fn should_apply_sdr(org_id: &str, stream_name: &str) -> bool {
+    !config::meta::self_reporting::redaction::is_self_reporting_stream(
+        org_id,
+        stream_name,
+        StreamType::Logs,
+    )
 }
 
 pub async fn ingest(
@@ -107,8 +137,19 @@ pub async fn ingest(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
+    // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
-    let pattern_manager = get_pattern_manager().await?;
+    let pattern_manager = match get_pattern_manager().await {
+        Ok(manager) => Some(manager),
+        Err(_) if !should_apply_sdr(org_id, in_stream_name) => None,
+        Err(e) => {
+            // Reported once the destination streams and their records are known, below.
+            log::error!(
+                "[LOGS:JSON] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
+            None
+        }
+    };
     let stream_type = StreamType::Logs;
 
     // check stream
@@ -120,19 +161,7 @@ pub async fn ingest(
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
-
-    // Block user ingestion into reserved internal streams
-    // (usage/stats/triggers/errors/slo_slices/...). The internal job writes
-    // these via `IngestionRequest::Usage` (for which `should_report_usage()` is
-    // false → `need_usage_report == false`), so it is exempt; any other request
-    // targeting a reserved stream is a user write and is rejected. Cloud-only:
-    // OSS / self-hosted may legitimately use these stream names.
-    #[cfg(feature = "cloud")]
-    if need_usage_report && is_reserved_internal_stream(&stream_name) {
-        return Err(Error::IngestionError(format!(
-            "stream '{stream_name}' is reserved and cannot be ingested into"
-        )));
-    }
+    let dbm_gate = cfg.db_monitoring.enabled && is_dbm_server_stream(&stream_name);
 
     // Block user ingestion into internal rollup streams (_o2_*,
     // _agent_signals) in ALL editions — they are written only by internal
@@ -196,13 +225,32 @@ pub async fn ingest(
 
     let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
 
+    // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
+    let needs_json_records = !executable_pipelines.is_empty()
+        || extend_json.is_some()
+        || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
+        || streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+        || streams_need_all_values_map
+            .get(&stream_name)
+            .is_some_and(|v| *v);
+    let mut columnar = if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
+        JsonColumnar::plan(org_id, &stream_name, flatten_level, (min_ts, max_ts)).await
+    } else {
+        None
+    };
+
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (endpoint, usage_type, data) = match in_req {
         IngestionRequest::JSON(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = match columnar.as_mut().and_then(|c| c.parse(&req)) {
+                Some(unaccepted) => unaccepted,
+                None => {
+                    columnar = None;
+                    parse_json_body(&req)?
+                }
+            };
             (
                 "/api/org/ingest/logs/_json",
                 UsageType::Json,
@@ -245,10 +293,7 @@ pub async fn ingest(
             IngestionData::Multi(req),
         ),
         IngestionRequest::Usage(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = parse_json_body(&req)?;
             (
                 "/api/org/ingest/logs/_usage",
                 UsageType::Json,
@@ -264,7 +309,7 @@ pub async fn ingest(
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {
-                log::error!("IngestionError: {e:?}");
+                log::error!("[LOGS:JSON] IngestionError: org_id: {org_id}, error: {e:?}");
                 return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
             }
         };
@@ -319,6 +364,7 @@ pub async fn ingest(
                 streams_need_all_values_map: &streams_need_all_values_map,
                 need_usage_report,
                 log_ingestion_errors,
+                dbm_enabled: dbm_gate,
                 stream_status: &mut stream_status,
                 json_data_by_stream: &mut json_data_by_stream,
             },
@@ -326,6 +372,13 @@ pub async fn ingest(
             continue;
         }
         tokio::task::coop::consume_budget().await;
+    }
+
+    if let Some(columnar) = columnar.as_ref().filter(|c| c.rows() > 0) {
+        *size_by_stream.entry(stream_name.clone()).or_insert(0) += columnar.input_bytes();
+        json_data_by_stream
+            .entry(stream_name.clone())
+            .or_insert_with(|| (Vec::new(), need_usage_report.then_some(0)));
     }
 
     // batch process records through pipeline
@@ -391,6 +444,8 @@ pub async fn ingest(
                         }
 
                         let destination_stream = stream_params.stream_name.to_string();
+                        let dest_dbm_gate =
+                            cfg.db_monitoring.enabled && is_dbm_server_stream(&destination_stream);
                         if !derived_streams.contains(&destination_stream) {
                             derived_streams.insert(destination_stream.clone());
                         }
@@ -413,8 +468,7 @@ pub async fn ingest(
                                 match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
                                     Ok(ts) => ts,
                                     Err(e) => {
-                                        stream_status.status.failed += 1;
-                                        stream_status.status.error = e.to_string();
+                                        count_timestamp_rejection(&mut stream_status.status, &e);
                                         metrics::INGEST_ERRORS
                                             .with_label_values(&[
                                                 org_id,
@@ -440,6 +494,13 @@ pub async fn ingest(
                                 json::Value::Object(val) => val,
                                 _ => unreachable!(),
                             };
+
+                            // Keyed on the destination: client `o2_dbm_*` keys must not land raw.
+                            if dest_dbm_gate {
+                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                                    &mut local_val,
+                                );
+                            }
 
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
@@ -562,6 +623,7 @@ pub async fn ingest(
                         streams_need_all_values_map: &streams_need_all_values_map,
                         need_usage_report,
                         log_ingestion_errors,
+                        dbm_enabled: dbm_gate,
                         stream_status: &mut stream_status,
                         json_data_by_stream: &mut json_data_by_stream,
                     },
@@ -572,6 +634,8 @@ pub async fn ingest(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
+        // Wholly-discarded batch skips the write path below, so count/warn its drops here.
+        warn_and_count_discards(org_id, endpoint, &stream_status);
         return Ok(IngestionResponse::new(
             http::StatusCode::OK.into(),
             vec![stream_status],
@@ -586,25 +650,48 @@ pub async fn ingest(
     drop(user_defined_schema_map);
 
     #[cfg(feature = "vectorscan")]
-    {
-        for (stream, data) in json_data_by_stream.iter_mut() {
-            match pattern_manager.process_at_ingestion(
-                org_id,
-                StreamType::Logs,
-                stream,
-                &mut data.0,
-            ) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "error in processing records for patterns for stream {stream} : {e}"
-                    );
-                }
+    if pattern_manager.is_none() {
+        // One row per destination stream: a pipeline fans a request out to several.
+        for (stream, data) in json_data_by_stream.iter() {
+            if !should_apply_sdr(org_id, stream) {
+                continue;
             }
+            let records = &data.0;
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+                &config::meta::self_reporting::redaction::EvidenceScope::new(
+                    org_id,
+                    stream,
+                    StreamType::Logs,
+                ),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+                records.len() as u64,
+                config::meta::self_reporting::redaction::DataWindow::from_timestamps(
+                    records.iter().map(|(ts, _)| *ts),
+                ),
+            )
+            .await;
         }
     }
 
-    let (metric_rpt_status_code, response_body) = {
+    #[cfg(feature = "vectorscan")]
+    if let Some(pattern_manager) = pattern_manager.as_ref() {
+        for (stream, data) in json_data_by_stream.iter_mut() {
+            if !should_apply_sdr(org_id, stream) {
+                continue;
+            }
+            let before = super::snapshot_derived_sources(&data.0);
+            if let Err(e) =
+                pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0)
+            {
+                log::error!(
+                    "[LOGS:JSON] error in processing records for patterns for stream {org_id}/{stream} : {e}"
+                );
+            }
+            super::refresh_derived_columns(&before, &mut data.0);
+        }
+    }
+
+    let (metric_rpt_status_code, response_body, stream_skipped) = {
         let mut status = if usage_type == UsageType::Bulk {
             IngestionStatus::Bulk(BulkResponse {
                 took: 0,
@@ -624,6 +711,7 @@ pub async fn ingest(
             json_data_by_stream,
             size_by_stream,
             derived_streams,
+            columnar,
         )
         .await;
         match status {
@@ -635,10 +723,10 @@ pub async fn ingest(
             }
         };
         match write_result {
-            Ok(()) => ("200", stream_status),
+            Ok(skipped) => ("200", stream_status, skipped),
             Err(e) => {
-                log::error!("Error while writing logs: {e}");
-                ("500", stream_status)
+                log::error!("[LOGS:JSON] Error while writing logs: org_id: {org_id}, error: {e}");
+                ("500", stream_status, false)
             }
         }
     };
@@ -670,10 +758,117 @@ pub async fn ingest(
             .inc();
     }
 
-    Ok(IngestionResponse::new(
-        http::StatusCode::OK.into(),
-        vec![response_body],
-    ))
+    warn_and_count_discards(org_id, endpoint, &response_body);
+
+    // A write failure used to be visible only in the metric label while the
+    // caller still saw 200. Signalled on `write_failed` and NOT on `code`, which
+    // is a serialized body field on every legacy route sharing this function.
+    Ok(
+        IngestionResponse::new(http::StatusCode::OK.into(), vec![response_body])
+            .with_write_failed(metric_rpt_status_code == "500")
+            .with_stream_skipped(stream_skipped),
+    )
+}
+
+/// Flatten a record and resolve its timestamp — the only two steps of record
+/// preparation that can reject an event.
+///
+/// Shared with the HEC collector's pre-write validation pass, which must reach
+/// the same verdict as the write does; a second implementation would drift.
+pub fn prepare_record(
+    item: json::Value,
+    flatten_level: u32,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(json::Value, i64), PrepareRecordError> {
+    let mut res =
+        flatten::flatten_with_level(item, flatten_level).map_err(PrepareRecordError::Flatten)?;
+    match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+        Ok(ts) => Ok((res, ts)),
+        Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
+    }
+}
+
+/// A body is an array of records or a single record.
+fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
+    match json::from_slice(body) {
+        Ok(records) => Ok(records),
+        Err(_) => Ok(vec![json::from_slice(body)?]),
+    }
+}
+
+/// Count one rejected record on a stream's status, separating an ingestion-window
+/// POLICY drop from a record that genuinely could not be prepared.
+///
+/// Both the pipeline and non-pipeline timestamp paths must agree here: the HEC
+/// collector reads `failed > policy_dropped` to decide code 6 vs code 0, so a
+/// window drop counted only as `failed` returns a 400 the client never retries
+/// and makes it discard its in-window events too.
+fn count_timestamp_rejection(status: &mut ingestion_common::RecordStatus, e: &anyhow::Error) {
+    status.failed += 1;
+    if schema::is_window_discard_error(e) {
+        status.policy_dropped += 1;
+    }
+    status.error = e.to_string();
+}
+
+/// True when a batch stored nothing at all, the case a 200 hides most completely.
+fn is_wholly_discarded(status: &RecordStatus) -> bool {
+    status.failed > 0 && status.successful == 0
+}
+
+/// True when a discarded batch is worth a warn at all.
+///
+/// A partial drop qualifies: a mixed batch keeps `successful > 0` forever, so a source with
+/// skewed timestamps loses records indefinitely with nothing said.
+fn warrants_discard_warn(status: &RecordStatus) -> bool {
+    status.failed > 0
+}
+
+/// Warn and count the records a success status hides.
+fn warn_and_count_discards(org_id: &str, endpoint: &str, status: &StreamStatus) {
+    if status.status.policy_dropped > 0 {
+        metrics::INGEST_RECORDS_DROPPED
+            .with_label_values(&[org_id, StreamType::Logs.as_str(), "ingestion_window"])
+            .inc_by(status.status.policy_dropped as u64);
+    }
+    if !warrants_discard_warn(&status.status) {
+        return;
+    }
+    if !discard_warn_permitted(&format!("{org_id}/{}", status.name), Instant::now()) {
+        return;
+    }
+    if is_wholly_discarded(&status.status) {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.error
+        );
+    } else {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded {} of {} record(s), {} stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.failed + status.status.successful,
+            status.status.successful,
+            status.status.error
+        );
+    }
+}
+
+/// At most one warn per stream per interval; a poisoned lock silences rather than panics.
+fn discard_warn_permitted(key: &str, now: Instant) -> bool {
+    let Ok(mut warned_at) = DISCARD_WARN_AT.lock() else {
+        return false;
+    };
+    match warned_at.get(key) {
+        Some(last) if now.duration_since(*last) < DISCARD_WARN_INTERVAL => false,
+        _ => {
+            warned_at.insert(key.to_string(), now);
+            true
+        }
+    }
 }
 
 /// Finalize a log record (flatten, resolve timestamp, apply UDS, add
@@ -687,20 +882,17 @@ fn finalize_and_buffer_record(
     original_data: Option<String>,
     ctx: &mut FinalizeRecordContext<'_>,
 ) -> bool {
-    let mut res = match flatten::flatten_with_level(item, ctx.flatten_level) {
-        Ok(r) => r,
-        Err(e) => {
+    let (mut res, timestamp) = match prepare_record(item, ctx.flatten_level, ctx.min_ts, ctx.max_ts)
+    {
+        Ok(v) => v,
+        Err(PrepareRecordError::Flatten(e)) => {
             ctx.stream_status.status.failed += 1;
             ctx.stream_status.status.error = e.to_string();
             log::error!("Record flattening error: {e}");
             return false;
         }
-    };
-    let timestamp = match handle_timestamp_for_value(&mut res, ctx.min_ts, ctx.max_ts) {
-        Ok(ts) => ts,
-        Err(e) => {
-            ctx.stream_status.status.failed += 1;
-            ctx.stream_status.status.error = e.to_string();
+        Err(PrepareRecordError::Timestamp(res, e)) => {
+            count_timestamp_rejection(&mut ctx.stream_status.status, &e);
             metrics::INGEST_ERRORS
                 .with_label_values(&[
                     ctx.org_id,
@@ -729,7 +921,9 @@ fn finalize_and_buffer_record(
     // Client-supplied `o2_dbm_*` keys are dropped first — the logs path flattens
     // user keys directly, so without this a caller could spoof a deadlock event
     // (the same exposure D1 condition 1 closes for spans).
-    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+    if ctx.dbm_enabled {
+        crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
+    }
 
     if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
         local_val = crate::ingestion::refactor_map(local_val, fields);
@@ -965,7 +1159,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                     value = json::to_value(event)?;
                     let local_val = value
                         .as_object_mut()
-                        .ok_or(anyhow::anyhow!("Error to convert Value to object"))?;
+                        .ok_or_else(|| anyhow::anyhow!("Error to convert Value to object"))?;
 
                     local_val.insert("requestId".to_owned(), request_id.into());
                     local_val.insert(
@@ -1013,22 +1207,21 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                 let timestamp = kfh_metric_data.timestamp;
 
                 let mut parsed_metric_value = json::to_value(kfh_metric_data)?;
-                let local_parsed_metric_value = parsed_metric_value.as_object_mut().ok_or(
-                    anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object"),
-                )?;
+                let local_parsed_metric_value =
+                    parsed_metric_value.as_object_mut().ok_or_else(|| {
+                        anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object")
+                    })?;
 
-                for (value_name, value_val) in values.as_object().ok_or(anyhow::anyhow!(
-                    "CloudWatch metrics failed to Metric Value Object"
-                ))? {
+                for (value_name, value_val) in values.as_object().ok_or_else(|| {
+                    anyhow::anyhow!("CloudWatch metrics failed to Metric Value Object")
+                })? {
                     local_parsed_metric_value.insert(value_name.to_owned(), value_val.to_owned());
                 }
                 local_parsed_metric_value.remove("value");
 
                 let metric_dimensions = dimensions
                     .as_object()
-                    .ok_or(anyhow::anyhow!(
-                        "CloudWatch metrics dimensions parsing failed"
-                    ))?
+                    .ok_or_else(|| anyhow::anyhow!("CloudWatch metrics dimensions parsing failed"))?
                     .iter()
                     .map(|(k, v)| format!("{k}=[{v}]"))
                     .collect::<Vec<_>>()
@@ -1187,9 +1380,140 @@ fn construct_values_from_open_telemetry_v1_metric(
 #[cfg(test)]
 mod tests {
 
+    use config::meta::self_reporting::{
+        redaction::REDACTION_EVIDENCE_STREAM,
+        usage::{
+            AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM, TRIGGERS_STREAM,
+            USAGE_STREAM,
+        },
+    };
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
+
+    /// A bulk ingest returned 200 while dropping every record as "Too old data", and
+    /// nothing server-side said so. The status code has to stay 200 — clients and
+    /// OpenObserve's own self-reporting retry a non-2xx, and "too old" never becomes
+    /// ingestible — so the total loss must be detected here to be logged.
+    #[test]
+    fn a_batch_that_stored_nothing_is_reported_as_wholly_discarded() {
+        let all_dropped = RecordStatus {
+            successful: 0,
+            failed: 1000,
+            policy_dropped: 1000,
+            error: "Too old data, only last 5 hours data can be ingested".to_string(),
+        };
+        assert!(is_wholly_discarded(&all_dropped));
+    }
+
+    /// A partial failure still stored data, and a clean batch failed nothing: neither is the
+    /// silent total loss, and warning on them would train operators to ignore the line.
+    #[test]
+    fn a_partial_or_clean_batch_is_not_wholly_discarded() {
+        let partial = RecordStatus {
+            successful: 57,
+            failed: 6_567,
+            policy_dropped: 6_567,
+            error: "Too old data".to_string(),
+        };
+        assert!(!is_wholly_discarded(&partial));
+        assert!(!is_wholly_discarded(&RecordStatus::default()));
+        assert!(!is_wholly_discarded(&RecordStatus {
+            successful: 10,
+            failed: 0,
+            policy_dropped: 0,
+            error: String::new(),
+        }));
+    }
+
+    #[test]
+    fn a_partial_drop_warrants_a_warn_even_though_the_batch_stored_records() {
+        let partial = RecordStatus {
+            successful: 9,
+            failed: 1,
+            policy_dropped: 1,
+            error: "too old".to_string(),
+        };
+        // The regression: gating the warn on `is_wholly_discarded` alone skips this,
+        // so a skewed source loses records indefinitely with nothing logged.
+        assert!(!is_wholly_discarded(&partial));
+        assert!(warrants_discard_warn(&partial));
+
+        // A batch that stored everything stays silent.
+        assert!(!warrants_discard_warn(&RecordStatus {
+            successful: 10,
+            failed: 0,
+            policy_dropped: 0,
+            error: String::new(),
+        }));
+    }
+
+    #[test]
+    fn a_policy_drop_increments_the_dropped_counter() {
+        let mut status = StreamStatus::new("s");
+        status.status = RecordStatus {
+            successful: 9,
+            failed: 1,
+            policy_dropped: 1,
+            error: "too old".to_string(),
+        };
+        let counter = metrics::INGEST_RECORDS_DROPPED
+            .get_metric_with_label_values(&["org_partial_drop", "logs", "ingestion_window"])
+            .unwrap();
+        let before = counter.get();
+
+        warn_and_count_discards("org_partial_drop", "/test", &status);
+
+        assert_eq!(counter.get(), before + 1);
+    }
+
+    /// The interval throttles per stream, so one bad client cannot drown the log.
+    #[test]
+    fn wholly_discarded_warns_are_rate_limited_per_stream() {
+        let now = Instant::now();
+        assert!(discard_warn_permitted("org_rl/stream_a", now));
+        assert!(!discard_warn_permitted("org_rl/stream_a", now));
+        assert!(!discard_warn_permitted(
+            "org_rl/stream_a",
+            now + DISCARD_WARN_INTERVAL - Duration::from_secs(1)
+        ));
+        assert!(discard_warn_permitted(
+            "org_rl/stream_a",
+            now + DISCARD_WARN_INTERVAL
+        ));
+        // Another stream is its own bucket.
+        assert!(discard_warn_permitted("org_rl/stream_b", now));
+    }
+
+    #[test]
+    fn a_window_drop_is_counted_as_a_policy_drop_on_both_timestamp_paths() {
+        // §11.1: the pipeline path timestamps the pipeline OUTPUT and used to
+        // count only `failed`, so one out-of-window event in a pipeline-attached
+        // HEC stream answered 400/code 6 and the client dropped its in-window
+        // events with it. Both paths now route through this one helper.
+        let mut status = ingestion_common::RecordStatus::default();
+        count_timestamp_rejection(&mut status, &schema::get_upto_discard_error());
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.policy_dropped, 1);
+
+        count_timestamp_rejection(&mut status, &schema::get_future_discard_error());
+        assert_eq!(status.failed, 2);
+        assert_eq!(status.policy_dropped, 2);
+
+        // The collector's code-0 test: nothing but window drops.
+        assert!(status.failed <= status.policy_dropped);
+    }
+
+    #[test]
+    fn a_malformed_timestamp_is_not_a_policy_drop() {
+        let mut status = ingestion_common::RecordStatus::default();
+        count_timestamp_rejection(&mut status, &anyhow::anyhow!("Can't parse timestamp"));
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.policy_dropped, 0);
+        // Which is what the collector turns into code 6.
+        assert!(status.failed > status.policy_dropped);
+        assert_eq!(status.error, "Can't parse timestamp");
+    }
 
     #[test]
     fn test_internal_rollup_write_guard_blocks_users_in_all_editions() {
@@ -1235,6 +1559,50 @@ mod tests {
             &user,
             true
         ));
+    }
+
+    #[test]
+    fn test_should_apply_sdr_exempts_only_self_reporting_streams() {
+        for stream in [REDACTION_EVIDENCE_STREAM, USAGE_STREAM, TRIGGERS_STREAM] {
+            assert!(
+                !should_apply_sdr("any_org", stream),
+                "{stream} is per-org and must not be scanned in any org"
+            );
+        }
+        for stream in [
+            AUDIT_STREAM,
+            ERROR_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+        ] {
+            assert!(
+                !should_apply_sdr(config::META_ORG_ID, stream),
+                "{stream} must not be scanned in the meta org"
+            );
+        }
+    }
+
+    #[test]
+    fn test_should_apply_sdr_scans_customer_streams() {
+        // The gRPC funnel stamps InternalGrpc on these too, and they carry customer data.
+        for stream in ["default", "app_logs", "_o2_service_graph", "k8s_events"] {
+            assert!(should_apply_sdr("acme", stream), "{stream} must be scanned");
+        }
+    }
+
+    #[test]
+    fn a_customer_stream_named_like_a_meta_only_one_is_still_scanned() {
+        for stream in [
+            AUDIT_STREAM,
+            ERROR_STREAM,
+            STATS_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+        ] {
+            assert!(
+                should_apply_sdr("acme", stream),
+                "acme/{stream} is customer data and must be scanned"
+            );
+        }
     }
 
     #[test]
@@ -1426,5 +1794,18 @@ mod tests {
             extract_resource_id_from_amazon_resource_number(arn),
             "resource-id"
         );
+    }
+
+    #[test]
+    fn test_parse_json_body_takes_an_array_or_a_single_record() {
+        assert_eq!(
+            parse_json_body(br#"[{"a":1},{"b":2}]"#).unwrap(),
+            vec![json::json!({"a": 1}), json::json!({"b": 2})]
+        );
+        assert_eq!(
+            parse_json_body(br#"{"a":1}"#).unwrap(),
+            vec![json::json!({"a": 1})]
+        );
+        assert!(parse_json_body(br#"[{"a":1}"#).is_err());
     }
 }

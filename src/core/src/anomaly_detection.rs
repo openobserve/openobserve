@@ -13,6 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, RwLock},
+    time::{Duration, Instant},
+};
+
 use anyhow::Result;
 use chrono::Utc;
 use config::{
@@ -37,6 +44,87 @@ use utoipa::ToSchema;
 
 use crate::{alerts::destinations, common::meta::authz::Authz};
 
+/// G4. Words that name an error subset rather than a population, matched as whole tokens so
+/// an unrelated stream cannot be caught by a substring.
+const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5xx", "50x"];
+
+/// G4. The 5xx band, half-open. 4xx is deliberately outside it: structurally the same fault,
+/// but it has legitimate standalone uses and no measured failure behind it.
+const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
+
+/// The web form states the same floor through its own i18n key; the two are kept in step by hand.
+const WINDOW_FLOOR_RULE: &str =
+    "detection_window_seconds must be at least schedule_interval plus histogram_interval";
+
+/// Value column names tried when a config declares none. Kept so configs created before
+/// `value_column` existed keep resolving exactly as they did.
+#[cfg(feature = "enterprise")]
+const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
+
+/// Timestamp column names a result row is read from, in priority order. `zo_sql_timestamp`
+/// is the histogram alias the Logs page generates, so queries copied from there train as-is.
+#[cfg(feature = "enterprise")]
+const TIMESTAMP_COLUMNS: [&str; 5] = [
+    "_timestamp",
+    "timestamp",
+    "time",
+    "time_bucket",
+    "zo_sql_timestamp",
+];
+
+/// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
+#[cfg(feature = "enterprise")]
+const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
+
+/// Keyed `(org_id, anomaly_id)` so per-tick detection stops PK-reading the meta primary.
+#[cfg(feature = "enterprise")]
+static VALUE_COLUMN_CACHE: LazyLock<RwLock<ValueColumnCache>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Lowercased aggregations the trainer's `DetectionFunction` can deserialize. A name
+/// accepted here but unknown there persists a config that can never train.
+const SUPPORTED_DETECTION_FUNCTIONS: [&str; 8] =
+    ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
+
+/// Lowercased operators the enterprise query builder can express, mirroring its
+/// `build_single_filter` arms and the UI's `ANOMALY_FILTER_OPERATORS`. All three must move
+/// together: an operator accepted here but unknown there yields an unfiltered query.
+const SUPPORTED_FILTER_OPERATORS: [&str; 30] = [
+    "=",
+    "equals",
+    "eq",
+    "!=",
+    "<>",
+    "not_equals",
+    "neq",
+    ">=",
+    "<=",
+    ">",
+    "<",
+    "contains",
+    "not contains",
+    "not_contains",
+    "starts with",
+    "starts_with",
+    "ends with",
+    "ends_with",
+    "is null",
+    "is_null",
+    "is not null",
+    "is_not_null",
+    "in",
+    "not in",
+    "not_in",
+    "str_match",
+    "str_match_ignore_case",
+    "match_all",
+    "re_match",
+    "re_not_match",
+];
+
+#[cfg(feature = "enterprise")]
+type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
@@ -53,7 +141,19 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_window_seconds: i64,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
+    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    #[serde(
+        default,
+        alias = "threshold",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub percentile: Option<f64>,
+    /// Delivered-alert budget per day; mutually exclusive with `percentile` in one request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_budget_per_day: Option<f64>,
+    /// Absent keeps the one-day default; the response echoes the stored value, not the clamp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_half_width_seconds: Option<i64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -104,7 +204,30 @@ pub struct UpdateAnomalyConfigRequest {
     pub schedule_interval: Option<String>,
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
+    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    #[serde(
+        default,
+        alias = "threshold",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub percentile: Option<f64>,
+    /// Double-option like `priority`: `None` leaves the stored budget, `Some(None)` clears it
+    /// (back to percentile mode), `Some(Some(b))` sets it. A plain Option could never clear.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_budget_per_day: Option<Option<f64>>,
+    /// Double-option: `Some(None)` clears back to the default, which `Option` cannot express.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<i64>)]
+    pub level_half_width_seconds: Option<Option<i64>>,
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
     pub alert_destinations: Option<Vec<String>>,
@@ -151,16 +274,15 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
     }
 
     // Auto-create the default Alerts folder on first use, same as alert::create does.
-    if name == DEFAULT_FOLDER {
-        if crate::folders::ensure_default_folder(org_id, FolderType::Alerts)
+    if name == DEFAULT_FOLDER
+        && crate::folders::ensure_default_folder(org_id, FolderType::Alerts)
             .await
             .is_ok()
-        {
-            return infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
-                .await
-                .ok()
-                .flatten();
-        }
+    {
+        return infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
+            .await
+            .ok()
+            .flatten();
     }
 
     None
@@ -197,7 +319,56 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
             serde_json::Value::String(status_label(s as i32).to_string()),
         );
     }
+    add_effective_shingle_size(&mut val);
+    add_notice_class(&mut val);
     val
+}
+
+/// Report the width the model is actually trained at alongside the requested one: the stored
+/// column is only the request, and the span derivation routinely overrides it (a sub-hourly
+/// config stores the default 4 and trains at 1), so reading it alone misleads.
+fn add_effective_shingle_size(val: &mut serde_json::Value) {
+    let Some(obj) = val.as_object_mut() else {
+        return;
+    };
+    let (Some(configured), Some(interval), Some(window_days), Some(tree_size)) = (
+        obj.get("rcf_shingle_size").and_then(|v| v.as_i64()),
+        obj.get("histogram_interval").and_then(|v| v.as_str()),
+        obj.get("training_window_days").and_then(|v| v.as_i64()),
+        obj.get("rcf_tree_size").and_then(|v| v.as_i64()),
+    ) else {
+        return;
+    };
+    if let Some(effective) =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            configured as i32,
+            interval,
+            window_days as i32,
+            tree_size as i32,
+        )
+    {
+        obj.insert(
+            "effective_rcf_shingle_size".to_string(),
+            serde_json::Value::from(effective),
+        );
+    }
+}
+
+/// §4.8: the UI keys on this class, never on the enterprise notice text riding `last_error`.
+fn add_notice_class(val: &mut serde_json::Value) {
+    let Some(obj) = val.as_object_mut() else {
+        return;
+    };
+    let class = obj
+        .get("last_error")
+        .and_then(|v| v.as_str())
+        .and_then(o2_enterprise::enterprise::anomaly_detection::scheduler::notice_class);
+    obj.insert(
+        "notice_class".to_string(),
+        class.map_or(serde_json::Value::Null, |c| {
+            serde_json::Value::String(c.to_string())
+        }),
+    );
 }
 
 /// Merge the run state the scheduler recorded on the trigger into a config row.
@@ -370,10 +541,10 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
 /// Create a new anomaly detection configuration
 pub async fn create_config(
     org_id: &str,
-    req: CreateAnomalyConfigRequest,
+    mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
-    // Validate request
-    validate_config_request(&req)?;
+    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
+    validate_config_request(&req).map_err(validation_error)?;
 
     // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
     // means the same thing on both. Kept typed, not stringified, so the API
@@ -396,6 +567,25 @@ pub async fn create_config(
         .await
         .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
 
+    let resolved_threshold = clamped_threshold(req.percentile.unwrap_or(DEFAULT_PERCENTILE));
+    let resolved_tree_size = req.rcf_tree_size.unwrap_or(
+        o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .rcf_tree_size as i32,
+    );
+    let resolved_training_window_days = resolved_training_window_days(
+        req.training_window_days,
+        &req.histogram_interval,
+        resolved_threshold as f64,
+        resolved_tree_size,
+    );
+    let starvation_warning = training_window_starvation_warning(
+        &req.histogram_interval,
+        resolved_training_window_days,
+        resolved_threshold as f64,
+        resolved_tree_size,
+    );
+
     use infra::table::entity::anomaly_detection_config::Model as ConfigModel;
     let new_config = ConfigModel {
         anomaly_id: anomaly_id.clone(),
@@ -415,29 +605,25 @@ pub async fn create_config(
         histogram_interval: req.histogram_interval.clone(),
         schedule_interval: req.schedule_interval.clone(),
         detection_window_seconds: req.detection_window_seconds,
-        training_window_days: req.training_window_days.unwrap_or(7),
+        training_window_days: resolved_training_window_days,
         retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
-        // Store percentile as i32 (e.g. 97.0 → 97). Whole-number percentiles are
-        // sufficient; the valid range is 50–99 and we clamp at the model level.
-        threshold: req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32,
+        threshold: resolved_threshold,
+        alert_budget_per_day: req.alert_budget_per_day,
         is_trained: false,
         training_started_at: None,
         training_completed_at: None,
         last_error: None,
         last_processed_timestamp: None,
         current_model_version: 0,
+        // Unclamped on purpose: clamping here would freeze today's bounds into the row.
+        level_half_width_seconds: req.level_half_width_seconds,
         rcf_num_trees: req.rcf_num_trees.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
                 .rcf_num_trees as i32,
         ),
-        rcf_tree_size: req.rcf_tree_size.unwrap_or(
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_tree_size as i32,
-        ),
-        // shingle_size default comes from O2_ANOMALY_RCF_SHINGLE_SIZE env var (default=4).
-        // 4 consecutive time-buckets gives the RCF model enough temporal context.
+        rcf_tree_size: resolved_tree_size,
+        // Buckets of context per score, so the span is this times histogram_interval.
         rcf_shingle_size: req.rcf_shingle_size.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
@@ -461,6 +647,9 @@ pub async fn create_config(
         },
         status: 0i32, // 0 = waiting
         retries: 0,
+        last_failed_at: None,
+        last_alert_fired_at: None,
+        last_recovery_notified_at: None,
         last_updated: now_us,
         // Seasonality is auto-determined at training time from training_window_days;
         // initialise to "none" as a placeholder until the first training run.
@@ -469,6 +658,8 @@ pub async fn create_config(
         updated_at: now_us,
     };
 
+    #[cfg(feature = "enterprise")]
+    let created_enabled = new_config.enabled;
     let result = anomaly_config_table::create(db, new_config)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -523,10 +714,12 @@ pub async fn create_config(
     // Immediately kick off training in the background rather than waiting up to
     // `training_check_interval_seconds` (default 1h) for the scheduler tick.
     #[cfg(feature = "enterprise")]
-    if !o2_enterprise::enterprise::common::config::get_config()
-        .anomaly_detection
-        .disabled
-    {
+    if initial_training_allowed(
+        created_enabled,
+        o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .disabled,
+    ) {
         let anomaly_id_for_training = anomaly_id.clone();
         tokio::spawn(async move {
             if let Err(e) =
@@ -545,11 +738,20 @@ pub async fn create_config(
     }
 
     let mut val = serde_json::to_value(result)?;
+    // §4.8: this path bypasses model_to_api_json, so the class is added here too.
+    add_notice_class(&mut val);
     if let Some(obj) = val.as_object_mut() {
         obj.insert(
             "folder_id".to_string(),
             serde_json::Value::String(folder_name_owned),
         );
+        // Returned not refused, since starved shapes serve today — but NO surface reads this key.
+        if let Some(warning) = starvation_warning {
+            obj.insert(
+                "training_window_warning".to_string(),
+                serde_json::Value::String(warning),
+            );
+        }
     }
     Ok(val)
 }
@@ -558,7 +760,7 @@ pub async fn create_config(
 pub async fn update_config(
     org_id: &str,
     anomaly_id: &str,
-    req: UpdateAnomalyConfigRequest,
+    mut req: UpdateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
     let db = get_orm_client_rw().await;
 
@@ -569,9 +771,39 @@ pub async fn update_config(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
+    // Normalized before the gates, as create does: `{}` and `null` persist as `[]`, so a gate
+    // comparing the raw value would read them as a change and re-litigate a grandfathered row
+    // over an edit that leaves the stored filters exactly as they were. Kept after the fetch
+    // so a request against a missing config still answers 404 rather than 400.
+    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
+
     // Remember the pre-update threshold so we can detect an actual change below and, if so,
     // recompute the trained model's cutoff in place without a retrain.
     let previous_threshold = existing.threshold;
+    let previous = existing.clone();
+    // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
+    // folder move or tag edit cannot reset the counter on dozens of configs at once.
+    let mut retryable_change = false;
+
+    validated_intervals(&req, &existing).map_err(validation_error)?;
+    validated_detection_window(&req, &existing).map_err(validation_error)?;
+    validated_detection_function(&req, &existing).map_err(validation_error)?;
+    validated_custom_sql(&req, &existing).map_err(validation_error)?;
+    validated_denominator(&req, &existing).map_err(validation_error)?;
+    validated_budget_update(
+        req.percentile,
+        req.alert_budget_per_day,
+        existing.alert_budget_per_day,
+        existing.threshold,
+    )
+    .map_err(validation_error)?;
+    // `Some(None)` clears back to the default and needs no bound; only an explicit value does.
+    if let Some(Some(half_width)) = req.level_half_width_seconds {
+        validate_level_half_width(half_width).map_err(validation_error)?;
+    }
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days).map_err(validation_error)?;
+    }
 
     let mut active_model = existing.into_active_model();
 
@@ -625,21 +857,43 @@ pub async fn update_config(
             }
             _ => {}
         }
+        retryable_change |= previous.query_mode != query_mode;
         active_model.query_mode = Set(query_mode);
     }
-    if let Some(filters) = req.filters {
+    if let Some(filters) = normalize_request_filters(req.filters).map_err(validation_error)? {
+        // Compared as rows so NULL, `{}` and `[]` all read as the same "no filters".
+        let rows = |v: Option<&serde_json::Value>| {
+            v.and_then(|v| v.as_array()).cloned().unwrap_or_default()
+        };
+        retryable_change |= rows(previous.filters.as_ref()) != rows(Some(&filters));
         active_model.filters = Set(Some(filters));
     }
     if let Some(custom_sql) = req.custom_sql {
+        retryable_change |= previous.custom_sql.as_deref() != Some(custom_sql.as_str());
         active_model.custom_sql = Set(Some(custom_sql));
     }
     if let Some(detection_function) = req.detection_function {
-        active_model.detection_function = Set(combine_detection_fn(
-            &detection_function,
-            req.detection_function_field.as_deref(),
-        ));
+        let combined =
+            combine_detection_fn(&detection_function, req.detection_function_field.as_deref());
+        retryable_change |= previous.detection_function != combined;
+        active_model.detection_function = Set(combined);
     }
     if let Some(histogram_interval) = req.histogram_interval {
+        if previous.histogram_interval != histogram_interval {
+            retryable_change = true;
+            // §4.2: the edit redefines the grid, so judgment restarts — cursor and watermark.
+            active_model.last_processed_timestamp = Set(None);
+            if let Err(e) =
+                o2_enterprise::enterprise::anomaly_detection::storage::delete_graded_until_blob(
+                    org_id, anomaly_id,
+                )
+                .await
+            {
+                log::warn!(
+                    "[anomaly_detection {anomaly_id}] failed to clear the grading watermark on an interval edit: {e}"
+                );
+            }
+        }
         active_model.histogram_interval = Set(histogram_interval);
     }
     if let Some(schedule_interval) = req.schedule_interval {
@@ -652,14 +906,24 @@ pub async fn update_config(
         active_model.detection_window_seconds = Set(detection_window_seconds);
     }
     if let Some(percentile) = req.percentile {
-        let clamped = percentile.clamp(50.0, 99.9) as i32;
+        let clamped = clamped_threshold(percentile);
         active_model.threshold = Set(clamped);
         if clamped != previous_threshold {
             new_threshold = Some(clamped);
         }
     }
+    if let Some(budget) = req.alert_budget_per_day {
+        active_model.alert_budget_per_day = Set(budget);
+    }
     if let Some(training_window_days) = req.training_window_days {
-        active_model.training_window_days = Set(training_window_days.max(1));
+        let clamped = training_window_days.max(1);
+        retryable_change |= previous.training_window_days != clamped;
+        active_model.training_window_days = Set(clamped);
+    }
+    if let Some(half_width) = req.level_half_width_seconds {
+        // Retryable: it changes the level the baseline is fitted with, so the model is stale.
+        retryable_change |= previous.level_half_width_seconds != half_width;
+        active_model.level_half_width_seconds = Set(half_width);
     }
     if let Some(retrain_interval_days) = req.retrain_interval_days {
         active_model.retrain_interval_days = Set(retrain_interval_days);
@@ -700,6 +964,11 @@ pub async fn update_config(
         });
     }
 
+    // A repaired config must not sit out the inherited backoff before it is retried.
+    if retryable_change {
+        active_model.retries = Set(0);
+    }
+
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
     let updated = active_model.update(db).await?;
@@ -709,6 +978,8 @@ pub async fn update_config(
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&updated.anomaly_id)
         .await;
+    #[cfg(feature = "enterprise")]
+    invalidate_value_column_cache(org_id, anomaly_id);
 
     // If the threshold (percentile) changed on a trained config, recompute the model's baked
     // cutoff in place from its persisted training-score distribution — no retrain needed. This
@@ -845,6 +1116,8 @@ pub async fn update_config(
 
     let name = pk_to_name(Some(&updated.folder_id)).await;
     let mut val = serde_json::to_value(updated)?;
+    // §4.8: this path bypasses model_to_api_json, so the class is added here too.
+    add_notice_class(&mut val);
     if let Some(obj) = val.as_object_mut() {
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
@@ -966,6 +1239,8 @@ pub async fn clone_config(
         training_window_days: src.training_window_days,
         retrain_interval_days: src.retrain_interval_days,
         threshold: src.threshold,
+        alert_budget_per_day: src.alert_budget_per_day,
+        level_half_width_seconds: src.level_half_width_seconds,
         seasonality: src.seasonality.clone(),
         is_trained: false,
         training_started_at: None,
@@ -987,6 +1262,9 @@ pub async fn clone_config(
         tags: src.tags.clone(),
         status: 0i32,
         retries: 0,
+        last_failed_at: None,
+        last_alert_fired_at: None,
+        last_recovery_notified_at: None,
         last_updated: now_us,
         created_at: now_us,
         updated_at: now_us,
@@ -1065,6 +1343,9 @@ async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
+    // Precedes the queue-reset writes below: a disabled config must not be left mid-transition.
+    ensure_trainable(&config)?;
+
     // Don't clobber an in-flight (re)train: a training run already bakes the latest
     // `config.threshold`, so the new percentile will land in the model it produces. Resetting
     // status/is_trained here would interrupt it for no benefit.
@@ -1110,6 +1391,8 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     let mut active = config.into_active_model();
     // Status 0 = Waiting — back to the queue so the user can re-trigger training.
     active.status = Set(0i32);
+    // The scheduler's queued fast-path needs retries == 0, so without this it never re-queues.
+    active.retries = Set(0);
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
@@ -1123,10 +1406,12 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
 pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
     // Verify the config exists and belongs to this org before delegating.
     let db = get_orm_client_ro().await;
-    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
+
+    ensure_trainable(&config)?;
 
     #[cfg(feature = "enterprise")]
     {
@@ -1237,31 +1522,13 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         }
 
         // Send alert if anomalies found and alert is configured
-        if result.anomaly_count > 0 && config.alert_enabled {
+        if dispatch_allowed(result.anomaly_count, config.alert_enabled) {
             let destinations: Vec<String> = config
                 .alert_destinations
                 .as_ref()
                 .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
                 .unwrap_or_default();
             if !destinations.is_empty() {
-                let anomaly_pts: Vec<_> = result
-                    .scored_points
-                    .iter()
-                    .filter(|p| p.is_anomaly)
-                    .collect();
-                let max_dev = anomaly_pts
-                    .iter()
-                    .map(|p| p.deviation_percent)
-                    .fold(0.0f64, f64::max);
-                let worst_val = anomaly_pts
-                    .iter()
-                    .max_by(|a, b| {
-                        a.deviation_percent
-                            .partial_cmp(&b.deviation_percent)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .map(|p| p.actual_value)
-                    .unwrap_or(0.0);
                 let window_start = result
                     .scored_points
                     .iter()
@@ -1274,22 +1541,24 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                     .map(|p| p.timestamp)
                     .max()
                     .unwrap_or(end_time_us);
+                // The scheduler's builder, so the two dispatchers cannot disagree on kind.
+                let ctx = o2_enterprise::enterprise::anomaly_detection::types::build_alert_context(
+                    &result.scored_points,
+                    &o2_enterprise::enterprise::anomaly_detection::types::AlertContextIdent {
+                        org_id,
+                        config_name: &config.name,
+                        anomaly_id,
+                        anomaly_count: result.anomaly_count,
+                        stream_name: &config.stream_name,
+                        window_start_us: window_start,
+                        window_end_us: window_end,
+                    },
+                );
 
+                let mut outcomes = Vec::with_capacity(destinations.len());
                 for dest_id in destinations {
-                    if let Err(e) = send_anomaly_alert(
-                        org_id.to_string(),
-                        dest_id.clone(),
-                        config.name.clone(),
-                        anomaly_id.to_string(),
-                        result.anomaly_count,
-                        config.stream_name.clone(),
-                        max_dev,
-                        worst_val,
-                        window_start,
-                        window_end,
-                    )
-                    .await
-                    {
+                    let sent = send_anomaly_alert(dest_id.clone(), ctx.clone()).await;
+                    if let Err(e) = &sent {
                         log::warn!(
                             "[anomaly_detection {}] failed to send alert to '{}': {}",
                             anomaly_id,
@@ -1297,6 +1566,24 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                             e
                         );
                     }
+                    outcomes.push(sent);
+                }
+                let delivered = any_alert_delivered(outcomes);
+
+                // Anchored on the alerting point's data time; an all-failed send arms nothing.
+                if delivered
+                    && let Some(fired_at_us) = leading_edge_anchor_us(
+                        result
+                            .scored_points
+                            .iter()
+                            .map(|p| (p.is_anomaly, p.timestamp)),
+                    )
+                {
+                    o2_enterprise::enterprise::anomaly_detection::scheduler::record_manual_alert_delivery(
+                        anomaly_id,
+                        fired_at_us,
+                    )
+                    .await;
                 }
             }
         }
@@ -1339,6 +1626,38 @@ pub struct DetectionHistoryItem {
     pub timestamp: i64,
     pub anomalies_detected: usize,
     pub points_scored: usize,
+}
+
+/// G4. Whether a detection target carries the denominator its aggregation needs.
+/// `NotACount` is distinct from `Present` so the gate cannot silently widen from counts
+/// to every aggregation without a test noticing.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DenominatorVerdict {
+    Present,
+    Absent,
+    NotACount,
+}
+
+/// The fields that decide WHICH series a config scores, merged across a partial update.
+/// G4 fires only when a request moves one of these off its persisted value.
+struct SeriesDefinition {
+    detection_function: String,
+    query_mode: String,
+    filters: Option<serde_json::Value>,
+    custom_sql: Option<String>,
+    stream_name: String,
+}
+
+impl SeriesDefinition {
+    /// The inputs G4 reads. The bucket size is excluded: it cannot create or remove a
+    /// denominator, so an interval edit must not drag a grandfathered row through the gate.
+    fn defines_the_same_query_as(&self, other: &Self) -> bool {
+        self.detection_function == other.detection_function
+            && self.query_mode == other.query_mode
+            && filter_rows(self.filters.as_ref()) == filter_rows(other.filters.as_ref())
+            && self.custom_sql == other.custom_sql
+            && self.stream_name == other.stream_name
+    }
 }
 
 /// Startup recovery: ensure every enabled anomaly config has a live detection trigger
@@ -1413,11 +1732,1062 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
         anyhow::bail!("custom_sql required when query_mode is 'custom_sql'");
     }
 
-    // Validate interval strings
-    parse_interval(&req.histogram_interval)?;
-    parse_interval(&req.schedule_interval)?;
+    validated_budget_create(req.percentile, req.alert_budget_per_day)?;
+    if let Some(half_width) = req.level_half_width_seconds {
+        validate_level_half_width(half_width)?;
+    }
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days)?;
+    }
 
+    // Delegated so create and update cannot drift to two differently-worded rules.
+    validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
+    validate_detection_window(
+        &req.schedule_interval,
+        &req.histogram_interval,
+        req.detection_window_seconds,
+    )?;
+
+    // §4.1.1: a custom query's own histogram() must sit on the config's grid.
+    if req.query_mode == "custom_sql"
+        && let Some(sql) = req.custom_sql.as_deref()
+    {
+        validate_custom_sql_grid(sql, &req.histogram_interval)?;
+    }
+
+    // The COMBINED form is what the row stores, what update sees, and what the trainer reads,
+    // so both rules below are spelled against it rather than the two raw fields.
+    let combined = combine_detection_fn(
+        &req.detection_function,
+        req.detection_function_field.as_deref(),
+    );
+
+    validate_denominator(
+        &combined,
+        &req.stream_name,
+        &req.query_mode,
+        req.filters.as_ref(),
+        req.custom_sql.as_deref(),
+    )?;
+
+    // Last, because G4 reads a count case-insensitively: `COUNT(*)` has to reach the
+    // denominator verdict before this stricter spelling rule can short-circuit it.
+    validate_detection_function(&combined)
+}
+
+/// Splits a combined `fn(field)` into its parts; a bare name yields no field.
+fn split_combined_detection_fn(combined: &str) -> Result<(&str, Option<&str>)> {
+    let combined = combined.trim();
+    let Some((name, rest)) = combined.split_once('(') else {
+        return Ok((combined, None));
+    };
+    let Some(field) = rest.strip_suffix(')') else {
+        anyhow::bail!("detection_function is malformed: {combined}");
+    };
+    Ok((name.trim(), Some(field.trim())))
+}
+
+/// Rejects an aggregation the trainer cannot deserialize, and a non-count one with no field:
+/// both persist a config that saves with a 200 and then fails every training run.
+///
+/// Matched case-SENSITIVELY on purpose. The trainer does
+/// `serde_json::from_str("\"{name}\"")` into its `DetectionFunction`, and serde matches
+/// variants exactly, so `AVG` is as untrainable as `p75`. Lowercasing here would widen this
+/// gate past the one it is mirroring and re-open the bug for a different spelling.
+fn validate_detection_function(combined: &str) -> Result<()> {
+    let (name, field) = split_combined_detection_fn(combined)?;
+    if !SUPPORTED_DETECTION_FUNCTIONS.contains(&name) {
+        if SUPPORTED_DETECTION_FUNCTIONS.contains(&name.to_ascii_lowercase().as_str()) {
+            anyhow::bail!(
+                "detection_function is case-sensitive: use '{}', not '{name}'",
+                name.to_ascii_lowercase()
+            );
+        }
+        anyhow::bail!(
+            "unsupported detection_function: {name}. Supported: {}",
+            SUPPORTED_DETECTION_FUNCTIONS.join(", ")
+        );
+    }
+    // `count` is the one aggregation with no operand; every other reads a column.
+    if name == "count" {
+        return Ok(());
+    }
+    match field {
+        Some(f) if !f.is_empty() && f != "*" => Ok(()),
+        _ => anyhow::bail!("detection_function {name} requires detection_function_field"),
+    }
+}
+
+/// A budget the meter arithmetic cannot enforce (0, negative, NaN, inf) must never be stored.
+fn validate_budget_value(budget: f64) -> Result<()> {
+    if !budget.is_finite() || budget <= 0.0 {
+        anyhow::bail!("alert_budget_per_day must be a finite value greater than 0");
+    }
     Ok(())
+}
+
+/// Bounded at the API, not only clamped at fit time, so a typo cannot store an ignored value.
+fn validate_level_half_width(half_width_seconds: i64) -> Result<()> {
+    const ONE_YEAR_SECONDS: i64 = 365 * 86_400;
+    if half_width_seconds <= 0 {
+        anyhow::bail!("level_half_width_seconds must be greater than 0");
+    }
+    if half_width_seconds > ONE_YEAR_SECONDS {
+        anyhow::bail!(
+            "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the \
+             level window must fit inside the training window"
+        );
+    }
+    Ok(())
+}
+
+/// `0` is "Never"; a negative value would put the due-time in the future and retrain on every tick.
+fn validate_retrain_interval_days(days: i32) -> Result<()> {
+    const MAX_RETRAIN_INTERVAL_DAYS: i32 = 36_500;
+    if days < 0 {
+        anyhow::bail!("retrain_interval_days must be 0 (never) or greater");
+    }
+    if days > MAX_RETRAIN_INTERVAL_DAYS {
+        anyhow::bail!(
+            "retrain_interval_days must be at most {MAX_RETRAIN_INTERVAL_DAYS} (100 years); \
+             use 0 to never auto-retrain"
+        );
+    }
+    Ok(())
+}
+
+/// Create-time rule: one sensitivity primitive per request, never both.
+fn validated_budget_create(percentile: Option<f64>, budget: Option<f64>) -> Result<()> {
+    if percentile.is_some() && budget.is_some() {
+        anyhow::bail!("supply either percentile or alert_budget_per_day, not both");
+    }
+    if let Some(b) = budget {
+        validate_budget_value(b)?;
+    }
+    Ok(())
+}
+
+/// The ceiling reads 99 because the column is `i32`: `99.9 as i32` is already 99.
+fn clamped_threshold(percentile: f64) -> i32 {
+    if percentile.is_nan() {
+        return DEFAULT_PERCENTILE as i32;
+    }
+    percentile.clamp(50.0, MAX_STORABLE_PERCENTILE) as i32
+}
+
+/// The derivation only ever WIDENS, so fine cadences keep the shipped default.
+const DERIVED_WINDOW_FLOOR_DAYS: i32 = 7;
+
+/// Past this the honest requirement stops being advice an operator can act on.
+const MAX_ADVISABLE_WINDOW_DAYS: usize = 365;
+
+/// Past a month, provisioning the honest requirement unasked would surprise more than it helps.
+const DERIVED_WINDOW_CEILING_DAYS: i32 = 30;
+
+/// The percentile a create request gets when it names none.
+const DEFAULT_PERCENTILE: f64 = 97.0;
+
+/// The highest percentile the `i32` `threshold` column can store without truncating.
+const MAX_STORABLE_PERCENTILE: f64 = 99.0;
+
+/// While a budget is in force the percentile is derived, so only a CHANGE to it is rejected.
+fn validated_budget_update(
+    percentile: Option<f64>,
+    budget: Option<Option<f64>>,
+    existing_budget: Option<f64>,
+    existing_threshold: i32,
+) -> Result<()> {
+    let percentile_changed = percentile.is_some_and(|p| clamped_threshold(p) != existing_threshold);
+    if let Some(Some(b)) = budget {
+        validate_budget_value(b)?;
+        if percentile_changed {
+            anyhow::bail!("supply either percentile or alert_budget_per_day, not both");
+        }
+    }
+    let budget_after = match budget {
+        None => existing_budget,
+        Some(b) => b,
+    };
+    if percentile_changed && budget_after.is_some() {
+        anyhow::bail!(
+            "percentile is derived while alert_budget_per_day is set; clear the budget \
+             (alert_budget_per_day: null) to set a percentile"
+        );
+    }
+    Ok(())
+}
+
+/// An explicit value is ALWAYS honoured however starved; only an absent field derives.
+fn resolved_training_window_days(
+    requested: Option<i32>,
+    histogram_interval: &str,
+    percentile: f64,
+    tree_size: i32,
+) -> i32 {
+    match requested {
+        Some(explicit) => explicit.max(1),
+        None => derived_training_window_days(histogram_interval, percentile, tree_size),
+    }
+}
+
+/// Not `days * buckets_per_day`: the trailing partial bucket and `shingle - 1` never score.
+fn expected_training_windows(
+    histogram_interval: &str,
+    training_window_days: i32,
+    tree_size: i32,
+) -> Option<i64> {
+    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
+    let days = training_window_days.max(1) as i64;
+    let buckets = days.checked_mul(86_400)?.checked_div(histogram_secs)?;
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            // The row does not exist yet, so an omitted shingle resolves to create's env default.
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            training_window_days.max(1),
+            tree_size.max(1),
+        )? as i64;
+    Some((buckets - 1 - (shingle - 1)).max(0))
+}
+
+/// The requirement spans 251x across the legal interval range, so one flat default cannot be right.
+fn derived_training_window_days(histogram_interval: &str, percentile: f64, tree_size: i32) -> i32 {
+    let Ok(histogram_secs) = parse_interval(histogram_interval) else {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    };
+    if histogram_secs <= 0 {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    }
+    // Rounded UP: truncating a cadence understates wall-clock and lands short of the bar.
+    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
+    let needed =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
+            tree_size.max(1) as usize,
+            percentile,
+        );
+    // Widened by one window to cover the trailing partial bucket the trainer drops.
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            DERIVED_WINDOW_CEILING_DAYS,
+            tree_size.max(1),
+        )
+        .unwrap_or(1);
+    let Some(days) = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
+        needed.saturating_add(1),
+        interval_minutes,
+        shingle,
+    ) else {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    };
+    let proposal = (days.min(i32::MAX as usize) as i32)
+        .clamp(DERIVED_WINDOW_FLOOR_DAYS, DERIVED_WINDOW_CEILING_DAYS);
+    // A widening that does not cross the reservoir buys nothing: below `tree_size` nothing evicts.
+    let clears_reservoir = expected_training_windows(histogram_interval, proposal, tree_size)
+        .is_some_and(|w| w >= tree_size.max(1) as i64);
+    if clears_reservoir {
+        proposal
+    } else {
+        DERIVED_WINDOW_FLOOR_DAYS
+    }
+}
+
+/// `None` when the bar is calibrated or the interval will not parse; a warning, never an error.
+fn training_window_starvation_warning(
+    histogram_interval: &str,
+    training_window_days: i32,
+    percentile: f64,
+    tree_size: i32,
+) -> Option<String> {
+    let windows = expected_training_windows(histogram_interval, training_window_days, tree_size)?;
+    o2_enterprise::enterprise::anomaly_detection::rcf_model::bar_starvation(
+        windows.max(0) as usize,
+        tree_size.max(1) as usize,
+        percentile,
+    )?;
+    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
+    // Rounded up like the derivation: truncating lands the count short of the bar it must clear.
+    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            training_window_days.max(1),
+            tree_size.max(1),
+        )
+        .unwrap_or(1);
+    // Sized on every bar, not the one that trips first, or the remedy leaves the config starved.
+    let needed =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
+            tree_size.max(1) as usize,
+            percentile,
+        );
+    let days = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
+        needed,
+        interval_minutes,
+        shingle,
+    );
+    let finer =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::interval_minutes_for_windows(
+            needed,
+            training_window_days.max(1) as usize,
+            shingle,
+        )
+        .filter(|m| *m < interval_minutes);
+    let days = days.filter(|d| *d <= MAX_ADVISABLE_WINDOW_DAYS);
+    let remedy = match (days, finer) {
+        (Some(d), Some(m)) => format!(
+            " Raise training_window_days to {d} at the current {histogram_interval}, or use a \
+             histogram_interval of {m}m or finer at the current {training_window_days} days, or \
+             lower the percentile."
+        ),
+        (Some(d), None) => format!(
+            " Raise training_window_days to {d} at the current {histogram_interval}, or lower \
+             the percentile."
+        ),
+        (None, Some(m)) => format!(
+            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days reaches the bar at a \
+             {histogram_interval} interval. Use a histogram_interval of {m}m or finer at the \
+             current {training_window_days} days, or lower the percentile."
+        ),
+        (None, None) => format!(
+            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days and no histogram_interval \
+             of a minute or coarser reaches the bar: this combination of interval and percentile \
+             cannot calibrate. Lower the percentile, or use a finer histogram_interval."
+        ),
+    };
+    // `0` is a config that can never train, not a thin window, so it is not a degree of that fault.
+    let severity = if windows == 0 {
+        " This config produces no training windows at all and will never train."
+    } else {
+        ""
+    };
+    Some(format!(
+        "p{} at a {} interval over {} days gives {} training windows, but {} are needed, so \
+         the bar will flag more often than the percentile names. The config is saved and will \
+         train.{}{}",
+        percentile as i64,
+        histogram_interval,
+        training_window_days,
+        windows,
+        needed,
+        severity,
+        remedy,
+    ))
+}
+
+/// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
+fn validation_error(e: anyhow::Error) -> anyhow::Error {
+    // Idempotent: a rule that already marked itself must not be double-prefixed on its way
+    // out through create_config, which wraps every rule indiscriminately.
+    if e.to_string().starts_with("validation error: ") {
+        return e;
+    }
+    anyhow::anyhow!("validation error: {e}")
+}
+
+/// Only `enabled` gates training: `alert_enabled` gates dispatch and `status` gates nothing.
+fn ensure_trainable(config: &infra::table::entity::anomaly_detection_config::Model) -> Result<()> {
+    if !config.enabled {
+        return Err(validation_error(anyhow::anyhow!(
+            "config is disabled: enable it before training"
+        )));
+    }
+    Ok(())
+}
+
+/// The one place `alert_enabled` is allowed to decide anything: dispatch, never training.
+fn dispatch_allowed(anomaly_count: i32, alert_enabled: bool) -> bool {
+    anomaly_count > 0 && alert_enabled
+}
+
+/// Whether any destination actually received the alert: only `Ok(true)` counts, so a
+/// skipped destination (not found, non-HTTP) or a failed send can never arm the cooldown.
+fn any_alert_delivered(outcomes: impl IntoIterator<Item = anyhow::Result<bool>>) -> bool {
+    outcomes.into_iter().any(|o| matches!(o, Ok(true)))
+}
+
+/// Manual-run cooldown anchor, `min` not `first` since callers need not pass sorted points.
+fn leading_edge_anchor_us(points: impl IntoIterator<Item = (bool, i64)>) -> Option<i64> {
+    points
+        .into_iter()
+        .filter(|(is_anomaly, _)| *is_anomaly)
+        .map(|(_, timestamp)| timestamp)
+        .min()
+}
+
+/// Create-time training gate: the config's own `enabled`, not just the global kill-switch.
+fn initial_training_allowed(enabled: bool, globally_disabled: bool) -> bool {
+    enabled && !globally_disabled
+}
+
+/// The two time grids agree only where the interval divides the origin.
+fn validate_origin_aligned_interval(histogram_interval: &str, histogram_secs: i64) -> Result<()> {
+    use config::meta::histogram_origin::{DATE_BIN_ORIGIN_SECS, histogram_origin_skew};
+    let skew = histogram_origin_skew(histogram_secs);
+    if skew != 0 {
+        anyhow::bail!(
+            "histogram_interval ({}) must divide the date_bin origin of {}s (2001-01-01): it \
+             leaves a remainder of {}s, so indexed and unindexed runs would bucket the same rows \
+             onto grids that do not line up",
+            histogram_interval,
+            DATE_BIN_ORIGIN_SECS,
+            skew,
+        );
+    }
+    Ok(())
+}
+
+/// The pure interval rule create and update share, so the two cannot drift apart.
+fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> Result<()> {
+    let schedule_secs = parse_interval(schedule_interval)?;
+    let histogram_secs = parse_interval(histogram_interval)?;
+
+    // Must precede the `%` below, which panics on a zero divisor.
+    if schedule_secs <= 0 || histogram_secs <= 0 {
+        anyhow::bail!(
+            "schedule_interval ({}) and histogram_interval ({}) must both be positive",
+            schedule_interval,
+            histogram_interval
+        );
+    }
+
+    validate_origin_aligned_interval(histogram_interval, histogram_secs)?;
+
+    // A short schedule scores a partial bucket against a full-bucket baseline, forever.
+    if schedule_secs < histogram_secs {
+        anyhow::bail!(
+            "schedule_interval ({}) must not be shorter than histogram_interval ({}): each run \
+             would score a partial bucket against a full-bucket baseline",
+            schedule_interval,
+            histogram_interval
+        );
+    }
+    if schedule_secs % histogram_secs != 0 {
+        anyhow::bail!(
+            "schedule_interval ({}) must be a whole multiple of histogram_interval ({}): \
+             otherwise runs straddle bucket boundaries and rescore partial data",
+            schedule_interval,
+            histogram_interval
+        );
+    }
+    Ok(())
+}
+
+/// The look-back caps the cursor (`detect_start = max(cursor, now - detection_window)`), so a
+/// window shorter than the gap between runs drops every bucket in between, permanently.
+fn validate_detection_window(
+    schedule_interval: &str,
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
+    // §4.5 (D9): W > 0 is unconditional; each later comparison skips only on its own parse.
+    if detection_window_seconds <= 0 {
+        anyhow::bail!(
+            "detection_window_seconds ({}) must be positive",
+            detection_window_seconds
+        );
+    }
+    if let Ok(schedule_secs) = parse_interval(schedule_interval)
+        && detection_window_seconds < schedule_secs
+    {
+        anyhow::bail!(
+            "detection_window_seconds ({}) must not be shorter than schedule_interval ({}): the \
+             look-back caps the cursor, so buckets between runs would never be scored",
+            detection_window_seconds,
+            schedule_interval
+        );
+    }
+    validate_coverage_floor(
+        schedule_interval,
+        histogram_interval,
+        detection_window_seconds,
+    )
+}
+
+/// A validity floor, not health: below it no cadence holds a complete bucket at an off-grid phase.
+fn validate_coverage_floor(
+    schedule_interval: &str,
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
+    // §4.5 (D9): the floor needs both parses, so an unparsable value skips only this rule.
+    let (Ok(schedule_secs), Ok(histogram_secs)) = (
+        parse_interval(schedule_interval),
+        parse_interval(histogram_interval),
+    ) else {
+        return Ok(());
+    };
+    let minimum = schedule_secs.saturating_add(histogram_secs);
+    if detection_window_seconds < minimum {
+        anyhow::bail!(
+            "{WINDOW_FLOOR_RULE}: detection_window_seconds ({}) is under the floor of {} \
+             (schedule_interval {} + histogram_interval {})",
+            detection_window_seconds,
+            minimum,
+            schedule_interval,
+            histogram_interval
+        );
+    }
+    Ok(())
+}
+
+/// The pair a partial update lands on: a submitted field wins, an absent one keeps the row's.
+fn merged_interval_pair(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> (String, String) {
+    (
+        req.schedule_interval
+            .clone()
+            .unwrap_or_else(|| existing.schedule_interval.clone()),
+        req.histogram_interval
+            .clone()
+            .unwrap_or_else(|| existing.histogram_interval.clone()),
+    )
+}
+
+/// Skips unchanged pairs: the full-body PUT resends them, and rejecting would strand rows.
+fn validated_intervals(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let (schedule, histogram) = merged_interval_pair(req, existing);
+    // A row whose persisted interval cannot parse must still accept an edit that leaves it alone.
+    if req
+        .schedule_interval
+        .as_ref()
+        .is_none_or(|v| *v == existing.schedule_interval)
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
+    {
+        return Ok(());
+    }
+    // An unparseable value never matches, so it reaches the rule instead of being skipped.
+    if let (Ok(schedule_secs), Ok(histogram_secs), Ok(stored_schedule), Ok(stored_histogram)) = (
+        parse_interval(&schedule),
+        parse_interval(&histogram),
+        parse_interval(&existing.schedule_interval),
+        parse_interval(&existing.histogram_interval),
+    ) && (schedule_secs, histogram_secs) == (stored_schedule, stored_histogram)
+    {
+        return Ok(());
+    }
+    validate_interval_pair(&schedule, &histogram)
+}
+
+/// Same grandfathering as `validated_intervals`: a stored row that already violates the rule
+/// stays editable, and only an edit that touches either field is held to it.
+fn validated_detection_window(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let (schedule, histogram) = merged_interval_pair(req, existing);
+    let window = req
+        .detection_window_seconds
+        .unwrap_or(existing.detection_window_seconds);
+    // The coverage floor reads histogram_interval, so an edit to it is held to the rule too.
+    if req
+        .schedule_interval
+        .as_ref()
+        .is_none_or(|v| *v == existing.schedule_interval)
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
+        && req
+            .detection_window_seconds
+            .is_none_or(|v| v == existing.detection_window_seconds)
+    {
+        return Ok(());
+    }
+    validate_detection_window(&schedule, &histogram, window)
+}
+
+/// §4.1.1 grandfathering: a stored violating row stays editable; a grid-touching edit is not.
+fn validated_custom_sql(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    if req
+        .custom_sql
+        .as_ref()
+        .is_none_or(|v| existing.custom_sql.as_deref() == Some(v.as_str()))
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
+        && req
+            .query_mode
+            .as_ref()
+            .is_none_or(|v| *v == existing.query_mode)
+    {
+        return Ok(());
+    }
+    let query_mode = req.query_mode.as_deref().unwrap_or(&existing.query_mode);
+    // The other mode's leftover SQL is not the query the detector runs (see G4's verdict).
+    if !query_mode.eq_ignore_ascii_case("custom_sql") {
+        return Ok(());
+    }
+    let Some(sql) = req.custom_sql.as_deref().or(existing.custom_sql.as_deref()) else {
+        return Ok(());
+    };
+    let (_, histogram) = merged_interval_pair(req, existing);
+    validate_custom_sql_grid(sql, &histogram)
+}
+
+/// §4.1.1: an AST walk, because substring checks lose to nesting, comments and IANA names.
+fn validate_custom_sql_grid(sql: &str, histogram_interval: &str) -> Result<()> {
+    use std::ops::ControlFlow;
+    let statements =
+        sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
+            .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
+    // §4.5 (D9): only the interval-equality rule needs the stored interval's parse.
+    let config_interval_secs = parse_interval(histogram_interval).ok();
+    let walk =
+        sqlparser::ast::visit_expressions(&statements, |expr| {
+            match validated_histogram_call(expr, config_interval_secs, histogram_interval) {
+                Ok(()) => ControlFlow::Continue(()),
+                Err(e) => ControlFlow::Break(e),
+            }
+        });
+    match walk {
+        ControlFlow::Continue(()) => Ok(()),
+        ControlFlow::Break(e) => Err(e),
+    }
+}
+
+/// One `histogram()` call held to §4.1.1's four rules; every other expression passes through.
+fn validated_histogram_call(
+    expr: &sqlparser::ast::Expr,
+    config_interval_secs: Option<i64>,
+    configured_interval: &str,
+) -> Result<()> {
+    let sqlparser::ast::Expr::Function(func) = expr else {
+        return Ok(());
+    };
+    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
+        return Ok(());
+    }
+    let args: &[sqlparser::ast::FunctionArg] = match &func.args {
+        sqlparser::ast::FunctionArguments::List(list) => &list.args,
+        _ => &[],
+    };
+    if args.len() > 2 {
+        anyhow::bail!(
+            "custom_sql histogram() must not take a timezone or origin argument: the detector's \
+             grid is UTC on the date_bin origin, and a shifted grid never lines up with it"
+        );
+    }
+    let Some(interval_arg) = args.get(1) else {
+        anyhow::bail!(
+            "custom_sql histogram() must state its interval explicitly, e.g. \
+             histogram(_timestamp, '{configured_interval}'): an omitted interval is injected \
+             at query time and desyncs from the config's grid"
+        );
+    };
+    let raw = interval_arg.to_string();
+    let raw = raw.trim().trim_matches(|c| c == '\'' || c == '"');
+    let sql_secs = custom_sql_interval_seconds(raw)?;
+    if let Some(config_secs) = config_interval_secs
+        && sql_secs != config_secs
+    {
+        anyhow::bail!(
+            "custom_sql histogram() interval '{raw}' does not equal the config's \
+             histogram_interval '{configured_interval}': the two grids would never line up"
+        );
+    }
+    Ok(())
+}
+
+/// The engine's own interval grammar, compared as µs-equivalent seconds ("300s" == "5m").
+fn custom_sql_interval_seconds(interval: &str) -> Result<i64> {
+    let interval = interval.trim();
+    let split = interval
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(interval.len());
+    let (number, unit) = interval.split_at(split);
+    let number: i64 = number.parse().map_err(|_| {
+        anyhow::anyhow!("custom_sql histogram() interval '{interval}' is not a number plus unit")
+    })?;
+    let unit_seconds = match unit.trim().to_ascii_lowercase().as_str() {
+        "second" | "seconds" | "sec" | "secs" | "s" => 1,
+        "minute" | "minutes" | "min" | "mins" | "m" => 60,
+        "hour" | "hours" | "hr" | "hrs" | "h" => 3600,
+        "day" | "days" | "d" => 86400,
+        "month" | "months" | "mon" | "year" | "years" | "y" => anyhow::bail!(
+            "custom_sql histogram() interval '{interval}' uses a calendar unit with no fixed \
+             stride; use seconds, minutes, hours or days"
+        ),
+        _ => anyhow::bail!(
+            "custom_sql histogram() interval '{interval}' has an unsupported unit; use seconds, \
+             minutes, hours or days"
+        ),
+    };
+    number.checked_mul(unit_seconds).ok_or_else(|| {
+        anyhow::anyhow!("custom_sql histogram() interval '{interval}' is out of range")
+    })
+}
+
+/// G4. True for the aggregations that grow with population size and carry no normalizer.
+/// Reads the combined form the row stores, so `count` and `count(*)` are one config.
+fn is_count_aggregation(detection_function: &str) -> bool {
+    let normalized = detection_function.trim().to_ascii_lowercase();
+    normalized == "count" || normalized.starts_with("count(")
+}
+
+/// G4. Whether one predicate restricts the population to an error subset.
+fn is_error_predicate(field: &str, operator: &str, value: &str) -> bool {
+    let operator = operator.trim();
+    // A negated or downward comparison selects the healthy majority, not the error subset.
+    if !matches!(operator, "=" | "==" | ">" | ">=") {
+        return false;
+    }
+    let value = value.trim().trim_matches('\'').trim_matches('"');
+    // `priority = 'critical'` on a ticket stream is an ordinary slice, so the severity word
+    // only restricts when the column it sits on is a severity column.
+    if field_has_token(field, &["level", "severity", "status"]) && is_error_word(value) {
+        return true;
+    }
+    // A bare 5xx number carries no error meaning off a status column: `zip_code = 500` and
+    // `area_code = 503` are ordinary values, which a `contains("code")` test would refuse.
+    if !field_has_token(field, &["status"]) {
+        return false;
+    }
+    let Ok(parsed) = value.parse::<i64>() else {
+        return false;
+    };
+    let lower_bound = if operator == ">" {
+        // `status > 499` names the same band as `>= 500`; saturating keeps a huge literal out.
+        parsed.saturating_add(1)
+    } else {
+        parsed
+    };
+    SERVER_ERROR_BAND.contains(&lower_bound)
+}
+
+/// G4. Matches whole tokens rather than substrings, so `terror_logs` is not an error stream.
+fn is_error_word(token: &str) -> bool {
+    let token = token.trim().to_ascii_lowercase();
+    ERROR_VOCABULARY.contains(&token.as_str())
+}
+
+/// G4. Whole-token field matching, so `status_code` counts as a status column but
+/// `zip_code` and `error_code` do not.
+fn field_has_token(field: &str, wanted: &[&str]) -> bool {
+    field
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|token| wanted.contains(&token.to_ascii_lowercase().as_str()))
+}
+
+/// G4. An error-named stream is the error subset of an application's activity, so a bare
+/// count of it carries the same ambiguity as a filtered one.
+fn stream_name_is_error_restricted(stream_name: &str) -> bool {
+    stream_name
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(is_error_word)
+}
+
+/// G4. Reads the structured filter list; an entry it cannot parse is not a restriction,
+/// because an unrelated payload bug must not surface as a denominator refusal.
+fn filters_are_error_restricted(filters: Option<&serde_json::Value>) -> bool {
+    let Some(serde_json::Value::Array(entries)) = filters else {
+        return false;
+    };
+    entries.iter().any(|entry| {
+        let (Some(field), Some(operator), Some(value)) = (
+            entry.get("field").and_then(|v| v.as_str()),
+            entry.get("operator").and_then(|v| v.as_str()),
+            entry.get("value").and_then(json_scalar_as_string),
+        ) else {
+            return false;
+        };
+        is_error_predicate(field, operator, &value)
+    })
+}
+
+/// G4. The filter `value` arrives as a string from the UI but a client may post a number.
+fn json_scalar_as_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
+/// G4. Finds an error restriction anywhere in the SQL, not only in a WHERE clause: the same
+/// defect is expressible as a CASE inside the aggregate.
+fn custom_sql_is_error_restricted(sql: &str) -> bool {
+    sql_tokens(sql)
+        .windows(3)
+        .any(|w| is_error_predicate(&w[0], &w[1], &w[2]))
+}
+
+/// G4. custom_sql is the only mode that can carry a denominator, and a division is how it
+/// does: `errors / total` is a rate, `errors` alone is not.
+fn custom_sql_has_division(sql: &str) -> bool {
+    sql_tokens(sql).iter().any(|token| token == "/")
+}
+
+/// G4. A crude scanner, deliberately: it only has to surface `field op value` triples and
+/// bare operators, and a full SQL parse here would be a second dialect to keep in step.
+fn sql_tokens(sql: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut chars = sql.chars().peekable();
+    let mut in_string = false;
+    while let Some(c) = chars.next() {
+        if in_string {
+            current.push(c);
+            if c == '\'' {
+                in_string = false;
+                tokens.push(std::mem::take(&mut current));
+            }
+            continue;
+        }
+        // A comment's own slashes and dashes would otherwise read as a division or operator.
+        if c == '-' && chars.peek() == Some(&'-') {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            for skipped in chars.by_ref() {
+                if skipped == '\n' {
+                    break;
+                }
+            }
+            continue;
+        }
+        if c == '/' && chars.peek() == Some(&'*') {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            let mut previous = ' ';
+            for skipped in chars.by_ref() {
+                if previous == '*' && skipped == '/' {
+                    break;
+                }
+                previous = skipped;
+            }
+            continue;
+        }
+        if c.is_ascii_alphanumeric() || c == '_' || c == '.' {
+            current.push(c);
+            continue;
+        }
+        if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+        if c == '\'' {
+            in_string = true;
+            current.push(c);
+            continue;
+        }
+        if "<>=!/".contains(c) {
+            // `>=` and `!=` must stay one token or the operator reads as a bare `>`.
+            match tokens.last_mut() {
+                Some(last) if last.len() == 1 && "<>=!".contains(last.as_str()) => last.push(c),
+                _ => tokens.push(c.to_string()),
+            }
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
+}
+
+/// G4. Classifies a detection target's denominator from the config alone.
+fn count_denominator_verdict(
+    detection_function: &str,
+    stream_name: &str,
+    query_mode: &str,
+    filters: Option<&serde_json::Value>,
+    custom_sql: Option<&str>,
+) -> DenominatorVerdict {
+    if !is_count_aggregation(detection_function) {
+        return DenominatorVerdict::NotACount;
+    }
+    // The mode picks the query the detector actually runs, so the other mode's leftover
+    // field on the row is not part of this config and must not decide the verdict.
+    let custom_sql_mode = query_mode.eq_ignore_ascii_case("custom_sql");
+    let sql = custom_sql_mode.then_some(custom_sql).flatten();
+    let error_restricted = stream_name_is_error_restricted(stream_name)
+        || (!custom_sql_mode && filters_are_error_restricted(filters))
+        || sql.is_some_and(custom_sql_is_error_restricted);
+    if !error_restricted {
+        // An unrestricted count IS its own population; nothing is missing.
+        return DenominatorVerdict::Present;
+    }
+    // Filters mode expresses exactly one aggregate, so a denominator is inexpressible there.
+    match sql {
+        Some(sql) if custom_sql_has_division(sql) => DenominatorVerdict::Present,
+        _ => DenominatorVerdict::Absent,
+    }
+}
+
+/// G4. The pure denominator rule create and update share, so the two cannot drift apart.
+fn validate_denominator(
+    detection_function: &str,
+    stream_name: &str,
+    query_mode: &str,
+    filters: Option<&serde_json::Value>,
+    custom_sql: Option<&str>,
+) -> Result<()> {
+    match count_denominator_verdict(
+        detection_function,
+        stream_name,
+        query_mode,
+        filters,
+        custom_sql,
+    ) {
+        // Self-marked as a 400: this rule is reached through `validate_config_request`, whose
+        // other callers read its error directly rather than through `create_config`'s wrapper.
+        DenominatorVerdict::Absent => Err(validation_error(anyhow::anyhow!(
+            "a count over an error-restricted population carries no denominator, so 20 errors \
+             in 330,000 requests and 20 in 200 are the same number to the detector. Express it \
+             as a rate or ratio instead: in custom_sql mode divide the error count by the total \
+             count, or pick an aggregation that is already normalized."
+        ))),
+        DenominatorVerdict::Present | DenominatorVerdict::NotACount => Ok(()),
+    }
+}
+
+/// The series a partial update lands on: a submitted field wins, an absent one keeps the
+/// row's. The function is compared in its combined form because that is what the row stores.
+fn merged_series_definition(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> SeriesDefinition {
+    SeriesDefinition {
+        detection_function: req
+            .detection_function
+            .as_deref()
+            .map(|f| combine_detection_fn(f, req.detection_function_field.as_deref()))
+            .unwrap_or_else(|| existing.detection_function.clone()),
+        query_mode: req
+            .query_mode
+            .clone()
+            .unwrap_or_else(|| existing.query_mode.clone()),
+        filters: req.filters.clone().or_else(|| existing.filters.clone()),
+        custom_sql: req
+            .custom_sql
+            .clone()
+            .or_else(|| existing.custom_sql.clone()),
+        stream_name: existing.stream_name.clone(),
+    }
+}
+
+/// The filter list as rows, so absent, `null`, `{}` and `[]` all compare as "no filters" —
+/// the same equivalence `update_config` applies when it decides what to persist.
+fn filter_rows(filters: Option<&serde_json::Value>) -> Vec<serde_json::Value> {
+    filters
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// The persisted series, for comparison against the merged one.
+fn stored_series_definition(
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> SeriesDefinition {
+    SeriesDefinition {
+        detection_function: existing.detection_function.clone(),
+        query_mode: existing.query_mode.clone(),
+        filters: existing.filters.clone(),
+        custom_sql: existing.custom_sql.clone(),
+        stream_name: existing.stream_name.clone(),
+    }
+}
+
+/// G4. Validates the merged row only when the submitted fields actually differ from the
+/// persisted ones, so a row already broken on disk stays administrable — including a row
+/// whose stored function cannot be read, which never reaches the rule while it is untouched.
+fn validated_denominator(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let merged = merged_series_definition(req, existing);
+    if merged.defines_the_same_query_as(&stored_series_definition(existing)) {
+        return Ok(());
+    }
+    validate_denominator(
+        &merged.detection_function,
+        &merged.stream_name,
+        &merged.query_mode,
+        merged.filters.as_ref(),
+        merged.custom_sql.as_deref(),
+    )
+}
+
+/// Validates the merged function only when it differs from the persisted one, so a row
+/// already carrying an unusable function stays administrable — it can still be renamed,
+/// moved, disabled or repaired, exactly as the denominator rule allows.
+fn validated_detection_function(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let merged = merged_series_definition(req, existing);
+    if merged.detection_function == existing.detection_function {
+        return Ok(());
+    }
+    validate_detection_function(&merged.detection_function)
+}
+
+/// Collapses the `filters` shapes that mean "no filters" to `[]`; rejects any other non-array.
+fn normalize_request_filters(
+    filters: Option<serde_json::Value>,
+) -> Result<Option<serde_json::Value>> {
+    let Some(value) = filters else {
+        return Ok(None);
+    };
+    match value {
+        serde_json::Value::Array(ref entries) => {
+            validate_filter_operators(entries)?;
+            Ok(Some(value))
+        }
+        serde_json::Value::Null => Ok(Some(serde_json::json!([]))),
+        serde_json::Value::Object(ref map) if map.is_empty() => Ok(Some(serde_json::json!([]))),
+        // The value itself is never echoed back: it is caller-controlled JSON.
+        other => anyhow::bail!(
+            "filters must be a JSON array, got a JSON {}",
+            json_type(&other)
+        ),
+    }
+}
+
+/// Rejects an operator the enterprise query builder cannot express. Accepting one would
+/// persist a filter that silently drops out of the query, scoring the unfiltered stream.
+fn validate_filter_operators(entries: &[serde_json::Value]) -> Result<()> {
+    for entry in entries {
+        let Some(operator) = entry.get("operator").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if !SUPPORTED_FILTER_OPERATORS.contains(&operator.trim().to_lowercase().as_str()) {
+            anyhow::bail!("unsupported filter operator: {operator}");
+        }
+    }
+    Ok(())
+}
+
+/// Names a JSON value's type for an error message, without disclosing the value.
+fn json_type(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
 }
 
 /// Combine a detection function name and optional field into the DB storage form.
@@ -1437,17 +2807,28 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
     }
 }
 
-/// Parse interval string like "1h", "30m" into seconds
+/// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
 fn parse_interval(interval: &str) -> Result<i64> {
-    if let Some(stripped) = interval.strip_suffix('h') {
-        let hours: i64 = stripped.parse()?;
-        Ok(hours * 3600)
+    let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {
+        (stripped, 1)
     } else if let Some(stripped) = interval.strip_suffix('m') {
-        let minutes: i64 = stripped.parse()?;
-        Ok(minutes * 60)
+        (stripped, 60)
+    } else if let Some(stripped) = interval.strip_suffix('h') {
+        (stripped, 3600)
+    } else if let Some(stripped) = interval.strip_suffix('d') {
+        (stripped, 86400)
     } else {
-        anyhow::bail!("Invalid interval format. Use '1h' or '30m'");
-    }
+        anyhow::bail!("Invalid interval format. Use a number plus 's', 'm', 'h' or 'd'");
+    };
+    let value: i64 = value.parse().map_err(|_| {
+        anyhow::anyhow!(
+            "Invalid interval format ('{interval}'). Use a number plus 's', 'm', 'h' or 'd'"
+        )
+    })?;
+    // A positive wrap lands on a plausible schedule that clears every downstream guard.
+    value
+        .checked_mul(unit_seconds)
+        .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -1456,12 +2837,9 @@ pub fn config_to_training_config(
 ) -> Result<o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig> {
     use o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig;
 
-    // Parse filters if present
-    let filters = if let Some(filters_json) = &config.filters {
-        serde_json::from_value(filters_json.clone())?
-    } else {
-        Vec::new()
-    };
+    let filters = o2_enterprise::enterprise::anomaly_detection::types::parse_filters(
+        config.filters.as_ref(),
+    )?;
 
     Ok(AnomalyConfig {
         anomaly_id: config.anomaly_id.clone(),
@@ -1490,6 +2868,8 @@ pub fn config_to_training_config(
         training_window_days: config.training_window_days as usize,
         retrain_interval_days: config.retrain_interval_days,
         threshold: config.threshold,
+        alert_budget_per_day: config.alert_budget_per_day,
+        level_half_width_seconds: config.level_half_width_seconds,
         seasonality: serde_json::from_str(&format!("\"{}\"", config.seasonality))
             .unwrap_or_default(),
         is_trained: config.is_trained,
@@ -1553,7 +2933,8 @@ pub async fn execute_anomaly_query(
         regions: vec![],
         clusters: vec![],
         timeout: 0,
-        search_type: None,
+        // Untagged, this multi-day training scan routes to the interactive nodes serving the UI.
+        search_type: Some(config::meta::search::SearchEventType::DerivedStream),
         search_event_context: None,
         use_cache: false,
         clear_cache: false,
@@ -1574,9 +2955,66 @@ pub async fn execute_anomaly_query(
         search_result.total
     );
 
-    let data_points = parse_search_results_to_timeseries(&search_result, anomaly_id)?;
+    // Resolved here rather than threaded through the enterprise query-executor boundary,
+    // whose registered Fn signature is fixed and shared by every anomaly query path.
+    let value_column = resolve_value_column(org_id, anomaly_id).await;
+
+    let data_points =
+        parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())?;
 
     Ok(data_points)
+}
+
+/// The config-declared value column; degrades to `None` (legacy fallback) on lookup failure.
+#[cfg(feature = "enterprise")]
+async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> {
+    let key = (org_id.to_string(), anomaly_id.to_string());
+    if let Ok(cache) = VALUE_COLUMN_CACHE.read()
+        && let Some((column, cached_at)) = cache.get(&key)
+        && cached_at.elapsed() < VALUE_COLUMN_TTL
+    {
+        return column.clone();
+    }
+
+    let db = get_orm_client_ro().await;
+    // A failed read is not cached, so the legacy fallback lasts one run, not a full TTL.
+    let model = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[anomaly_detection {anomaly_id}] could not load config for value column: {e}"
+            )
+        })
+        .ok()??;
+
+    let column = declared_value_column(&model.query_mode, &model.detection_function);
+    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
+        cache.insert(key, (column.clone(), Instant::now()));
+    }
+    column
+}
+
+/// Update-path hook; only bounds staleness on the serving node, the TTL covers the rest.
+#[cfg(feature = "enterprise")]
+fn invalidate_value_column_cache(org_id: &str, anomaly_id: &str) {
+    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
+        cache.remove(&(org_id.to_string(), anomaly_id.to_string()));
+    }
+}
+
+/// The value column a config declares, or `None` when it declares none.
+///
+/// Only custom_sql mode has one: filter mode's builder emits `AS value` itself, and there
+/// `detection_function`'s field names the input column to aggregate, not the output column.
+#[cfg(feature = "enterprise")]
+fn declared_value_column(query_mode: &str, detection_function: &str) -> Option<String> {
+    use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
+
+    if !query_mode.eq_ignore_ascii_case("custom_sql") {
+        return None;
+    }
+    let (_, field) = split_detection_function(detection_function);
+    field.filter(|f| !f.trim().is_empty())
 }
 
 /// Parse search results into time-series data points.
@@ -1585,15 +3023,28 @@ pub async fn execute_anomaly_query(
 /// `hour` and `dow` are included by filter-based queries via `date_part()`; they are
 /// absent for custom SQL queries, in which case `QueryDataPoint` carries `None` and
 /// `build_feature_vector` falls back to Rust-side extraction from the timestamp.
+///
+/// `value_column` is the config-declared column carrying the metric; `None` keeps the
+/// legacy name fallback.
 #[cfg(feature = "enterprise")]
 fn parse_search_results_to_timeseries(
     results: &config::meta::search::Response,
     anomaly_id: &str,
+    value_column: Option<&str>,
 ) -> Result<Vec<o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint>> {
     use o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint;
 
+    // A truncated hit set would read as a sparse series and could revoke a healthy model.
+    if results.is_partial {
+        anyhow::bail!(
+            "[anomaly_detection {anomaly_id}] search returned partial results — not usable as evidence"
+        );
+    }
+
     let mut data_points = Vec::new();
     let mut skipped = 0usize;
+    let mut timestamp_failures = 0usize;
+    let mut value_failures = 0usize;
 
     if let Some(first) = results.hits.first()
         && let Some(obj) = first.as_object()
@@ -1617,10 +3068,11 @@ fn parse_search_results_to_timeseries(
                     hit
                 );
                 skipped += 1;
+                timestamp_failures += 1;
                 continue;
             }
         };
-        let value = match extract_value_from_hit(hit) {
+        let value = match extract_value_from_hit(hit, value_column) {
             Ok(v) => v,
             Err(e) => {
                 log::warn!(
@@ -1630,6 +3082,7 @@ fn parse_search_results_to_timeseries(
                     hit
                 );
                 skipped += 1;
+                value_failures += 1;
                 continue;
             }
         };
@@ -1662,6 +3115,35 @@ fn parse_search_results_to_timeseries(
         );
     }
 
+    // Total extraction loss on a non-empty result set is a misconfigured column, not an
+    // absence of data. Returning Ok(empty) here is what made that present as "no data".
+    // The message names the column that actually failed: value is only read once the
+    // timestamp parsed, so a timestamp failure must never be reported as a value one.
+    if data_points.is_empty() && !results.hits.is_empty() {
+        let timestamp_problem = format!(
+            "no usable timestamp column (expected one of: {})",
+            TIMESTAMP_COLUMNS.join(", ")
+        );
+        let value_problem = format!(
+            "no usable value column ({})",
+            match value_column {
+                Some(c) => format!("configured: '{c}'"),
+                None => format!("expected one of: {}", LEGACY_VALUE_COLUMNS.join(", ")),
+            }
+        );
+        let problem = match (timestamp_failures, value_failures) {
+            (_, 0) => timestamp_problem,
+            (0, _) => value_problem,
+            (t, v) => format!("{t} rows had {timestamp_problem}, {v} rows had {value_problem}"),
+        };
+        anyhow::bail!(
+            "[anomaly_detection {anomaly_id}] query returned {} rows but none were usable: {problem}; \
+             columns present: [{}]",
+            results.hits.len(),
+            columns_present(&results.hits).join(", "),
+        );
+    }
+
     data_points.sort_by_key(|p| p.timestamp_us);
 
     Ok(data_points)
@@ -1671,7 +3153,7 @@ fn parse_search_results_to_timeseries(
 #[cfg(feature = "enterprise")]
 fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     // Try different timestamp field names
-    for field_name in &["_timestamp", "timestamp", "time", "time_bucket"] {
+    for field_name in &TIMESTAMP_COLUMNS {
         if let Some(ts_value) = hit.get(field_name) {
             // Numeric microseconds
             if let Some(ts_num) = ts_value.as_i64() {
@@ -1708,118 +3190,233 @@ fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     anyhow::bail!("No timestamp field found in search result")
 }
 
-/// Extract value from a search hit
+/// A declared `value_column` is authoritative: a missing one errors, never legacy-falls-back.
 #[cfg(feature = "enterprise")]
-fn extract_value_from_hit(hit: &serde_json::Value) -> Result<f64> {
-    // Try different value field names
-    for field_name in &["value", "count", "_count", "metric", "result"] {
-        if let Some(value) = hit.get(field_name) {
-            if let Some(val_num) = value.as_f64() {
-                return Ok(val_num);
-            }
-            if let Some(val_int) = value.as_i64() {
-                return Ok(val_int as f64);
-            }
+fn extract_value_from_hit(hit: &serde_json::Value, value_column: Option<&str>) -> Result<f64> {
+    if let Some(column) = value_column.map(str::trim).filter(|c| !c.is_empty()) {
+        return hit.get(column).and_then(json_value_as_f64).ok_or_else(|| {
+            anyhow::anyhow!("declared value column '{column}' is missing or non-numeric")
+        });
+    }
+
+    for field_name in LEGACY_VALUE_COLUMNS {
+        if let Some(val) = hit.get(field_name).and_then(json_value_as_f64) {
+            return Ok(val);
         }
     }
 
     anyhow::bail!("No value field found in search result")
 }
 
+/// Numeric coercion shared by the declared-column and legacy-fallback paths.
+#[cfg(feature = "enterprise")]
+fn json_value_as_f64(value: &serde_json::Value) -> Option<f64> {
+    value.as_f64().or_else(|| value.as_i64().map(|v| v as f64))
+}
+
+/// Column names the result set actually carried, for the misconfiguration diagnostic.
+#[cfg(feature = "enterprise")]
+fn columns_present(hits: &[serde_json::Value]) -> Vec<String> {
+    hits.first()
+        .and_then(|h| h.as_object())
+        .map(|obj| obj.keys().cloned().collect())
+        .unwrap_or_default()
+}
+
 /// Write anomaly events to the _anomalies stream.
 ///
-/// Uses HTTP POST to an ingester node so this works from any node role
-/// (including scheduler nodes, which are not ingesters and cannot call
-/// service::logs::ingest::ingest() directly).
+/// Goes through internal gRPC ingestion so this works from any node role (including
+/// scheduler nodes, which are not ingesters) and never depends on a user login: root
+/// Basic auth is refused wherever native login is disabled, as on cloud.
 #[cfg(feature = "enterprise")]
 pub async fn write_anomalies_to_stream(
     org_id: &str,
     anomalies: Vec<serde_json::Value>,
 ) -> Result<()> {
+    use proto::cluster_rpc;
+
     if anomalies.is_empty() {
         return Ok(());
     }
 
-    // Pick an online ingester node to forward the write to.
-    let ingester = infra::cluster::get_cached_online_ingester_nodes()
+    let anomaly_count = anomalies.len();
+    let req = cluster_rpc::IngestionRequest {
+        org_id: org_id.to_string(),
+        stream_type: StreamType::Logs.as_str().to_string(),
+        stream_name: "_anomalies".to_string(),
+        data: Some(cluster_rpc::IngestionData::from(anomalies)),
+        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+        metadata: None,
+    };
+
+    let resp = crate::ingestion::ingestion_service::ingest(req)
         .await
-        .and_then(|nodes| nodes.into_iter().next())
-        .ok_or_else(|| anyhow::anyhow!("No online ingester node available to write _anomalies"))?;
-
-    let cfg = config::get_config();
-    let url = format!(
-        "{}{}/api/{org_id}/_anomalies/_json",
-        ingester.http_addr, cfg.common.base_uri,
-    );
-
-    tracing::info!(
-        org_id = %org_id,
-        anomaly_count = anomalies.len(),
-        ingester = %ingester.name,
-        "Writing anomalies to _anomalies stream via ingester HTTP"
-    );
-
-    let json_body = serde_json::to_string(&anomalies)?;
-
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header(
-            "Authorization",
-            format!(
-                "Basic {}",
-                base64::Engine::encode(
-                    &base64::engine::general_purpose::STANDARD,
-                    format!(
-                        "{}:{}",
-                        cfg.auth.root_user_email, cfg.auth.root_user_password
-                    )
-                )
-            ),
-        )
-        .body(json_body)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("HTTP request to ingester failed: {e}"))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("Ingester returned {status} writing _anomalies: {body}");
+        .map_err(|e| anyhow::anyhow!("internal ingestion of _anomalies failed: {e}"))?;
+    if resp.status_code != 200 {
+        anyhow::bail!(
+            "ingester returned {} writing _anomalies: {}",
+            resp.status_code,
+            resp.message
+        );
     }
 
     tracing::info!(
         org_id = %org_id,
-        "Successfully wrote anomalies to _anomalies stream"
+        anomaly_count,
+        "Wrote anomalies to _anomalies stream"
     );
 
     Ok(())
 }
 
-/// Send an anomaly alert to the configured destination.
+/// Format a microsecond timestamp for alert text.
+#[cfg(feature = "enterprise")]
+fn fmt_alert_us(us: i64) -> String {
+    chrono::DateTime::from_timestamp_micros(us)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Deep link to the config's detail page (`alerts/anomaly/edit/:anomaly_id`), where the
+/// operator sees the score timeline and threshold behind this alert.
+#[cfg(feature = "enterprise")]
+fn anomaly_detail_link(org_id: &str, anomaly_id: &str) -> String {
+    let cfg = config::get_config();
+    format!(
+        "{}{}/web/alerts/anomaly/edit/{}?org_identifier={}",
+        cfg.common.web_url.trim_end_matches('/'),
+        cfg.common.base_uri,
+        anomaly_id,
+        org_id
+    )
+}
+
+/// One honestly-labeled message per alert kind: a score-space deviation, a value-space
+/// drop, an absence, and a recovery are different claims and must not share a phrasing.
+#[cfg(feature = "enterprise")]
+fn anomaly_alert_message(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    link: &str,
+) -> String {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let window = format!(
+        "{}\u{2013}{}",
+        fmt_alert_us(ctx.window_start_us),
+        fmt_alert_us(ctx.window_end_us)
+    );
+    let body = match ctx.kind {
+        AnomalyAlertKind::Absence => format!(
+            "no data received in window {window}, although the stream's learned schedule \
+             expected data"
+        ),
+        AnomalyAlertKind::PartialDrop => {
+            let worst = ctx.worst_actual_value.unwrap_or(0.0);
+            match (ctx.max_deviation_percent, ctx.worst_expected) {
+                (Some(dev), Some(expected)) => format!(
+                    "data volume dropped in window {window} | worst value: {worst:.2}, \
+                     {dev:.1}% below its hour-of-week median ~{expected:.2}"
+                ),
+                _ => format!("data volume dropped in window {window} | worst value: {worst:.2}"),
+            }
+        }
+        AnomalyAlertKind::Recovery => {
+            format!("a full detection run found no anomalies in window {window}")
+        }
+        AnomalyAlertKind::Value => value_anomaly_body(ctx, &window),
+    };
+    let verb = if ctx.kind == AnomalyAlertKind::Recovery {
+        "Anomaly recovered"
+    } else {
+        "Anomaly detected"
+    };
+    format!(
+        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
+        ctx.stream_name, ctx.config_name
+    )
+}
+
+/// The numeric section for a scored value anomaly, degrading field by field so a cold
+/// start (no expectation) or a legacy model (no stored threshold) still reads sensibly.
+#[cfg(feature = "enterprise")]
+fn value_anomaly_body(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    window: &str,
+) -> String {
+    let mut body = format!("{} anomalies in window {window}", ctx.anomaly_count);
+    if let Some(worst) = ctx.worst_actual_value {
+        body.push_str(&format!(" | worst value: {worst:.2}"));
+        if let Some(expected) = ctx.worst_expected {
+            body.push_str(&format!(" (expected ~{expected:.2} for this hour)"));
+        }
+    }
+    if let (Some(score), Some(threshold)) = (ctx.score, ctx.threshold) {
+        body.push_str(&format!(" | score {score:.2} vs threshold {threshold:.2}"));
+    }
+    // Labeled as score-space: this number is NOT "the metric was N% above normal".
+    if let Some(dev) = ctx.max_deviation_percent {
+        body.push_str(&format!(" (score {dev:.1}% over its bar)"));
+    }
+    body
+}
+
+/// The webhook JSON body; `deviation_kind` names which space `max_deviation_percent` is in.
+#[cfg(feature = "enterprise")]
+fn anomaly_alert_payload(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    message: &str,
+    link: &str,
+) -> serde_json::Value {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let alert_type = match ctx.kind {
+        AnomalyAlertKind::Recovery => "anomaly_detection_recovery",
+        _ => "anomaly_detection",
+    };
+    let deviation_kind = match ctx.kind {
+        AnomalyAlertKind::Value => Some("score_over_threshold"),
+        AnomalyAlertKind::PartialDrop => Some("value_below_expected"),
+        _ => None,
+    };
+    serde_json::json!({
+        "text": message,
+        "alert_type": alert_type,
+        // The same field an alert recovery carries, so one webhook can read
+        // both message classes without knowing which produced it.
+        "alert_status": if ctx.kind == AnomalyAlertKind::Recovery { "resolved" } else { "firing" },
+        "kind": ctx.kind,
+        "anomaly_id": ctx.anomaly_id,
+        "config_name": ctx.config_name,
+        "org_id": ctx.org_id,
+        "stream_name": ctx.stream_name,
+        "anomaly_count": ctx.anomaly_count,
+        // Both predate the nullable kinds and were always numeric; strict parsers break on null.
+        "max_deviation_percent": ctx.max_deviation_percent.unwrap_or(0.0),
+        "deviation_kind": deviation_kind,
+        "worst_actual_value": ctx.worst_actual_value.unwrap_or(0.0),
+        "expected_value": ctx.worst_expected,
+        "score": ctx.score,
+        "threshold": ctx.threshold,
+        "window_start": fmt_alert_us(ctx.window_start_us),
+        "window_end": fmt_alert_us(ctx.window_end_us),
+        "link": link,
+        "message": message,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    })
+}
+
+/// Send an anomaly alert (or recovery message) to the configured destination.
 ///
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
+/// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
+/// that recovery messages inherit. Returns `Ok(true)` only when the webhook was actually
+/// sent; a skip returns `Ok(false)` so the caller never arms a cooldown on nothing.
 #[cfg(feature = "enterprise")]
-#[allow(clippy::too_many_arguments)]
 pub async fn send_anomaly_alert(
-    org_id: String,
     destination_id: String,
-    config_name: String,
-    anomaly_id: String,
-    anomaly_count: i32,
-    stream_name: String,
-    // Max deviation above threshold as a percentage (0.0 if no anomalies).
-    max_deviation_percent: f64,
-    // Actual metric value of the worst-scoring anomalous bucket.
-    worst_actual_value: f64,
-    // Detection window start (Unix microseconds).
-    window_start_us: i64,
-    // Detection window end (Unix microseconds).
-    window_end_us: i64,
-) -> anyhow::Result<()> {
-    let dest = match destinations::get(&org_id, &destination_id).await {
+    ctx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> anyhow::Result<bool> {
+    let anomaly_id = ctx.anomaly_id.clone();
+    let dest = match destinations::get(&ctx.org_id, &destination_id).await {
         Ok(d) => d,
         Err(e) => {
             log::warn!(
@@ -1828,7 +3425,7 @@ pub async fn send_anomaly_alert(
                 destination_id,
                 e
             );
-            return Ok(());
+            return Ok(false);
         }
     };
 
@@ -1843,47 +3440,14 @@ pub async fn send_anomaly_alert(
                 anomaly_id,
                 destination_id
             );
-            return Ok(());
+            return Ok(false);
         }
     };
 
-    // Format the detection window as human-readable UTC strings.
-    let fmt_us = |us: i64| -> String {
-        chrono::DateTime::from_timestamp_micros(us)
-            .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
-            .unwrap_or_else(|| "unknown".to_string())
-    };
-    let window_start_str = fmt_us(window_start_us);
-    let window_end_str = fmt_us(window_end_us);
-
-    let message = format!(
-        "Anomaly detected in stream '{}' (anomaly name: '{}'): {} anomalies in window {}\u{2013}{} \
-         | worst value: {:.2} | max deviation: {:.1}%",
-        stream_name,
-        config_name,
-        anomaly_count,
-        window_start_str,
-        window_end_str,
-        worst_actual_value,
-        max_deviation_percent,
-    );
-    // Use Slack-compatible format (text field) so the same payload works for
-    // Slack incoming webhooks. Other webhook receivers can still use the fields.
-    let payload = serde_json::json!({
-        "text": message,
-        "alert_type": "anomaly_detection",
-        "anomaly_id": anomaly_id,
-        "config_name": config_name,
-        "org_id": org_id,
-        "stream_name": stream_name,
-        "anomaly_count": anomaly_count,
-        "max_deviation_percent": max_deviation_percent,
-        "worst_actual_value": worst_actual_value,
-        "window_start": window_start_str,
-        "window_end": window_end_str,
-        "message": message,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-    });
+    let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
+    let message = anomaly_alert_message(&ctx, &link);
+    // Slack-compatible shape: `text` renders in Slack, other receivers read the fields.
+    let payload = anomaly_alert_payload(&ctx, &message, &link);
 
     // SSRF protection: validate the URL (incl. DNS) before sending and build the
     // client through `build_safe_client` so redirects + connect-time resolution
@@ -1924,7 +3488,7 @@ pub async fn send_anomaly_alert(
         status
     );
 
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -2053,10 +3617,17 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_interval_seconds_and_days() {
+        assert_eq!(parse_interval("10s").unwrap(), 10);
+        assert_eq!(parse_interval("90s").unwrap(), 90);
+        assert_eq!(parse_interval("1d").unwrap(), 86400);
+    }
+
+    #[test]
     fn test_parse_interval_invalid_suffix() {
-        assert!(parse_interval("10s").is_err());
-        assert!(parse_interval("10d").is_err());
+        assert!(parse_interval("10x").is_err());
         assert!(parse_interval("abc").is_err());
+        assert!(parse_interval("5").is_err());
     }
 
     #[test]
@@ -2071,6 +3642,7 @@ mod tests {
         CreateAnomalyConfigRequest {
             name: "test".to_string(),
             description: None,
+            level_half_width_seconds: None,
             stream_name: "logs".to_string(),
             stream_type: "logs".to_string(),
             query_mode: "filters".to_string(),
@@ -2080,10 +3652,11 @@ mod tests {
             detection_function_field: None,
             histogram_interval: "5m".to_string(),
             schedule_interval: "1h".to_string(),
-            detection_window_seconds: 3600,
+            detection_window_seconds: 7200,
             training_window_days: Some(7),
             retrain_interval_days: Some(7),
             percentile: Some(97.0),
+            alert_budget_per_day: None,
             rcf_num_trees: None,
             rcf_tree_size: None,
             rcf_shingle_size: None,
@@ -2102,12 +3675,151 @@ mod tests {
         assert!(validate_config_request(&make_valid_filters_req()).is_ok());
     }
 
+    /// The HTTP layer selects 400 by matching this marker, so both must move together.
+    #[test]
+    fn test_validation_error_is_recognisable_to_the_http_layer() {
+        let err = normalize_request_filters(Some(serde_json::json!({"action": "login"})))
+            .map_err(validation_error)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("validation error"), "unexpected error: {err}");
+        assert!(err.contains("must be a JSON array"), "detail lost: {err}");
+    }
+
+    /// A row already holding `{}` would otherwise 400 the moment anything re-saved it.
+    #[test]
+    fn test_normalize_request_filters_collapses_the_no_filter_shapes() {
+        let empty = serde_json::json!([]);
+        assert_eq!(
+            normalize_request_filters(Some(serde_json::json!({}))).unwrap(),
+            Some(empty.clone())
+        );
+        assert_eq!(
+            normalize_request_filters(Some(serde_json::Value::Null)).unwrap(),
+            Some(empty)
+        );
+        assert_eq!(normalize_request_filters(None).unwrap(), None);
+    }
+
+    #[test]
+    fn test_normalize_request_filters_passes_arrays_through_untouched() {
+        for value in [
+            serde_json::json!([]),
+            serde_json::json!([{"field": "action", "operator": "=", "value": "login"}]),
+        ] {
+            assert_eq!(
+                normalize_request_filters(Some(value.clone())).unwrap(),
+                Some(value)
+            );
+        }
+    }
+
+    /// Every operator the UI can persist must survive validation, or a saved config would
+    /// carry a filter the query builder drops — scoring the unfiltered stream.
+    #[test]
+    fn test_normalize_request_filters_accepts_every_ui_operator() {
+        for op in [
+            "=",
+            "<>",
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "IN",
+            "NOT IN",
+            "str_match",
+            "str_match_ignore_case",
+            "match_all",
+            "re_match",
+            "re_not_match",
+            "Contains",
+            "Starts With",
+            "Ends With",
+            "Not Contains",
+            "Is Null",
+            "Is Not Null",
+        ] {
+            let filters = serde_json::json!([{"field": "host", "operator": op, "value": "api"}]);
+            assert!(
+                normalize_request_filters(Some(filters)).is_ok(),
+                "UI operator `{op}` must be accepted at save time"
+            );
+        }
+    }
+
+    /// An operator the query builder cannot express is refused at save time rather than
+    /// persisted to fail silently later.
+    #[test]
+    fn test_normalize_request_filters_rejects_an_unbuildable_operator() {
+        let filters =
+            serde_json::json!([{"field": "host", "operator": "sounds_like", "value": "api"}]);
+        let err = normalize_request_filters(Some(filters))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("unsupported filter operator"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Refused rather than dropped, and the caller-controlled value is never echoed back.
+    #[test]
+    fn test_normalize_request_filters_rejects_any_other_shape() {
+        let err = normalize_request_filters(Some(serde_json::json!({"action": "login"})))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("a JSON object"), "unexpected error: {err}");
+        assert!(!err.contains("login"), "error echoed the value: {err}");
+
+        assert!(normalize_request_filters(Some(serde_json::json!("a = b"))).is_err());
+        assert!(normalize_request_filters(Some(serde_json::json!(7))).is_err());
+        assert!(normalize_request_filters(Some(serde_json::json!(true))).is_err());
+    }
+
+    #[test]
+    fn test_json_type_names_every_variant() {
+        assert_eq!(json_type(&serde_json::Value::Null), "null");
+        assert_eq!(json_type(&serde_json::json!(true)), "boolean");
+        assert_eq!(json_type(&serde_json::json!(1)), "number");
+        assert_eq!(json_type(&serde_json::json!("s")), "string");
+        assert_eq!(json_type(&serde_json::json!([])), "array");
+        assert_eq!(json_type(&serde_json::json!({})), "object");
+    }
+
     #[test]
     fn test_validate_valid_custom_sql_mode() {
         let mut req = make_valid_filters_req();
         req.query_mode = "custom_sql".to_string();
         req.filters = None;
         req.custom_sql = Some("SELECT count(*) FROM logs".to_string());
+        assert!(validate_config_request(&req).is_ok());
+    }
+
+    /// A negative cadence puts the due-time in the future, retraining on every tick forever.
+    #[test]
+    fn a_negative_or_absurd_retrain_cadence_is_rejected_at_validation() {
+        assert!(validate_retrain_interval_days(0).is_ok(), "0 is Never");
+        for days in [1, 7, 14, 30, 365, 36_500] {
+            assert!(validate_retrain_interval_days(days).is_ok(), "{days}d");
+        }
+        for days in [-1, -7, -36_500, i32::MIN] {
+            assert!(
+                validate_retrain_interval_days(days).is_err(),
+                "{days}d must be rejected"
+            );
+        }
+        for days in [36_501, i32::MAX] {
+            assert!(
+                validate_retrain_interval_days(days).is_err(),
+                "{days}d must be rejected"
+            );
+        }
+
+        // And it is actually wired into the create path, not merely defined.
+        let mut req = make_valid_filters_req();
+        req.retrain_interval_days = Some(-5);
+        assert!(validate_config_request(&req).is_err());
+        req.retrain_interval_days = Some(0);
         assert!(validate_config_request(&req).is_ok());
     }
 
@@ -2137,7 +3849,7 @@ mod tests {
     #[test]
     fn test_validate_invalid_histogram_interval() {
         let mut req = make_valid_filters_req();
-        req.histogram_interval = "10d".to_string();
+        req.histogram_interval = "10x".to_string();
         assert!(validate_config_request(&req).is_err());
     }
 
@@ -2146,6 +3858,120 @@ mod tests {
         let mut req = make_valid_filters_req();
         req.schedule_interval = "bad".to_string();
         assert!(validate_config_request(&req).is_err());
+    }
+
+    // A window shorter than the schedule silently drops every bucket between two runs,
+    // because the look-back caps the cursor rather than extending it.
+    #[test]
+    fn test_detection_window_shorter_than_schedule_is_rejected() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1h".to_string();
+        req.detection_window_seconds = 900;
+        let err = validate_config_request(&req).expect_err("15m window under a 1h schedule");
+        assert!(
+            err.to_string().contains("never be scored"),
+            "unexpected message: {err}"
+        );
+    }
+
+    /// §4.3: `W == schedule` clears the cadence rule yet still misses every off-grid phase.
+    #[test]
+    fn test_detection_window_equal_to_schedule_is_under_the_floor() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1h".to_string();
+        req.detection_window_seconds = 3600;
+        assert!(validate_config_request(&req).is_err());
+        req.detection_window_seconds = 3900;
+        assert!(validate_config_request(&req).is_ok());
+    }
+
+    #[test]
+    fn test_non_positive_detection_window_is_rejected() {
+        let mut req = make_valid_filters_req();
+        req.detection_window_seconds = 0;
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    /// The live defect shape: it passed both older rules yet could never judge a bucket off-grid.
+    #[test]
+    fn the_window_that_can_never_judge_a_bucket_is_rejected() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "5m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 300;
+        let err = validate_config_request(&req).expect_err("the live broken config's shape");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("600"),
+            "the message must state the locally computed floor: {msg}"
+        );
+        assert!(
+            !msg.contains("O2_ANOMALY_EDGE_SETTLE_SECONDS"),
+            "the deleted margin must not be named anywhere: {msg}"
+        );
+    }
+
+    /// Boundary-exact on both sides, with the schedule rule unable to fake either verdict.
+    #[test]
+    fn the_coverage_floor_is_boundary_exact() {
+        for (histogram, histogram_secs) in [("1m", 60i64), ("5m", 300)] {
+            let minimum = 1800 + histogram_secs;
+            let mut req = make_valid_filters_req();
+            req.schedule_interval = "30m".to_string();
+            req.histogram_interval = histogram.to_string();
+            req.detection_window_seconds = minimum;
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "exactly the floor must be accepted ({histogram})"
+            );
+            req.detection_window_seconds = minimum - 1;
+            assert!(
+                validate_config_request(&req).is_err(),
+                "one second under the floor must be refused ({histogram})"
+            );
+        }
+    }
+
+    /// N7's other half: both dead formulas' minima give the wrong verdict under this floor.
+    #[test]
+    fn the_coverage_floor_rejects_both_dead_formulas_minima() {
+        // The schedule-only formula (`W >= schedule`) accepted 1800 here; the floor refuses.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "30m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 1800;
+        assert!(
+            validate_config_request(&req).is_err(),
+            "the schedule-only minimum must be refused"
+        );
+        // Margin-free, this band is valid; refusing it would strand working configs.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "5m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 600;
+        assert!(
+            validate_config_request(&req).is_ok(),
+            "the margin-free floor sits at 600, not the settle-inclusive 900"
+        );
+        req.detection_window_seconds = 899;
+        assert!(
+            validate_config_request(&req).is_ok(),
+            "the settle-inclusive formula must not resurrect"
+        );
+        req.detection_window_seconds = 599;
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    /// §4.6: the floor is computed locally and every surface shares one message constant.
+    #[test]
+    fn the_floor_message_is_the_shared_constant_with_the_computed_minimum() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1h".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 3899;
+        let msg = validate_config_request(&req).unwrap_err().to_string();
+        assert!(msg.contains(WINDOW_FLOOR_RULE), "one rule text: {msg}");
+        assert!(msg.contains("3900"), "the computed minimum: {msg}");
     }
 
     // ── model_to_api_json ───────────────────────────────────────────────────
@@ -2170,6 +3996,30 @@ mod tests {
         let val = serde_json::json!("just a string");
         let result = model_to_api_json(val.clone());
         assert_eq!(result, val);
+    }
+
+    /// The API returned the stored `rcf_shingle_size` while the model trained at another
+    /// width, and only the log carried the truth. A 5m config stored at the default 4
+    /// trains at 1, so the response must carry that width beside the request.
+    #[test]
+    fn the_api_reports_the_width_the_model_trains_at() {
+        let val = serde_json::json!({
+            "rcf_shingle_size": 4i64,
+            "histogram_interval": "5m",
+            "training_window_days": 7i64,
+            "rcf_tree_size": 256i64,
+        });
+        let result = model_to_api_json(val);
+        assert_eq!(result["effective_rcf_shingle_size"], 1);
+        // The operator's request stays visible, so a 4 that became a 1 is legible as such.
+        assert_eq!(result["rcf_shingle_size"], 4);
+    }
+
+    /// A row without the shingle inputs must pass through rather than gain a fabricated width.
+    #[test]
+    fn a_row_without_the_shingle_inputs_gains_no_effective_width() {
+        let result = model_to_api_json(serde_json::json!({"name": "test"}));
+        assert!(result.get("effective_rcf_shingle_size").is_none());
     }
 
     // ── extract_timestamp_from_hit ──────────────────────────────────────────
@@ -2228,49 +4078,249 @@ mod tests {
     #[test]
     fn test_extract_value_from_hit_value_field_f64() {
         let hit = serde_json::json!({"value": 3.25});
-        assert!((extract_value_from_hit(&hit).unwrap() - 3.25).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 3.25).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_count_field_integer() {
         let hit = serde_json::json!({"count": 42});
-        assert!((extract_value_from_hit(&hit).unwrap() - 42.0).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_underscore_count_field() {
         let hit = serde_json::json!({"_count": 7});
-        assert!((extract_value_from_hit(&hit).unwrap() - 7.0).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 7.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_metric_field() {
         let hit = serde_json::json!({"metric": 100.5});
-        assert!((extract_value_from_hit(&hit).unwrap() - 100.5).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 100.5).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_result_field() {
         let hit = serde_json::json!({"result": 0.0});
-        assert!((extract_value_from_hit(&hit).unwrap() - 0.0).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 0.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_no_value_field_returns_error() {
         let hit = serde_json::json!({"other_field": 99.0});
-        assert!(extract_value_from_hit(&hit).is_err());
+        assert!(extract_value_from_hit(&hit, None).is_err());
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_non_numeric_value_field_returns_error() {
         let hit = serde_json::json!({"value": "not_a_number"});
-        assert!(extract_value_from_hit(&hit).is_err());
+        assert!(extract_value_from_hit(&hit, None).is_err());
+    }
+
+    // ── (a) config-declared value column ────────────────────────────────────
+
+    /// The data-loss bug: custom SQL naming its output column anything outside the
+    /// hardcoded list produced rows that all failed extraction and were dropped.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_declared_value_column_outside_the_hardcoded_list_is_extracted() {
+        let hit = serde_json::json!({"p95_value": 12.5});
+        assert!(
+            (extract_value_from_hit(&hit, Some("p95_value")).unwrap() - 12.5).abs() < f64::EPSILON
+        );
+    }
+
+    /// Backward compatibility: a config that declares nothing keeps the legacy fallback.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_no_declared_column_still_falls_back_to_the_legacy_names() {
+        let hit = serde_json::json!({"count": 42});
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
+    }
+
+    /// A declared column must win over a legacy name present in the same row, or a
+    /// query selecting both its own metric and a raw `count` would score the wrong one.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_declared_column_wins_over_a_legacy_name_in_the_same_hit() {
+        let hit = serde_json::json!({"count": 1.0, "latency_ms": 250.0});
+        assert!(
+            (extract_value_from_hit(&hit, Some("latency_ms")).unwrap() - 250.0).abs()
+                < f64::EPSILON
+        );
+    }
+
+    /// A declared column that the result set does not contain must not silently fall
+    /// through to a legacy name: that would score a different series than configured.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_declared_column_missing_from_the_hit_is_an_error_not_a_fallback() {
+        let hit = serde_json::json!({"count": 42});
+        assert!(extract_value_from_hit(&hit, Some("p95_value")).is_err());
+    }
+
+    /// custom_sql mode carries the declaration in `detection_function`'s field slot, which
+    /// that mode's query builder never reads — no new column, no migration.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_custom_sql_mode_declares_its_value_column() {
+        assert_eq!(
+            declared_value_column("custom_sql", "max(p95_value)"),
+            Some("p95_value".to_string())
+        );
+    }
+
+    /// Filter mode's builder emits `AS value` itself, so its field names the aggregated
+    /// input column — reading it as an output column would score the wrong thing.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_filter_mode_declares_nothing() {
+        assert_eq!(
+            declared_value_column("filters", "avg(cpu_millicores)"),
+            None
+        );
+    }
+
+    /// Backward compatibility: a pre-existing custom_sql config declares nothing.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_custom_sql_config_without_a_field_declares_nothing() {
+        assert_eq!(declared_value_column("custom_sql", "count(*)"), None);
+        assert_eq!(declared_value_column("custom_sql", "count"), None);
+    }
+
+    // ── (b) loud failure on a fully-unextractable result set ────────────────
+
+    /// The bug presented as "no data" rather than "bad config". A non-empty result set
+    /// that yields zero usable points must fail loudly and name the columns it did find.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_result_set_with_no_usable_value_column_is_a_named_error() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"time_bucket": "2026-02-20T13:15:00", "p95_value": 1.0,
+                                   "request_count": 9}),
+                serde_json::json!({"time_bucket": "2026-02-20T13:20:00", "p95_value": 2.0,
+                                   "request_count": 8}),
+            ],
+            ..Default::default()
+        };
+        let err = parse_search_results_to_timeseries(&resp, "a1", None).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains('2'), "hit count not reported: {msg}");
+        assert!(
+            msg.contains("p95_value"),
+            "present columns not named: {msg}"
+        );
+        assert!(
+            msg.contains("request_count"),
+            "present columns not named: {msg}"
+        );
+    }
+
+    /// A result set whose only time column has an unrecognised name must be reported as a
+    /// timestamp problem. It used to blame the value column, which was present and fine.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_unrecognised_timestamp_column_is_named_as_the_failure() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"value": 5, "bucket_start": "2026-02-20T13:15:00"}),
+                serde_json::json!({"value": 6, "bucket_start": "2026-02-20T13:30:00"}),
+            ],
+            ..Default::default()
+        };
+        let msg = parse_search_results_to_timeseries(&resp, "a1", None)
+            .unwrap_err()
+            .to_string();
+        assert!(msg.contains("no usable timestamp column"), "{msg}");
+        assert!(!msg.contains("value column"), "value blamed: {msg}");
+        assert!(
+            msg.contains("bucket_start"),
+            "present columns not named: {msg}"
+        );
+    }
+
+    /// `zo_sql_timestamp` is the Logs page's histogram alias; a query copied from there
+    /// must train without renaming it.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_logs_page_histogram_alias_is_accepted_as_the_timestamp() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"value": 6, "zo_sql_timestamp": "2026-02-20T13:30:00"}),
+                serde_json::json!({"value": 5, "zo_sql_timestamp": "2026-02-20T13:15:00"}),
+            ],
+            ..Default::default()
+        };
+        let points = parse_search_results_to_timeseries(&resp, "a1", None).unwrap();
+        assert_eq!(points.len(), 2);
+        assert!(points[0].timestamp_us < points[1].timestamp_us);
+        assert!((points[0].value - 5.0).abs() < f64::EPSILON);
+    }
+
+    /// The same result set becomes usable once the config declares its column — the
+    /// error above is a configuration diagnosis, not a dead end.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_declaring_the_column_makes_that_same_result_set_parse() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"time_bucket": "2026-02-20T13:15:00", "p95_value": 1.0}),
+                serde_json::json!({"time_bucket": "2026-02-20T13:20:00", "p95_value": 2.0}),
+            ],
+            ..Default::default()
+        };
+        let points = parse_search_results_to_timeseries(&resp, "a1", Some("p95_value")).unwrap();
+        assert_eq!(points.len(), 2);
+        assert!((points[0].value - 1.0).abs() < f64::EPSILON);
+        assert!((points[1].value - 2.0).abs() < f64::EPSILON);
+    }
+
+    /// A partially-usable result set must still parse: the loud failure is for total
+    /// loss only, so one malformed bucket cannot abort an otherwise healthy run.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_partially_extractable_result_set_still_parses() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"time_bucket": "2026-02-20T13:15:00", "value": 1.0}),
+                serde_json::json!({"time_bucket": "2026-02-20T13:20:00", "nothing_usable": 2.0}),
+            ],
+            ..Default::default()
+        };
+        let points = parse_search_results_to_timeseries(&resp, "a1", None).unwrap();
+        assert_eq!(points.len(), 1);
+    }
+
+    /// A truncated hit set fed to the trainer reads as a sparse series and can revoke a model.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_partial_search_result_is_an_error_not_evidence() {
+        let resp = config::meta::search::Response {
+            is_partial: true,
+            ..Default::default()
+        };
+        let err = parse_search_results_to_timeseries(&resp, "a1", None).unwrap_err();
+        assert!(err.to_string().contains("partial"), "{err}");
+    }
+
+    /// The guard must reject only partiality, never an ordinary complete (even empty) response.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_complete_search_result_still_parses() {
+        let resp = config::meta::search::Response::default();
+        assert!(
+            parse_search_results_to_timeseries(&resp, "a1", None)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     /// The key names here are a cross-crate contract:
@@ -2316,5 +4366,2419 @@ mod tests {
 
             assert!(obj.is_empty());
         }
+    }
+
+    /// Both directions of interval mismatch are live production faults, so both
+    /// must be rejected at creation rather than producing silently wrong scores.
+    #[test]
+    fn test_validate_rejects_schedule_shorter_than_histogram() {
+        // default/ingester_health: 1m schedule, 5m buckets -> scores 0.2 of a bucket.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1m".to_string();
+        req.histogram_interval = "5m".to_string();
+        let err = validate_config_request(&req).unwrap_err().to_string();
+        assert!(err.contains("must not be shorter"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_rejects_schedule_not_a_multiple_of_histogram() {
+        // default/ingester_offline: 5m schedule, 1m buckets is a clean multiple and
+        // allowed; 7m against 5m straddles boundaries and is not.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "7m".to_string();
+        req.histogram_interval = "5m".to_string();
+        let err = validate_config_request(&req).unwrap_err().to_string();
+        assert!(err.contains("whole multiple"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_accepts_matching_and_multiple_intervals() {
+        for (sched, hist) in [("5m", "5m"), ("1h", "5m"), ("10m", "5m"), ("5m", "1m")] {
+            let mut req = make_valid_filters_req();
+            req.schedule_interval = sched.to_string();
+            req.histogram_interval = hist.to_string();
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "{sched} against {hist} must be accepted"
+            );
+        }
+    }
+
+    // ── P0.4: the interval rule as a shared pure seam ───────────────────────
+
+    /// A value the create path rejects can never reach `SeasonalBaseline::fit`.
+    mod level_half_width_rule {
+        use super::*;
+
+        #[test]
+        fn a_non_null_half_width_inside_the_bound_is_accepted() {
+            for seconds in [1_i64, 3_600, 86_400, 365 * 86_400] {
+                assert!(
+                    validate_level_half_width(seconds).is_ok(),
+                    "{seconds}s is within one year and must be accepted"
+                );
+            }
+        }
+
+        #[test]
+        fn a_non_positive_half_width_is_rejected() {
+            for seconds in [0_i64, -1, -86_400] {
+                assert!(
+                    validate_level_half_width(seconds).is_err(),
+                    "{seconds}s cannot describe a level window"
+                );
+            }
+        }
+
+        #[test]
+        fn a_half_width_past_one_year_is_rejected() {
+            let err = validate_level_half_width(365 * 86_400 + 1)
+                .expect_err("one second past a year must not be stored");
+            let msg = err.to_string();
+            assert!(msg.contains("31536000"), "the bound must be stated: {msg}");
+            assert!(
+                !msg.contains("  "),
+                "the message must not carry a broken line continuation: {msg:?}"
+            );
+        }
+    }
+
+    mod interval_pair_rule {
+        use super::*;
+
+        /// 2d is the trap: every smaller day-multiple divides the origin, but 11,323 is odd.
+        #[test]
+        fn a_two_day_bucket_is_rejected_even_though_one_day_is_not() {
+            assert!(validate_origin_aligned_interval("1d", 86_400).is_ok());
+            let err = validate_origin_aligned_interval("2d", 172_800)
+                .expect_err("11323 is odd, so 2d leaves a full day of skew");
+            assert!(
+                err.to_string().contains("86400s"),
+                "the message must state the remainder: {err}"
+            );
+        }
+
+        /// An off-grid bucket is refused even when the schedule/histogram ratio is legal.
+        #[test]
+        fn an_off_grid_bucket_is_rejected_through_the_shared_pair_rule() {
+            assert_eq!(2940 % 420, 0, "49m is a whole multiple of 7m");
+            let err = validate_interval_pair("49m", "7m")
+                .expect_err("a clean ratio must not launder an off-grid bucket");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be the one that fired: {err}"
+            );
+        }
+
+        #[test]
+        fn accepts_equal_intervals() {
+            assert!(validate_interval_pair("5m", "5m").is_ok());
+            assert!(validate_interval_pair("1h", "1h").is_ok());
+        }
+
+        #[test]
+        fn accepts_whole_multiples() {
+            assert!(validate_interval_pair("10m", "5m").is_ok(), "2x");
+            assert!(validate_interval_pair("1h", "5m").is_ok(), "12x");
+            assert!(validate_interval_pair("5m", "1m").is_ok(), "5x");
+        }
+
+        /// default/ingester_health, live: 1m schedule against 5m buckets scores a fifth of
+        /// a bucket against a full-bucket baseline -- a permanent apparent 80% drop.
+        #[test]
+        fn rejects_prod_shape_ingester_health() {
+            let err = validate_interval_pair("1m", "5m").unwrap_err().to_string();
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        /// default/ingester_offline, live: 5m against 1m is a clean multiple and must stay
+        /// allowed, so the case that pins its class is the non-multiple 7m/5m.
+        #[test]
+        fn rejects_non_multiples() {
+            let err = validate_interval_pair("7m", "5m").unwrap_err().to_string();
+            assert!(err.contains("whole multiple"), "got: {err}");
+            assert!(validate_interval_pair("7m", "2m").is_err());
+        }
+
+        /// Pinned to the parse contract's own wording: an impl that swallowed the parse
+        /// error and substituted its own text would otherwise satisfy a bare `is_err()`.
+        #[test]
+        fn rejects_unparseable_intervals_rather_than_ignoring_them() {
+            for bad in ["bad", "10x", "", "5"] {
+                let err = validate_interval_pair(bad, "5m").unwrap_err().to_string();
+                assert!(err.contains("Invalid interval format"), "{bad}: {err}");
+            }
+            let err = validate_interval_pair("5m", "10x").unwrap_err().to_string();
+            assert!(err.contains("Invalid interval format"), "got: {err}");
+        }
+
+        /// `%` by a zero divisor panics, so a zero histogram must be refused BEFORE the
+        /// multiple check -- `0m` clears the `schedule < histogram` guard and reaches it.
+        #[test]
+        fn rejects_zero_histogram_without_panicking() {
+            assert!(validate_interval_pair("5m", "0m").is_err());
+            assert!(validate_interval_pair("0h", "0m").is_err());
+        }
+
+        /// `"-5m"` parses to -300 via i64, so a signed interval reaches the rule and would
+        /// otherwise pass `schedule >= histogram` against a negative bucket width.
+        #[test]
+        fn rejects_negative_intervals() {
+            assert!(validate_interval_pair("-5m", "5m").is_err());
+            assert!(validate_interval_pair("5m", "-5m").is_err());
+        }
+
+        /// `hours * 3600` is unguarded. A NEGATIVE wrap is already caught by the positivity
+        /// guard, so the real threat is a POSITIVE wrap: 384307168202282400h lands on exactly
+        /// 268800s (74h), which clears `schedule >= histogram` AND divides 300 evenly, so a
+        /// wrapping multiply accepts it as a plausible schedule. Only `checked_mul` rejects it.
+        #[test]
+        fn rejects_intervals_that_overflow_the_seconds_conversion() {
+            // Pins the debug-build panic; in release this one wraps negative.
+            assert!(validate_interval_pair("9223372036854775807h", "5m").is_err());
+
+            for (schedule, histogram) in
+                [("384307168202282400h", "5m"), ("5m", "384307168202282400h")]
+            {
+                let err = validate_interval_pair(schedule, histogram)
+                    .unwrap_err()
+                    .to_string();
+                assert!(
+                    err.contains("out of range"),
+                    "{schedule}/{histogram} must be refused as overflow, not merely as \
+                     non-positive -- the two are indistinguishable otherwise: {err}"
+                );
+            }
+        }
+    }
+
+    // ── P0.4: partial updates validate the MERGED row, not just the payload ──
+
+    mod update_interval_validation {
+        use super::*;
+
+        /// The persisted side of a partial update: 1h schedule against 5m buckets, valid.
+        /// `pub(super)` so the G4 grandfathering fixtures build on one persisted row
+        /// rather than three copies that can drift apart field by field.
+        pub(super) fn stored_config() -> infra::table::entity::anomaly_detection_config::Model {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: "a1".to_string(),
+                org_id: "default".to_string(),
+                level_half_width_seconds: None,
+                stream_name: "logs".to_string(),
+                stream_type: "logs".to_string(),
+                enabled: true,
+                name: "test".to_string(),
+                description: None,
+                query_mode: "filters".to_string(),
+                filters: Some(serde_json::json!([])),
+                custom_sql: None,
+                detection_function: "count(*)".to_string(),
+                histogram_interval: "5m".to_string(),
+                schedule_interval: "1h".to_string(),
+                detection_window_seconds: 3600,
+                training_window_days: 7,
+                retrain_interval_days: 7,
+                threshold: 97,
+                alert_budget_per_day: None,
+                seasonality: "none".to_string(),
+                is_trained: false,
+                training_started_at: None,
+                training_completed_at: None,
+                last_error: None,
+                last_processed_timestamp: None,
+                current_model_version: 0,
+                rcf_num_trees: 50,
+                rcf_tree_size: 256,
+                rcf_shingle_size: 8,
+                alert_enabled: false,
+                alert_destinations: None,
+                folder_id: "f1".to_string(),
+                owner: None,
+                priority: None,
+                tags: None,
+                status: 0,
+                retries: 0,
+                last_failed_at: None,
+                last_alert_fired_at: None,
+                last_recovery_notified_at: None,
+                last_updated: 0,
+                created_at: 1000,
+                updated_at: 1000,
+            }
+        }
+
+        /// The ingester_health shape, as already persisted: a row that create would now
+        /// refuse but that exists in production and must stay administrable.
+        fn broken_legacy_config() -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1m".to_string();
+            stored.histogram_interval = "5m".to_string();
+            stored
+        }
+
+        /// The other live broken row, ingester_offline: 5m schedule over 1m buckets is a
+        /// clean multiple, so what is wrong with it is the skipped buckets, not the ratio.
+        fn ingester_offline_config() -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "1m".to_string();
+            stored
+        }
+
+        /// A full-body PUT replay: every interval resent at exactly its persisted value.
+        fn full_body_replay(
+            existing: &infra::table::entity::anomaly_detection_config::Model,
+        ) -> UpdateAnomalyConfigRequest {
+            UpdateAnomalyConfigRequest {
+                name: Some("renamed in the UI".to_string()),
+                schedule_interval: Some(existing.schedule_interval.clone()),
+                histogram_interval: Some(existing.histogram_interval.clone()),
+                ..Default::default()
+            }
+        }
+
+        /// Targets the same fn `update_config` calls, so tests cannot drift from the product.
+        fn update_result(req: UpdateAnomalyConfigRequest) -> Result<()> {
+            validated_intervals(&req, &stored_config()).map_err(validation_error)
+        }
+
+        /// Structural proof that create DELEGATES rather than keeping a copy: a `0m`
+        /// histogram panics on `% 0` in the old inline rule, so only a create path routed
+        /// through the shared guard can return Err here. Copy-paste cannot satisfy this.
+        #[test]
+        fn create_delegates_so_the_zero_histogram_panic_is_gone() {
+            let mut req = make_valid_filters_req();
+            req.schedule_interval = "5m".to_string();
+            req.histogram_interval = "0m".to_string();
+            assert!(validate_config_request(&req).is_err());
+        }
+
+        /// Update must reuse the create rule verbatim, otherwise update could drift to a
+        /// second, differently-worded rule saying the same thing.
+        #[test]
+        fn shares_the_create_paths_wording_for_the_same_pair() {
+            for (schedule, histogram) in [("1m", "5m"), ("7m", "5m")] {
+                let mut req = make_valid_filters_req();
+                req.schedule_interval = schedule.to_string();
+                req.histogram_interval = histogram.to_string();
+                let from_create = validate_config_request(&req).unwrap_err().to_string();
+                let from_rule = validate_interval_pair(schedule, histogram)
+                    .unwrap_err()
+                    .to_string();
+                assert_eq!(from_create, from_rule, "{schedule}/{histogram} diverged");
+            }
+        }
+
+        #[test]
+        fn absent_intervals_fall_back_to_the_persisted_values() {
+            let stored = stored_config();
+            let (schedule, histogram) =
+                merged_interval_pair(&UpdateAnomalyConfigRequest::default(), &stored);
+            assert_eq!(schedule, "1h");
+            assert_eq!(histogram, "5m");
+        }
+
+        #[test]
+        fn a_submitted_interval_overrides_the_persisted_one() {
+            let stored = stored_config();
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("10m".to_string()),
+                ..Default::default()
+            };
+            let (schedule, histogram) = merged_interval_pair(&req, &stored);
+            assert_eq!(schedule, "10m");
+            assert_eq!(histogram, "5m", "unchanged field keeps the stored value");
+        }
+
+        /// Mutation shape 1: schedule alone, conflicting with the UNCHANGED stored histogram.
+        /// Validating only the submitted field would miss this entirely.
+        #[test]
+        fn rejects_changing_schedule_alone_into_a_conflict() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("1m".to_string()),
+                ..Default::default()
+            };
+            let err = update_result(req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        /// 8m is on the date_bin grid, so the ratio rule fires here, not the origin rule.
+        #[test]
+        fn rejects_changing_histogram_alone_into_a_conflict() {
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("8m".to_string()),
+                ..Default::default()
+            };
+            let err = update_result(req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("whole multiple"), "got: {err}");
+        }
+
+        /// Mutation shape 3: both fields at once, recreating the live ingester_health row.
+        #[test]
+        fn rejects_changing_both_into_the_ingester_health_shape() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("1m".to_string()),
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            let err = update_result(req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        /// A histogram larger than the stored 1h schedule: valid read on its own, broken
+        /// against the row it lands in. Only merged-state validation catches it.
+        #[test]
+        fn rejects_a_lone_field_that_only_conflicts_once_merged() {
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("2h".to_string()),
+                ..Default::default()
+            };
+            let err = update_result(req).unwrap_err().to_string();
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        #[test]
+        fn accepts_a_valid_interval_change() {
+            for (schedule, histogram) in [
+                (Some("10m"), Some("5m")),
+                (Some("30m"), None),
+                (None, Some("1m")),
+            ] {
+                let req = UpdateAnomalyConfigRequest {
+                    schedule_interval: schedule.map(str::to_string),
+                    histogram_interval: histogram.map(str::to_string),
+                    ..Default::default()
+                };
+                assert!(
+                    update_result(req).is_ok(),
+                    "{schedule:?}/{histogram:?} must be accepted"
+                );
+            }
+        }
+
+        /// Grandfathering case 1 of 4, split so always-validate fails four separate tests
+        /// rather than one: a folder move must not re-litigate a row broken on disk.
+        #[test]
+        fn a_broken_row_can_still_be_moved_between_folders() {
+            let req = UpdateAnomalyConfigRequest {
+                folder_id: Some("other".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken_legacy_config()).is_ok());
+        }
+
+        /// The case that matters most operationally: ingester_health is Slack-wired at a
+        /// ceiling of 1440 alerts/day, and validating here would make it undisableable.
+        #[test]
+        fn a_broken_row_can_still_be_disabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken_legacy_config()).is_ok());
+        }
+
+        /// Bulk enable reaches `update_config` with no 400 path at all, so a rejection here
+        /// surfaces as a 500 on a row the operator never asked to change.
+        #[test]
+        fn a_broken_row_can_still_be_bulk_enabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(true),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken_legacy_config()).is_ok());
+        }
+
+        #[test]
+        fn the_other_broken_prod_row_is_equally_administrable() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &ingester_offline_config()).is_ok());
+        }
+
+        /// The alerts v2 PUT replays the FULL body, so a rename resends both intervals at
+        /// their stored values. Keyed on presence this reads as "touching both" and blocks
+        /// the edit through the primary UI path; keyed on change it is correctly a no-op.
+        #[test]
+        fn a_full_body_replay_of_unchanged_intervals_is_not_a_change() {
+            for broken in [broken_legacy_config(), ingester_offline_config()] {
+                let req = full_body_replay(&broken);
+                assert!(
+                    validated_intervals(&req, &broken).is_ok(),
+                    "a UI rename must not be rejected by resent-but-identical intervals"
+                );
+            }
+        }
+
+        /// The single-field twin of the replay: resending one interval at its stored value.
+        #[test]
+        fn resubmitting_one_interval_unchanged_is_not_a_change() {
+            let broken = broken_legacy_config();
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some(broken.schedule_interval.clone()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken).is_ok());
+        }
+
+        /// Compared in parsed seconds, not strings: the UI re-spelling an interval is not an
+        /// edit. A string compare would re-validate here and make the broken row uneditable
+        /// again -- precisely what grandfathering exists to prevent.
+        #[test]
+        fn a_respelled_interval_of_equal_length_is_not_a_change() {
+            let mut stored = broken_legacy_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "5m".to_string();
+            // 1h and 60m are the same duration, so this row is untouched, not repaired.
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("60m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &stored).is_ok());
+
+            let broken = broken_legacy_config();
+            let zero_padded = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("01m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&zero_padded, &broken).is_ok());
+        }
+
+        /// An empty interval must reach the rule and be refused, not be mistaken for
+        /// "unchanged" by an implementation that filters blanks before comparing.
+        #[test]
+        fn an_empty_interval_string_is_refused_not_grandfathered() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some(String::new()),
+                ..Default::default()
+            };
+            let err = validated_intervals(&req, &broken_legacy_config())
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("Invalid interval format"), "got: {err}");
+        }
+
+        /// Grandfathering does not extend to a genuine edit: changing one interval on a
+        /// broken row is validated against the persisted other, so it can only improve.
+        #[test]
+        fn genuinely_changing_one_interval_on_a_broken_row_is_still_validated() {
+            let broken = broken_legacy_config();
+            let worse = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("2m".to_string()),
+                ..Default::default()
+            };
+            let err = validated_intervals(&worse, &broken)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        #[test]
+        fn repairing_a_broken_row_from_either_side_is_allowed() {
+            let broken = broken_legacy_config();
+            let by_schedule = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("10m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&by_schedule, &broken).is_ok());
+
+            // The symmetric repair: 1m buckets under the stored 1m schedule is 1:1.
+            let by_histogram = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("1m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&by_histogram, &broken).is_ok());
+        }
+
+        /// The boundary of the `<` comparison, reached through a merge rather than the
+        /// pure rule: equal intervals are the tightest pair that must still be accepted.
+        #[test]
+        fn a_merge_landing_on_equal_intervals_is_accepted() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &stored_config()).is_ok());
+        }
+
+        /// The grandfathering rule: a stored row already violating the bound stays
+        /// editable so long as the edit leaves both fields alone.
+        #[test]
+        fn an_edit_elsewhere_leaves_a_violating_stored_window_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.detection_window_seconds = 900;
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_window(&req, &stored).is_ok());
+            // Pins that grandfathering spared it: touching the histogram re-enters the rules.
+            let err = validated_intervals(
+                &UpdateAnomalyConfigRequest {
+                    histogram_interval: Some("7m".to_string()),
+                    ..Default::default()
+                },
+                &stored,
+            )
+            .expect_err("an edit that moves the interval is held to the origin rule");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be what refused it: {err}"
+            );
+        }
+
+        #[test]
+        fn shortening_the_window_below_the_schedule_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.detection_window_seconds = 3600;
+            let req = UpdateAnomalyConfigRequest {
+                detection_window_seconds: Some(900),
+                ..Default::default()
+            };
+            assert!(validated_detection_window(&req, &stored).is_err());
+        }
+
+        /// Held to the rule, or grandfathering becomes a back door to the broken shape.
+        #[test]
+        fn widening_the_histogram_under_the_coverage_floor_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "1m".to_string();
+            stored.detection_window_seconds = 400;
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_window(&req, &stored).is_err(),
+                "400 clears 300+60 but not 300+300"
+            );
+        }
+
+        /// Only an edit that actually moves an interval is held to the rule.
+        #[test]
+        fn a_stored_off_grid_interval_survives_an_edit_that_leaves_it_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "7m".to_string();
+            stored.histogram_interval = "7m".to_string();
+            assert!(
+                validate_interval_pair("7m", "7m").is_err(),
+                "the row must be one create would now refuse"
+            );
+
+            let elsewhere = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&elsewhere, &stored).is_ok());
+
+            assert!(
+                validated_intervals(&full_body_replay(&stored), &stored).is_ok(),
+                "a full-body PUT resends the interval unchanged and must not strand the row"
+            );
+
+            let respelled = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("420s".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_intervals(&respelled, &stored).is_ok(),
+                "420s is the same duration as 7m, so the row is untouched, not repaired"
+            );
+        }
+
+        /// Off-grid to off-grid is a real edit, so grandfathering cannot admit new bad values.
+        #[test]
+        fn moving_a_stored_interval_to_another_off_grid_value_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "7m".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("11m".to_string()),
+                ..Default::default()
+            };
+            let err = validated_intervals(&req, &stored)
+                .expect_err("11m is a new off-grid value, not the stored one");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be the one that fired: {err}"
+            );
+        }
+
+        /// Repair onto the grid must be allowed, or the rule traps the rows it exists to fix.
+        #[test]
+        fn repairing_an_off_grid_interval_onto_the_grid_is_accepted() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "7m".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &stored).is_ok());
+            // Pins that the repair was judged, not waved through.
+            let err = validated_intervals(
+                &UpdateAnomalyConfigRequest {
+                    histogram_interval: Some("11m".to_string()),
+                    ..Default::default()
+                },
+                &stored,
+            )
+            .expect_err("11m is off the grid and must not pass as a repair");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be what refused it: {err}"
+            );
+        }
+
+        /// A pre-existing violation stays administrable while the edit touches none of the fields.
+        #[test]
+        fn an_edit_elsewhere_leaves_a_violating_coverage_floor_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "5m".to_string();
+            stored.detection_window_seconds = 300;
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_window(&req, &stored).is_ok());
+        }
+    }
+
+    // ── §4.1.1: the custom-SQL grid rules, enforced by AST walk ─────────────
+
+    mod custom_sql_grid_rules {
+        use super::*;
+
+        fn custom_sql_req(sql: &str) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.custom_sql = Some(sql.to_string());
+            req
+        }
+
+        /// A stored custom-SQL row; the SQL passed in may deliberately violate the rules.
+        fn stored_custom_sql_config(
+            sql: &str,
+        ) -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = update_interval_validation::stored_config();
+            stored.query_mode = "custom_sql".to_string();
+            stored.custom_sql = Some(sql.to_string());
+            stored
+        }
+
+        /// Rule (iii) is semantic µs equality: "300s" and "5m" name the same grid.
+        #[test]
+        fn a_respelled_equal_interval_is_accepted() {
+            for interval in ["5m", "300s", "300 seconds", "300sec"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '{interval}') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                assert!(
+                    validate_config_request(&custom_sql_req(&sql)).is_ok(),
+                    "'{interval}' equals the config's 5m and must be accepted"
+                );
+            }
+        }
+
+        /// Rule (iii): a mismatched interval is a permanent grid desync.
+        #[test]
+        fn a_mismatched_interval_is_rejected() {
+            let err = validate_config_request(&custom_sql_req(
+                "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(err.contains("does not equal"), "got: {err}");
+        }
+
+        /// Rule (iv): the argless form's interval is injected at query time — guaranteed desync.
+        #[test]
+        fn the_argless_histogram_form_is_rejected() {
+            let err = validate_config_request(&custom_sql_req(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(err.contains("explicitly"), "got: {err}");
+        }
+
+        /// Rule (i): a third argument shifts the grid off the detector's, IANA names included.
+        #[test]
+        fn a_timezone_argument_is_rejected() {
+            for timezone in ["'+05:30'", "'America/Los_Angeles'", "'UTC'"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '5m', {timezone}) AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                let err = validate_config_request(&custom_sql_req(&sql))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("timezone"), "{timezone}: {err}");
+            }
+        }
+
+        /// Rule (ii): calendar units have no fixed stride, so no grid exists to match.
+        #[test]
+        fn a_calendar_unit_interval_is_rejected() {
+            for interval in ["1 month", "1 year", "2 months"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '{interval}') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                let err = validate_config_request(&custom_sql_req(&sql))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("calendar"), "'{interval}': {err}");
+            }
+        }
+
+        /// The defeats that beat a substring check — nesting, comments, casing — reach the AST.
+        #[test]
+        fn substring_defeats_are_caught_by_the_ast_walk() {
+            for sql in [
+                "SELECT ts, value FROM (SELECT histogram(_timestamp, '10m') AS ts, \
+                 count(*) AS value FROM logs GROUP BY ts) sub",
+                "SELECT histogram /* tz */ (_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+                "SELECT HISTOGRAM(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            ] {
+                assert!(
+                    validate_config_request(&custom_sql_req(sql)).is_err(),
+                    "a violation a substring check would miss must still be caught: {sql}"
+                );
+            }
+        }
+
+        /// Refused rather than waved through unexamined: what cannot be parsed cannot be walked.
+        #[test]
+        fn unparsable_sql_is_rejected() {
+            assert!(validate_config_request(&custom_sql_req("SELECT FROM WHERE ((")).is_err());
+        }
+
+        /// §4.1.1 grandfathering: an unrelated edit on a stored violating row still passes.
+        #[test]
+        fn an_unrelated_edit_on_a_violating_row_is_grandfathered() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
+
+        /// A full-body PUT resends the stored SQL byte-identically; that is not an edit.
+        #[test]
+        fn a_resent_identical_custom_sql_is_not_a_change() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                custom_sql: stored.custom_sql.clone(),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
+
+        /// An edit that touches `custom_sql` is held to the rules.
+        #[test]
+        fn an_edit_touching_custom_sql_is_validated() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                custom_sql: Some(
+                    "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                        .to_string(),
+                ),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_err());
+        }
+
+        /// An interval edit under a custom query desyncs the same grid through the back door.
+        #[test]
+        fn an_interval_edit_under_a_custom_query_is_validated() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("10m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_err());
+        }
+
+        /// Filters mode's leftover `custom_sql` column is not the running query (G4's rule).
+        #[test]
+        fn a_filters_mode_row_is_not_held_to_the_sql_rules() {
+            let mut stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            stored.query_mode = "filters".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("1m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
+    }
+
+    // ── P0.6: `enabled` gates training on EVERY entry point, not just the SELECT ──
+
+    mod training_flag_hygiene {
+        use super::*;
+
+        /// An enabled, never-trained config: the row every manual entry point starts from.
+        fn trainable_config() -> infra::table::entity::anomaly_detection_config::Model {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: "a1".to_string(),
+                org_id: "default".to_string(),
+                level_half_width_seconds: None,
+                stream_name: "logs".to_string(),
+                stream_type: "logs".to_string(),
+                enabled: true,
+                name: "test".to_string(),
+                description: None,
+                query_mode: "filters".to_string(),
+                filters: Some(serde_json::json!([])),
+                custom_sql: None,
+                detection_function: "count(*)".to_string(),
+                histogram_interval: "5m".to_string(),
+                schedule_interval: "1h".to_string(),
+                detection_window_seconds: 3600,
+                training_window_days: 7,
+                retrain_interval_days: 7,
+                threshold: 97,
+                alert_budget_per_day: None,
+                seasonality: "none".to_string(),
+                is_trained: false,
+                training_started_at: None,
+                training_completed_at: None,
+                last_error: None,
+                last_processed_timestamp: None,
+                current_model_version: 0,
+                rcf_num_trees: 50,
+                rcf_tree_size: 256,
+                rcf_shingle_size: 8,
+                alert_enabled: true,
+                alert_destinations: None,
+                folder_id: "f1".to_string(),
+                owner: None,
+                priority: None,
+                tags: None,
+                status: 0,
+                retries: 0,
+                last_failed_at: None,
+                last_alert_fired_at: None,
+                last_recovery_notified_at: None,
+                last_updated: 0,
+                created_at: 1000,
+                updated_at: 1000,
+            }
+        }
+
+        /// The gap this task closes: the automatic SELECT filters `Enabled.eq(true)` but the
+        /// manual path does not, so a disabled config can still be retrained by hand.
+        #[test]
+        fn a_disabled_config_is_refused_by_the_manual_training_guard() {
+            let mut disabled = trainable_config();
+            disabled.enabled = false;
+            assert!(ensure_trainable(&disabled).is_err());
+        }
+
+        /// The guard must not become a second obstacle for the normal path.
+        #[test]
+        fn an_enabled_config_is_accepted() {
+            assert!(ensure_trainable(&trainable_config()).is_ok());
+        }
+
+        /// The exact conflation this task exists to prevent: an implementation that reads
+        /// `alert_enabled` where `enabled` was meant passes every other test but fails here.
+        #[test]
+        fn the_guard_reads_enabled_and_never_alert_enabled() {
+            let mut alerts_off = trainable_config();
+            alerts_off.alert_enabled = false;
+            assert!(
+                ensure_trainable(&alerts_off).is_ok(),
+                "alert_enabled gates dispatch, never training"
+            );
+
+            let mut disabled_but_alerting = trainable_config();
+            disabled_but_alerting.enabled = false;
+            disabled_but_alerting.alert_enabled = true;
+            assert!(ensure_trainable(&disabled_but_alerting).is_err());
+        }
+
+        /// Pinned policy: `default/test` sat at 44,572 retries with `alert_enabled=false`.
+        /// Turning alerts off is not a training kill switch and must not become one.
+        #[test]
+        fn alert_enabled_false_does_not_stop_a_failing_config_from_retraining() {
+            let mut burning = trainable_config();
+            burning.alert_enabled = false;
+            burning.retries = 44_572;
+            burning.last_failed_at = Some(1_700_000_000_000_000);
+            assert!(ensure_trainable(&burning).is_ok());
+        }
+
+        /// `alert_enabled=false` DOES suppress dispatch — the other half of the same policy.
+        /// Targets the predicate `detect_anomalies` calls, so the test cannot drift from it.
+        #[test]
+        fn alert_enabled_false_suppresses_dispatch() {
+            assert!(!dispatch_allowed(7, false));
+            assert!(dispatch_allowed(7, true));
+        }
+
+        /// Dispatch still needs anomalies: `alert_enabled` alone must not fire an empty run.
+        #[test]
+        fn dispatch_needs_both_anomalies_and_the_alert_flag() {
+            assert!(!dispatch_allowed(0, true));
+            assert!(!dispatch_allowed(0, false));
+        }
+
+        /// The manual `/detect` path delivered real webhooks while leaving
+        /// `last_alert_fired_at` NULL, so the cooldown never saw those alerts. The anchor it
+        /// records must be the leading edge, matching the scheduled path.
+        #[test]
+        fn the_manual_anchor_is_the_earliest_anomalous_point() {
+            let points = [(false, 10), (true, 30), (true, 20), (false, 5)];
+            assert_eq!(leading_edge_anchor_us(points), Some(20));
+        }
+
+        /// A run that scored nothing anomalous has no anchor to arm the cooldown with.
+        #[test]
+        fn a_run_without_anomalies_yields_no_manual_anchor() {
+            assert_eq!(leading_edge_anchor_us([(false, 10), (false, 20)]), None);
+            assert_eq!(leading_edge_anchor_us([]), None);
+        }
+
+        /// `send_anomaly_alert` returns Ok on its skip paths (destination missing,
+        /// non-HTTP); counting those as deliveries armed the cooldown with nothing sent.
+        #[test]
+        fn a_skipped_destination_does_not_count_as_delivered() {
+            assert!(!any_alert_delivered([Ok(false)]));
+            assert!(!any_alert_delivered([
+                Ok(false),
+                Err(anyhow::anyhow!("boom"))
+            ]));
+            assert!(!any_alert_delivered([]));
+        }
+
+        /// A single real delivery arms the cooldown even when other destinations skip.
+        #[test]
+        fn a_real_delivery_still_arms_the_cooldown() {
+            assert!(any_alert_delivered([Ok(false), Ok(true)]));
+            assert!(any_alert_delivered([
+                Err(anyhow::anyhow!("boom")),
+                Ok(true)
+            ]));
+        }
+
+        /// `Status::Disabled` (4) is dead: nothing writes it, and the guard keys off
+        /// `enabled`, so a row carrying it is still trainable. Documents current reality.
+        #[test]
+        fn status_disabled_is_dead_and_does_not_gate_the_guard() {
+            let mut odd = trainable_config();
+            odd.status = 4;
+            assert!(ensure_trainable(&odd).is_ok());
+
+            let mut disabled_and_status_four = trainable_config();
+            disabled_and_status_four.enabled = false;
+            disabled_and_status_four.status = 4;
+            assert!(ensure_trainable(&disabled_and_status_four).is_err());
+        }
+
+        /// A config created with `enabled: Some(false)` must not train on create. The spawn
+        /// at the create site is gated only on the global kill-switch, so a disabled config
+        /// trains immediately today.
+        #[test]
+        fn a_config_created_disabled_does_not_train_on_create() {
+            assert!(!initial_training_allowed(false, false));
+        }
+
+        /// The create-time gate keeps its existing kill-switch behaviour for enabled configs.
+        #[test]
+        fn create_time_training_respects_both_the_flag_and_the_kill_switch() {
+            assert!(initial_training_allowed(true, false));
+            assert!(!initial_training_allowed(true, true));
+            assert!(!initial_training_allowed(false, true));
+        }
+
+        // Wiring the guard into train_model / force_retrain_for_threshold / ENT
+        // trigger_training is a KNOWN GAP no unit test here can hold; the
+        // implementation-phase diff review owns it.
+    }
+
+    // ── G4: a denominator-free error count is not a detection target ─────────
+
+    /// Phase 1H's headline "miss" was not a detector fault. `nginx_5xx_1h` took a x1352
+    /// excursion and scored 0.4771 because z = 0.348: the training window already held 29
+    /// values >= 1352, ten of them 9-54x larger, max 72,738. A bare error COUNT cannot
+    /// separate 20 errors in 330,000 requests from 20 errors in 200, so no forest and no
+    /// thresholder can rescue it -- only refusing the config can. The rate form of the same
+    /// signal, `nginx_5xx_rate_1h`, is servable and did detect the same platform outage.
+    mod detection_function_rule {
+        use super::*;
+
+        fn req_with(function: &str, field: Option<&str>) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.detection_function = function.to_string();
+            req.detection_function_field = field.map(str::to_string);
+            req
+        }
+
+        fn stored_with(function: &str) -> infra::table::entity::anomaly_detection_config::Model {
+            let mut model = update_interval_validation::stored_config();
+            model.detection_function = function.to_string();
+            model
+        }
+
+        #[test]
+        fn every_supported_function_is_accepted() {
+            for function in ["avg", "sum", "min", "max", "p50", "p95", "p99"] {
+                assert!(
+                    validate_config_request(&req_with(function, Some("latency_ms"))).is_ok(),
+                    "{function} is a supported aggregation and must be accepted"
+                );
+            }
+            assert!(validate_config_request(&req_with("count", None)).is_ok());
+        }
+
+        #[test]
+        fn the_retired_percentiles_are_refused_at_create() {
+            for function in ["p75", "p90"] {
+                let err = validate_config_request(&req_with(function, Some("latency_ms")))
+                    .expect_err("the trainer cannot deserialize this name");
+                assert!(
+                    err.to_string().contains("unsupported detection_function"),
+                    "{function} must name itself in the refusal, got: {err}"
+                );
+            }
+        }
+
+        #[test]
+        fn a_function_the_trainer_cannot_read_is_refused_even_with_runnable_sql() {
+            // `median` is real DataFusion, so only the trainer's enum rejects it: the gap that
+            // let it save with a 200 and then fail every run.
+            let err = validate_config_request(&req_with("median", Some("latency_ms")))
+                .expect_err("median is not a DetectionFunction variant");
+            assert!(err.to_string().contains("median"), "got: {err}");
+        }
+
+        #[test]
+        fn an_arbitrary_name_is_refused() {
+            assert!(validate_config_request(&req_with("totally_made_up", Some("x"))).is_err());
+        }
+
+        #[test]
+        fn the_refusal_lists_what_is_supported() {
+            let err = validate_config_request(&req_with("p75", Some("latency_ms")))
+                .expect_err("p75 is refused");
+            let msg = err.to_string();
+            for supported in SUPPORTED_DETECTION_FUNCTIONS {
+                assert!(msg.contains(supported), "{supported} missing from: {msg}");
+            }
+        }
+
+        #[test]
+        fn a_non_count_function_without_a_field_is_refused() {
+            // `combine_detection_fn` leaves this bare as `avg`, which reads as a column name.
+            let err = validate_config_request(&req_with("avg", None))
+                .expect_err("avg has no operand to aggregate");
+            assert!(
+                err.to_string()
+                    .contains("requires detection_function_field"),
+                "got: {err}"
+            );
+        }
+
+        #[test]
+        fn an_empty_field_is_not_a_field() {
+            assert!(validate_config_request(&req_with("avg", Some(""))).is_err());
+            assert!(validate_config_request(&req_with("avg", Some("   "))).is_err());
+        }
+
+        #[test]
+        fn count_needs_no_field_in_either_spelling() {
+            assert!(validate_config_request(&req_with("count", None)).is_ok());
+            assert!(validate_config_request(&req_with("count(*)", None)).is_ok());
+        }
+
+        #[test]
+        fn a_pre_combined_request_reaches_the_same_verdict() {
+            assert!(validate_config_request(&req_with("p95(latency_ms)", None)).is_ok());
+            assert!(validate_config_request(&req_with("p75(latency_ms)", None)).is_err());
+        }
+
+        #[test]
+        fn an_uppercase_spelling_of_a_supported_function_is_refused() {
+            // Measured: `AVG`, `Avg`, `P95` and `COUNT` all save with a 200 today and then fail
+            // training with `unknown variant`. serde matches enum variants exactly, so a
+            // case-insensitive gate here would leave the bug open under a different spelling.
+            for function in ["AVG", "Avg", "P95", "COUNT", "Sum"] {
+                let err = validate_config_request(&req_with(function, Some("latency_ms")))
+                    .expect_err("the trainer deserializes variants case-sensitively");
+                assert!(
+                    err.to_string().contains("case-sensitive"),
+                    "{function} must be told it is a case problem, got: {err}"
+                );
+            }
+        }
+
+        #[test]
+        fn the_case_refusal_names_the_spelling_that_works() {
+            let err = validate_config_request(&req_with("AVG", Some("latency_ms")))
+                .expect_err("AVG is refused");
+            assert!(err.to_string().contains("'avg'"), "got: {err}");
+        }
+
+        #[test]
+        fn an_uppercase_unsupported_function_is_refused_as_unsupported() {
+            let err = validate_config_request(&req_with("P75", Some("latency_ms")))
+                .expect_err("p75 is refused in any spelling");
+            assert!(
+                err.to_string().contains("unsupported detection_function"),
+                "case is not the reason p75 fails, got: {err}"
+            );
+        }
+
+        #[test]
+        fn a_malformed_combined_form_is_named_not_ignored() {
+            let err = validate_config_request(&req_with("avg(latency_ms", None))
+                .expect_err("an unclosed paren is not a function");
+            assert!(err.to_string().contains("malformed"), "got: {err}");
+        }
+
+        #[test]
+        fn the_rule_is_reported_as_a_400_not_a_500() {
+            let err = validate_config_request(&req_with("p75", Some("latency_ms")))
+                .expect_err("p75 is refused");
+            assert!(
+                validation_error(err)
+                    .to_string()
+                    .starts_with("validation error: "),
+                "the HTTP layer answers 400 only on this prefix"
+            );
+        }
+
+        #[test]
+        fn changing_a_stored_function_into_an_unusable_one_is_refused() {
+            let existing = stored_with("avg(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p75".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_function(&req, &existing).is_err());
+        }
+
+        #[test]
+        fn a_row_already_carrying_an_unusable_function_stays_administrable() {
+            // The mirror of the denominator rule's grandfathering: a config stored before this
+            // gate existed must still be renamable, movable and disableable.
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_ok(),
+                "an untouched function must not be re-litigated by an unrelated edit"
+            );
+        }
+
+        #[test]
+        fn a_replay_of_the_stored_unusable_function_is_not_a_change() {
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p75".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_ok(),
+                "a full-body replay re-sends the stored value and changes nothing"
+            );
+        }
+
+        #[test]
+        fn repairing_a_broken_row_is_allowed() {
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p95".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_function(&req, &existing).is_ok());
+        }
+
+        #[test]
+        fn dropping_the_field_from_a_stored_function_is_refused() {
+            let existing = stored_with("avg(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("avg".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_err(),
+                "an edit that strips the operand must not save a bare aggregation"
+            );
+        }
+    }
+
+    mod denominator_rule {
+        use super::*;
+
+        /// A count restricted to an error subset, in filters mode: the shape that missed.
+        fn nginx_5xx_count_req() -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.stream_name = "nginx_access".to_string();
+            req.detection_function = "count".to_string();
+            req.detection_function_field = None;
+            req.filters = Some(serde_json::json!([
+                {"field": "status", "operator": ">=", "value": "500"}
+            ]));
+            req
+        }
+
+        // ── the rejected class ──────────────────────────────────────────────
+
+        /// The live config the phase measured. Rejected because filters mode can express
+        /// exactly one aggregate, so a denominator is not merely absent here but
+        /// inexpressible: no edit short of switching to custom_sql can supply one.
+        #[test]
+        fn rejects_the_measured_nginx_5xx_count_config() {
+            let err = validate_config_request(&nginx_5xx_count_req())
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// Pins the verdict itself, not just that an error came back, so an implementation
+        /// that refuses this config for some unrelated reason cannot satisfy the suite.
+        #[test]
+        fn the_measured_config_is_classified_absent_not_merely_refused() {
+            let req = nginx_5xx_count_req();
+            assert_eq!(
+                count_denominator_verdict(
+                    &combine_detection_fn(&req.detection_function, None),
+                    &req.stream_name,
+                    &req.query_mode,
+                    req.filters.as_ref(),
+                    req.custom_sql.as_deref(),
+                ),
+                DenominatorVerdict::Absent
+            );
+        }
+
+        /// The error vocabulary must be read from the FILTER, not only from the stream name:
+        /// `nginx_access` is a neutral name and the 5xx restriction lives in the predicate.
+        /// An implementation keyed on stream name alone passes the test above and fails here.
+        #[test]
+        fn an_error_restriction_is_recognised_in_the_filter_on_a_neutral_stream() {
+            for filter in [
+                serde_json::json!([{"field": "status", "operator": ">=", "value": "500"}]),
+                serde_json::json!([{"field": "status_code", "operator": "=", "value": "503"}]),
+                serde_json::json!([{"field": "level", "operator": "=", "value": "error"}]),
+                serde_json::json!([{"field": "severity", "operator": "=", "value": "fatal"}]),
+                serde_json::json!([{"field": "log_level", "operator": "=", "value": "critical"}]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(filter.clone());
+                assert!(
+                    validate_config_request(&req).is_err(),
+                    "{filter} restricts to an error subset and must be refused"
+                );
+            }
+        }
+
+        /// The symmetric half: a stream NAMED for its error subset, counted without any
+        /// filter, is the same denominator-free count. Keying on the filter alone misses it.
+        ///
+        /// This is deliberately NOT the `usage_records` case, though both are unfiltered
+        /// counts. `usage_records` is the population of interest itself; an error stream is
+        /// the error subset of an application's activity, and its count carries exactly the
+        /// 20-in-330,000 versus 20-in-200 ambiguity the gate exists to refuse. The repair is
+        /// reachable: `build_custom_sql_incremental_query` passes user SQL through verbatim,
+        /// so the denominator can be joined in from the request-volume stream.
+        #[test]
+        fn an_error_restriction_is_recognised_in_the_stream_name_with_no_filter() {
+            for stream in ["nginx_5xx", "nginx_5xx_1h", "app_errors", "error_log"] {
+                let mut req = nginx_5xx_count_req();
+                req.stream_name = stream.to_string();
+                req.filters = Some(serde_json::json!([]));
+                assert!(
+                    validate_config_request(&req).is_err(),
+                    "{stream} is an error subset stream and a bare count of it must be refused"
+                );
+            }
+        }
+
+        /// custom_sql is the only mode that CAN carry a denominator, so a custom_sql count
+        /// that does not is refused too. Restricting the gate to filters mode would leave
+        /// the identical defect reachable through the other mode.
+        #[test]
+        fn rejects_an_error_count_written_in_custom_sql_without_a_denominator() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            req.custom_sql = Some(
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value FROM nginx_access \
+                 WHERE status >= 500 GROUP BY ts"
+                    .to_string(),
+            );
+            let err = validate_config_request(&req).unwrap_err().to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// The same defect written without a WHERE clause: the error restriction lives in a
+        /// CASE inside the aggregate, and nothing divides. An implementation scanning for an
+        /// error predicate only in a WHERE clause admits this, and it is the identical fault.
+        #[test]
+        fn rejects_an_error_count_restricted_inside_the_aggregate_with_no_division() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            req.custom_sql = Some(
+                "SELECT histogram(_timestamp, '5m') AS ts, \
+                 count(CASE WHEN status >= 500 THEN 1 END) AS value \
+                 FROM nginx_access GROUP BY ts"
+                    .to_string(),
+            );
+            let err = validate_config_request(&req).unwrap_err().to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        // ── the admitted class: this is the hard half ───────────────────────
+
+        /// `usage_records_1h` is a COUNT series carrying a real labelled positive (x9.6), so
+        /// a blanket "reject every count" rule is wrong. It counts the whole population
+        /// rather than an error subset, and needs no denominator to be interpretable.
+        #[test]
+        fn admits_the_labelled_positive_usage_records_count() {
+            let mut req = make_valid_filters_req();
+            req.stream_name = "usage_records".to_string();
+            req.detection_function = "count".to_string();
+            req.filters = Some(serde_json::json!([]));
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "usage_records_1h is a servable count with a labelled positive"
+            );
+            assert_eq!(
+                count_denominator_verdict("count(*)", "usage_records", "filters", None, None),
+                DenominatorVerdict::Present,
+                "an unrestricted count IS its own population; nothing is missing"
+            );
+        }
+
+        /// The rate/ratio form of the very same signal must stay servable: `nginx_5xx_rate_1h`
+        /// is a live config that detected the platform outage the count series could not
+        /// express. A gate that took the rate form down would remove the only working option.
+        #[test]
+        fn admits_the_rate_form_of_the_rejected_signal() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            req.custom_sql = Some(
+                "SELECT histogram(_timestamp, '5m') AS ts, \
+                 count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
+                 FROM nginx_access GROUP BY ts"
+                    .to_string(),
+            );
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "the ratio form carries its own denominator and is the servable answer"
+            );
+        }
+
+        /// A non-count aggregation over an error stream is not this defect: avg/p50/max of a
+        /// latency or size field is already a normalized quantity. Refusing it would be
+        /// scope creep, and would take `nginx_latency_p50_1h` down for the wrong reason.
+        #[test]
+        fn admits_non_count_aggregations_over_an_error_restricted_stream() {
+            for function in ["avg", "sum", "min", "max", "p50", "p95"] {
+                let mut req = nginx_5xx_count_req();
+                req.detection_function = function.to_string();
+                req.detection_function_field = Some("response_time".to_string());
+                assert_eq!(
+                    count_denominator_verdict(
+                        &combine_detection_fn(function, Some("response_time")),
+                        &req.stream_name,
+                        &req.query_mode,
+                        req.filters.as_ref(),
+                        None,
+                    ),
+                    DenominatorVerdict::NotACount,
+                    "{function} is not a count and this gate must not touch it"
+                );
+                assert!(validate_config_request(&req).is_ok(), "{function} refused");
+
+                // With no field `combine_detection_fn` returns the bare name, so the gate
+                // sees "p50" rather than "p50(response_time)". The verdict must not change.
+                assert_eq!(
+                    count_denominator_verdict(
+                        &combine_detection_fn(function, None),
+                        &req.stream_name,
+                        &req.query_mode,
+                        req.filters.as_ref(),
+                        None,
+                    ),
+                    DenominatorVerdict::NotACount,
+                    "the bare {function} is still not a count"
+                );
+            }
+        }
+
+        /// `sum` deserves its own arm: it is the aggregation most easily mistaken for a count
+        /// (both grow with volume) yet a sum of a measured field is not the defect this gate
+        /// describes, and folding it in would silently widen the rule.
+        #[test]
+        fn a_sum_over_an_error_subset_is_not_a_count() {
+            let mut req = nginx_5xx_count_req();
+            req.detection_function = "sum".to_string();
+            req.detection_function_field = Some("bytes_sent".to_string());
+            assert!(validate_config_request(&req).is_ok());
+        }
+
+        /// A non-error filter is a legitimate slice, not a numerator: counting one tenant's
+        /// or one endpoint's traffic is interpretable on its own. Rejecting every filtered
+        /// count would be the over-wide rule, and this is the test that stops it.
+        #[test]
+        fn admits_a_count_restricted_by_a_non_error_predicate() {
+            for filter in [
+                serde_json::json!([{"field": "org_id", "operator": "=", "value": "acme"}]),
+                serde_json::json!([{"field": "endpoint", "operator": "=", "value": "/api/v1"}]),
+                serde_json::json!([{"field": "status", "operator": "=", "value": "200"}]),
+                serde_json::json!([{"field": "method", "operator": "=", "value": "POST"}]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(filter.clone());
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "{filter} is an ordinary slice, not an error numerator"
+                );
+            }
+        }
+
+        /// The boundary INSIDE the error vocabulary, from both sides. `status = 200` and
+        /// `status = 404` are not the 5xx class this gate is about; a rule that matched the
+        /// FIELD name `status` regardless of value would reject both and is killed here.
+        #[test]
+        fn the_status_field_alone_is_not_an_error_restriction() {
+            for (value, refused) in [
+                ("200", false),
+                ("204", false),
+                ("301", false),
+                ("400", false),
+                ("404", false),
+                ("500", true),
+                ("503", true),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters =
+                    Some(serde_json::json!([{"field": "status", "operator": "=", "value": value}]));
+                assert_eq!(
+                    validate_config_request(&req).is_err(),
+                    refused,
+                    "status = {value} must {} be refused",
+                    if refused { "" } else { "not" }
+                );
+            }
+        }
+
+        /// The same value under different operators must reach different verdicts, or the
+        /// operator is being ignored. `status >= 200` is every request there is and must be
+        /// admitted; `status >= 500` is the error subset. An implementation reading only the
+        /// value refuses the first, which is the most ordinary count in the product.
+        #[test]
+        fn the_operator_is_read_and_not_only_the_value() {
+            for (operator, value, refused) in [
+                (">=", "200", false),
+                (">=", "500", true),
+                ("=", "500", true),
+                ("<", "500", false),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(
+                    serde_json::json!([{"field": "status", "operator": operator, "value": value}]),
+                );
+                assert_eq!(
+                    validate_config_request(&req).is_err(),
+                    refused,
+                    "status {operator} {value}: expected refused={refused}"
+                );
+            }
+        }
+
+        /// The `>=` boundary on the 5xx band, pinned from both sides so an off-by-one on the
+        /// threshold (>= 499, or > 500 missing 500 itself) cannot survive. Values inside the
+        /// band beyond the endpoints are included so a hardcoded {500, 503, 599} value list
+        /// is not indistinguishable from a real range check.
+        ///
+        /// DELIBERATE SCOPE: a 4xx count is structurally just as denominator-free, and is
+        /// admitted anyway. The gate is drawn at the class Phase 1H actually measured, and
+        /// 4xx carries far more legitimate standalone uses (404 hunts, auth-failure spikes)
+        /// than 5xx does, so widening it would refuse working configs to catch a fault
+        /// nobody has observed. Extending the band is a decision with its own evidence bar,
+        /// not an oversight -- and this test is where that decision would be re-litigated.
+        #[test]
+        fn the_five_hundred_boundary_is_pinned_from_both_sides() {
+            for (value, refused) in [
+                ("499", false),
+                ("500", true),
+                ("502", true),
+                ("550", true),
+                ("599", true),
+                ("600", false),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters =
+                    Some(serde_json::json!([{"field": "status", "operator": "=", "value": value}]));
+                assert_eq!(
+                    validate_config_request(&req).is_err(),
+                    refused,
+                    "status = {value}: expected refused={refused}"
+                );
+            }
+        }
+
+        /// The error clause is not always first. An implementation reading only `filters[0]`
+        /// passes every other test here and admits the exact config the gate exists to
+        /// refuse, so the clause is placed last as well as first.
+        #[test]
+        fn an_error_clause_is_found_wherever_it_sits_in_the_filter_list() {
+            let benign = serde_json::json!({"field": "org_id", "operator": "=", "value": "acme"});
+            let error = serde_json::json!({"field": "status", "operator": ">=", "value": "500"});
+            for filters in [
+                serde_json::json!([benign, error]),
+                serde_json::json!([benign, benign, error]),
+                serde_json::json!([error, benign]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(filters.clone());
+                assert!(
+                    validate_config_request(&req).is_err(),
+                    "{filters} carries an error clause and must be refused"
+                );
+            }
+        }
+
+        /// A NEGATED error predicate selects the healthy majority, not the error subset, so
+        /// it is an ordinary slice. An operator-blind implementation that matches the field
+        /// and value while ignoring `!=` refuses it, and refuses a legitimate config.
+        #[test]
+        fn a_negated_error_predicate_is_not_an_error_restriction() {
+            for operator in ["!=", "<"] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(
+                    serde_json::json!([{"field": "status", "operator": operator, "value": "500"}]),
+                );
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "status {operator} 500 selects non-errors and is an ordinary slice"
+                );
+            }
+        }
+
+        /// A count restricted by an error predicate AND divided in custom_sql is the repair
+        /// path a user takes after being refused. It must actually work, or the error message
+        /// sends them somewhere that also fails.
+        #[test]
+        fn the_documented_repair_path_is_accepted() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            for sql in [
+                "SELECT histogram(_timestamp, '5m') AS ts, \
+                 sum(CASE WHEN status >= 500 THEN 1 ELSE 0 END) * 1.0 / count(*) AS value \
+                 FROM nginx_access GROUP BY ts",
+                "SELECT histogram(_timestamp, '5m') AS ts, \
+                 count(*) FILTER (WHERE status >= 500) / count(*) AS value \
+                 FROM nginx_access GROUP BY ts",
+            ] {
+                req.custom_sql = Some(sql.to_string());
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "the repair the error message points at must be servable: {sql}"
+                );
+            }
+        }
+
+        /// The message has to name the fix, not just the fault: a user told only "refused"
+        /// cannot act, and the rate form is the whole point of the gate.
+        #[test]
+        fn the_refusal_names_the_actionable_repair() {
+            let err = validate_config_request(&nginx_5xx_count_req())
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("validation error"), "not a 400: {err}");
+            assert!(
+                err.contains("rate") || err.contains("ratio"),
+                "the message must point at the rate/ratio form: {err}"
+            );
+        }
+
+        // ── the producer: what actually builds the value being validated ────
+
+        /// The gate reads the COMBINED detection function, which `create_config` builds with
+        /// `combine_detection_fn` rather than taking from the request verbatim. A gate that
+        /// read `req.detection_function` would see "count" where the row stores "count(*)",
+        /// and would then disagree with itself on update, where only the stored form exists.
+        #[test]
+        fn the_gate_reads_the_combined_form_the_row_actually_stores() {
+            // `count` + a field still combines to `count(*)`, so both spellings a client can
+            // post land on the one string the row stores, and the gate must read that string.
+            assert_eq!(
+                combine_detection_fn("count", Some("request_id")),
+                "count(*)"
+            );
+            assert_eq!(
+                count_denominator_verdict(
+                    &combine_detection_fn("count", None),
+                    "nginx_5xx",
+                    "filters",
+                    Some(&serde_json::json!([])),
+                    None,
+                ),
+                DenominatorVerdict::Absent,
+                "count(*) over an error stream is denominator-free"
+            );
+
+            // The other combined shape the producer emits: a named field on a real
+            // aggregation. Reading the request's bare "avg" instead would lose the field.
+            assert_eq!(
+                count_denominator_verdict(
+                    &combine_detection_fn("avg", Some("response_time")),
+                    "nginx_5xx",
+                    "filters",
+                    Some(&serde_json::json!([])),
+                    None,
+                ),
+                DenominatorVerdict::NotACount
+            );
+        }
+
+        /// `combine_detection_fn` passes an already-combined string through untouched, so a
+        /// client posting "count(*)" directly reaches the gate in that form. Both spellings
+        /// of the same config must land on the same verdict or the gate is bypassable.
+        #[test]
+        fn a_pre_combined_request_reaches_the_same_verdict() {
+            let mut split = nginx_5xx_count_req();
+            split.detection_function = "count".to_string();
+            let mut pre_combined = nginx_5xx_count_req();
+            pre_combined.detection_function = "count(*)".to_string();
+            assert!(validate_config_request(&split).is_err());
+            assert!(
+                validate_config_request(&pre_combined).is_err(),
+                "posting the combined form must not bypass the gate"
+            );
+        }
+
+        /// Case must not be a bypass. A gate comparing raw strings lets `COUNT(*)` or a
+        /// `Status`/`ERROR` filter through, which is a one-character evasion.
+        #[test]
+        fn case_is_not_a_bypass() {
+            let mut upper_fn = nginx_5xx_count_req();
+            upper_fn.detection_function = "COUNT(*)".to_string();
+            assert!(validate_config_request(&upper_fn).is_err());
+
+            let mut upper_filter = nginx_5xx_count_req();
+            upper_filter.filters =
+                Some(serde_json::json!([{"field": "LEVEL", "operator": "=", "value": "ERROR"}]));
+            assert!(validate_config_request(&upper_filter).is_err());
+
+            let mut upper_stream = nginx_5xx_count_req();
+            upper_stream.stream_name = "APP_ERRORS".to_string();
+            upper_stream.filters = Some(serde_json::json!([]));
+            assert!(validate_config_request(&upper_stream).is_err());
+        }
+
+        /// A filters-mode config whose `filters` is the empty array and whose stream is
+        /// neutral is the most ordinary count there is. It anchors the default answer as
+        /// ADMIT, so a gate that inverted its comparison fails here rather than passing
+        /// every rejection test by refusing everything.
+        #[test]
+        fn the_default_answer_for_an_ordinary_count_is_admit() {
+            let mut req = make_valid_filters_req();
+            req.stream_name = "app_logs".to_string();
+            req.detection_function = "count".to_string();
+            req.filters = Some(serde_json::json!([]));
+            assert!(validate_config_request(&req).is_ok());
+        }
+
+        /// Malformed filter entries must not decide the verdict. Refusing on a shape the
+        /// gate cannot read would turn an unrelated payload bug into a denominator refusal.
+        #[test]
+        fn an_unreadable_filter_shape_does_not_trigger_a_refusal() {
+            for filter in [
+                serde_json::json!([{"no_field_key": "status"}]),
+                serde_json::json!([7]),
+                serde_json::json!(["status >= 500"]),
+                serde_json::json!([{"field": null, "value": null}]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.stream_name = "app_logs".to_string();
+                req.filters = Some(filter.clone());
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "{filter} is unreadable, not an error restriction"
+                );
+            }
+        }
+
+        // ── grandfathering: the same discipline `validated_intervals` encodes ──
+
+        /// The persisted twin of `nginx_5xx_count_req`: a row create would now refuse.
+        fn broken_count_config() -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = update_interval_validation::stored_config();
+            stored.stream_name = "nginx_5xx".to_string();
+            stored.detection_function = "count(*)".to_string();
+            stored.query_mode = "filters".to_string();
+            stored.filters = Some(serde_json::json!([]));
+            stored
+        }
+
+        /// Grandfathering 1 of 3, split so an always-validate implementation fails three
+        /// separate tests: an existing denominator-free row must stay disableable. This is
+        /// the operationally urgent one -- it is how an operator silences a bad config.
+        #[test]
+        fn a_broken_row_can_still_be_disabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken_count_config()).is_ok());
+        }
+
+        #[test]
+        fn a_broken_row_can_still_be_renamed_and_moved() {
+            let req = UpdateAnomalyConfigRequest {
+                name: Some("renamed".to_string()),
+                folder_id: Some("other".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken_count_config()).is_ok());
+        }
+
+        /// The full-body PUT the alerts v2 UI sends: every field resent at its stored value.
+        /// Keyed on PRESENCE this reads as "touching the detection function" and blocks the
+        /// rename; keyed on CHANGE it is correctly a no-op. Exactly the trap P0.4 hit.
+        #[test]
+        fn a_full_body_replay_of_the_unchanged_config_is_not_a_change() {
+            let broken = broken_count_config();
+            let req = UpdateAnomalyConfigRequest {
+                name: Some("renamed in the UI".to_string()),
+                detection_function: Some(broken.detection_function.clone()),
+                query_mode: Some(broken.query_mode.clone()),
+                filters: broken.filters.clone(),
+                ..Default::default()
+            };
+            assert!(
+                validated_denominator(&req, &broken).is_ok(),
+                "a UI rename must not be rejected by resent-but-identical fields"
+            );
+        }
+
+        /// The replay resends the SPLIT spelling too, because the UI renders the stored
+        /// `count(*)` back into a function box and a field box. `count` + no field recombines
+        /// to exactly the stored `count(*)`, so this is still not a change -- an
+        /// implementation comparing the raw request string to the stored one rejects it.
+        #[test]
+        fn a_replay_that_recombines_to_the_stored_function_is_not_a_change() {
+            let broken = broken_count_config();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken).is_ok());
+        }
+
+        /// Bulk enable reaches `update_config` with no 400 path at all, so a rejection here
+        /// surfaces as a 500 on a row the operator never asked to change. Split from the
+        /// disable case because the two travel different code paths in the UI.
+        #[test]
+        fn a_broken_row_can_still_be_bulk_enabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(true),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken_count_config()).is_ok());
+        }
+
+        /// The counterpart of the interval gate's unparseable-stored-value case: a row whose
+        /// persisted `detection_function` cannot be read at all must still accept an edit
+        /// that leaves that field alone. An implementation that classifies the merged row
+        /// before checking whether anything changed refuses these rows forever.
+        #[test]
+        fn a_row_with_an_unreadable_stored_function_still_accepts_an_unrelated_edit() {
+            for stored_function in ["", "count(", "???"] {
+                let mut broken = broken_count_config();
+                broken.detection_function = stored_function.to_string();
+                let req = UpdateAnomalyConfigRequest {
+                    enabled: Some(false),
+                    ..Default::default()
+                };
+                assert!(
+                    validated_denominator(&req, &broken).is_ok(),
+                    "a row storing {stored_function:?} must stay administrable"
+                );
+            }
+        }
+
+        /// Grandfathering does not extend to a genuine edit. Adding a 5xx filter to an
+        /// already-error-named stream is still denominator-free, and the row was not
+        /// previously carrying that filter, so this IS a change and must be validated.
+        #[test]
+        fn genuinely_changing_the_config_on_a_broken_row_is_still_validated() {
+            let mut broken = broken_count_config();
+            broken.stream_name = "nginx_access".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            let err = validated_denominator(&req, &broken)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// Repairing a broken row must be allowed from every side, or grandfathering
+        /// becomes a trap that preserves the fault forever.
+        #[test]
+        fn repairing_a_broken_row_is_allowed() {
+            let broken = broken_count_config();
+
+            let to_an_average = UpdateAnomalyConfigRequest {
+                detection_function: Some("avg".to_string()),
+                detection_function_field: Some("response_time".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&to_an_average, &broken).is_ok());
+
+            let to_a_ratio = UpdateAnomalyConfigRequest {
+                query_mode: Some("custom_sql".to_string()),
+                custom_sql: Some(
+                    "SELECT histogram(_timestamp, '5m') AS ts, \
+                     count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
+                     FROM nginx_access GROUP BY ts"
+                        .to_string(),
+                ),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&to_a_ratio, &broken).is_ok());
+        }
+
+        /// A healthy row must not be edited INTO the broken shape. Grandfathering exempts
+        /// what is already on disk, never a new fault introduced by this very request.
+        #[test]
+        fn a_healthy_row_cannot_be_edited_into_the_broken_shape() {
+            let mut healthy = update_interval_validation::stored_config();
+            healthy.stream_name = "nginx_access".to_string();
+            healthy.detection_function = "avg(response_time)".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            let err = validated_denominator(&req, &healthy)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// Update must reuse the create rule verbatim rather than growing a second,
+        /// differently-worded copy that can drift.
+        #[test]
+        fn update_shares_the_create_paths_wording() {
+            let from_create = validate_config_request(&nginx_5xx_count_req())
+                .unwrap_err()
+                .to_string();
+            let mut healthy = update_interval_validation::stored_config();
+            healthy.stream_name = "nginx_access".to_string();
+            healthy.detection_function = "avg(response_time)".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            let from_update = validated_denominator(&req, &healthy)
+                .unwrap_err()
+                .to_string();
+            assert_eq!(
+                from_create, from_update,
+                "create and update wording diverged"
+            );
+        }
+
+        /// The merge the update path lands on: an absent field keeps the row's value, a
+        /// submitted one wins. Validating only the payload would miss a change to the
+        /// function that conflicts with the UNCHANGED stored filters, and vice versa.
+        #[test]
+        fn an_absent_field_falls_back_to_the_persisted_value() {
+            let mut healthy = update_interval_validation::stored_config();
+            healthy.stream_name = "nginx_access".to_string();
+            healthy.detection_function = "avg(response_time)".to_string();
+            healthy.filters = Some(serde_json::json!([
+                {"field": "status", "operator": ">=", "value": "500"}
+            ]));
+
+            // Only the function is submitted; the 5xx restriction it conflicts with is stored.
+            let function_alone = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_denominator(&function_alone, &healthy).is_err(),
+                "a lone function change must be judged against the stored filters"
+            );
+
+            let mut counting = update_interval_validation::stored_config();
+            counting.stream_name = "nginx_access".to_string();
+            counting.detection_function = "count(*)".to_string();
+            counting.filters = Some(serde_json::json!([]));
+            // Only the filter is submitted; the count it conflicts with is stored.
+            let filter_alone = UpdateAnomalyConfigRequest {
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            assert!(
+                validated_denominator(&filter_alone, &counting).is_err(),
+                "a lone filter change must be judged against the stored function"
+            );
+        }
+    }
+
+    // ── Alert message rendering: one honest label per deviation space ──────
+
+    mod alert_rendering {
+        use o2_enterprise::enterprise::anomaly_detection::types::{
+            AnomalyAlertContext, AnomalyAlertKind,
+        };
+
+        use super::super::{anomaly_alert_message, anomaly_alert_payload};
+
+        const LINK: &str = "https://o2.example/web/alerts/anomaly/edit/id1?org_identifier=org";
+
+        fn ctx(kind: AnomalyAlertKind) -> AnomalyAlertContext {
+            AnomalyAlertContext {
+                org_id: "org".to_string(),
+                config_name: "login-errors".to_string(),
+                anomaly_id: "id1".to_string(),
+                anomaly_count: 3,
+                stream_name: "app_logs".to_string(),
+                kind,
+                max_deviation_percent: None,
+                worst_actual_value: None,
+                worst_expected: None,
+                score: None,
+                threshold: None,
+                // 2024-01-01T00:00:00Z .. +1h, so the window text is deterministic.
+                window_start_us: 1_704_067_200_000_000,
+                window_end_us: 1_704_070_800_000_000,
+            }
+        }
+
+        #[test]
+        fn a_value_alert_shows_actual_expected_and_a_labeled_score_deviation() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.worst_actual_value = Some(612.0);
+            c.worst_expected = Some(180.0);
+            c.score = Some(3.2);
+            c.threshold = Some(2.1);
+            c.max_deviation_percent = Some(52.4);
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(
+                msg.contains("worst value: 612.00 (expected ~180.00 for this hour)"),
+                "{msg}"
+            );
+            assert!(msg.contains("score 3.20 vs threshold 2.10"), "{msg}");
+            assert!(
+                msg.contains("(score 52.4% over its bar)"),
+                "score-space must be labeled as score-space, not bare deviation: {msg}"
+            );
+            assert!(msg.contains("2024-01-01 00:00 UTC"), "{msg}");
+            assert!(msg.ends_with(&format!("details: {LINK}")), "{msg}");
+        }
+
+        #[test]
+        fn a_cold_start_value_alert_omits_the_expected_clause() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.worst_actual_value = Some(612.0);
+            c.max_deviation_percent = Some(52.4);
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(msg.contains("worst value: 612.00"), "{msg}");
+            assert!(
+                !msg.contains("expected"),
+                "no baseline means no expected claim: {msg}"
+            );
+        }
+
+        #[test]
+        fn a_drop_alert_speaks_value_space_against_its_median() {
+            let mut c = ctx(AnomalyAlertKind::PartialDrop);
+            c.worst_actual_value = Some(43.0);
+            c.worst_expected = Some(180.0);
+            c.max_deviation_percent = Some(76.1);
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(
+                msg.contains("worst value: 43.00, 76.1% below its hour-of-week median ~180.00"),
+                "{msg}"
+            );
+            assert!(
+                !msg.contains("score"),
+                "the drop sentinel is not a model verdict: {msg}"
+            );
+        }
+
+        #[test]
+        fn an_absence_alert_has_no_numeric_framing() {
+            let msg = anomaly_alert_message(&ctx(AnomalyAlertKind::Absence), LINK);
+            assert!(msg.contains("no data received"), "{msg}");
+            assert!(
+                !msg.contains('%'),
+                "absence has no honest percentage: {msg}"
+            );
+            assert!(msg.contains("details:"), "{msg}");
+        }
+
+        #[test]
+        fn a_recovery_message_reads_as_recovery_not_as_an_alert() {
+            let mut c = ctx(AnomalyAlertKind::Recovery);
+            c.anomaly_count = 0;
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(msg.starts_with("Anomaly recovered"), "{msg}");
+            assert!(msg.contains("no anomalies"), "{msg}");
+            assert!(msg.contains("details:"), "{msg}");
+        }
+
+        #[test]
+        fn the_payload_names_the_deviation_space_and_the_recovery_class() {
+            let mut value = ctx(AnomalyAlertKind::Value);
+            value.max_deviation_percent = Some(52.4);
+            let p = anomaly_alert_payload(&value, "m", LINK);
+            assert_eq!(p["alert_type"], "anomaly_detection");
+            assert_eq!(p["deviation_kind"], "score_over_threshold");
+            assert_eq!(p["link"], LINK);
+
+            let absent = ctx(AnomalyAlertKind::Absence);
+            let p = anomaly_alert_payload(&absent, "m", LINK);
+            assert_eq!(
+                p["max_deviation_percent"], 0.0,
+                "neither the absence sentinel 100.0 nor a null may reach the wire payload"
+            );
+            assert!(p["deviation_kind"].is_null());
+
+            let p = anomaly_alert_payload(&ctx(AnomalyAlertKind::Recovery), "m", LINK);
+            assert_eq!(p["alert_type"], "anomaly_detection_recovery");
+            assert_eq!(p["kind"], "recovery");
+        }
+
+        /// Pre-recovery webhooks always carried numbers here; strict parsers break on null.
+        #[test]
+        fn the_payload_keeps_legacy_numeric_fields_numeric_for_every_kind() {
+            for kind in [
+                AnomalyAlertKind::Value,
+                AnomalyAlertKind::PartialDrop,
+                AnomalyAlertKind::Absence,
+                AnomalyAlertKind::Recovery,
+            ] {
+                let p = anomaly_alert_payload(&ctx(kind), "m", LINK);
+                assert_eq!(p["max_deviation_percent"], 0.0, "{kind:?}");
+                assert_eq!(p["worst_actual_value"], 0.0, "{kind:?}");
+            }
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.max_deviation_percent = Some(52.4);
+            c.worst_actual_value = Some(612.0);
+            let p = anomaly_alert_payload(&c, "m", LINK);
+            assert_eq!(p["max_deviation_percent"], 52.4);
+            assert_eq!(p["worst_actual_value"], 612.0);
+        }
+    }
+
+    // ── Phase B: the alert budget as the sensitivity primitive ──────────────
+    mod budget_rules {
+        use super::super::*;
+
+        #[test]
+        fn create_rejects_both_sensitivity_primitives_at_once() {
+            let err = validated_budget_create(Some(97.0), Some(1.0)).unwrap_err();
+            assert!(err.to_string().contains("not both"), "{err}");
+            assert!(validated_budget_create(Some(97.0), None).is_ok());
+            assert!(validated_budget_create(None, Some(1.0)).is_ok());
+            assert!(validated_budget_create(None, None).is_ok());
+        }
+
+        #[test]
+        fn unusable_budget_values_are_rejected_not_clamped() {
+            for bad in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                let err = validated_budget_create(None, Some(bad)).unwrap_err();
+                assert!(
+                    err.to_string().contains("finite value greater than 0"),
+                    "{bad}: {err}"
+                );
+                assert!(validated_budget_update(None, Some(Some(bad)), None, 95).is_err());
+            }
+            assert!(validated_budget_create(None, Some(1.0 / 7.0)).is_ok());
+        }
+
+        /// While a budget is stored `threshold` is derived state (B.3), so a CHANGE is refused.
+        #[test]
+        fn update_refuses_a_changed_percentile_while_a_budget_is_in_force() {
+            let err = validated_budget_update(Some(95.0), None, Some(1.0), 90).unwrap_err();
+            assert!(err.to_string().contains("derived"), "{err}");
+            // Same request setting both is the create-time rule.
+            let err = validated_budget_update(Some(95.0), Some(Some(1.0)), None, 90).unwrap_err();
+            assert!(err.to_string().contains("not both"), "{err}");
+        }
+
+        /// A full-body RMW echoes the derived percentile; an unchanged echo must pass.
+        #[test]
+        fn update_accepts_an_unchanged_percentile_echo_while_a_budget_is_in_force() {
+            assert!(validated_budget_update(Some(95.0), None, Some(1.0), 95).is_ok());
+            assert!(validated_budget_update(Some(95.0), Some(Some(1.0)), Some(1.0), 95).is_ok());
+            // Unchanged is judged post-clamp, the form the row stores.
+            assert!(validated_budget_update(Some(95.4), None, Some(1.0), 95).is_ok());
+            assert!(validated_budget_update(Some(120.0), None, Some(1.0), 99).is_ok());
+        }
+
+        /// The atomic switch back: clearing the budget and supplying a percentile in ONE
+        /// request must be allowed, or percentile mode is unreachable without two calls.
+        #[test]
+        fn update_allows_clear_budget_and_set_percentile_together() {
+            assert!(validated_budget_update(Some(95.0), Some(None), Some(1.0), 90).is_ok());
+            // And plain edits in each mode stay legal.
+            assert!(validated_budget_update(Some(95.0), None, None, 90).is_ok());
+            assert!(validated_budget_update(None, Some(Some(2.0)), Some(1.0), 95).is_ok());
+            assert!(validated_budget_update(None, None, Some(1.0), 95).is_ok());
+        }
+
+        /// The double-option contract: absent leaves, null clears, a value sets.
+        #[test]
+        fn update_budget_field_keeps_absent_and_null_apart() {
+            let absent: UpdateAnomalyConfigRequest = serde_json::from_str("{}").unwrap();
+            assert_eq!(absent.alert_budget_per_day, None);
+            let null: UpdateAnomalyConfigRequest =
+                serde_json::from_str(r#"{"alert_budget_per_day":null}"#).unwrap();
+            assert_eq!(null.alert_budget_per_day, Some(None));
+            let set: UpdateAnomalyConfigRequest =
+                serde_json::from_str(r#"{"alert_budget_per_day":0.25}"#).unwrap();
+            assert_eq!(set.alert_budget_per_day, Some(Some(0.25)));
+        }
+
+        /// Pre-budget clients omit the field entirely; both request shapes must accept that.
+        #[test]
+        fn create_budget_field_defaults_to_absent() {
+            let req: CreateAnomalyConfigRequest = serde_json::from_str(
+                r#"{"name":"a","stream_name":"s","stream_type":"logs","query_mode":"filters",
+                    "detection_function":"count","histogram_interval":"5m",
+                    "schedule_interval":"15m","detection_window_seconds":3600}"#,
+            )
+            .unwrap();
+            assert_eq!(req.alert_budget_per_day, None);
+        }
+    }
+
+    /// The whole change rests on this: a value the operator typed is never second-guessed.
+    #[test]
+    fn an_explicit_training_window_is_always_honoured_and_only_an_omitted_one_is_derived() {
+        // A derived value exists for 1h, so a routing bug would return 30, not the explicit value.
+        for explicit in [1_i32, 3, 7, 30, 365, i32::MAX] {
+            assert_eq!(
+                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
+                explicit,
+                "an explicit {explicit} days must be stored as {explicit}"
+            );
+        }
+        // Non-positive takes update's `.max(1)` rule rather than the derivation.
+        for explicit in [0_i32, -1, i32::MIN] {
+            assert_eq!(
+                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
+                1,
+                "a non-positive window clamps to 1, never to a derivation"
+            );
+        }
+        // At 1h the derivation must actually move, or every assertion above passes vacuously.
+        assert_eq!(resolved_training_window_days(None, "1h", 97.0, 256), 30);
+    }
+
+    #[test]
+    fn the_derived_training_window_never_narrows_and_only_widens_when_it_buys_something() {
+        // The derivation may only ever widen; a narrowing would silently cut history.
+        for interval in [
+            "1s", "30s", "1m", "5m", "15m", "30m", "1h", "90m", "2h", "6h", "12h", "1d", "202s",
+        ] {
+            for percentile in [50.0, 80.0, 90.0, 97.0, 99.0] {
+                let derived = derived_training_window_days(interval, percentile, 256);
+                assert!(
+                    derived >= 7,
+                    "{interval} at p{percentile} derived {derived}, narrower than the shipped 7"
+                );
+            }
+        }
+        // The floor binds here, so the cadences the ledger measured at are untouched.
+        assert_eq!(derived_training_window_days("1m", 97.0, 256), 7);
+        assert_eq!(derived_training_window_days("5m", 97.0, 256), 7);
+        // Where it widens it must cross the reservoir, or it buys query span for no calibration.
+        for (interval, expected) in [("15m", 11), ("30m", 21), ("1h", 30), ("6h", 7), ("1d", 7)] {
+            assert_eq!(
+                derived_training_window_days(interval, 97.0, 256),
+                expected,
+                "{interval} must derive {expected}"
+            );
+            let derived = derived_training_window_days(interval, 97.0, 256);
+            if derived > 7 {
+                let windows = expected_training_windows(interval, derived, 256)
+                    .expect("a parseable interval has a window count");
+                assert!(
+                    windows >= 256,
+                    "{interval} widened to {derived} days for {windows} windows, still below \
+                     the reservoir — a cost with no benefit"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_starvation_warning_advice_clears_the_bar_in_one_move() {
+        // Sizing the remedy on the bar that trips first left it starved on the percentile's own.
+        let warning = training_window_starvation_warning("1h", 7, 97.0, 256)
+            .expect("7d/1h/p97 is starved at the shipped defaults");
+        assert!(
+            warning.contains("training_window_days to 42"),
+            "the advice must clear every bar at once: {warning}"
+        );
+        assert!(
+            !warning.contains("training_window_days to 11"),
+            "11 days clears only the reservoir: {warning}"
+        );
+        // And following it must genuinely work.
+        let after = expected_training_windows("1h", 42, 256).expect("parseable");
+        assert!(
+            after >= 1000,
+            "42 days at 1h gives {after} windows, short of 1000"
+        );
+
+        // A calibrated config says nothing at all.
+        assert!(
+            training_window_starvation_warning("1m", 7, 97.0, 256).is_none(),
+            "1m/7d/p97 clears both bars and must not be warned about"
+        );
+        // An unparseable interval is the interval rules' business, not this one's.
+        assert!(training_window_starvation_warning("junk", 7, 97.0, 256).is_none());
+    }
+
+    #[test]
+    fn an_unusable_requirement_is_named_as_such_rather_than_printed_as_an_instruction() {
+        // `rcf_tree_size` has no range validation, so garbage must not become confident advice.
+        let absurd = training_window_starvation_warning("1h", 7, 97.0, 2_000_000_000)
+            .expect("an absurd tree size is starved");
+        assert!(
+            !absurd.contains("training_window_days to 83333334"),
+            "a day count nobody can act on must not be printed as advice: {absurd}"
+        );
+        assert!(
+            absurd.contains("cannot calibrate") || absurd.contains("No training window"),
+            "past the advisable bound the message must say so: {absurd}"
+        );
+
+        // A config that can never train at all is a different fault from a thin one.
+        let never = training_window_starvation_warning("30d", 7, 97.0, 256)
+            .expect("a 30d bucket over a 7d window yields nothing");
+        assert!(
+            never.contains("will never train"),
+            "zero training windows is not a degree of thinness: {never}"
+        );
+    }
+
+    #[test]
+    fn the_percentile_ceiling_change_moves_no_finite_value() {
+        // The i32 column truncates, so p99.9 was ALREADY 99; pinned so nobody "fixes" it back.
+        assert_eq!(clamped_threshold(99.9), 99);
+        assert_eq!(clamped_threshold(99.0), 99);
+        assert_eq!(clamped_threshold(97.0), 97);
+        assert_eq!(clamped_threshold(50.0), 50);
+        assert_eq!(clamped_threshold(0.0), 50);
+        assert_eq!(clamped_threshold(1000.0), 99);
+        let mut value = -200.0_f64;
+        while value < 300.0 {
+            assert_eq!(
+                value.clamp(50.0, 99.9) as i32,
+                clamped_threshold(value),
+                "the ceiling change must be a no-op at {value}"
+            );
+            value += 0.01;
+        }
+        // `NaN as i32` saturates to 0, which would have stored percentile 0.
+        assert_eq!(f64::NAN.clamp(50.0, 99.9) as i32, 0);
+        assert_eq!(clamped_threshold(f64::NAN), 97);
+    }
+
+    #[test]
+    fn threshold_is_accepted_as_an_alias_for_percentile_on_both_request_bodies() {
+        let create: CreateAnomalyConfigRequest = serde_json::from_value(serde_json::json!({
+            "name": "a",
+            "stream_name": "s",
+            "stream_type": "logs",
+            "query_mode": "filters",
+            "histogram_interval": "5m",
+            "schedule_interval": "5m",
+            "detection_window_seconds": 1200,
+            "threshold": 99,
+        }))
+        .expect("threshold must deserialize into percentile");
+        assert_eq!(create.percentile, Some(99.0));
+
+        let update: UpdateAnomalyConfigRequest =
+            serde_json::from_value(serde_json::json!({ "threshold": 99.9 }))
+                .expect("threshold must deserialize into percentile");
+        assert_eq!(update.percentile, Some(99.9));
+
+        let canonical: UpdateAnomalyConfigRequest =
+            serde_json::from_value(serde_json::json!({ "percentile": 55.0 })).unwrap();
+        assert_eq!(canonical.percentile, Some(55.0));
+    }
+
+    #[test]
+    fn the_training_search_type_routes_to_background_nodes() {
+        use config::meta::{cluster::RoleGroup, search::SearchEventType};
+
+        assert_eq!(
+            RoleGroup::from(SearchEventType::DerivedStream),
+            RoleGroup::Background,
+            "training scans must not land on the interactive nodes serving the UI"
+        );
+        // An untagged request yields no role group at all, which is the bug this pins.
+        assert_ne!(RoleGroup::from(SearchEventType::UI), RoleGroup::Background);
     }
 }

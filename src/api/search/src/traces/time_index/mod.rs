@@ -1727,6 +1727,15 @@ mod tests {
         assert_eq!(union_ranges(None, None), None);
     }
 
+    #[test]
+    fn union_takes_the_index_range_when_the_caller_sends_none() {
+        let index = TraceTimeRange {
+            start_time: 10,
+            end_time: 20,
+        };
+        assert_eq!(union_ranges(None, Some(index)), Some(index));
+    }
+
     fn outcome(stream_index: usize) -> LookupOutcome {
         LookupOutcome {
             key_index: 0,

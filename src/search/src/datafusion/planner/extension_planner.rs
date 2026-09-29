@@ -17,16 +17,20 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use datafusion::{
+    catalog::Session,
     common::Result as DataFusionResult,
     error::DataFusionError,
-    execution::{SessionState, context::QueryPlanner},
-    logical_expr::{LogicalPlan, UserDefinedLogicalNode},
+    execution::context::QueryPlanner,
+    logical_expr::{
+        LogicalPlan, UserDefinedLogicalNode, physical_planning_context::PhysicalPlanningContext,
+    },
     physical_plan::{ExecutionPlan, expressions::Column},
     physical_planner::{DefaultPhysicalPlanner, ExtensionPlanner, PhysicalPlanner},
 };
 
 use crate::datafusion::plan::{
     deduplication::DeduplicationLogicalNode, deduplication_exec::DeduplicationExec,
+    shared_subplan::SharedSubplanNode, shared_subplan_exec::SharedSubplanMarkerExec,
 };
 
 // A query planner that wrap datafusion's default planner with extension planner
@@ -50,10 +54,12 @@ impl QueryPlanner for OpenobserveQueryPlanner {
     async fn create_physical_plan(
         &self,
         logical_plan: &LogicalPlan,
-        session_state: &SessionState,
+        session_state: &dyn Session,
     ) -> DataFusionResult<Arc<dyn ExecutionPlan>> {
-        let planners: Vec<Arc<dyn ExtensionPlanner + Send + Sync>> =
-            vec![Arc::new(DeduplicationExecPlanner::new())];
+        let planners: Vec<Arc<dyn ExtensionPlanner + Send + Sync>> = vec![
+            Arc::new(DeduplicationExecPlanner::new()),
+            Arc::new(SharedSubplanPlanner::new()),
+        ];
 
         DefaultPhysicalPlanner::with_extension_planners(planners)
             .create_physical_plan(logical_plan, session_state)
@@ -85,7 +91,8 @@ impl ExtensionPlanner for DeduplicationExecPlanner {
         node: &dyn UserDefinedLogicalNode,
         _logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        _session_state: &SessionState,
+        _session_state: &dyn Session,
+        _planning_ctx: &PhysicalPlanningContext,
     ) -> DataFusionResult<Option<Arc<dyn ExecutionPlan>>> {
         let Some(deduplication_node) = node.as_any().downcast_ref::<DeduplicationLogicalNode>()
         else {
@@ -111,6 +118,42 @@ impl ExtensionPlanner for DeduplicationExecPlanner {
         let deduplication_exec =
             DeduplicationExec::new(input.clone(), deduplication_columns, max_rows);
         Ok(Some(Arc::new(deduplication_exec)))
+    }
+}
+
+/// A physical planner that converts a `SharedSubplanNode` into a `SharedSubplanMarkerExec`.
+#[derive(Debug, Default)]
+pub struct SharedSubplanPlanner {}
+
+impl SharedSubplanPlanner {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl ExtensionPlanner for SharedSubplanPlanner {
+    async fn plan_extension(
+        &self,
+        _planner: &dyn PhysicalPlanner,
+        node: &dyn UserDefinedLogicalNode,
+        _logical_inputs: &[&LogicalPlan],
+        physical_inputs: &[Arc<dyn ExecutionPlan>],
+        _session_state: &dyn Session,
+        _planning_ctx: &PhysicalPlanningContext,
+    ) -> DataFusionResult<Option<Arc<dyn ExecutionPlan>>> {
+        let Some(shared) = node.as_any().downcast_ref::<SharedSubplanNode>() else {
+            return Ok(None);
+        };
+        let [input] = physical_inputs else {
+            return Err(DataFusionError::Plan(
+                "SharedSubplanPlanner expects exactly one input".to_string(),
+            ));
+        };
+        Ok(Some(Arc::new(SharedSubplanMarkerExec::new(
+            shared.id,
+            Arc::clone(input),
+        ))))
     }
 }
 

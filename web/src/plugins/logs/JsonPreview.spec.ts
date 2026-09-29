@@ -56,11 +56,14 @@ const ODialogStub = {
 };
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mock-image-url"),
@@ -635,6 +638,13 @@ describe("JsonPreview Component", () => {
   });
 
   describe("Field Operations", () => {
+    it("offers include/exclude for schema fields in every stream and for _stream_name", () => {
+      expect(wrapper.vm.canFilterOnField("field1")).toBe(true);
+      expect(wrapper.vm.canFilterOnField("field3")).toBe(false);
+      expect(wrapper.vm.canFilterOnField("nested")).toBe(false);
+      expect(wrapper.vm.canFilterOnField("_stream_name")).toBe(true);
+    });
+
     it("should return correct label for adding field to table", () => {
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1"];
 

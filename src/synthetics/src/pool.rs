@@ -32,7 +32,7 @@ use std::{collections::HashMap, future::Future, pin::Pin, sync::OnceLock};
 /// Set once, by [`crate::init`], before any worker is spawned.
 static HOOKS: OnceLock<StepPoolHooks> = OnceLock::new();
 
-/// Steps left in one org's two synthetics grants — SPEC §6.1, §6.6.
+/// Steps left in one org's three synthetics grants — SPEC §6.1, §6.6.
 ///
 /// Deliberately NOT `Default`: a zeroed value for an org missing from the batch
 /// read means "grant spent" and blacks that org's monitoring out, where absent
@@ -41,6 +41,8 @@ static HOOKS: OnceLock<StepPoolHooks> = OnceLock::new();
 pub struct StepRemaining {
     pub browser: u64,
     pub protocol: u64,
+    /// The monthly allowance for status-page checks, already scoped to this month.
+    pub status: u64,
 }
 
 /// The batch read's result, boxed because a `fn` pointer cannot name an

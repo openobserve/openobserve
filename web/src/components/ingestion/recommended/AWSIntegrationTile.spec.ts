@@ -33,15 +33,18 @@ vi.mock("@/services/segment_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    list_Folders: vi.fn(() => Promise.resolve({ data: { list: [] } })),
-    new_Folder: vi.fn(() => Promise.resolve({ data: { folderId: "folder-1", name: "AWS" } })),
-    list: vi.fn(() => Promise.resolve({ data: { dashboards: [] } })),
-    create: vi.fn(() => Promise.resolve({ data: {} })),
-    delete: vi.fn(() => Promise.resolve({ data: {} })),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_Folders: vi.fn(() => Promise.resolve({ data: { list: [] } })),
+      new_Folder: vi.fn(() => Promise.resolve({ data: { folderId: "folder-1", name: "AWS" } })),
+      list: vi.fn(() => Promise.resolve({ data: { dashboards: [] } })),
+      create: vi.fn(() => Promise.resolve({ data: {} })),
+      delete: vi.fn(() => Promise.resolve({ data: {} })),
+    },
+  });
+});
 
 vi.mock("./WindowsConfig.vue", () => ({
   default: {

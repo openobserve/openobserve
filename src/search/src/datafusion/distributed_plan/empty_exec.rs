@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{Result, internal_err},
+    common::{Result, internal_err, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType, SchedulingType},
@@ -175,6 +175,13 @@ impl DisplayAs for NewEmptyExec {
 }
 
 impl ExecutionPlan for NewEmptyExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "NewEmptyExec"
     }

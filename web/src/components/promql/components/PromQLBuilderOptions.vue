@@ -23,7 +23,7 @@
           <!-- Legend -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ms-2.5 flex flex-row items-center gap-2"
+            class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0 max-md:w-full"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -32,7 +32,7 @@
             >
             <div
               data-test="promql-builder-options-field-input-wrapper"
-              class="relative inline-block"
+              class="relative inline-block max-md:min-w-0 max-md:flex-1"
             >
               <OCombobox
                 v-model="
@@ -44,6 +44,7 @@
                 search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
                 data-test="dashboard-promql-builder-legend"
                 :value-replace-fn="selectPromQlNameOption"
+                class="max-md:w-full!"
                 style="width: 16.25rem"
               />
               <OIcon
@@ -68,7 +69,7 @@
           <!-- Step Value -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ms-2.5 flex flex-row items-center gap-2"
+            class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -111,7 +112,7 @@
           <!-- Query Type Select (Range/Instant) -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ms-2.5 flex flex-row items-center gap-2"
+            class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0"
           >
             <span
               data-test="promql-builder-options-field-label"

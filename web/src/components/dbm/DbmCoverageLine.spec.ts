@@ -20,6 +20,7 @@ import i18n from "@/locales";
 import type { Freshness } from "@/services/db_monitoring";
 
 import DbmCoverageLine from "./DbmCoverageLine.vue";
+import DbmToolbarNote from "./DbmToolbarNote.vue";
 
 const freshness = (over: Partial<Freshness> = {}): Freshness => ({
   data_through: Date.now() * 1000,
@@ -220,6 +221,57 @@ describe("DbmCoverageLine", () => {
       const wrapper = mountLine({ freshness: behindBy(5) });
       expect(trailer(wrapper)).not.toContain("last half-minute");
       expect(trailer(wrapper)).toContain("5 minutes behind");
+    });
+  });
+
+  describe("the legend slot", () => {
+    it("renders a legend on the line, beside the counted-up-to note", () => {
+      const wrapper = mount(DbmCoverageLine, {
+        props: { freshness: freshness(), hits: [{ total_time_ns: 1_000 }] },
+        slots: { legend: '<span data-test="probe-legend">key</span>' },
+        global: { plugins: [i18n] },
+      });
+      const line = wrapper.get("[data-test='dbm-coverage-line']");
+      expect(line.find("[data-test='probe-legend']").exists()).toBe(true);
+    });
+
+    it("renders nothing extra without one", () => {
+      expect(mountLine().find("[data-test='probe-legend']").exists()).toBe(false);
+    });
+  });
+
+  describe("inline, as a toolbar note", () => {
+    const note = (wrapper: ReturnType<typeof mountLine>) => wrapper.findComponent(DbmToolbarNote);
+
+    it("carries the same sentence as the line, as a note instead of a band", () => {
+      const wrapper = mountLine({ inline: true });
+      expect(wrapper.find("[data-test='dbm-coverage-line']").exists()).toBe(false);
+      expect(note(wrapper).props("text")).toBe(
+        mountLine().find("[data-test='dbm-coverage-text']").text(),
+      );
+      expect(note(wrapper).props("tone")).toBe("neutral");
+    });
+
+    it("renders nothing while empty, where the empty state already speaks", () => {
+      expect(note(mountLine({ inline: true, hits: [] })).exists()).toBe(false);
+    });
+
+    it("keeps the counted-up-to time in the tooltip", () => {
+      const detail = String(note(mountLine({ inline: true })).props("detail"));
+      expect(detail).toContain("Counted up to");
+    });
+
+    it("turns amber when behind and red when data is missing", () => {
+      expect(note(mountLine({ inline: true, freshness: behindBy(45) })).props("tone")).toBe(
+        "warning",
+      );
+      expect(
+        note(mountLine({ inline: true, freshness: freshness({ data_through: 0 }) })).props("tone"),
+      ).toBe("error");
+    });
+
+    it("passes compact through for a toolbar with no room for text", () => {
+      expect(note(mountLine({ inline: true, compact: true })).props("compact")).toBe(true);
     });
   });
 });

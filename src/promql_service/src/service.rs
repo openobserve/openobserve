@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Request types used by the OpenObserve PromQL query service.
-use config::meta::search::SearchEventType;
+use config::meta::search::{SearchEventContext, SearchEventType};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -27,6 +27,7 @@ pub struct MetricsQueryRequest {
     pub query_exemplars: bool,
     pub use_cache: Option<bool>,
     pub search_type: Option<SearchEventType>,
+    pub search_event_context: Option<SearchEventContext>,
     pub regions: Vec<String>,
     pub clusters: Vec<String>,
 }
@@ -59,6 +60,7 @@ impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
                 .search_type
                 .map(|value| value.to_string())
                 .unwrap_or_default(),
+            search_event_context: req.search_event_context.map(Into::into),
             regions: req.regions,
             clusters: req.clusters,
             is_super_cluster: false,

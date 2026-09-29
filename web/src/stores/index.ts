@@ -22,6 +22,7 @@ import streams from "./streams";
 import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
+import { purgeAllQueries } from "@/composables/query/queryClient";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -38,6 +39,8 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 const organizationObj = {
   organizationPasscode: "",
   organizationPasscodeUser: "",
+  // distinct from an empty passcode, which renders as a valid-looking but dead credential
+  organizationPasscodeForbidden: false,
   allDashboardList: {},
   allDashboardData: {},
   allAlertsListByFolderId: {},
@@ -95,7 +98,7 @@ export default createStore({
     organizations: [],
     currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
-    theme: "",
+    theme: localStorage.getItem("theme") === "dark" ? "dark" : "light",
     printMode: false,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
@@ -205,6 +208,9 @@ export default createStore({
     setOrganizationPasscodeUser(state, payload) {
       state.organizationData.organizationPasscodeUser = payload;
     },
+    setOrganizationPasscodeForbidden(state, payload) {
+      state.organizationData.organizationPasscodeForbidden = payload;
+    },
     resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
     },
@@ -279,11 +285,8 @@ export default createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      // Every caller commits ONE type's folders ({ alerts: [...] }), so replacing
-      // the whole map made each module's fetch wipe every other module's cached
-      // folders. Worst with a late-resolving fetch from a page the user has left:
-      // opening the alert form and going back to Dashboards landed on a folder
-      // sidebar holding nothing but Favorites.
+      // Merge, not replace: callers pass a single `{ [type]: folders }` entry,
+      // and replacing dropped every sibling type's cached list.
       state.organizationData.foldersByType = {
         ...state.organizationData.foldersByType,
         ...payload,
@@ -442,6 +445,9 @@ export default createStore({
     },
     logout(context) {
       context.commit("logout");
+      // Nothing from the previous session may survive — including anything the
+      // query layer persisted to localStorage/IndexedDB.
+      purgeAllQueries();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
@@ -469,6 +475,9 @@ export default createStore({
     },
     setOrganizationPasscodeUser(context, payload) {
       context.commit("setOrganizationPasscodeUser", payload);
+    },
+    setOrganizationPasscodeForbidden(context, payload) {
+      context.commit("setOrganizationPasscodeForbidden", payload);
     },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);

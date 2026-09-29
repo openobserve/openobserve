@@ -73,6 +73,13 @@ pub enum FolderError {
     #[error("Folder contains synthetics. Please move/delete synthetics from folder.")]
     DeleteWithSynthetics,
 
+    /// An error that occurs when trying to delete a folder that contains workflows.
+    #[error("Folder contains workflows. Please move/delete workflows from folder.")]
+    DeleteWithWorkflows,
+    /// An error that occurs when trying to delete a folder that contains prompts.
+    #[error("Folder contains prompts. Please move/delete prompts from folder.")]
+    DeleteWithPrompts,
+
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
     NotFound,
@@ -117,8 +124,10 @@ pub async fn save_folder(
     }
 
     let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
-    let folder_type_ofga = folder_type_ofga_name(folder_type);
-    set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
+    if folder_type != FolderType::Prompts {
+        let folder_type_ofga = folder_type_ofga_name(folder_type);
+        set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
+    }
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -162,12 +171,14 @@ pub async fn ensure_default_folder(
         return Ok(folder);
     }
 
-    set_ownership(
-        org_id,
-        folder_type_ofga_name(folder_type),
-        Authz::new(&folder.folder_id),
-    )
-    .await;
+    if folder_type != FolderType::Prompts {
+        set_ownership(
+            org_id,
+            folder_type_ofga_name(folder_type),
+            Authz::new(&folder.folder_id),
+        )
+        .await;
+    }
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -239,6 +250,8 @@ pub async fn list_folders(
         FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
         FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
+        FolderType::Workflows => OFGA_MODELS.get("workflow_folder").unwrap().key,
+        FolderType::Prompts => "",
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -337,6 +350,50 @@ pub async fn delete_folder(
                 }
             }
         }
+        FolderType::Workflows => {
+            // `folder_id` is the user-facing id from the URL; the workflows
+            // table stores the folder's primary key, so translate before
+            // counting. A missing folder falls through to the `exists` check
+            // below, which reports NotFound.
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+                && table::workflows::count_by_folder(org_id, &folder_pk).await? > 0
+            {
+                return Err(FolderError::DeleteWithWorkflows);
+            }
+        }
+        FolderType::Prompts => {
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+            {
+                use sea_orm::{
+                    ConnectionTrait, TryGetable,
+                    sea_query::{Alias, Expr, Func, Query},
+                };
+                let query = Query::select()
+                    .expr_as(
+                        Func::count(Expr::col(Alias::new("entity_id"))),
+                        Alias::new("count"),
+                    )
+                    .from(Alias::new("llm_prompts"))
+                    .and_where(Expr::col(Alias::new("org_id")).eq(org_id))
+                    .and_where(Expr::col(Alias::new("folder_id")).eq(folder_pk))
+                    .to_owned();
+                let statement = client.get_database_backend().build(&query);
+                let count = match client
+                    .query_one(statement)
+                    .await
+                    .map_err(infra::errors::Error::from)?
+                {
+                    Some(row) => i64::try_get(&row, "", "count")
+                        .map_err(|error| infra::errors::Error::Message(format!("{error:?}")))?,
+                    None => 0,
+                };
+                if count > 0 {
+                    return Err(FolderError::DeleteWithPrompts);
+                }
+            }
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {
@@ -344,8 +401,10 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    let folder_type_ofga = folder_type_ofga_name(folder_type);
-    remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
+    if folder_type != FolderType::Prompts {
+        let folder_type_ofga = folder_type_ofga_name(folder_type);
+        remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
+    }
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -370,6 +429,8 @@ fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
         FolderType::Alerts => "alert_folders",
         FolderType::Reports => "report_folders",
         FolderType::Synthetics => "synthetic_folder",
+        FolderType::Workflows => "workflow_folder",
+        FolderType::Prompts => "",
     }
 }
 
@@ -388,6 +449,9 @@ async fn permitted_folders(
     user_id: Option<&str>,
     folder_type: FolderType,
 ) -> Result<Option<Vec<String>>, FolderError> {
+    if folder_type == FolderType::Prompts {
+        return Ok(None);
+    }
     let (folder_ofga_model, child_ofga_model) = match folder_type {
         FolderType::Dashboards => (
             OFGA_MODELS.get("folders").unwrap().key,
@@ -405,6 +469,11 @@ async fn permitted_folders(
             OFGA_MODELS.get("synthetic_folder").unwrap().key,
             OFGA_MODELS.get("synthetics").unwrap().key,
         ),
+        FolderType::Workflows => (
+            OFGA_MODELS.get("workflow_folder").unwrap().key,
+            OFGA_MODELS.get("workflows").unwrap().key,
+        ),
+        FolderType::Prompts => unreachable!("prompt folders are not modeled in OpenFGA"),
     };
 
     let Some(user_id) = user_id else {
@@ -450,8 +519,6 @@ async fn permitted_folders(
             folder_list = Some(folder_list_with_roles);
         }
     }
-    log::info!("folder_list: {folder_list:?}");
-
     Ok(folder_list)
 }
 

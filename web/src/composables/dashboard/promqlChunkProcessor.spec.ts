@@ -341,3 +341,113 @@ describe("PromQL Chunk Processor", () => {
     console.log(`   Result: Perfect match! Chart will render identically.`);
   });
 });
+
+describe("the series cap vs. partitions that arrive oldest-first", () => {
+  const matrix = (entries: Array<[string, number]>, startSec: number) => ({
+    result_type: "matrix",
+    result: entries.map(([name, count]) => ({
+      metric: { __name__: "m", instance: name },
+      values: Array.from({ length: count }, (_, t) => [startSec + t * 60, "1"]) as [
+        number,
+        string,
+      ][],
+    })),
+  });
+
+  const stream = (maxSeries: number, perPartition: (p: number) => Array<[string, number]>) => {
+    const processor = createPromQLChunkProcessor({ maxSeries, enableLogging: false });
+    let result: any = null;
+    for (let p = 0; p < 6; p++) {
+      result = processor.processChunk(result, matrix(perPartition(p), 1640000000 + p * 3600));
+    }
+    return result;
+  };
+
+  it("does not spend the whole cap on series that died in the first partition", () => {
+    // Partitions arrive oldest-first, so two nearly-dead series are seen before the
+    // long-lived host is ever mentioned; arrival order must not decide the cap.
+    const result = stream(2, (p) =>
+      p === 0
+        ? [
+            ["dying_a", 1],
+            ["dying_b", 1],
+          ]
+        : [["real_host", 60]],
+    );
+
+    const kept = result.result.map((m: any) => m.metric.instance);
+    expect(kept).toContain("real_host");
+  });
+
+  it("keeps the series carrying the most data when the cap forces a choice", () => {
+    const result = stream(1, (p) =>
+      p === 0
+        ? [["sparse", 2]]
+        : [
+            ["sparse", 0],
+            ["dense", 60],
+          ],
+    );
+
+    expect(result.result.length).toBe(1);
+    expect(result.result[0].metric.instance).toBe("dense");
+  });
+
+  it("keeps every point of the series it decides to keep", () => {
+    const result = stream(2, (p) => [
+      ["a", 60],
+      ...((p >= 3 ? [["late", 60]] : []) as Array<[string, number]>),
+    ]);
+
+    const a = result.result.find((m: any) => m.metric.instance === "a");
+    expect(a.values.length).toBe(360);
+    const late = result.result.find((m: any) => m.metric.instance === "late");
+    if (late) expect(late.values.length).toBe(180);
+  });
+
+  it("still holds the cap", () => {
+    const result = stream(10, () =>
+      Array.from({ length: 40 }, (_, i) => [`s_${i}`, 60] as [string, number]),
+    );
+    expect(result.result.length).toBeLessThanOrEqual(10);
+  });
+});
+
+// A dropped series is invisible data loss, so the stats the panel warns from must
+// distinguish "series were dropped" from "the same series arrived in many chunks".
+describe("PromQL Chunk Processor — dropped-series reporting", () => {
+  const chunkOf = (names: string[]) => ({
+    result_type: "matrix",
+    result: names.map((instance) => ({
+      metric: { __name__: "m", instance },
+      values: [[1640000000, "1"]] as [number, string][],
+    })),
+  });
+
+  const streamUnique = (uniqueCount: number, chunks: number, maxSeries: number) => {
+    const processor = createPromQLChunkProcessor({ maxSeries, enableLogging: false });
+    const names = Array.from({ length: uniqueCount }, (_, i) => `h_${i}`);
+    let result: any = null;
+    for (let c = 0; c < chunks; c++) result = processor.processChunk(result, chunkOf(names));
+    return { stats: processor.getStats(), rendered: result.result.length };
+  };
+
+  it("reports uniqueSeriesSeen, not the per-chunk arrival sum", () => {
+    const { stats } = streamUnique(150, 6, 100);
+    expect(stats.totalMetricsReceived).toBe(900);
+    expect(stats.uniqueSeriesSeen).toBe(150);
+  });
+
+  it("reports no drop when the cap is exactly met across many chunks", () => {
+    const { stats, rendered } = streamUnique(100, 6, 100);
+    expect(rendered).toBe(100);
+    expect(stats.uniqueSeriesSeen).toBe(100);
+    expect(stats.uniqueSeriesSeen - stats.metricsStored).toBe(0);
+  });
+
+  it("reports the exact number of series it dropped whole", () => {
+    const { stats, rendered } = streamUnique(150, 6, 100);
+    expect(rendered).toBe(100);
+    expect(stats.uniqueSeriesSeen - stats.metricsStored).toBe(50);
+  });
+});

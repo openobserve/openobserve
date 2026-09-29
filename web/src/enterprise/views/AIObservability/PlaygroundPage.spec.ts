@@ -49,6 +49,10 @@ vi.mock("vuex", async () => {
 });
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...args: unknown[]) => toast(...args) }));
+// The real hash runs on the thread pool; under CI load it outlives flushPromises and leaves providers unloaded.
+vi.mock("@/utils/userOrgKey", () => ({
+  computeUserOrgKey: (email: string, org: string) => Promise.resolve(`${email}:${org}`),
+}));
 
 vi.mock("@/types/i18n", async () => {
   const actual = await vi.importActual<typeof import("@/types/i18n")>("@/types/i18n");

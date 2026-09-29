@@ -186,6 +186,7 @@ describe("incidents service", () => {
             logs: [{ stream_name: "default", filters: {} }],
             metrics: [{ stream_name: "metrics", filters: {} }],
             traces: [{ stream_name: "traces", filters: {} }],
+            profiles: [],
           },
         },
       };
@@ -219,7 +220,7 @@ describe("incidents service", () => {
           service_name: "unknown",
           matched_dimensions: {},
           additional_dimensions: {},
-          related_streams: { logs: [], metrics: [], traces: [] },
+          related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
         },
       };
 
@@ -247,7 +248,7 @@ describe("incidents service", () => {
           service_name: "api-gateway",
           matched_dimensions: {},
           additional_dimensions: {},
-          related_streams: { logs: [], metrics: [], traces: [] },
+          related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
         },
       };
 

@@ -58,16 +58,6 @@
               </div>
             </div>
 
-            <div>
-              <OFormInput
-                name="endpoint"
-                :label="t('onlineEvals.provider.endpointLabel')"
-                :placeholder="raw(endpointPlaceholder)"
-                size="sm"
-                data-test="provider-form-endpoint-input"
-              />
-            </div>
-
             <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
               <div>
                 <OFormInput
@@ -86,10 +76,20 @@
                   :label="t('onlineEvals.provider.availableModelsLabel')"
                   :placeholder="raw('gpt-4o-mini, gpt-4.1')"
                   size="sm"
-                  :help-text="t('onlineEvals.provider.availableModelsHelp')"
                   data-test="provider-form-available-models-input"
                 />
               </div>
+            </div>
+
+            <div>
+              <OFormInput
+                name="endpoint"
+                :label="t('onlineEvals.provider.endpointLabel')"
+                :placeholder="raw(endpointPlaceholder)"
+                size="sm"
+                :help-text="endpointHelpText"
+                data-test="provider-form-endpoint-input"
+              />
             </div>
           </div>
         </section>
@@ -208,6 +208,12 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
+import { saveProviderMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
+import {
+  DEFAULT_PROVIDER_BASE_URLS,
+  SUGGESTED_PROVIDER_BASE_URLS,
+} from "@/utils/llmProviderBaseUrls";
 import { availableModelsOf, defaultModelOf, providerTypeOf } from "../utils/evalEntity";
 import { showError, splitCsv } from "../utils/evalFormat";
 import { makeProviderFormSchema, type ProviderForm } from "./ProviderFormPage.schema";
@@ -240,34 +246,33 @@ const form = useOForm<ProviderForm>({
 });
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
 const apiKeyRequired = computed(() =>
-  ["openai", "deepseek", "anthropic"].includes(formValues.value.providerType),
+  ["openai", "deepseek", "anthropic", "systemone"].includes(formValues.value.providerType),
 );
 
 const providerTypeOptions = computed(() => [
   { label: raw("OpenAI"), value: "openai" },
   { label: raw("DeepSeek"), value: "deepseek" },
   { label: raw("Anthropic"), value: "anthropic" },
-  { label: raw("Azure OpenAI"), value: "azure_openai" },
   { label: raw("Ollama"), value: "ollama" },
   { label: raw("vLLM"), value: "vllm" },
   { label: raw("OpenAI-compatible"), value: "openai_compatible" },
-  { label: t("ingestion.otherLabel"), value: "other" },
+  { label: raw("System One (TypeSafe Jev)"), value: "systemone" },
 ]);
-
-const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "https://api.openai.com/v1/chat/completions",
-  deepseek: "https://api.deepseek.com/chat/completions",
-  anthropic: "https://api.anthropic.com/v1/messages",
-  azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
-  ollama: "http://localhost:11434/api/generate",
-  vllm: "http://localhost:8000/v1/chat/completions",
-};
 
 const endpointPlaceholder = computed(
   () =>
-    DEFAULT_ENDPOINTS[formValues.value.providerType] ||
+    DEFAULT_PROVIDER_BASE_URLS[formValues.value.providerType] ||
+    SUGGESTED_PROVIDER_BASE_URLS[formValues.value.providerType] ||
     t("onlineEvals.provider.endpointPlaceholder"),
 );
+
+// The help text must say what a blank field does: a real default, or plainly no fallback at all.
+const endpointHelpText = computed(() => {
+  const defaultUrl = DEFAULT_PROVIDER_BASE_URLS[formValues.value.providerType];
+  return defaultUrl
+    ? t("onlineEvals.provider.endpointHelpDefault", { url: defaultUrl })
+    : t("onlineEvals.provider.endpointHelpRequired");
+});
 
 function initForm(row: Provider | null): ProviderForm {
   if (!row) {
@@ -315,19 +320,22 @@ function buildPayload(value: ProviderForm) {
   };
 }
 
-// @submit handler — OForm only calls this once the whole schema passes, so the
-// schema (not a manual guard) gates the save. OForm awaits this promise → the
-// Save button spinner spans the whole save (no manual `isSaving` ref).
+// Create vs update is this form's decision; the cache consequence is declared beside the endpoint.
+const saveProvider = useMutation(() =>
+  saveProviderMutation(
+    props.orgId,
+    () => props.mode === "edit" && !!props.row,
+    () => props.row?.id ?? "",
+  ),
+);
+
+// Runs only after the schema passes; `value` is untransformed, so trim/split here, and OForm awaits it so the Save spinner spans the write.
 async function save(value: ProviderForm) {
   if (!props.orgId) return;
   try {
     const payload = buildPayload(value);
 
-    if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.providers.update(props.orgId, props.row.id, payload);
-    } else {
-      await onlineEvalsService.providers.create(props.orgId, payload);
-    }
+    await saveProvider.mutateAsync(payload);
     toast({
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.providers") }),

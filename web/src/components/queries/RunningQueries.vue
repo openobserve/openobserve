@@ -26,9 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #subnav>
       <div
         data-test="running-queries-filter-container"
-        class="px-page-edge flex items-center justify-start gap-3 py-2"
+        class="px-page-edge flex items-center justify-start gap-3 py-2 max-md:flex-wrap max-md:gap-2"
       >
         <OToggleGroup
+          mobile-dropdown
           :model-value="selectedQueryTypeTab"
           @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
           data-test="running-queries-query-type-tabs"
@@ -48,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="searchFieldOptions"
             labelKey="label"
             valueKey="value"
-            class="w-35 p-0"
+            class="w-35 p-0 max-md:w-28"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
           />
@@ -56,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           v-if="selectedSearchField == 'all'"
           v-model="filterQuery"
-          class="no-border o2-search-input"
+          class="no-border o2-search-input max-md:min-w-24 max-md:flex-1"
           :placeholder="t('queries.search')"
           data-test="running-queries-search-input"
         />
@@ -84,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <RunningQueriesList
               :rows="rowsQuery"
+              :forbidden="forbidden"
               :filtered="!!filterQuery"
               :last-refreshed="lastRefreshed"
               :search-type="selectedSearchType"
@@ -105,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <SummaryList
               :rows="summaryRows"
+              :forbidden="forbidden"
               :filtered="!!filterQuery"
               :last-refreshed="lastRefreshed"
               v-model:selectedRows="selectedRow['summary']"
@@ -152,10 +155,9 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { durationFormatter } from "@/utils/zincutils";
+import { durationFormatter, getDuration } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
-import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -302,6 +304,7 @@ export default defineComponent({
     };
 
     const loadingState = ref(false);
+    const forbidden = ref(false);
     const queries = ref([]);
 
     const deleteDialog = ref({
@@ -604,10 +607,14 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          toast({
-            message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
-            variant: "error",
-          });
+          forbidden.value = error?.response?.status === 403;
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (!forbidden.value) {
+            toast({
+              message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
+              variant: "error",
+            });
+          }
         })
         .finally(() => {
           dismiss();
@@ -772,6 +779,7 @@ export default defineComponent({
       cancel: "cancel",
       schemaData,
       loadingState,
+      forbidden,
       refreshData,
       lastRefreshed,
       isMetaOrg,

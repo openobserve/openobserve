@@ -1076,3 +1076,27 @@ describe("useConfigPanel – isSectionVisible", () => {
     expect(c.isSectionVisible("general")).toBe(true);
   });
 });
+
+describe("useConfigPanel – show exemplars option", () => {
+  const promqlPanel = (type: string, queryType = "range") => {
+    const panel = makePanelData(type, {}, { config: { query_type: queryType } });
+    (panel.data as Record<string, unknown>).queryType = "promql";
+    return panel;
+  };
+
+  it("is found by searching 'exemplars' on an eligible PromQL panel", async () => {
+    const c = makeComposable(promqlPanel("line"), ref(true));
+    c.searchQuery.value = "exemplars";
+    await nextTick();
+    expect(c.isConfigOptionVisible("general", "show-exemplars")).toBe(true);
+  });
+
+  it.each([
+    ["h-bar", "range", true],
+    ["line", "instant", true],
+    ["line", "range", false],
+  ])("stays hidden for %s/%s with promqlMode=%s", (type, queryType, promql) => {
+    const c = makeComposable(promqlPanel(type, queryType), ref(promql));
+    expect(c.isConfigOptionVisible("general", "show-exemplars")).toBe(false);
+  });
+});

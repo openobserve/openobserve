@@ -18,9 +18,9 @@ use std::{io::Cursor, sync::Arc};
 use arrow::ipc::reader::FileReader;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{Result, internal_err},
+    common::{Result, internal_err, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -109,6 +109,13 @@ impl DisplayAs for TmpExec {
 }
 
 impl ExecutionPlan for TmpExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "TmpExec"
     }

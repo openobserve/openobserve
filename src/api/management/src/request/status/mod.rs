@@ -213,11 +213,15 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    oncall_enabled: bool,
     /// Whether private locations — pools served by long-running agents deployed
     /// inside the customer's network — are available. Enterprise only, so the
     /// UI hides the private-locations views, the agent-setup drawer and the
     /// public/private selector on this rather than on `synthetics_enabled`.
     synthetics_private_locations_enabled: bool,
+    synthetics_subtests_enabled: bool,
+    /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
+    synthetics_browser_max_steps: usize,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
     /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
@@ -237,6 +241,7 @@ struct ConfigResponse<'a> {
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    profiling_enabled: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -475,6 +480,7 @@ pub async fn zo_config(
     // is not running super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
+    let synthetics_subtests_enabled = cfg.synthetics.subtests_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     // Read straight from the config in every build: synthetics is OSS now, and
     // reporting `false` here is what hid the whole feature from the UI.
@@ -485,6 +491,8 @@ pub async fn zo_config(
     // cannot serve.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
+    let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
+    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -504,7 +512,7 @@ pub async fn zo_config(
     #[cfg(feature = "enterprise")]
     let last_usage_report_ts = last_reported_timestamp().await;
 
-    let usage_enabled = enterprise_value!(cfg.common.usage_enabled, true);
+    let usage_enabled = enterprise_value!(false, true);
 
     // max usage reporting interval can be 10 mins, because we
     // need relatively recent data for usage calculations
@@ -598,13 +606,17 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        oncall_enabled,
         synthetics_private_locations_enabled,
+        synthetics_subtests_enabled,
+        synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
+        profiling_enabled: cfg.common.profiling_enabled,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]
@@ -1267,7 +1279,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(cfg.auth.cookie_secure_only);
@@ -1425,7 +1438,9 @@ pub async fn refresh_token_with_dex(
                     let mut auth_cookie = Cookie::new("auth_tokens", cleared);
                     auth_cookie.set_expires(
                         time::OffsetDateTime::now_utc()
-                            + time::Duration::seconds(conf.auth.cookie_max_age),
+                            + time::Duration::seconds(
+                                db::password_policy::cookie_max_age_secs().await,
+                            ),
                     );
                     auth_cookie.set_http_only(true);
                     auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1466,7 +1481,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1490,7 +1506,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1511,15 +1528,18 @@ pub async fn refresh_token_with_dex(
     }
 }
 
+/// `max_age_secs` is passed in rather than read here: the policy read is async and this is not, and
+/// logout builds two cookies from the one answer.
 fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     cookie_name: &'a str,
     token_struct: &T,
     conf: &Arc<Config>,
+    max_age_secs: i64,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
-    auth_cookie.set_max_age(time::Duration::seconds(conf.auth.cookie_max_age));
+    auth_cookie.set_max_age(time::Duration::seconds(max_age_secs));
     auth_cookie.set_http_only(true);
     auth_cookie.set_secure(conf.auth.cookie_secure_only);
     auth_cookie.set_path("/");
@@ -1562,8 +1582,11 @@ pub async fn logout(
             .await;
         }
     };
-    let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
-    let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
+    let max_age_secs = db::password_policy::cookie_max_age_secs().await;
+    let auth_cookie =
+        prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf, max_age_secs);
+    let auth_ext_cookie =
+        prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf, max_age_secs);
 
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
@@ -1945,7 +1968,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
+        let cookie = prepare_empty_cookie(
+            "test_cookie",
+            &test_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.starts_with("test_cookie="));
@@ -1964,7 +1992,12 @@ mod tests {
 
         let empty_token = EmptyToken {};
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
+        let cookie = prepare_empty_cookie(
+            "auth_cookie",
+            &empty_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.contains("HttpOnly"));
@@ -1986,8 +2019,10 @@ mod tests {
         let test_data = TestData { id: 42 };
         let config = Arc::new(Config::default());
 
-        let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
-        let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
+        let cookie1 =
+            prepare_empty_cookie("cookie1", &test_data, &config, config.auth.cookie_max_age);
+        let cookie2 =
+            prepare_empty_cookie("cookie2", &test_data, &config, config.auth.cookie_max_age);
         let cookie1_str = cookie1.to_string();
         let cookie2_str = cookie2.to_string();
 
@@ -2101,7 +2136,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
+        let cookie = prepare_empty_cookie(
+            "complex_cookie",
+            &complex_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "complex_cookie");
         assert!(!cookie.value().is_empty());
@@ -2185,7 +2225,12 @@ mod tests {
 
         let empty_data = EmptyStruct;
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
+        let cookie = prepare_empty_cookie(
+            "empty_cookie",
+            &empty_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "empty_cookie");
         assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
@@ -2213,7 +2258,12 @@ mod tests {
             value: "test".to_string(),
         };
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
+        let cookie = prepare_empty_cookie(
+            "valid_cookie",
+            &valid_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         // Should not panic and should produce valid cookie
         assert_eq!(cookie.name(), "valid_cookie");

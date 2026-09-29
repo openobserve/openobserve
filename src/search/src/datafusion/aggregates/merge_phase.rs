@@ -189,7 +189,7 @@ impl GroupedHashAggregateStream {
                     _ => {
                         // if aggregation is over intermediate states,
                         // use merge
-                        acc.merge_batch(values, group_indices, None, total_num_groups)?;
+                        acc.merge_batch(values, group_indices, total_num_groups)?;
                     }
                 }
             }

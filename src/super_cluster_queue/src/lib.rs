@@ -37,6 +37,7 @@ mod folders;
 mod incidents;
 mod kv;
 mod meta;
+mod oncall;
 mod org_ingestion_token;
 mod org_user;
 mod organization;
@@ -54,6 +55,7 @@ mod status_pages;
 mod synthetics;
 mod synthetics_locations;
 mod synthetics_probe_tokens;
+mod synthetics_variables;
 mod templates;
 mod user;
 
@@ -122,8 +124,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_anomaly_detection_msg: anomaly_detection::process,
         on_alert_state_msg: alert_states::process,
     };
+    // On-call rides the scheduler topic with the triggers it belongs to, so a
+    // response record always lands before the escalation timer that names it.
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,
+        on_oncall_msg: oncall::process,
     };
     let search_jobs_queue = SearchJobsQueue {
         on_search_job_msg: search_job::process,
@@ -176,6 +181,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_synthetics_msg: synthetics::process,
         on_locations_msg: synthetics_locations::process,
         on_probe_tokens_msg: synthetics_probe_tokens::process,
+        on_variables_msg: synthetics_variables::process,
     };
     let org_users_queue = OrgUsersQueue {
         on_org_users_msg: org_user::process,

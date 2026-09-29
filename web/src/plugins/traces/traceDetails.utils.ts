@@ -49,3 +49,22 @@ export function resolveSessionId(spans: any[] | null | undefined): string {
   const s: any = spans.find((sp: any) => sp?.gen_ai_conversation_id || sp?.session_id);
   return s ? String(s.gen_ai_conversation_id || s.session_id || "") : "";
 }
+
+/** First RUM bridge span whose browser session has a replay to play; null when the trace has none. */
+export function resolveReplaySpan(spans: any[] | null | undefined): any | null {
+  if (!spans?.length) return null;
+  return spans.find((sp: any) => sp?.rum_session_id && sp?.rum_session_has_replay === true) ?? null;
+}
+
+/**
+ * Resolve the trace-details window from the route query. Unusable bounds
+ * collapse to `0/0` — the API's "no caller range" — and always together,
+ * because a half-valid pair is itself rejected.
+ */
+export function resolveUrlTimeRange(from: unknown, to: unknown): { from: number; to: number } {
+  const start = Number(from);
+  const end = Number(to);
+  const usable =
+    Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > 0 && start <= end;
+  return usable ? { from: start, to: end } : { from: 0, to: 0 };
+}

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import store from "./index";
 
 // `store` is an imported singleton mutated by every test in this file, so the
@@ -239,5 +239,37 @@ describe("root store", () => {
       expect(cache().byTraceId).toEqual({});
       expect(cache().knownStreams).toEqual([]);
     });
+  });
+});
+
+// #14696/#12952 regression lock: reverting the store's theme default to "" fails these.
+describe("initial theme default from localStorage (#14696)", () => {
+  const evaluateFreshStore = async () => {
+    vi.resetModules();
+    const mod = await import("./index");
+    return mod.default;
+  };
+
+  afterEach(() => {
+    localStorage.clear();
+    vi.resetModules();
+  });
+
+  it("boots dark when the persisted theme is exactly 'dark'", async () => {
+    localStorage.setItem("theme", "dark");
+    const freshStore = await evaluateFreshStore();
+    expect(freshStore.state.theme).toBe("dark");
+  });
+
+  it("boots light when no theme is persisted (the #12952 login-flip case)", async () => {
+    localStorage.removeItem("theme");
+    const freshStore = await evaluateFreshStore();
+    expect(freshStore.state.theme).toBe("light");
+  });
+
+  it("falls back to light for any non-'dark' value (case-sensitive)", async () => {
+    localStorage.setItem("theme", "DARK");
+    const freshStore = await evaluateFreshStore();
+    expect(freshStore.state.theme).toBe("light");
   });
 });

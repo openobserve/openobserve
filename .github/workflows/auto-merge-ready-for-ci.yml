@@ -1,0 +1,29 @@
+name: Auto Merge Ready For CI
+
+# "Merge when ready" cannot queue a PR while ci-gate is pending, so label it the way the author would have.
+on:
+  # pull_request_target so a fork PR is labelled too; no checkout, so nothing untrusted runs.
+  pull_request_target:
+    types: [auto_merge_enabled]
+
+permissions: {}
+
+jobs:
+  label:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'ready-for-ci') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Add ready-for-ci label
+        env:
+          # A label added with GITHUB_TOKEN fires no `labeled` event, so the gated workflows would never start.
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if gh pr edit "$NUMBER" --add-label "ready-for-ci"; then
+            echo "Labeled PR #$NUMBER with ready-for-ci"
+          else
+            echo "::error::Could not label PR #$NUMBER"
+            exit 1
+          fi

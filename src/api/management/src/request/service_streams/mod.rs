@@ -857,6 +857,7 @@ mod tests {
                     "app_metrics".to_string(),
                     StreamType::Metrics,
                 )],
+                profiles: vec![],
             },
         );
 
@@ -890,6 +891,7 @@ mod tests {
                 logs: vec![],
                 traces: vec![],
                 metrics: vec![],
+                profiles: vec![],
             },
         );
 
@@ -918,12 +920,14 @@ mod tests {
             logs: vec!["app_logs".to_string()],
             traces: vec![],
             metrics: vec![],
+            profiles: vec![],
         };
 
         let json = serde_json::to_value(&streams).unwrap();
         assert!(json.get("logs").is_some());
         assert!(json.get("traces").is_none());
         assert!(json.get("metrics").is_none());
+        assert!(json.get("profiles").is_none());
     }
 
     #[test]

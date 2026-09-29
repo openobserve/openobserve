@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
-import { defineAsyncComponent } from "vue";
+import { defineComponent, ref, watch, defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";

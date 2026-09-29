@@ -21,7 +21,7 @@ use openobserve_core::llm_evaluations::{
         CloneExperimentOverrides, CreateExperiment, CreateExperimentResult, Experiment,
         ExperimentPreview, ExperimentScorerRef, ExperimentSlot, ExperimentSlotPage,
         ExperimentStatus, ExperimentTaskConfig, PinnedExperimentScorer, PromptMessage,
-        RemoteTaskOverrides,
+        PromptRefOverrides, RemoteTaskOverrides,
         cost::ExperimentCostEstimate,
         dispersion::{DimensionDispersion, RowDispersion},
         evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
@@ -32,8 +32,9 @@ use openobserve_core::llm_evaluations::{
         results::{
             ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
             ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
-            ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary,
-            ExperimentSlotStatus, ExperimentSummaryStatus, ScoringStatus,
+            ExperimentResultTaskStatus, ExperimentScoreOutcomes, ExperimentScoreSummary,
+            ExperimentSkipSummary, ExperimentSlotStatus, ExperimentSummaryStatus,
+            ExperimentTaskOutcomes, ScoringStatus,
         },
     },
 };
@@ -71,6 +72,8 @@ pub struct ExperimentResultRowBody {
     pub expected_output: Option<Value>,
     pub trial_count: usize,
     pub status: ExperimentSlotStatusBody,
+    pub task_outcomes: ExperimentTaskOutcomesBody,
+    pub score_outcomes: ExperimentScoreOutcomesBody,
     /// Present only for a single-trial row; multi-trial outputs belong in drill-down.
     pub output: Option<Value>,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
@@ -105,6 +108,9 @@ pub struct ExperimentPreviewQuery {
 pub struct ExperimentListQuery {
     pub include_summary: Option<bool>,
     pub dataset_id: Option<String>,
+    pub prompt_id: Option<String>,
+    pub prompt_version: Option<i32>,
+    pub content_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, IntoParams)]
@@ -135,6 +141,8 @@ pub struct ExperimentSummaryResponseBody {
     pub scoring_status: Option<ScoringStatus>,
     pub execution_progress: Option<ExperimentProgressBody>,
     pub scoring_progress: Option<ExperimentProgressBody>,
+    pub task_outcomes: Option<ExperimentTaskOutcomesBody>,
+    pub score_outcomes: Option<ExperimentScoreOutcomesBody>,
     pub score_summaries: Option<Vec<ExperimentScoreSummaryBody>>,
     pub aggregate_summary: Option<ExperimentAggregateSummaryBody>,
 }
@@ -234,6 +242,13 @@ pub enum ExperimentTaskBody {
         #[serde(default)]
         params: Option<Value>,
     },
+    PromptRef {
+        id: String,
+        version: i32,
+        provider_id: String,
+        #[serde(default)]
+        params_overrides: Option<PromptRefOverridesBody>,
+    },
     Remote {
         /// Pinned `name@version` of a published Remote Task. Never latest.
         task_ref: String,
@@ -268,6 +283,17 @@ impl From<ExperimentTaskBody> for ExperimentTaskConfig {
                 provider_id,
                 model,
                 params,
+            },
+            ExperimentTaskBody::PromptRef {
+                id,
+                version,
+                provider_id,
+                params_overrides,
+            } => Self::PromptRef {
+                id,
+                version,
+                provider_id,
+                params_overrides: params_overrides.map(Into::into),
             },
             ExperimentTaskBody::Remote {
                 task_ref,
@@ -307,6 +333,17 @@ impl From<ExperimentTaskConfig> for ExperimentTaskBody {
                 model,
                 params,
             },
+            ExperimentTaskConfig::PromptRef {
+                id,
+                version,
+                provider_id,
+                params_overrides,
+            } => Self::PromptRef {
+                id,
+                version,
+                provider_id,
+                params_overrides: params_overrides.map(Into::into),
+            },
             ExperimentTaskConfig::Remote {
                 task_ref,
                 overrides,
@@ -321,6 +358,41 @@ impl From<ExperimentTaskConfig> for ExperimentTaskBody {
                 task_fingerprint,
                 config,
             },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PromptRefOverridesBody {
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub params: Option<Value>,
+    #[serde(default)]
+    pub tools: Option<Value>,
+    #[serde(default)]
+    pub response_format: Option<Value>,
+}
+
+impl From<PromptRefOverridesBody> for PromptRefOverrides {
+    fn from(value: PromptRefOverridesBody) -> Self {
+        Self {
+            model: value.model,
+            params: value.params,
+            tools: value.tools,
+            response_format: value.response_format,
+        }
+    }
+}
+
+impl From<PromptRefOverrides> for PromptRefOverridesBody {
+    fn from(value: PromptRefOverrides) -> Self {
+        Self {
+            model: value.model,
+            params: value.params,
+            tools: value.tools,
+            response_format: value.response_format,
         }
     }
 }
@@ -966,6 +1038,10 @@ pub struct ExperimentResponseBody {
     /// The organization's Baseline for this Dataset. At most one Experiment per
     /// organization and Dataset carries it.
     pub is_baseline: bool,
+    pub prompt_id: Option<String>,
+    pub prompt_name: Option<String>,
+    pub prompt_version: Option<i32>,
+    pub prompt_content_hash: Option<String>,
     pub created_by: String,
     pub created_at: i64,
 }
@@ -1002,6 +1078,10 @@ impl From<Experiment> for ExperimentResponseBody {
             retry_count: value.retry_count,
             idempotency_key: value.idempotency_key,
             is_baseline: value.is_baseline,
+            prompt_id: value.prompt_id,
+            prompt_name: value.prompt_name,
+            prompt_version: value.prompt_version,
+            prompt_content_hash: value.prompt_content_hash,
             created_by: value.created_by,
             created_at: value.created_at,
         }
@@ -1205,6 +1285,7 @@ pub struct ExperimentResultScoreBody {
 #[serde(rename_all = "snake_case")]
 pub enum ExperimentResultTaskStatusBody {
     Pending,
+    Queued,
     InProgress,
     Ok,
     Skipped,
@@ -1239,6 +1320,30 @@ pub struct ExperimentProgressBody {
     pub completed: u64,
     pub total: u64,
     pub skipped: u64,
+}
+
+/// Slot counts over the pinned set; `pending` is `total` minus the slots that have finished.
+#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentTaskOutcomesBody {
+    pub total: u64,
+    pub succeeded: u64,
+    pub failed: u64,
+    pub pending: u64,
+    pub skipped: u64,
+}
+
+/// `completed` is scored plus failed; `total` also counts pending, skipped and unscored.
+#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentScoreOutcomesBody {
+    pub completed: u64,
+    pub total: u64,
+    pub scored: u64,
+    pub failed: u64,
+    pub pending: u64,
+    pub skipped: u64,
+    pub unscored: u64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -1319,6 +1424,7 @@ impl From<ExperimentResultTaskStatus> for ExperimentResultTaskStatusBody {
     fn from(value: ExperimentResultTaskStatus) -> Self {
         match value {
             ExperimentResultTaskStatus::Pending => Self::Pending,
+            ExperimentResultTaskStatus::Queued => Self::Queued,
             ExperimentResultTaskStatus::InProgress => Self::InProgress,
             ExperimentResultTaskStatus::Ok => Self::Ok,
             ExperimentResultTaskStatus::Skipped => Self::Skipped,
@@ -1381,6 +1487,32 @@ impl From<ExperimentProgress> for ExperimentProgressBody {
             completed: value.completed,
             total: value.total,
             skipped: value.skipped,
+        }
+    }
+}
+
+impl From<ExperimentTaskOutcomes> for ExperimentTaskOutcomesBody {
+    fn from(value: ExperimentTaskOutcomes) -> Self {
+        Self {
+            total: value.total,
+            succeeded: value.succeeded,
+            failed: value.failed,
+            pending: value.pending,
+            skipped: value.skipped,
+        }
+    }
+}
+
+impl From<ExperimentScoreOutcomes> for ExperimentScoreOutcomesBody {
+    fn from(value: ExperimentScoreOutcomes) -> Self {
+        Self {
+            completed: value.completed,
+            total: value.total,
+            scored: value.scored,
+            failed: value.failed,
+            pending: value.pending,
+            skipped: value.skipped,
+            unscored: value.unscored,
         }
     }
 }
@@ -1475,11 +1607,17 @@ mod tests {
 
     #[test]
     fn create_contract_reserves_discriminated_task_variants() {
-        for kind in ["inline_prompt", "remote", "sdk"] {
+        for kind in ["inline_prompt", "prompt_ref", "remote", "sdk"] {
             let task = match kind {
                 "inline_prompt" => serde_json::json!({
                     "type": kind,
                     "messages": [{"role": "user", "content": "{{ input }}"}],
+                    "providerId": "provider-1"
+                }),
+                "prompt_ref" => serde_json::json!({
+                    "type": kind,
+                    "id": "prompt-1",
+                    "version": 3,
                     "providerId": "provider-1"
                 }),
                 // An SDK Task is identified by the customer code behind it, so
@@ -1492,7 +1630,8 @@ mod tests {
                 }),
                 // A Remote Task is pinned to one published version, so the
                 // reference is the definition.
-                _ => serde_json::json!({"type": kind, "taskRef": "mock-task@1"}),
+                "remote" => serde_json::json!({"type": kind, "taskRef": "mock-task@1"}),
+                _ => unreachable!(),
             };
             let body: CreateExperimentRequestBody = serde_json::from_value(serde_json::json!({
                 "name": "Experiment",
@@ -1654,6 +1793,10 @@ mod tests {
             scores_settled_at: Some(2),
             idempotency_key: None,
             is_baseline: false,
+            prompt_id: Some("prompt-1".to_string()),
+            prompt_name: Some("Support answer".to_string()),
+            prompt_version: Some(3),
+            prompt_content_hash: Some("sha256:content".to_string()),
             created_by: "owner@example.com".to_string(),
             created_at: 1,
         });
@@ -1663,6 +1806,13 @@ mod tests {
         assert_eq!(value["executionStatus"], serde_json::json!("completed"));
         assert_eq!(value["executionStatusReason"], serde_json::json!("done"));
         assert_eq!(value["executionCompletedAt"], serde_json::json!(2));
+        assert_eq!(value["promptId"], serde_json::json!("prompt-1"));
+        assert_eq!(value["promptName"], serde_json::json!("Support answer"));
+        assert_eq!(value["promptVersion"], serde_json::json!(3));
+        assert_eq!(
+            value["promptContentHash"],
+            serde_json::json!("sha256:content")
+        );
         for legacy in ["status", "statusReason", "completedAt"] {
             assert!(
                 value.get(legacy).is_none(),
@@ -1697,6 +1847,10 @@ mod tests {
             retry_count: 0,
             idempotency_key: None,
             is_baseline: false,
+            prompt_id: None,
+            prompt_name: None,
+            prompt_version: None,
+            prompt_content_hash: None,
             created_by: "owner@example.com".to_string(),
             created_at: 1,
         };
@@ -1705,6 +1859,8 @@ mod tests {
             "scoringStatus",
             "executionProgress",
             "scoringProgress",
+            "taskOutcomes",
+            "scoreOutcomes",
             "scoreSummaries",
             "aggregateSummary",
         ];
@@ -1728,6 +1884,8 @@ mod tests {
                 scoring_status: None,
                 execution_progress: None,
                 scoring_progress: None,
+                task_outcomes: None,
+                score_outcomes: None,
                 score_summaries: None,
                 aggregate_summary: None,
             }),

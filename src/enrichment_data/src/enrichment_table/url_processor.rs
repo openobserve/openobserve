@@ -1665,7 +1665,7 @@ async fn process_enrichment_table_url(
     let schema = stream_schema_map
         .get(&stream_name)
         .map(|s| s.schema().as_ref().clone())
-        .unwrap_or(arrow_schema::Schema::empty());
+        .unwrap_or_else(arrow_schema::Schema::empty);
 
     // Calculate total expected size
     let current_size_in_bytes = if append_data {
@@ -1739,7 +1739,7 @@ async fn process_enrichment_table_url(
 async fn save_enrichment_batch(
     org_id: &str,
     table_name: &str,
-    payload: Vec<json::Map<String, json::Value>>,
+    mut payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
     is_first_batch: bool,
 ) -> Result<(arrow_schema::Schema, i64)> {
@@ -1808,6 +1808,8 @@ async fn save_enrichment_batch(
         .await;
     }
 
+    super::apply_redaction(org_id, &stream_name, &mut payload).await;
+
     // Prepare records with timestamp
     let mut records = vec![];
     let mut records_size = 0;
@@ -1844,7 +1846,7 @@ async fn save_enrichment_batch(
         let db_schema = stream_schema_map
             .get(&stream_name)
             .map(|s| s.schema().as_ref().clone())
-            .unwrap_or(arrow_schema::Schema::empty());
+            .unwrap_or_else(arrow_schema::Schema::empty);
 
         if !db_schema.fields().is_empty() && db_schema.fields().ne(inferred_schema.fields()) {
             return Err(anyhow!(

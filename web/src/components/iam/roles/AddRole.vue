@@ -62,7 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createRole } from "@/services/iam";
+import { useMutation } from "@tanstack/vue-query";
+import { createRoleMutation } from "@/services/iam.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -70,7 +72,6 @@ import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
@@ -97,13 +98,16 @@ const { track } = useReo();
 
 // "Start from" preset options — the selected value is form-owned (startFrom):
 // "custom" = empty role (default); "readonly" = seed read-only permissions
-// (AllowList + AllowGet) once the user lands on EditRole.
+// (AllowList + AllowGet) on every resource; "dbm" = seed the same read
+// permissions on the DB Monitoring module and the metric streams its Metrics
+// tab reads; "k8s" = seed them on the curated Kubernetes/host metric streams.
+// Each seeds once the user lands on EditRole.
 const startFromOptions = computed(() => [
   { label: t("iam.role.startFrom.custom"), value: "custom" },
   { label: t("iam.role.startFrom.readonly"), value: "readonly" },
+  { label: t("iam.role.startFrom.dbm"), value: "dbm" },
+  { label: t("iam.role.startFrom.k8s"), value: "k8s" },
 ]);
-
-const store = useStore();
 
 const addRoleSchema = makeAddRoleSchema(t);
 
@@ -121,10 +125,14 @@ const addRoleDefaults = computed((): AddRoleForm => ({
 // matches (mirrors the old `v-model.trim`). `saveRole` always calls createRole
 // (even when prefilled in edit mode) — behavior preserved from the original.
 // Emits the "start from" preset so AppRoles can seed EditRole's permissions.
+const orgId = useOrgId();
+const createRoleMutation_ = useMutation(() => createRoleMutation(orgId.value));
+
 const saveRole = async (value: AddRoleForm) => {
   const name = value.name.trim();
   try {
-    await createRole(name, store.state.selectedOrganization.identifier);
+    // The mutation declares the scope it drops; this component never names a cache.
+    await createRoleMutation_.mutateAsync(name);
     emits("update:open", false);
     emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({

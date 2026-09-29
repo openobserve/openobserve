@@ -62,6 +62,8 @@ const {
   estimateSize: props.estimateSize,
   overscan: props.overscan,
   dynamicRowHeight: dynamicRowHeightRef,
+  // A delegated scroller can hold content above this list, so a data refresh that remeasures rows must not move the owning page
+  preserveScrollOffsetOnRowResize: () => !!props.scrollTarget && props.dynamicRowHeight,
 });
 
 // Emit virtual-scroll event on mount and whenever the rendered range changes.

@@ -1,12 +1,12 @@
 use std::io::Read;
 
 use anyhow::Context;
-use config::SOURCEMAP_FILE_MAX_SIZE;
+use config::{SOURCEMAP_FILE_MAX_SIZE, SOURCEMAP_ZIP_MAX_ENTRIES, SOURCEMAP_ZIP_MAX_SIZE};
 use db::sourcemaps;
 use hashbrown::{HashMap, HashSet};
 use infra::{
     storage,
-    table::source_maps::{FileType, SourceMap},
+    table::source_maps::{FileType, SourceMap, get_file_path},
 };
 use serde::Serialize;
 #[cfg(feature = "enterprise")]
@@ -77,10 +77,6 @@ impl TranslatedStack {
     }
 }
 
-fn get_file_path(org_id: &str, name: &str) -> String {
-    format!("files/{org_id}/sourcemaps/{name}")
-}
-
 pub async fn process_zip(
     org_id: &str,
     service: Option<String>,
@@ -144,64 +140,99 @@ pub async fn process_zip(
         ));
     }
 
-    let mut source_maps = Vec::with_capacity(map_pairs.len());
-    let mut source_map_paths = Vec::with_capacity(map_pairs.len());
-
-    let now = chrono::Utc::now().timestamp_micros();
-
-    // finally, for each minified-sourcemap pair -
-    // first store the sourcemap file with a uuid in storage
-    // then bulk insert all file entries in the db
-    // finally if db entry fails, attempt to delete from storage
-    for (minified, (smap, path)) in map_pairs {
-        let mut file = archive
-            .by_path(&path)
-            .context(format!("path {path} missing unexpectedly in archive"))?;
-
-        if file.size() > SOURCEMAP_FILE_MAX_SIZE {
-            return Err(anyhow::anyhow!(
-                "file {} in zip exceeds maximum allowed file size.",
-                path
-            ));
-        }
-        let mut buf = Vec::with_capacity(file.size() as usize);
-        file.read_to_end(&mut buf)?;
-
-        let id = config::ider::uuid();
-        let storage_name = format!("{id}.js.map");
-        let path = get_file_path(org_id, &storage_name);
-        source_map_paths.push(path.clone());
-
-        storage::put("", &path, buf.into()).await?;
-
-        let sourcemap = SourceMap {
-            id: 0,
-            org: org_id.to_string(),
-            service: service.clone(),
-            env: env.clone(),
-            version: version.clone(),
-            source_file_name: minified,
-            source_map_file_name: smap,
-            file_store_id: storage_name,
-            file_type: FileType::SourceMap,
-            cluster: config::get_cluster_name(),
-            created_at: now,
-        };
-        source_maps.push(sourcemap);
+    if map_pairs.len() > SOURCEMAP_ZIP_MAX_ENTRIES {
+        return Err(anyhow::anyhow!(
+            "zip contains {} sourcemap files, exceeding the maximum of {SOURCEMAP_ZIP_MAX_ENTRIES}",
+            map_pairs.len()
+        ));
     }
 
-    if let Err(e) = sourcemaps::add_many(source_maps).await {
-        log::error!("error saving sourcemaps in db for org_id {org_id} : {e}");
-        let temp = source_map_paths.iter().map(|p| ("", p.as_str())).collect();
-        if let Err(e) = storage::del(temp).await {
-            log::warn!(
-                "error deleting files from storage after sourcemap saving error for org_id {org_id} {e} "
-            );
+    let now = chrono::Utc::now().timestamp_micros();
+    let cluster = config::get_cluster_name();
+    let (archive_paths, entries): (Vec<String>, Vec<SourceMap>) = map_pairs
+        .into_iter()
+        .map(|(minified, (smap, path))| {
+            let entry = SourceMap {
+                id: 0,
+                org: org_id.to_string(),
+                service: service.clone(),
+                env: env.clone(),
+                version: version.clone(),
+                source_file_name: minified,
+                source_map_file_name: smap,
+                file_store_id: format!("{}.js.map", config::ider::uuid()),
+                file_type: FileType::SourceMap,
+                cluster: cluster.clone(),
+                created_at: now,
+            };
+            (path, entry)
+        })
+        .unzip();
+
+    let mut total_bytes = 0;
+    for (i, (archive_path, entry)) in archive_paths.iter().zip(&entries).enumerate() {
+        if let Err(e) = store_map_file(&mut archive, archive_path, entry, &mut total_bytes).await {
+            rollback_stored(org_id, &entries[..=i]).await;
+            return Err(e);
         }
+    }
+
+    if let Err(e) = sourcemaps::add_many(entries.clone()).await {
+        log::error!("error saving sourcemaps in db for org_id {org_id} : {e}");
+        rollback_stored(org_id, &entries).await;
         return Err(e);
     }
 
     Ok(())
+}
+
+async fn store_map_file(
+    archive: &mut zip::read::ZipArchive<std::io::Cursor<Vec<u8>>>,
+    archive_path: &str,
+    entry: &SourceMap,
+    total_bytes: &mut u64,
+) -> Result<(), anyhow::Error> {
+    let buf = {
+        let mut file = archive.by_path(archive_path).context(format!(
+            "path {archive_path} missing unexpectedly in archive"
+        ))?;
+        read_entry(&mut file, archive_path)?
+    };
+    *total_bytes += buf.len() as u64;
+    if *total_bytes > SOURCEMAP_ZIP_MAX_SIZE {
+        return Err(anyhow::anyhow!(
+            "total uncompressed size of files in zip exceeds maximum allowed size."
+        ));
+    }
+    let path = get_file_path(&entry.org, &entry.file_store_id);
+    storage::put("", &path, buf.into()).await?;
+    Ok(())
+}
+
+fn read_entry<R: Read>(
+    file: &mut zip::read::ZipFile<'_, R>,
+    name: &str,
+) -> Result<Vec<u8>, anyhow::Error> {
+    let too_large = || anyhow::anyhow!("file {name} in zip exceeds maximum allowed file size.");
+    if file.size() > SOURCEMAP_FILE_MAX_SIZE {
+        return Err(too_large());
+    }
+    let mut buf = Vec::with_capacity(file.size().min(SOURCEMAP_FILE_MAX_SIZE) as usize);
+    // size() is the archive's own claim; only this bounded read is authoritative
+    file.take(SOURCEMAP_FILE_MAX_SIZE + 1)
+        .read_to_end(&mut buf)?;
+    if buf.len() as u64 > SOURCEMAP_FILE_MAX_SIZE {
+        return Err(too_large());
+    }
+    Ok(buf)
+}
+
+async fn rollback_stored(org_id: &str, entries: &[SourceMap]) {
+    if let Err(e) = sourcemaps::delete_stored_files(entries).await {
+        log::warn!(
+            "error deleting files from storage after sourcemap saving error for org_id {org_id} {e} "
+        );
+    }
 }
 
 fn parse_line(line: &str) -> Result<ParsedLine, ()> {
@@ -920,5 +951,213 @@ mod tests {
         assert!(parsed.file.contains("App.js"));
         assert_eq!(parsed.line, 1);
         assert_eq!(parsed.col, 5);
+    }
+
+    fn build_zip(files: &[(&str, &[u8])]) -> Vec<u8> {
+        use std::io::Write;
+
+        use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+
+        let mut w = ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let opts = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        for (name, data) in files {
+            w.start_file(*name, opts).unwrap();
+            w.write_all(data).unwrap();
+        }
+        w.finish().unwrap().into_inner()
+    }
+
+    fn set_declared_size(zip: &mut [u8], size: u32) {
+        for (sig, offset) in [(b"PK\x03\x04", 22), (b"PK\x01\x02", 24)] {
+            for i in 0..=zip.len() - 4 {
+                if &zip[i..i + 4] == sig {
+                    zip[i + offset..i + offset + 4].copy_from_slice(&size.to_le_bytes());
+                }
+            }
+        }
+    }
+
+    async fn stored_files(org: &str) -> Vec<String> {
+        storage::list("", &format!("files/{org}/sourcemaps/"))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_zip_too_many_entries_is_rejected() {
+        let org = "org_zip_entries";
+        let names: Vec<String> = (0..=SOURCEMAP_ZIP_MAX_ENTRIES)
+            .map(|i| format!("f{i}.js.map"))
+            .collect();
+        let files: Vec<(&str, &[u8])> = names.iter().map(|n| (n.as_str(), &b"{}"[..])).collect();
+        let err = process_zip(org, None, None, None, build_zip(&files))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("exceeding the maximum"), "{err}");
+        assert!(stored_files(org).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_zip_total_size_over_limit_rolls_back_storage() {
+        let org = "org_zip_total";
+        let data = vec![0u8; SOURCEMAP_FILE_MAX_SIZE as usize];
+        let count = (SOURCEMAP_ZIP_MAX_SIZE / SOURCEMAP_FILE_MAX_SIZE) as usize + 1;
+        let names: Vec<String> = (0..count).map(|i| format!("f{i}.js.map")).collect();
+        let files: Vec<(&str, &[u8])> = names
+            .iter()
+            .map(|n| (n.as_str(), data.as_slice()))
+            .collect();
+        let err = process_zip(org, None, None, None, build_zip(&files))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("total uncompressed size"), "{err}");
+        assert!(stored_files(org).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_zip_entry_with_understated_size_is_rejected() {
+        let org = "org_zip_declared";
+        let data = vec![0u8; SOURCEMAP_FILE_MAX_SIZE as usize + 1];
+        let mut zip = build_zip(&[("big.js.map", data.as_slice())]);
+        set_declared_size(&mut zip, 1024);
+        let mut archive = zip::read::ZipArchive::new(std::io::Cursor::new(zip.clone())).unwrap();
+        assert_eq!(archive.by_index(0).unwrap().size(), 1024);
+        let err = process_zip(org, None, None, None, zip).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("exceeds maximum allowed file size"),
+            "{err}"
+        );
+        assert!(stored_files(org).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_delete_group_removes_stored_files() {
+        let service = "svc_delete_storage";
+        let environment = "env_delete_storage";
+        let version = "v_delete_storage";
+        upload_zip(service, environment, version).await;
+        let files = list_files(
+            "default",
+            Some(service.into()),
+            Some(environment.into()),
+            Some(version.into()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(files.len(), 4);
+        let paths: Vec<String> = files
+            .iter()
+            .map(|f| get_file_path(&f.org, &f.file_store_id))
+            .collect();
+        for p in &paths {
+            assert!(
+                storage::get("", p).await.is_ok(),
+                "{p} missing after upload"
+            );
+        }
+        delete_group(
+            "default",
+            Some(service.into()),
+            Some(environment.into()),
+            Some(version.into()),
+        )
+        .await
+        .unwrap();
+        for p in &paths {
+            assert!(
+                storage::get("", p).await.is_err(),
+                "{p} still stored after delete"
+            );
+        }
+    }
+
+    async fn group_store_ids(svc: &str, env: &str, version: &str) -> HashSet<String> {
+        list_files(
+            "default",
+            Some(svc.into()),
+            Some(env.into()),
+            Some(version.into()),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|f| f.file_store_id)
+        .collect()
+    }
+
+    #[tokio::test]
+    async fn test_delete_group_returns_only_removed_rows() {
+        let (svc_a, svc_b) = ("svc_delete_rows_a", "svc_delete_rows_b");
+        let environment = "env_delete_rows";
+        let version = "v_delete_rows";
+        upload_zip(svc_a, environment, version).await;
+        upload_zip(svc_b, environment, version).await;
+        let ids_a = group_store_ids(svc_a, environment, version).await;
+        let ids_b = group_store_ids(svc_b, environment, version).await;
+        assert_eq!(ids_a.len(), 4);
+        assert_eq!(ids_b.len(), 4);
+
+        let removed = infra::table::source_maps::delete_group(
+            "default",
+            Some(svc_a.into()),
+            Some(environment.into()),
+            Some(version.into()),
+        )
+        .await
+        .unwrap();
+        let removed_ids: HashSet<String> =
+            removed.iter().map(|f| f.file_store_id.clone()).collect();
+        assert_eq!(removed_ids, ids_a);
+        assert!(
+            group_store_ids(svc_a, environment, version)
+                .await
+                .is_empty()
+        );
+        assert_eq!(group_store_ids(svc_b, environment, version).await, ids_b);
+
+        delete_stored_files(&removed).await.unwrap();
+        for id in &ids_a {
+            let p = get_file_path("default", id);
+            assert!(storage::get("", &p).await.is_err(), "{p} still stored");
+        }
+        for id in &ids_b {
+            let p = get_file_path("default", id);
+            assert!(storage::get("", &p).await.is_ok(), "{p} missing");
+        }
+        delete_group(
+            "default",
+            Some(svc_b.into()),
+            Some(environment.into()),
+            Some(version.into()),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_delete_stored_files_ignores_missing_objects() {
+        let org = "org_delete_missing";
+        let entry = |name: &str| SourceMap {
+            id: 0,
+            org: org.to_string(),
+            service: None,
+            env: None,
+            version: None,
+            source_file_name: format!("{name}.js"),
+            source_map_file_name: format!("{name}.js.map"),
+            file_store_id: format!("{name}.js.map"),
+            file_type: FileType::SourceMap,
+            cluster: String::new(),
+            created_at: 0,
+        };
+        let entries = [entry("stored"), entry("never_stored")];
+        let stored = get_file_path(org, &entries[0].file_store_id);
+        storage::put("", &stored, b"{}".to_vec().into())
+            .await
+            .unwrap();
+        delete_stored_files(&entries).await.unwrap();
+        assert!(storage::get("", &stored).await.is_err());
+        assert!(stored_files(org).await.is_empty());
     }
 }

@@ -21,12 +21,15 @@ import store from "@/test/unit/helpers/store";
 import SearchService from "@/services/search";
 
 // Mock SearchService
-vi.mock("@/services/search", () => ({
-  default: {
-    get_running_queries: vi.fn(),
-    delete_running_queries: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_running_queries: vi.fn(),
+      delete_running_queries: vi.fn(),
+    },
+  });
+});
 
 // Mock composables
 vi.mock("@/composables/useIsMetaOrg", () => ({

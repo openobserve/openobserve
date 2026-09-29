@@ -52,6 +52,11 @@ pub struct HttpResponse {
     /// Closest valid alternatives for a mistyped field/function name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggestions: Option<Vec<String>>,
+    /// Problems with a request that succeeded anyway. Distinct from `hint`,
+    /// which explains a failure: these accompany a 200, and the caller is
+    /// entitled to have meant it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warnings: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -72,6 +77,7 @@ impl HttpResponse {
             trace_id: None,
             hint: None,
             suggestions: None,
+            warnings: None,
         }
     }
 
@@ -85,6 +91,7 @@ impl HttpResponse {
             trace_id: None,
             hint: None,
             suggestions: None,
+            warnings: None,
         }
     }
 
@@ -98,6 +105,7 @@ impl HttpResponse {
             trace_id: None,
             hint: None,
             suggestions: None,
+            warnings: None,
         }
     }
 
@@ -111,6 +119,7 @@ impl HttpResponse {
             trace_id,
             hint: None,
             suggestions: None,
+            warnings: None,
         }
     }
 
@@ -126,6 +135,13 @@ impl HttpResponse {
 
     pub fn with_name(&mut self, name: String) -> &mut Self {
         self.name = Some(name);
+        self
+    }
+
+    /// Attaches advisories to a successful response, or nothing when there are
+    /// none — an empty array reads as a claim that everything was checked.
+    pub fn with_warnings(&mut self, warnings: Vec<String>) -> &mut Self {
+        self.warnings = (!warnings.is_empty()).then_some(warnings);
         self
     }
 
@@ -402,6 +418,7 @@ mod tests {
             trace_id: Some("trace-123".to_string()),
             hint: None,
             suggestions: None,
+            warnings: None,
         };
 
         let serialized = serde_json::to_string(&response).unwrap();
@@ -500,6 +517,7 @@ mod tests {
             trace_id: None,
             hint: None,
             suggestions: None,
+            warnings: None,
         };
         let serialized = serde_json::to_string(&response).unwrap();
         assert!(!serialized.contains("id"));
@@ -532,6 +550,7 @@ mod tests {
             trace_id: Some("trace-abc".to_string()),
             hint: None,
             suggestions: None,
+            warnings: None,
         };
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"id\""));
@@ -551,6 +570,7 @@ mod tests {
             trace_id: None,
             hint: None,
             suggestions: None,
+            warnings: None,
         };
         let response = http_response.into_response();
         assert_eq!(response.status(), http::StatusCode::OK);
@@ -616,6 +636,7 @@ mod tests {
             trace_id: None,
             hint: None,
             suggestions: None,
+            warnings: None,
         };
         let response = http_response.into_response();
         assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);

@@ -1,0 +1,573 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// Kubernetes content pack — PACK-SPECIFIC invariants only (design §4.2, §7.1).
+// Every generic rule lives in lint.spec.ts, which is parameterized over the
+// registry, so registering a pack is what opts it into those.
+
+import { describe, it, expect } from "vitest";
+import { kubernetesPage } from "./kubernetes.page";
+import { GROUP, STALENESS_24H_US } from "../types";
+import enLocale from "@/locales/languages/en-US.json";
+
+const allPanels = () => kubernetesPage.sections.flatMap((section: any) => section.panels);
+
+const panel = (id: string) => {
+  const found = allPanels().find((p: any) => p.id === id);
+  if (!found) throw new Error(`panel ${id} is not in the kubernetes pack`);
+  return found;
+};
+
+const sectionOf = (id: string) =>
+  kubernetesPage.sections.find((s: any) => s.panels.some((p: any) => p.id === id));
+
+const group = (id: string) => {
+  const found = kubernetesPage.groups.find((g: any) => g.id === id);
+  if (!found) throw new Error(`group ${id} is not in the kubernetes pack`);
+  return found;
+};
+
+const queriesOf = (id: string): string[] =>
+  panel(id).variants.flatMap((v: any) => v.queries.map((q: any) => q.query as string));
+
+describe("kubernetes pack — shape", () => {
+  it("declares 3 groups, 3 pickers, 6 sections and 50 panels", () => {
+    expect(kubernetesPage.id).toBe("kubernetes");
+    expect(kubernetesPage.groups.map((g: any) => g.id)).toEqual([
+      "kubelet-node",
+      "kubelet-pod",
+      "kube-state",
+    ]);
+    expect(kubernetesPage.scopePickers.map((p: any) => p.name)).toEqual([
+      "cluster",
+      "namespace",
+      "pod",
+    ]);
+    expect(kubernetesPage.sections.map((s: any) => s.id)).toEqual([
+      // The fleet quadrant is the landing tab (tabs[0], CuratedPageView.vue:151-164):
+      // which cluster to open is the question that precedes opening one.
+      "overview",
+      "inventory",
+      "health",
+      "utilization",
+      "nodes",
+      "workloads",
+    ]);
+    expect(allPanels()).toHaveLength(50);
+  });
+
+  it("pins the 24h staleness threshold like every pack (§5.3)", () => {
+    expect(kubernetesPage.stalenessThresholdUs).toBe(STALENESS_24H_US);
+  });
+
+  it("defaults to the 3h relative period the hosts surface already uses", () => {
+    expect(kubernetesPage.defaultRelativePeriod).toBe("3h");
+  });
+});
+
+describe("kube-state fieldOverrides — keyed by the REAL group ids", () => {
+  it("overrides namespace/pod/node to the bare kube-state spellings", () => {
+    // The key spelling IS the contract (JSON-truth pass) — a `pod:` shorthand
+    // silently stops overriding anything and rung 2 takes over.
+    expect(group("kube-state").fieldOverrides).toEqual({
+      [GROUP.namespace]: "namespace",
+      [GROUP.pod]: "pod",
+      [GROUP.node]: "node",
+      // The inventory tables name their cluster, so the token must resolve here
+      // too — without the override an empty dictionary hides those panels.
+      [GROUP.cluster]: "k8s_cluster",
+    });
+    expect(Object.keys(group("kube-state").fieldOverrides)).toEqual([
+      "k8s-namespace",
+      "k8s-pod-name",
+      "k8s-node-name",
+      "k8s-cluster",
+    ]);
+  });
+
+  it("the kubeletstats groups declare probeFields as the rung-4a net (§5.4)", () => {
+    // Not defensive dead code: the validation deployment runs a lossy override.
+    expect(group("kubelet-node").probeFields).toEqual({
+      [GROUP.node]: ["k8s_node_name", "k8s_node", "node"],
+      [GROUP.cluster]: ["k8s_cluster_name", "k8s_cluster", "cluster"],
+    });
+    expect(group("kubelet-pod").probeFields).toEqual({
+      [GROUP.namespace]: ["k8s_namespace_name", "k8s_namespace", "namespace"],
+      [GROUP.pod]: ["k8s_pod_name", "k8s_pod", "pod"],
+    });
+  });
+});
+
+describe("the Inventory node pair reads ONE collector", () => {
+  it("the Nodes total and the Nodes-ready count both come from kube-state", () => {
+    // A NotReady node stops emitting kubeletstats but keeps emitting kube-state, so
+    // a kubeletstats total shrinks toward the ready count and the pair reads 30/30
+    // at the exact moment a node has failed. Same collector, or the tile lies.
+    for (const id of ["k8s_ov_nodes", "k8s_ov_nodes_ready"]) {
+      expect(panel(id).groupId, id).toBe("kube-state");
+      expect(sectionOf(id)!.id, id).toBe("inventory");
+    }
+    for (const query of queriesOf("k8s_ov_nodes")) {
+      expect(query).toContain("kube_node_status_allocatable");
+      // Asserted negatively so a well-meaning revert to the kubeletstats spelling fails here.
+      expect(query).not.toContain("k8s_node_cpu");
+    }
+    expect(panel("k8s_ov_nodes").variants).toHaveLength(1);
+    expect(panel("k8s_ov_nodes").variants[0].requiresStreams).toEqual([
+      "kube_node_status_allocatable",
+    ]);
+  });
+
+  it("the Nodes total counts NODES, not the resource rows allocatable emits per node", () => {
+    // kube_node_status_allocatable carries one series per (node, resource); a bare
+    // count() would report cpu+memory+pods+… and multiply the fleet.
+    const [query] = queriesOf("k8s_ov_nodes");
+    expect(query).toMatch(/count\(count by \(\$\{f:k8s-node-name\}\)/);
+  });
+});
+
+describe("drift variants (§10 pass-1 finding 1)", () => {
+  it("node CPU and node memory each carry exactly 2 variants of the right families", () => {
+    for (const id of ["k8s_nd_cpu", "k8s_ov_node_cpu_top"]) {
+      expect(panel(id).variants, id).toHaveLength(2);
+      expect(panel(id).variants[0].requiresStreams, id).toEqual(["k8s_node_cpu_utilization"]);
+      expect(panel(id).variants[1].requiresStreams, id).toEqual(["k8s_node_cpu_usage"]);
+    }
+    expect(panel("k8s_nd_memory").variants).toHaveLength(2);
+    expect(panel("k8s_nd_memory").variants[0].requiresStreams).toEqual(["k8s_node_memory_usage"]);
+    expect(panel("k8s_nd_memory").variants[1].requiresStreams).toEqual(["k8s_node_memory_rss"]);
+  });
+
+  it("the usage variant overrides the unit — cores in use is not a ratio", () => {
+    expect(panel("k8s_nd_cpu").unit).toBe("percent-1");
+    expect(panel("k8s_nd_cpu").variants[1].unit).toBe("numbers");
+  });
+});
+
+describe("DRY-RUN finding 2 — a `status` label is not a value test", () => {
+  it('k8s_nd_not_ready matches condition="Ready" with `== 0`, positively and negatively', () => {
+    const [query] = queriesOf("k8s_nd_not_ready");
+    expect(panel("k8s_nd_not_ready").type).toBe("table");
+    expect(sectionOf("k8s_nd_not_ready")!.id).toBe("nodes");
+    expect(panel("k8s_nd_not_ready").groupId).toBe("kube-state");
+    expect(query).toContain('condition="Ready"');
+    expect(query).toContain("== 0");
+    // The old form selected the 13 UNRELATED node-problem-detector conditions and
+    // returned 20 healthy nodes valued 0. Asserted negatively so a well-meaning
+    // edit cannot restore it.
+    expect(query).not.toContain('condition!="Ready"');
+    // Measured live: without status="true" the `== 0` matched 214 false/unknown
+    // rows — 0 BECAUSE they are false — while zero nodes were actually not ready.
+    expect(query).toContain('status="true"');
+    // A status selector still has to carry a value test somewhere in the query.
+    expect(query).toMatch(/(==|>|<|>=|<=)\s*-?\d/);
+  });
+
+  it("k8s_nd_conditions and k8s_ov_nodes_ready both carry a `== 1` value test", () => {
+    expect(queriesOf("k8s_nd_conditions")[0]).toContain("== 1");
+    expect(queriesOf("k8s_ov_nodes_ready")[0]).toContain("== 1");
+    expect(queriesOf("k8s_ov_nodes_ready")[0]).toContain('condition="Ready"');
+  });
+});
+
+describe("DRY-RUN finding 7 — topk bounds rows only on an instant vector", () => {
+  const TABLES = [
+    "k8s_ov_unhealthy_pods",
+    "k8s_wh_waiting_top",
+    "k8s_wh_terminated_top",
+    "k8s_wh_hpa_limited",
+    "k8s_wh_deploy_short_top",
+    "k8s_wh_sts_short_top",
+    "k8s_wh_ds_unavailable_top",
+    "k8s_wh_jobs_failed_top",
+    "k8s_wh_pvc_unbound_top",
+    "k8s_ut_over_limit_top",
+    "k8s_ut_cpu_waste_top",
+    "k8s_ut_mem_waste_top",
+    "k8s_ut_node_commit_top",
+    "k8s_nd_conditions",
+    "k8s_nd_not_ready",
+    "k8s_wl_pod_restarts",
+  ];
+
+  it("every table panel is instant-vector shaped so topk(20) is a real row cap", () => {
+    // Measured: a RANGE topk(20) returned 450 series behind a title promising 20.
+    // The window is now pinned by running the panel at a single instant; the old
+    // `[5m:]` spelling did cap the rows but 500s the panel when nothing matches.
+    for (const id of TABLES) {
+      expect(panel(id).type, id).toBe("table");
+      for (const variant of panel(id).variants) {
+        expect(variant.queryMode, id).toBe("instant");
+        for (const { query } of variant.queries) {
+          expect(query, id).toContain("topk(20,");
+        }
+      }
+    }
+  });
+
+  it("the four tables are the ONLY table panels — every other panel is a chart", () => {
+    const tables = allPanels()
+      .filter((p: any) => p.type === "table")
+      .map((p: any) => p.id);
+    expect(tables.sort()).toEqual([...TABLES].sort());
+  });
+
+  it("no NON-table panel's query is instant-vector wrapped — topk there is a per-step selector", () => {
+    for (const p of allPanels().filter((x: any) => x.type !== "table")) {
+      for (const variant of p.variants) {
+        for (const q of variant.queries) {
+          expect(q.query, p.id).not.toContain("last_over_time(");
+        }
+      }
+    }
+  });
+});
+
+describe("pass-4 finding 1 — every aggregate has an inventory behind it", () => {
+  it("k8s_ov_unhealthy_pods names the pods behind the three phase tiles", () => {
+    expect(sectionOf("k8s_ov_unhealthy_pods")!.id).toBe("inventory");
+    expect(panel("k8s_ov_unhealthy_pods").groupId).toBe("kube-state");
+    const [query] = queriesOf("k8s_ov_unhealthy_pods");
+    expect(query).toContain('phase=~"Pending|Failed|Unknown"');
+    expect(query).toContain("${f:k8s-namespace}");
+    expect(query).toContain("${f:k8s-pod-name}");
+    expect(query).toContain("phase");
+  });
+
+  it("every metric tile counting unhealthy objects has an inventory panel in its group", () => {
+    // Structural invariant, so a future tile cannot ship without its "which ones?".
+    const unhealthyTiles = allPanels().filter(
+      (p: any) =>
+        p.type === "metric" &&
+        p.variants.some((v: any) =>
+          v.queries.some(
+            (q: any) => /phase="(Pending|Failed|Unknown)"/.test(q.query) || /== 0/.test(q.query),
+          ),
+        ),
+    );
+    expect(unhealthyTiles.length).toBeGreaterThan(0);
+    for (const tile of unhealthyTiles) {
+      const inventory = allPanels().filter(
+        (p: any) => p.type === "table" && p.groupId === tile.groupId,
+      );
+      expect(inventory.length, tile.id).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("pass-4 finding 7 — the two headroom panels", () => {
+  it("k8s_wl_pod_mem_limit_pct is a kubelet-pod percent-1 panel on the limit-utilization stream", () => {
+    expect(panel("k8s_wl_pod_mem_limit_pct").groupId).toBe("kubelet-pod");
+    expect(panel("k8s_wl_pod_mem_limit_pct").unit).toBe("percent-1");
+    expect(panel("k8s_wl_pod_mem_limit_pct").variants[0].requiresStreams).toEqual([
+      "k8s_pod_memory_limit_utilization",
+    ]);
+  });
+
+  it("k8s_wl_pod_restarts sits in kube-state on the restarts stream, and is NO LONGER flagged unevidenced", () => {
+    // Dry run confirmation 12: 864 M docs, 0.1 h fresh, 102 series. §10 row 13 closed.
+    expect(panel("k8s_wl_pod_restarts").groupId).toBe("kube-state");
+    expect(panel("k8s_wl_pod_restarts").variants[0].requiresStreams).toEqual([
+      "kube_pod_container_status_restarts_total",
+    ]);
+    expect((kubernetesPage as any).unevidencedAssumptions ?? []).not.toContain(
+      "kube_pod_container_status_restarts_total",
+    );
+  });
+});
+
+describe("DRY-RUN finding 10 — five phases exist, so the tiles are not a partition", () => {
+  it("k8s_ov_pods_by_phase carries NO phase filter — nothing is silently dropped", () => {
+    const [query] = queriesOf("k8s_ov_pods_by_phase");
+    expect(query).toContain("sum by (phase)");
+    expect(query).not.toContain("phase=");
+    expect(query).not.toContain("phase=~");
+  });
+
+  // The disclosure moved OFF the tiles: sharing a one-line bar with the title it
+  // truncated them to "Pods ru…"/"Pods pe…"/"Pods f…". It is a fact about the
+  // trio, so the Inventory section states it once, above the grid.
+  it("the phase fact is a SECTION note, and no tile carries a subtitle", () => {
+    const inventory = kubernetesPage.sections.find((s: any) => s.id === "inventory")!;
+    expect(inventory.noteKey).toBe("infra.k8s.section.inventoryNote");
+    // Pack-wide, not just the phase trio: CuratedPanelDef dropped subtitleKey, so a re-introduction would be read by nothing.
+    for (const p of allPanels()) {
+      expect((p as any).subtitleKey, p.id).toBeUndefined();
+    }
+  });
+});
+
+describe("DRY-RUN finding 6 — pickers source from a LIVE stream and omit on empty values", () => {
+  const picker = (name: string) => kubernetesPage.scopePickers.find((p: any) => p.name === name)!;
+
+  it("the cluster and namespace pickers source from the collector the tables query", () => {
+    // Original intent, preserved: never the 177-day-dead `k8s_node_cpu_utilization`
+    // spelling, which returned 0 values from `_values`.
+    //
+    // Re-sourced from kube_pod_status_phase (kube-state) after a live diagnosis:
+    // sourcing cluster/namespace from kubeletstats offered 10 clusters and 58
+    // namespaces, but the SPARSE kube-state families the health tables query only
+    // exist where kube-state emits them — waiting_reason on 2 clusters, HPA
+    // conditions on 3 — so 8 of 10 clusters and 46 of 58 namespaces blanked every
+    // health table. kube_pod_status_phase is live, carries both k8s_cluster and
+    // namespace, and lists all 10 clusters plus 61 namespaces (3 more than the
+    // kubeletstats stream). Safe for the kubeletstats sections because a picker
+    // supplies VALUES only: each panel spells the label from its own group
+    // (resolve.ts:909 prefers panel.resolvedFields over the picker's field).
+    for (const name of ["cluster", "namespace"]) {
+      expect(picker(name).valuesFrom.stream, name).toBe("kube_pod_status_phase");
+      expect(picker(name).valuesFrom.groupId, name).toBe("kube-state");
+    }
+    expect(picker("cluster").valuesFrom.stream).not.toBe("k8s_node_cpu_utilization");
+  });
+
+  it("the cluster picker defaults to its first value, not the all-sentinel", () => {
+    // A fleet-wide default mixes ten clusters into one crash-loop list nobody can
+    // act on. `defaultFirstValue` makes buildVariable emit
+    // selectAllValueForMultiSelect: "first", which the manager resolves to the
+    // first loaded option (useVariablesManager:96-112).
+    expect(picker("cluster").defaultFirstValue).toBe(true);
+    expect(picker("namespace").defaultFirstValue).toBeUndefined();
+    expect(picker("pod").defaultFirstValue).toBeUndefined();
+  });
+
+  it("all three pickers set omitWhenValuesEmpty — schema presence is not resolvability", () => {
+    for (const name of ["cluster", "namespace", "pod"]) {
+      expect(picker(name).omitWhenValuesEmpty, name).toBe(true);
+    }
+  });
+
+  it("the cluster picker also sets omitWhenFieldAbsent (single-cluster orgs lack the label)", () => {
+    expect(picker("cluster").omitWhenFieldAbsent).toBe(true);
+  });
+
+  it("pickers name the real group ids and the pod picker chains on cluster AND namespace", () => {
+    expect(picker("cluster").group).toBe(GROUP.cluster);
+    expect(picker("namespace").group).toBe(GROUP.namespace);
+    expect(picker("pod").group).toBe(GROUP.pod);
+    expect(picker("namespace").chainedOn).toEqual([{ picker: "cluster" }]);
+    // Namespace names are NOT unique across clusters — `openobserve` exists in
+    // several — so a pod picker filtering on namespace alone offered every
+    // cluster's identically-named pods, the reported bug.
+    expect(picker("pod").chainedOn).toEqual([{ picker: "cluster" }, { picker: "namespace" }]);
+  });
+
+  it("all three pickers source values from the collector the health tables query", () => {
+    // A picker offering values from a collector the panels do not query is the
+    // 46-of-58 miss that re-sourced cluster and namespace; pod was left behind.
+    const kubeState = {
+      groupId: "kube-state",
+      stream: "kube_pod_status_phase",
+      streamType: "metrics",
+    };
+    expect(picker("cluster").valuesFrom).toEqual(kubeState);
+    expect(picker("namespace").valuesFrom).toEqual(kubeState);
+    expect(picker("pod").valuesFrom).toEqual(kubeState);
+  });
+});
+
+describe("declarative scoping (pass-1 finding 3)", () => {
+  it("Inventory and Nodes declare `cluster` only — fleet tiles stay fleet-wide BY DECLARATION", () => {
+    expect(kubernetesPage.sections.find((s: any) => s.id === "inventory")!.scopedBy).toEqual([
+      "cluster",
+    ]);
+    expect(kubernetesPage.sections.find((s: any) => s.id === "nodes")!.scopedBy).toEqual([
+      "cluster",
+    ]);
+    // Dry-run change 10 left this chart unfiltered by PHASE, so the Succeeded
+    // series stays visible; it never meant unscoped by CLUSTER. Pinned both ways
+    // so the two decisions cannot be conflated again.
+    expect(queriesOf("k8s_ov_pods_by_phase")[0]).not.toMatch(/phase\s*=/);
+    expect(queriesOf("k8s_ov_pods_by_phase")[0]).toContain("${scope:cluster}");
+  });
+
+  it("EVERY Inventory and Nodes panel reacts to the cluster picker (the shipped bug)", () => {
+    // A user picking one cluster saw 2 of 9 Inventory panels move; the rest kept
+    // fleet-wide numbers. No panel in either section is exempt.
+    for (const id of ["inventory", "nodes"]) {
+      const section = kubernetesPage.sections.find((s: any) => s.id === id)!;
+      for (const p of section.panels as any[]) {
+        expect(p.fleetWide ?? [], `${p.id} claims a cluster exemption`).not.toContain("cluster");
+        for (const q of queriesOf(p.id)) expect(q, p.id).toContain("${scope:cluster}");
+      }
+    }
+  });
+
+  it("Workloads declares cluster/namespace/pod, and every kube-state workload panel scopes on namespace", () => {
+    expect(kubernetesPage.sections.find((s: any) => s.id === "workloads")!.scopedBy).toEqual([
+      "cluster",
+      "namespace",
+      "pod",
+    ]);
+    for (const id of ["k8s_wl_nonrunning_by_ns", "k8s_wl_cpu_requests"]) {
+      expect(queriesOf(id)[0], id).toContain("${scope:namespace}");
+    }
+  });
+
+  it("EVERY Workloads panel carries the cluster scope on EVERY query", () => {
+    // Pod names repeat across clusters, so an unscoped Workloads panel silently
+    // pools identically-named pods from every cluster into one series while the
+    // cluster picker beside it reads as a single cluster. No panel opts out:
+    // unlike `pod`, narrowing to one cluster never under-reports a namespace
+    // rollup — it is the rollup the user asked for.
+    const workloads = kubernetesPage.sections.find((s: any) => s.id === "workloads")!;
+    expect(workloads.panels.length).toBe(8);
+    for (const p of workloads.panels as any[]) {
+      expect(p.fleetWide ?? [], `${p.id} must not opt out of cluster`).not.toContain("cluster");
+      for (const q of queriesOf(p.id)) expect(q, p.id).toContain("${scope:cluster}");
+    }
+  });
+
+  it("the pod picker filters per-POD panels and is declined by per-NAMESPACE rollups", () => {
+    // The split is the `by (…)` shape: a panel keyed by pod must react to the pod
+    // picker; a namespace rollup filtered by pod would under-report the total its
+    // own title promises, so it declines the picker in writing.
+    for (const id of [
+      "k8s_wl_pod_cpu_top",
+      "k8s_wl_pod_mem_top",
+      "k8s_wl_pod_fs",
+      "k8s_wl_pod_restarts",
+      "k8s_wl_pod_mem_limit_pct",
+    ]) {
+      for (const q of queriesOf(id)) expect(q, id).toContain("${scope:pod}");
+    }
+    for (const id of ["k8s_wl_nonrunning_by_ns", "k8s_wl_cpu_requests", "k8s_wl_pod_network"]) {
+      expect(panel(id).fleetWide, id).toEqual(["pod"]);
+      for (const q of queriesOf(id)) expect(q, id).not.toContain("${scope:pod}");
+    }
+  });
+});
+
+describe("panel titles carry an N only where the query can honour it", () => {
+  it("every line-chart title key is a 'Highest-' style key with no {n} interpolation", () => {
+    // Pack-level half of the two-sided lint (dry run finding 7).
+    for (const p of allPanels().filter((x: any) => x.type !== "table")) {
+      const hasTopk = p.variants.some((v: any) =>
+        v.queries.some((q: any) => /topk\(\d+,/.test(q.query)),
+      );
+      if (!hasTopk) continue;
+      expect(p.titleKey, p.id).not.toMatch(/top\d/i);
+    }
+  });
+});
+
+// Item 1-4: the trust defects an on-call SRE hit at 3am — tiles and tables that
+// disagreed, a 500 on healthy clusters, ready nodes listed as not-ready, and
+// rows no one could attribute to a cluster. Verified live against introspect.
+describe("inventory tables read the same instant as the tiles above them", () => {
+  const TABLES = [
+    "k8s_ov_unhealthy_pods",
+    "k8s_wh_waiting_top",
+    "k8s_wh_terminated_top",
+    "k8s_wh_hpa_limited",
+    "k8s_wh_deploy_short_top",
+    "k8s_wh_sts_short_top",
+    "k8s_wh_ds_unavailable_top",
+    "k8s_wh_jobs_failed_top",
+    "k8s_wh_pvc_unbound_top",
+    "k8s_ut_over_limit_top",
+    "k8s_ut_cpu_waste_top",
+    "k8s_ut_mem_waste_top",
+    "k8s_ut_node_commit_top",
+    "k8s_nd_conditions",
+    "k8s_nd_not_ready",
+    "k8s_wl_pod_restarts",
+  ];
+
+  it.each(TABLES)("%s runs as an instant query", (id) => {
+    for (const variant of panel(id).variants) {
+      expect(variant.queryMode, `${id} must pin its window to one instant`).toBe("instant");
+    }
+  });
+
+  // Measured: wrapping an expression that matches ZERO series in `[5m:]` makes the
+  // engine mis-type the empty result as scalar and 500 the panel — reproduced on
+  // production and ap1cloud, clean without the subquery.
+  it.each(TABLES)("%s carries no [Ns:] subquery", (id) => {
+    for (const query of queriesOf(id)) {
+      expect(query, `${id} still wraps a subquery`).not.toMatch(/\[\d+[smh]:\]/);
+    }
+  });
+
+  // Measured on the live fleet: the tile read 4 pending while the 3h range table
+  // listed 399 rows, 395 of whose series had stopped reporting hours earlier.
+  it("the unhealthy-pods table and the phase tiles select the same phases", () => {
+    const [table] = queriesOf("k8s_ov_unhealthy_pods");
+    expect(table).toContain('phase=~"Pending|Failed|Unknown"');
+    expect(table).toContain("> 0");
+  });
+});
+
+describe("node condition panels test the ACTIVE condition row", () => {
+  // kube_node_status_condition emits a row per condition/status pair. Measured:
+  // {condition="Ready"} == 0 matched 214 rows — the false and unknown rows, which
+  // are 0 BECAUSE they are false — while zero nodes were actually not ready.
+  it("nodes-not-ready pins status=true so it cannot match the false/unknown rows", () => {
+    for (const query of queriesOf("k8s_nd_not_ready")) {
+      expect(query).toMatch(/condition="Ready"/);
+      expect(query, "must pin status=true or it lists healthy nodes").toMatch(/status="true"/);
+    }
+  });
+});
+
+describe("multi-cluster inventory tables name their cluster", () => {
+  // With every cluster selected, a row grouped only by (namespace, pod) is
+  // unattributable — the reader cannot tell WHICH cluster the sick pod is in.
+  it.each(["k8s_ov_unhealthy_pods", "k8s_nd_conditions", "k8s_nd_not_ready"])(
+    "%s groups by the cluster field",
+    (id) => {
+      for (const query of queriesOf(id)) {
+        const by = query.match(/by\s*\(([^)]*)\)/);
+        expect(by, `${id} has no by(...) clause`).toBeTruthy();
+        expect(by![1], `${id} drops the cluster label`).toContain("${f:k8s-cluster}");
+      }
+    },
+  );
+
+  it.each(["k8s_ov_unhealthy_pods", "k8s_nd_conditions", "k8s_nd_not_ready"])(
+    "%s names the cluster in its legend",
+    (id) => {
+      for (const variant of panel(id).variants) {
+        for (const query of variant.queries) {
+          expect(query.legend, `${id} legend omits the cluster`).toContain("${f:k8s-cluster}");
+        }
+      }
+    },
+  );
+});
+
+// These tables must agree with the tiles they sit under, which they can only do
+// by reading the same instant. The titles used to spell it "(now)"; the words
+// went, so the read itself is pinned and the section notes carry the disclosure.
+describe("every instant panel actually reads one instant", () => {
+  it.each(["k8s_ov_unhealthy_pods", "k8s_nd_not_ready", "k8s_nd_conditions"])(
+    "%s reads the current instant and resolves to real copy",
+    (id) => {
+      let node: any = enLocale;
+      for (const segment of panel(id).titleKey.split(".")) node = node?.[segment];
+      expect(typeof node, `${panel(id).titleKey} resolves to no copy`).toBe("string");
+      for (const variant of panel(id).variants) {
+        expect((variant as any).queryMode, `${id} must not widen to a range`).toBe("instant");
+      }
+    },
+  );
+
+  it("the inventory note tells the reader the tiles and the table share one instant", () => {
+    let node: any = enLocale;
+    const inventory = kubernetesPage.sections.find((s: any) => s.id === "inventory");
+    for (const segment of inventory!.noteKey!.split(".")) node = node?.[segment];
+    expect(String(node).toLowerCase()).toContain("current instant");
+  });
+});

@@ -68,11 +68,14 @@ const mockEmptySummaryData = {
 
 // ── Module mocks (hoisted by Vitest) ────────────────────────────────────────
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get_organization_summary: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_organization_summary: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/aws-exports", () => ({
   default: {

@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, nextTick, watch, onMounted } from "vue";
+import DOMPurify from "dompurify";
 import { generateAnomalySummary } from "@/utils/alerts/anomalySummaryGenerator";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -65,8 +66,12 @@ const props = defineProps<{
 const summaryContainer = ref<HTMLElement | null>(null);
 const showScrollToBottom = ref(false);
 
+// generator interpolates user-controlled config/destination values unescaped, so sanitize before v-html
 const summaryText = computed(() =>
-  generateAnomalySummary(props.config, props.destinations, t, props.wizardStep),
+  DOMPurify.sanitize(
+    generateAnomalySummary(props.config, props.destinations, t, props.wizardStep),
+    { ALLOWED_TAGS: ["div", "span", "strong"], ALLOWED_ATTR: ["class"] },
+  ),
 );
 
 const checkScrollState = () => {

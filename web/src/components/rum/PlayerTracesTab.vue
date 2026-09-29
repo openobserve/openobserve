@@ -187,6 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ formatTraceTimestamp(row.metadata?.start_time) }}
             </span>
           </template>
+          <template #cell-page="{ row }">
+            <span class="block truncate font-mono text-xs" :title="pageRoute(row)">
+              {{ pageRoute(row) }}
+            </span>
+          </template>
           <template #cell-route="{ row }">
             <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
               {{ traceDisplayName(row) }}
@@ -224,6 +229,7 @@ import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStre
 import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -293,6 +299,16 @@ const traceColumns = computed(() => [
     meta: { align: "left" },
   },
   {
+    // The browser page each request was made from; the route column names the request itself.
+    id: "page",
+    header: t("rum.errorDetail.facetPage"),
+    accessorFn: (row: any) => pageRoute(row),
+    size: 160,
+    minSize: 80,
+    maxSize: 400,
+    meta: { align: "left" },
+  },
+  {
     id: "route",
     header: t("rum.route"),
     accessorFn: (row: any) => traceDisplayName(row),
@@ -329,10 +345,16 @@ function traceRowClass(row: any): string {
 function shortRoute(url: string): string {
   try {
     const u = new URL(url);
+    // Hash-routed SPAs keep the route after `#`, so the pathname alone is `/` for every page.
+    if (u.hash.startsWith("#/")) return u.pathname + u.search + u.hash;
     return u.pathname + u.search || "/";
   } catch {
     return url;
   }
+}
+
+function pageRoute(trace: any): string {
+  return trace.route ? shortRoute(trace.route) : "";
 }
 
 function traceDisplayName(trace: any): string {
@@ -407,11 +429,8 @@ async function fetchTraceMetadata(
   const searchEndTime = window?.endTime ?? (props.endTime || nowMs) * 1000;
 
   // Build filter for multiple trace IDs
-  const safeTraceIds = traceIds.map((id) => id.replace(/'/g, "''"));
   const filter =
-    safeTraceIds.length === 1
-      ? `trace_id='${safeTraceIds[0]}'`
-      : `trace_id IN (${safeTraceIds.map((id) => `'${id}'`).join(",")})`;
+    traceIds.length === 1 ? sqlEquals("trace_id", traceIds[0]) : sqlIn("trace_id", traceIds);
 
   const metadata = await new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
@@ -545,7 +564,7 @@ async function fetchTraces() {
       aggOrNull("max", "type", "_type"),
       aggOrNull("min", "date", "_date"),
     ];
-    const whereParts = [`session_id='${props.sessionId}'`, traceIdSet];
+    const whereParts = [sqlEquals("session_id", props.sessionId), traceIdSet];
     const having = has("resource_url")
       ? " HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0"
       : "";

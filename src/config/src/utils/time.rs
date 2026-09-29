@@ -27,6 +27,7 @@ pub static BASE_TIME: Lazy<DateTime<Utc>> =
 
 pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
 pub static HOUR_MICRO_SECS: i64 = 3600 * 1_000_000;
+pub static SECOND_MICRO_SECS: i64 = 1_000_000;
 
 pub enum HourFormat {
     Zero,
@@ -70,6 +71,14 @@ pub fn second_micros(n: i64) -> i64 {
         .unwrap()
         .num_microseconds()
         .unwrap()
+}
+
+/// The `YYYYMM` of a microsecond timestamp, UTC. One encoding, or a period compares against
+/// something that was written with another.
+#[inline(always)]
+pub fn month_of(micros: i64) -> i32 {
+    let at = DateTime::from_timestamp_micros(micros).unwrap_or_default();
+    at.year() * 100 + at.month() as i32
 }
 
 #[inline(always)]
@@ -164,26 +173,38 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
 // return timestamp and is_valid micros value
 #[inline(always)]
 pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), anyhow::Error> {
-    let (ts, is_i64) = match v {
-        json::Value::String(s) => (parse_str_to_timestamp_micros(s)?, false),
+    match v {
+        json::Value::String(s) => parse_timestamp_micro_from_str(s),
         json::Value::Number(n) => {
-            if n.is_i64() {
-                let n = n.as_i64().unwrap();
-                (n, n > 0)
-            } else if n.is_u64() {
-                let n = n.as_u64().unwrap() as i64;
-                (n, n > 0)
+            if let Some(n) = n.as_i64() {
+                Ok(parse_timestamp_micro_from_integer(n))
+            } else if let Some(n) = n.as_u64() {
+                Ok(parse_timestamp_micro_from_integer(n as i64))
             } else if n.is_f64() {
-                (n.as_f64().unwrap() as i64, false)
+                Ok((
+                    parse_i64_to_timestamp_micros(n.as_f64().unwrap() as i64),
+                    false,
+                ))
             } else {
-                return Err(anyhow::anyhow!("Invalid time format [timestamp]"));
+                Err(anyhow::anyhow!("Invalid time format [timestamp]"))
             }
         }
-        _ => return Err(anyhow::anyhow!("Invalid time format [type]")),
-    };
+        _ => Err(anyhow::anyhow!("Invalid time format [type]")),
+    }
+}
+
+/// `parse_timestamp_micro_from_value` for a JSON string.
+pub fn parse_timestamp_micro_from_str(s: &str) -> Result<(i64, bool), anyhow::Error> {
+    Ok((
+        parse_i64_to_timestamp_micros(parse_str_to_timestamp_micros(s)?),
+        false,
+    ))
+}
+
+/// `parse_timestamp_micro_from_value` for a JSON integer.
+pub fn parse_timestamp_micro_from_integer(ts: i64) -> (i64, bool) {
     let new_ts = parse_i64_to_timestamp_micros(ts);
-    let is_valid = is_i64 && new_ts == ts;
-    Ok((new_ts, is_valid))
+    (new_ts, ts > 0 && new_ts == ts)
 }
 
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
@@ -354,6 +375,15 @@ pub fn parse_interval_to_minutes(s: &str) -> i64 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_month_of_reads_the_utc_month() {
+        assert_eq!(month_of(1_788_800_853_300_917), 202609);
+        assert_eq!(month_of(0), 197001);
+        // A month boundary is the one place an off-by-one lands on the wrong grant.
+        assert_eq!(month_of(1_767_225_599_000_000), 202512);
+        assert_eq!(month_of(1_767_225_600_000_000), 202601);
+    }
+
     use super::*;
 
     #[test]

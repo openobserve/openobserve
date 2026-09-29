@@ -5,25 +5,34 @@ import ImportPipeline from "@/components/pipeline/ImportPipeline.vue";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    createPipeline: vi.fn(),
-    getPipelineStreams: vi.fn(),
-    getPipelines: vi.fn(),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createPipeline: vi.fn(),
+      getPipelineStreams: vi.fn(),
+      getPipelines: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({

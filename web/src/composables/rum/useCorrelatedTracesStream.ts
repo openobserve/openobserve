@@ -32,10 +32,7 @@ export interface TraceLocation {
   range?: TraceTimeRange;
 }
 
-// Probes look up a trace by id, but the caller's window is event-derived and
-// ingestion can lag it — widen like useRumSpanBuilder's RUM_TIME_BUFFER_US,
-// but generously: probes are `limit 1` point lookups, so the wider window is
-// effectively free.
+// Ingestion can lag the event-derived window; probes are `limit 1` point lookups, so a wide buffer is free.
 const PROBE_TIME_BUFFER_US = 300_000_000; // ±5 min
 
 // Deduplicates concurrent resolves of the same id (e.g. the error card and the

@@ -43,6 +43,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
 import { ACTION_ICONS, stepActionLabelKey } from "@/constants/synthetics";
@@ -54,8 +56,12 @@ const props = withDefaults(
   defineProps<{
     /** Step data rows. Each row must have an `id` field for selection/expansion keys. */
     data: TData[];
-    /** Render mode: editor (editable) or results (read-only). */
-    mode: "editor" | "results";
+    /** Row 0 — the Starting URL, which is not a Step: rendered above the rows, never among them. */
+    startRow?: TData | null;
+    /** Render mode: editor (editable), results (read-only) or preview (a child's steps, no run). */
+    mode: "editor" | "results" | "preview";
+    /** Preview mode: the reference row's number, so child rows read `2.1`, `2.2`, … */
+    numberPrefix?: string;
     /** Accessor for the action field on each row. */
     actionKey?: string;
     /** Accessor for the step name field on each row. */
@@ -66,6 +72,10 @@ const props = withDefaults(
     iconKey?: string;
     /** When set, renders colored status dots per step during replay. */
     dotStateFn?: (row: TData) => StepDotState | undefined;
+    /** When set, renders a "{done}/{total}" counter on a collapsed reference row. */
+    stepProgressFn?: (row: TData) => { done: number; total: number } | null;
+    /** When set, renders a badge on an editor row where the progress counter would sit. */
+    stepBadgeFn?: (row: TData) => { label: string; variant: "default" | "error" } | null;
     /** When true, hides row action buttons (during replay). */
     locked?: boolean;
     /**
@@ -202,6 +212,28 @@ function getDotState(row: TData): StepDotState | undefined {
   return props.dotStateFn?.(row);
 }
 
+/** Row's position in `data` — the same 0-based unit the dot/progress hooks are keyed by. */
+function rowIndex(row: TData): number {
+  return (props.data as TData[]).indexOf(row);
+}
+
+function stepProgress(row: TData): { done: number; total: number } | null {
+  return props.stepProgressFn?.(row) ?? null;
+}
+
+function stepBadge(row: TData): { label: string; variant: "default" | "error" } | null {
+  return props.stepBadgeFn?.(row) ?? null;
+}
+
+function isSkippedPreview(row: TData): boolean {
+  return props.mode === "preview" && getDotState(row) === "skip";
+}
+
+function stepNumber(row: TData): string {
+  const n = rowIndex(row) + 1;
+  return props.numberPrefix ? `${props.numberPrefix}.${n}` : String(n);
+}
+
 // ── Column definitions ─────────────────────────────────────────────
 const isEditor = computed(() => props.mode === "editor");
 
@@ -248,6 +280,10 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
       { id: "actions", header: raw(""), size: 168, isAction: true },
     ];
   }
+  // A child's steps are a definition, not a run: no shot, timeline, time or actions.
+  if (props.mode === "preview") {
+    return [{ id: "details", header: raw(""), meta: { autoWidth: true } }];
+  }
   // Results mode. Headers are named here because results mode renders them —
   // the run's steps are a table an engineer reads down, and an unlabelled
   // timeline column cannot say what its bars are drawn against.
@@ -293,8 +329,8 @@ const focusAnchorId = ref<string | null>(null);
  * happen. The pointer/focus handlers deliberately do NOT consult it: `markerTone`
  * gates the render, which also covers the case no handler can see.
  */
-function recordBeforeDisabled(row: TData): boolean {
-  return isLocked.value || isFirstRow(row) || !props.canRecordFrom;
+function recordBeforeDisabled(): boolean {
+  return isLocked.value || !props.canRecordFrom;
 }
 
 function onRecordBeforeEnter(row: TData) {
@@ -329,7 +365,7 @@ function markerTone(row: TData): "anchor" | "hover" | null {
   const id = rowId(row);
   if (!id) return null;
   const previewed = id === hoverAnchorId.value || id === focusAnchorId.value;
-  return previewed && !recordBeforeDisabled(row) ? "hover" : null;
+  return previewed && !recordBeforeDisabled() ? "hover" : null;
 }
 
 /**
@@ -344,23 +380,7 @@ function markerCellStyle({ columnId, row }: { columnId: string; row: TData }) {
   return { overflow: "visible" };
 }
 
-/**
- * Whether `row` is the journey's first step.
- *
- * The first step must be the navigation that starts the journey, so there is no
- * "before" it to record into — `validateJourneySteps` rejects a journey whose first
- * step is anything else.
- */
-function isFirstRow(row: TData): boolean {
-  return props.data[0] === row;
-}
-
-/**
- * What the record-before action does, or why it cannot.
- *
- * Only the capability is spelled out: a first-row disable is legible from where the row
- * sits, but an extension too old to restore looks identical to one that works.
- */
+/** What the record-before action does, or why it cannot. */
 const recordBeforeTooltip = computed(() =>
   props.canRecordFrom
     ? t("synthetics.journey.recordBeforeStepHint")
@@ -378,6 +398,22 @@ function handleUpdateSelected(ids: string[]) {
 function handleUpdateExpanded(ids: string[]) {
   emit("update:expanded-ids", ids);
 }
+
+/** Only results show row 0; the editor's Starting URL lives in the toolbar pill. */
+const showStartRow = computed(() => !!props.startRow && props.mode === "results");
+
+const startRowStatusColor = computed(() =>
+  props.startRow ? props.getRowStatusColor?.(props.startRow) || undefined : undefined,
+);
+
+/** Row 0 spans the data columns plus OTable's own expand, select and drag cells. */
+const startRowColspan = computed(
+  () =>
+    columns.value.length +
+    (props.mode === "preview" ? 0 : 1) +
+    (props.selectionEnabled ? 1 : 0) +
+    (reorderEnabled.value ? 1 : 0),
+);
 </script>
 
 <template>
@@ -389,7 +425,7 @@ function handleUpdateExpanded(ids: string[]) {
     :show-header="mode === 'results'"
     :selection="selectionEnabled ? 'multiple' : 'none'"
     :selected-ids="selectedIds"
-    :expansion="'multiple'"
+    :expansion="mode === 'preview' ? 'none' : 'multiple'"
     :expanded-ids="expandedIds"
     :enable-row-reorder="reorderEnabled"
     :disable-row-reorder="disableRowReorder"
@@ -401,7 +437,7 @@ function handleUpdateExpanded(ids: string[]) {
     :bordered="true"
     :default-columns="false"
     :fill-height="false"
-    :expand-on-row-click="true"
+    :expand-on-row-click="mode !== 'preview'"
     :get-row-status-color="getRowStatusColor"
     :get-cell-style="markerCellStyle"
     @row-reorder="handleRowReorder"
@@ -409,6 +445,39 @@ function handleUpdateExpanded(ids: string[]) {
     @update:expanded-ids="handleUpdateExpanded"
     @row-click="(row: TData, evt: MouseEvent) => emit('row-click', row, evt)"
   >
+    <!-- Row 0 is not a data row (never numbered, counted, selected, moved), so it is OTable's leading body row. -->
+    <template v-if="showStartRow" #body-start>
+      <tr data-test="synthetics-journey-start-row" :data-status-color="startRowStatusColor">
+        <td :colspan="startRowColspan" class="border-table-row-divider border-b px-3">
+          <div class="flex items-center gap-2 py-2">
+            <div class="flex w-11 shrink-0 items-center justify-center">
+              <span :class="dotClass(getDotState(startRow!))" aria-hidden="true" />
+            </div>
+            <div
+              class="rounded-default border-border-default bg-surface-subtle flex h-12 w-18 shrink-0 items-center justify-center overflow-hidden border"
+            >
+              <slot name="screenshot-thumb" :row="startRow!">
+                <OIcon name="image" size="xs" class="text-text-secondary" />
+              </slot>
+            </div>
+            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="text-text-body truncate text-sm">{{ startRow!.name }}</span>
+              <span
+                v-if="startRow!.error"
+                class="text-status-error-text truncate font-mono text-xs"
+                :title="startRow!.error"
+              >
+                {{ startRow!.error }}
+              </span>
+            </div>
+            <span class="text-text-secondary shrink-0 font-mono text-xs tabular-nums">
+              {{ startRow!.durStr ?? "" }}
+            </span>
+          </div>
+        </td>
+      </tr>
+    </template>
+
     <!-- ── cell-step: Status dot (results mode) ───────────────── -->
     <template v-if="mode === 'results'" #cell-step="{ row }">
       <div class="flex items-center justify-center">
@@ -432,14 +501,21 @@ function handleUpdateExpanded(ids: string[]) {
     <!-- ── cell-details: Step content (both modes) ─────────────── -->
     <template #cell-details="{ row }">
       <div class="flex min-w-0 items-center gap-2">
-        <!-- Step number (editor mode — circle during replay, plain text otherwise) -->
         <span
-          v-if="mode === 'editor'"
+          v-if="mode !== 'results'"
           :class="[
             getDotState(row) ? dotClass(getDotState(row)) : '',
             'shrink-0 tabular-nums',
             getDotState(row) ? '' : 'text-text-muted w-6 text-center text-sm',
           ]"
+          :data-test="
+            mode === 'preview'
+              ? `synthetics-journey-preview-step-${stepNumber(row)}`
+              : getDotState(row)
+                ? `synthetics-journey-step-dot-${rowIndex(row)}`
+                : undefined
+          "
+          :data-dot-state="mode === 'preview' ? getDotState(row) : undefined"
         >
           <OSpinner
             v-if="getDotState(row) === 'active'"
@@ -447,7 +523,7 @@ function handleUpdateExpanded(ids: string[]) {
             size="xs"
             class="text-accent"
           />
-          <template v-else>{{ (data as any[]).indexOf(row) + 1 }}</template>
+          <template v-else>{{ stepNumber(row) }}</template>
         </span>
 
         <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
@@ -468,16 +544,41 @@ function handleUpdateExpanded(ids: string[]) {
         </div>
 
         <!-- Step display name -->
-        <span class="text-text-body min-w-0 flex-1 truncate text-sm">
+        <span
+          :class="[
+            isSkippedPreview(row) ? 'text-text-muted' : 'text-text-body',
+            'min-w-0 flex-1 truncate text-sm',
+          ]"
+        >
           {{ stepName(row) }}
         </span>
 
-        <!-- Selector/value preview (editor mode only) -->
+        <!-- The only progress on a reference row while it runs: nothing auto-expands during `running`. -->
         <span
-          v-if="mode === 'editor' && stepDetail(row)"
+          v-if="mode === 'editor' && stepProgress(row)"
+          class="text-text-secondary shrink-0 font-mono text-xs tabular-nums"
+          :data-test="`synthetics-journey-subtest-progress-${rowIndex(row)}`"
+          :aria-label="
+            t('synthetics.journey.subtest.progressAria', {
+              done: stepProgress(row)!.done,
+              total: stepProgress(row)!.total,
+            })
+          "
+          >{{ stepProgress(row)!.done }}/{{ stepProgress(row)!.total }}</span
+        >
+        <OBadge
+          v-else-if="mode === 'editor' && stepBadge(row)"
+          :variant="stepBadge(row)!.variant"
+          size="sm"
+          :data-test="`synthetics-journey-step-badge-${rowIndex(row)}`"
+          >{{ stepBadge(row)!.label }}</OBadge
+        >
+
+        <span
+          v-if="mode !== 'results' && (stepDetail(row) || isSkippedPreview(row))"
           class="text-text-secondary max-w-[25%] shrink-0 truncate font-mono text-xs"
         >
-          {{ stepDetail(row) }}
+          {{ isSkippedPreview(row) ? t("synthetics.journey.subtest.notRun") : stepDetail(row) }}
         </span>
 
         <!-- Insertion marker: recorded steps land ABOVE this row. Absolutely
@@ -553,10 +654,7 @@ function handleUpdateExpanded(ids: string[]) {
       <div class="flex shrink-0 items-center gap-0.5">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
 
-        <!-- Disabled on the first row: inserting before it would leave the journey
-             starting with something other than a navigate, which validation rejects.
-             Disabled without `canRecordFrom` because the action promises a restore the
-             installed extension cannot perform. -->
+        <!-- Disabled without `canRecordFrom`: the installed extension cannot perform the restore. -->
         <OTooltip v-if="!readonly" :content="recordBeforeTooltip">
           <!-- The span is the hover target, not the button: a disabled control
                dispatches no pointer events, so a tooltip bound straight to it would
@@ -564,7 +662,7 @@ function handleUpdateExpanded(ids: string[]) {
                preview rides the same span for the same reason, and focus is bound
                alongside hover so the destination is not mouse-only. -->
           <span
-            class="inline-flex"
+            class="inline-flex max-md:hidden"
             @mouseenter="onRecordBeforeEnter(row)"
             @mouseleave="onRecordBeforeLeave"
             @focusin="onRecordBeforeFocus(row)"
@@ -575,7 +673,7 @@ function handleUpdateExpanded(ids: string[]) {
               size="xs"
               :aria-label="t('synthetics.journey.recordBeforeStep')"
               data-test="synthetics-journey-step-record-before-btn"
-              :disabled="recordBeforeDisabled(row)"
+              :disabled="recordBeforeDisabled()"
               @click="emit('record-before', row)"
             >
               <!-- The same icon as the toolbar's Record button: this row action starts a
@@ -589,6 +687,7 @@ function handleUpdateExpanded(ids: string[]) {
           v-if="!readonly"
           variant="ghost"
           size="xs"
+          class="max-md:hidden"
           :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
           :disabled="isLocked"
@@ -601,6 +700,7 @@ function handleUpdateExpanded(ids: string[]) {
           v-if="!readonly"
           variant="ghost"
           size="xs"
+          class="max-md:hidden"
           :aria-label="t('synthetics.journey.duplicateStep')"
           data-test="synthetics-journey-step-duplicate-btn"
           data-row-action="duplicate"
@@ -618,11 +718,61 @@ function handleUpdateExpanded(ids: string[]) {
           data-test="synthetics-journey-step-delete-btn"
           data-row-action="delete"
           :disabled="isLocked"
-          class="hover:text-status-error-text"
+          class="hover:text-status-error-text max-md:hidden"
           @click="emit('delete', row)"
         >
           <OIcon name="delete" size="sm" aria-hidden="true" />
         </OButton>
+
+        <ODropdown v-if="!readonly" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              data-test="synthetics-journey-step-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            icon-left="smart-display"
+            class="md:hidden"
+            :disabled="recordBeforeDisabled()"
+            data-test="synthetics-journey-step-record-before-btn-menu"
+            @select="emit('record-before', row)"
+          >
+            <span>{{ t("synthetics.journey.recordBeforeStep") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="add"
+            class="md:hidden"
+            :disabled="isLocked"
+            data-test="synthetics-journey-step-insert-btn-menu"
+            @select="emit('insert-below', row)"
+          >
+            <span>{{ t("synthetics.journey.insertStepBelow") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="content-copy"
+            class="md:hidden"
+            :disabled="isLocked"
+            data-test="synthetics-journey-step-duplicate-btn-menu"
+            @select="emit('duplicate', row)"
+          >
+            <span>{{ t("synthetics.journey.duplicateStep") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="delete"
+            variant="destructive"
+            class="md:hidden"
+            :disabled="isLocked"
+            data-test="synthetics-journey-step-delete-btn-menu"
+            @select="emit('delete', row)"
+          >
+            <span>{{ t("synthetics.journey.deleteStepAria") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </template>
 

@@ -18,8 +18,9 @@
     icon="play-circle"
     title-data-test="ai-playground-title"
     bleed
+    overflow-first
   >
-    <template #actions>
+    <template #actions-overflow>
       <ODropdown v-if="recentDrafts.length" align="end" content-class="w-100">
         <template #trigger>
           <OButton
@@ -57,7 +58,11 @@
       >
         {{ t("aiObservability.playground.reset") }}
       </OButton>
-      <span class="text-text-secondary text-xs" data-test="ai-playground-window-count">
+      <span
+        v-if="!isMobile"
+        class="text-text-secondary text-xs"
+        data-test="ai-playground-window-count"
+      >
         {{
           t("aiObservability.playground.windowCount", {
             count: draft.variants.length,
@@ -86,6 +91,21 @@
       >
         {{ t("aiObservability.playground.share") }}
       </OButton>
+    </template>
+
+    <template #actions>
+      <span
+        v-if="isMobile"
+        class="text-text-secondary text-xs"
+        data-test="ai-playground-window-count"
+      >
+        {{
+          t("aiObservability.playground.windowCount", {
+            count: draft.variants.length,
+            max: MAX_VARIANTS,
+          })
+        }}
+      </span>
       <OButton
         v-if="runningAll"
         variant="cancel-query"
@@ -239,6 +259,7 @@
             @copy="copyOutput(variant.id, SINGLE_ROW_KEY)"
             @add-to-messages="addOutputToMessages(variant.id)"
             @create-experiment="createExperiment(variant.id)"
+            @save-as-prompt="openSaveAsPrompt(variant.id)"
           />
         </div>
       </div>
@@ -267,6 +288,15 @@
       :creating="sharing"
       @confirm="onShareConfirmed"
     />
+
+    <SaveAsPromptDialog
+      v-model:open="savePromptOpen"
+      :org-id="orgId"
+      :payload="savePromptPayload"
+      :config="savePromptConfig"
+      type="chat"
+      source="playground"
+    />
   </OPageLayout>
 </template>
 
@@ -282,12 +312,16 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/PlaygroundExpectedBar.vue";
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
 import PlaygroundScorersMenu from "@/enterprise/components/AIObservability/PlaygroundScorersMenu.vue";
 import PlaygroundShareDialog from "@/enterprise/components/AIObservability/PlaygroundShareDialog.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import PlaygroundVariableBar from "@/enterprise/components/AIObservability/PlaygroundVariableBar.vue";
 import PlaygroundVariantColumn from "@/enterprise/components/AIObservability/PlaygroundVariantColumn.vue";
+import SaveAsPromptDialog from "@/views/AIObservability/SaveAsPromptDialog.vue";
+import type { PromptConfig } from "@/services/llm-prompts.service";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
 import { entityId } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import llmDatasetsService, {
@@ -295,6 +329,7 @@ import llmDatasetsService, {
   type LlmDatasetItem,
 } from "@/services/llm-datasets.service";
 import {
+  chatProviders,
   PlaygroundRunError,
   runPlayground,
   scorePlayground,
@@ -324,10 +359,13 @@ import {
   type PlaygroundCell,
   type PlaygroundDraft,
   type PlaygroundResults,
+  type PlaygroundMessage,
+  type PlaygroundRole,
   type PlaygroundTool,
   type PlaygroundVariant,
 } from "./playgroundDraft";
 import { takeHandoff } from "./playgroundHandoff";
+import { takePromptPlaygroundHandoff } from "@/views/AIObservability/promptPlaygroundHandoff";
 import { aiExperimentCreateRoute } from "./experimentRoutes";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useHorizontalOverflow } from "@/composables/useHorizontalOverflow";
@@ -350,6 +388,7 @@ const results = reactive<PlaygroundResults>({});
 const providers = ref<Provider[]>([]);
 const loadingProviders = ref(true);
 const scorers = ref<Scorer[]>([]);
+const { isMobile } = useBreakpoint();
 const scoring = ref(false);
 const datasets = ref<LlmDataset[]>([]);
 
@@ -357,6 +396,32 @@ const sampleOpen = ref(false);
 const sampleStepping = ref(false);
 const shareOpen = ref(false);
 const sharing = ref(false);
+const savePromptOpen = ref(false);
+const savePromptVariant = ref<PlaygroundVariant | null>(null);
+const savePromptPayload = computed(() =>
+  (savePromptVariant.value?.messages ?? []).map((message) => ({
+    role: message.role,
+    content: message.content,
+  })),
+);
+const savePromptConfig = computed<PromptConfig>(() => {
+  const variant = savePromptVariant.value;
+  if (!variant) return { model: null, params: null, tools: null, responseFormat: null };
+  const temperature = Number(variant.temperature);
+  return {
+    model: variant.model || null,
+    params: Number.isFinite(temperature) ? { temperature } : null,
+    tools: variant.tools.map((tool) => ({
+      type: "function",
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: parsePromptJson(tool.parameters) ?? {},
+      },
+    })),
+    responseFormat: variant.responseSchema ? parsePromptJson(variant.responseSchema) : null,
+  };
+});
 
 /** The snapshot this bench descends from — the link it was opened on, or the
  *  last one shared from it. Sent as the parent so lineage forms a chain. */
@@ -468,13 +533,14 @@ function cellFor(variantId: string, rowKey: string): PlaygroundCell | undefined 
 // ── loading ───────────────────────────────────────────────────────
 
 onMounted(async () => {
-  // First, and synchronously: the bench is the work, and it must be on screen
-  // before anything that can fail or take a round trip.
-  restoreSession();
+  // Drop the old org-only keys so a prior user's drafts never resurface for the next login.
+  removeLegacyStorage();
+  // Before anything that can fail or take a round trip: the bench must be on screen first.
+  await restoreSession();
   applyHandoff();
   await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
   applyEntryParams();
-  loadRecentDrafts();
+  await loadRecentDrafts();
   const snapshotId = String(route.query.snapshot ?? "");
   if (snapshotId) await openSharedSnapshot(snapshotId);
   if (initialDatasetId.value) sampleOpen.value = true;
@@ -492,7 +558,7 @@ onBeforeUnmount(() => {
 async function loadProviders() {
   loadingProviders.value = true;
   try {
-    providers.value = await onlineEvalsService.providers.list(orgId.value);
+    providers.value = chatProviders(await onlineEvalsService.providers.list(orgId.value));
     seedDefaultProvider();
   } catch {
     toast({ variant: "error", message: t("aiObservability.playground.providerLoadError") });
@@ -527,28 +593,88 @@ function seedDefaultProvider() {
   if (!preferred) return;
   for (const variant of draft.variants) {
     if (variant.providerId) continue;
-    variant.providerId = preferred.id;
-    variant.model = preferred.defaultModel ?? preferred.default_model ?? "";
+    const supporting = variant.model
+      ? providers.value.find((provider) =>
+          (provider.availableModels ?? provider.available_models ?? []).includes(variant.model),
+        )
+      : null;
+    const selected = supporting ?? preferred;
+    variant.providerId = selected.id;
+    if (!variant.model) variant.model = selected.defaultModel ?? selected.default_model ?? "";
   }
 }
 
+function promptRole(value: unknown): PlaygroundRole {
+  return value === "system" || value === "assistant" || value === "tool" ? value : "user";
+}
+
+function promptMessages(payload: unknown): PlaygroundMessage[] {
+  if (typeof payload === "string") {
+    return [{ id: playgroundId("message"), role: "user", content: payload }];
+  }
+  if (!Array.isArray(payload)) return [];
+  return payload.flatMap((entry): PlaygroundMessage[] => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    return [
+      {
+        id: playgroundId("message"),
+        role: promptRole("role" in entry ? entry.role : "user"),
+        content: String("content" in entry ? (entry.content ?? "") : ""),
+      },
+    ];
+  });
+}
+
+function promptTools(value: unknown): PlaygroundTool[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): PlaygroundTool[] => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const candidate =
+      "function" in entry &&
+      entry.function &&
+      typeof entry.function === "object" &&
+      !Array.isArray(entry.function)
+        ? entry.function
+        : entry;
+    const name = "name" in candidate ? String(candidate.name ?? "") : "";
+    if (!name) return [];
+    const description = "description" in candidate ? String(candidate.description ?? "") : "";
+    const parameters = "parameters" in candidate ? candidate.parameters : {};
+    return [{ name, description, parameters: JSON.stringify(parameters ?? {}, null, 2) }];
+  });
+}
+
 /**
- * Loads the conversation Trace Details stashed for us. Everything arrives as
- * ordinary editable content — the whole point of the entry is to change the
- * call and re-run it, so nothing is pinned readonly.
+ * Loads a trace or managed Prompt into a fresh editable fork. Prompt content
+ * stays in one-shot session storage and never appears in browser history.
  */
 function applyHandoff() {
-  if (String(route.query.from ?? "") !== "span") return;
+  const source = String(route.query.from ?? "");
+  if (source === "prompt") {
+    const handoff = takePromptPlaygroundHandoff();
+    if (!handoff) return;
+    const variant = emptyVariant();
+    variant.messages = promptMessages(handoff.payload);
+    variant.model = handoff.config.model ?? "";
+    const params = handoff.config.params;
+    variant.temperature =
+      params && typeof params.temperature === "number" ? String(params.temperature) : "";
+    variant.tools = promptTools(handoff.config.tools);
+    variant.responseSchema =
+      handoff.config.responseFormat == null
+        ? null
+        : JSON.stringify(handoff.config.responseFormat, null, 2);
+    Object.assign(draft, starterDraft());
+    draft.variants = [variant];
+    draft.provenance = { type: "prompt", label: raw(handoff.provenance.label) };
+    return;
+  }
+  if (source !== "span") return;
   const handoff = takeHandoff();
   if (!handoff) return;
   const variant = emptyVariant();
   variant.messages = handoff.messages;
-  // Provider and model are left to seedDefaultProvider: the trace's model may
-  // not exist on any provider configured here.
   variant.temperature = handoff.temperature;
-  // A fresh draft, not a merge: the imported call is the subject of the bench,
-  // and leaving a restored session's variants beside it would silently compare
-  // the trace against whatever the user last had open.
   Object.assign(draft, starterDraft());
   draft.variants = [variant];
   draft.provenance = {
@@ -1091,6 +1217,21 @@ function goToProviders() {
 
 /** The one durable exit. Everything the experiment form needs travels in the
  *  query, so the handoff survives a full page load. */
+function parsePromptJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function openSaveAsPrompt(variantId: string) {
+  const variant = draft.variants.find((candidate) => candidate.id === variantId);
+  if (!variant) return;
+  savePromptVariant.value = variant;
+  savePromptOpen.value = true;
+}
+
 function createExperiment(variantId: string) {
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;
@@ -1148,11 +1289,36 @@ const recentDrafts = ref<RecentDraftEntry[]>([]);
 /** Identifies the draft being worked on now; a new one starts on Reset. */
 const draftSessionId = ref(playgroundId("draft"));
 
-const storageKey = computed(() => `o2-playground-drafts:${orgId.value}`);
+// Same hash O2AIChat uses; an org-only key leaks one user's drafts to the next login on a shared profile.
+let cachedUserOrgRaw = "";
+let cachedUserOrgKeyPromise: Promise<string> | null = null;
 
-function loadRecentDrafts() {
+function getUserOrgKey(): Promise<string> {
+  const email = store.state.userInfo?.email ?? "";
+  const raw = `${email}:${orgId.value}`;
+  if (raw !== cachedUserOrgRaw) {
+    cachedUserOrgRaw = raw;
+    cachedUserOrgKeyPromise = computeUserOrgKey(email, orgId.value);
+  }
+  return cachedUserOrgKeyPromise!;
+}
+
+async function storageKey(): Promise<string> {
+  return `o2-playground-drafts:${await getUserOrgKey()}`;
+}
+
+function removeLegacyStorage() {
   try {
-    const stored = localStorage.getItem(storageKey.value);
+    localStorage.removeItem(`o2-playground-drafts:${orgId.value}`);
+    localStorage.removeItem(`o2-playground-session:${orgId.value}`);
+  } catch {
+    // Nothing to do — the next save uses the new key regardless.
+  }
+}
+
+async function loadRecentDrafts() {
+  try {
+    const stored = localStorage.getItem(await storageKey());
     recentDrafts.value = stored ? (JSON.parse(stored) as RecentDraftEntry[]) : [];
   } catch {
     recentDrafts.value = [];
@@ -1219,11 +1385,13 @@ interface StoredSession {
   results: PlaygroundResults;
 }
 
-const sessionKey = computed(() => `o2-playground-session:${orgId.value}`);
+async function sessionKey(): Promise<string> {
+  return `o2-playground-session:${await getUserOrgKey()}`;
+}
 
-function restoreSession() {
+async function restoreSession() {
   try {
-    const stored = localStorage.getItem(sessionKey.value);
+    const stored = localStorage.getItem(await sessionKey());
     if (!stored) return;
     const session = JSON.parse(stored) as StoredSession;
     if (!session?.draft?.variants?.length) return;
@@ -1238,7 +1406,7 @@ function restoreSession() {
   }
 }
 
-function saveSession() {
+async function saveSession() {
   try {
     const session: StoredSession = {
       id: draftSessionId.value,
@@ -1247,15 +1415,15 @@ function saveSession() {
       // never finishes.
       results: settledResults(results),
     };
-    localStorage.setItem(sessionKey.value, JSON.stringify(session));
+    localStorage.setItem(await sessionKey(), JSON.stringify(session));
   } catch {
     // A full or disabled localStorage costs the convenience, never the session.
   }
 }
 
-function clearSession() {
+async function clearSession() {
   try {
-    localStorage.removeItem(sessionKey.value);
+    localStorage.removeItem(await sessionKey());
   } catch {
     // Nothing to do — the next save overwrites it anyway.
   }
@@ -1281,7 +1449,7 @@ watch(running, (isRunning, wasRunning) => {
   if (wasRunning && !isRunning) saveSession();
 });
 
-function persistDraft() {
+async function persistDraft() {
   const summary = draftSummary(draft);
   if (!summary) return;
   const entry: RecentDraftEntry = {
@@ -1296,7 +1464,7 @@ function persistDraft() {
   const others = recentDrafts.value.filter((candidate) => candidate.id !== entry.id);
   recentDrafts.value = [entry, ...others].slice(0, 10);
   try {
-    localStorage.setItem(storageKey.value, JSON.stringify(recentDrafts.value));
+    localStorage.setItem(await storageKey(), JSON.stringify(recentDrafts.value));
   } catch {
     // A full or disabled localStorage costs the convenience, never the session.
   }

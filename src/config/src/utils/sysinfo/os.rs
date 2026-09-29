@@ -14,15 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub fn get_os_name() -> String {
-    sysinfo::System::name().unwrap_or("unknown".to_string())
+    sysinfo::System::name().unwrap_or_else(|| "unknown".to_string())
 }
 
 pub fn get_os_version() -> String {
-    sysinfo::System::os_version().unwrap_or("unknown".to_string())
+    sysinfo::System::os_version().unwrap_or_else(|| "unknown".to_string())
 }
 
 pub fn get_hostname() -> String {
-    sysinfo::System::host_name().unwrap_or("unknown".to_string())
+    sysinfo::System::host_name().unwrap_or_else(|| "unknown".to_string())
 }
 
 #[cfg(target_os = "linux")]

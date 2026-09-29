@@ -33,7 +33,7 @@ impl schema::OrganizationProvisioner for CoreOrganizationProvisioner {
         #[cfg(feature = "enterprise")]
         let usage_enabled = true;
         #[cfg(not(feature = "enterprise"))]
-        let usage_enabled = cfg.common.usage_enabled;
+        let usage_enabled = false;
 
         #[cfg(feature = "enterprise")]
         let audit_enabled = o2_enterprise::enterprise::common::config::get_config()
@@ -92,6 +92,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
 
     cache_instance_id(&get_or_create_instance_id().await?);
+
+    // _meta used to appear only once self-reporting wrote its first stream into it,
+    // so a deployment that reports nothing never had the org its history pages read.
+    crate::organization::check_and_create_org(config::META_ORG_ID).await?;
 
     wal::init()?;
     // because of asynchronous, we need to wait for a while

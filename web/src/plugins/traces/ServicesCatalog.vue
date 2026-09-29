@@ -212,13 +212,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
          folder-rail + table layout (panel bg + vertical separator, 230px). -->
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left rail: the entity-type filter. Panel background + right border
            match FolderList.vue so the rail reads like the app's other left
            rails. The stream selector lives in the top toolbar alongside the
            search. -->
       <div
-        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-e px-1.5 py-2"
+        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-e px-1.5 py-2 max-md:h-auto max-md:w-full max-md:flex-row max-md:flex-wrap max-md:border-e-0 max-md:border-b"
       >
         <!-- Entity-type filter: All / Services / Datastores / Queues /
              External / RPC. A vertical nav rail — same OTabs pattern as the
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              unhealthy badge right. -->
         <div v-if="!isLoading && services.length > 0" class="catalog-type-filter overflow-y-auto">
           <OTabs
-            orientation="vertical"
+            :orientation="isMobile ? 'horizontal' : 'vertical'"
             dense
             :model-value="typeFilter"
             data-test="services-catalog-type-filter"
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            header, rows, in-frame toolbar and footer (count + "Showing X–Y of N"
            + records-per-page + pager) all match. OTable owns pagination, so we
            feed it the full sorted list and it paginates internally. -->
-      <div v-else class="h-full min-w-0 flex-1">
+      <div v-else class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg h-full">
           <OTable
             ref="oTableRef"
@@ -437,10 +437,12 @@ import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { classifyEntity } from "@/utils/traces/serviceClassification";
 import {
   b64EncodeUnicode,
@@ -458,8 +460,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
+import { resolveTraceStream } from "@/utils/traces/streamSelection";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
@@ -478,8 +482,9 @@ const P99_WARN_NS = 1_000_000_000;
 // Stream filter — synced from traces page selected stream
 const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
 const storedStreamFilter = localStorage.getItem("servicesCatalog_streamFilter");
-const streamFilter = ref(tracesStream || storedStreamFilter || "default");
+const streamFilter = ref(tracesStream || storedStreamFilter || "");
 const availableStreams = ref<string[]>([]);
+const streamsLoaded = ref(false);
 
 interface ServiceRow {
   id: string;
@@ -539,6 +544,9 @@ function serviceRowId(row: {
 }
 
 const isLoading = ref(false);
+// A search in flight with results still on screen — the spinner, not the
+// empty state.
+const isSearching = ref(false);
 // Epoch-ms of the last completed load, shown on the page header's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
@@ -929,10 +937,16 @@ function getTimeRange(): { start_time: number; end_time: number } {
 const loadAvailableStreams = async () => {
   try {
     const res: any = await getStreams("traces", false, false);
-    if (res?.list?.length > 0) {
-      availableStreams.value = res.list.map((stream: any) => stream.name);
-    }
+    const streams = res?.list ?? [];
+    availableStreams.value = streams.map((stream: any) => stream.name);
+    streamFilter.value = resolveTraceStream(streams, [
+      searchObj.data.stream.selectedStream.value,
+      storedStreamFilter,
+      streamFilter.value,
+    ]);
   } catch (e) {
+    availableStreams.value = [];
+    streamFilter.value = "";
     console.error("Error loading trace streams:", e);
   }
 };
@@ -957,8 +971,10 @@ async function loadServicesCatalog() {
     });
   }
 
-  isLoading.value = true;
-  services.value = [];
+  // Search-driven, so deliberately never cached — but the previous results
+  // stay on screen while the next search runs rather than the panel emptying.
+  isLoading.value = services.value.length === 0;
+  isSearching.value = true;
 
   const { start_time, end_time } = getTimeRange();
 
@@ -966,8 +982,10 @@ async function loadServicesCatalog() {
   if (hasInferColumns.value === null) {
     try {
       const org = searchObj.organizationIdentifier;
-      const schemaResponse = await streamService.schema(org, streamName, "traces");
-      const schemaFields = schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      const schemaPayload = await queryClient.fetchQuery(
+        streamSchemaQuery(org, streamName, "traces"),
+      );
+      const schemaFields = schemaPayload?.schema || schemaPayload?.fields || [];
       hasInferColumns.value = schemaFields.some((f: any) => f.name === "infer_service_name");
     } catch {
       // If schema check fails, default to false (use service_name only)
@@ -1078,14 +1096,17 @@ ORDER BY total_requests DESC`;
       },
       error: () => {
         isLoading.value = false;
+        isSearching.value = false;
       },
       complete: () => {
         isLoading.value = false;
+        isSearching.value = false;
         lastRunAt.value = Date.now();
       },
       reset: () => {
         services.value = [];
         isLoading.value = false;
+        isSearching.value = false;
       },
     },
   );
@@ -1109,7 +1130,6 @@ watch(
       streamFilter.value = newStream;
       localStorage.setItem("servicesCatalog_streamFilter", newStream);
       hasInferColumns.value = null;
-      loadServicesCatalog();
     }
   },
 );
@@ -1122,6 +1142,7 @@ watch(
     searchObj.data.datetime.relativeTimePeriod,
   ],
   () => {
+    if (!streamsLoaded.value) return;
     // This component only renders on its own route now, so no search-mode
     // guard is needed — if it is mounted, it is the visible view.
     loadServicesCatalog();
@@ -1130,6 +1151,7 @@ watch(
 
 onMounted(async () => {
   await loadAvailableStreams();
+  streamsLoaded.value = true;
   loadServicesCatalog();
 });
 

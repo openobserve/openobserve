@@ -22,6 +22,7 @@ import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import { routeGuard } from "@/utils/zincutils";
+import { promptRoutes } from "@/views/AIObservability/promptRoutes";
 
 const AIObservabilityShell = () => import("@/enterprise/views/AIObservability/Index.vue");
 const AILLMInsightsPage = () => import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
@@ -163,35 +164,36 @@ const useEnvRoutes = () => {
           component: AIDatasetDetailPage,
           meta: { titleKey: "routeTitles.aiDatasetDetail", keepAlive: false },
         },
+        ...promptRoutes,
         {
           path: "playground",
           name: "aiPlayground",
           component: AIPlaygroundPage,
-          meta: { title: "Playground", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.playground", keepAlive: false },
         },
         {
           path: "experiments",
           name: "aiExperiments",
           component: AIExperimentsPage,
-          meta: { title: "Experiments", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.experiments", keepAlive: false },
         },
         {
           path: "experiments/new",
           name: "aiExperimentCreate",
           component: AIExperimentCreatePage,
-          meta: { title: "New Experiment", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiExperimentCreate", keepAlive: false },
         },
         {
           path: "experiments/compare/:baselineId/:candidateId",
           name: "aiExperimentCompare",
           component: AIExperimentComparePage,
-          meta: { title: "Compare Experiments", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiExperimentCompare", keepAlive: false },
         },
         {
           path: "experiments/:id",
           name: "aiExperimentDetail",
           component: AIExperimentDetailPage,
-          meta: { title: "Experiment", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiExperimentDetail", keepAlive: false },
         },
         {
           // `remote-tasks/new` must precede `remote-tasks/:id`, or "new" is
@@ -199,25 +201,25 @@ const useEnvRoutes = () => {
           path: "remote-tasks",
           name: "aiRemoteTasks",
           component: AIRemoteTasksPage,
-          meta: { title: "Remote Tasks", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.remoteTasks", keepAlive: false },
         },
         {
           path: "remote-tasks/new",
           name: "aiRemoteTaskCreate",
           component: AIRemoteTaskFormPage,
-          meta: { title: "New Remote Task", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiRemoteTaskCreate", keepAlive: false },
         },
         {
           path: "remote-tasks/:id/edit",
           name: "aiRemoteTaskEdit",
           component: AIRemoteTaskFormPage,
-          meta: { title: "Edit Remote Task", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiRemoteTaskEdit", keepAlive: false },
         },
         {
           path: "remote-tasks/:id",
           name: "aiRemoteTaskDetail",
           component: AIRemoteTaskDetailPage,
-          meta: { title: "Remote Task", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiRemoteTaskDetail", keepAlive: false },
         },
         {
           path: "evaluations",

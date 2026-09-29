@@ -7,6 +7,10 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
  * Search History is backed by usage reporting, so rows only appear once the usage
  * batch has been published — every read here polls the refresh button rather than
  * assuming the row is present on first paint.
+ *
+ * ENTERPRISE ONLY since #14316: SearchHistory.vue is gated on `zoConfig.usage_enabled`,
+ * which an OSS build hardcodes false, so on OSS the page renders only its "enable usage
+ * reporting" placeholder and none of these selectors exist.
  */
 export class SearchHistoryPage {
   constructor(page) {

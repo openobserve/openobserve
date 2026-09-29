@@ -147,6 +147,7 @@ class TestLogsMaxQueryRange:
     MAX_QUERY_RANGE_HOURS = DEFAULT_MAX_QUERY_RANGE_HOURS
     ORIGINAL_MAX_QUERY_RANGE = None
     TEST_RUN_ID = None
+    SETUP_NOW = None
 
     @pytest.fixture(scope="class", autouse=True)
     def setup_stream(self, create_session, base_url, org_id):
@@ -155,6 +156,10 @@ class TestLogsMaxQueryRange:
         logger.info(f"=== SETUP: Preparing stream '{self.STREAM_NAME}' ===")
 
         now = datetime.now(timezone.utc)
+        # Tests re-derive their query windows from this same `now`, not a fresh
+        # datetime.now() call, so a "2_hours_ago" record stays >1h away from
+        # end_time regardless of how long setup's ingest+flush+retry took.
+        TestLogsMaxQueryRange.SETUP_NOW = now
         test_run_id = f"mqr_test_{int(now.timestamp())}"
         TestLogsMaxQueryRange.TEST_RUN_ID = test_run_id
 
@@ -203,7 +208,7 @@ class TestLogsMaxQueryRange:
         """
         logger.info("=== TEST: Query within limit (30 mins) ===")
 
-        now = datetime.now(timezone.utc)
+        now = self.SETUP_NOW
         end_time = int(now.timestamp() * 1000000)
         start_time = int((now - timedelta(minutes=35)).timestamp() * 1000000)  # 35 mins to include 30_mins_ago
 
@@ -249,7 +254,7 @@ class TestLogsMaxQueryRange:
         """
         logger.info("=== TEST: Query exceeding limit (3 hours → truncated to 1 hour) ===")
 
-        now = datetime.now(timezone.utc)
+        now = self.SETUP_NOW
         end_time = int(now.timestamp() * 1000000)
         start_time_3h = int((now - timedelta(hours=3)).timestamp() * 1000000)
 
@@ -315,7 +320,7 @@ class TestLogsMaxQueryRange:
         """
         logger.info("=== TEST: Boundary condition at exactly 1 hour ===")
 
-        now = datetime.now(timezone.utc)
+        now = self.SETUP_NOW
         end_time = int(now.timestamp() * 1000000)
         # Query for exactly 1 hour - should not trigger truncation
         start_time_1h = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -358,8 +363,11 @@ class TestLogsMaxQueryRange:
         """
         logger.info("=== TEST: Verify ALL old data is excluded ===")
 
-        now = datetime.now(timezone.utc)
-        end_time = int(now.timestamp() * 1000000)
+        now = self.SETUP_NOW
+        # The "now" record is seeded at exactly `now`; the search range's upper
+        # bound is exclusive, so end_time must sit strictly after it or "now"
+        # itself gets truncated out along with the genuinely old records.
+        end_time = int(now.timestamp() * 1000000) + 1
         start_time_3h = int((now - timedelta(hours=3)).timestamp() * 1000000)
 
         resp = self._search_stream(create_session, base_url, org_id, start_time_3h, end_time)
@@ -410,6 +418,7 @@ class TestMetricsMaxQueryRange:
     MAX_QUERY_RANGE_HOURS = DEFAULT_MAX_QUERY_RANGE_HOURS
     ORIGINAL_MAX_QUERY_RANGE = None
     TEST_RUN_ID = None
+    SETUP_NOW = None
 
     @pytest.fixture(scope="class", autouse=True)
     def setup_stream(self, create_session, base_url, org_id):
@@ -418,6 +427,10 @@ class TestMetricsMaxQueryRange:
         logger.info(f"=== SETUP: Preparing stream '{self.STREAM_NAME}' (type={self.STREAM_TYPE}) ===")
 
         now = datetime.now(timezone.utc)
+        # Tests re-derive their query windows from this same `now`, not a fresh
+        # datetime.now() call, so a "2_hours_ago" record stays >1h away from
+        # end_time regardless of how long setup's ingest+flush+retry took.
+        TestMetricsMaxQueryRange.SETUP_NOW = now
         test_run_id = f"metrics_mqr_{int(now.timestamp())}"
         TestMetricsMaxQueryRange.TEST_RUN_ID = test_run_id
 
@@ -469,7 +482,7 @@ class TestMetricsMaxQueryRange:
         """
         logger.info("=== TEST: Metrics query truncation (3h → 1h) ===")
 
-        now = datetime.now(timezone.utc)
+        now = self.SETUP_NOW
         end_time = int(now.timestamp() * 1000000)
         start_time_3h = int((now - timedelta(hours=3)).timestamp() * 1000000)
 
@@ -511,6 +524,7 @@ class TestTracesMaxQueryRange:
     MAX_QUERY_RANGE_HOURS = DEFAULT_MAX_QUERY_RANGE_HOURS
     ORIGINAL_MAX_QUERY_RANGE = None
     TEST_RUN_ID = None
+    SETUP_NOW = None
 
     @pytest.fixture(scope="class", autouse=True)
     def setup_stream(self, create_session, base_url, org_id):
@@ -519,6 +533,10 @@ class TestTracesMaxQueryRange:
         logger.info(f"=== SETUP: Preparing stream '{self.STREAM_NAME}' (type={self.STREAM_TYPE}) ===")
 
         now = datetime.now(timezone.utc)
+        # Tests re-derive their query windows from this same `now`, not a fresh
+        # datetime.now() call, so a "2_hours_ago" record stays >1h away from
+        # end_time regardless of how long setup's ingest+flush+retry took.
+        TestTracesMaxQueryRange.SETUP_NOW = now
         test_run_id = f"traces_mqr_{int(now.timestamp())}"
         TestTracesMaxQueryRange.TEST_RUN_ID = test_run_id
 
@@ -573,7 +591,7 @@ class TestTracesMaxQueryRange:
         """
         logger.info("=== TEST: Traces query truncation (3h → 1h) ===")
 
-        now = datetime.now(timezone.utc)
+        now = self.SETUP_NOW
         end_time = int(now.timestamp() * 1000000)
         start_time_3h = int((now - timedelta(hours=3)).timestamp() * 1000000)
 
@@ -606,6 +624,7 @@ class TestMaxQueryRangeNegativeCases:
 
     STREAM_NAME = "test_mqr_negative_cases"
     TEST_RUN_ID = None
+    SETUP_NOW = None
 
     @pytest.fixture(scope="class", autouse=True)
     def setup_stream(self, create_session, base_url, org_id):
@@ -614,6 +633,10 @@ class TestMaxQueryRangeNegativeCases:
         logger.info(f"=== SETUP: Preparing stream '{self.STREAM_NAME}' for negative tests ===")
 
         now = datetime.now(timezone.utc)
+        # Tests re-derive their query windows from this same `now`, not a fresh
+        # datetime.now() call, so a seeded record stays on the intended side of
+        # a truncation boundary regardless of how long setup's retry loop took.
+        TestMaxQueryRangeNegativeCases.SETUP_NOW = now
         test_run_id = f"mqr_neg_{int(now.timestamp())}"
         TestMaxQueryRangeNegativeCases.TEST_RUN_ID = test_run_id
 
@@ -657,7 +680,7 @@ class TestMaxQueryRangeNegativeCases:
         assert resp.status_code == 200, f"Failed to set max_query_range=0: {resp.text}"
 
         # Query for 4 hours (to ensure 3_hours_ago is included even with slight timing differences)
-        now = datetime.now(timezone.utc)
+        now = self.SETUP_NOW
         end_time = int(now.timestamp() * 1000000)
         start_time_4h = int((now - timedelta(hours=4)).timestamp() * 1000000)
 
@@ -806,7 +829,7 @@ class TestMaxQueryRangeNegativeCases:
             logger.info(f"BEHAVIOR: API accepted fractional value, stored as: {stored_value}")
 
             # Query for 3 hours - should be truncated to 30 mins if 0.5 was accepted
-            now = datetime.now(timezone.utc)
+            now = self.SETUP_NOW
             end_time = int(now.timestamp() * 1000000)
             start_time_3h = int((now - timedelta(hours=3)).timestamp() * 1000000)
 
@@ -841,7 +864,7 @@ class TestMaxQueryRangeNegativeCases:
         resp = create_session.put(settings_url, json={"max_query_range": 1}, headers={"Content-Type": "application/json"})
         assert resp.status_code == 200
 
-        now = datetime.now(timezone.utc)
+        now = self.SETUP_NOW
         end_time = int(now.timestamp() * 1000000)
         # Query exactly 1 hour (at the boundary)
         start_time_1h = int((now - timedelta(hours=1)).timestamp() * 1000000)

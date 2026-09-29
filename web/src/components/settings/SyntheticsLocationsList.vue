@@ -120,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :data-test="`synthetics-locations-${row.id}-${row.enabled ? 'disable' : 'enable'}-btn`"
                   @click.stop="toggleLocationEnabled(row)"
@@ -140,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="edit"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('common.edit')"
                   @click.stop="openEditDialog(row)"
                   icon-left="edit"
@@ -153,12 +155,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="delete"
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('common.delete')"
                   @click.stop="confirmDelete(row)"
                   icon-left="delete"
                 >
                   <OTooltip side="bottom" :content="t('common.delete')" />
                 </OButton>
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="synthetics-locations-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="!toggleLoadingMap[row.id]"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :variant="row.enabled ? 'destructive' : 'default'"
+                    class="md:hidden"
+                    :data-test="`synthetics-locations-${row.id}-${row.enabled ? 'disable' : 'enable'}-btn-menu`"
+                    @select="toggleLocationEnabled(row)"
+                  >
+                    <span>{{
+                      row.enabled
+                        ? t("synthetics.locations.disable")
+                        : t("synthetics.locations.enable")
+                    }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`synthetics-locations-${row.id}-edit-btn-menu`"
+                    @select="openEditDialog(row)"
+                  >
+                    <span>{{ t("common.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`synthetics-locations-${row.id}-delete-btn-menu`"
+                    @select="confirmDelete(row)"
+                  >
+                    <span>{{ t("common.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
             <template #bottom>
@@ -172,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     }}
                   </template>
-                  <template v-else>
+                  <span v-else class="max-md:hidden">
                     {{ resultTotal }} {{ t("synthetics.locations.bottomHeader") }}
-                  </template>
+                  </span>
                 </span>
                 <template v-if="selectedLocations.length > 0">
                   <OButton
@@ -236,6 +282,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -255,6 +303,8 @@ export default defineComponent({
   components: {
     OPageLayout,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OSearchInput,
     OTable,

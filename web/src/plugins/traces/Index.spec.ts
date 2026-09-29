@@ -293,17 +293,23 @@ vi.mock("@/utils/traces/constants", async (importOriginal) => {
 });
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -373,9 +379,16 @@ describe("Index.vue (Main Traces Page)", () => {
     if (wrapper) {
       wrapper.unmount();
     }
-    // Drain all pending microtasks/promises before clearing mocks so
-    // lingering async chains from the current test cannot contaminate the
-    // next test's beforeEach or mount lifecycle.
+    // Drain pending async before clearing mocks so lingering chains from this
+    // test cannot contaminate the next one. `flushPromises` alone only drains
+    // microtasks; the field-grouping path awaits the query client, whose
+    // scheduling spans a few macrotask hops, so the loop alternates the two.
+    // Bounded and deterministic — no arbitrary sleep. Two iterations were not
+    // always enough; three are.
+    for (let i = 0; i < 3; i++) {
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 0));
+    }
     await flushPromises();
     vi.clearAllMocks();
   });
@@ -735,7 +748,7 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Stream Selection", () => {
-    it("should not select the stream with latest data by default", async () => {
+    it("should select the default stream automatically", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -757,7 +770,7 @@ describe("Index.vue (Main Traces Page)", () => {
       // getStreamList uses an un-awaited .then() chain; poll until it resolves
       await vi.waitFor(
         () => {
-          expect(mockSearchObj.data.stream.selectedStream.value).toBeFalsy();
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
         },
         { timeout: 2000 },
       );
@@ -1108,6 +1121,173 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // Should have called getQueryData which uses the current page
       expect(wrapper.vm).toBeTruthy();
+    });
+  });
+
+  describe("Streaming page writes (issue #14317)", () => {
+    // The shared beforeEach does not reset currentPage, so it would leak into later tests.
+    afterEach(() => {
+      mockSearchObj.data.resultGrid.currentPage = 0;
+    });
+
+    const meta = (hits: any[] = []) => ({
+      type: "search_response_metadata",
+      content: { results: { hits } },
+    });
+    const chunk = (hits: any[]) => ({
+      type: "search_response_hits",
+      content: { results: { hits } },
+    });
+    const spans = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        span_id: `${prefix}-${i}`,
+        trace_id: `t-${prefix}-${i}`,
+        service_name: "svc",
+        operation_name: "op",
+        _timestamp: 1700000000000000 + i,
+      }));
+
+    const mountPage = async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      // Mounting runs loadPageData, which can reset the stream selection.
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      // getQueryData derives `from` from currentPage, so this is what makes it page 2.
+      mockSearchObj.data.resultGrid.currentPage = 1;
+      mockSearchObj.meta.resultGrid.rowsPerPage = 25;
+      mockSearchObj.data.queryPayload = {
+        query: {
+          sql: "",
+          start_time: 1700000000000000,
+          end_time: 1700003600000000,
+          from: 0,
+          size: 25,
+        },
+      };
+      return wrapper;
+    };
+
+    const lastCallbacks = () => {
+      const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+      return calls[calls.length - 1][1];
+    };
+
+    it("replaces the previous page when the stream opens with an empty batch", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const page1 = spans("p1", 25);
+      mockSearchObj.data.queryResults.hits = [...page1];
+
+      const cb = lastCallbacks();
+      const page2 = spans("p2", 25);
+      // The backend opens every page past the first with an empty batch.
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.data(null, meta([]));
+      cb.data(null, chunk(page2));
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toHaveLength(25);
+      expect(ids).toEqual(page2.map((h) => h.span_id));
+      expect(ids.some((id: string) => id.startsWith("p1-"))).toBe(false);
+    });
+
+    it("joins batches within one page instead of replacing them", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const cb = lastCallbacks();
+      const first = spans("a", 5);
+      const second = spans("b", 20);
+      cb.data(null, meta([]));
+      cb.data(null, chunk(first));
+      cb.data(null, meta([]));
+      cb.data(null, chunk(second));
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual([...first, ...second].map((h) => h.span_id));
+    });
+
+    it("clears the grid when a page streams no rows at all", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      mockSearchObj.data.queryResults.hits = spans("p1", 25);
+
+      const cb = lastCallbacks();
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.complete(null);
+
+      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
+    });
+
+    // Logs shows its error banner over the last results rather than blanking; traces matches it.
+    it("keeps the previous rows when a page fails before writing any", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const page1 = spans("p1", 25);
+      mockSearchObj.data.queryResults.hits = [...page1];
+
+      const cb = lastCallbacks();
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.error(null, { content: { message: "boom", code: 500 } });
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual(page1.map((h) => h.span_id));
+    });
+
+    it("ignores batches from a request that a newer search superseded", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      const stale = lastCallbacks();
+
+      // A second search cancels the first and takes ownership of the grid.
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      const current = lastCallbacks();
+
+      const fresh = spans("new", 25);
+      current.data(null, meta([]));
+      current.data(null, chunk(fresh));
+
+      stale.data(null, meta([]));
+      stale.data(null, chunk(spans("old", 25)));
+      stale.complete(null);
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual(fresh.map((h) => h.span_id));
     });
   });
 
@@ -2423,14 +2603,13 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
-    it("should select persisted stream (Priority 3) when no URL stream and no previously selected", async () => {
+    it("should select persisted stream when auto query is disabled", async () => {
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
       mockRestoreTracesStream.mockReturnValue("persisted-stream");
 
-      // Enable auto_query so the persisted-stream branch is entered.
       store.state.zoConfig = {
         ...store.state.zoConfig,
-        auto_query_enabled: true,
+        auto_query_enabled: false,
       };
 
       routerCurrentRouteSpy.mockReturnValue({
@@ -2459,15 +2638,9 @@ describe("Index.vue (Main Traces Page)", () => {
         },
         { timeout: 2000 },
       );
-
-      // Restore zoConfig to its original shape.
-      store.state.zoConfig = {
-        ...store.state.zoConfig,
-        auto_query_enabled: false,
-      };
     });
 
-    it("should leave selectedStream empty when no priority matches", async () => {
+    it("should select the first stream when no preferred or default stream exists", async () => {
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
       mockRestoreTracesStream.mockReturnValue("");
 
@@ -2503,7 +2676,7 @@ describe("Index.vue (Main Traces Page)", () => {
         { timeout: 2000 },
       );
 
-      expect(mockSearchObj.data.stream.selectedStream.value).toBe("");
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("url-stream");
     });
   });
 
@@ -2772,6 +2945,86 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.streamChangeDialog.show).toBe(false);
       // Stream must remain unchanged — the cancel did not apply the pending change
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+    });
+  });
+
+  // Placed last in the file: this test drives fetchQueryDataWithHttpStream's
+  // handlers directly and calls mockFetchQueryDataWithHttpStream.mockReset()
+  // at the end, so it cannot leak an implementation into tests declared after it.
+  describe("Stale search error handling (o2-enterprise#2643)", () => {
+    // Regression: a rejected query's RED metrics charts stayed hidden forever,
+    // even after the query was fixed and the next search succeeded — because a
+    // cancelled search's late error callback overwrote the newer search's state.
+    it("should not let a cancelled search's late error overwrite a newer search's state", async () => {
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.datetime = {
+        startTime: new Date().getTime() * 1000 - 900000000,
+        endTime: new Date().getTime() * 1000,
+        relativeTimePeriod: "15m",
+        type: "relative",
+      };
+
+      const capturedHandlers: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_data: any, handlers: any) => {
+        capturedHandlers.push(handlers);
+      });
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      capturedHandlers.length = 0;
+
+      // Search #1 starts and is left in-flight (never resolves on its own).
+      await wrapper.vm.getQueryData();
+      expect(capturedHandlers.length).toBe(1);
+
+      // Search #2 starts before #1 finishes — this cancels #1 (deletes its
+      // request-state entry) and clears errorMsg for the new attempt.
+      await wrapper.vm.getQueryData();
+      expect(capturedHandlers.length).toBe(2);
+
+      expect(mockSearchObj.data.errorMsg).toBe("");
+
+      // #1's HTTP stream finally errors out after being cancelled/superseded.
+      capturedHandlers[0].error({}, { message: "stale failure from search #1", code: 500 });
+      await flushPromises();
+
+      // The stale error must not resurrect the error banner / hide the charts
+      // for the still-in-flight, newer search.
+      expect(mockSearchObj.data.errorMsg).toBe("");
+
+      // A genuine error for the CURRENT (non-superseded) search must still work.
+      // getQueryData()'s error handler sets errorMsg synchronously, so assert
+      // immediately — before yielding to the event loop via flushPromises().
+      // An unrelated component instance left over from an earlier test in this
+      // file can still have a mount-triggered search pending (onUnmounted does
+      // not cancel in-flight work); if its own getQueryData() call happens to
+      // settle during our flushPromises() here, it resets the shared
+      // mockSearchObj.data.errorMsg back to "" before we get a chance to read
+      // it, unrelated to the cancellation behavior this test is verifying.
+      capturedHandlers[1].error({}, { message: "real failure from search #2", code: 500 });
+      expect(mockSearchObj.data.errorMsg).toBe("real failure from search #2");
+      await flushPromises();
+
+      mockFetchQueryDataWithHttpStream.mockReset();
     });
   });
 });

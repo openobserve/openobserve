@@ -195,4 +195,49 @@ describe("AiScopeBar", () => {
     expect(w.emitted("update:selectedEnv")).toBeTruthy();
     expect(w.emitted("update:selectedEnv")![0]).toEqual(["prod"]);
   });
+
+  describe("showAgentToggle (OSS callers hide Agent mode entirely)", () => {
+    it("defaults to true — the toggle renders when the prop is omitted (no regression for existing callers)", () => {
+      const w = mountBar();
+      expect(w.find('[data-test="sessions-list-filter-mode"]').exists()).toBe(true);
+    });
+
+    it("hides the toggle group when showAgentToggle is false", () => {
+      const w = mountBar({ showAgentToggle: false });
+      expect(w.find('[data-test="sessions-list-filter-mode"]').exists()).toBe(false);
+    });
+
+    it("pins the bar to stream mode when showAgentToggle is false, even if filterMode is (defensively) 'agent'", () => {
+      const w = mountBar({
+        showAgentToggle: false,
+        filterMode: "agent",
+        activeStream: "s1",
+        selectedStreamCount: 5,
+      });
+      expect(w.find('[data-test="sessions-list-stream-selector"]').exists()).toBe(true);
+      expect(w.find(".agent-scope-cascade").exists()).toBe(false);
+      // The count only means something alongside a way to act on it — with no
+      // toggle to reach Agent mode, it's hidden too, not just the cascade.
+      expect(w.find('[data-test="sessions-list-stream-count"]').exists()).toBe(false);
+    });
+
+    it("never renders the agent cascade when showAgentToggle is false, regardless of filterMode", () => {
+      // activeStream must be truthy here — with it blank, a pre-existing (and
+      // unrelated) quirk lower in the template falls through to the cascade
+      // branch regardless of mode; showAgentToggle isn't what that's testing.
+      const wStream = mountBar({
+        showAgentToggle: false,
+        filterMode: "stream",
+        activeStream: "s1",
+      });
+      const wAgent = mountBar({ showAgentToggle: false, filterMode: "agent", activeStream: "s1" });
+      expect(wStream.find(".agent-scope-cascade").exists()).toBe(false);
+      expect(wAgent.find(".agent-scope-cascade").exists()).toBe(false);
+    });
+
+    it("does not show the stream-count badge when showAgentToggle is false and no stream is active yet", () => {
+      const w = mountBar({ showAgentToggle: false, filterMode: "agent", activeStream: "" });
+      expect(w.find('[data-test="sessions-list-stream-count"]').exists()).toBe(false);
+    });
+  });
 });

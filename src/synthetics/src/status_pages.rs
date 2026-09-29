@@ -318,7 +318,7 @@ async fn apply_engine_actions(
             // Latest resolution wins for the merge window.
             let entry = recently_resolved
                 .entry(check_id)
-                .or_insert((n.id.clone(), resolved_at));
+                .or_insert_with(|| (n.id.clone(), resolved_at));
             if resolved_at > entry.1 {
                 *entry = (n.id.clone(), resolved_at);
             }

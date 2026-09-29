@@ -14,10 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::rand::get_rand_element;
-use infra::cluster::get_cached_schedulable_ingester_nodes;
-use tonic::transport::Channel;
+use infra::{client::grpc::GrpcChannel, cluster::get_cached_schedulable_ingester_nodes};
 
-pub async fn get_ingester_channel() -> Result<(String, Channel), tonic::Status> {
+pub async fn get_ingester_channel() -> Result<(String, GrpcChannel), tonic::Status> {
     let grpc_addr = get_rand_ingester_addr().await?;
     infra::client::grpc::get_cached_channel(&grpc_addr)
         .await

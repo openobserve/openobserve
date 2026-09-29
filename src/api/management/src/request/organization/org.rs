@@ -72,7 +72,7 @@ use crate::common::meta::{
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn organizations(
@@ -92,7 +92,8 @@ pub async fn organizations(
 
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
     let is_root_user = is_root_user(user_id);
@@ -172,6 +173,9 @@ pub async fn organizations(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn all_organizations(
@@ -187,7 +191,8 @@ pub async fn all_organizations(
     let mut org_names = HashSet::new();
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
 
@@ -249,6 +254,8 @@ pub async fn all_organizations(
             browser_steps_limit: synthetics.browser_limit,
             protocol_steps_used: synthetics.protocol_used,
             protocol_steps_limit: synthetics.protocol_limit,
+            status_steps_used: synthetics.status_used,
+            status_steps_limit: synthetics.status_limit,
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -316,7 +323,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     tag = "Organizations",
     operation_id = "GetOrganizationUserIngestToken",
     summary = "Get user's ingestion token",
-    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints.",
+    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -325,6 +332,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -338,6 +346,12 @@ pub async fn get_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "read the organization ingestion token")
+            .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
@@ -357,7 +371,7 @@ pub async fn get_user_passcode(
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserIngestToken",
     summary = "Update user's ingestion token",
-    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token.",
+    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -366,6 +380,7 @@ pub async fn get_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -379,6 +394,12 @@ pub async fn update_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "rotate the organization ingestion token")
+            .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
@@ -531,7 +552,7 @@ pub async fn create_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create an organization", "category": "organizations"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_org(
@@ -670,7 +691,7 @@ async fn set_pool_limit(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Must be _meta"),
-        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps | synthetics_status_protocol (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
     ),
     request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(

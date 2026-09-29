@@ -49,24 +49,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <!-- Healthy leads with the reassurance, not with a call to action: there
            is nothing for the reader to fix. -->
-      <span
+      <OTag
         v-if="healthy"
-        class="bg-status-success-bg text-status-success-text text-2xs inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 font-semibold"
+        variant="success-soft"
+        class="self-center"
         :data-test="`${dataTest}-healthy-pill`"
       >
-        <OIcon name="check-circle" class="size-3" />
+        <template #icon><OIcon name="check-circle" size="xs" /></template>
         {{ collectionHealthyLabel }}
-      </span>
-      <OButton
+      </OTag>
+      <EmptyStateActionCard
         v-for="action in actions"
         :key="action.id"
-        :variant="action.primary ? 'primary' : 'outline'"
-        size="sm"
+        :icon="action.icon ?? 'arrow-forward'"
+        :label="action.label"
         :data-test="`${dataTest}-action-${action.id}`"
         @click="emit('action', action.id)"
-      >
-        {{ action.label }}
-      </OButton>
+      />
     </template>
 
     <!-- The checklist grammar is shared with DbmEmptyState via DbmCheckList, so
@@ -84,9 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import DbmCheckList, { type DbmCheckRow } from "./DbmCheckList.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, type I18nText } from "@/types/i18n";
 
 // Alias of the shared checklist row type, kept exported so callers keep typing
@@ -97,6 +98,7 @@ export interface DbmLockEmptyAction {
   id: string;
   label: I18nText;
   primary?: boolean;
+  icon?: IconName;
 }
 
 withDefaults(

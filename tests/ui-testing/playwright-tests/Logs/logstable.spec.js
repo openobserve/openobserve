@@ -526,7 +526,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('✓ CMD+Enter editor bug test completed');
   });
 
-  // Bug #9550 test moved to RegressionSet/logs-regression.spec.js or similar
+  // Bug #9550 lives in RegressionSet/Logs/logs-bugs.spec.js (skipped there on a product blocker)
 
   test.afterEach(async () => {
     try {

@@ -26,6 +26,7 @@
  */
 
 import type { I18nKey } from "@/types/i18n";
+import { START_LOAD_STEP_ID } from "@/constants/synthetics";
 
 // ── Stream + field config (the single source of truth) ────────────────────
 
@@ -51,6 +52,7 @@ export const SYNTHETIC_FIELDS = {
   engine: "engine",
   error: "error",
   executionId: "execution_id",
+  environment: "environment",
 } as const;
 
 export const STATUS_VALUES = {
@@ -177,6 +179,7 @@ export interface SyntheticRun {
   location: string;
   device: string;
   browserEngine: string;
+  environment: string;
   triggerType: string;
   error: string;
   jobId: string;
@@ -192,6 +195,8 @@ export interface SyntheticRunDetail extends SyntheticRun {
   failedStep: string | null;
   recordedSteps: RecordedStep[];
   lastAttemptSteps: StepExecution[];
+  /** Row 0 — a sibling of the steps, never one of them, so every `steps.length` reader is unchanged. */
+  startLoad: StartLoad | null;
   retryHistory: RetryAttempt[];
   /** Spec P5.4 — present exactly when the final attempt failed. */
   failureDetail: FailureDetail | null;
@@ -302,12 +307,16 @@ export interface StepExecution {
   settle_ms?: number;
 }
 
+/** The start load as the probe reports it: a step execution plus the URL it actually opened. */
+export type StartLoad = StepExecution & { url: string };
+
 export interface RetryAttempt {
   attempt: number;
   status: string;
   durationMs: number;
   failedStep: string | null;
   steps: StepExecution[];
+  startLoad: StartLoad | null;
   /** Why THIS attempt failed. Null on an attempt that passed. */
   failureDetail: FailureDetail | null;
   /** This attempt's own artifacts, uploaded under an attempt-scoped key. */
@@ -805,6 +814,7 @@ export interface RunLocationResult {
   executionId: string;
   traceKey: string | null;
   steps: StepResult[];
+  startLoad: (StepResult & { url: string }) | null;
   recordedSteps: RecordedStep[];
   retryHistory: RetryAttempt[];
 }
@@ -922,6 +932,10 @@ function escapeSqlLiteral(value: string): string {
   return value.replace(/'/g, "''");
 }
 
+function environmentPredicate(environment?: string): string {
+  return environment ? ` AND environment = '${escapeSqlLiteral(environment)}'` : "";
+}
+
 function num(value: unknown): number {
   const n = typeof value === "string" ? parseFloat(value) : (value as number);
   return Number.isFinite(n) ? n : 0;
@@ -978,21 +992,31 @@ function parseAssertions(raw: unknown): ProtocolAssertionResult[] {
   }));
 }
 
-function parseSteps(raw: unknown): StepResult[] {
-  return parseJsonArray(raw).map((s: any) => ({
+function parseStep(s: any): StepResult {
+  return {
     stepId: str(s.step_id ?? s.id),
     status: s.status === "ok" || s.status === "passed" ? "ok" : "fail",
     durationMs: num(s.duration_ms),
     error: str(s.error),
     screenshotKey: s.screenshot_key ? str(s.screenshot_key) : null,
-  }));
+  };
 }
 
-export function buildLastRunSql(monitorId: string): string {
+function parseSteps(raw: unknown): StepResult[] {
+  return parseJsonArray(raw).map(parseStep);
+}
+
+function parseStartLoadResult(raw: unknown): (StepResult & { url: string }) | null {
+  const s = parseJson(raw);
+  if (!s || typeof s !== "object") return null;
+  return { ...parseStep(s), url: str((s as any).url) };
+}
+
+export function buildLastRunSql(monitorId: string, environment?: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT ${F.status} as status, ${F.timestamp} as ts
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'
+WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
 ORDER BY ${F.timestamp} DESC
 LIMIT 1`;
 }
@@ -1021,8 +1045,12 @@ export function buildHistogramSql(
   interval: string,
   hasAttemptsField = false,
   hasStatusReasonField = false,
+  environment?: string,
+  splitByEnvironment = false,
 ): string {
   const id = escapeSqlLiteral(monitorId);
+  const envCol = splitByEnvironment ? "\n  environment," : "";
+  const envGroup = splitByEnvironment ? ", environment" : "";
   const retriedClause = hasAttemptsField
     ? `\n  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,`
     : "";
@@ -1031,7 +1059,7 @@ export function buildHistogramSql(
       `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason != '' AND status_reason != '${STATUS_REASON.flaky}') as degraded_runs,`
     : "";
   return `SELECT
-  histogram(${F.timestamp}, '${interval}') as ts,
+  histogram(${F.timestamp}, '${interval}') as ts,${envCol}
   COALESCE(AVG(${F.duration}), 0) as avg_duration,
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,${retriedClause}${reasonClauses}
   COUNT(*) as total_runs,
@@ -1040,8 +1068,8 @@ export function buildHistogramSql(
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.failed}') as failed_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.error}') as error_runs
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'
-GROUP BY ts
+WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
+GROUP BY ts${envGroup}
 ORDER BY ts`;
 }
 
@@ -1051,11 +1079,11 @@ ORDER BY ts`;
  * percentiles — so this stays a separate (small) query while every count comes
  * from the cached histogram.
  */
-export function buildP95Sql(monitorId: string): string {
+export function buildP95Sql(monitorId: string, environment?: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'`;
+WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}`;
 }
 
 // ── Query builders ────────────────────────────────────────────────────────
@@ -1078,9 +1106,8 @@ const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
  * `evidence_by_step`. Those are JSON blob columns; on a 5000-row aggregation
  * one of them was ~20 MB of duplicated payload.
  *
- * Blob columns belong to the single-row detail query only
- * (`buildRunDetailSql` / `buildProtocolRunDetailSql` use `SELECT *`
- * deliberately — one row).
+ * Blob columns belong to the single-row detail query only: `buildRunDetailSql` names columns
+ * explicitly (see `RUN_DETAIL_COLUMNS`); `buildProtocolRunDetailSql` uses `SELECT *`.
  *
  * `buildRunsWithStepsSql` is the one intentional exception: it needs
  * `last_attempt_steps` and `retry_history` to tally per-step stats. It still
@@ -1107,6 +1134,8 @@ const RUNS_COLUMNS: { field: string; alias: string; fallback: string }[] = [
   { field: F.engine, alias: "engine", fallback: "''" },
   { field: "trigger_type", alias: "trigger_type", fallback: "''" },
   { field: F.error, alias: "error", fallback: "''" },
+  // '' = unattributed (unscoped check, or a row written before the field).
+  { field: F.environment, alias: "environment", fallback: "''" },
   { field: "job_id", alias: "job_id", fallback: "''" },
   { field: "run_id", alias: "run_id", fallback: "''" },
   { field: F.executionId, alias: "execution_id", fallback: "''" },
@@ -1119,6 +1148,7 @@ export function buildRunsSql(
    * selected as typed literals. Pass null to select all fields by name
    * (only safe when the schema is known to be complete). */
   schemaFields: Set<string> | null = new Set(),
+  environment?: string,
 ): string {
   const id = escapeSqlLiteral(monitorId);
   const select = RUNS_COLUMNS.map(({ field, alias, fallback }) => {
@@ -1127,7 +1157,7 @@ export function buildRunsSql(
   }).join(", ");
   return `SELECT ${select}
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'
+WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
 ORDER BY ${F.timestamp} DESC
 LIMIT ${limit}`;
 }
@@ -1141,6 +1171,7 @@ export function buildRunsWithStepsSql(
   monitorId: string,
   limit: number,
   hasRetryHistoryField = true,
+  environment?: string,
 ): string {
   const id = escapeSqlLiteral(monitorId);
   const retryHistoryCol = hasRetryHistoryField ? ", retry_history" : "";
@@ -1152,7 +1183,7 @@ export function buildRunsWithStepsSql(
   // instead.
   return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id, attempts, last_attempt_steps${retryHistoryCol}
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'
+WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
 ORDER BY ${F.timestamp} DESC
 LIMIT ${limit}`;
 }
@@ -1192,6 +1223,7 @@ export function buildRetryAttributionSql(
    * Naming it unconditionally took the whole Steps tab down with
    * "unknown field 'status_reason'". */
   hasStatusReason = true,
+  environment?: string,
 ): string {
   const id = escapeSqlLiteral(monitorId);
   // Absent `status_reason` is itself informative: no warning record with a
@@ -1199,7 +1231,7 @@ export function buildRetryAttributionSql(
   const reasonCol = hasStatusReason ? "status_reason" : "'' as status_reason";
   return `SELECT ${F.executionId} as execution_id, ${F.status} as status, ${reasonCol}, attempts, retry_step_ids, retry_error_classes, retry_consistent
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}' AND attempts > 1
+WHERE ${F.monitorId} = '${id}' AND attempts > 1${environmentPredicate(environment)}
 ORDER BY ${F.timestamp} DESC
 LIMIT ${limit}`;
 }
@@ -1377,7 +1409,7 @@ const STEP_TABLE = `"${SYNTHETIC_STEP_RESULTS_STREAM}"`;
  * execution rows, so every number on the tab was computed from the newest ~28%
  * of a "7 days" window.
  */
-export function buildStepAggregateSql(monitorId: string): string {
+export function buildStepAggregateSql(monitorId: string, environment?: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT step_id,
        min(step_index) AS step_index,
@@ -1390,7 +1422,7 @@ export function buildStepAggregateSql(monitorId: string): string {
        approx_percentile_cont(duration_ms, 0.95) AS p95_duration_ms,
        max(duration_ms) AS max_duration_ms
 FROM ${STEP_TABLE}
-WHERE synthetics_id = '${id}' AND kind = 'step'
+WHERE synthetics_id = '${id}' AND kind = 'step'${environmentPredicate(environment)}
 GROUP BY step_id`;
 }
 
@@ -1401,14 +1433,14 @@ GROUP BY step_id`;
  * `locationStats` by folding the same rows twice. Result size is
  * steps × engines × locations, which is tens of rows, not thousands.
  */
-export function buildStepDimensionSql(monitorId: string): string {
+export function buildStepDimensionSql(monitorId: string, environment?: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT step_id, engine, location,
        count(*) AS total,
        sum(CASE WHEN status <> 'passed' THEN 1 ELSE 0 END) AS failures,
        sum(CASE WHEN failed_in_prior_attempt THEN 1 ELSE 0 END) AS flaky
 FROM ${STEP_TABLE}
-WHERE synthetics_id = '${id}' AND kind = 'step'
+WHERE synthetics_id = '${id}' AND kind = 'step'${environmentPredicate(environment)}
 GROUP BY step_id, engine, location`;
 }
 
@@ -1419,11 +1451,15 @@ GROUP BY step_id, engine, location`;
  * last N runs", not an aggregate over the window, so a cap is the definition
  * rather than a truncation. Ordered newest-first and reversed when folded.
  */
-export function buildStepSparklineSql(monitorId: string, limit = 2000): string {
+export function buildStepSparklineSql(
+  monitorId: string,
+  limit = 2000,
+  environment?: string,
+): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT step_id, status, failed_in_prior_attempt, _timestamp
 FROM ${STEP_TABLE}
-WHERE synthetics_id = '${id}' AND kind = 'step'
+WHERE synthetics_id = '${id}' AND kind = 'step'${environmentPredicate(environment)}
 ORDER BY _timestamp DESC
 LIMIT ${limit}`;
 }
@@ -1465,7 +1501,8 @@ export function foldStepStream(
 
   for (const hit of aggregateHits) {
     const stepId = str(hit.step_id);
-    if (!stepId) continue;
+    // The stream groups by step_id, so row 0 arrives like a step; it is never a numbered one.
+    if (!stepId || stepId === START_LOAD_STEP_ID) continue;
     const executions = num(hit.executions);
     const failures = num(hit.failures);
     const flaky = num(hit.flaky);
@@ -1583,11 +1620,11 @@ export function foldStepStream(
   };
 }
 
-export function buildStepDefsSql(monitorId: string, limit = 100): string {
+export function buildStepDefsSql(monitorId: string, limit = 100, environment?: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT recorded_steps
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'
+WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
 ORDER BY ${F.timestamp} DESC
 LIMIT ${limit}`;
 }
@@ -1605,6 +1642,7 @@ const RUN_DETAIL_COLUMNS: { field: string; alias: string; fallback: string }[] =
   { field: F.engine, alias: "engine", fallback: "''" },
   { field: F.error, alias: "error", fallback: "''" },
   { field: F.monitorName, alias: "synthetics_name", fallback: "''" },
+  { field: F.environment, alias: "environment", fallback: "''" },
   { field: "scheduled_ts", alias: "scheduled_ts", fallback: "0" },
   // C4 — probe start-up, already inside `duration`. Observed at 113 131 ms on a
   // cold Lambda against a 243 ms check: unsubtracted, Lambda locations look
@@ -1671,6 +1709,7 @@ const RUN_DETAIL_COLUMNS: { field: string; alias: string; fallback: string }[] =
   { field: "retry_step_ids", alias: "retry_step_ids", fallback: "''" },
   { field: "last_attempt_steps", alias: "last_attempt_steps", fallback: "''" },
   { field: "recorded_steps", alias: "recorded_steps", fallback: "''" },
+  { field: "start_load", alias: "start_load", fallback: "''" },
 ];
 
 /** run/execution WHERE clauses restricted to fields that exist in the schema.
@@ -1797,11 +1836,30 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
     location: str(rawHit.location),
     device: str(rawHit.device),
     browserEngine: str(rawHit.engine),
+    environment: str(rawHit.environment),
     triggerType: str(rawHit.trigger_type) || "schedule",
     error: str(rawHit.error),
     jobId: str(rawHit.job_id),
     runId: str(rawHit.run_id),
     executionId: str(rawHit.execution_id),
+  };
+}
+
+function normaliseStepStatus(status: unknown): StepExecution["status"] {
+  if (status === "ok" || status === "passed") return "ok";
+  return status === "skipped" ? "skipped" : "fail";
+}
+
+/** `start_load` arrives nested on an attempt or as a JSON string on the record; both map here. */
+function mapStartLoad(raw: unknown): StartLoad | null {
+  const s = parseJson(raw);
+  if (!s || typeof s !== "object") return null;
+  const st = s as any;
+  return {
+    ...st,
+    step_id: str(st.step_id) || START_LOAD_STEP_ID,
+    status: normaliseStepStatus(st.status),
+    url: str(st.url),
   };
 }
 
@@ -1835,12 +1893,7 @@ function mapRetryHistory(raw: unknown): RetryAttempt[] {
     // a broken one.
     const steps: StepExecution[] = parseJsonArray(a?.steps).map((st: any) => ({
       ...st,
-      status:
-        st?.status === "ok" || st?.status === "passed"
-          ? ("ok" as const)
-          : st?.status === "skipped"
-            ? ("skipped" as const)
-            : ("fail" as const),
+      status: normaliseStepStatus(st?.status),
     }));
     const summed = steps.reduce((sum, st) => sum + (st.duration_ms ?? 0), 0);
     const refs: Array<{ step_id?: unknown; key?: unknown }> = Array.isArray(
@@ -1857,6 +1910,7 @@ function mapRetryHistory(raw: unknown): RetryAttempt[] {
         steps.find((st: any) => st.status === "failed" || st.status === "fail")?.step_id ??
         null,
       steps,
+      startLoad: mapStartLoad(a?.start_load),
       failureDetail: mapFailureDetail(a?.failure_detail),
       screenshotKeys: new Map(refs.map((r) => [str(r.step_id), str(r.key)])),
       traceKey: a?.artifacts?.trace_ref ? str(a.artifacts.trace_ref) : null,
@@ -1889,6 +1943,7 @@ export function buildAttemptViews(detail: SyntheticRunDetail): AttemptView[] {
         durationMs: detail.durationMs,
         failedStep: detail.failedStep,
         steps: detail.lastAttemptSteps,
+        startLoad: detail.startLoad,
         failureDetail: detail.failureDetail,
         screenshotKeys: new Map(),
         traceKey: detail.traceKey,
@@ -1905,6 +1960,7 @@ export function buildAttemptViews(detail: SyntheticRunDetail): AttemptView[] {
     return {
       ...a,
       steps: detail.lastAttemptSteps.length ? detail.lastAttemptSteps : a.steps,
+      startLoad: detail.startLoad ?? a.startLoad,
       failureDetail: detail.failureDetail ?? a.failureDetail,
       traceKey: detail.traceKey ?? a.traceKey,
       evidenceKey: detail.evidenceKey ?? a.evidenceKey,
@@ -2037,6 +2093,7 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
     location: rawHit.location,
     device: rawHit.device,
     engine: rawHit.engine,
+    environment: rawHit.environment,
     error: rawHit.error,
     job_id: rawHit.job_id,
     run_id: rawHit.run_id,
@@ -2046,6 +2103,7 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
   const rawRecordedSteps = parseJson(rawHit.recorded_steps);
   const rawSteps = parseJson(rawHit.last_attempt_steps);
   const rawStepsArr = Array.isArray(rawSteps) ? (rawSteps as any[]) : [];
+  const failureDetail = mapFailureDetail(flattenedFailureDetail(rawHit), rawHit.trace_key);
 
   return {
     ...base,
@@ -2059,10 +2117,11 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
     // `parseJsonArray` on the fallback too — `retry_history` arrives as a JSON
     // string, so `Array.isArray` made this branch dead for every real record.
     attempts: num(rawHit.attempts) || parseJsonArray(rawHit.retry_history).length,
+    // A failing Step wins; `_start` is named only by `failure_detail`, since the start load is in no steps array.
     failedStep: rawHit.failed_step
       ? str(rawHit.failed_step)
       : (rawStepsArr.find((s: any) => s.status === "fail" || s.status === "failed")?.step_id ??
-        null),
+        (failureDetail?.stepId === START_LOAD_STEP_ID ? START_LOAD_STEP_ID : null)),
     recordedSteps: Array.isArray(rawRecordedSteps) ? (rawRecordedSteps as RecordedStep[]) : [],
     // `skipped` is a real outcome, not a failure. An `optional` step exists
     // precisely because it may not be there — a cookie banner, a one-time
@@ -2071,19 +2130,15 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
     // for. The type has always allowed all three; only this mapper did not.
     lastAttemptSteps: rawStepsArr.map((s: any) => ({
       ...s,
-      status:
-        s.status === "ok" || s.status === "passed"
-          ? ("ok" as const)
-          : s.status === "skipped"
-            ? ("skipped" as const)
-            : ("fail" as const),
+      status: normaliseStepStatus(s.status),
     })),
+    startLoad: mapStartLoad(rawHit.start_load),
     // The probe writes retry_history on every failed run; the mapper discarded
     // it before any component could read it. A step that failed once and passed
     // on the next attempt is transient by definition, and this is the only place
     // that fact survives.
     retryHistory: mapRetryHistory(rawHit.retry_history),
-    failureDetail: mapFailureDetail(flattenedFailureDetail(rawHit), rawHit.trace_key),
+    failureDetail,
     evidenceByStep: mapEvidence(rawHit.evidence_by_step),
     evidenceKey: rawHit.evidence_key ? str(rawHit.evidence_key) : null,
     evidenceTruncated: !!rawHit.evidence_truncated,
@@ -2145,6 +2200,7 @@ export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocati
     executionId: str(rawHit.execution_id),
     traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
     steps: parseSteps(rawHit.last_attempt_steps),
+    startLoad: parseStartLoadResult(rawHit.start_load),
     recordedSteps: parseJsonArray(rawHit.recorded_steps).map((s: any) => ({
       id: str(s.id),
       name: str(s.name),
@@ -2202,6 +2258,54 @@ export function mapHistogram(
   }
 
   return Array.from(buckets.values()).sort((a, b) => a.tsMs - b.tsMs);
+}
+
+export function mapHistogramSplit(
+  rawHits: Record<string, unknown>[],
+  startMicros: number,
+  endMicros: number,
+): { blended: SyntheticBucket[]; byEnv: Map<string, SyntheticBucket[]> } {
+  const byEnvRows = new Map<string, Record<string, unknown>[]>();
+  const blendedByTs = new Map<string, Record<string, unknown>>();
+  for (const hit of rawHits) {
+    const env = str(hit.environment);
+    if (env) {
+      const list = byEnvRows.get(env) ?? [];
+      list.push(hit);
+      byEnvRows.set(env, list);
+    }
+    const key = str(hit.ts);
+    const prev = blendedByTs.get(key);
+    if (!prev) {
+      blendedByTs.set(key, { ...hit });
+      continue;
+    }
+    const prevTotal = num(prev.total_runs);
+    const total = num(hit.total_runs);
+    prev.avg_duration =
+      prevTotal + total > 0
+        ? (num(prev.avg_duration) * prevTotal + num(hit.avg_duration) * total) / (prevTotal + total)
+        : 0;
+    // Percentiles do not add; the slowest part's p95 bounds the blend from above.
+    prev.p95_duration = Math.max(num(prev.p95_duration), num(hit.p95_duration));
+    for (const k of [
+      "total_runs",
+      "passed_runs",
+      "warning_runs",
+      "failed_runs",
+      "error_runs",
+      "retried_runs",
+      "flaky_runs",
+      "degraded_runs",
+    ]) {
+      prev[k] = num(prev[k]) + num(hit[k]);
+    }
+  }
+  const byEnv = new Map<string, SyntheticBucket[]>();
+  for (const [env, rows] of byEnvRows) {
+    byEnv.set(env, mapHistogram(rows, startMicros, endMicros));
+  }
+  return { blended: mapHistogram([...blendedByTs.values()], startMicros, endMicros), byEnv };
 }
 
 // ── Step aggregation (client-side) ───────────────────────────────────────

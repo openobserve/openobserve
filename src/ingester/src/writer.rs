@@ -19,7 +19,6 @@ use std::{
         Arc, LazyLock as Lazy,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
-    time::Instant,
 };
 
 use arrow_schema::Schema;
@@ -153,17 +152,10 @@ pub async fn get_writer(
     stream_type: &str,
     stream_name: &str,
 ) -> Arc<Writer> {
-    let start = std::time::Instant::now();
     let idx = get_table_idx(thread_id, org_id, stream_name);
     let key = WriterKey::new(idx, org_id, stream_type);
     let r = WRITERS[idx].read().await;
     let data = r.get(&key);
-    if start.elapsed().as_millis() > 500 {
-        log::warn!(
-            "get_writer from read cache took: {} ms",
-            start.elapsed().as_millis()
-        );
-    }
     let mut is_existing_writer_channel_closed = false;
     if let Some(w) = data {
         if !w.is_channel_closed() {
@@ -439,7 +431,6 @@ impl Writer {
     }
 
     fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
-        let _start_preprocess_batch = Instant::now();
         // data_size == 0 is treated as an empty entry downstream
         for entry in entries.iter_mut() {
             entry.normalize_data_size();
@@ -474,12 +465,9 @@ impl Writer {
         // The JSON data is already in bytes_entries and Arrow format in batch_entries
         for entry in entries.iter_mut() {
             let _ = std::mem::take(&mut entry.data);
+            let _ = entry.batch.take();
         }
 
-        let start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
-        if start_preprocess_batch_duration.as_millis() > 100 {
-            log::warn!("start_preprocess_batch_duration: {start_preprocess_batch_duration:?}");
-        }
         Ok(crate::ProcessedBatch {
             entries,
             bytes_entries,
@@ -493,7 +481,6 @@ impl Writer {
         if batch.entries.is_empty() {
             return Ok(());
         }
-        let _start_consume_processed = Instant::now();
         // Check rotation
         self.rotate(batch.entries_wal_size, batch.entries_arrow_size)
             .await?;
@@ -505,7 +492,6 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        let _start_wal_processed = Instant::now();
         for entry in batch.bytes_entries {
             if entry.is_empty() {
                 continue;
@@ -514,10 +500,6 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(wal);
-        let start_wal_processed_duration = _start_wal_processed.elapsed();
-        if start_wal_processed_duration.as_millis() > 100 {
-            log::warn!("start_wal_processed_duration: {start_wal_processed_duration:?}");
-        }
 
         // Write into Memtable - pure IO, no CPU-intensive processing
         let start = std::time::Instant::now();
@@ -526,7 +508,6 @@ impl Writer {
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(mem_lock_time);
-        let _start_mem_processed = Instant::now();
         for (entry, batch_entry) in batch.entries.into_iter().zip(batch.batch_entries) {
             if batch_entry.data.num_rows() == 0 {
                 continue;
@@ -535,21 +516,12 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(mem);
-        let start_mem_processed_duration = _start_mem_processed.elapsed();
-        if start_mem_processed_duration.as_millis() > 100 {
-            log::warn!("start_mem_processed_duration: {start_mem_processed_duration:?}");
-        }
 
         // Check fsync
         if fsync {
             let mut wal = self.wal.write().await;
             wal.sync().context(WalSnafu)?;
             drop(wal);
-        }
-
-        let start_consume_processed_duration = _start_consume_processed.elapsed();
-        if start_consume_processed_duration.as_millis() > 500 {
-            log::warn!("start_consume_processed_duration: {start_consume_processed_duration:?}");
         }
 
         Ok(())

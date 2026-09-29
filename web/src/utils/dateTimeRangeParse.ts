@@ -74,6 +74,62 @@ const MONTH_INDEX: Record<string, string> = {
   dec: "12",
 };
 
+function isValidDateTimeParts(
+  year: string,
+  month: string,
+  day: string,
+  hour = "00",
+  minute = "00",
+  second = "00",
+): boolean {
+  const yearValue = Number(year);
+  const monthValue = Number(month);
+  const dayValue = Number(day);
+  const hourValue = Number(hour);
+  const minuteValue = Number(minute);
+  const secondValue = Number(second);
+
+  if (
+    ![yearValue, monthValue, dayValue, hourValue, minuteValue, secondValue].every(
+      Number.isFinite,
+    ) ||
+    ![yearValue, monthValue, dayValue, hourValue, minuteValue].every(Number.isInteger) ||
+    monthValue < 1 ||
+    monthValue > 12 ||
+    dayValue < 1 ||
+    hourValue < 0 ||
+    hourValue > 23 ||
+    minuteValue < 0 ||
+    minuteValue > 59 ||
+    secondValue < 0 ||
+    secondValue >= 60
+  ) {
+    return false;
+  }
+
+  const isLeapYear = yearValue % 4 === 0 && (yearValue % 100 !== 0 || yearValue % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][
+    monthValue - 1
+  ];
+
+  return dayValue <= (daysInMonth ?? 0);
+}
+
+function isValidAbsoluteValue(date: string, time?: string): boolean {
+  const dateParts = date.split(/[/-]/);
+  const timeParts = (time ?? "00:00:00").split(":");
+  if (dateParts.length !== 3 || timeParts.length !== 3) return false;
+
+  return isValidDateTimeParts(
+    dateParts[0],
+    dateParts[1],
+    dateParts[2],
+    timeParts[0],
+    timeParts[1],
+    timeParts[2],
+  );
+}
+
 export function parseDateRangeString(raw: string): ParsedDateRange | null {
   const s = raw.trim();
 
@@ -97,6 +153,8 @@ export function parseDateRangeString(raw: string): ParsedDateRange | null {
 
   const absMatch = s.match(ABSOLUTE_RANGE_RE);
   if (absMatch) {
+    if (!isValidAbsoluteValue(absMatch[1], absMatch[2])) return null;
+    if (!isValidAbsoluteValue(absMatch[3], absMatch[4])) return null;
     return {
       type: "absolute",
       startDate: absMatch[1],
@@ -126,6 +184,8 @@ export function parseSingleDateTime(raw: string): ParsedSingleDateTime | null {
 
   const absMatch = s.match(ABSOLUTE_SINGLE_RE);
   if (absMatch) {
+    const [date, time] = [absMatch[1], absMatch[2]];
+    if (!isValidAbsoluteValue(date, time)) return null;
     return { type: "absolute", date: absMatch[1], time: absMatch[2] };
   }
 
@@ -143,6 +203,8 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
   const m = raw.match(ISO_SINGLE_RE);
   if (!m) return null;
   const [, year, month, day, hour, minute, second, offset] = m;
+
+  if (!isValidDateTimeParts(year, month, day, hour, minute, second)) return null;
 
   if (offset) {
     // Explicit offset already IS the instant — ignores the picker's timezone.
@@ -168,6 +230,8 @@ function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
   const month = MONTH_INDEX[monthAbbr.toLowerCase()];
   const dd = day.padStart(2, "0");
   const secWithMs = ms ? `${second}.${ms}` : second;
+
+  if (!isValidDateTimeParts(year, month, dd, hour, minute, secWithMs)) return null;
 
   if (offset) {
     const normalizedOffset =

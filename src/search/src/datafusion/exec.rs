@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX},
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, MetricsBlockScan},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -83,12 +83,16 @@ fn create_session_config(
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
+        .with_collect_statistics(true)
         .with_information_schema(true);
 
     config
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
+
+    // DF55 migrated aggregate streams regress grouped-agg perf; revisit on the next DF bump.
+    config.options_mut().execution.enable_migration_aggregate = false;
 
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
@@ -205,6 +209,7 @@ pub struct DataFusionContextBuilder<'a> {
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
     sort_order: FileSortOrder,
+    metrics_block_scan: Option<Arc<MetricsBlockScan>>,
 }
 
 impl<'a> Default for DataFusionContextBuilder<'a> {
@@ -223,6 +228,7 @@ impl<'a> DataFusionContextBuilder<'a> {
             optimizer_rules: vec![],
             physical_optimizer_rules: vec![],
             sort_order: FileSortOrder::None,
+            metrics_block_scan: None,
         }
     }
 
@@ -270,6 +276,11 @@ impl<'a> DataFusionContextBuilder<'a> {
         self
     }
 
+    pub fn metrics_block_scan(mut self, scan: Option<Arc<MetricsBlockScan>>) -> Self {
+        self.metrics_block_scan = scan;
+        self
+    }
+
     pub async fn build(self, target_partitions: usize) -> Result<SessionContext, DataFusionError> {
         let cfg = get_config();
         let (target_partitions, memory_size) =
@@ -283,8 +294,11 @@ impl<'a> DataFusionContextBuilder<'a> {
         )
         .await?;
 
-        let session_config =
+        let mut session_config =
             create_session_config(self.sort_order, target_partitions, self.stream_type)?;
+        if let Some(scan) = self.metrics_block_scan {
+            session_config.set_extension(scan);
+        }
         let runtime_env = Arc::new(create_runtime_env(self.trace_id, memory_size).await?);
         let mut builder = SessionStateBuilder::new()
             .with_config(session_config)
@@ -299,7 +313,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         for rule in self.physical_optimizer_rules {
             builder = builder.with_physical_optimizer_rule(rule);
         }
-        if cfg.search.feature_join_match_one_enabled {
+        if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         }
         Ok(SessionContext::new_with_state(builder.build()))
@@ -524,12 +538,33 @@ pub async fn register_metrics_table(
     files: Vec<FileKey>,
     sort_order: FileSortOrder,
 ) -> Result<SessionContext> {
+    register_metrics_table_with_blocks(session, schema, table_name, files, sort_order, None).await
+}
+
+pub async fn register_metrics_table_with_blocks(
+    session: &SearchSession,
+    schema: Arc<Schema>,
+    table_name: &str,
+    files: Vec<FileKey>,
+    sort_order: FileSortOrder,
+    block_scan: Option<Arc<MetricsBlockScan>>,
+) -> Result<SessionContext> {
+    let block_scan = block_scan.filter(|scan| {
+        let valid = scan.table_name == table_name
+            && scan.files == files
+            && sort_order == FileSortOrder::HashTimestampAsc;
+        if !valid {
+            log::warn!("[trace_id {}] ignoring metrics block descriptor that does not match the registered table", session.id);
+        }
+        valid
+    });
     let schema = metrics_query_schema(schema);
     let ctx = DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
         .stream_type(StreamType::Metrics)
         .sort_order(sort_order)
+        .metrics_block_scan(block_scan)
         .build(session.target_partitions)
         .await?;
 
@@ -593,7 +628,7 @@ fn metrics_query_schema_with_utf8_view(
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -623,10 +658,7 @@ impl TableBuilder {
         self
     }
 
-    pub fn file_stat_cache(
-        mut self,
-        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
-    ) -> Self {
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -744,9 +776,7 @@ impl TableBuilder {
             }
         };
 
-        let mut listing_options = ListingOptions::new(file_format)
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true);
+        let mut listing_options = ListingOptions::new(file_format);
 
         if self.sort_order.is_sorted() {
             // specify sort columns for parquet file
@@ -807,6 +837,7 @@ impl TableBuilder {
             self.index_condition.clone(),
             self.fst_fields.clone(),
             self.timestamp_filter,
+            target_partitions,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache.clone());
@@ -924,10 +955,14 @@ mod tests {
                 .cpu_num
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, get_batch_size());
+        assert_eq!(
+            config.options().execution.batch_size.get(),
+            get_batch_size()
+        );
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        assert!(!config.options().execution.enable_migration_aggregate);
         assert_eq!(
             config.options().execution.parquet.pushdown_filters,
             get_config().search.feature_pushdown_filter_enabled

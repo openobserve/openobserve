@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedKeyIds"
           selection="multiple"
           pagination="client"
@@ -60,20 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="cipherKeysRefresh"
               data-test="cipher-keys-list-refresh-btn"
-              @click="getData"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="cipherKeysRefresh"
-              />
-            </OButton>
+              @click="refreshData"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -89,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               :title="t('common.edit')"
               @click="editCipherKey(row)"
               icon-left="edit"
@@ -99,11 +95,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               :title="t('common.delete')"
               @click="confirmDeleteCipherKey(row)"
               icon-left="delete"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="cipher-keys-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`cipherkey-list-${row.name}-update-menu`"
+                @select="editCipherKey(row)"
+              >
+                <span>{{ t("common.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`cipherkey-list-${row.name}-delete-menu`"
+                @select="confirmDeleteCipherKey(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template v-if="selectedKeys.length > 0" #bottom>
             <span class="text-text-body text-xs font-medium">
@@ -145,6 +170,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { cipherKeysQuery } from "@/services/cipher_keys.queries";
+import { cipherKeyKeys } from "@/services/cipher_keys.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -155,7 +185,9 @@ import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -173,7 +205,9 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
-    OTooltip,
+    ODropdown,
+    ODropdownItem,
+    ORefreshButton,
     OSearchInput,
     OTable,
   },
@@ -183,7 +217,22 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const cipherKeysList = useQuery(() =>
+      Object.assign(cipherKeysQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    const loading = cipherKeysList.isPending;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = cipherKeysList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = cipherKeysList.dataUpdatedAt;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = cipherKeysList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
       {
@@ -291,49 +340,79 @@ export default defineComponent({
       });
     };
 
-    const getData = () => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("settings.cipherKeysPage.loadingData"),
-        timeout: 0,
-      });
+    // `force` is for the refresh shortcut and post-mutation reloads: those must
+    // reach the server. A plain call is a cache hit when the list is still fresh.
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshData = () => getData(true);
 
-      CipherKeysService.list(store.state.selectedOrganization.identifier)
-        .then((response) => {
-          const data = [];
-          const responseData = response.data.keys;
-          for (let i = 0; i < responseData.length; i++) {
-            data.push({
-              name: responseData[i].name,
-              store_type: responseData[i].key.store.type,
-              mechanism_type: responseData[i].key.mechanism.type,
-            });
-          }
-
-          tabledata.value = data;
-          resultTotal.value = responseData.length;
-          loading.value = false;
-          dismiss();
-        })
-        .catch((error) => {
-          loading.value = false;
-          dismiss();
-          if (error.status != 403) {
-            toast({
-              variant: "error",
-              message: error.response?.data?.message || t("settings.cipherKeysPage.fetchFailed"),
-              timeout: 5000,
-            });
-          }
+    const applyCipherKeys = (responseData: any[]) => {
+      const data = [];
+      for (let i = 0; i < responseData.length; i++) {
+        data.push({
+          name: responseData[i].name,
+          store_type: responseData[i].key.store.type,
+          mechanism_type: responseData[i].key.mechanism.type,
         });
+      }
+
+      tabledata.value = data;
+      resultTotal.value = responseData.length;
+    };
+
+    // The table is the query now: anything that invalidates the cipher-keys
+    // scope repaints these rows without this component asking.
+    watch(
+      cipherKeysList.data,
+      (rows: any) => {
+        if (rows) applyCipherKeys(rows);
+      },
+      { immediate: true },
+    );
+
+    // The cold-read toast, kept: it is shown only while there is nothing on
+    // screen, and dismissed as soon as the first rows land or the read fails.
+    let dismissLoadingToast: (() => void) | null = null;
+    watch(
+      loading,
+      (isCold) => {
+        if (isCold && !dismissLoadingToast) {
+          dismissLoadingToast = toast({
+            variant: "loading",
+            message: t("settings.cipherKeysPage.loadingData"),
+            timeout: 0,
+          });
+        } else if (!isCold && dismissLoadingToast) {
+          dismissLoadingToast();
+          dismissLoadingToast = null;
+        }
+      },
+      { immediate: true },
+    );
+
+    watch(cipherKeysList.error, (error: any) => {
+      if (!error) return;
+      dismissLoadingToast?.();
+      dismissLoadingToast = null;
+      if (error.status != 403) {
+        toast({
+          variant: "error",
+          message: error.response?.data?.message || t("settings.cipherKeysPage.fetchFailed"),
+          timeout: 5000,
+        });
+      }
+    });
+
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const getData = async (force = false) => {
+      if (force) await cipherKeysList.refetch();
     };
 
     getData();
 
     const hideAddDialog = async () => {
       showAddDialog.value = !showAddDialog.value;
-      await getData();
+      await getData(true);
       router.push({
         name: "cipherKeys",
         query: {
@@ -360,7 +439,15 @@ export default defineComponent({
               message: t("settings.cipherKeysPage.deleteSuccess"),
             });
 
-            getData();
+            // Drop the row from the cache first so it disappears now, not when
+            // the refetch lands.
+            const deletedName = confirmDelete.value.data.name;
+            queryClient.setQueriesData(
+              { queryKey: cipherKeyKeys.all(store.state.selectedOrganization.identifier) },
+              (list: any) =>
+                Array.isArray(list) ? list.filter((k: any) => k.name !== deletedName) : list,
+            );
+            getData(true);
           })
           .catch((err) => {
             dismiss();
@@ -449,7 +536,7 @@ export default defineComponent({
 
           selectedKeys.value = [];
           confirmBulkDelete.value = false;
-          getData();
+          getData(true);
         })
         .catch((err: any) => {
           if (err.response?.status != 403 || err?.status != 403) {
@@ -471,16 +558,20 @@ export default defineComponent({
       {
         id: "cipherKeysRefresh",
         handler: () => {
-          if (!isInputFocused()) getData();
+          if (!isInputFocused()) getData(true);
         },
       },
     ]);
 
     return {
+      refreshData,
       t,
       store,
       router,
       loading,
+      fetching,
+      lastUpdatedAt,
+      forbidden,
       tabledata,
       columns,
       showAddDialog,

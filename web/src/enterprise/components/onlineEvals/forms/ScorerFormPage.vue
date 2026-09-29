@@ -150,7 +150,7 @@
                   <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="text-text-secondary">
                     {{ t("onlineEvals.scorer.endpointLabel") }}
-                    <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                    <span class="font-mono">{{ resolvedEndpointOf(selectedProvider) || "—" }}</span>
                   </span>
                   <span class="text-text-secondary">·</span>
                   <span class="text-text-secondary">
@@ -222,16 +222,22 @@
                  optional field in the app — not as a separate uppercase badge
                  on its own line. -->
                 <div class="flex flex-col gap-0.5">
-                  <strong class="text-xs font-semibold">{{
+                  <strong v-if="!decisionProvider" class="text-xs font-semibold">{{
                     t("onlineEvals.scorer.extraFieldsLabel")
                   }}</strong>
-                  <small class="text-2xs text-text-secondary block">{{
+                  <small
+                    v-if="decisionProvider"
+                    class="text-2xs text-text-secondary block"
+                    data-test="scorer-form-decision-provider-note"
+                    >{{ t("onlineEvals.scorer.decisionProviderNote") }}</small
+                  >
+                  <small v-else class="text-2xs text-text-secondary block">{{
                     t("onlineEvals.scorer.extraFieldsHint")
                   }}</small>
                 </div>
 
                 <div
-                  v-if="formValues.extraMetadataFields.length"
+                  v-if="!decisionProvider && formValues.extraMetadataFields.length"
                   class="border-border-default rounded-default bg-card-bg flex flex-col gap-1.5 border px-2.5 py-2"
                   data-test="scorer-form-extra-fields"
                 >
@@ -282,6 +288,7 @@
 
                 <div class="flex justify-between gap-3">
                   <OButton
+                    v-if="!decisionProvider"
                     variant="ghost-primary"
                     size="xs"
                     :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
@@ -671,7 +678,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef } from "vue";
+import { computed, onMounted, ref, toRef, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -690,7 +697,14 @@ import onlineEvalsService, {
   type Scorer,
   type ScorerType,
 } from "@/services/online-evals.service";
-import { dataTypeOf, defaultModelOf, entityId, valueOf } from "../utils/evalEntity";
+import {
+  dataTypeOf,
+  defaultModelOf,
+  entityId,
+  resolvedEndpointOf,
+  valueOf,
+} from "../utils/evalEntity";
+import { isDecisionOnlyProvider } from "@/services/llm-playground.service";
 import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
@@ -885,8 +899,9 @@ function cleanExtraFields(fields: ExtraMetadataFieldRow[]): ExtraMetadataField[]
     }));
 }
 
+// A decision provider fills no extra fields, whatever was set before switching to it.
 const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
-  cleanExtraFields(formValues.value.extraMetadataFields),
+  decisionProvider.value ? [] : cleanExtraFields(formValues.value.extraMetadataFields),
 );
 
 // Builds the remote `auth` / `params` from a SOURCE object — the live `form`
@@ -1087,6 +1102,13 @@ const selectedHealthy = computed(() => {
 const selectedProvider = computed(
   () => props.providers.find((p) => p.id === formValues.value.providerId) || null,
 );
+const decisionProvider = computed(() => isDecisionOnlyProvider(selectedProvider.value));
+// Hidden rows would still be validated, so drop them when a decision provider is chosen.
+watch(decisionProvider, (isDecision) => {
+  if (isDecision && formValues.value.extraMetadataFields.length) {
+    form.setFieldValue("extraMetadataFields", [], { dontUpdateMeta: true });
+  }
+});
 
 const promptVariables = computed(() => extractTemplateVariables(formValues.value.template || ""));
 
@@ -1224,17 +1246,6 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
   };
 }
 
-function providerEndpoint(provider: Provider) {
-  return provider.endpoint || providerHostFallback(provider);
-}
-
-function providerHostFallback(provider: Provider) {
-  const type = String(valueOf(provider, "providerType", "provider_type") || "").toLowerCase();
-  if (type === "openai") return "api.openai.com";
-  if (type === "anthropic") return "api.anthropic.com";
-  return "—";
-}
-
 async function handleScoreConfigSelection() {
   form.setFieldValue("pinScoreConfigVersion", false);
   form.setFieldValue("producesScoreConfigVersion", "");
@@ -1279,7 +1290,10 @@ async function save(value: ScorerForm) {
           ? Number(value.producesScoreConfigVersion)
           : null,
     };
-    const extraFields = cleanExtraFields(value.extraMetadataFields);
+    const valueProvider = props.providers.find((p) => p.id === value.providerId);
+    const extraFields = isDecisionOnlyProvider(valueProvider)
+      ? []
+      : cleanExtraFields(value.extraMetadataFields);
     const scorerPayload: Record<string, any> = isLlmJudge
       ? {
           type: "llm_judge",

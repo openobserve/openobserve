@@ -169,6 +169,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-ignore
 import { defineComponent, ref, computed, onMounted, provide, reactive, watch } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -280,6 +281,15 @@ export default defineComponent({
         splitterModel.value = 0;
       }
     };
+
+    const { isMobile } = useBreakpoint();
+    watch(
+      isMobile,
+      (mobile) => {
+        if (mobile && showSidebar.value) collapseSidebar();
+      },
+      { immediate: true },
+    );
 
     onMounted(async () => {
       // Fetch billing info to determine provider type

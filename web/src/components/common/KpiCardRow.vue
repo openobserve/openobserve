@@ -31,7 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   inset, so it lines up with the header and any table below it.
 -->
 <template>
-  <div class="grid" :class="gap" :style="gridStyle" data-test="kpi-card-row">
+  <div
+    class="grid max-lg:flex max-lg:flex-wrap max-lg:gap-1.5"
+    :class="gap"
+    :style="gridStyle"
+    data-test="kpi-card-row"
+  >
     <slot />
   </div>
 </template>

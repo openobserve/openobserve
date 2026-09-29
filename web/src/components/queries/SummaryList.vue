@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :columns="columns"
     row-key="row_id"
     :loading="loadingState"
+    :forbidden="forbidden"
     pagination="client"
     selection="multiple"
     v-model:selected-ids="selectedIds"
@@ -124,6 +125,10 @@ export default defineComponent({
     selectedRows: {
       type: Array,
       required: true,
+    },
+    forbidden: {
+      type: Boolean,
+      default: false,
     },
     filtered: {
       type: Boolean,

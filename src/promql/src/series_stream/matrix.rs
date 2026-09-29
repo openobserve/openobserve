@@ -17,21 +17,35 @@
 //! series-stream contract, so layouts that cannot stream still share the
 //! streaming consumers.
 
-use config::meta::promql::value::{Labels, RangeValue, Sample};
-use datafusion::error::Result;
+use std::time::Duration;
+
+use config::meta::promql::{
+    NAME_LABEL,
+    value::{Labels, RangeValue, Sample, Value},
+};
+use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
+use rayon::prelude::*;
 
 use super::SeriesStream;
-use crate::aggregations::{group_series_by_labels, projected_labels};
+use crate::{
+    aggregations::{group_series_by_labels, projected_labels},
+    functions::KEEP_METRIC_NAME_FUNC,
+};
 
 /// Series per partition; matches the fused fold's historical chunk size.
 pub(crate) const MATRIX_PARTITION_CHUNK: usize = 1024;
+
+/// A partition of the matrix, already open.
+pub(crate) type MaterializedSource = std::future::Ready<Result<MatrixSeriesStream>>;
 
 /// One partition of a materialized matrix, owning its series in group order.
 pub(crate) struct MatrixSeriesStream {
     series: std::vec::IntoIter<(u64, RangeValue)>,
     current: Option<RangeValue>,
     modifier: Option<LabelModifier>,
+    /// Emit every label of a series rather than its group projection.
+    series_labels: bool,
 }
 
 impl SeriesStream for MatrixSeriesStream {
@@ -46,27 +60,33 @@ impl SeriesStream for MatrixSeriesStream {
 
     fn labels(&mut self) -> Labels {
         let series = self.current.as_ref().expect("advance yielded a series");
+        if self.series_labels {
+            return series.labels.clone();
+        }
         projected_labels(&self.modifier, &series.labels)
     }
 
-    async fn consume(&mut self) -> Result<&[Sample]> {
-        let series = self.current.as_ref().expect("advance yielded a series");
-        Ok(&series.samples)
+    async fn consume(&mut self, samples: &mut Vec<Sample>) -> Result<()> {
+        let series = self.current.as_mut().expect("advance yielded a series");
+        *samples = std::mem::take(&mut series.samples);
+        Ok(())
     }
 }
 
 /// Splits a matrix into group-contiguous partitions; boundaries depend only on the series count.
+/// `series_labels` streams every label of a series instead of its group projection.
 pub(crate) fn matrix_streams(
     matrix: Vec<RangeValue>,
     modifier: &Option<LabelModifier>,
     max_partitions: usize,
+    series_labels: bool,
 ) -> Vec<MatrixSeriesStream> {
     let mut groups: Vec<(u64, Vec<usize>)> = group_series_by_labels(&matrix, modifier)
         .into_iter()
         .collect();
     groups.sort_unstable_by_key(|(sig, _)| *sig);
 
-    let total: usize = groups.iter().map(|(_, indices)| indices.len()).sum();
+    let total = matrix.len();
     // small folds stay sequential, keeping them bit-identical to the generic path
     let partitions = if total < 2 * MATRIX_PARTITION_CHUNK {
         1
@@ -96,6 +116,71 @@ pub(crate) fn matrix_streams(
             series: part.into_iter(),
             current: None,
             modifier: modifier.clone(),
+            series_labels,
         })
         .collect()
+}
+
+/// The matrix as group-ordered sources for the aggregate and the window the load applied to
+/// it; `None` for no input. `series_labels` streams every label of a series instead of its
+/// group projection.
+pub(crate) fn group_sources(
+    data: Value,
+    modifier: &Option<LabelModifier>,
+    func_name: &str,
+    series_labels: bool,
+) -> Result<Option<(Vec<MaterializedSource>, Duration)>> {
+    let mut matrix = match data {
+        Value::Matrix(matrix) if matrix.is_empty() => return Ok(None),
+        Value::Matrix(matrix) => matrix,
+        Value::None => return Ok(None),
+        value => {
+            return Err(DataFusionError::Plan(format!(
+                "{func_name}: matrix argument expected but got {}",
+                value.get_type()
+            )));
+        }
+    };
+    // the load applied one window to every series, so the first speaks for all
+    let range = matrix[0]
+        .time_window
+        .as_ref()
+        .expect("range function input must have a time window")
+        .range;
+    // strip the metric name as the range function would have; visible to `sum by(__name__)`
+    if func_name != KEEP_METRIC_NAME_FUNC {
+        matrix.par_iter_mut().for_each(|series| {
+            series.labels.retain(|label| label.name != NAME_LABEL);
+        });
+    }
+    let sources = matrix_streams(
+        matrix,
+        modifier,
+        config::get_config().limit.cpu_num,
+        series_labels,
+    )
+    .into_iter()
+    .map(|stream| std::future::ready(Ok(stream)))
+    .collect();
+    Ok(Some((sources, range)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_group_sources_none_and_invalid_input() {
+        assert!(
+            group_sources(Value::None, &None, "rate", false)
+                .unwrap()
+                .is_none()
+        );
+        assert!(group_sources(Value::Float(1.0), &None, "rate", false).is_err());
+        assert!(
+            group_sources(Value::Matrix(vec![]), &None, "rate", false)
+                .unwrap()
+                .is_none()
+        );
+    }
 }

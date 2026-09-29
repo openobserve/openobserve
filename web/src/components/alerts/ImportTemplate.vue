@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Template-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-s">
+      <div
+        class="border-border-default flex h-full w-full min-w-100 flex-col border-s max-md:min-w-0"
+      >
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -42,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alert_templates.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
+        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto max-md:min-w-0">
           <!-- Template Errors Section -->
           <div class="error-section mb-2.5 p-2.5" v-if="templateErrorsToDisplay.length > 0">
             <div class="error-list">
@@ -181,11 +183,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { saveTemplateMutation } from "@/services/alert_templates.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import templateService from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -427,10 +431,15 @@ export default defineComponent({
       return templatesList.includes(templateName);
     };
 
+    const orgIdForWrites = useOrgId();
+    const createTemplateWrite = useMutation(() =>
+      saveTemplateMutation(orgIdForWrites.value, () => false),
+    );
+
     const createTemplate = async (input: any, index: number) => {
       try {
-        await templateService.create({
-          org_identifier: store.state.selectedOrganization.identifier,
+        // Was: invalidate, then create — the refetch raced the write.
+        await createTemplateWrite.mutateAsync({
           template_name: input.name,
           data: {
             name: input.name.trim(),

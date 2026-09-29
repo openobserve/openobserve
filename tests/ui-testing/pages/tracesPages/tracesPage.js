@@ -1,9 +1,17 @@
 // tracesPage.js
 import { expect } from '@playwright/test';
 
+
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 
+// Panel titles rendered by web/src/plugins/traces/metrics/metrics.json.
+const TRACES_METRICS_PANELS = ['Rate', 'Errors', 'Duration'];
+const CHART_ZOOM_START_RATIO = 0.35;
+const CHART_ZOOM_END_RATIO = 0.75;
+const CHART_DRAG_STEPS = 20;
+const QUERY_CLEAR_ATTEMPTS = 10;
 
 export class TracesPage {
   constructor(page) {
@@ -75,6 +83,7 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsViewSessionReplayButton = '[data-test="trace-details-view-session-replay-btn"]';
 
     // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
     // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
@@ -128,6 +137,14 @@ export class TracesPage {
     // Metrics dashboard container
     // Source: web/src/plugins/traces/metrics/TracesMetricsDashboard.vue
     this.tracesMetricsDashboard = '[data-test="traces-metrics-dashboard"]';
+    // No-stream prompt rendered before a stream is selected
+    // Source: web/src/plugins/traces/TracesNoStreamState.vue
+    this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
+    // Right-click Duration gte/lte context menu
+    // Source: web/src/plugins/traces/metrics/TracesMetricsContextMenu.vue
+    this.metricsContextMenu = '[data-test="traces-metrics-context-menu"]';
+    this.metricsContextMenuGte = '[data-test="context-menu-gte"]';
+    this.metricsContextMenuLte = '[data-test="context-menu-lte"]';
     // Analysis Dashboard Tabs — source: web/src/plugins/traces/metrics/TracesAnalysisDashboard.vue
     // Tabs render as <OTab data-test="traces-analysis-dashboard-${name}-tab"> where name ∈ {volume,duration,error}
     this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"]';
@@ -209,13 +226,19 @@ export class TracesPage {
   }
 
   async navigateToTraces() {
-    await this.tracesMenuItem.click();
     // Cloud: sidebar click may silently fail — verify URL and fallback to direct navigation
     if (isCloudEnvironment()) {
+      await this.tracesMenuItem.click();
       await this.page.waitForURL('**/traces**', { timeout: 5000 }).catch(async () => {
         await this.navigateToTracesUrl();
       });
+      return;
     }
+    // The sidebar click can be swallowed by the nav flyout under load, so retry until the traces route loads.
+    await expect(async () => {
+      await this.tracesMenuItem.click();
+      await this.page.waitForURL('**/traces**', { timeout: 5000 });
+    }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
   }
 
   async validateTracesPage() {
@@ -371,6 +394,33 @@ export class TracesPage {
     await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
   }
 
+  /** `fromUs` / `toUs` are microsecond epoch bounds (traceDetails.utils.ts resolveUrlTimeRange). */
+  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default' }) {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const url = `${baseUrl}/web/traces/trace-details?trace_id=${traceId}&stream=${stream}&from=${fromUs}&to=${toUs}&org_identifier=${org}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async expectTraceTreeSpanOperationName(spanId, operationName) {
+    await expect(this.page.locator(`[data-test="trace-tree-span-operation-name-${spanId}"]`)).toHaveText(operationName, { timeout: 30000 });
+  }
+
+  async expectSessionReplayButtonVisible() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Callers must first prove the RUM bridge span rendered, or an absent button proves nothing. */
+  async expectSessionReplayButtonHidden() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toHaveCount(0);
+  }
+
+  async clickSessionReplayButton() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+    await this.page.locator(this.traceDetailsViewSessionReplayButton).click();
+  }
+
   async navigateBackFromTraceDetails() {
     // Try to click back button if visible
     const backButton = this.page.locator(this.traceDetailsBackButton);
@@ -461,6 +511,18 @@ export class TracesPage {
 
   async switchToSearchView() {
     await this.page.locator(this.searchToggle).click();
+  }
+
+  // Verify the toggle flipped, so a silently-failed click cannot green downstream assertions.
+  async switchToSpansMode() {
+    await this.page.locator(this.spansToggle).click();
+    await this.expectSpansModeActive();
+  }
+
+  // The active search-mode toggle carries data-state="on" (OToggleGroupItem).
+  async expectSpansModeActive() {
+    await expect(this.page.locator(this.spansToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
   async expectServiceGraphVisible() {
@@ -559,6 +621,11 @@ export class TracesPage {
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
+  }
+
+  // Guards that a time-range change took effect before asserting downstream re-renders.
+  async getTimeRangeLabel() {
+    return (await this.page.locator(this.dateTimeButton).textContent().catch(() => '')) || '';
   }
 
   async setDateTime() {
@@ -1549,6 +1616,53 @@ export class TracesPage {
   /**
    * Click share link button
    */
+  /**
+   * Click Share and return the short URL from the clipboard.
+   *
+   * Deliberately self-contained rather than reusing logsPage's version: that one
+   * is depended on by 10 green share-link tests and is not worth destabilising.
+   * The button is the same shared ShareButton component (it even carries the
+   * logs data-test), so the toast wait and origin re-pointing below mirror it.
+   *
+   * Requires a deployment with `web_url` set — ShareButton is disabled outright
+   * without it (components/common/ShareButton.vue).
+   */
+  async clickShareLinkAndGetUrl() {
+    const shareBtn = this.page.locator(this.shareLinkButton);
+    await expect(shareBtn, 'Share button must be enabled — needs web_url configured').toBeEnabled({ timeout: 10000 });
+    await shareBtn.click();
+
+    // Wait for the copy-success toast specifically: a preceding refresh can
+    // leave an unrelated info toast on screen and trip strict mode.
+    await this.page
+      .locator('[data-test-variant="success"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
+
+    let sharedUrl = await this.page.evaluate(() => navigator.clipboard.readText());
+
+    // Re-point the short URL at the host the tests authenticated against: a
+    // deployed app builds share links from its PUBLIC base URL, and navigating
+    // cross-origin drops the auth cookies. The /short/<id> id resolves the same
+    // on any ingress, so swapping only the origin keeps the session valid.
+    const baseUrl = process.env.ZO_BASE_URL;
+    if (baseUrl && sharedUrl && !sharedUrl.includes('localhost')) {
+      try {
+        const shared = new URL(sharedUrl);
+        const base = new URL(baseUrl);
+        if (shared.origin !== base.origin) {
+          shared.protocol = base.protocol;
+          shared.host = base.host;
+          sharedUrl = shared.toString();
+        }
+      } catch {
+        // leave the URL as-is; the navigation below will surface any problem
+      }
+    }
+    testLogger.info('Traces share URL captured', { url: sharedUrl });
+    return sharedUrl;
+  }
+
   async clickShareLinkButton() {
     await this.page.locator(this.shareLinkButton).click();
     await this.page.waitForTimeout(1000);
@@ -1674,6 +1788,26 @@ export class TracesPage {
     await tab.click();
     await this.page.waitForTimeout(1000);
     return true;
+  }
+
+  // The detail opens on the flame graph and the last tab persists per-browser (#13347), so select explicitly.
+  /** Open the first search result's trace details on the waterfall tab. */
+  async openFirstTraceWaterfall() {
+    const firstResult = this.getTraceResultItems().first();
+    await firstResult.waitFor({ state: 'visible', timeout: 30000 });
+    await firstResult.click();
+    await this.openTraceDetailsTab('waterfall');
+    await this.page.locator(this.traceDetailsTree).waitFor({ state: 'visible', timeout: 20000 });
+  }
+
+  /**
+   * How many spans in the open trace tree carry the given span-kind badge.
+   * @param {string} kind - e.g. 'server', 'client'
+   */
+  async countSpanKindBadges(kind) {
+    return await this.page
+      .locator(`[data-test="trace-tree-span-kind-badge-${kind}"]`)
+      .count();
   }
 
   /**
@@ -2019,6 +2153,23 @@ export class TracesPage {
     await this.page.waitForTimeout(1000);
   }
 
+  /**
+   * Whether the error-only filter is currently active. The badge (SearchResult.vue)
+   * swaps its fill class when showErrorOnly is true, so this reads that class as the
+   * state guard for the toggle.
+   * @returns {Promise<boolean>}
+   */
+  async isErrorOnlyFilterActive() {
+    const badge = this.page.locator(this.errorOnlyToggle);
+    const shown = await badge
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!shown) return false;
+    const cls = (await badge.getAttribute('class').catch(() => '')) || '';
+    return cls.includes('bg-badge-error-solid-bg');
+  }
+
   // --- Metrics Dashboard ---
 
   /**
@@ -2079,6 +2230,575 @@ export class TracesPage {
     // Verify the page is still functional after brush interaction
     const insightsVisible = await this.isInsightsButtonVisible();
     return insightsVisible;
+  }
+
+  // --- RED Metrics Charts (TracesMetricsDashboard.vue + PanelContainer.vue) ---
+
+  /**
+   * Locator for a RED metrics panel by its title.
+   * @param {string} title - Panel title: 'Rate', 'Errors' or 'Duration'
+   */
+  metricsPanelLocator(title) {
+    return this.page.locator(
+      `${this.tracesMetricsDashboard} [data-test-panel-title="${title}"]`
+    );
+  }
+
+  /**
+   * Wait for every RED metrics panel to finish rendering its ECharts canvas.
+   * @returns {Promise<string[]>} Titles of the panels that rendered a canvas
+   */
+  async waitForMetricsPanels(timeout = 30000) {
+    await this.page
+      .locator(this.tracesMetricsDashboard)
+      .waitFor({ state: 'visible', timeout })
+      .catch(() => {});
+
+    const rendered = [];
+    for (const title of TRACES_METRICS_PANELS) {
+      const canvas = this.metricsPanelLocator(title).locator('canvas').first();
+      const ok = await canvas.waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+      if (ok) rendered.push(title);
+    }
+    return rendered;
+  }
+
+  /**
+   * Assert the no-stream prompt is absent, i.e. a stream was auto-selected.
+   * @param {string} message - Assertion message
+   */
+  async expectNoStreamCardHidden(message) {
+    await expect(this.page.locator(this.tracesNoStreamCard), message)
+      .toBeHidden({ timeout: 15000 });
+  }
+
+  /**
+   * Bounding box of a metrics panel's ECharts canvas.
+   * @param {string} title - Panel title
+   */
+  async getMetricsPanelCanvasBox(title) {
+    const canvas = this.metricsPanelLocator(title).locator('canvas').first();
+    if (!(await canvas.isVisible({ timeout: 10000 }).catch(() => false))) return null;
+    return await canvas.boundingBox();
+  }
+
+  /**
+   * Drag-select a band on a panel's chart, which ECharts treats as a zoom because
+   * ChartRenderer arms `dataZoomSelect` on every render.
+   * @param {string} title - Panel title
+   * @param {{ startRatio?: number, endRatio?: number, yStartRatio?: number, yEndRatio?: number }} [range]
+   * @returns {Promise<boolean>} true when the drag was performed
+   */
+  async zoomOnMetricsPanel(title, range = {}) {
+    const {
+      startRatio = CHART_ZOOM_START_RATIO,
+      endRatio = CHART_ZOOM_END_RATIO,
+      yStartRatio = 0.5,
+      yEndRatio = 0.5,
+    } = range;
+    const box = await this.getMetricsPanelCanvasBox(title);
+    if (!box) return false;
+
+    // Coordinates only after this point — ECharts re-renders detach the canvas element.
+    const startX = box.x + box.width * startRatio;
+    const endX = box.x + box.width * endRatio;
+    const startY = box.y + box.height * yStartRatio;
+    const endY = box.y + box.height * yEndRatio;
+
+    await this.page.mouse.move(startX, startY);
+    await this.page.mouse.down();
+    for (let i = 1; i <= CHART_DRAG_STEPS; i++) {
+      const p = i / CHART_DRAG_STEPS;
+      await this.page.mouse.move(startX + (endX - startX) * p, startY + (endY - startY) * p);
+      await this.page.waitForTimeout(20);
+    }
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1500);
+    return true;
+  }
+
+  /**
+   * Drag across both axes of the Duration panel so the selection carries a real
+   * duration band; a flat horizontal drag collapses it to a single value.
+   * @returns {Promise<boolean>} true when the drag was performed
+   */
+  async zoomDurationBand() {
+    return await this.zoomOnMetricsPanel('Duration', {
+      startRatio: 0.25,
+      endRatio: 0.8,
+      yStartRatio: 0.15,
+      yEndRatio: 0.85,
+    });
+  }
+
+  /**
+   * Click a chart without dragging, which must not register as a zoom selection.
+   * @param {string} title - Panel title
+   * @returns {Promise<boolean>} true when the click landed
+   */
+  async clickMetricsPanelWithoutDrag(title) {
+    const box = await this.getMetricsPanelCanvasBox(title);
+    if (!box) return false;
+    await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await this.page.mouse.down();
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1500);
+    return true;
+  }
+
+  /**
+   * Composite every ECharts layer of a panel into one offscreen canvas and keep the
+   * pixels under `slot`; canvas pixels exclude the DOM tooltip that floats over the chart.
+   * @param {string} title - Panel title
+   * @param {string} slot - Key to store the snapshot under
+   * @returns {Promise<boolean>} true when a snapshot was taken
+   */
+  async snapshotMetricsPanelPixels(title, slot) {
+    return await this.page.evaluate(
+      ({ title, slot }) => {
+        const panel = document.querySelector(
+          `[data-test="traces-metrics-dashboard"] [data-test-panel-title="${title}"]`
+        );
+        const canvases = panel ? [...panel.querySelectorAll('canvas')] : [];
+        if (!canvases.length) return false;
+        const w = canvases[0].width;
+        const h = canvases[0].height;
+        const off = document.createElement('canvas');
+        off.width = w;
+        off.height = h;
+        const ctx = off.getContext('2d');
+        for (const c of canvases) ctx.drawImage(c, 0, 0, w, h);
+        const win = window;
+        win.__o2ChartSnaps = win.__o2ChartSnaps || {};
+        win.__o2ChartSnaps[slot] = ctx.getImageData(0, 0, w, h);
+        return true;
+      },
+      { title, slot }
+    );
+  }
+
+  /**
+   * Compare the two stored snapshots inside the zoom selection rectangle, which is
+   * located from the flat fill the drag paints rather than from drag coordinates.
+   * @returns {Promise<{ rect: object, beforeInk: number, duringInk: number, inkRatio: number } | null>}
+   */
+  async measureChartInkUnderSelection() {
+    return await this.page.evaluate(() => {
+      const snaps = window.__o2ChartSnaps || {};
+      const before = snaps.before;
+      const during = snaps.during;
+      if (!before || !during) return null;
+
+      const { width: w, height: h } = during;
+      const key = (d, i) => `${d[i]},${d[i + 1]},${d[i + 2]},${d[i + 3]}`;
+      const tally = (img) => {
+        const counts = new Map();
+        for (let i = 0; i < img.data.length; i += 4) {
+          const k = key(img.data, i);
+          counts.set(k, (counts.get(k) || 0) + 1);
+        }
+        return counts;
+      };
+
+      const beforeCounts = tally(before);
+      const duringCounts = tally(during);
+      let beforeBg = '';
+      let beforeBgN = 0;
+      for (const [k, n] of beforeCounts) if (n > beforeBgN) [beforeBg, beforeBgN] = [k, n];
+
+      // The fill is whatever the drag added: most common colour that barely existed before.
+      let fill = '';
+      let fillN = 0;
+      for (const [k, n] of duringCounts) {
+        if (n > fillN && n > (beforeCounts.get(k) || 0) * 2) [fill, fillN] = [k, n];
+      }
+      if (!fill || fillN < 200) return null;
+
+      let x0 = w;
+      let x1 = -1;
+      let y0 = h;
+      let y1 = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (key(during.data, (y * w + x) * 4) !== fill) continue;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+      // Inset past the selection border, which is drawn in its own colour.
+      x0 += 3;
+      x1 -= 3;
+      y0 += 3;
+      y1 -= 3;
+      if (x1 - x0 < 10 || y1 - y0 < 10) return null;
+
+      let beforeInk = 0;
+      let duringInk = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = (y * w + x) * 4;
+          if (key(before.data, i) !== beforeBg) beforeInk++;
+          const d = key(during.data, i);
+          if (d !== fill && d !== beforeBg) duringInk++;
+        }
+      }
+      return {
+        rect: { x0, y0, x1, y1 },
+        beforeInk,
+        duringInk,
+        inkRatio: beforeInk ? duringInk / beforeInk : 1,
+      };
+    });
+  }
+
+  /**
+   * Hold a zoom drag open on a panel, snapshotting its canvas before and during, then release.
+   * @param {string} title - Panel title
+   * @returns {Promise<boolean>} true when both snapshots were taken
+   */
+  async zoomWithCanvasSnapshots(title) {
+    const box = await this.getMetricsPanelCanvasBox(title);
+    if (!box) return false;
+
+    const startX = box.x + box.width * CHART_ZOOM_START_RATIO;
+    const endX = box.x + box.width * CHART_ZOOM_END_RATIO;
+    const y = box.y + box.height / 2;
+
+    // Hover first so the axis pointer is already painted into the baseline snapshot.
+    await this.page.mouse.move(startX, y);
+    await this.page.waitForTimeout(600);
+    const before = await this.snapshotMetricsPanelPixels(title, 'before');
+
+    await this.page.mouse.down();
+    for (let i = 1; i <= CHART_DRAG_STEPS; i++) {
+      await this.page.mouse.move(startX + (endX - startX) * (i / CHART_DRAG_STEPS), y);
+      await this.page.waitForTimeout(20);
+    }
+    await this.page.waitForTimeout(400);
+    const during = await this.snapshotMetricsPanelPixels(title, 'during');
+
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1000);
+    return before && during;
+  }
+
+  /**
+   * Clear the traces query editor with real keystrokes, retrying until Monaco is empty.
+   * @returns {Promise<boolean>} true once the editor holds no text
+   */
+  async clearTraceQueryByKeyboard() {
+    const input = this.page
+      .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
+      .first();
+    for (let attempt = 0; attempt < QUERY_CLEAR_ATTEMPTS; attempt++) {
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
+      await input.click({ force: true });
+      await this.page.waitForTimeout(250);
+      await this.page.keyboard.press('ControlOrMeta+A');
+      await this.page.waitForTimeout(200);
+      await this.page.keyboard.press('Delete');
+      await this.page.waitForTimeout(400);
+      if ((await this.getQueryEditorContent()).trim() === '') return true;
+    }
+    return false;
+  }
+
+  /**
+   * Type a query with real keystrokes. Monaco's setValue() never reaches the app's
+   * search state, so a programmatically set query is dropped from the request.
+   * @param {string} query - Query text to type
+   * @returns {Promise<boolean>} true when the editor holds exactly this query
+   */
+  async typeTraceQuery(query) {
+    if (!(await this.clearTraceQueryByKeyboard())) return false;
+    if (query) {
+      const input = this.page
+        .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
+        .first();
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
+      await input.click({ force: true });
+      await this.page.keyboard.type(query, { delay: 25 });
+      await this.page.waitForTimeout(600);
+    }
+    return (await this.getQueryEditorContent()).trim() === query.trim();
+  }
+
+  /**
+   * Whether the traces search error banner is on screen.
+   * @returns {Promise<boolean>}
+   */
+  async isSearchErrorVisible(timeout = 10000) {
+    return await this.page
+      .locator(this.errorMessage)
+      .isVisible({ timeout })
+      .catch(() => false);
+  }
+
+  /**
+   * Error text surfaced by any RED metrics panel, or '' when every panel is clean.
+   * @returns {Promise<string>}
+   */
+  async getMetricsPanelErrorText() {
+    const errors = this.page.locator(
+      `${this.tracesMetricsDashboard} [data-test="panel-schema-renderer-error-message"]`
+    );
+    if (!(await errors.first().isVisible({ timeout: 2000 }).catch(() => false))) return '';
+    return (await errors.first().textContent().catch(() => '')) || '';
+  }
+
+  /**
+   * Whether any RED metrics panel reports no data for the current query.
+   * @returns {Promise<boolean>}
+   */
+  async hasMetricsPanelNoData() {
+    return await this.page
+      .locator(`${this.tracesMetricsDashboard} [data-test="no-data"]`)
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
+  }
+
+  // --- Right-click Context Menu (TracesMetricsContextMenu.vue) ---
+
+  /**
+   * Record which metrics panel each contextmenu event reaches.
+   * Capture phase runs before ChartRenderer's handler, so the record survives its
+   * stopPropagation() and a "menu did not open" result can be told apart from a
+   * right-click that simply missed the canvas.
+   */
+  async armMetricsContextMenuProbe() {
+    await this.page.evaluate(() => {
+      window.__o2CtxMenuHits = [];
+      if (window.__o2CtxMenuProbe) return;
+      window.__o2CtxMenuProbe = (e) => {
+        const panel = e.target && e.target.closest && e.target.closest('[data-test-panel-title]');
+        if (panel) window.__o2CtxMenuHits.push(panel.getAttribute('data-test-panel-title'));
+      };
+      document.addEventListener('contextmenu', window.__o2CtxMenuProbe, true);
+    });
+  }
+
+  /**
+   * Panel titles that received a contextmenu event since the probe was armed.
+   * @returns {Promise<string[]>}
+   */
+  async getMetricsContextMenuProbeHits() {
+    return await this.page.evaluate(() => window.__o2CtxMenuHits || []);
+  }
+
+  /**
+   * Viewport points on a panel canvas that sit on a plotted series mark.
+   * ECharts fires its contextmenu event only on a data item, and Duration is a
+   * scatter of 5px dots, so a right-click on empty plot space never reaches it.
+   * Scans the canvas for saturated (series-coloured) pixels whose 3x3 neighbourhood
+   * is also coloured, i.e. the inside of a mark rather than an anti-aliased edge.
+   * @param {import('@playwright/test').Locator} canvas
+   * @param {number} max - Maximum number of points to return
+   * @returns {Promise<{x: number, y: number}[]>}
+   */
+  async findPlottedPoints(canvas, max = 5) {
+    return await canvas.evaluate((el, limit) => {
+      const ctx = el.getContext('2d');
+      if (!ctx || !el.width || !el.height) return [];
+      const { data, width, height } = ctx.getImageData(0, 0, el.width, el.height);
+      const coloured = (x, y) => {
+        const i = (y * width + x) * 4;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        return data[i + 3] > 200 && Math.max(r, g, b) - Math.min(r, g, b) > 60;
+      };
+      const rect = el.getBoundingClientRect();
+      const sx = rect.width / width, sy = rect.height / height;
+      const points = [];
+      const step = Math.max(1, Math.floor(width / 200));
+      for (let x = 1; x < width - 1 && points.length < limit; x += step) {
+        for (let y = 1; y < height - 1; y++) {
+          if (!coloured(x, y)) continue;
+          let solid = true;
+          for (let dx = -1; dx <= 1 && solid; dx++) {
+            for (let dy = -1; dy <= 1 && solid; dy++) solid = coloured(x + dx, y + dy);
+          }
+          if (!solid) continue;
+          points.push({ x: rect.left + x * sx, y: rect.top + y * sy });
+          x += Math.floor(width / limit);
+          break;
+        }
+      }
+      return points;
+    }, max);
+  }
+
+  /**
+   * Right-click a plotted point of a metrics panel chart to open the Duration-only
+   * gte/lte context menu, retrying because ECharts arms its contextmenu handler a
+   * beat after the panel data resolves. Falls back to the canvas centre when no
+   * plotted point can be located.
+   * @param {string} title - Panel title ('Duration', 'Rate', 'Errors')
+   * @returns {Promise<{ dispatched: boolean, opened: boolean }>} whether the
+   *   right-click reached the panel, and whether the menu opened
+   */
+  async openMetricsContextMenu(title = 'Duration') {
+    await this.armMetricsContextMenuProbe();
+    const canvas = this.metricsPanelLocator(title).locator('canvas').first();
+    const ready = await canvas
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ready) return { dispatched: false, opened: false };
+    const box = await canvas.boundingBox();
+    if (!box) return { dispatched: false, opened: false };
+    // ECharts stacks canvas layers, so a locator click hits the wrong one — drive the mouse instead.
+    const points = await this.findPlottedPoints(canvas);
+    const targets = points.length ? points : [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
+    let opened = false;
+    for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+      for (const point of targets) {
+        await this.page.mouse.click(point.x, point.y, { button: 'right' });
+        opened = await this.isMetricsContextMenuVisible(1000);
+        if (opened) break;
+      }
+    }
+    const hits = await this.getMetricsContextMenuProbeHits();
+    return { dispatched: hits.includes(title), opened };
+  }
+
+  /**
+   * Whether the metrics context menu is currently open.
+   * @param {number} timeout - How long to wait for it to appear
+   * @returns {Promise<boolean>}
+   */
+  async isMetricsContextMenuVisible(timeout = 3000) {
+    return await this.page
+      .locator(this.metricsContextMenu)
+      .waitFor({ state: 'visible', timeout })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /**
+   * Assert the metrics context menu is visible.
+   */
+  async expectMetricsContextMenuVisible() {
+    await expect(this.page.locator(this.metricsContextMenu)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Assert the metrics context menu is hidden.
+   */
+  async expectMetricsContextMenuHidden() {
+    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 5000 });
+  }
+
+  /**
+   * Assert the metrics context menu never opens. A right-click on a non-Duration
+   * panel must be a no-op, so settle briefly (a buggy late render is caught) then
+   * assert the menu is still absent.
+   */
+  async expectMetricsContextMenuStaysHidden() {
+    await this.page.waitForTimeout(600);
+    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 1000 });
+  }
+
+  /**
+   * Whether a context menu item is visible.
+   * @param {'gte'|'lte'} condition
+   * @returns {Promise<boolean>}
+   */
+  async isMetricsContextMenuItemVisible(condition) {
+    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
+    return await this.page
+      .locator(selector)
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /**
+   * Click a context menu item to write a single-sided duration bound.
+   * @param {'gte'|'lte'} condition
+   */
+  async selectMetricsContextMenuItem(condition) {
+    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
+    await this.page.locator(selector).click();
+  }
+
+  /**
+   * Dismiss the metrics context menu with Escape.
+   */
+  async dismissMetricsContextMenu() {
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
+   * Per-dimension panel tally inside the Insights drawer.
+   * @returns {Promise<{ panels: number, charts: number, errors: number, errorText: string }>}
+   */
+  async getAnalysisPanelStates() {
+    return await this.page.evaluate((drawerSel) => {
+      const drawer = document.querySelector(drawerSel);
+      if (!drawer) return { panels: 0, charts: 0, errors: 0, errorText: '' };
+      const panels = [...drawer.querySelectorAll('[data-test-panel-title]')];
+      const errored = panels.filter((p) =>
+        p.querySelector('[data-test="panel-schema-renderer-error-message"]')
+      );
+      // The no-data overlay coexists with an empty canvas, so exclude it to keep charts/noData disjoint.
+      return {
+        panels: panels.length,
+        charts: panels.filter(
+          (p) => p.querySelector('canvas') && !p.querySelector('[data-test="no-data"]')
+        ).length,
+        noData: panels.filter((p) => p.querySelector('[data-test="no-data"]')).length,
+        errors: errored.length,
+        errorText: errored.length ? errored[0].textContent.trim().slice(0, 300) : '',
+      };
+    }, this.analysisDashboardDrawer);
+  }
+
+  /**
+   * Open one Insights tab and wait for its panels to settle.
+   * @param {'volume'|'duration'|'error'} name - Tab slug from TracesAnalysisDashboard.vue
+   */
+  async openAnalysisTab(name) {
+    await this.page.locator(`[data-test="traces-analysis-dashboard-${name}-tab"]`).click();
+    await this.waitForAnalysisDashboardLoad();
+    return await this.waitForAnalysisPanelsSettled();
+  }
+
+  /**
+   * Wait until every dimension panel has resolved and stopped changing, then report it.
+   * The previous tab's panels stay mounted for a beat after a tab switch, so a single
+   * resolved read can describe the old tab; two matching reads cannot.
+   * @returns {Promise<{ panels: number, charts: number, noData: number, errors: number, errorText: string }>}
+   */
+  async waitForAnalysisPanelsSettled(timeout = 45000) {
+    const deadline = Date.now() + timeout;
+    let previous = null;
+    while (Date.now() < deadline) {
+      const states = await this.getAnalysisPanelStates();
+      const resolved =
+        states.panels > 0 && states.charts + states.noData + states.errors === states.panels;
+      if (resolved && previous && JSON.stringify(previous) === JSON.stringify(states)) {
+        return states;
+      }
+      previous = resolved ? states : null;
+      await this.page.waitForTimeout(1000);
+    }
+    return await this.getAnalysisPanelStates();
+  }
+
+  /**
+   * Rendered text of the Insights drawer; per-panel query errors land in the panel
+   * body rather than the drawer's error slot, so the whole drawer is the safe source.
+   * @returns {Promise<string>}
+   */
+  async getAnalysisDashboardText() {
+    return (
+      (await this.page
+        .locator(this.analysisDashboardDrawer)
+        .innerText()
+        .catch(() => '')) || ''
+    );
   }
 
   // --- Dimension Selector Sidebar (TracesAnalysisDashboard.vue) ---
@@ -2817,6 +3537,47 @@ export class TracesPage {
    */
   async expectThreadViewContains(text) {
     await expect(this.page.locator(this.llmThreadView)).toContainText(text, { timeout: 15000 });
+  }
+
+  async getResultCountBadgeText() {
+    return ((await this.page.locator(this.tracesCountBadge).first().textContent().catch(() => '')) || '').trim();
+  }
+
+  // The first run can fire before the editor commits a typed filter, and fresh spans lag ingestion.
+  async searchUntilResultCount(expected, timeout = 90000) {
+    await expect(async () => {
+      await this.runTraceSearch();
+      expect(await this.getResultCountBadgeText()).toContain(expected);
+    }).toPass({ timeout, intervals: [2000, 3000, 5000] });
+  }
+
+  async getResultOperationNames() {
+    return await this.page.locator(`${this.searchResultList} [data-test="trace-row-operation-name"]`).allInnerTexts();
+  }
+
+  async getResultSpanStatuses() {
+    return await this.page.locator(`${this.searchResultList} [data-test="span-row-status-pill"]`).allInnerTexts();
+  }
+
+  async getResultPageCount() {
+    return await this.page.locator('[data-test^="traces-search-result-pagination-page-"]').count();
+  }
+
+  async goToResultPage(pageNumber) {
+    await this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`).click();
+  }
+
+  async clickResultPaginationNext() {
+    await this.page.locator('[data-test="traces-search-result-pagination-next"]').click();
+  }
+
+  async clickResultPaginationPrev() {
+    await this.page.locator('[data-test="traces-search-result-pagination-prev"]').click();
+  }
+
+  async setResultRecordsPerPage(size) {
+    await this.page.locator('[data-test="traces-search-result-records-per-page-trigger"]').click();
+    await this.page.getByRole('option', { name: String(size), exact: true }).click();
   }
 
 }

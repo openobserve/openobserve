@@ -24,9 +24,9 @@ use config::{
     utils::rand::generate_random_string,
 };
 use datafusion::{
-    common::{DataFusionError, Result},
+    common::{DataFusionError, Result, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -38,15 +38,19 @@ use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use flight::common::{Metrics, RemoteScanMetrics};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
+use opentelemetry::context::FutureExt as _;
 use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 
 use super::node::RemoteScanNode;
-use crate::datafusion::distributed_plan::{
-    codec::get_physical_extension_codec,
-    common::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
-    decoder_stream::FlightDecoderStream,
-    utils::make_flight_client,
+use crate::datafusion::{
+    distributed_plan::{
+        codec::get_physical_extension_codec,
+        common::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
+        decoder_stream::FlightDecoderStream,
+        utils::make_flight_client,
+    },
+    plan::shared_subplan_exec::strip_shared_subplan_markers,
 };
 
 /// Execution plan for empty relation with produce_one_row=false
@@ -70,6 +74,8 @@ impl RemoteScanExec {
         input: Arc<dyn ExecutionPlan>,
         mut remote_scan_node: RemoteScanNode,
     ) -> Result<Self> {
+        // Sharing happens on the leader only, a follower must never see a marker.
+        let input = strip_shared_subplan_markers(input)?;
         let output_partitions = remote_scan_node.nodes.len();
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 
@@ -200,6 +206,13 @@ impl DisplayAs for RemoteScanExec {
 }
 
 impl ExecutionPlan for RemoteScanExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "RemoteScanExec"
     }
@@ -356,7 +369,8 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    let stream = match client.do_get(request).await {
+    // runs outside the planner span, so the gRPC CLIENT span takes its parent from this context
+    let stream = match client.do_get(request).with_context(context.clone()).await {
         Ok(stream) => stream,
         Err(e) => {
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {

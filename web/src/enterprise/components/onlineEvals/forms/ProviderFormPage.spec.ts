@@ -14,15 +14,18 @@ import ProviderFormPage from "./ProviderFormPage.vue";
 import onlineEvalsService from "@/services/online-evals.service";
 import i18n from "@/locales";
 
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    providers: {
-      create: vi.fn(),
-      update: vi.fn(),
-      testConfig: vi.fn(),
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      providers: {
+        create: vi.fn(),
+        update: vi.fn(),
+        testConfig: vi.fn(),
+      },
     },
-  },
-}));
+  });
+});
 
 const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },
@@ -62,6 +65,7 @@ describe("ProviderFormPage", () => {
     vi.clearAllMocks();
     (onlineEvalsService.providers.create as any).mockResolvedValue({});
     (onlineEvalsService.providers.update as any).mockResolvedValue({});
+
     (onlineEvalsService.providers.testConfig as any).mockResolvedValue("Connection OK");
   });
 

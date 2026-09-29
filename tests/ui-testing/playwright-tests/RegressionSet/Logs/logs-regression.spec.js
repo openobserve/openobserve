@@ -1154,7 +1154,7 @@ test.describe("Logs Regression Bugs", () => {
    * while still confirming both tabs render and Table stays reachable by switching.
    */
   test("Log detail sidebar opens with JSON tab by default", {
-    tag: ['@regressionBugs', '@logDetail', '@sidebar', '@bug9724', '@P1', '@logs']
+    tag: ['@regressionBugs', '@logDetail', '@sidebar', '@bug-9724', '@P1', '@logs']
   }, async ({ page }) => {
     testLogger.info('Test: Log detail sidebar default tab verification');
 
@@ -1538,7 +1538,7 @@ test.describe("Logs Regression Bugs", () => {
   // ======================================================================
 
   test("Bug #11400: should validate double-quoted strings in query editor", {
-    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+    tag: ['@P2', '@functional', '@bug-11400', '@logs', '@regressionBugs']
   }, async ({ page }) => {
     testLogger.info("Testing double-quote validation in query editor (logs page context)");
 
@@ -1584,7 +1584,7 @@ test.describe("Logs Regression Bugs", () => {
   // ======================================================================
 
   test("Bug #11400: should filter functions from value suggestions in WHERE clause", {
-    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+    tag: ['@P2', '@functional', '@bug-11400', '@logs', '@regressionBugs']
   }, async ({ page }) => {
     testLogger.info("Testing that functions are filtered from value suggestions");
 
@@ -1648,7 +1648,7 @@ test.describe("Logs Regression Bugs", () => {
   // ======================================================================
 
   test("Bug #11400: should handle mixed quotes in multi-condition WHERE clauses", {
-    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+    tag: ['@P2', '@functional', '@bug-11400', '@logs', '@regressionBugs']
   }, async ({ page }) => {
     testLogger.info("Testing mixed quote handling in multi-condition WHERE clauses");
 

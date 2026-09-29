@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use axum::{
     extract::{Path, Query},
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
@@ -26,7 +26,7 @@ use openobserve_core::{
     llm_evaluations::{
         datasets,
         experiments::{
-            self, ExperimentError, PinnedExperimentScorer, baseline, deletion,
+            self, ExperimentError, PinnedExperimentScorer, baseline,
             dispersion::{self, NormalizationSpans, RowDispersion},
             ingest::{self, IngestError},
             results::{self, ExperimentResultSlot, ExperimentSlotStatus},
@@ -83,6 +83,7 @@ fn experiment_error_response(error: ExperimentError) -> Response {
         ExperimentError::IdempotencyConflict
         | ExperimentError::InvalidLifecycleTransition { .. }
         | ExperimentError::BaselineNotEligible(_)
+        | ExperimentError::ActiveSlotRetry
         | ExperimentError::ConcurrentLifecycleUpdate => MetaHttpResponse::conflict(error),
         // The plan is valid and permitted; it is only waiting to be
         // acknowledged, which is a precondition rather than a conflict.
@@ -184,6 +185,8 @@ fn experiment_summary_body(
         execution_progress,
         scoring_status,
         scoring_progress,
+        task_outcomes,
+        score_outcomes,
         score_summaries,
         aggregate_summary,
         scorer_definitions,
@@ -199,6 +202,8 @@ fn experiment_summary_body(
         scoring_status,
         execution_progress: execution_progress.map(Into::into),
         scoring_progress: scoring_progress.map(Into::into),
+        task_outcomes: task_outcomes.map(Into::into),
+        score_outcomes: score_outcomes.map(Into::into),
         score_summaries,
         aggregate_summary: aggregate_summary.map(Into::into),
     }
@@ -290,6 +295,8 @@ fn experiment_result_rows(
                 expected_output: first.expected_output.clone(),
                 trial_count: trials.len(),
                 status: experiment_result_row_status(&trials).into(),
+                task_outcomes: summary.task_outcomes.into(),
+                score_outcomes: summary.score_outcomes.into(),
                 output,
                 score_summaries: score_summary_bodies(
                     summary.score_summaries,
@@ -567,7 +574,27 @@ pub async fn list_experiments(
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty());
-    let experiments = match experiments::list(&org_id, dataset_id).await {
+    let prompt_id = query
+        .prompt_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let content_hash = query
+        .content_hash
+        .as_deref()
+        .map(str::trim)
+        .filter(|hash| !hash.is_empty());
+    let experiments = match experiments::list_filtered(
+        &org_id,
+        experiments::ExperimentListFilter {
+            dataset_id,
+            prompt_id,
+            prompt_version: query.prompt_version,
+            content_hash,
+        },
+    )
+    .await
+    {
         Ok(experiments) => experiments
             .into_iter()
             .filter(|experiment| {
@@ -1279,7 +1306,13 @@ pub async fn delete_experiment(
     {
         return response;
     }
-    match deletion::delete(&org_id, &experiment_id, &user.user_id).await {
+    match openobserve_core::llm_evaluations::experiments::runner::delete_experiment(
+        &org_id,
+        &experiment_id,
+        &user.user_id,
+    )
+    .await
+    {
         Ok(()) => {
             // The authorization object outlives the row it named, so it is
             // removed here rather than by the cleanup sweep.
@@ -1309,13 +1342,18 @@ pub async fn delete_experiment(
     )
 )]
 pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
-    match experiments::retry_failed(&org_id, &experiment_id).await {
+    match openobserve_core::llm_evaluations::experiments::runner::retry_failed_experiment(
+        &org_id,
+        &experiment_id,
+    )
+    .await
+    {
         Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
         Err(error) => experiment_error_response(error),
     }
 }
 
-/// Retry one selected slot whose latest durable execution is an error.
+/// Retry one selected slot of a failed Experiment.
 #[utoipa::path(
     post,
     path = "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
@@ -1331,11 +1369,11 @@ pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, Strin
     ),
     request_body(content = RetryExperimentSlotRequestBody, content_type = "application/json"),
     responses(
-        (status = 200, description = "Selected slot retry result"),
+        (status = 202, description = "Selected slot retry queued"),
         (status = 400, description = "Invalid idempotency key"),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment, row, or trial not found"),
-        (status = 409, description = "Experiment lifecycle or latest slot state disallows retry"),
+        (status = 409, description = "Experiment lifecycle, active slot retry, or idempotency conflict"),
     )
 )]
 pub async fn retry_experiment_slot(
@@ -1351,7 +1389,7 @@ pub async fn retry_experiment_slot(
         return response;
     }
 
-    match openobserve_core::llm_evaluations::experiments::runner::retry_error_slot(
+    match openobserve_core::llm_evaluations::experiments::runner::queue_slot_retry(
         &org_id,
         &experiment_id,
         &row_id,
@@ -1360,7 +1398,7 @@ pub async fn retry_experiment_slot(
     )
     .await
     {
-        Ok(record) => MetaHttpResponse::json(record),
+        Ok(record) => (axum::http::StatusCode::ACCEPTED, axum::Json(record)).into_response(),
         Err(ExperimentSlotRetryError::Experiment(error)) => experiment_error_response(error),
         Err(ExperimentSlotRetryError::InvalidIdempotencyKey) => {
             MetaHttpResponse::bad_request("Invalid slot retry idempotency key")
@@ -1370,7 +1408,8 @@ pub async fn retry_experiment_slot(
         }
         Err(
             error @ (ExperimentSlotRetryError::InvalidLifecycle(_)
-            | ExperimentSlotRetryError::LatestExecutionNotError),
+            | ExperimentSlotRetryError::ActiveConflict
+            | ExperimentSlotRetryError::IdempotencyConflict),
         ) => MetaHttpResponse::conflict(error),
         Err(ExperimentSlotRetryError::Runtime(error)) => {
             log::error!("[Experiment] failed to retry selected slot: {error}");
@@ -1595,6 +1634,8 @@ mod tests {
             expected_output: None,
             trial_count: 2,
             status: crate::models::experiments::ExperimentSlotStatusBody::Completed,
+            task_outcomes: Default::default(),
+            score_outcomes: Default::default(),
             output: None,
             score_summaries: Vec::new(),
             p50_latency_ms: None,

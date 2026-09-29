@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { BrowserStep, StepAction, WireStep } from "@/types/synthetics";
+import { isCompositionAction } from "@/constants/synthetics";
 import { getUUIDv7 } from "../uuid";
+import { substitutePlaceholders } from "@/components/synthetics/variables/placeholders";
 
 // Maps the extension's Playwright-flavoured action names onto the UI's StepAction.
 // `setInputFiles` has no dedicated UI action and is surfaced as a `type` step.
@@ -38,6 +40,7 @@ const ACTION_MAP: Record<string, StepAction> = {
   assert: "assert",
   screenshot: "screenshot",
   setInputFiles: "upload",
+  subtest: "subtest",
 };
 
 /**
@@ -168,6 +171,7 @@ export function mapWireStep(wire: WireStep, opts: MapWireStepOptions = {}): Brow
     assertion: wire.assertion,
     optional: wire.optional,
     alwaysRun: wire.always_run,
+    subtest: wire.subtest,
     // Keep the original extension step untouched for replay (full fidelity) —
     // only when the caller says this wire came from a live recording. See
     // MapWireStepOptions.
@@ -245,6 +249,10 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
       return { ...base, value: step.value };
     case "screenshot":
       return base;
+    case "subtest":
+      // Never sent to a browser: expansion replaces it first (§5.1), so the filter in
+      // `journeyToWireSteps` stays the single place a reference is dropped.
+      return null;
     default:
       // Should never reach here — StepAction is a closed union.
       console.warn(`[synthetics] unknown action "${step.action}", defaulting to click`);
@@ -259,6 +267,10 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
  * actions yield `null` and are dropped.
  */
 export function journeyToWireSteps(steps: BrowserStep[]): WireStep[] {
+  const leaked = steps.find((s) => isCompositionAction(s.action));
+  if (leaked) {
+    throw new Error(`subtest step "${leaked.id}" must be expanded before replay`);
+  }
   return steps.map((s) => s.wire ?? buildWireFromStep(s)).filter((w): w is WireStep => w != null);
 }
 
@@ -268,11 +280,8 @@ export function journeyToWireSteps(steps: BrowserStep[]): WireStep[] {
  * variable references (value, url, text, key, selector, name).
  */
 export function substituteVariables(step: WireStep, vars: Record<string, string>): WireStep {
-  const re = /\{\{\s*(\w+)\s*\}\}/g;
-  const sub = (s: string | undefined): string | undefined => {
-    if (s === undefined || s === null) return s;
-    return s.replace(re, (_, k: string) => vars[k] ?? "");
-  };
+  const sub = (s: string | undefined): string | undefined =>
+    s === undefined || s === null ? s : substitutePlaceholders(s, vars);
   return {
     ...step,
     url: sub(step.url),

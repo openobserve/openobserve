@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         @row-click="openDetail"
         :footer-title="t('aiObservability.datasets.listTitle')"
         :global-filter="search"
@@ -57,16 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full w-full"
       >
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastUpdatedAt"
+            :loading="fetching"
             data-test="ai-datasets-refresh-btn"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
+            @click="refreshDatasets"
+          />
         </template>
 
         <template #toolbar>
@@ -142,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               icon-left="edit"
+              class="max-md:hidden"
               :data-test="`ai-datasets-edit-${row.id}`"
               @click.stop="openEdit(row)"
             >
@@ -151,11 +151,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
+              class="max-md:hidden"
               :data-test="`ai-datasets-delete-${row.id}`"
               @click.stop="removeDataset(row)"
             >
               <OTooltip side="bottom" :content="t('common.delete')" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-datasets-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`ai-datasets-edit-${row.id}-menu`"
+                @select="openEdit(row)"
+              >
+                <span>{{ t("common.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`ai-datasets-delete-${row.id}-menu`"
+                @select="removeDataset(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -228,6 +258,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useQuery } from "@tanstack/vue-query";
+import { llmDatasetsQuery } from "@/services/llm-datasets.service.queries";
 import { computed, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -239,6 +271,9 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -277,8 +312,23 @@ function openDetail(row: LlmDataset) {
   });
 }
 
-const datasets = ref<LlmDataset[]>([]);
-const loading = ref(false);
+const datasetsList = useQuery(() =>
+  Object.assign(llmDatasetsQuery(orgId.value), { enabled: !!orgId.value }),
+);
+
+// The list is the query, not a copy of it: a write that invalidates the scope
+// repaints these rows with no wiring here.
+const datasets = computed<LlmDataset[]>(() => (datasetsList.data.value ?? []) as LlmDataset[]);
+const loading = datasetsList.isPending;
+// Request in flight with rows still on screen — the refresh control's spinner.
+const fetching = datasetsList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = datasetsList.dataUpdatedAt;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = datasetsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
@@ -366,15 +416,21 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-async function refresh() {
+// Named handler: binding refresh straight to @click puts the MouseEvent in
+// `force`.
+const refreshDatasets = () => refresh(true);
+
+async function refresh(force = true) {
   if (!orgId.value) return;
-  loading.value = true;
   try {
-    datasets.value = await llmDatasetsService.list(orgId.value);
+    // `force` by default: every caller here is a post-write reload or the
+    // refresh control. A plain mount passes false and keeps the cached rows.
+    if (force) await datasetsList.refetch();
   } catch {
-    toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
-  } finally {
-    loading.value = false;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+    }
   }
 }
 
@@ -451,5 +507,7 @@ async function removeDataset(row: LlmDataset) {
   }
 }
 
-onMounted(refresh);
+// Explicitly false: onMounted passes no argument, so `refresh` would fall back
+// to its force default and every visit would bypass the cache.
+onMounted(() => refresh(false));
 </script>

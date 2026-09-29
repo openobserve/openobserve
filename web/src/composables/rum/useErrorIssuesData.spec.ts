@@ -46,11 +46,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToast(...args),
 }));
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
 // Mock vuex to inject a controlled store
 const mockStore = {

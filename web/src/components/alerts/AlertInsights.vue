@@ -197,8 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Dashboard Content -->
-    <div class="min-h-0 flex-1 px-2.5 pb-2.5">
-      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
+    <div class="min-h-0 flex-1 px-2.5 pb-2.5 max-lg:overflow-y-auto">
+      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)] max-md:h-auto">
         <div @contextmenu="handleNativeContextMenu">
           <div v-show="isLoading" class="flex h-100 items-center justify-center">
             <OSpinner size="md" />

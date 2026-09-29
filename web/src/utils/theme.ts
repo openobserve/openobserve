@@ -109,6 +109,46 @@ export const hexToRgba = (hex: string, opacity: number): string => {
 };
 
 /**
+ * WCAG relative luminance of a hex color (sRGB, gamma-corrected).
+ */
+const relativeLuminance = (hex: string): number => {
+  hex = hex.replace("#", "");
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = channel(parseInt(hex.substring(0, 2), 16));
+  const g = channel(parseInt(hex.substring(2, 4), 16));
+  const b = channel(parseInt(hex.substring(4, 6), 16));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/** WCAG contrast ratio (1–21) between two hex colors. */
+const contrastRatio = (hexA: string, hexB: string): number => {
+  const a = relativeLuminance(hexA);
+  const b = relativeLuminance(hexB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+};
+
+/**
+ * Pick white or dark label text for a button whose background is theme-color
+ * derived. Predefined dark-mode theme colors are deliberately light/pastel (so
+ * they double as readable text/link accents on dark surfaces) — which can drop
+ * hardcoded white button-label text well below readable, e.g. O2 Signature's
+ * dark accent #8B8DF0 with white text lands at 2.93:1. Falls back to dark text
+ * only below a floor, not the strict 4.5:1 AA text bar: every saturated brand
+ * color (e.g. O2 Signature light #6B76E3, white text at 3.94:1) already ships
+ * with white and sits just under that bar, so comparing "whichever wins" flips
+ * text to dark across the whole app over a fractional AA shortfall.
+ */
+const pickButtonForeground = (bgHex: string): string => {
+  const darkText = cssToken("--color-grey-900", "#171717");
+  const white = "#FFFFFF";
+  const MIN_WHITE_CONTRAST = 3;
+  return contrastRatio(white, bgHex) >= MIN_WHITE_CONTRAST ? white : darkText;
+};
+
+/**
  * Mix two colors together (similar to CSS color-mix)
  * @param color1 - First hex color code (e.g., "#3F7994")
  * @param color2 - Second hex color code (e.g., "#FFFFFF")
@@ -185,6 +225,10 @@ const syncO2LibraryTokens = (themeColor: string): void => {
   for (const [shade, hex] of Object.entries(palette)) {
     root.style.setProperty(`--color-primary-${shade}`, hex);
   }
+  // The "primary" button variant's label text must stay readable against its
+  // resting background (the 600 shade) — see pickButtonForeground for why this
+  // can't be hardcoded to white.
+  root.style.setProperty("--color-button-primary-foreground", pickButtonForeground(palette["600"]));
 };
 
 /**
@@ -215,6 +259,7 @@ export const applyThemeColors = (
         root.style.removeProperty(`--color-primary-${shade}`);
       },
     );
+    root.style.removeProperty("--color-button-primary-foreground");
   } else {
     syncO2LibraryTokens(themeColor);
   }

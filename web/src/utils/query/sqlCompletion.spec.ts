@@ -791,6 +791,23 @@ describe("B1 — keyword ordering is coherent in the raw catalog", () => {
       expect(field.sortText! < k.sortText!, `${k.name} sorts ahead of fields`).toBe(true);
     }
   });
+
+  it("gives every function an explicit sortText, not just keywords/clauses", () => {
+    for (const fn of SQL_FUNCTIONS) {
+      expect(fn.sortText, `${fn.name} needs an explicit sortText`).toBeTruthy();
+    }
+  });
+
+  it("pins match_all ahead of every other function regardless of label", () => {
+    const matchAll = byName("match_all");
+    for (const fn of SQL_FUNCTIONS) {
+      if (fn.name === "match_all") continue;
+      expect(
+        matchAll.sortText! < fn.sortText!,
+        `match_all (${matchAll.sortText}) must sort ahead of ${fn.name} (${fn.sortText})`,
+      ).toBe(true);
+    }
+  });
 });
 
 describe("B1 — clause keywords reach a SQL editor through the fallback", () => {

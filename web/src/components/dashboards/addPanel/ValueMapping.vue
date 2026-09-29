@@ -38,11 +38,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, ref } from "vue";
+import { defineComponent, inject, ref, onBeforeMount } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
-import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({

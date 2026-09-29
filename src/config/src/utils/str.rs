@@ -99,6 +99,20 @@ pub fn find(haystack: &str, needle: &str) -> bool {
     haystack.contains(needle)
 }
 
+/// Render a credential as `abcd****wxyz` so it can be logged without leaking.
+///
+/// Anything shorter than 12 characters is masked whole — 4 visible characters
+/// out of fewer than 12 would narrow the search space too far.
+pub fn mask_secret(secret: &str) -> String {
+    let chars: Vec<char> = secret.chars().collect();
+    if chars.len() < 12 {
+        return "****".to_string();
+    }
+    let head: String = chars[..4].iter().collect();
+    let tail: String = chars[chars.len() - 4..].iter().collect();
+    format!("{head}****{tail}")
+}
+
 pub trait StringExt {
     fn find(&self, needle: &str) -> bool;
     fn optional(&self) -> Option<String>;

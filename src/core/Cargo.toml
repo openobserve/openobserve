@@ -41,6 +41,11 @@ vectorscan = [
     "promql-service/vectorscan",
     "stream/vectorscan",
 ]
+profiling = [
+    "dep:jemalloc_pprof",
+    "dep:pprof",
+    "dep:tikv-jemalloc-ctl",
+]
 
 [dependencies]
 db.workspace = true
@@ -77,6 +82,7 @@ arrow-schema.workspace = true
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
+itoa = "1.0"
 hmac.workspace = true
 image.workspace = true
 itertools.workspace = true
@@ -107,7 +113,9 @@ sea-orm.workspace = true
 serde.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
+sqlparser.workspace = true
 snap.workspace = true
+strum.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 time.workspace = true
@@ -126,6 +134,9 @@ openobserve-synthetics.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 futures-util.workspace = true
+jemalloc_pprof = { workspace = true, optional = true }
+pprof = { workspace = true, optional = true }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
@@ -133,4 +144,8 @@ multer.workspace = true
 
 [[bench]]
 name = "db_enrich"
+harness = false
+
+[[bench]]
+name = "trace_enrich"
 harness = false

@@ -14,6 +14,7 @@ feel like one product.
   - [The mandatory listing toolbar: search · refresh · column toggle](#the-mandatory-listing-toolbar)
   - [Columns: hideable + default-hidden + persisted](#columns-hideable--default-hidden--persisted)
   - [Empty state: filtered vs first-run](#empty-state-filtered-vs-first-run)
+  - [Denied: the third empty state (`:forbidden`)](#denied-the-third-empty-state-forbidden)
   - [States, actions, shortcuts, data](#states-actions-shortcuts-data)
 - [Recipe: detail / editor page](#recipe-detail--editor-page)
 - [Listing-page checklist](#listing-page-checklist)
@@ -26,9 +27,11 @@ Any routed view is: an `OPageHeader` (rule 1) on top, then the page body below
 it, all inside a **full-height flex column** so the header stays put and only the
 body scrolls.
 
-- **Primary page action** (New / Add / Create) and page-level secondary actions
-  (Import, an overflow `ODropdown`) go in the header's **`#actions`** slot as O2
-  buttons — never in the table toolbar.
+- **Primary page action** (New / Add / Create) goes in the header's
+  **`#actions`** slot; page-level secondary actions (Import, Export, an overflow
+  `ODropdown`) go in **`#actions-overflow`** — inline on desktop, behind one ⋮ on
+  phones (add `overflow-first` so they keep their place before the CTA). Never in the
+  table toolbar. See [responsive.md](responsive.md#page-shell-the-header-stays-on-one-row).
 - **The create CTA is label-only — no `icon-left="add"`.** Secondary header
   actions keep their semantic icons (Import → `upload-file`), and in-section
   adders inside the body keep their `+`; it is only the header's create button
@@ -140,21 +143,29 @@ for every list — don't ship a listing page without them.
   data-test="channels-table"
   @row-click="edit"
 >
-  <!-- filters + search on the LEFT of the toolbar (fills the row) -->
+  <!-- filters + search on the LEFT of the toolbar (fills the row); max-md:contents +
+       mobile-dropdown keep the phone toolbar on one row -->
   <template #toolbar>
-    <div class="flex items-center gap-2 w-full">
-      <OToggleGroup :model-value="typeFilter" @update:model-value="filterByType">
+    <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+      <OToggleGroup
+        mobile-dropdown
+        :model-value="typeFilter"
+        data-test="channels-type-filter"
+        @update:model-value="filterByType"
+      >
         <OToggleGroupItem value="all" size="sm">{{ t("channels.all") }}</OToggleGroupItem>
         <OToggleGroupItem value="prebuilt" size="sm">{{ t("channels.prebuilt") }}</OToggleGroupItem>
         <OToggleGroupItem value="custom" size="sm">{{ t("channels.custom") }}</OToggleGroupItem>
       </OToggleGroup>
-      <OSearchInput
-        v-model="search"
-        class="flex-1"
-        :placeholder="t('channels.search')"
-        clearable
-        data-test="channels-search"
-      />
+      <div class="min-w-0 flex-1 max-md:min-w-40">
+        <OSearchInput
+          v-model="search"
+          class="w-full"
+          :placeholder="t('channels.search')"
+          clearable
+          data-test="channels-search"
+        />
+      </div>
     </div>
   </template>
 
@@ -164,9 +175,9 @@ for every list — don't ship a listing page without them.
       variant="outline"
       size="icon-sm"
       icon-left="refresh"
-      :loading="loading"
+      :loading="fetching"
       data-test="channels-refresh"
-      @click="fetchChannels"
+      @click="refreshChannels"
     >
       <OTooltip side="bottom" :content="t('channels.reload')" shortcut-id="channelsRefresh" />
     </OButton>
@@ -203,9 +214,30 @@ search-only lists with no other filters).
   needs extra controls (scope toggles, etc.). Set `:show-global-filter="false"`
   and drive the query yourself.
 
-**Refresh.** An `OButton size="icon-sm" icon-left="refresh" :loading` in the
-`#toolbar-trailing` slot, wired to the same fetch function the page uses on
-mount. Attach an `OTooltip` with `shortcut-id` so it advertises the `r` shortcut.
+**Refresh.** An `OButton size="icon-sm" icon-left="refresh"` in the
+`#toolbar-trailing` slot, with `:loading` bound to the query's `isFetching` (the
+table's `:loading` is `isPending`, the cold-read skeleton). Attach an `OTooltip`
+with `shortcut-id` so it advertises the `r` shortcut.
+
+The click goes to a **named handler that forces every read the page shows** —
+the list and any secondary read (counts, "Used by", dropdown options). Mount,
+paging and search read the cache; only a refresh is guaranteed to reach the
+server. Full rule: [data-fetching.md § The refresh rule](data-fetching.md#the-refresh-rule).
+
+```ts
+const orgId = useOrgId();
+const channelsList = useQuery(() =>
+  Object.assign(channelsQuery(orgId.value), { enabled: !!orgId.value }),
+);
+const rows = computed(() => channelsList.data.value ?? []);
+const loading = channelsList.isPending;
+const fetching = channelsList.isFetching;
+// Named handler: `@click="channelsList.refetch"` would pass the MouseEvent in.
+const refreshChannels = () => {
+  void channelsList.refetch();
+  void loadChannelUsage(true); // a secondary read on the same view is forced too
+};
+```
 
 **Column show/hide toggle.** `OTable` renders the column-visibility button
 **automatically** — but only when **all three** hold:
@@ -287,6 +319,80 @@ blocks:
   first-run title/description/illustration/action cards — pick or add one rather
   than passing raw title/description strings for a listing page.
 
+### Denied: the third empty state (`:forbidden`)
+
+A 403 and a genuinely empty list are **both zero rows**, so without help the table
+shows the first-run state — inviting a user to "create your first alert" behind
+buttons that will each 403. The page carries one boolean so `OTable` can tell them
+apart:
+
+```vue
+<OTable :loading="loading" :forbidden="forbidden" ... />
+```
+
+With `useQuery`, derive it from the query's own error — it follows every
+load path by construction:
+
+```ts
+const forbidden = computed(() => {
+  const e: any = channelsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+```
+
+With an imperative `queryClient.fetchQuery` loader, keep a ref and clear it at
+the start of every load:
+
+```ts
+const forbidden = ref(false);
+
+const getAlerts = async (folderId: string, force = false) => {
+  loading.value = true;
+  forbidden.value = false;                 // clear at the START of every load
+  try {
+    const options = alertsListQuery(orgId.value, folderId);
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+    }
+    rows.value = await queryClient.fetchQuery(options);
+  } catch (err: any) {
+    forbidden.value = err?.response?.status === 403;
+    // the grouped access toast already reports a 403; a second red toast adds nothing
+    if (!forbidden.value) showErrorNotification(...);
+  } finally {
+    loading.value = false;
+  }
+};
+```
+
+`OTable` renders the shared `no-access` state ("You don't have access", no action
+cards) when `forbidden` is true **and** the table has no rows. It never overrides
+visible data.
+
+**The rules that matter:**
+
+- **Only the request that fetches THIS table's rows may set it.** A 403 from a
+  *different* endpoint says nothing about this one. Sibling resources are granted
+  independently — `dfolder` vs `dashboard`, `alerts` vs `alerts/templates` — so a
+  denied folder list must not blank a dashboard list the user can read.
+- **Wire every load path.** Initial load *and* refresh/refetch, or the flag goes
+  stale between them.
+- **The `#empty` slot is the only place for the empty state.** If a page renders
+  its first-run state in an outer `v-else-if="!rows.length"` branch, the table
+  never mounts when the list is empty and `:forbidden` is dead code. Fold both
+  first-run and filtered copy into `#empty` (conditional `title`/`description`)
+  so there is one code path.
+- **Presentational tables** (a child that receives `:loading` as a prop) need a
+  `forbidden?: boolean` prop forwarded the same way; the parent that owns the
+  fetch sets it.
+- **Never put `data-test` on `OEmptyState` itself** — Vue attribute fallthrough
+  lands it on the same root element and silently *replaces* the component's own
+  `data-test="o2-empty-state"`. Put it on the wrapper.
+- **Beware composables that rewrap errors.** A helper that rejects with
+  `new Error(e.message)` drops `.response`, so `err?.response?.status` is
+  `undefined` and the flag can never fire. Preserve the status on the rejection.
+
+
 ### States, actions, shortcuts, data
 
 - **Loading / empty / error:** pass `:loading`; provide the single `#empty`
@@ -294,14 +400,18 @@ blocks:
   blank table.
 - **Primary action** (New) is in the header `#actions`; **row actions**
   (edit/delete/…) are in the `isAction` column as O2 buttons; **destructive
-  delete** goes through `ConfirmDialog` + `useConfirmDialog`.
+  delete** goes through `ConfirmDialog` + `useConfirmDialog`. On phones the inline
+  row buttons are `max-md:hidden` and one `md:hidden` kebab mirrors them — see
+  [responsive § Tables and row actions](responsive.md#tables-and-row-actions).
 - **Keyboard shortcuts** (register + bind — see
   [keyboard-shortcuts.md](keyboard-shortcuts.md)): `n` → create, `/` → focus
   search, `r` → refresh. Advertise `r` via the refresh button's `OTooltip
   shortcut-id`.
-- **Data flow** (see [SKILL.md § Where code goes](../SKILL.md)): fetch through a
-  domain service, org from `store.state.selectedOrganization`; hold the rows in a
-  local `ref` (or Vuex if shared); keep column defs local.
+- **Data flow** (see [data-fetching.md](data-fetching.md)): read the rows
+  through the domain's declared query (`services/<domain>.queries.ts`, reuse
+  one if it exists), org from `useOrgId()`; the rows are a `computed` over the
+  query's data — never a Vuex copy; writes are `mutationOptions()` that
+  invalidate the domain; keep column defs local.
 
 ---
 
@@ -333,15 +443,27 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
       (`:show-global-filter="false"`), or the built-in global filter for a
       search-only list.
 - [ ] **Refresh** button in `#toolbar-trailing` (`variant="outline"
-      size="icon-sm" icon-left="refresh"`), wired to the fetch fn, with an
-      `OTooltip shortcut-id`.
+      size="icon-sm" icon-left="refresh"`, `:loading` from `isFetching`), with an
+      `OTooltip shortcut-id`; its named handler **forces** the list and every
+      secondary read on the page.
+- [ ] Rows come from a declared query (`useQuery` or `fetchQuery`) — no raw
+      service/`http` call, no Vuex copy; writes invalidate the domain.
 - [ ] **Column show/hide toggle** present — i.e. `:persist-columns="true"` +
       `table-id` + at least one `hideable` column.
 - [ ] Non-essential columns **hidden by default** via `:column-visibility`.
 - [ ] Single `#empty` `OEmptyState` with a `preset` + **`:filtered`** (true when
       search/filter active) + an `@action` that resets on `clear-filters`;
-      `#error` if fetch can fail; `:loading` bound.
-- [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`.
+      `#error` if fetch can fail; `:loading` bound. **No first-run state in an
+      outer `v-if` branch** — the table must mount even when the list is empty.
+- [ ] **`:forbidden`** bound to a ref the page sets from a 403 on *its own* list
+      request (cleared at the start of every load path), so a denied user sees
+      "You don't have access" rather than a create CTA that will 403.
+- [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`; inline
+      buttons `max-md:hidden` + a `md:hidden` kebab mirroring them (`-menu` data-tests).
+- [ ] **Responsive** — toolbar recipe (`max-md:contents`, `mobile-dropdown`, search
+      floor), footer count `max-md:hidden`, secondary header actions in
+      `#actions-overflow`; checked at 375 / 768 / 1280 with 1280 identical to main
+      (see [responsive.md](responsive.md)).
 - [ ] `n` / `/` / `r` keyboard shortcuts registered and bound.
 - [ ] **Registered in navigation** and gated for the right env/role — see
       [navigation-menus.md](navigation-menus.md).

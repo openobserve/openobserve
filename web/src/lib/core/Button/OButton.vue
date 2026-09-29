@@ -323,6 +323,8 @@ const classes = computed<string[]>(() => [
   // taller than a borderless ghost one of the same size.
   "relative box-border",
   "whitespace-nowrap",
+  // `as="a"` renders a real anchor, which base-elements.css underlines on hover.
+  "no-underline hover:no-underline",
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
   "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
   "outline-none",
@@ -368,11 +370,8 @@ function handleClick(event: MouseEvent): void {
       <OIcon name="progress-activity" size="sm" class="animate-spin" />
     </span>
 
-    <!-- Original content — invisible (not hidden) when loading to preserve button dimensions -->
-    <span
-      :class="loading ? 'invisible inline-flex items-center' : 'contents'"
-      :style="loading ? { gap: 'inherit' } : undefined"
-    >
+    <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
+    <span :class="loading ? 'invisible contents' : 'contents'">
       <slot name="icon-left">
         <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
       </slot>

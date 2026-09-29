@@ -20,17 +20,26 @@ import { createStore } from "vuex";
 import { ref } from "vue";
 
 // ─── Service mocks ────────────────────────────────────────────────────────────
-vi.mock("@/services/alert_templates", () => ({
-  default: { create: vi.fn() },
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { create: vi.fn() },
+  });
+});
 
-vi.mock("@/services/alerts", () => ({
-  default: { create: vi.fn() },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { create: vi.fn() },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: { create: vi.fn() },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { create: vi.fn() },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({ streams: { value: [] } })),

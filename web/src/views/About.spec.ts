@@ -34,28 +34,31 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 // Mock license server
-vi.mock("@/services/license_server", () => ({
-  default: {
-    get_license: vi.fn().mockResolvedValue({
-      data: {
-        license: {
-          license_id: "test-license-123",
-          created_at: 1704067200000000,
-          expires_at: 1735689600000000,
-          limits: {
-            Ingestion: {
-              typ: "PerDayCount",
-              value: 100,
+vi.mock("@/services/license_server", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_license: vi.fn().mockResolvedValue({
+        data: {
+          license: {
+            license_id: "test-license-123",
+            created_at: 1704067200000000,
+            expires_at: 1735689600000000,
+            limits: {
+              Ingestion: {
+                typ: "PerDayCount",
+                value: 100,
+              },
             },
           },
+          expired: false,
+          ingestion_used: 45.5,
+          installation_id: "install-123",
         },
-        expired: false,
-        ingestion_used: 45.5,
-        installation_id: "install-123",
-      },
-    }),
-  },
-}));
+      }),
+    },
+  });
+});
 
 describe("About", () => {
   let store: any;

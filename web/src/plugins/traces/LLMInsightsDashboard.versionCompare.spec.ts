@@ -114,6 +114,15 @@ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   compareAgentVersions: (...args: any[]) => mockCompareAgentVersions(...args),
 }));
 
+// Version Compare is Agent-mode-only, enterprise-only — independent of
+// whatever a developer's local .env happens to set.
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "true",
+    isCloud: "false",
+  },
+}));
+
 vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({
     t: (key: string, params?: Record<string, any>) => (params ? key + JSON.stringify(params) : key),

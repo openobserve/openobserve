@@ -64,6 +64,7 @@ import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import { alertConditionText, alertWarningConditionText } from "@/utils/alerts/alertCondition";
 import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
@@ -126,40 +127,10 @@ const formatMinutesDuration = (minutes: number | null | undefined): string => {
   return t("common.minShort", { count: minutes });
 };
 
-const conditionText = computed(() => {
-  const qc = queryCondition.value;
-  // PromQL keeps its threshold on promql_condition (the expression itself is the
-  // query); render the comparison so it doesn't fall through to "—".
-  if (qc?.type === "promql") {
-    const pc = qc.promql_condition;
-    return isBlank(pc?.value) ? EMPTY : `${pc.operator || ""} ${pc.value}`.trim();
-  }
-  const agg = aggregation.value;
-  if (!agg) return qc?.sql || EMPTY;
-  const fn = agg.function || "";
-  const col = agg.having?.column || "";
-  const op = agg.having?.operator || "";
-  const val = agg.having?.value;
-  return `${fn}(${col}) ${op} ${val}`;
-});
-
-const warningText = computed(() => {
-  const qc = queryCondition.value;
-  // PromQL warning lives on promql_warning_value and shares the critical operator.
-  if (qc?.type === "promql") {
-    return isBlank(qc.promql_warning_value)
-      ? EMPTY
-      : `${qc.promql_condition?.operator || ""} ${qc.promql_warning_value}`.trim();
-  }
-  const agg = aggregation.value;
-  if (isBlank(agg?.warning_value)) {
-    return EMPTY;
-  }
-  const fn = agg.function || "";
-  const col = agg.having?.column || "";
-  const op = agg.having?.operator || "";
-  return `${fn}(${col}) ${op} ${agg.warning_value}`;
-});
+// Shared with the on-call page detail, which asks the same "what fired"
+// question of the same alert.
+const conditionText = computed(() => alertConditionText(props.alert));
+const warningText = computed(() => alertWarningConditionText(props.alert));
 
 // ── SLO alerts (Feature 5, Phase 3.3) ───────────────────────────────────────
 // This family has no stream, no SQL and no aggregation, so the generic source
@@ -303,14 +274,24 @@ const anomalySourceFields = computed(() => {
       },
     );
   }
-  // Stored as the percentile scored against; the form shows its complement.
+  // Budget mode: the enforced cap is the sensitivity statement. Percentile
+  // mode: the stored value indexes TRAINING scores — never restated as a live
+  // anomaly rate, which was measured false.
+  const budget = isBlank(a?.alert_budget_per_day) ? NaN : Number(a.alert_budget_per_day);
   const percentile = isBlank(a?.threshold) ? NaN : Number(a.threshold);
+  const roundBudget = (n: number) => Math.round(n * 1e6) / 1e6;
+  const sensitivityValue =
+    Number.isFinite(budget) && budget > 0
+      ? budget < 1
+        ? t("alerts.anomaly.summaryBudgetPerWeek", { count: roundBudget(budget * 7) })
+        : t("alerts.anomaly.summaryBudgetPerDay", { count: roundBudget(budget) })
+      : Number.isFinite(percentile)
+        ? t("alerts.anomaly.summaryThresholdPercentile", { percentile })
+        : EMPTY;
   fields.push({
     key: "sensitivity",
     label: t("alerts.sensitivity"),
-    value: Number.isFinite(percentile)
-      ? t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })
-      : EMPTY,
+    value: sensitivityValue,
   });
   return fields;
 });

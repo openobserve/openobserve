@@ -1,6 +1,15 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, onMounted, ref, watch, type Ref } from "vue";
+import {
+  computed,
+  onMounted,
+  ref,
+  toValue,
+  watch,
+  watchEffect,
+  type MaybeRefOrGetter,
+  type Ref,
+} from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 
 export interface UseVirtualScrollOptions {
@@ -21,6 +30,8 @@ export interface UseVirtualScrollOptions {
    * Passed as a Ref so toggling at runtime is reactive.
    */
   dynamicRowHeight?: Ref<boolean>;
+  /** Keep the scroll element's offset stable while measured row heights change (a delegated scroller also holds content above the list). */
+  preserveScrollOffsetOnRowResize?: MaybeRefOrGetter<boolean>;
 }
 
 /**
@@ -30,7 +41,14 @@ export interface UseVirtualScrollOptions {
  * instead of TanStack Table `Row<T>[]`.
  */
 export function useVirtualScroll(options: UseVirtualScrollOptions) {
-  const { items, parentRef, scrollTarget, estimateSize = 40, overscan = 5 } = options;
+  const {
+    items,
+    parentRef,
+    scrollTarget,
+    estimateSize = 40,
+    overscan = 5,
+    preserveScrollOffsetOnRowResize,
+  } = options;
 
   const dynamicRowHeight = options.dynamicRowHeight ?? ref(false);
 
@@ -93,6 +111,15 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
   });
 
   const virtualizer = useVirtualizer(virtualizerOptions);
+
+  // TanStack shifts scrollTop by every remeasure delta above the viewport; on a shared scroller that drags the whole page
+  watchEffect(() => {
+    virtualizer.value.shouldAdjustScrollPositionOnItemSizeChange = toValue(
+      preserveScrollOffsetOnRowResize,
+    )
+      ? () => false
+      : undefined;
+  });
 
   const virtualItems = computed(() => virtualizer.value.getVirtualItems());
   const totalSize = computed(() => virtualizer.value.getTotalSize());

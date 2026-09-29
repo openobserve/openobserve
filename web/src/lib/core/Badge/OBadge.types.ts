@@ -3,6 +3,8 @@
  * No types should be defined inline in OBadge.vue.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 /**
  * Semantic colour variant — design is baked in, no style override props.
  *
@@ -118,6 +120,16 @@ export interface BadgeProps {
   clickable?: boolean;
   /** Mutes the badge visually and suppresses interaction. */
   disabled?: boolean;
+  /**
+   * Renders a trailing ✕ that emits `remove`. This is the O2 delete affordance
+   * for a chip — a token in a multi-select, an escalation target, a filter pill.
+   * Without it, call sites nest a bare `<button>` inside the badge, which is
+   * neither focus-styled nor sized and gives a keyboard user an unstyled tab
+   * stop inside a pill.
+   */
+  removable?: boolean;
+  /** Accessible name for the remove button. Defaults to `common.remove`. */
+  removeLabel?: I18nText;
 }
 
 export interface BadgeEmits {
@@ -126,6 +138,8 @@ export interface BadgeEmits {
    * via the keyboard (Enter or Space).
    */
   click: [e: MouseEvent | KeyboardEvent];
+  /** Fired when the `removable` ✕ is activated. */
+  remove: [e: MouseEvent];
 }
 
 export interface BadgeSlots {

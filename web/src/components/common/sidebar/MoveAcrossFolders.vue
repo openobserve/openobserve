@@ -152,6 +152,8 @@ export default defineComponent({
           return "report_ids";
         case "synthetics":
           return "synthetic_ids";
+        case "workflows":
+          return "workflow_ids";
         default:
           return "alert_ids";
       }

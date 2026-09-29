@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="defaultColumnVisibility"
         :persist-columns="true"
         table-id="dbm-databases"
+        :footer-title="t('dbm.databases.summary.databases')"
         :enable-column-resize="true"
         :toolbar-bordered="false"
         :get-row-style="rowStyle"
@@ -86,22 +87,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('dbm.databases.searchPlaceholder')"
             search-data-test="dbm-databases-search"
           >
-            <DbmScopeFilters
-              class="min-w-0 flex-1"
-              :filters="dimensionFilters"
-              @clear="clearScope"
+            <template #filters>
+              <DbmScopeFilters
+                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
+                :filters="dimensionFilters"
+                @clear="clearScope"
+              />
+            </template>
+            <DbmCoverageLine
+              inline
+              class="ms-auto"
+              :freshness="freshness"
+              :hits="rows"
+              :top-n-subset="topNSubset"
+              :error-count="errorCount"
+              exact-percentiles
+              data-test="dbm-databases-coverage"
             />
           </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DbmRefreshButton
-              mode="status"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-databases-refresh"
-            />
             <DateTime
               auto-apply
               menu-align="end"
@@ -109,14 +116,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-databases-date-time"
-              class="h-8"
+              class="h-8 max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
-            <DbmRefreshButton
-              mode="button"
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
               :loading="loading"
+              :last-run-at="lastRunAt"
               data-test="dbm-databases-refresh"
-              @refresh="onRefresh"
+              @click="onRefresh()"
             />
           </div>
         </template>
@@ -125,16 +134,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <DbmSubheaderBand data-test="dbm-databases-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
+            <OStatStrip
+              :items="summaryStats"
+              :loading="loading"
+              selectable
+              :selected-key="statFilter"
+              default-key="databases"
+              @select="onStatSelect"
+            />
           </DbmSubheaderBand>
-          <DbmCoverageLine
-            :freshness="freshness"
-            :hits="rows"
-            :top-n-subset="topNSubset"
-            :error-count="errorCount"
-            exact-percentiles
-            data-test="dbm-databases-coverage"
-          />
         </template>
 
         <!-- One name column at three grains: a database, a schema or service
@@ -222,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             source="client"
             :qualifier-key="CLIENT_OBSERVED"
             :engine="engineOf(row)"
+            :with-marker="false"
             data-test="dbm-databases-calls"
           />
         </template>
@@ -369,28 +378,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatPercent(row.share, 0) }}
               </span>
             </span>
-            <!-- The other overlap measure, and the one where an absent
-                 qualifier is most costly: a duration under "Load" with no
-                 vantage named reads as time the ENGINE spent, which on
-                 MySQL/MariaDB would be wait time. This is span time, and it
-                 includes network and pool wait the server never sees (T7). -->
-            <span class="text-text-secondary text-3xs" data-test="dbm-databases-load-qualifier">
-              <OTooltip
-                :content="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
-              />
-              {{ t("dbm.list.overlap.clientObserved") }}
-            </span>
           </span>
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
         </template>
 
-        <!-- Both actions are about queries — opening the query list, or
-             alerting on a p95 nothing measured — so a trafficless row offers
-             neither rather than offering two dead buttons. -->
+        <!-- Actions are per-row: the query-shaped ones (open, alert) need
+             traffic to point at, so a trafficless row offers only the Metrics
+             hop — its identity came from the metric streams, so that one
+             always lands on content. -->
         <template #cell-actions="{ row }">
           <DbmRowActions
-            v-if="!isBreakdownRow(row) && !row.trafficless"
-            :actions="rowActions"
+            v-if="!isBreakdownRow(row)"
+            :actions="rowActionsFor(row)"
             data-test="dbm-databases-row-actions"
             @action="(id) => onRowAction(id, row)"
           />
@@ -441,7 +440,6 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
@@ -449,6 +447,7 @@ import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -489,6 +488,7 @@ import { foldServerInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
 import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
 import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
+import { APP_SOURCE_QUALIFIER } from "@/utils/dbm/overlapMetrics";
 import { detectDrowningDatabases, isCriticalErrorRate, totalsKey } from "@/utils/dbm/insights";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
@@ -628,6 +628,12 @@ const errorCount = computed(() => rows.value.reduce((acc, row) => acc + (row.err
  * facet the table can filter to, so making them clickable would promise a
  * behaviour the page does not have.
  */
+// The Failed tile narrows the table to databases with a failed call; Calls and Database time are totals, not rows.
+const statFilter = ref<"failed" | null>(null);
+const onStatSelect = (key: string) => {
+  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
+};
+
 const summaryStats = computed<StatItem[]>(() => {
   // Both figures are summed over the CLIENT hits, so the trace vantage is the
   // population signal: no trace rows means nobody measured, and the sums are
@@ -657,6 +663,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: calls.value ?? raw("—"),
       icon: "bar-chart",
       tone: "info",
+      selectable: false,
       dataTest: "dbm-databases-summary-calls",
     },
     {
@@ -665,6 +672,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: time.value ?? raw("—"),
       icon: "timer",
       tone: "teal",
+      selectable: false,
       dataTest: "dbm-databases-summary-time",
     },
     {
@@ -673,12 +681,15 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-databases-summary-failed",
     },
   ];
 });
 
-const isFiltered = computed(() => !!search.value || !!systemFilter.value);
+const isFiltered = computed(
+  () => !!search.value || !!systemFilter.value || statFilter.value !== null,
+);
 
 // Every filter change publishes the scope to the URL BEFORE reloading — the
 // factory owns the handler, so no entry can forget the URL half.
@@ -709,8 +720,10 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
  */
 const visibleRows = computed(() => {
   const needle = search.value.trim().toLowerCase();
-  if (!needle) return rows.value;
-  return rows.value.filter((row) =>
+  const scoped =
+    statFilter.value === "failed" ? rows.value.filter((row) => (row.errors ?? 0) > 0) : rows.value;
+  if (!needle) return scoped;
+  return scoped.filter((row) =>
     [row.db_instance, row.db_namespace, row.db_system, ...(row.calling_services ?? [])]
       .filter(Boolean)
       .some((field) => String(field).toLowerCase().includes(needle)),
@@ -812,15 +825,7 @@ const sortOrder = ref<"asc" | "desc">("desc");
  */
 const attentionOf = (row: TableRow) => healthScalar(isBreakdownRow(row) ? undefined : row.metrics);
 
-/**
- * The engine that reported a row, for the client-observed attribution tooltip.
- *
- * Only a database row carries one: a breakdown row is a schema or service
- * *within* a database, so it has no engine of its own and must not borrow its
- * parent's — the tooltip would then attribute the figure to something the row
- * does not name. `undefined` is the honest answer and is what `DbmOverlapValue`
- * already defaults to.
- */
+/** The engine that reported a row; a breakdown row has none and must not borrow its parent's. */
 const engineOf = (row: TableRow): string | undefined =>
   isBreakdownRow(row) ? undefined : row.db_system;
 
@@ -1314,13 +1319,13 @@ const traceVantage = computed(() =>
  * labelling the one we have.
  *
  * So the resolver's server branch is unreachable at this grain and these
- * render as `clientObserved`. That is not a placeholder for a future server
+ * render with the app-source marker. That is not a placeholder for a future server
  * number: it is the true provenance, and it is exactly what D2 demands be
  * said out loud, because "Calls" with no qualifier reads as what the DATABASE
  * counted when it is what our instrumented callers counted — a number the
  * live fleet shows to be ~3.7x smaller.
  */
-const CLIENT_OBSERVED = "clientObserved";
+const CLIENT_OBSERVED = APP_SOURCE_QUALIFIER;
 
 /**
  * Calls-per-second for one row. Database rows carry the server-computed rate
@@ -1355,14 +1360,32 @@ const rowStyle = (row: TableRow) => {
   return color ? { boxShadow: `var(--shadow-rail-thin-geom) ${color}` } : {};
 };
 
-const rowActions = computed<DbmRowAction[]>(() => [
-  { id: "open", icon: "chevron-right", label: t("dbm.databases.openQueries") },
-  { id: "alert", icon: "shield", label: t("dbm.databases.alertMe") },
-]);
+/**
+ * Per-row: the query-shaped actions need traffic to point at, but a
+ * TRAFFICLESS row's identity came from the metric streams — the Metrics hop is
+ * exactly the one guaranteed to land on content there.
+ */
+const rowActionsFor = (row: DatabaseRow): DbmRowAction[] => {
+  const metrics: DbmRowAction = {
+    id: "metrics",
+    icon: "show-chart",
+    label: t("dbm.databases.viewMetrics"),
+  };
+  if (row.trafficless) return [metrics];
+  return [
+    { id: "open", icon: "chevron-right", label: t("dbm.databases.openQueries") },
+    metrics,
+    { id: "alert", icon: "shield", label: t("dbm.databases.alertMe") },
+  ];
+};
 
 const onRowAction = (id: string, row: DatabaseRow) => {
   if (id === "open") {
     openQueries(row);
+    return;
+  }
+  if (id === "metrics") {
+    openMetrics(row);
     return;
   }
   // Database scope, not query scope: this row IS the whole instance, so the
@@ -1402,9 +1425,11 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // half that cannot be hoisted into a header on a table that mixes engines.
   {
     id: "calls",
+    hideable: true,
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
-    size: 96,
+    // At 96 the "from your apps" sub-label ellipsised beside the sort chevron.
+    size: 124,
     sortable: true,
     meta: {
       align: "right",
@@ -1413,6 +1438,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "qps",
+    hideable: true,
     header: t("dbm.databases.columns.qps"),
     // "Per second" plus the sort icon needs ~100; at 84 it ellipsised to
     // "Per se…".
@@ -1425,6 +1451,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "errorRate",
+    hideable: true,
     header: t("dbm.databases.columns.errorRate"),
     accessorKey: "errorRate",
     size: 84,
@@ -1433,6 +1460,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p50",
+    hideable: true,
     header: t("dbm.databases.columns.p50"),
     accessorKey: "p50_ns",
     // The label is prose ("Half are under"), not a token, so the width has to
@@ -1448,6 +1476,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p95",
+    hideable: true,
     header: t("dbm.databases.columns.p95"),
     accessorKey: "p95_ns",
     size: 96,
@@ -1460,6 +1489,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p99",
+    hideable: true,
     header: t("dbm.databases.columns.p99"),
     accessorKey: "p99_ns",
     // Same as p50: "Slowest 1%" plus the sort icon did not fit in 92.
@@ -1473,6 +1503,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "services",
+    hideable: true,
     header: t("dbm.databases.columns.services"),
     accessorKey: "calling_services",
     size: 200,
@@ -1488,6 +1519,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // setting, which is the same discipline the four unmatched causes follow.
   {
     id: "instanceHealth",
+    hideable: true,
     header: t("dbm.instanceMetrics.columnHeader"),
     // Width 200: the cell carries a sparkline, the ratio, the "N of M
     // connections" line AND the secondary chips (cache hit, lag, deadlocks);
@@ -1507,6 +1539,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // the vantage it came from.
   {
     id: "attention",
+    hideable: true,
     header: t("dbm.databases.columns.attention"),
     size: 130,
     sortable: true,
@@ -1518,6 +1551,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "load",
+    hideable: true,
     header: t("dbm.databases.columns.load"),
     accessorKey: "total_time_ns",
     size: 190,
@@ -1569,6 +1603,7 @@ const defaultColumnVisibility = {};
 
 const clearScope = () => {
   systemFilter.value = null;
+  statFilter.value = null;
   // Clear the SEARCH too, the way every sibling tab's clear does
   // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set makes "clear"
   // mean two different things inside one section: the list stays narrowed by a
@@ -1651,6 +1686,24 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
  * than a dead end. Its schema wins over the row's, because the leaf is the
  * narrower and more recent statement of what the reader wants.
  */
+/** The Metrics tab, scoped to this database — window and filters carry. */
+const openMetrics = (row: DatabaseRow, namespaceOverride?: string | null) => {
+  const namespace = namespaceOverride ?? row.db_namespace;
+  router
+    .push({
+      name: "dbmMetrics",
+      query: {
+        ...route.query,
+        org_identifier: org.value,
+        ...queryParams.value,
+        system: row.db_system,
+        instance: row.db_instance,
+        ...(namespace ? { namespace } : {}),
+      },
+    })
+    .catch(() => {});
+};
+
 const openQueries = (
   row: DatabaseRow,
   target?: { namespace: string | null; service: string | null },
@@ -1681,21 +1734,21 @@ const openQueries = (
  * child carries only names, so its database is found by the key it was built
  * from.
  */
+/**
+ * A row click applies the row as SCOPE and lands on Metrics — the database's
+ * vital signs, filters pre-set. The per-query views stay one explicit action
+ * away on the row (open queries / alert).
+ */
 const onRowClick = (row: TableRow) => {
   if (!isBreakdownRow(row)) {
-    // A trafficless row navigates too: the query list is not empty by
-    // construction for it — Top queries falls back to the database-reported
-    // list, and the system/instance scope this handoff carries filters that
-    // list to exactly this row. Returning early here would turn the whole fleet
-    // into dead rows on a no-APM org.
-    openQueries(row);
+    openMetrics(row);
     return;
   }
   // A placeholder names no schema and no service, so it has no scope to hand
-  // off — clicking it would silently open the unfiltered query list.
+  // off — clicking it would silently open unfiltered Metrics.
   if (row.kind === "status") return;
   const parent = rows.value.find((candidate) => row.rowKey.startsWith(`${candidate.rowKey}/`));
-  if (parent) openQueries(parent, { namespace: row.namespace, service: row.service });
+  if (parent) openMetrics(parent, row.namespace);
 };
 
 // This page carries no "suggest a fix" button — "make my database faster" has no

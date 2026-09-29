@@ -458,8 +458,7 @@ pub async fn trigger_incident_rca(
     Query(query): Query<TriggerRcaQuery>,
 ) -> Response {
     use o2_enterprise::enterprise::{
-        alerts::rca_service::{self, IncidentRcaContext},
-        common::config::get_config as get_o2_config,
+        alerts::rca_service, common::config::get_config as get_o2_config,
     };
 
     let o2_cfg = get_o2_config();
@@ -502,39 +501,37 @@ pub async fn trigger_incident_rca(
     )
     .await;
 
-    // Get incident with alerts
-    let incident =
-        match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
-            .await
-        {
-            Ok(Some(i)) => i,
-            Ok(None) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Incident not found",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        None,
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::not_found("Incident not found");
-            }
-            Err(e) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Database error",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::internal_error(e);
-            }
-        };
+    // Existence check only: the builder below re-derives everything this used to supply, so this
+    // reads the one row rather than hydrating every alert on the incident to throw them away.
+    match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            let _ = openobserve_core::incidents::append_event(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
+                    "Incident not found",
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual,
+                    None,
+                ),
+            )
+            .await;
+            return MetaHttpResponse::not_found("Incident not found");
+        }
+        Err(e) => {
+            let _ = openobserve_core::incidents::append_event(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
+                    "Database error",
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual,
+                    Some(format!("{:#}", e)),
+                ),
+            )
+            .await;
+            return MetaHttpResponse::internal_error(e);
+        }
+    }
 
     // Build RCA context. Each run is a fresh analysis unless the caller explicitly opts
     // into continuity — chaining every run compounds the report (and the agent's context)
@@ -549,11 +546,10 @@ pub async fn trigger_incident_rca(
     } else {
         None
     };
-    let context = IncidentRcaContext {
-        incident_id: incident.incident.id.clone(),
-        org_id: incident.incident.org_id.clone(),
-        previous_analysis,
-    };
+    // The single builder both this endpoint and the autonomous path call, so the two can no
+    // longer disagree about severity or past_causes (C1).
+    let context =
+        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
 
     // Create RCA agent client with SA credentials
     let (email, token) =
@@ -1207,6 +1203,8 @@ mod tests {
             alert_count: 5,
             title: Some("Test Incident".to_string()),
             assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
             created_at: 1000,
             updated_at: 2000,
             group_values: serde_json::Value::Object(Default::default()),

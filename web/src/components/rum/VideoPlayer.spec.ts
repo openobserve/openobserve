@@ -574,11 +574,17 @@ describe("VideoPlayer", () => {
       disconnectSpy = vi.fn();
       capturedCallback = undefined;
 
-      function MockRO(this: ResizeObserver, cb: ResizeObserverCallback) {
+      function MockRO(this: any, cb: ResizeObserverCallback) {
         capturedCallback = cb;
       }
-      MockRO.prototype.observe = observeSpy;
-      MockRO.prototype.disconnect = disconnectSpy;
+      // Records the observed element per instance — OSelect's option list also creates observers against this mock.
+      MockRO.prototype.observe = function (this: any, el: Element) {
+        this._el = el;
+        observeSpy(el);
+      };
+      MockRO.prototype.disconnect = function (this: any) {
+        disconnectSpy(this._el);
+      };
       MockRO.prototype.unobserve = vi.fn();
       global.ResizeObserver = MockRO as unknown as typeof ResizeObserver;
     });
@@ -591,9 +597,11 @@ describe("VideoPlayer", () => {
       const localWrapper = mountComponent();
       await flushPromises();
       await localWrapper.vm.$nextTick();
+      const containerEl = localWrapper.find("#player").element.parentElement;
 
       expect(capturedCallback).toBeDefined();
-      expect(observeSpy).toHaveBeenCalledTimes(1);
+      // OSelect's speed dropdown options each attach their own truncation ResizeObserver too, so scope by target.
+      expect(observeSpy).toHaveBeenCalledWith(containerEl);
 
       localWrapper.unmount();
     });
@@ -602,10 +610,11 @@ describe("VideoPlayer", () => {
       const localWrapper = mountComponent();
       await flushPromises();
       await localWrapper.vm.$nextTick();
+      const containerEl = localWrapper.find("#player").element.parentElement;
 
       localWrapper.unmount();
 
-      expect(disconnectSpy).toHaveBeenCalledTimes(1);
+      expect(disconnectSpy).toHaveBeenCalledWith(containerEl);
     });
 
     it("should resize the player when the ResizeObserver callback fires after player is initialized", async () => {
@@ -650,6 +659,7 @@ describe("VideoPlayer", () => {
       const localWrapper = mountComponent();
       await flushPromises();
       await localWrapper.vm.$nextTick();
+      const containerEl = localWrapper.find("#player").element.parentElement;
 
       // Simulate keep-alive deactivation then activation
       localWrapper.vm.$.appContext.app;
@@ -657,7 +667,7 @@ describe("VideoPlayer", () => {
       await (localWrapper.vm as any).$options.activated?.();
 
       // observe was called at least once (on initial mount) — component handles re-activation
-      expect(observeSpy).toHaveBeenCalledTimes(1);
+      expect(observeSpy).toHaveBeenCalledWith(containerEl);
 
       localWrapper.unmount();
     });

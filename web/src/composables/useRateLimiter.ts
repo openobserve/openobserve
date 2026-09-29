@@ -20,10 +20,13 @@ const useRateLimiter = () => {
   const store = useStore();
   let isApiLimitsLoading = ref<boolean>(false);
   let isRoleLimitsLoading = ref<boolean>(false);
+  const apiLimitsForbidden = ref<boolean>(false);
+  const roleLimitsForbidden = ref<boolean>(false);
 
   const getApiLimitsByOrganization = async (orgId: string, interval: string = "second") => {
     try {
       isApiLimitsLoading.value = true;
+      apiLimitsForbidden.value = false;
       const response = await rateLimiterService.getApiLimits(orgId, interval);
       let transformedData: any = [];
 
@@ -64,8 +67,9 @@ const useRateLimiter = () => {
       });
       isApiLimitsLoading.value = false;
       return transformedData;
-    } catch (error) {
+    } catch (error: any) {
       isApiLimitsLoading.value = false;
+      apiLimitsForbidden.value = error?.response?.status === 403;
       console.log(error);
     }
   };
@@ -114,8 +118,9 @@ const useRateLimiter = () => {
       });
       isRoleLimitsLoading.value = false;
       return transformedData;
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
+      roleLimitsForbidden.value = error?.response?.status === 403;
       isRoleLimitsLoading.value = false;
     }
   };
@@ -146,6 +151,8 @@ const useRateLimiter = () => {
     getModulesToDisplay,
     isRoleLimitsLoading,
     isApiLimitsLoading,
+    apiLimitsForbidden,
+    roleLimitsForbidden,
   };
 };
 export default useRateLimiter;
