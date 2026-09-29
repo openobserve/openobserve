@@ -4090,6 +4090,7 @@
       "oracleTagline": "Thu thập các chỉ số Oracle DB với OpenTelemetry Collector và gửi chúng tới OpenObserve.",
       "otlpFixBody": "Việc định nghĩa exporter là chưa đủ — nó phải được liệt kê trong pipeline. Đây là lý do phổ biến nhất khiến một cấu hình trông có vẻ đúng nhưng lại không gửi dữ liệu:",
       "otlpFixTitle": "Kiểm tra exporter đã thực sự được nối vào pipeline",
+      "otlpGrpcCloudNote": "Cổng gRPC công khai của OpenObserve Cloud — chi phí thấp hơn so với HTTP cho khối lượng span lớn, không cần cấu hình mạng tự triển khai.",
       "otlpGrpcNote": "Ít chi phí hơn HTTP cho khối lượng span lớn. Cổng 5081 phải truy cập được từ collector.",
       "otlpHttpNote": "Mặc định cho OpenTelemetry Collector — hoạt động ở mọi nơi, kể cả sau proxy và bộ cân bằng tải.",
       "otlpSdkEnvNote": "Các biến môi trường OTEL_* tiêu chuẩn — mọi OpenTelemetry SDK đều đọc các biến này, nên không cần thay đổi mã.",

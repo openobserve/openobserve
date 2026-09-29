@@ -4090,6 +4090,7 @@
       "oracleTagline": "OpenTelemetry Collector로 Oracle DB 메트릭을 수집하고 OpenObserve로 전송하세요.",
       "otlpFixBody": "익스포터를 정의하는 것만으로는 충분하지 않습니다 — 파이프라인에 나열되어야 합니다. 올바르게 보이는 구성이 아무것도 보내지 않는 가장 흔한 이유입니다:",
       "otlpFixTitle": "익스포터가 실제로 파이프라인에 연결되어 있는지 확인",
+      "otlpGrpcCloudNote": "OpenObserve Cloud의 공개 gRPC 게이트웨이 — 많은 Span 볼륨에서 HTTP보다 오버헤드가 낮으며, 구성할 자체 호스팅 네트워킹이 없습니다.",
       "otlpGrpcNote": "높은 스팬 볼륨에서 HTTP보다 오버헤드가 낮습니다. 포트 5081은 컬렉터에서 도달 가능해야 합니다.",
       "otlpHttpNote": "OpenTelemetry Collector의 기본값 — 프록시 및 로드 밸런서 뒤를 포함한 모든 곳에서 작동합니다.",
       "otlpSdkEnvNote": "표준 OTEL_* 환경 변수 — 모든 OpenTelemetry SDK가 이를 읽으므로 코드 변경이 필요 없습니다.",

@@ -4090,6 +4090,7 @@
       "oracleTagline": "Verzamel Oracle DB-metrics met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "otlpFixBody": "Een exporter definiëren is niet voldoende — deze moet in een pipeline worden opgenomen. Dit is de meest voorkomende reden dat een correct uitziende configuratie niets verzendt:",
       "otlpFixTitle": "Controleer of de exporter daadwerkelijk in de pipeline is opgenomen",
+      "otlpGrpcCloudNote": "De openbare gRPC-gateway van OpenObserve Cloud — minder overhead dan HTTP voor grote hoeveelheden spans, geen zelfgehoste netwerkinfrastructuur te configureren.",
       "otlpGrpcNote": "Lagere overhead dan HTTP voor grote spanvolumes. Poort 5081 moet bereikbaar zijn vanaf de collector.",
       "otlpHttpNote": "De standaard voor de OpenTelemetry Collector — werkt overal, ook achter proxies en load balancers.",
       "otlpSdkEnvNote": "Standaard OTEL_*-omgevingsvariabelen — elke OpenTelemetry-SDK leest deze, dus er is geen codewijziging nodig.",
