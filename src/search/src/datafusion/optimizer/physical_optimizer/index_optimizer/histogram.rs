@@ -34,7 +34,9 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::{is_complex_plan, is_unfiltered_count_rows, limits_rows},
+    index_optimizer::utils::{
+        aggregate_input_drops_rows, is_complex_plan, is_unfiltered_count_rows,
+    },
     utils::{get_column_name, is_column},
 };
 
@@ -88,7 +90,10 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Check if the AggregateExec matches SimpleHistogram pattern
-            if aggregate.group_expr().expr().len() == 1 && is_unfiltered_count_rows(aggregate) {
+            if aggregate.group_expr().expr().len() == 1
+                && is_unfiltered_count_rows(aggregate)
+                && !aggregate_input_drops_rows(aggregate)
+            {
                 // Check group by field
                 if let Some((group_expr, _)) = aggregate.group_expr().expr().first()
                     && let Some(func) = get_data_bin(group_expr)
@@ -128,10 +133,6 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
             return Ok(TreeNodeRecursion::Stop);
         } else if is_complex_plan(node) {
             // If encounter complex plan, stop visiting
-            self.simple_histogram = None;
-            return Ok(TreeNodeRecursion::Stop);
-        } else if self.simple_histogram.is_some() && limits_rows(node) {
-            // A limit below the aggregate drops rows that the index would still count.
             self.simple_histogram = None;
             return Ok(TreeNodeRecursion::Stop);
         }
@@ -242,7 +243,10 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Exactly 2 group-by expressions (histogram + breakdown) and 1 aggregate (count(*))
-            if aggregate.group_expr().expr().len() == 2 && is_unfiltered_count_rows(aggregate) {
+            if aggregate.group_expr().expr().len() == 2
+                && is_unfiltered_count_rows(aggregate)
+                && !aggregate_input_drops_rows(aggregate)
+            {
                 let groups = aggregate.group_expr().expr();
                 // One must be date_bin (histogram), the other must be an index field column
                 let date_bin_idx = groups
@@ -292,10 +296,6 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
             self.simple_multi_histogram = None;
             return Ok(TreeNodeRecursion::Stop);
         } else if is_complex_plan(node) {
-            self.simple_multi_histogram = None;
-            return Ok(TreeNodeRecursion::Stop);
-        } else if self.simple_multi_histogram.is_some() && limits_rows(node) {
-            // A limit below the aggregate drops rows that the index would still count.
             self.simple_multi_histogram = None;
             return Ok(TreeNodeRecursion::Stop);
         }

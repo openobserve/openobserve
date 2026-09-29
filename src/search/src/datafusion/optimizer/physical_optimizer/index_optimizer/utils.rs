@@ -17,7 +17,11 @@ use std::sync::Arc;
 
 use datafusion::{
     common::tree_node::TreeNode,
-    physical_plan::{ExecutionPlan, aggregates::AggregateExec, limit::GlobalLimitExec},
+    physical_plan::{
+        ExecutionPlan,
+        aggregates::{AggregateExec, AggregateInputMode},
+        limit::GlobalLimitExec,
+    },
 };
 
 use crate::datafusion::optimizer::physical_optimizer::utils::is_count_rows_aggregate;
@@ -50,8 +54,16 @@ pub fn is_unfiltered_count_rows(aggregate: &AggregateExec) -> bool {
         && aggregate.filter_expr().iter().all(Option::is_none)
 }
 
-/// Whether the node caps its output rows, so the index would count rows the query drops.
-pub fn limits_rows(node: &Arc<dyn ExecutionPlan>) -> bool {
+/// Whether a limit or nested aggregate below this raw-input aggregate drops rows the index reads.
+pub fn aggregate_input_drops_rows(aggregate: &AggregateExec) -> bool {
+    aggregate.mode().input_mode() == AggregateInputMode::Raw
+        && aggregate
+            .input()
+            .exists(|node| Ok(limits_rows(node) || node.downcast_ref::<AggregateExec>().is_some()))
+            .unwrap_or(true)
+}
+
+fn limits_rows(node: &Arc<dyn ExecutionPlan>) -> bool {
     node.fetch().is_some() || node.downcast_ref::<GlobalLimitExec>().is_some()
 }
 

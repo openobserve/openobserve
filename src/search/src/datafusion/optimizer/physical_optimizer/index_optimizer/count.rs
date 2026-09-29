@@ -25,7 +25,7 @@ use datafusion::{
 };
 
 use crate::datafusion::optimizer::physical_optimizer::index_optimizer::utils::{
-    is_complex_plan, is_unfiltered_count_rows, limits_rows,
+    aggregate_input_drops_rows, is_complex_plan, is_unfiltered_count_rows,
 };
 
 #[rustfmt::skip]
@@ -70,17 +70,16 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
-            if !aggregate.group_expr().is_empty() || !is_unfiltered_count_rows(aggregate) {
+            if !aggregate.group_expr().is_empty()
+                || !is_unfiltered_count_rows(aggregate)
+                || aggregate_input_drops_rows(aggregate)
+            {
                 self.is_simple_count = false;
                 return Ok(TreeNodeRecursion::Stop);
             }
             self.is_simple_count = true;
         } else if is_complex_plan(node) {
             // if encounter complex plan, stop visiting
-            self.is_simple_count = false;
-            return Ok(TreeNodeRecursion::Stop);
-        } else if self.is_simple_count && limits_rows(node) {
-            // A limit below the aggregate drops rows that the index would still count.
             self.is_simple_count = false;
             return Ok(TreeNodeRecursion::Stop);
         }
