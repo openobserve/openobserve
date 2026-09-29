@@ -13142,6 +13142,7 @@
       "promptLabel": "Yargıç istemi",
       "includeReasoningLabel": "Gerekçeyi Dahil Et",
       "includeReasoningHint": "Hakem, bu puanı neden verdiğini açıklar ve her sonuçla birlikte kaydedilir.",
+      "decisionProviderNote": "Karar modelleri yalnızca bir puan ve gerekçe döndürür, bu nedenle ek alanlar kullanılamaz.",
       "extraFieldsLabel": "Ek Meta Veri Alanları (İsteğe Bağlı)",
       "extraFieldsHint": "Hakemden her puanla birlikte ek değerler döndürmesini isteyin — örneğin bir kategori veya güven düzeyi.",
       "extraFields": {
@@ -19568,6 +19569,8 @@
     "unroutedDismissedTag": "kapatıldı",
     "notAvailableTitle": "Nöbet özelliği bu dağıtımda kullanılamıyor",
     "notAvailableDescription": "Bağlantı sorunsuz — bu sürüm burada nöbet desteği sunmuyor. Hiçbir şey başarısız olmadı ve yeniden denenecek bir şey yok.",
+    "teamNotFoundTitle": "Ekip bulunamadı",
+    "teamNotFoundDescription": "Bu ekip artık mevcut değil. Silinmiş olabilir.",
     "unroutedPagedNobody": "Kimse bilgilendirilmedi",
     "unroutedLoadFailed": "Yönlendirilmemiş kuyruk yüklenemedi",
     "routingLoadFailed": "Sahiplik ve yönlendirme yüklenemedi",

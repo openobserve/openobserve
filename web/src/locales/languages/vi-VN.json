@@ -13142,6 +13142,7 @@
       "promptLabel": "Lời nhắc của người đánh giá",
       "includeReasoningLabel": "Bao gồm lý luận",
       "includeReasoningHint": "Người đánh giá giải thích lý do cho điểm đó, được lưu kèm mỗi kết quả.",
+      "decisionProviderNote": "Mô hình quyết định chỉ trả về điểm số và lý do, nên các trường bổ sung không khả dụng.",
       "extraFieldsLabel": "Trường Metadata Bổ sung (Tùy chọn)",
       "extraFieldsHint": "Yêu cầu người đánh giá trả về các giá trị bổ sung cùng mỗi điểm — ví dụ như danh mục hoặc độ tin cậy.",
       "extraFields": {
@@ -19568,6 +19569,8 @@
     "unroutedDismissedTag": "đã bỏ qua",
     "notAvailableTitle": "Trực on-call không khả dụng trên bản triển khai này",
     "notAvailableDescription": "Liên kết vẫn ổn — bản dựng này không cung cấp tính năng trực on-call ở đây. Không có gì lỗi và cũng không có gì để thử lại.",
+    "teamNotFoundTitle": "Không tìm thấy nhóm",
+    "teamNotFoundDescription": "Nhóm này không còn tồn tại. Có thể nhóm đã bị xóa.",
     "unroutedPagedNobody": "Không ai được thông báo",
     "unroutedLoadFailed": "Không thể tải hàng đợi chưa định tuyến",
     "routingLoadFailed": "Không thể tải quyền sở hữu và định tuyến",

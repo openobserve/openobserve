@@ -13142,6 +13142,7 @@
       "promptLabel": "Aufforderung des Richters",
       "includeReasoningLabel": "Begründung einbeziehen",
       "includeReasoningHint": "Der Judge erklärt, warum er diese Bewertung gegeben hat, gespeichert mit jedem Ergebnis.",
+      "decisionProviderNote": "Entscheidungsmodelle geben nur einen Score und eine Begründung zurück, daher sind keine zusätzlichen Felder verfügbar.",
       "extraFieldsLabel": "Zusätzliche Metadatenfelder (Optional)",
       "extraFieldsHint": "Bitten Sie den Judge, mit jeder Bewertung zusätzliche Werte zurückzugeben — zum Beispiel eine Kategorie oder ein Konfidenzniveau.",
       "extraFields": {
@@ -19568,6 +19569,8 @@
     "unroutedDismissedTag": "verworfen",
     "notAvailableTitle": "On-Call ist in dieser Installation nicht verfügbar",
     "notAvailableDescription": "Der Link ist in Ordnung — dieser Build bietet hier kein On-Call. Es ist nichts fehlgeschlagen und es gibt nichts zu wiederholen.",
+    "teamNotFoundTitle": "Team nicht gefunden",
+    "teamNotFoundDescription": "Dieses Team existiert nicht mehr. Es wurde möglicherweise gelöscht.",
     "unroutedPagedNobody": "Niemand benachrichtigt",
     "unroutedLoadFailed": "Die Warteschlange ungerouteter Alarme konnte nicht geladen werden.",
     "routingLoadFailed": "Zuständigkeiten und Routing konnten nicht geladen werden.",
