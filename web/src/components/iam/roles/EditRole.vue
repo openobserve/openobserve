@@ -301,6 +301,7 @@ import onlineEvalsService from "@/services/online-evals.service";
 
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import llmPromptsService from "@/services/llm-prompts.service";
 import {
   DBM_MODULE_RESOURCE,
   DBM_VIEWER_STREAM_ROW_PERMS,
@@ -697,6 +698,13 @@ const modifyResourcePermissions = (resource: Resource) => {
   }
   if (resource.resourceName === "prompt") {
     // Prompt deletion is archival and label deletion is a pointer update.
+    resource.permission.AllowDelete.show = false;
+  }
+  if (resource.resourceName === "prompt_label") {
+    // Only moving/deleting a protected label is checked, and that is a PUT.
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowGet.show = false;
+    resource.permission.AllowPost.show = false;
     resource.permission.AllowDelete.show = false;
   }
 };
@@ -1609,6 +1617,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     eval_job: getEvalJobs,
     annotation_queue: getAnnotationQueues,
     dataset: getDatasets,
+    prompt: getPrompts,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
     logs_cache: getLogsCacheStreams,
@@ -2166,6 +2175,16 @@ const getDatasets = async () => {
   });
 };
 
+const getPrompts = async () => {
+  const prompts = await llmPromptsService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("prompt", ["entityId"], prompts, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
 const updateEntityEntities = (
   entity: Entity | Resource,
   entityNameKeys: string[],
@@ -2339,6 +2358,9 @@ const updateResourceEntities = (
       entity.permission.AllowDelete.show = false;
       entity.permission.AllowPost.show = false;
       entity.permission.AllowPut.show = false;
+    }
+    if (resourceName === "prompt") {
+      resource.entities[resource.entities.length - 1].permission.AllowDelete.show = false;
     }
     // Hide non-applicable permissions for logs_cache entities (only All and Delete)
     if (resourceName === "logs_cache") {
