@@ -660,21 +660,11 @@ async fn prepare_alert(
         }
     }
 
-    if !TZ_OFFSET_RANGE_MINUTES.contains(&alert.tz_offset) {
-        return Err(AlertError::TzOffsetOutOfRange);
-    }
-
     if alert.trigger_condition.frequency_type == FrequencyType::Cron {
         let now = Utc::now().second();
         alert.trigger_condition.cron = update_cron_expression(&alert.trigger_condition.cron, now);
         // Check the cron expression
-        let schedule =
-            Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
-        if schedule.upcoming(Utc).next().is_none() {
-            return Err(AlertError::CronHasNoFutureOccurrence {
-                cron: alert.trigger_condition.cron.clone(),
-            });
-        }
+        Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
     } else {
         // if cron is not empty, set it to empty string
         if !alert.trigger_condition.cron.is_empty() {
@@ -685,20 +675,8 @@ async fn prepare_alert(
             alert.trigger_condition.frequency =
                 std::cmp::max(60, get_config().limit.alert_schedule_interval);
         }
-        if !(1..=SCHEDULE_FIELD_MAX_SECS).contains(&alert.trigger_condition.frequency) {
-            return Err(AlertError::FrequencyOutOfRange);
-        }
     }
-
-    // `silence` is in minutes, unlike the other two fields
-    if !(0..=SCHEDULE_FIELD_MAX_SECS / 60).contains(&alert.trigger_condition.silence) {
-        return Err(AlertError::SilenceOutOfRange);
-    }
-    if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs
-        && !(0..=SCHEDULE_FIELD_MAX_SECS).contains(&tolerance)
-    {
-        return Err(AlertError::ToleranceOutOfRange);
-    }
+    check_schedule(old_alert.as_ref(), alert)?;
 
     // An SLO alert (§6b.6) runs no query and therefore has no stream. The
     // `stream_name` half of this check is skipped for it — note the two are
@@ -1092,6 +1070,47 @@ mod prepare_alert_name_tests {
     fn the_route_name_remains_a_fallback_for_legacy_bodies() {
         assert_eq!(prepared_alert_name("old-name", "  "), "old-name");
     }
+}
+
+/// Validates the schedule unless `stored` already holds it, so an enable toggle still saves.
+fn check_schedule(stored: Option<&Alert>, alert: &Alert) -> Result<(), AlertError> {
+    if stored.is_some_and(|stored| same_schedule(stored, alert)) {
+        return Ok(());
+    }
+    if !TZ_OFFSET_RANGE_MINUTES.contains(&alert.tz_offset) {
+        return Err(AlertError::TzOffsetOutOfRange);
+    }
+    let trigger = &alert.trigger_condition;
+    if trigger.frequency_type == FrequencyType::Cron {
+        let schedule = Schedule::from_str(&trigger.cron).map_err(AlertError::ParseCron)?;
+        if schedule.upcoming(Utc).next().is_none() {
+            return Err(AlertError::CronHasNoFutureOccurrence {
+                cron: trigger.cron.clone(),
+            });
+        }
+    } else if !(1..=SCHEDULE_FIELD_MAX_SECS).contains(&trigger.frequency) {
+        return Err(AlertError::FrequencyOutOfRange);
+    }
+    // `silence` is in minutes, unlike the other two fields
+    if !(0..=SCHEDULE_FIELD_MAX_SECS / 60).contains(&trigger.silence) {
+        return Err(AlertError::SilenceOutOfRange);
+    }
+    if let Some(tolerance) = trigger.tolerance_in_secs
+        && !(0..=SCHEDULE_FIELD_MAX_SECS).contains(&tolerance)
+    {
+        return Err(AlertError::ToleranceOutOfRange);
+    }
+    Ok(())
+}
+
+fn same_schedule(a: &Alert, b: &Alert) -> bool {
+    let (x, y) = (&a.trigger_condition, &b.trigger_condition);
+    a.tz_offset == b.tz_offset
+        && x.frequency_type == y.frequency_type
+        && x.frequency == y.frequency
+        && x.cron == y.cron
+        && x.silence == y.silence
+        && x.tolerance_in_secs == y.tolerance_in_secs
 }
 
 pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
@@ -7650,6 +7669,46 @@ mod tests {
             matches!(err, AlertError::CronHasNoFutureOccurrence { .. }),
             "{err:?}"
         );
+    }
+
+    fn legacy_alert_with_an_invalid_schedule() -> Alert {
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = i64::MAX;
+        alert.trigger_condition.silence = i64::MAX;
+        alert.trigger_condition.tolerance_in_secs = Some(i64::MAX);
+        alert.tz_offset = 1440;
+        alert
+    }
+
+    #[test]
+    fn toggling_enabled_on_a_legacy_invalid_schedule_is_not_revalidated() {
+        let stored = legacy_alert_with_an_invalid_schedule();
+        let mut toggled = stored.clone();
+        toggled.enabled = !stored.enabled;
+        assert!(check_schedule(Some(&stored), &toggled).is_ok());
+
+        let mut stored = Alert::default();
+        stored.trigger_condition.frequency_type = FrequencyType::Cron;
+        stored.trigger_condition.cron = "0 0 0 1 1 * 2020".to_string();
+        let mut toggled = stored.clone();
+        toggled.enabled = !stored.enabled;
+        assert!(check_schedule(Some(&stored), &toggled).is_ok());
+    }
+
+    #[test]
+    fn editing_a_schedule_to_an_invalid_value_is_still_rejected() {
+        let mut stored = Alert::default();
+        stored.trigger_condition.frequency = 60;
+        let mut edited = stored.clone();
+        edited.tz_offset = 1440;
+        let err = check_schedule(Some(&stored), &edited).unwrap_err();
+        assert!(matches!(err, AlertError::TzOffsetOutOfRange), "{err:?}");
+
+        let stored = legacy_alert_with_an_invalid_schedule();
+        let mut edited = stored.clone();
+        edited.trigger_condition.frequency -= 1;
+        let err = check_schedule(Some(&stored), &edited).unwrap_err();
+        assert!(matches!(err, AlertError::TzOffsetOutOfRange), "{err:?}");
     }
 
     #[tokio::test]
