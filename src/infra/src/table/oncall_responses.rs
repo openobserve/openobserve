@@ -24,8 +24,9 @@ use config::{
     utils::time::now_micros,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, Select, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Select, SelectModel, SelectorRaw, Set,
+    Statement, Value,
     sea_query::{Expr, ExprTrait, SimpleExpr},
 };
 
@@ -1580,15 +1581,24 @@ pub async fn deepest_rungs(
 #[derive(Debug, FromQueryResult)]
 struct HandoffRecipient {
     response_id: String,
-    recipient: Option<String>,
+    recipient: String,
 }
 
 /// Who each of these records was most recently handed off to, in one grouped
 /// query — the same shape as [`deepest_rungs`]. `MAX(at)` cannot be paired with
 /// `recipient` in a single `GROUP BY` without the aggregate losing which row it
-/// came from, so this reads every handoff for the page and keeps the first one
-/// seen per record in a globally `at`-descending scan, which is that record's
-/// latest.
+/// came from, so this ranks every Handoff event per record with `ROW_NUMBER()
+/// OVER (PARTITION BY response_id ORDER BY at DESC, id DESC)` and keeps only
+/// `rn = 1` — one row per record, regardless of how long its handoff history
+/// is.
+///
+/// `recipient` is only ever set on a person handoff; a handoff to a team
+/// leaves it `NULL` (the team lives in the event body, not this column). The
+/// `recipient IS NOT NULL` check runs *after* ranking, not before — so when a
+/// record's most recent handoff was to a team, that record is simply absent
+/// from the result instead of falling back to whichever person it was
+/// previously handed to. Callers must not read a missing entry as "never
+/// handed off"; it may mean "handed off, but not to a person".
 pub async fn latest_handoff_recipients(
     ids: &[String],
 ) -> Result<std::collections::HashMap<String, String>, errors::Error> {
@@ -1596,25 +1606,41 @@ pub async fn latest_handoff_recipients(
         return Ok(Default::default());
     }
     let client = get_orm_client_rw().await;
-    let mut out: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    for row in oncall_response_events::Entity::find()
-        .filter(oncall_response_events::Column::ResponseId.is_in(ids.to_vec()))
-        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Handoff.to_i32()))
-        .filter(oncall_response_events::Column::Recipient.is_not_null())
-        .select_only()
-        .column_as(oncall_response_events::Column::ResponseId, "response_id")
-        .column_as(oncall_response_events::Column::Recipient, "recipient")
-        .order_by_desc(oncall_response_events::Column::At)
-        .order_by_desc(oncall_response_events::Column::Id)
-        .into_model::<HandoffRecipient>()
+    let backend = client.get_database_backend();
+    let placeholder = |n: usize| match backend {
+        DatabaseBackend::Postgres => format!("${n}"),
+        DatabaseBackend::MySql | DatabaseBackend::Sqlite => "?".to_string(),
+    };
+
+    let mut values: Vec<Value> = Vec::with_capacity(ids.len() + 1);
+    values.push(Value::from(ResponseEventKind::Handoff.to_i32()));
+    values.extend(ids.iter().cloned().map(Value::from));
+    let id_placeholders = (2..=ids.len() + 1)
+        .map(placeholder)
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let sql = format!(
+        "SELECT response_id, recipient FROM (\
+            SELECT response_id, recipient, \
+                   ROW_NUMBER() OVER (PARTITION BY response_id ORDER BY at DESC, id DESC) AS rn \
+            FROM oncall_response_events \
+            WHERE kind = {} AND response_id IN ({id_placeholders}) \
+        ) ranked WHERE rn = 1 AND recipient IS NOT NULL",
+        placeholder(1),
+    );
+
+    let rows: Vec<HandoffRecipient> =
+        SelectorRaw::<SelectModel<HandoffRecipient>>::from_statement(
+            Statement::from_sql_and_values(backend, &sql, values),
+        )
         .all(client)
-        .await?
-    {
-        if let Some(recipient) = row.recipient {
-            out.entry(row.response_id).or_insert(recipient);
-        }
-    }
-    Ok(out)
+        .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| (row.response_id, row.recipient))
+        .collect())
 }
 
 #[cfg(test)]
