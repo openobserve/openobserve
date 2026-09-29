@@ -395,8 +395,7 @@ pub async fn generate_report(
     Ok((pdf_data, email_dashb_url))
 }
 
-/// Percent-encodes the key and value so a variable containing `&`, `#` or `"` cannot inject
-/// extra query parameters or break out of the dashboard URL.
+/// Percent-encodes both sides so a `&`, `#` or `"` in a variable can't break out of the URL.
 fn format_dashb_var(key: &str, value: &str) -> String {
     format!(
         "var-{}={}",

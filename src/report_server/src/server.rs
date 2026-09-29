@@ -46,8 +46,7 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// A non-IPv6 `addr` (e.g. the shared IPv4 default) would fail to bind, so fall back to the
-/// unspecified address rather than silently listening on the wrong interface.
+/// Falls back to `::` when `addr` isn't a valid IPv6 literal (e.g. the shared IPv4 default).
 fn report_server_ipv6_bind_addr(addr: &str) -> std::net::Ipv6Addr {
     if addr.is_empty() {
         return std::net::Ipv6Addr::UNSPECIFIED;
