@@ -162,6 +162,9 @@ impl Search for Searcher {
         req: Request<GetTableRequest>,
     ) -> Result<Response<GetTableResponse>, Status> {
         let path = req.into_inner().path;
+        if !::search::datafusion::distributed_plan::codec::is_join_result_path(&path) {
+            return Err(Status::invalid_argument("invalid table path"));
+        }
         let res = infra::storage::get_bytes("", &path)
             .await
             .map_err(|e| Status::internal(format!("failed to get table: {e}")))?;
@@ -174,6 +177,9 @@ impl Search for Searcher {
         req: Request<GetResultRequest>,
     ) -> Result<Response<GetResultResponse>, Status> {
         let path = req.into_inner().path;
+        if !crate::search_jobs::is_search_job_result_path(&path) {
+            return Err(Status::invalid_argument("invalid result path"));
+        }
         let res = infra::storage::get_bytes("", &path)
             .await
             .map_err(|e| Status::internal(format!("failed to get result: {e}")))?;
@@ -488,5 +494,46 @@ impl Search for Searcher {
         _req: Request<GetWorkflowInputsRequest>,
     ) -> Result<Response<GetWorkflowInputsResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_table_rejects_non_join_paths() {
+        let searcher = Searcher::new();
+        for path in [
+            "files/otherorg/logs/x.parquet",
+            "../x",
+            "join/../files/otherorg/secret.arrow",
+        ] {
+            let req = Request::new(GetTableRequest {
+                path: path.to_string(),
+            });
+            let err = searcher
+                .get_table(req)
+                .await
+                .expect_err(&format!("{path} was accepted"));
+            assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_table_accepts_join_result_path() {
+        let searcher = Searcher::new();
+        let path = "join/2026/09/29/0123456789abcdef0123456789abcdef/test.arrow";
+        infra::storage::put("", path, Vec::new().into())
+            .await
+            .unwrap();
+
+        let req = Request::new(GetTableRequest {
+            path: path.to_string(),
+        });
+        let res = searcher.get_table(req).await;
+
+        assert!(res.is_ok(), "join result path was rejected: {res:?}");
+        let _ = infra::storage::del(vec![("", path)]).await;
     }
 }
