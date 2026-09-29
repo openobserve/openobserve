@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     time::{Duration, Instant},
 };
 
@@ -25,48 +25,19 @@ thread_local! {
     /// Deadline for the eval running on this thread; the interrupt handler aborts once it passes.
     static JS_DEADLINE: Cell<Option<Instant>> = const { Cell::new(None) };
 
-    /// Thread-local JS runtime - each thread gets its own runtime with security hardening
-    /// This pattern matches the VRL runtime approach and ensures thread safety
-    ///
-    /// Phase 2 Security Hardening:
-    /// - Memory limit: 10MB per runtime (protects against memory exhaustion)
-    /// - Max stack size: 512KB (prevents stack overflow attacks)
-    /// - Sandboxed context: Removes dangerous globals (eval, Function, setTimeout, etc.)
-    static JS_RUNTIME: Runtime = {
-        let rt = Runtime::new().expect("Failed to create JS runtime");
-
-        // Set memory limit: 10MB per runtime
-        // This prevents unbounded memory allocation attacks
-        rt.set_memory_limit(10 * 1024 * 1024);
-
-        // Set stack size limit
-        // 512KB max stack - prevents stack overflow attacks and excessive recursion
-        rt.set_max_stack_size(512 * 1024);
-
-        // A non-yielding function (e.g. `while(true){}`) would otherwise pin the thread forever.
-        rt.set_interrupt_handler(Some(Box::new(|| {
-            JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
-        })));
-
-        rt
-    };
-
-    static JS_CONTEXT: Context = JS_RUNTIME.with(|rt| {
-        // Phase 2 Security: Use Context::full() but pattern blocking provides defense-in-depth
-        // We need full() for JSON, Math, String, Array, Object which are safe
-        // Pattern blocking prevents access to dangerous globals (eval, Function, setTimeout, etc.)
-        //
-        // Note: Ideally we'd use Context::base() and add only safe globals, but rquickjs
-        // doesn't expose individual global registration. Instead, we rely on:
-        // 1. Comprehensive pattern blocking (Phase 1)
-        // 2. Memory/stack limits (Phase 2)
-        // 3. Execution deadline via the runtime interrupt handler (see JS_DEADLINE / JsDeadlineGuard)
-        Context::full(rt).expect("Failed to create JS context")
-    });
+    /// Recently used contexts on this thread; one per org and function so no two share globals.
+    static JS_CONTEXTS: RefCell<Vec<CachedJsContext>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
 const DEFAULT_JS_EXEC_TIMEOUT_SECS: u64 = 5;
+
+/// Contexts kept per thread; each owns its own runtime and memory limit.
+const JS_CONTEXT_CACHE_SIZE: usize = 8;
+
+const JS_MEMORY_LIMIT_BYTES: usize = 10 * 1024 * 1024;
+
+const JS_MAX_STACK_SIZE_BYTES: usize = 512 * 1024;
 
 /// Compiled JS function configuration
 #[derive(Clone, Debug)]
@@ -104,10 +75,15 @@ impl Drop for JsDeadlineGuard {
     }
 }
 
-/// Initialize a new JS runtime for the current thread
-/// This is called automatically via thread_local!, but can be used to verify runtime
+struct CachedJsContext {
+    org_id: String,
+    function: String,
+    context: Context,
+}
+
+/// Verifies that a sandboxed JS runtime and context can be created.
 pub fn init_js_runtime() -> Result<(), String> {
-    JS_CONTEXT.with(|_ctx| Ok(()))
+    new_js_context().map(|_| ())
 }
 
 /// Compile and validate a JS function
@@ -194,10 +170,10 @@ fn compile_js_function_inner(
     let test_value = if is_result_array { "[]" } else { "{}" };
 
     // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
-    JS_CONTEXT.with(|ctx| {
-        ctx.with(|ctx| {
-            let test_code = format!(
-                r#"
+    let context = new_js_context().map_err(std::io::Error::other)?;
+    context.with(|ctx| {
+        let test_code = format!(
+            r#"
                 (function() {{
                     const {} = {};
                     try {{
@@ -207,25 +183,24 @@ fn compile_js_function_inner(
                     return JSON.stringify({{ success: true }});
                 }})();
                 "#,
-                var_name, test_value, func_for_compilation
-            );
+            var_name, test_value, func_for_compilation
+        );
 
-            let guard = JsDeadlineGuard::new(timeout);
-            let eval_result = ctx.eval::<String, _>(test_code);
-            if guard.expired() {
-                return Err(std::io::Error::other(
-                    "JavaScript function exceeded the execution time limit (possible infinite loop)",
-                ));
-            }
-            // error here would mean there was some syntax error, which should be propagated
-            let _: String = eval_result
-                .map_err(|e| std::io::Error::other(format!("JavaScript syntax error: {}", e)))?;
+        let guard = JsDeadlineGuard::new(timeout);
+        let eval_result = ctx.eval::<String, _>(test_code);
+        if guard.expired() {
+            return Err(std::io::Error::other(
+                "JavaScript function exceeded the execution time limit (possible infinite loop)",
+            ));
+        }
+        // error here would mean there was some syntax error, which should be propagated
+        let _: String = eval_result
+            .map_err(|e| std::io::Error::other(format!("JavaScript syntax error: {}", e)))?;
 
-            let params = vec!["row".to_string()];
-            Ok(JSRuntimeConfig {
-                function: func.to_string(), // Store original with marker
-                params,
-            })
+        let params = vec!["row".to_string()];
+        Ok(JSRuntimeConfig {
+            function: func.to_string(), // Store original with marker
+            params,
         })
     })
 }
@@ -273,59 +248,62 @@ pub fn apply_js_fn(
     org_id: &str,
     stream_name: &[String],
 ) -> (json::Value, Option<String>) {
-    JS_CONTEXT.with(|ctx| {
-        ctx.with(|ctx| {
-            // Set up the execution environment
-            let globals = ctx.globals();
+    let context = match cached_js_context(org_id, &js_config.function) {
+        Ok(context) => context,
+        Err(e) => return (row, Some(e)),
+    };
+    context.with(|ctx| {
+        // Set up the execution environment
+        let globals = ctx.globals();
 
-            // Inject input data as JSON string
-            let input_json = match serde_json::to_string(&row) {
-                Ok(json) => json,
-                Err(e) => {
-                    return (
-                        row.clone(),
-                        Some(format!("Failed to serialize input: {}", e)),
-                    );
-                }
-            };
-
-            // Set global variables
-            if let Err(e) = globals.set("inputJson", input_json.as_str()) {
-                return (row.clone(), Some(format!("Failed to set input: {}", e)));
-            }
-
-            if let Err(e) = globals.set("orgId", org_id) {
-                return (row.clone(), Some(format!("Failed to set orgId: {}", e)));
-            }
-
-            if let Err(e) = globals.set(
-                "streamName",
-                stream_name.first().unwrap_or(&String::new()).as_str(),
-            ) {
+        // Inject input data as JSON string
+        let input_json = match serde_json::to_string(&row) {
+            Ok(json) => json,
+            Err(e) => {
                 return (
                     row.clone(),
-                    Some(format!("Failed to set streamName: {}", e)),
+                    Some(format!("Failed to serialize input: {}", e)),
                 );
             }
+        };
 
-            // Strip #ResultArray# marker for execution (invalid JS syntax)
-            let func_for_execution = strip_result_array_marker(&js_config.function);
+        // Set global variables
+        if let Err(e) = globals.set("inputJson", input_json.as_str()) {
+            return (row.clone(), Some(format!("Failed to set input: {}", e)));
+        }
 
-            // Detect if this is a ResultArray function to use appropriate variable name
-            // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single
-            // object)
-            // Only match #ResultArray# at the start of the function (not in comments)
-            let is_result_array = RESULT_ARRAY.is_match(&js_config.function);
-            let var_name = if is_result_array { "rows" } else { "row" };
+        if let Err(e) = globals.set("orgId", org_id) {
+            return (row.clone(), Some(format!("Failed to set orgId: {}", e)));
+        }
 
-            // Create execution wrapper that catches errors and returns them as structured data
-            // Use 'rows' for #ResultArray# functions (consistent with VRL), 'row' for regular
-            // functions The function's return value is captured; if undefined, use the
-            // input variable Wrap user function to capture return value or mutated
-            // input For #ResultArray# functions, use 'rows' variable (array input)
-            // For regular functions, use 'row' variable (single object input)
-            let exec_code = format!(
-                r#"
+        if let Err(e) = globals.set(
+            "streamName",
+            stream_name.first().unwrap_or(&String::new()).as_str(),
+        ) {
+            return (
+                row.clone(),
+                Some(format!("Failed to set streamName: {}", e)),
+            );
+        }
+
+        // Strip #ResultArray# marker for execution (invalid JS syntax)
+        let func_for_execution = strip_result_array_marker(&js_config.function);
+
+        // Detect if this is a ResultArray function to use appropriate variable name
+        // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single
+        // object)
+        // Only match #ResultArray# at the start of the function (not in comments)
+        let is_result_array = RESULT_ARRAY.is_match(&js_config.function);
+        let var_name = if is_result_array { "rows" } else { "row" };
+
+        // Create execution wrapper that catches errors and returns them as structured data
+        // Use 'rows' for #ResultArray# functions (consistent with VRL), 'row' for regular
+        // functions The function's return value is captured; if undefined, use the
+        // input variable Wrap user function to capture return value or mutated
+        // input For #ResultArray# functions, use 'rows' variable (array input)
+        // For regular functions, use 'row' variable (single object input)
+        let exec_code = format!(
+            r#"
                 (function() {{
                     try {{
                         var {} = JSON.parse(inputJson);
@@ -343,79 +321,114 @@ pub fn apply_js_fn(
                     }}
                 }})();
                 "#,
-                var_name, func_for_execution, var_name
-            );
+            var_name, func_for_execution, var_name
+        );
 
-            // Execute the function
-            let guard = JsDeadlineGuard::new(exec_timeout());
-            let eval_result = ctx.eval::<String, _>(exec_code);
-            if guard.expired() {
-                let msg = "JavaScript function exceeded the execution time limit".to_string();
-                log::error!("{}/{:?} {}", org_id, stream_name, msg);
-                return (row, Some(msg));
-            }
-            match eval_result {
-                Ok(result_json) => {
-                    // Parse the result to check if there was an error
-                    match serde_json::from_str::<json::Value>(&result_json) {
-                        Ok(result_obj) => {
-                            if let Some(success) =
-                                result_obj.get("success").and_then(|v| v.as_bool())
-                                && success
-                            {
-                                // Extract the actual data
-                                if let Some(data) = result_obj.get("data") {
-                                    (data.clone(), None)
-                                } else {
-                                    (row.clone(), Some("No data returned".to_string()))
-                                }
-                            } else if let Some(success) =
-                                result_obj.get("success").and_then(|v| v.as_bool())
-                                && !success
-                            {
-                                // Extract error details
-                                let error_msg = result_obj
-                                    .get("error")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("Unknown error");
-                                let line = result_obj
-                                    .get("line")
-                                    .and_then(|v| v.as_str())
-                                    .filter(|s| *s != "unknown");
-                                let column = result_obj
-                                    .get("column")
-                                    .and_then(|v| v.as_str())
-                                    .filter(|s| *s != "unknown");
-
-                                // Only append line/column if we have valid values
-                                let error_message = match (line, column) {
-                                    (Some(l), Some(c)) => {
-                                        format!("{} (line: {}, column: {})", error_msg, l, c)
-                                    }
-                                    (Some(l), None) => format!("{} (line: {})", error_msg, l),
-                                    (None, Some(c)) => format!("{} (column: {})", error_msg, c),
-                                    (None, None) => error_msg.to_string(),
-                                };
-
-                                log::error!("{}/{:?} {}", org_id, stream_name, error_message);
-                                (row, Some(error_message))
+        // Execute the function
+        let guard = JsDeadlineGuard::new(exec_timeout());
+        let eval_result = ctx.eval::<String, _>(exec_code);
+        if guard.expired() {
+            let msg = "JavaScript function exceeded the execution time limit".to_string();
+            log::error!("{}/{:?} {}", org_id, stream_name, msg);
+            return (row, Some(msg));
+        }
+        match eval_result {
+            Ok(result_json) => {
+                // Parse the result to check if there was an error
+                match serde_json::from_str::<json::Value>(&result_json) {
+                    Ok(result_obj) => {
+                        if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
+                            && success
+                        {
+                            // Extract the actual data
+                            if let Some(data) = result_obj.get("data") {
+                                (data.clone(), None)
                             } else {
-                                (row.clone(), Some("Unexpected response format".to_string()))
+                                (row.clone(), Some("No data returned".to_string()))
                             }
+                        } else if let Some(success) =
+                            result_obj.get("success").and_then(|v| v.as_bool())
+                            && !success
+                        {
+                            // Extract error details
+                            let error_msg = result_obj
+                                .get("error")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown error");
+                            let line = result_obj
+                                .get("line")
+                                .and_then(|v| v.as_str())
+                                .filter(|s| *s != "unknown");
+                            let column = result_obj
+                                .get("column")
+                                .and_then(|v| v.as_str())
+                                .filter(|s| *s != "unknown");
+
+                            // Only append line/column if we have valid values
+                            let error_message = match (line, column) {
+                                (Some(l), Some(c)) => {
+                                    format!("{} (line: {}, column: {})", error_msg, l, c)
+                                }
+                                (Some(l), None) => format!("{} (line: {})", error_msg, l),
+                                (None, Some(c)) => format!("{} (column: {})", error_msg, c),
+                                (None, None) => error_msg.to_string(),
+                            };
+
+                            log::error!("{}/{:?} {}", org_id, stream_name, error_message);
+                            (row, Some(error_message))
+                        } else {
+                            (row.clone(), Some("Unexpected response format".to_string()))
                         }
-                        Err(e) => (
-                            row.clone(),
-                            Some(format!("Failed to parse JS output: {}", e)),
-                        ),
                     }
-                }
-                Err(e) => {
-                    let error_msg = format!("JS execution failed: {}", e);
-                    log::error!("{}/{:?} {}", org_id, stream_name, error_msg);
-                    (row, Some(error_msg))
+                    Err(e) => (
+                        row.clone(),
+                        Some(format!("Failed to parse JS output: {}", e)),
+                    ),
                 }
             }
-        })
+            Err(e) => {
+                let error_msg = format!("JS execution failed: {}", e);
+                log::error!("{}/{:?} {}", org_id, stream_name, error_msg);
+                (row, Some(error_msg))
+            }
+        }
+    })
+}
+
+fn new_js_context() -> Result<Context, String> {
+    let rt = Runtime::new().map_err(|e| format!("Failed to create JS runtime: {e}"))?;
+    rt.set_memory_limit(JS_MEMORY_LIMIT_BYTES);
+    rt.set_max_stack_size(JS_MAX_STACK_SIZE_BYTES);
+    // A non-yielding function (e.g. `while(true){}`) would otherwise pin the thread forever.
+    rt.set_interrupt_handler(Some(Box::new(|| {
+        JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
+    })));
+    // Context::full still exposes eval and Function; only the source denylist keeps them out.
+    Context::full(&rt).map_err(|e| format!("Failed to create JS context: {e}"))
+}
+
+fn cached_js_context(org_id: &str, function: &str) -> Result<Context, String> {
+    JS_CONTEXTS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(pos) = cache
+            .iter()
+            .position(|c| c.org_id == org_id && c.function == function)
+        {
+            let entry = cache.remove(pos);
+            let context = entry.context.clone();
+            cache.push(entry);
+            return Ok(context);
+        }
+        let context = new_js_context()?;
+        if cache.len() >= JS_CONTEXT_CACHE_SIZE {
+            cache.remove(0);
+        }
+        cache.push(CachedJsContext {
+            org_id: org_id.to_string(),
+            function: function.to_string(),
+            context: context.clone(),
+        });
+        Ok(context)
     })
 }
 
@@ -502,7 +515,7 @@ mod tests {
         for src in payloads {
             let start = Instant::now();
             let _guard = JsDeadlineGuard::new(Duration::from_millis(100));
-            let result: Result<String, _> = JS_CONTEXT.with(|ctx| ctx.with(|ctx| ctx.eval(src)));
+            let result: Result<String, _> = new_js_context().unwrap().with(|ctx| ctx.eval(src));
             assert!(result.is_err(), "infinite loop must be interrupted: {src}");
             assert!(
                 start.elapsed() < Duration::from_secs(5),
@@ -1058,15 +1071,41 @@ for (var i = 0; i < filtered.length; i++) {
     }
 
     #[test]
-    fn test_security_context_base_removes_dangerous_globals() {
-        // Test that dangerous globals are not available in Context::base()
-        // This test verifies Phase 2 security: Context::base() removes eval, Function, etc.
+    fn test_functions_do_not_share_globals_across_orgs() {
+        let stream = ["s".to_string()];
+        let hook = compile_js_function(
+            "if (!JSON.captured) { const p = JSON.parse; JSON.captured = []; \
+             JSON.parse = function(s) { JSON.captured.push(s); return p(s); }; \
+             Array.prototype.map = function() { return ['tampered']; }; }",
+            "org_a",
+        )
+        .unwrap();
+        let (_, error) = apply_js_fn(&hook, json!({}), "org_a", &stream);
+        assert!(error.is_none(), "{error:?}");
 
-        // Try to use eval (should fail at runtime if not caught by pattern blocking)
+        let victim = compile_js_function("row.mapped = [1, 2].map(x => x * 2);", "org_b").unwrap();
+        let (victim_out, error) =
+            apply_js_fn(&victim, json!({"secret": "s3cr3t"}), "org_b", &stream);
+        assert!(error.is_none(), "{error:?}");
+
+        let reader = compile_js_function(
+            "row.stolen = JSON.captured ? JSON.captured.join('|') : null;",
+            "org_a",
+        )
+        .unwrap();
+        let (reader_out, error) = apply_js_fn(&reader, json!({}), "org_a", &stream);
+        assert!(error.is_none(), "{error:?}");
+        assert_eq!(
+            (&victim_out["mapped"], &reader_out["stolen"]),
+            (&json!([2, 4]), &json!(null))
+        );
+    }
+
+    #[test]
+    fn test_security_eval_blocked_by_denylist() {
+        // Context::full still provides eval, so the source denylist is the only guard.
         let func_eval = r#"
             try {
-                // This should fail because eval is not available in Context::base()
-                // But our pattern blocking should catch it first
                 row.result = eval("1 + 1");
             } catch(e) {
                 row.error = "eval not available";
