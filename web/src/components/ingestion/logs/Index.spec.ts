@@ -129,7 +129,9 @@ describe("IngestLogs Component", () => {
         "curl",
         "fluentbit",
         "fluentd",
+        "kinesisfirehose",
         "vector",
+        "gcpLogs",
         "syslogNg",
         "splunkHec",
         "loongcollector",
@@ -236,6 +238,30 @@ describe("IngestLogs Component", () => {
       const tw = mount(IngestLogs, buildMountOptions());
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "vector",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
+    it("should push with org_identifier query when route is 'kinesisfirehose'", () => {
+      mockRouter.currentRoute.value.name = "kinesisfirehose";
+      const tw = mount(IngestLogs, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "kinesisfirehose",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
+    it("should push with org_identifier query when route is 'gcpLogs'", () => {
+      mockRouter.currentRoute.value.name = "gcpLogs";
+      const tw = mount(IngestLogs, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "gcpLogs",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },

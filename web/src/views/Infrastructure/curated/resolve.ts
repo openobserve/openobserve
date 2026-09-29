@@ -814,6 +814,7 @@ export function lintManifest(manifest: CuratedPageManifest): Violation[] {
   const panels = manifestPanels(manifest).map(({ panel, sectionId }) => ({ ...panel, sectionId }));
   const unitValues = new Set(
     getUnitOptions(((key: string) => raw(key)) as never)
+      .filter((option) => !option.expandable)
       .map((option) => option.value)
       .filter((value): value is string => value != null),
   );
