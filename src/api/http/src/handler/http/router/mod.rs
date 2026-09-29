@@ -2835,6 +2835,28 @@ mod tests {
         }
     }
 
+    // the Loki handler does not inflate bodies itself, so this layer pair is the only cap
+    #[tokio::test]
+    async fn loki_body_that_decompresses_over_the_limit_is_413() {
+        let limit = 64 * 1024;
+        let app = Router::new()
+            .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
+            .layer(RequestDecompressionLayer::new())
+            .layer(DefaultBodyLimit::max(limit));
+        let compressed = zstd::encode_all(&vec![b' '; limit + 1][..], 3).unwrap();
+        assert!(compressed.len() < limit);
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/default/loki/api/v1/push")
+            .header(header::CONTENT_ENCODING, "zstd")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(compressed))
+            .unwrap();
+
+        let status = app.oneshot(req).await.unwrap().status();
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
     // ── unauthenticated /config bootstrap ─────────────────────────────────
     //
     // GET /config is served WITHOUT auth so the login page can render. Its

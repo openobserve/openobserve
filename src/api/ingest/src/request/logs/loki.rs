@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Read;
-
 use axum::{
     body::Bytes,
     extract::Path,
@@ -25,7 +23,6 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     utils::snappy::decode_raw_snappy,
 };
-use flate2::read::GzDecoder;
 use prost::Message;
 use proto::loki_rpc;
 
@@ -138,15 +135,8 @@ fn parse_json_request(
     content_encoding: Option<&str>,
     body: Bytes,
 ) -> Result<LokiPushRequest, LokiError> {
+    // `RequestDecompressionLayer` has already inflated gzip within the body limit
     let json_data = match content_encoding {
-        Some("gzip") => {
-            let mut decoder = GzDecoder::new(body.as_ref());
-            let mut decompressed = Vec::new();
-            match decoder.read_to_end(&mut decompressed) {
-                Ok(_) => decompressed,
-                Err(_) => body.to_vec(), // Fallback to original data like OpenObserve pattern
-            }
-        }
         None | Some("identity") => body.to_vec(),
         Some(encoding) => {
             return Err(LokiError::UnsupportedContentEncoding {
@@ -311,5 +301,16 @@ mod tests {
                 .to_string();
             assert!(err.contains("larger than allowed"), "{encoding:?}: {err}");
         }
+    }
+
+    #[test]
+    fn parse_json_request_does_not_inflate_gzip_itself() {
+        use std::io::Write;
+
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        gz.write_all(create_valid_loki_json().as_bytes()).unwrap();
+        let body = Bytes::from(gz.finish().unwrap());
+        let err = parse_json_request(Some("gzip"), body).unwrap_err();
+        assert!(matches!(err, LokiError::UnsupportedContentEncoding { .. }));
     }
 }
