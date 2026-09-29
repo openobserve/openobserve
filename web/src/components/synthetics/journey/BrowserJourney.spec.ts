@@ -1277,7 +1277,7 @@ describe("BrowserJourney add menu and step filter", () => {
         order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
-    expect(order[0].parentElement).toBe(order[3].parentElement);
+    expect(order[0].parentElement!.contains(order[3])).toBe(true);
   });
 
   it("the filter has a fixed width instead of growing", () => {
@@ -4722,6 +4722,20 @@ describe("BrowserJourney toolbar on a phone", () => {
     expect(label).toBeTruthy();
     const tooltips = wrapper.findAll("[data-tooltip]").map((t) => t.attributes("data-tooltip"));
     expect(tooltips).toContain(label);
+  });
+
+  it("on a phone, the real Add subtest trigger is hidden, not just the stub", () => {
+    mockViewport.mdUp = false;
+    mockViewport.lgUp = false;
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: journey, replayPhase: "idle" },
+      global: { stubs: { ...STUBS, SubtestMenu: false, OTooltip: OTooltipWithContentStub } },
+    }) as VueWrapper;
+
+    expect(wrapper.findComponent({ name: "SubtestMenu" }).exists()).toBe(true);
+    const trigger = '[data-test="synthetics-journey-add-subtest-btn"]';
+    expect(wrapper.find(trigger).exists()).toBe(true);
+    expect(hasClassUpTo(wrapper, trigger, "max-md:hidden")).toBe(true);
   });
 
   it("on a phone, adding a step from the toolbar menu works", async () => {

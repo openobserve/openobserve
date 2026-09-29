@@ -134,10 +134,7 @@ const props = defineProps<{
    * row opens whenever the journey next renders.
    */
   fieldIssues?: readonly { path: PropertyKey[]; message: string }[];
-  /**
-   * Whether the parent's Variables panel is expanded. Undefined means the host
-   * has no such panel, and the toolbar toggle is not rendered at all.
-   */
+  /** Undefined means the host has no Variables panel, so rows must not offer to open one. */
   variablesPanelOpen?: boolean;
   /** This journey's own check id — forwarded to `SubtestPicker` to exclude self-reference. */
   ownCheckId?: string;
@@ -1573,13 +1570,15 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         >
           {{ t("synthetics.journey.addMenu.addStep") }}
         </OButton>
-        <SubtestMenu
-          :own-check-id="ownCheckId"
-          :disabled="addDisabled"
-          :composition-enabled="isCompositionEnabled"
-          class="max-md:hidden"
-          @pick="addSubtestReference"
-        />
+        <!-- Wrapped: SubtestMenu's root is a fragment, so a class on the component would be dropped. -->
+        <div class="contents max-md:hidden">
+          <SubtestMenu
+            :own-check-id="ownCheckId"
+            :disabled="addDisabled"
+            :composition-enabled="isCompositionEnabled"
+            @pick="addSubtestReference"
+          />
+        </div>
       </div>
 
       <div class="flex-1 max-lg:hidden" />
