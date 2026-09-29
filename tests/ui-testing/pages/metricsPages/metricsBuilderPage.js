@@ -175,6 +175,23 @@ export class MetricsBuilderPage {
         // OToast success / error
         this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.toastError = page.locator('[data-test-variant="error"]');
+
+        // PromQL panel queries stream over SSE, so a response's headers arrive long before its data; track body completion instead.
+        this.promqlInFlight = new Set();
+        this.promqlLastActivity = Date.now();
+        const isPromql = (req) => /\/prometheus\/api\/v1\/query(_range)?/.test(req.url());
+        const settle = (req) => {
+            if (!isPromql(req)) return;
+            this.promqlInFlight.delete(req);
+            this.promqlLastActivity = Date.now();
+        };
+        page.on('request', (req) => {
+            if (!isPromql(req)) return;
+            this.promqlInFlight.add(req);
+            this.promqlLastActivity = Date.now();
+        });
+        page.on('requestfinished', settle);
+        page.on('requestfailed', settle);
     }
 
     // ============== Factory helpers for per-index locators ==============
@@ -368,7 +385,8 @@ export class MetricsBuilderPage {
             custom: this.customModeBtn,
         };
         const btn = btnMap[mode];
-        if (await btn.isVisible({ timeout: 2000 })) {
+        // isVisible() ignores its timeout, and the query-type toggles re-render while the page initialises.
+        if (await btn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
             // OToggleGroupItem (Reka UI) signals active state via data-state="on".
             // Poll briefly because QueryTypeSelector mounts and initializes
             // `selectedButtonType` asynchronously after the page loads.
@@ -945,6 +963,19 @@ export class MetricsBuilderPage {
         ).catch(() => null);
     }
 
+    /** Wait until no PromQL stream is in flight and none started for quietMs since this call; throws on timeout. */
+    async waitForPromqlIdle({ quietMs = 1500, timeout = 30000 } = {}) {
+        // Quiet counts from the call too: a run the caller's last action scheduled (50ms debounce) may not have started yet.
+        const since = Date.now();
+        const deadline = since + timeout;
+        while (Date.now() < deadline) {
+            const lastActivity = Math.max(this.promqlLastActivity, since);
+            if (this.promqlInFlight.size === 0 && Date.now() - lastActivity >= quietMs) return;
+            await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        throw new Error(`PromQL queries still in flight after ${timeout}ms (${this.promqlInFlight.size} open)`);
+    }
+
     // ===== Add to Dashboard =====
 
     /**
@@ -1263,6 +1294,9 @@ export class MetricsBuilderPage {
      * @returns {Promise<string>} The PromQL query string from the request
      */
     async captureQueryFromRunRequest() {
+        // A chart-type switch fires its own debounced run; clicking Run on top of it overlaps runs and can strand the panel on "No Data".
+        await this.waitForPromqlIdle();
+
         const requestPromise = this.page.waitForRequest(
             (req) => req.url().includes('/prometheus/api/v1/query_range') ||
                      req.url().includes('/prometheus/api/v1/query'),
@@ -1289,8 +1323,8 @@ export class MetricsBuilderPage {
             }
         }
 
-        // Wait for the corresponding response so the chart renders before assertions
-        await this.waitForQueryResponse(15000);
+        // Run fires several superseding runs; wait for every stream body to finish so the chart shows the final one.
+        await this.waitForPromqlIdle();
         return decodeURIComponent(query);
     }
 

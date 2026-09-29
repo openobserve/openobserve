@@ -227,9 +227,10 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.logsApplyQueryButton();
 
-    await pm.logsVisualise.openVisualiseTab();
+    // The table type is auto-selected only after result_schema answers; a panel saved before then keeps the default bar type and renders "No Data".
+    await pm.logsVisualise.openVisualiseTabWithVrl();
 
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion({ expectTable: true });
 
     await pm.logsVisualise.verifyChartRenders(page);
 
