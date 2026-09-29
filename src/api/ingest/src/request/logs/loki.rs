@@ -21,7 +21,10 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use config::axum::middlewares::{get_process_time, insert_process_time_header};
+use config::{
+    axum::middlewares::{get_process_time, insert_process_time_header},
+    utils::snappy::decode_raw_snappy,
+};
 use flate2::read::GzDecoder;
 use prost::Message;
 use proto::loki_rpc;
@@ -158,13 +161,14 @@ fn parse_protobuf_request(
     content_encoding: Option<&str>,
     body: Bytes,
 ) -> Result<loki_rpc::PushRequest, LokiError> {
+    let limit = config::get_config().limit.req_payload_limit;
     let decompressed = match content_encoding {
         // promtail sends snappy protobuf with no Content-Encoding, so None means snappy
-        Some("snappy") | None => snap::raw::Decoder::new()
-            .decompress_vec(&body)
-            .map_err(|e| LokiError::UnsupportedContentEncoding {
+        Some("snappy") | None => {
+            decode_raw_snappy(&body, limit).map_err(|e| LokiError::UnsupportedContentEncoding {
                 encoding: format!("snappy decompression failed: {e}"),
-            })?,
+            })?
+        }
         Some("identity") => body.to_vec(),
         Some(encoding) => {
             return Err(LokiError::UnsupportedContentEncoding {
@@ -284,5 +288,28 @@ mod tests {
     fn test_parse_protobuf_request_no_encoding_is_still_snappy() {
         let result = parse_protobuf_request(None, create_snappy_protobuf_body());
         assert_eq!(result.unwrap().streams.len(), 1);
+    }
+
+    fn snappy_header_declaring(decompressed_len: u64) -> Bytes {
+        let mut header = Vec::new();
+        let mut n = decompressed_len;
+        while n >= 0x80 {
+            header.push((n as u8 & 0x7f) | 0x80);
+            n >>= 7;
+        }
+        header.push(n as u8);
+        header.extend_from_slice(b"garbage");
+        Bytes::from(header)
+    }
+
+    #[test]
+    fn parse_protobuf_request_rejects_a_declared_length_over_the_limit() {
+        let limit = config::get_config().limit.req_payload_limit as u64;
+        for encoding in [None, Some("snappy")] {
+            let err = parse_protobuf_request(encoding, snappy_header_declaring(limit + 1))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("larger than allowed"), "{encoding:?}: {err}");
+        }
     }
 }
