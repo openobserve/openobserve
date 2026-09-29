@@ -1173,7 +1173,12 @@ const pollManifest = async () => {
   const { hits } = await fetchAllPages(manifestSql(), liveWindowUs(upperTs));
   if (cancelled || !isLive.value) return;
   upperTs = raiseUpperTs(upperTs, hits, timestampField());
-  const { appended, late } = mergeManifestTail(manifest.value, hits as ManifestEntry[], indexById);
+  // The open dropped rows before the first full snapshot, so a poll that returns them again must drop them too.
+  const rows = trimBeforeReplayStart(
+    hits as ManifestEntry[],
+    sessionState.data.selectedSession?.replay_start,
+  );
+  const { appended, late } = mergeManifestTail(manifest.value, rows, indexById);
   if (late) lateRows.value = true;
   if (!appended.length) return;
   lastNewIdAtMs = Date.now();

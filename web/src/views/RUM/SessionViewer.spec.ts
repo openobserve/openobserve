@@ -1922,6 +1922,8 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     return server.rows.filter((row) => row.start >= lo && row.start <= hi).map(fixtureBody);
   }
 
+  let replayStart: number | undefined;
+
   function lookupRow(endTime: number) {
     return {
       ...sessionLookupRow,
@@ -1929,6 +1931,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
       start_time: L,
       end_time: endTime,
       max_ts: maxTs,
+      replay_start: replayStart,
     };
   }
 
@@ -1984,6 +1987,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     server.rows = [liveRow(0), liveRow(1), liveRow(2)];
     server.rum = [];
     server.logs = [];
+    replayStart = undefined;
     resetStreaming(liveResponder);
   });
 
@@ -2099,6 +2103,26 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     expect(lateNotice(wrapper).text()).toContain(
       "Earlier activity arrived after the replay loaded. Reload to include it.",
     );
+    wrapper.unmount();
+  });
+
+  it("drops a row before the first full snapshot that a poll returns again, without the notice", async () => {
+    replayStart = L + 1000;
+    server.rows = [
+      liveRow(0, { has_full_snapshot: false }),
+      liveRow(1, { has_full_snapshot: true }),
+      liveRow(2),
+    ];
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.manifest).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(manifestPolls()).toHaveLength(1);
+    expect(vm.manifest).toHaveLength(2);
+    expect(vm.lateRows).toBe(false);
+    expect(lateNotice(wrapper).exists()).toBe(false);
     wrapper.unmount();
   });
 
