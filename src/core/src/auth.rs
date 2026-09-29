@@ -27,10 +27,7 @@ use common::meta::user::AuthTokensExt;
 use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
     meta::user::UserRole,
-    utils::{
-        hash::{get_passcode_hash, try_get_passcode_hash},
-        json,
-    },
+    utils::{hash::try_get_passcode_hash, json},
 };
 use lru::LruCache;
 use parking_lot::Mutex;
@@ -843,7 +840,7 @@ pub fn build_basic_auth_header(email: &str, token: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use config::DEFAULT_ORG;
+    use config::{DEFAULT_ORG, utils::hash::get_passcode_hash};
     use db::user::is_root_user;
     use infra::{db as infra_db, table as infra_table};
 
