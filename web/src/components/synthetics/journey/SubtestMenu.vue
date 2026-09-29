@@ -206,14 +206,12 @@ async function onPick(c: SubtestCandidate) {
             :data-test="`synthetics-subtest-menu-row-${c.id}`"
             @click="onPick(c)"
           >
-            <OIcon name="account-tree" size="sm" class="text-text-secondary" aria-hidden="true" />
             <span class="flex min-w-0 flex-1 flex-col">
               <span class="text-text-body truncate text-sm">{{ c.name }}</span>
               <span v-if="rowSummary(c)" class="text-text-secondary truncate text-xs font-normal">
                 {{ rowSummary(c) }}
               </span>
             </span>
-            <OIcon name="add" size="sm" class="text-text-secondary" aria-hidden="true" />
           </OButton>
           <template v-if="visibleBlocked.length">
             <OSeparator class="my-1" />
@@ -233,7 +231,6 @@ async function onPick(c: SubtestCandidate) {
               class="h-auto! justify-start! py-2! text-start whitespace-normal!"
               :data-test="`synthetics-subtest-menu-row-${c.id}`"
             >
-              <OIcon name="account-tree" size="sm" aria-hidden="true" />
               <span class="flex min-w-0 flex-1 flex-col">
                 <span class="truncate text-sm">{{ c.name }}</span>
                 <span class="truncate text-xs font-normal">
