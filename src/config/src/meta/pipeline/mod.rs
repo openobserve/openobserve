@@ -160,6 +160,9 @@ pub fn validate_nodes_edges(
     edges: &[Edge],
     is_draft: bool,
 ) -> Result<(), anyhow::Error> {
+    if nodes.is_empty() {
+        return Err(anyhow!("there must be at least 1 node"));
+    }
     if !is_draft && (nodes.len() < 2 || edges.is_empty()) {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
@@ -1814,6 +1817,12 @@ mod tests {
             v.to_string()
                 .contains("more than 1 node and at least 1 edge")
         }));
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_empty_graph() {
+        assert!(validate_nodes_edges(&[], &[], true).is_err());
+        assert!(validate_nodes_edges(&[], &[], false).is_err());
     }
 
     fn branch_node(id: &str, cases: Vec<components::BranchCase>) -> Node {
