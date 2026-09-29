@@ -138,10 +138,7 @@ pub(crate) async fn clean_orphan_par_files(process_start: std::time::SystemTime)
     Ok(())
 }
 
-// replay wal files to create immutable. a wal file is named by its writer's
-// creation time in micros (+1 per rotation), so a file named at or after
-// `process_start` belongs to a live writer of this process: skip it, replay
-// would persist and delete it under the writer and its later records are lost
+// replay wal files to create immutable
 pub(crate) async fn replay_wal_files(
     wal_dir: PathBuf,
     wal_files: Vec<PathBuf>,
@@ -400,7 +397,8 @@ mod tests {
         let live_id = chrono::Utc::now().timestamp_micros() as u64;
         let _live = new_wal(live_id);
 
-        // worst case: the scan saw the live wal too
+        // the scan runs in the background after ingestion starts, so it sees
+        // the live wal too
         let wal_files = wal_scan_files(&wal_dir, "wal").await.unwrap();
         assert_eq!(wal_files.len(), 2);
         replay_wal_files(wal_dir, wal_files, process_start)
