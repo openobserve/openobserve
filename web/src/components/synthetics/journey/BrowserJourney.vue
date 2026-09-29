@@ -1541,7 +1541,11 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-select-all"
           @update:model-value="toggleSelectAll()"
         />
-        <OSeparator vertical class="me-2 h-6" data-test="synthetics-journey-select-all-separator" />
+        <OSeparator
+          vertical
+          class="ms-4 me-2"
+          data-test="synthetics-journey-select-all-separator"
+        />
         <h3 class="sr-only">{{ t("synthetics.journey.steps") }}</h3>
         <JourneyStepCount
           :steps="modelValue"
@@ -1584,7 +1588,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       </div>
 
       <div class="flex-1 max-lg:hidden" />
-      <OSeparator vertical class="h-6 max-lg:hidden" />
+      <OSeparator vertical class="max-lg:hidden" />
 
       <div class="flex shrink-0 items-center gap-2">
         <!-- Rendered through a run as well, so Replay and Stop never shift sideways. -->
@@ -1718,7 +1722,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           </ODropdownItem>
         </ODropdown>
 
-        <OSeparator v-if="!readonly && suggestions.length > 0" vertical class="h-6 max-md:hidden" />
+        <OSeparator v-if="!readonly && suggestions.length > 0" vertical class="max-md:hidden" />
         <JourneySuggestions
           v-if="!readonly"
           :suggestions="suggestions"
