@@ -14313,7 +14313,6 @@
         "envHelp": "Saved with the test. Each scheduled run executes once per environment and location, and opens:",
         "noAccess": "No access",
         "capLine": "{count} of {cap} · Global values always apply",
-        "replayNote": "Replay uses the environment on the Replay button.",
         "runsIn": "Runs in",
         "envOverflow": "{first} +{count}"
       },
@@ -14322,9 +14321,10 @@
         "menuAria": "Replay environment",
         "menuTitle": "Replay and record in",
         "sessionOnly": "This session only — not saved with the test.",
-        "notInTest": "Not in this test's environments",
+        "inTest": "Selected environments",
+        "notInTest": "Other environments",
         "selected": "Selected",
-        "inLabel": "In",
+        "inLabel": "Test on",
         "triggerAria": "Replay environment: {environment}"
       },
       "replaySecrets": {

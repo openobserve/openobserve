@@ -189,7 +189,7 @@ describe("JourneyStartPill", () => {
       expect(span.classes(), span.text()).toContain("max-md:hidden");
     }
     expect(url.get('[data-icon="language"]').classes()).not.toContain("md:hidden");
-    expect(envs.get('[data-icon="dns"]').classes()).not.toContain("max-md:hidden");
+    expect(envs.get('[data-icon="layers"]').classes()).not.toContain("max-md:hidden");
     expect(url.attributes("aria-label")).toBeTruthy();
     expect(envs.attributes("aria-label")).toBeTruthy();
   });
@@ -230,11 +230,11 @@ describe("JourneyStartPill", () => {
     expect(tips).not.toContain("Change environments");
   });
 
-  it("the Runs in button leads with the dns icon and keeps its arrow", () => {
+  it("the Runs in button leads with the layers icon and keeps its arrow", () => {
     wrapper = mountPill();
     const icons = wrapper.get(ENVS_HALF).findAll("[data-icon]");
 
-    expect(icons.at(0)?.attributes("data-icon")).toBe("dns");
+    expect(icons.at(0)?.attributes("data-icon")).toBe("layers");
     expect(icons.at(-1)?.attributes("data-icon")).toBe("arrow-drop-down");
   });
 

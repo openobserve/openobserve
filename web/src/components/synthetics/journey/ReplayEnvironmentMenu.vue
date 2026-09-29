@@ -61,7 +61,11 @@ const selectedName = computed(
 
 const groups = computed(() =>
   [
-    { key: "in-test", label: undefined, options: props.options.filter((o) => o.inTest) },
+    {
+      key: "in-test",
+      label: t("synthetics.journey.replayEnv.inTest"),
+      options: props.options.filter((o) => o.inTest),
+    },
     {
       key: "not-in-test",
       label: t("synthetics.journey.replayEnv.notInTest"),
@@ -87,7 +91,7 @@ function itemKey(option: ReplayEnvironmentOption) {
       >
         <!-- First child so it anchors to the whole button rather than a sibling span. -->
         <OTooltip :content="t('synthetics.journey.replayEnv.menuAria')" side="bottom" />
-        <OIcon name="dns" size="sm" aria-hidden="true" />
+        <OIcon name="layers" size="sm" aria-hidden="true" />
         <span class="text-text-secondary font-normal">
           {{ t("synthetics.journey.replayEnv.inLabel") }}
         </span>

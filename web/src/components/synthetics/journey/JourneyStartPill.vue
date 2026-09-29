@@ -215,7 +215,7 @@ function onToggleEnvironment(id: string) {
         >
           <!-- First child so it anchors to the whole button rather than the names. -->
           <OTooltip :content="envsTooltip" side="bottom" />
-          <OIcon name="dns" size="sm" aria-hidden="true" />
+          <OIcon name="layers" size="sm" aria-hidden="true" />
           <span class="text-text-secondary font-normal max-md:hidden">
             {{ t("synthetics.journey.startPill.runsIn") }}
           </span>
@@ -262,17 +262,14 @@ function onToggleEnvironment(id: string) {
             </span>
           </div>
         </div>
-        <div class="text-text-secondary flex flex-col gap-1 text-xs">
-          <span>
-            {{
-              t("synthetics.journey.startPill.capLine", {
-                count: selectedCount,
-                cap: MAX_CHECK_ENVIRONMENTS,
-              })
-            }}
-          </span>
-          <span>{{ t("synthetics.journey.startPill.replayNote") }}</span>
-        </div>
+        <span class="text-text-secondary text-xs">
+          {{
+            t("synthetics.journey.startPill.capLine", {
+              count: selectedCount,
+              cap: MAX_CHECK_ENVIRONMENTS,
+            })
+          }}
+        </span>
       </div>
     </OPopover>
   </div>

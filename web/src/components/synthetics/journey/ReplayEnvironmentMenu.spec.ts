@@ -119,20 +119,25 @@ describe("ReplayEnvironmentMenu", () => {
     expect(other.text()).toContain("prod.test");
   });
 
-  it("groups environments outside the test under Not in this test's environments", () => {
+  it("groups the test's environments under Selected environments and the rest under Other environments", () => {
     wrapper = mountMenu();
 
-    const outside = wrapper
-      .findAll(".o-dropdown-group")
-      .find((g) => g.attributes("data-label") === "Not in this test's environments");
-    expect(outside).toBeDefined();
-    expect(outside!.find(item("env-qa")).exists()).toBe(true);
-    expect(outside!.find(item("env-prod")).exists()).toBe(false);
-    expect(outside!.find(item("env-stg")).exists()).toBe(false);
+    const group = (label: string) =>
+      wrapper.findAll(".o-dropdown-group").find((g) => g.attributes("data-label") === label);
+    const selected = group("Selected environments");
+    const other = group("Other environments");
+    expect(selected).toBeDefined();
+    expect(other).toBeDefined();
+    expect(selected!.find(item("env-prod")).exists()).toBe(true);
+    expect(selected!.find(item("env-stg")).exists()).toBe(true);
+    expect(selected!.find(item("env-qa")).exists()).toBe(false);
+    expect(other!.find(item("env-qa")).exists()).toBe(true);
+    expect(other!.find(item("env-prod")).exists()).toBe(false);
 
     wrapper.unmount();
     wrapper = mountMenu({ options: [PROD, STG] });
-    expect(wrapper.text()).not.toContain("Not in this test's environments");
+    expect(wrapper.text()).toContain("Selected environments");
+    expect(wrapper.text()).not.toContain("Other environments");
   });
 
   it("emits the chosen environment", async () => {
@@ -159,14 +164,14 @@ describe("ReplayEnvironmentMenu", () => {
     expect(wrapper.find(item("env-qa")).exists()).toBe(true);
   });
 
-  it("the trigger reads In and the selected environment, with the dns icon and a caret", () => {
+  it("the trigger reads Test on and the selected environment, with the layers icon and a caret", () => {
     wrapper = mountMenu();
     const trigger = wrapper.get(TRIGGER);
-    expect(trigger.text()).toContain("In");
+    expect(trigger.text()).toContain("Test on");
     expect(trigger.text()).toContain("Staging");
-    expect(trigger.get(".text-text-secondary").text()).toBe("In");
+    expect(trigger.get(".text-text-secondary").text()).toBe("Test on");
     const icons = trigger.findAll("[data-icon]").map((i) => i.attributes("data-icon"));
-    expect(icons[0]).toBe("dns");
+    expect(icons[0]).toBe("layers");
     expect(icons.at(-1)).toBe("arrow-drop-down");
   });
 
