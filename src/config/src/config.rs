@@ -1717,18 +1717,6 @@ pub struct Search {
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
-        name = "ZO_METRICS_SELECTION_CACHE_ENABLED",
-        default = false,
-        help = "Cache per-file PromQL metric selections: block IDs for MIDX block reads, or source row ranges for Parquet/Vortex reads."
-    )]
-    pub metrics_selection_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_SELECTION_CACHE_MAX_SIZE",
-        default = 256,
-        help = "Maximum memory size in MB of the metrics index selection cache."
-    )]
-    pub metrics_selection_cache_max_size: usize,
-    #[env_config(
         name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
         help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."

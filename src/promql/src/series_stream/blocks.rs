@@ -457,7 +457,7 @@ struct BlockSelectedFile {
 
 enum BlockSelection {
     All(Range<usize>),
-    Filtered(Arc<Vec<usize>>),
+    Filtered(Vec<usize>),
 }
 
 impl BlockSelection {
@@ -539,18 +539,13 @@ pub(super) async fn prepare(
     let metadata_ms = metadata_started.elapsed().as_secs_f64() * 1000.0;
     let selection_started = Instant::now();
     let matchers = Arc::new(matchers.clone());
-    let jobs = scan
-        .files
-        .iter()
-        .zip(loaded)
-        .map(|(source, file)| {
-            let source = source.clone();
+    let jobs = loaded
+        .into_iter()
+        .map(|file| {
             let matchers = Arc::clone(&matchers);
             async move {
                 let selection = if matchers.matchers.is_empty() && matchers.or_matchers.is_empty() {
                     BlockSelection::All(0..file.index.blocks.len())
-                } else if let Some(ids) = metrics_index::cached_blocks(&source, &matchers) {
-                    BlockSelection::Filtered(ids)
                 } else {
                     let index = Arc::clone(&file.index);
                     let filter = Arc::clone(&matchers);
@@ -558,7 +553,7 @@ pub(super) async fn prepare(
                         metrics_index::matching_blocks(&index, &filter)
                     })
                     .await??;
-                    BlockSelection::Filtered(metrics_index::cache_blocks(&source, &matchers, ids))
+                    BlockSelection::Filtered(ids)
                 };
                 let valid = match &selection {
                     BlockSelection::All(range) => {
@@ -2599,7 +2594,7 @@ mod tests {
         for family in registry.gather() {
             let name = family
                 .name()
-                .strip_prefix("zo_metrics_index_blocks_cache_")
+                .strip_prefix("zo_metrics_blocks_cache_")
                 .unwrap();
             for metric in family.get_metric() {
                 assert!(
