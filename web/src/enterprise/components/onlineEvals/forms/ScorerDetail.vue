@@ -313,7 +313,7 @@
               {{ t("onlineEvals.scorer.detail.usedByIntro") }}
             </p>
             <OEmptyState
-              v-if="usedByJobs.length === 0"
+              v-if="usedByCount === 0"
               size="inline"
               :title="t('onlineEvals.scorer.detail.usedByEmpty')"
               data-test="scorer-detail-used-by-empty"
@@ -336,6 +336,25 @@
                   />
                 </OButton>
               </li>
+              <li v-for="experiment in usedByExperiments" :key="experiment.id">
+                <OButton
+                  variant="ghost"
+                  class="sd-used-list__item group"
+                  :data-test="`scorer-detail-used-by-experiment-${experiment.name}`"
+                  @click="router.push(aiExperimentDetailRoute(orgId, experiment.id))"
+                >
+                  <OIcon name="science" size="xs" />
+                  <span>{{ experiment.name }}</span>
+                  <span class="sd-used-list__meta text-text-secondary">{{
+                    t("onlineEvals.scorer.detail.usedByExperiment")
+                  }}</span>
+                  <OIcon
+                    name="chevron-right"
+                    size="xs"
+                    class="sd-used-list__chevron text-text-secondary group-hover:text-accent group-hover:opacity-100"
+                  />
+                </OButton>
+              </li>
             </ul>
           </div>
         </template>
@@ -348,6 +367,7 @@
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -361,6 +381,9 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { aiExperimentDetailRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
 import type { EvalJob, Provider, Scorer, ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
 import { useScorerRuns, type RunRow, type ScorerRunsWindow } from "../composables/useScorerRuns";
@@ -386,6 +409,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
 type TabId = "configuration" | "versions" | "runs" | "usedBy";
@@ -455,6 +479,27 @@ const usedByJobs = computed<EvalJob[]>(() => {
   });
 });
 
+const experiments = ref<LlmExperiment[]>([]);
+
+// Best-effort: the jobs list still renders when the experiments request fails.
+async function loadExperiments() {
+  try {
+    experiments.value = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
+  } catch {
+    experiments.value = [];
+  }
+}
+watch(orgId, () => void loadExperiments(), { immediate: true });
+
+const usedByExperiments = computed<LlmExperiment[]>(() => {
+  const myId = entityId(props.row);
+  return experiments.value.filter((experiment) =>
+    (experiment.scorers ?? []).some((ref) => ref.id === myId),
+  );
+});
+
+const usedByCount = computed(() => usedByJobs.value.length + usedByExperiments.value.length);
+
 const createdAt = computed<number | null>(() => {
   const v = valueOf<number>(props.row, "createdAt", "created_at");
   return typeof v === "number" ? v : null;
@@ -485,7 +530,7 @@ const tabs = computed(() => [
   {
     id: "usedBy" as TabId,
     label: t("onlineEvals.scorer.detail.tabs.usedBy"),
-    count: usedByJobs.value.length,
+    count: usedByCount.value,
   },
 ]);
 
@@ -677,7 +722,7 @@ const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(()
     },
     {
       label: t("onlineEvals.scorer.detail.kpis.usedBy"),
-      value: String(usedByJobs.value.length),
+      value: String(usedByCount.value),
       unit: "",
     },
   ];

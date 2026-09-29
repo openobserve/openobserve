@@ -205,7 +205,7 @@ describe("DiscoveryPage fetching", () => {
 
     expect(table().attributes("data-table-id")).toBe("ai-discovery-trace");
     expect(table().attributes("data-columns")).toBe(
-      "refTimestamp,genAiOperationName,serviceName,input,quality,inQueue,actions",
+      "refTimestamp,trace,serviceName,input,quality,inQueue,actions",
     );
 
     (wrapper.vm as any).$.setupState.onPageChange(3);

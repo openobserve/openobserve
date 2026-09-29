@@ -131,6 +131,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <template #cell-trace="{ row }">
+          <div class="flex min-w-0 flex-col">
+            <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
+            <span v-if="row.traceId" class="text-text-secondary text-2xs truncate font-mono">
+              {{ raw(row.traceId) }}
+            </span>
+          </div>
+        </template>
+
         <template #cell-session="{ row }">
           <div class="flex min-w-0 flex-col">
             <span class="truncate font-mono text-xs">{{ textOrDash(row.sessionId) }}</span>
@@ -360,6 +369,7 @@ const visibleItems = computed(() => {
       item.serviceName,
       item.operationName,
       item.genAiOperationName,
+      item.traceId,
       item.sessionId,
       item.userEmail,
       item.quality,
@@ -506,12 +516,12 @@ const columns = computed(() => {
   return [
     timestamp,
     {
-      id: "genAiOperationName",
-      header: t("aiObservability.discovery.columns.type"),
-      accessorKey: "genAiOperationName",
-      hideable: true,
+      // Trace-level identity, not the first span's gen-ai operation: that value reads as a span kind.
+      id: "trace",
+      header: t("aiObservability.discovery.columns.trace"),
+      accessorKey: "operationName",
       sortable: false,
-      size: 180,
+      size: 240,
       meta: { align: "left" },
     },
     {
