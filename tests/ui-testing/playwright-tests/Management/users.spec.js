@@ -4,7 +4,7 @@ const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: 'parallel' });
 
-test.describe("Users and Organizations", () => {
+test.describe("User Management", () => {
     let pageManager;
 
     test("Error Message displayed if Email Blank", async ({ page }, testInfo) => {
