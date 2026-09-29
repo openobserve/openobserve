@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="defaultColumnVisibility"
         :persist-columns="true"
         table-id="dbm-databases"
+        :footer-title="t('dbm.databases.summary.databases')"
         :enable-column-resize="true"
         :toolbar-bordered="false"
         :get-row-style="rowStyle"
@@ -1422,6 +1423,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // half that cannot be hoisted into a header on a table that mixes engines.
   {
     id: "calls",
+    hideable: true,
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
     // At 96 the "from your apps" sub-label ellipsised beside the sort chevron.
@@ -1434,6 +1436,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "qps",
+    hideable: true,
     header: t("dbm.databases.columns.qps"),
     // "Per second" plus the sort icon needs ~100; at 84 it ellipsised to
     // "Per se…".
@@ -1446,6 +1449,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "errorRate",
+    hideable: true,
     header: t("dbm.databases.columns.errorRate"),
     accessorKey: "errorRate",
     size: 84,
@@ -1454,6 +1458,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p50",
+    hideable: true,
     header: t("dbm.databases.columns.p50"),
     accessorKey: "p50_ns",
     // The label is prose ("Half are under"), not a token, so the width has to
@@ -1469,6 +1474,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p95",
+    hideable: true,
     header: t("dbm.databases.columns.p95"),
     accessorKey: "p95_ns",
     size: 96,
@@ -1481,6 +1487,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p99",
+    hideable: true,
     header: t("dbm.databases.columns.p99"),
     accessorKey: "p99_ns",
     // Same as p50: "Slowest 1%" plus the sort icon did not fit in 92.
@@ -1494,6 +1501,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "services",
+    hideable: true,
     header: t("dbm.databases.columns.services"),
     accessorKey: "calling_services",
     size: 200,
@@ -1509,6 +1517,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // setting, which is the same discipline the four unmatched causes follow.
   {
     id: "instanceHealth",
+    hideable: true,
     header: t("dbm.instanceMetrics.columnHeader"),
     // Width 200: the cell carries a sparkline, the ratio, the "N of M
     // connections" line AND the secondary chips (cache hit, lag, deadlocks);
@@ -1528,6 +1537,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // the vantage it came from.
   {
     id: "attention",
+    hideable: true,
     header: t("dbm.databases.columns.attention"),
     size: 130,
     sortable: true,
@@ -1539,6 +1549,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "load",
+    hideable: true,
     header: t("dbm.databases.columns.load"),
     accessorKey: "total_time_ns",
     size: 190,

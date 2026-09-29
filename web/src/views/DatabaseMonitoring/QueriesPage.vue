@@ -213,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="columnVisibility"
         :persist-columns="true"
         table-id="dbm-queries"
+        :footer-title="t('dbm.queries.stmtClass.query')"
         :enable-column-resize="true"
         :row-class="rowClass"
         :get-row-style="rowStyle"
