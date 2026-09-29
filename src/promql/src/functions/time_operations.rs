@@ -13,74 +13,85 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
-use config::{meta::promql::value::Value, utils::time::parse_i64_to_timestamp_micros};
+use chrono::{DateTime, Datelike, Timelike, Utc};
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::Result;
 
 pub(crate) fn minute(data: Value) -> Result<Value> {
-    exec(data, Timelike::minute)
+    exec(data, |date| date.minute().into())
 }
 
 pub(crate) fn hour(data: Value) -> Result<Value> {
-    exec(data, Timelike::hour)
+    exec(data, |date| date.hour().into())
 }
 
 pub(crate) fn month(data: Value) -> Result<Value> {
-    exec(data, Datelike::month)
+    exec(data, |date| date.month().into())
 }
 
 pub(crate) fn year(data: Value) -> Result<Value> {
-    exec(data, |date| date.year() as u32)
+    exec(data, |date| date.year().into())
 }
 
 pub(crate) fn day_of_month(data: Value) -> Result<Value> {
-    exec(data, Datelike::day)
+    exec(data, |date| date.day().into())
 }
 
 pub(crate) fn day_of_week(data: Value) -> Result<Value> {
-    exec(data, |date| date.weekday().num_days_from_sunday()) // Starting from 0
+    exec(data, |date| date.weekday().num_days_from_sunday().into()) // Starting from 0
 }
 
 pub(crate) fn day_of_year(data: Value) -> Result<Value> {
-    exec(data, Datelike::ordinal) // Starting from 1
+    exec(data, |date| date.ordinal().into()) // Starting from 1
 }
 
 pub(crate) fn days_in_month(data: Value) -> Result<Value> {
-    exec(data, |date| {
-        let cur_month = date.month();
-        let cur_year = date.year();
-        let naive_date = if cur_month == 12 {
-            NaiveDate::from_ymd_opt(cur_year + 1, 1, 1)
-        } else {
-            NaiveDate::from_ymd_opt(cur_year, cur_month + 1, 1)
-        };
-        naive_date
-            .unwrap()
-            .signed_duration_since(NaiveDate::from_ymd_opt(cur_year, cur_month, 1).unwrap())
-            .num_days() as u32
-    })
+    exec(data, |date| date.num_days_in_month().into())
 }
 
 pub(crate) fn timestamp(data: Value) -> Result<Value> {
     super::map_samples(data, "timestamp", |sample| {
-        // Convert timestamp from microseconds to seconds for all samples
-        (sample.timestamp / 1_000_000) as f64
+        timestamp_seconds(sample.timestamp)
     })
+}
+
+/// https://prometheus.io/docs/prometheus/latest/querying/functions/#time
+pub(crate) fn time(eval_ctx: &EvalContext) -> Value {
+    if eval_ctx.is_instant() {
+        return Value::Float(timestamp_seconds(eval_ctx.start));
+    }
+    // a range-evaluated scalar is one label-less series with a sample per step
+    Value::Matrix(vec![RangeValue::new(
+        Labels::default(),
+        eval_ctx
+            .timestamps()
+            .into_iter()
+            .map(|timestamp| Sample::new(timestamp, timestamp_seconds(timestamp))),
+    )])
+}
+
+/// A microsecond timestamp in seconds, at the millisecond precision Prometheus keeps.
+pub(crate) fn timestamp_seconds(micros: i64) -> f64 {
+    micros.div_euclid(1_000) as f64 / 1_000.0
 }
 
 /// Given a timestamp, get the component from it
 /// for e.g. month(), year(), day() etc.
-fn exec(data: Value, op: impl Fn(&DateTime<Utc>) -> u32 + Sync) -> Result<Value> {
+fn exec(data: Value, op: impl Fn(&DateTime<Utc>) -> f64 + Sync) -> Result<Value> {
     super::map_samples(data, "time operation", |sample| {
-        let timestamp = parse_i64_to_timestamp_micros(sample.value as i64);
-        let naive_datetime = DateTime::from_timestamp_micros(timestamp).unwrap();
-        op(&naive_datetime) as f64
+        // Prometheus reads Unix seconds truncated toward zero; beyond chrono's range gives NaN
+        let date = sample
+            .value
+            .is_finite()
+            .then(|| DateTime::from_timestamp(sample.value as i64, 0))
+            .flatten();
+        date.map_or(f64::NAN, |date| op(&date))
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::value::{RangeValue, Sample};
+    use chrono::NaiveDate;
 
     use super::*;
 
@@ -104,8 +115,33 @@ mod tests {
     }
 
     #[test]
+    fn test_time_and_timestamp_truncate_to_milliseconds() {
+        let instant = 1_640_995_200_123_456;
+        let eval_ctx = EvalContext::new(instant, instant, 0, "test".into());
+        assert!(matches!(time(&eval_ctx), Value::Float(t) if t == 1_640_995_200.123));
+
+        let data = Value::Matrix(vec![RangeValue::new(
+            vec![],
+            [Sample::new(instant, 0.0), Sample::new(-1_500, 0.0)],
+        )]);
+        let Value::Matrix(matrix) = timestamp(data).unwrap() else {
+            panic!("expected matrix");
+        };
+        let values: Vec<f64> = matrix[0].samples.iter().map(|s| s.value).collect();
+        assert_eq!(values, [1_640_995_200.123, -0.002]);
+    }
+
+    fn apply(op: fn(Value) -> Result<Value>, input: f64) -> f64 {
+        let data = Value::Matrix(vec![RangeValue::new(vec![], [Sample::new(0, input)])]);
+        let Value::Matrix(matrix) = op(data).unwrap() else {
+            panic!("expected matrix");
+        };
+        matrix[0].samples[0].value
+    }
+
+    #[test]
     fn test_get_component_from_ts() {
-        let timestamp_micros: i64 = 1688379261000000; // Mon Jul 03 2023 10:14:21 GMT+0000
+        let timestamp_seconds: i64 = 1688379261; // Mon Jul 03 2023 10:14:21 GMT+0000
 
         let operations = [
             minute,
@@ -118,20 +154,34 @@ mod tests {
             year,
         ];
         let expected_outputs = [14, 10, 1, 3, 184, 31, 7, 2023]; // Strict ordering based on operations
+        for (op, expected) in std::iter::zip(operations, expected_outputs) {
+            assert_eq!(apply(op, timestamp_seconds as f64 + 0.9), expected as f64);
+        }
+    }
+
+    #[test]
+    fn test_date_functions_read_unix_seconds() {
+        assert_eq!(apply(day_of_week, 0.0), 4.0);
+        assert_eq!(apply(year, 0.0), 1970.0);
+        assert_eq!(apply(hour, 0.0), 0.0);
+        assert_eq!(apply(year, 4e10), 3237.0);
+        assert_eq!(apply(year, -0.5), 1970.0);
+        assert_eq!(apply(year, -1e11), -1199.0);
+    }
+
+    #[test]
+    fn test_date_functions_out_of_range_are_nan() {
         for input in [
-            timestamp_micros,
-            timestamp_micros / 1_000,
-            timestamp_micros / 1_000_000,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -9e12,
+            -1e13,
+            1e13,
+            1e300,
         ] {
-            for (op, expected) in std::iter::zip(operations, expected_outputs) {
-                let data = Value::Matrix(vec![RangeValue::new(
-                    vec![],
-                    [Sample::new(0, input as f64)],
-                )]);
-                let Value::Matrix(matrix) = op(data).unwrap() else {
-                    panic!("expected matrix");
-                };
-                assert_eq!(matrix[0].samples[0].value, expected as f64);
+            for op in [year, days_in_month, day_of_week] {
+                assert!(apply(op, input).is_nan(), "{input}");
             }
         }
     }
@@ -148,15 +198,8 @@ mod tests {
                 .and_hms_opt(0, 0, 0)
                 .unwrap()
                 .and_utc()
-                .timestamp_micros();
-            let data = Value::Matrix(vec![RangeValue::new(
-                vec![],
-                [Sample::new(0, timestamp as f64)],
-            )]);
-            let Value::Matrix(matrix) = days_in_month(data).unwrap() else {
-                panic!("expected matrix");
-            };
-            assert_eq!(matrix[0].samples[0].value, expected);
+                .timestamp();
+            assert_eq!(apply(days_in_month, timestamp as f64), expected);
         }
     }
 }

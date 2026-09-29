@@ -713,6 +713,8 @@ export const convertPromQLData = async (
 
               return {
                 name: seriesName,
+                // Position among the rendered queries; exemplar markers take the colour of their query's first series.
+                _queryIndex: index,
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",

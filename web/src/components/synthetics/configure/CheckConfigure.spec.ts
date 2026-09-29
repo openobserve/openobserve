@@ -28,7 +28,14 @@ import CheckConfigure from "./CheckConfigure.vue";
 
 // ── Child Component Stubs ─────────────────────────────────────────────────
 const CheckDetailsStub = {
-  props: ["check", "folders", "validationErrors", "targetLabel", "targetPlaceholder"],
+  props: [
+    "check",
+    "folders",
+    "validationErrors",
+    "targetLabel",
+    "targetPlaceholder",
+    "variableSuggestions",
+  ],
   emits: ["update:check"],
   template:
     '<div class="check-details-stub" :data-test="$attrs[\'data-test\']" :data-url="check.url"><slot /></div>',
@@ -263,6 +270,20 @@ describe("CheckConfigure", () => {
 
       const alerts = wrapper.findComponent(CheckAlertsStub);
       expect(alerts.props("destinations")).toEqual(destinations);
+    });
+
+    it("should pass variableSuggestions to CheckDetails, and nothing when absent", () => {
+      wrapper = mountConfigure();
+      expect(wrapper.findComponent(CheckDetailsStub).props("variableSuggestions")).toBeUndefined();
+      wrapper.unmount();
+
+      const variableSuggestions = [
+        { name: "BASE_URL", envs: ["prod"], global: false, secret: false, gap: [] },
+      ];
+      wrapper = mountConfigure({ variableSuggestions });
+      expect(wrapper.findComponent(CheckDetailsStub).props("variableSuggestions")).toEqual(
+        variableSuggestions,
+      );
     });
 
     it("should accept and pass validationErrors to CheckDetails", () => {

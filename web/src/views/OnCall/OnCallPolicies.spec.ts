@@ -35,7 +35,7 @@ const stubs = {
   OTable: {
     name: "OTable",
     props: ["data", "columns"],
-    template: "<div><slot name='subheader' /></div>",
+    template: "<div><slot name='subheader' /><slot name='toolbar-trailing' /></div>",
   },
   OStatStrip: { name: "OStatStrip", props: ["items"], template: "<div />" },
   OSearchInput: { name: "OSearchInput", template: "<div />" },
@@ -138,6 +138,27 @@ describe("OnCallPolicies", () => {
 
     expect(rowsOf(wrapper)).toHaveLength(2);
     expect(rowsOf(wrapper)[0].onCall).toBe("");
+  });
+
+  /// The audit is two requests per team wide, so a revisit that repeats them
+  /// pays the whole page again; only the refresh button is allowed to.
+  it("serves a revisit from the cache and reaches the server on refresh", async () => {
+    const first = render();
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(1);
+    expect(service.getPolicy).toHaveBeenCalledTimes(2);
+    first.unmount();
+
+    const second = render();
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(1);
+    expect(service.getPolicy).toHaveBeenCalledTimes(2);
+
+    await second.find('[data-test="oncall-policies-refresh"]').trigger("click");
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.getPolicy).toHaveBeenCalledTimes(4);
+    expect(service.whoIsOnCall).toHaveBeenCalledTimes(4);
   });
 
   /// On-Call owns one rail entry, so a sub-page with no Back is a dead end.

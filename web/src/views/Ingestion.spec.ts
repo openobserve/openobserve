@@ -134,6 +134,12 @@ describe("Ingestion", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // clearAllMocks keeps a previous test's mockRejectedValue, which onBeforeMount would settle into
+    queryClient.clear();
+    organizationsService.get_organization_passcode.mockResolvedValue({
+      data: { data: { token: "default-token", passcode: "default-passcode" } },
+    });
+    store.state.organizationData.organizationPasscodeForbidden = false;
 
     try {
       wrapper = mount(Ingestion, {
@@ -461,6 +467,225 @@ describe("Ingestion", () => {
     });
   });
 
+  // mounts the component so the lifecycle wiring itself is under test, not just the method
+  describe("passcode 403 via the real mount path", () => {
+    const mountIngestion = async () => {
+      const w = mount(Ingestion, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: {
+            ConfirmDialog: { template: "<div />" },
+            OButton: { template: "<button><slot /></button>" },
+            OTabs: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div><slot /></div>" },
+            "router-view": { template: "<div />" },
+          },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+
+    beforeEach(() => {
+      queryClient.clear();
+      store.state.organizationData.organizationPasscodeForbidden = false;
+    });
+
+    it("sets organizationPasscodeForbidden on mount when /passcode returns 403", async () => {
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+
+      expect(store.state.organizationData.organizationPasscodeForbidden).toBe(true);
+      expect(store.state.organizationData.organizationPasscode).not.toBe("");
+      w.unmount();
+    });
+
+    it("leaves organizationPasscodeForbidden false on mount for a non-403 failure", async () => {
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 500 },
+      });
+
+      const w = await mountIngestion();
+
+      expect(store.state.organizationData.organizationPasscodeForbidden).toBe(false);
+      w.unmount();
+    });
+
+    it("leaves organizationPasscodeForbidden false on mount when the passcode loads", async () => {
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "live-passcode", user: "a@b.c" } },
+      });
+
+      const w = await mountIngestion();
+
+      expect(store.state.organizationData.organizationPasscodeForbidden).toBe(false);
+      expect(store.state.organizationData.organizationPasscode).toBe("live-passcode");
+      w.unmount();
+    });
+  });
+
+  // assertions read `w.vm.store`: the `store` helper this file provides is not the one the component writes to
+  describe("passcode 403 is authoritative over a concurrent /ingestion-tokens", () => {
+    const ORG_TOKEN = "o2oi_orgwide_token_value";
+
+    const mountIngestion = async () => {
+      const w = mount(Ingestion, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: {
+            ConfirmDialog: { template: "<div />" },
+            OButton: { template: "<button><slot /></button>" },
+            OTabs: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div><slot /></div>" },
+            "router-view": { template: "<div />" },
+          },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+
+    const orgData = (w: any) => w.vm.store.state.organizationData;
+
+    const tokenRow = {
+      name: "default",
+      token: ORG_TOKEN,
+      enabled: true,
+      is_default: true,
+      description: "",
+      created_by: "a@b.c",
+      created_at: 0,
+    };
+
+    const stubNonEmptyTokens = () => {
+      // fetchOrgTokens dispatches `.data` of the body, so the array sits one level deeper
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({
+        data: { data: [tokenRow] },
+      });
+    };
+
+    beforeEach(() => {
+      queryClient.clear();
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({ data: { data: [] } });
+    });
+
+    afterEach(() => {
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({ data: { data: [] } });
+    });
+
+    it("keeps the banner when /ingestion-tokens succeeds and /passcode 403s", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+
+      // without this the test would re-prove the empty-list case, not the race
+      expect(orgData(w).orgTokens).toHaveLength(1);
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+      expect(orgData(w).organizationPasscode).not.toBe(ORG_TOKEN);
+      w.unmount();
+    });
+
+    it("keeps the banner when the tokens response lands AFTER the 403", async () => {
+      // the opposite interleaving: passcode rejects first, tokens resolve on a later macrotask
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+      organizationsService.list_org_ingestion_tokens.mockImplementation(
+        () =>
+          new Promise((resolve) => setTimeout(() => resolve({ data: { data: [tokenRow] } }), 0)),
+      );
+
+      const w = await mountIngestion();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await flushPromises();
+
+      expect(orgData(w).orgTokens).toHaveLength(1);
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+      expect(orgData(w).organizationPasscode).not.toBe(ORG_TOKEN);
+      w.unmount();
+    });
+
+    it("does not let picking a token from the dropdown clear an observed 403", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+
+      w.vm.onTokenSelected("default");
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+      expect(orgData(w).organizationPasscode).not.toBe(ORG_TOKEN);
+      w.unmount();
+    });
+
+    it("still shows tokens to a caller the passcode endpoint allows", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "allowed-passcode", user: "a@b.c" } },
+      });
+
+      const w = await mountIngestion();
+
+      expect(orgData(w).organizationPasscodeForbidden).toBe(false);
+      expect(orgData(w).orgTokens).toHaveLength(1);
+
+      w.vm.onTokenSelected("default");
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscode).toBe(ORG_TOKEN);
+      expect(orgData(w).organizationPasscodeForbidden).toBe(false);
+      w.unmount();
+    });
+
+    it("re-evaluates after an org switch instead of latching forever", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      const w = await mountIngestion();
+      expect(orgData(w).organizationPasscodeForbidden).toBe(true);
+
+      // MainLayout wipes organizationData on an org switch, so the new read decides afresh
+      const componentStore = w.vm.store;
+      const previous = componentStore.state.selectedOrganization.identifier;
+      componentStore.state.selectedOrganization = {
+        ...componentStore.state.selectedOrganization,
+        identifier: `${previous}-other`,
+      };
+      componentStore.dispatch("setOrganizationPasscodeForbidden", false);
+      await flushPromises();
+
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "other-org-passcode", user: "a@b.c" } },
+      });
+      queryClient.clear();
+      await w.vm.getOrganizationPasscode();
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscodeForbidden).toBe(false);
+      expect(orgData(w).organizationPasscode).toBe("other-org-passcode");
+
+      componentStore.state.selectedOrganization = {
+        ...componentStore.state.selectedOrganization,
+        identifier: previous,
+      };
+      w.unmount();
+    });
+  });
+
   describe("getOrganizationPasscode", () => {
     it("should successfully get organization passcode", async () => {
       if (!wrapper) {
@@ -480,6 +705,8 @@ describe("Ingestion", () => {
       organizationsService.get_organization_passcode.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
+      // onBeforeMount already cached this read, so the call under test would not reach the mock
+      queryClient.clear();
       await wrapper.vm.getOrganizationPasscode();
 
       expect(organizationsService.get_organization_passcode).toHaveBeenCalledWith("default");
@@ -504,6 +731,7 @@ describe("Ingestion", () => {
 
       organizationsService.get_organization_passcode.mockResolvedValue(mockResponse);
 
+      queryClient.clear();
       await wrapper.vm.getOrganizationPasscode();
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -511,6 +739,42 @@ describe("Ingestion", () => {
         message: "Passcode not found.",
         timeout: 5000,
       });
+    });
+
+    it("should flag passcode as forbidden on 403 so snippets are withheld", async () => {
+      if (!wrapper) {
+        expect.fail("Component failed to mount");
+        return;
+      }
+
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 403 },
+      });
+      const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
+
+      queryClient.clear();
+      await wrapper.vm.getOrganizationPasscode();
+
+      expect(dispatchSpy).toHaveBeenCalledWith("setOrganizationPasscodeForbidden", true);
+      expect(dispatchSpy).not.toHaveBeenCalledWith("setOrganizationPasscode", "");
+    });
+
+    it("should stay silent and not flag forbidden on a non-403 error", async () => {
+      if (!wrapper) {
+        expect.fail("Component failed to mount");
+        return;
+      }
+
+      organizationsService.get_organization_passcode.mockRejectedValue({
+        response: { status: 500 },
+      });
+      const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
+
+      queryClient.clear();
+      await wrapper.vm.getOrganizationPasscode();
+
+      expect(dispatchSpy).not.toHaveBeenCalledWith("setOrganizationPasscodeForbidden", true);
+      expect(mockNotify).not.toHaveBeenCalled();
     });
   });
 
@@ -533,8 +797,7 @@ describe("Ingestion", () => {
       apiKeysService.listRUMTokens.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
-      // Mounting already cached a token, and the read is a cache hit for an
-      // hour — drop it so the call under test reaches the mock above.
+      // mounting already cached this read, so the call under test would not reach the mock
       queryClient.clear();
       await wrapper.vm.getRUMToken();
 

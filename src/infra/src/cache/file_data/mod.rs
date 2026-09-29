@@ -23,7 +23,10 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::utils::time::{HourFormat, get_ymdh_from_micros};
+use config::{
+    meta::promql::index::{MIDX_TRAILER_LEN, MidxTrailer},
+    utils::time::{HourFormat, get_ymdh_from_micros},
+};
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use object_store::{GetOptions, GetResult};
@@ -232,13 +235,10 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
             }
         }
         FileType::Midx => {
-            if bytes.len() < metrics_block::FOOTER_LEN {
+            if bytes.len() < MIDX_TRAILER_LEN {
                 return Err(anyhow::anyhow!("invalid metrics index file"));
             }
-            metrics_block::read_footer(
-                &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
-                bytes.len() as u64,
-            )?;
+            MidxTrailer::read(&bytes[bytes.len() - MIDX_TRAILER_LEN..], bytes.len() as u64)?;
         }
     }
     Ok(())
@@ -440,17 +440,7 @@ pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_st
     })
 }
 
-/// Batched range read across the cache ladder.
-///
-/// `memory → disk → remote storage`, returning one `Bytes` per input
-/// range in input order. The hit-path stays inside a single file
-/// handle: memory cache slices its in-memory `Bytes`, disk cache does
-/// one `File::open` + N `pread`s. Only on a full cache miss do we go
-/// to remote storage (which itself implements batched `get_ranges`
-/// for local FS and any object_store backend).
-///
-/// `remote = false` is the search-side semantic — never hit S3 on a
-/// miss, return NotFound so the caller can degrade gracefully.
+/// `remote = false` prevents a storage fallback after both file caches miss.
 pub async fn get_ranges_opts(
     account: &str,
     file: &str,
@@ -458,25 +448,26 @@ pub async fn get_ranges_opts(
     remote: bool,
 ) -> object_store::Result<Vec<Bytes>> {
     let cfg = config::get_config();
-    if cfg.memory_cache.enabled
-        && let Some(v) = memory::get_ranges(file, ranges).await
-    {
-        return Ok(v);
-    }
-    if cfg.disk_cache.enabled
-        && let Ok(v) = disk::get_ranges(file, ranges).await
-    {
-        return Ok(v);
-    }
-
-    if remote {
-        return crate::storage::get_ranges(account, file, ranges).await;
-    }
-
-    Err(object_store::Error::NotFound {
-        path: file.to_string(),
-        source: Box::new(std::io::Error::other(file)),
+    crate::storage::get_ranges_opt(ranges, |fetched_ranges| async move {
+        if cfg.memory_cache.enabled
+            && let Some(v) = memory::get_ranges(file, &fetched_ranges).await
+        {
+            return Ok(v);
+        }
+        if cfg.disk_cache.enabled
+            && let Ok(v) = disk::get_ranges(file, &fetched_ranges).await
+        {
+            return Ok(v);
+        }
+        if remote {
+            return crate::storage::get_ranges(account, file, &fetched_ranges).await;
+        }
+        Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other(file)),
+        })
     })
+    .await
 }
 
 /// get the file time from the file name
@@ -526,37 +517,16 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn validate_midx_checks_current_footer() {
-        use arrow::{
-            array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
-            datatypes::{DataType, Field, Schema},
-        };
-        let schema = std::sync::Arc::new(Schema::new(vec![
-            Field::new("__hash__", DataType::UInt64, false),
-            Field::new("_timestamp", DataType::Int64, false),
-            Field::new("value", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                std::sync::Arc::new(UInt64Array::from(vec![1, 1])),
-                std::sync::Arc::new(Int64Array::from(vec![10, 20])),
-                std::sync::Arc::new(Float64Array::from(vec![1.0, 2.0])),
-            ],
-        )
-        .unwrap();
-        let mut writer =
-            metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
-        writer.write(&batch).unwrap();
-        let bytes = writer
-            .finish_for_vortex(
-                metrics_block::ParentMetadata {
-                    rows: 2,
-                    compressed_size: 123,
-                },
-                schema,
-            )
-            .unwrap();
+    async fn validate_midx_checks_current_trailer() {
+        let mut bytes = b"sample-block{\"header\":1}".to_vec();
+        bytes.extend_from_slice(
+            &MidxTrailer {
+                label_len: 2,
+                directory_len: 4,
+                header_len: 13,
+            }
+            .encode(),
+        );
 
         assert!(validate_file(&bytes, FileType::Midx).await.is_ok());
         assert!(
@@ -566,8 +536,11 @@ mod tests {
         );
         let mut oversized = bytes.clone();
         let len = oversized.len();
-        oversized[len - 16..len - 8].copy_from_slice(&u64::MAX.to_le_bytes());
+        oversized[len - 16..len - 12].copy_from_slice(&u32::MAX.to_le_bytes());
         assert!(validate_file(&oversized, FileType::Midx).await.is_err());
+        let mut previous = bytes.clone();
+        previous[len - 8..].copy_from_slice(b"O2MIDX02");
+        assert!(validate_file(&previous, FileType::Midx).await.is_err());
         assert!(
             validate_file(b"not a MIDX file", FileType::Midx)
                 .await

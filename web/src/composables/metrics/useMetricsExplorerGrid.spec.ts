@@ -943,6 +943,15 @@ describe("useMetricsExplorerGrid", () => {
       );
     });
 
+    it("never offers the internal exemplars field as a label name", async () => {
+      const grid = await setup();
+      (metricsService.labels as any).mockResolvedValue({
+        data: { data: ["job", "exemplars"] },
+      });
+      await grid.loadLabelNames();
+      expect(grid.labelNames.value).toEqual(["job"]);
+    });
+
     it("re-asks for the label NAMES on a new window, as it does for the values", async () => {
       // `labels` is asked over `start_time`/`end_time`, so the set of labels that
       // exist is a property of the window: a label carried only by a job that ran
@@ -1745,6 +1754,46 @@ describe("useMetricsExplorerGrid", () => {
       await flush();
       expect(inFlight).toHaveLength(0);
       expect(grid.previews.value["http_requests_total"].pendingRefresh).toBeUndefined();
+    });
+  });
+
+  describe("exemplars on a histogram card", () => {
+    const HIST_CARD = "lat_seconds_bucket";
+
+    beforeEach(() => {
+      sessionStorage.clear();
+    });
+
+    it("draws percentiles as a line while on and returns to heatmap when off, never touching fnOverrides", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, HIST_CARD);
+      const overridesBefore = localStorage.getItem("o2.metricsExplorer.fnOverrides.default");
+      expect(grid.effectiveVariant(card).resolved.variant.id).toBe("heatmap");
+      expect(grid.exemplarSwapsVariant(card)).toBe(true);
+      expect(grid.exemplarEligible(card)).toBe(true);
+
+      grid.toggleExemplars(card);
+      expect(grid.exemplarStateOf(HIST_CARD)?.valueUnit).toBe("seconds");
+      const on = grid.effectiveVariant(card).resolved;
+      expect(on.variant.id).toBe("percentiles");
+      expect(on.chartType).toBe("line");
+      expect(grid.exemplarsEnabled(HIST_CARD)).toBe(true);
+
+      grid.toggleExemplars(card);
+      expect(grid.effectiveVariant(card).resolved.variant.id).toBe("heatmap");
+      expect(grid.overrides.value[HIST_CARD]).toBeUndefined();
+      expect(localStorage.getItem("o2.metricsExplorer.fnOverrides.default")).toBe(overridesBefore);
+    });
+
+    it("adds the exemplar jobs to the card's keys so scroll-away cancels them", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, HIST_CARD);
+      expect(grid.exemplarKeysOf(card)).toEqual([]);
+      grid.toggleExemplars(card);
+      const keys = grid.exemplarKeysOf(card);
+      expect(keys).toHaveLength(3);
+      expect(keys.every((k: string) => k.startsWith("exemplars|"))).toBe(true);
+      grid.toggleExemplars(card);
     });
   });
 });

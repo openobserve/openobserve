@@ -296,7 +296,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODialog>
       <div v-if="!panels.length">
         <!-- if data not available show nodata component -->
-        <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
+        <NoPanel
+          @update:Panel="addPanelData"
+          :view-only="viewOnly"
+          :hide-add-action="hideAddPanel"
+        />
       </div>
     </div>
   </div>
@@ -401,6 +405,13 @@ export default defineComponent({
       default: false,
     },
     simplifiedPanelView: {
+      type: Boolean,
+      default: false,
+    },
+    /** Hides the "Add panel" quick-start action in the empty state, for
+     *  embeddings where panels are driven by something other than the
+     *  manual panel builder (e.g. dimension selection). */
+    hideAddPanel: {
       type: Boolean,
       default: false,
     },

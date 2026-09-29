@@ -250,9 +250,22 @@ export default defineComponent({
       );
     });
 
+    // Ticking every loaded option by hand shows as "all", but the selection stays an explicit list rather than SELECT_ALL_VALUE.
+    const everyOptionSelected = computed(() => {
+      if (!Array.isArray(selectedValue.value) || props.variableItem.isLoading) return false;
+      const optionValues = computedOptions.value
+        .map((opt: any) => opt.value)
+        .filter((v: any) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)));
+      const selected = new Set(selectedValue.value);
+      return optionValues.length > 0 && optionValues.every((v: any) => selected.has(v));
+    });
+
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
+        return (
+          (Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE) ||
+          everyOptionSelected.value
+        );
       }
       return selectedValue.value === SELECT_ALL_VALUE;
     });
