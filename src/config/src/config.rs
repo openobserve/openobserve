@@ -1400,6 +1400,8 @@ pub struct ReportServer {
     pub addr: String,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_REPORT_SERVER_SECRET", default = "")]
+    pub secret: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
