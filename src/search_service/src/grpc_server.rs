@@ -298,6 +298,9 @@ impl Search for Searcher {
             req.path
         );
 
+        if !infra::table::source_maps::is_sourcemap_path_for_org(&req.org_id, &req.path) {
+            return Err(Status::invalid_argument("invalid sourcemap path"));
+        }
         let res = infra::storage::get_bytes("", &req.path)
             .await
             .map_err(|e| {
@@ -534,6 +537,45 @@ mod tests {
         let res = searcher.get_table(req).await;
 
         assert!(res.is_ok(), "join result path was rejected: {res:?}");
+        let _ = infra::storage::del(vec![("", path)]).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_sourcemap_file_rejects_other_org_path() {
+        let searcher = Searcher::new();
+        for path in [
+            "files/otherorg/sourcemaps/secret.map",
+            "files/myorg/sourcemaps/../otherorg/sourcemaps/secret.map",
+        ] {
+            let req = Request::new(GetSourcemapFileRequest {
+                org_id: "myorg".to_string(),
+                original_name: "app.js.map".to_string(),
+                path: path.to_string(),
+            });
+            let err = searcher
+                .get_sourcemap_file(req)
+                .await
+                .expect_err(&format!("{path} was accepted"));
+            assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_sourcemap_file_accepts_own_org_path() {
+        let searcher = Searcher::new();
+        let path = "files/myorg/sourcemaps/app.js.map";
+        infra::storage::put("", path, Vec::new().into())
+            .await
+            .unwrap();
+
+        let req = Request::new(GetSourcemapFileRequest {
+            org_id: "myorg".to_string(),
+            original_name: "app.js.map".to_string(),
+            path: path.to_string(),
+        });
+        let res = searcher.get_sourcemap_file(req).await;
+
+        assert!(res.is_ok(), "own org sourcemap path was rejected: {res:?}");
         let _ = infra::storage::del(vec![("", path)]).await;
     }
 }
