@@ -142,7 +142,7 @@ pub async fn send_report(
 pub fn create_router() -> Router {
     Router::new()
         .route("/api/healthz", get(healthz))
-        .route("/api/:org_id/reports/:name/send", put(send_report))
+        .route("/api/{org_id}/reports/{name}/send", put(send_report))
 }
 
 #[cfg(test)]
@@ -193,5 +193,10 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("error_detail"));
         assert!(obj.contains_key("trace_id"));
+    }
+
+    #[test]
+    fn test_create_router_does_not_panic_on_axum_08_path_syntax() {
+        let _ = create_router();
     }
 }
