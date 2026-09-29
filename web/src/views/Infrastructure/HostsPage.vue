@@ -384,7 +384,12 @@ const osToggleLabel = (slug: string) =>
   <OPageLayout :title="t('menu.hosts')" icon="dns" bleed>
     <template #actions>
       <div class="flex items-center gap-2">
-        <OText v-if="hostsState === 'detected'" variant="meta" data-test="hosts-fleet-count">
+        <OText
+          v-if="hostsState === 'detected'"
+          variant="meta"
+          class="max-md:hidden"
+          data-test="hosts-fleet-count"
+        >
           {{
             t(
               "infra.hosts.fleetCount",
@@ -402,15 +407,17 @@ const osToggleLabel = (slug: string) =>
           data-test-name="hosts-date-time"
           @on:date-change="onDateChange"
         />
+        <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
         <OButton
           variant="outline"
           size="sm-action"
           icon-left="refresh"
+          class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
           data-test="hosts-refresh"
           :loading="loading"
           @click="onRefreshClick"
         >
-          {{ t("infra.hosts.refresh") }}
+          <span class="max-md:sr-only">{{ t("infra.hosts.refresh") }}</span>
         </OButton>
       </div>
     </template>
@@ -423,7 +430,7 @@ const osToggleLabel = (slug: string) =>
     <!-- Undetected: onboarding, not a dead end — the embedded card carries the auto-import wiring. -->
     <div v-else-if="hostsState !== 'detected'" class="min-h-0 flex-1 overflow-y-auto">
       <div
-        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+        class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
         data-test="hosts-empty-state"
       >
         <OText tag="h2" class="text-xl font-semibold">{{ t("infra.hosts.emptyHeadline") }}</OText>

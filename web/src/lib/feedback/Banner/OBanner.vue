@@ -120,7 +120,7 @@ const barVariantClass = computed(() => {
       bar ? (dense ? 'py-1' : 'py-2') : '',
       bar ? (center ? 'justify-center' : 'justify-between') : '',
       bar ? '' : 'rounded-default',
-      bar ? '' : inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
+      bar ? '' : inlineActions ? 'flex-row items-center gap-3 max-md:flex-wrap' : 'flex-col gap-2',
       bar ? '' : dense ? 'p-2' : 'p-4',
       bar ? barVariantClass : variantClass,
     ]"
@@ -137,7 +137,7 @@ const barVariantClass = computed(() => {
             ? 'min-w-0 items-center'
             : 'min-w-0 flex-1 items-center'
           : inlineActions
-            ? 'min-w-0 flex-1 items-center'
+            ? 'min-w-0 flex-1 items-center max-md:min-w-48'
             : preserveWhitespace
               ? 'min-w-0 items-start'
               : 'items-start',
@@ -168,7 +168,8 @@ const barVariantClass = computed(() => {
       </div>
     </div>
 
-    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : ''">
+    <!-- A phone keeps the message at least 12rem wide; past that the actions wrap under it, end-aligned. -->
+    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : ''">
       <slot name="actions" />
     </div>
   </div>

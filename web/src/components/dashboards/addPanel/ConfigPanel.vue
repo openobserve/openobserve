@@ -2222,7 +2222,12 @@ export default defineComponent({
     ];
     // Single source of truth — shared with the column-formatting dialog. Labels are
     // already translated; raw() only re-brands the `string` the helper widens to.
-    const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
+    const unitOptions = computed(() =>
+      getUnitOptions(t, dashboardPanelData.data.config.unit).map((o) => ({
+        ...o,
+        label: raw(o.label),
+      })),
+    );
 
     const labelPositionOptions = [
       {
