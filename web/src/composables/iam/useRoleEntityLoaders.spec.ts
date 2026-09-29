@@ -162,6 +162,9 @@ vi.mock("@/services/llm-queues.service", () => ({
 vi.mock("@/services/llm-datasets.service", () => ({
   default: { list: vi.fn(async () => [{ id: "golden-set", name: "Golden Set" }]) },
 }));
+vi.mock("@/services/llm-prompts.service", () => ({
+  default: { list: vi.fn(async () => [{ entityId: "welcome", name: "Welcome" }]) },
+}));
 
 import { useRoleEntityLoaders } from "@/composables/iam/useRoleEntityLoaders";
 import { queryClient } from "@/composables/query/queryClient";
@@ -172,6 +175,7 @@ import dashboardService from "@/services/dashboards";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import llmPromptsService from "@/services/llm-prompts.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import onlineEvalsService from "@/services/online-evals.service";
 import organizationsService from "@/services/organizations";
@@ -756,6 +760,17 @@ describe("useRoleEntityLoaders - flat resource loaders", () => {
     expect(updateResourceEntities.mock.calls).toEqual([
       ["annotation_queue", ["id"], [{ id: "review-queue", name: "Review Queue" }], false, "name"],
       ["dataset", ["id"], [{ id: "golden-set", name: "Golden Set" }], false, "name"],
+    ]);
+  });
+
+  it("getPrompts keys prompts by entityId and labels them by name", async () => {
+    const { getPrompts, updateResourceEntities } = setup();
+
+    await getPrompts();
+
+    expect(llmPromptsService.list).toHaveBeenCalledWith(ORG);
+    expect(updateResourceEntities.mock.calls).toEqual([
+      ["prompt", ["entityId"], [{ entityId: "welcome", name: "Welcome" }], false, "name"],
     ]);
   });
 });

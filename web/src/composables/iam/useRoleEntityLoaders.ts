@@ -35,6 +35,7 @@ import workflowService from "@/services/workflows";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import llmPromptsService from "@/services/llm-prompts.service";
 
 type RowBuilders = {
   updateResourceEntities: (
@@ -124,6 +125,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       eval_job: getEvalJobs,
       annotation_queue: getAnnotationQueues,
       dataset: getDatasets,
+      prompt: getPrompts,
       logs_pattern: getLogsPatternStreams,
       logs_insights: getLogsInsightsStreams,
       logs_cache: getLogsCacheStreams,
@@ -697,6 +699,16 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     });
   };
 
+  const getPrompts = async () => {
+    const prompts = await llmPromptsService.list(store.state.selectedOrganization.identifier);
+
+    updateResourceEntities("prompt", ["entityId"], prompts, false, "name");
+
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
+
   return {
     entityLoads,
     getResourceEntities,
@@ -738,5 +750,6 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getEvalJobs,
     getAnnotationQueues,
     getDatasets,
+    getPrompts,
   };
 };

@@ -89,7 +89,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 90: create the Prompt registry, webhook outbox, and Experiment attribution columns.
 // 91: add firing-episode columns for alert recovery.
 // 92: add recovery_destinations to alerts.
-pub const DB_SCHEMA_VERSION: u64 = 92;
+// 93: create oncall_response_reports.
+pub const DB_SCHEMA_VERSION: u64 = 93;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

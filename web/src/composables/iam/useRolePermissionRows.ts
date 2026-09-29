@@ -217,6 +217,9 @@ export const useRolePermissionRows = (deps: RowDeps) => {
         entity.permission.AllowPost.show = false;
         entity.permission.AllowPut.show = false;
       }
+      if (resourceName === "prompt") {
+        resource.entities[resource.entities.length - 1].permission.AllowDelete.show = false;
+      }
       // Hide non-applicable permissions for logs_cache entities (only All and Delete)
       if (resourceName === "logs_cache") {
         const entity = resource.entities[resource.entities.length - 1];

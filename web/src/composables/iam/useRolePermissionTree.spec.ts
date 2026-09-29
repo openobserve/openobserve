@@ -325,6 +325,16 @@ describe("useRolePermissionTree - modifyResourcePermissions new resource types",
     expect(r.permission.AllowDelete.show).toBe(true);
   });
 
+  it("prompt_label shows only Update", () => {
+    const r = makeResource("prompt_label");
+    modifyResourcePermissions(r);
+    expect(r.permission.AllowPut.show).toBe(true);
+    expect(r.permission.AllowAll.show).toBe(true);
+    ["AllowList", "AllowGet", "AllowPost", "AllowDelete"].forEach((action) =>
+      expect(r.permission[action].show).toBe(false),
+    );
+  });
+
   it("prompt hides AllowDelete only", () => {
     const r = makeResource("prompt");
     modifyResourcePermissions(r);

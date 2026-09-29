@@ -151,6 +151,13 @@ export const useRolePermissionTree = (deps: TreeDeps) => {
       // Prompt deletion is archival and label deletion is a pointer update.
       resource.permission.AllowDelete.show = false;
     }
+    if (resource.resourceName === "prompt_label") {
+      // Only moving/deleting a protected label is checked, and that is a PUT.
+      resource.permission.AllowList.show = false;
+      resource.permission.AllowGet.show = false;
+      resource.permission.AllowPost.show = false;
+      resource.permission.AllowDelete.show = false;
+    }
   };
 
   const getDefaultResource = (): Resource => {

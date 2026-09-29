@@ -71,6 +71,7 @@ use crate::{
     index::IndexCondition,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     match_file,
+    tantivy::aggregate::{IndexAggregate, prepare_aggregate},
 };
 
 #[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.query_identifier.org_id))]
@@ -244,7 +245,7 @@ pub async fn search(
 
     // search in object storage
     let mut metadata_count_file_list = Vec::new();
-    let mut tantivy_file_list = Vec::new();
+    let mut index_aggregate = None;
     if !req.search_info.file_id_list.is_empty() {
         let (mut file_list, file_list_took) = get_file_list_by_ids(
             &trace_id,
@@ -290,13 +291,14 @@ pub async fn search(
 
         let tantivy_optimize_start = std::time::Instant::now();
         let mut storage_idx_optimize_rule = idx_optimize_rule.clone();
-        (tantivy_file_list, file_list) = handle_tantivy_optimize(
+        let (tantivy_file_list, datafusion_file_list) = handle_tantivy_optimize(
             &mut storage_idx_optimize_rule, // pass by mutable reference
             file_list,
             index_updated_at,
             query_params.time_range,
         )
         .await?;
+        file_list = datafusion_file_list;
         log::info!(
             "{}",
             search_inspector_fields(
@@ -314,6 +316,21 @@ pub async fn search(
                     .build()
             )
         );
+
+        if !tantivy_file_list.is_empty() {
+            let prepared = prepare_aggregate(
+                query_params.clone(),
+                tantivy_file_list,
+                index_condition.clone(),
+                idx_optimize_rule
+                    .clone()
+                    .expect("index files require an aggregate mode"),
+            )
+            .await;
+            file_list.extend(prepared.fallback_files);
+            index_aggregate = prepared.answered;
+            scan_stats.idx_took += prepared.took as i64;
+        }
 
         // Apply sampling if configured (enterprise feature)
         #[cfg(feature = "enterprise")]
@@ -510,11 +527,8 @@ pub async fn search(
         &ctx,
         physical_plan,
         &mut scan_stats,
-        query_params.clone(),
         metadata_count_file_list,
-        tantivy_file_list,
-        index_condition,
-        idx_optimize_rule,
+        index_aggregate,
     )?;
 
     log::info!(
@@ -537,17 +551,13 @@ pub async fn search(
     Ok((ctx, physical_plan, scan_stats))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_pushdowns_and_optimizations(
     trace_id: &str,
     ctx: &SessionContext,
     mut physical_plan: Arc<dyn ExecutionPlan>,
     scan_stats: &mut ScanStats,
-    query_params: Arc<QueryParams>,
     metadata_count_file_list: Vec<FileKey>,
-    tantivy_file_list: Vec<FileKey>,
-    index_condition: Option<IndexCondition>,
-    idx_optimize_rule: Option<IndexOptimizeMode>,
+    index_aggregate: Option<IndexAggregate>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let cfg = get_config();
 
@@ -581,18 +591,14 @@ fn apply_pushdowns_and_optimizations(
         })?;
     }
 
-    if !metadata_count_file_list.is_empty() || !tantivy_file_list.is_empty() {
+    if !metadata_count_file_list.is_empty() || index_aggregate.is_some() {
         let index_optimize_start = std::time::Instant::now();
         scan_stats.add(&collect_stats(&metadata_count_file_list));
-        scan_stats.add(&collect_stats(&tantivy_file_list));
-        physical_plan = aggregate_optimize_rewrite(
-            query_params.clone(),
-            metadata_count_file_list,
-            tantivy_file_list,
-            index_condition,
-            idx_optimize_rule,
-            physical_plan,
-        )?;
+        if let Some(aggregate) = &index_aggregate {
+            scan_stats.add(&collect_stats(&aggregate.files));
+        }
+        physical_plan =
+            aggregate_optimize_rewrite(metadata_count_file_list, index_aggregate, physical_plan)?;
         log::info!(
             "{}",
             search_inspector_fields(

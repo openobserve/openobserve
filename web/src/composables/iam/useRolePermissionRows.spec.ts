@@ -32,6 +32,7 @@ function setup(selected: string[] = []) {
       resource("logs_pattern"),
       resource("logs_insights"),
       resource("logs_cache"),
+      resource("prompt"),
       resource("stream"),
       resource("dfolder", [
         { name: "dashboard", top_level: false },
@@ -150,6 +151,16 @@ describe("useRolePermissionRows - updateResourceEntities", () => {
       expect(row.permission.AllowGet.show).toBe(true);
       expect(row.permission.AllowAll.show).toBe(true);
     }
+  });
+
+  it("hides AllowDelete on prompt rows", () => {
+    const { updateResourceEntities, permissionsState } = setup();
+
+    updateResourceEntities("prompt", ["name"], [{ name: "welcome" }]);
+
+    const row = entitiesOf(permissionsState, "prompt")[0];
+    expect(row.permission.AllowDelete.show).toBe(false);
+    expect(row.permission.AllowGet.show).toBe(true);
   });
 
   it("hides AllowGet and keeps AllowDelete on logs_cache rows", () => {
