@@ -18,14 +18,6 @@ const PageManager = require('../../pages/page-manager.js');
 // probe cost; the rest skip immediately on OSS while running fully on enterprise.
 const featureAvailable = {};
 
-// ── Organization form ─────────────────────────────────────────────────────────
-// NOTE: The "IAM Organization form validation" describe was consolidated into
-// playwright-tests/Org/org.spec.js (the chosen home for the shared org dialog
-// [data-test="add-update-organization-dialog"] / [data-test="org-name-error"]).
-// Every assertion (empty-name required error, invalid-char charset error,
-// error-clears-on-correction, create-success dialog close + toast, cancel close)
-// now lives there. No org-name assertions were dropped in the move.
-
 // ── Group form (@enterprise — Groups tab requires isEnterprise && rbac_enabled) ──
 
 test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {

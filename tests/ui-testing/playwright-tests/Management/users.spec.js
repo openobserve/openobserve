@@ -245,14 +245,4 @@ test.describe("User Management", () => {
         
         testLogger.info('Test completed successfully');
     });
-
-    // NOTE: The organization tests that previously lived here
-    // ("Add Organization Successfully", "Save button stays enabled for empty org
-    // name", "Organization not added if Cancel clicked", "Error Message displayed
-    // if Add Organization is blank") were consolidated into
-    // playwright-tests/Org/org.spec.js (the chosen home for the shared org dialog).
-    // Their assertions — success toast "Organization added successfully.",
-    // Save-enabled on empty name, cancel-not-added, and the "Name is required"
-    // inline error — are all asserted there. No org assertions were dropped.
-    // Only the USER tests remain in this file.
 });

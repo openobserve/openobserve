@@ -184,10 +184,8 @@ test.describe("Schema testcases", () => {
         // Start of actual test - open the stream's schema editor
         await pm.schemaPage.completeStreamSettingsSchemaWorkflow(testStreamName);
 
-        // Real outcome: the schema editor actually rendered (drawer + title +
-        // field-mapping table with the stream's fields), and no logs-search error
-        // is present. (Original title claimed a "settings update" the workflow
-        // never performed — renamed to match the verified behaviour.)
+        // Verify the schema editor actually rendered (drawer + title +
+        // field-mapping table with the stream's fields) and no logs-search error.
         await pm.schemaPage.verifySchemaEditorLoaded();
         await pm.schemaPage.verifyNoErrorMessages();
 
@@ -254,14 +252,12 @@ test.describe("Schema testcases", () => {
         await pm.schemaPage.applyQuery();
         await allsearch3;
 
-        // Open the stream's schema editor. NOTE: the underlying workflow only
-        // navigates into the schema detail view — it never adds or deletes a field
-        // (the add/delete-field controls are gated behind isSchemaUDSEnabled, an
-        // enterprise/config feature, so they are not a reliable cross-environment
-        // signal). The title was renamed to match the verified behaviour.
+        // Opens the schema detail view only: add/delete-field controls are gated
+        // behind isSchemaUDSEnabled (enterprise/config), so they are not a reliable
+        // cross-environment signal.
         await pm.schemaPage.completeAddAndDeleteFieldWorkflow(testStreamName);
 
-        // Real outcome: the schema editor rendered with the stream's field list.
+        // Verify the schema editor rendered with the stream's field list.
         await pm.schemaPage.verifySchemaEditorLoaded();
     });
 });
