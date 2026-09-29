@@ -47,9 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :toolbar-bordered="false"
         :error="error"
+        :forbidden="forbidden"
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-blocked"
+        persist-columns
         :get-row-style="rowStyle"
         :total-count-exact="!truncated"
         data-test="dbm-blocked-table"
@@ -62,22 +64,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-blocked-search"
             @search="load"
           >
-            <DbmScopeFilters
-              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-              :filters="dimensionFilters"
-              @clear="clearScope"
-            />
+            <template #filters>
+              <DbmScopeFilters
+                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
+                :filters="dimensionFilters"
+                @clear="clearScope"
+              />
+            </template>
             <!-- Which question the table answers. Defaults to "who's stuck". -->
             <OToggleGroup
               v-model="perspective"
               class="shrink-0"
               data-test="dbm-blocked-perspective"
             >
-              <OToggleGroupItem value="waiting" size="sm">
+              <OToggleGroupItem
+                value="waiting"
+                size="sm"
+                data-test="dbm-blocked-perspective-waiting"
+              >
                 {{ t("dbm.blocked.perspective.waiting") }}
                 <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
               </OToggleGroupItem>
-              <OToggleGroupItem value="blocking" size="sm">
+              <OToggleGroupItem
+                value="blocking"
+                size="sm"
+                data-test="dbm-blocked-perspective-blocking"
+              >
                 {{ t("dbm.blocked.perspective.blocking") }}
                 <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
               </OToggleGroupItem>
@@ -87,12 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DbmRefreshButton
-              mode="status"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-blocked-refresh"
-            />
             <DateTime
               auto-apply
               menu-align="end"
@@ -103,11 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-8 max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
-            <DbmRefreshButton
-              mode="button"
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
               :loading="loading"
+              :last-run-at="lastRunAt"
               data-test="dbm-blocked-refresh"
-              @refresh="onRefresh"
+              @click="onRefresh()"
             />
           </div>
         </template>
@@ -422,7 +430,6 @@ import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -430,6 +437,7 @@ import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -491,6 +499,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,
@@ -702,6 +711,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "session",
+          hideable: true,
           accessorKey: "pid",
           header: t("dbm.blocked.columns.session"),
           size: 80,
@@ -709,6 +719,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "application",
+          hideable: true,
           accessorKey: "application",
           header: t("dbm.blocked.columns.application"),
           size: 140,
@@ -716,6 +727,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "blocking",
+          hideable: true,
           accessorKey: "blockingCount",
           header: t("dbm.blocked.columns.blocking"),
           size: 96,
@@ -723,6 +735,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "waiting",
+          hideable: true,
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,
@@ -746,6 +759,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "session",
+          hideable: true,
           accessorKey: "pid",
           header: t("dbm.blocked.columns.session"),
           size: 80,
@@ -753,6 +767,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "waitingFor",
+          hideable: true,
           header: t("dbm.blocked.columns.waitingFor"),
           size: 144,
           enableSorting: false,
@@ -760,6 +775,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "heldUpBy",
+          hideable: true,
           accessorKey: "blockerApplication",
           header: t("dbm.blocked.columns.heldUpBy"),
           size: 176,
@@ -767,6 +783,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "waiting",
+          hideable: true,
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,

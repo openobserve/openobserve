@@ -55,7 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
       <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
-        <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full">
+        <DbmScopeFilters
+          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
+          :filters="dimensionFilters"
+          @clear="clearScope"
+        />
+        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.samples.searchPlaceholder')"
@@ -65,16 +70,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v: unknown) => (search = typeof v === 'string' ? v : '')"
           />
         </div>
-        <DbmScopeFilters
-          class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-          :filters="dimensionFilters"
-          @clear="clearScope"
+        <DbmToolbarNote
+          v-if="!serverListShown"
+          class="ms-auto"
+          :text="t('dbm.samples.disclosureShort')"
+          :detail="t('dbm.samples.disclosureDetail')"
+          data-test="dbm-samples-disclosure"
         />
-        <DbmRefreshButton
-          mode="status"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-samples-refresh"
+        <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
+        <OTableColumnToggle
+          v-if="!serverListShown"
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+          @update:column-visibility="setColumnVisibility"
+          @reset:column-sizes="tableRef?.resetColumnSizes?.()"
         />
         <DateTime
           auto-apply
@@ -86,11 +96,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-8 max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
-        <DbmRefreshButton
-          mode="button"
+        <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
+          class="ms-auto"
           :loading="loading"
+          :last-run-at="lastRunAt"
           data-test="dbm-samples-refresh"
-          @refresh="onRefresh"
+          @click="onRefresh()"
         />
       </div>
 
@@ -101,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            why the usual list is empty. -->
       <OTable
         v-if="!serverListShown"
+        ref="tableRef"
         :enable-column-resize="true"
         :data="rows"
         :columns="columns"
@@ -112,6 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-samples"
+        persist-columns
+        :column-visibility="columnVisibility"
         :total-count-exact="!truncated"
         data-test="dbm-samples-table"
         @row-click="onRowClick"
@@ -125,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="px-page-edge border-table-row-divider h-50 w-full border-b py-1.5"
             data-test="dbm-samples-scatter"
           >
+            <!-- ChartRenderer, not PanelSchemaRenderer: a point click selects its sample, and the schema renderer does not re-emit chart clicks. -->
             <ChartRenderer :data="scatterData" @click="onScatterClick" />
           </div>
         </template>
@@ -204,12 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dbm.samples.partial") }}
             </span>
-            <div class="flex-1"></div>
-            <span class="text-text-secondary flex shrink-0 items-center gap-1">
-              <OIcon name="info-outline" class="shrink-0" size="sm" />
-              {{ t("dbm.samples.disclosureShort") }}
-              <OTooltip side="top" :content="t('dbm.samples.disclosureDetail')" />
-            </span>
           </div>
         </template>
 
@@ -228,12 +240,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                ships off), so the honest reading is "not switched on", not "no
                slow calls". The generic empty state below cannot say this: it
                reasons about traces, and this is a database setting. -->
-          <DbmStateNote
+          <DbmLockEmptyState
             v-else-if="serverLogOff"
+            :healthy="false"
             :title="t('dbm.samples.logOffTitle')"
-            :hint="t('dbm.samples.logOffDescription')"
-            placement="centered"
+            :description="t('dbm.samples.notCollecting.description')"
+            :checklist-title="t('dbm.samples.notCollecting.checklistTitle')"
+            :checks="logOffChecks"
+            :actions="logOffActions"
             data-test="dbm-samples-log-off"
+            @action="onLogOffAction"
           />
           <DbmEmptyState
             v-else-if="!loading"
@@ -335,15 +351,21 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
-import DbmStateNote from "@/components/dbm/DbmStateNote.vue";
+import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
+import DbmLockEmptyState, {
+  type DbmLockCheck,
+  type DbmLockEmptyAction,
+} from "@/components/dbm/DbmLockEmptyState.vue";
+import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, { type ServerSampleRow } from "@/services/db_monitoring";
@@ -376,6 +398,8 @@ const ChartRenderer = defineAsyncComponent(
 );
 
 const { t } = useI18nTyped();
+const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-samples");
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -394,6 +418,8 @@ const {
   lastRunAt,
   org,
   dbmEnabled,
+  queryCount,
+  databaseCount,
   run,
   onRefresh,
   onDateChange,
@@ -549,6 +575,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "timestamp",
+    hideable: true,
     accessorKey: "timestamp",
     header: t("dbm.samples.columns.when"),
     size: 140,
@@ -556,6 +583,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "duration",
+    hideable: true,
     accessorKey: "durationNs",
     header: t("dbm.samples.columns.duration"),
     size: 120,
@@ -567,6 +595,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "service",
+    hideable: true,
     accessorKey: "serviceName",
     header: t("dbm.samples.columns.service"),
     size: 144,
@@ -574,6 +603,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   },
   {
     id: "status",
+    hideable: true,
     accessorKey: "isError",
     header: t("dbm.samples.columns.status"),
     size: 120,
@@ -912,13 +942,56 @@ const onRowClick = (row: DbmSampleRow) => {
     .catch(() => {});
 };
 
+const openSetup = () =>
+  router.push({
+    name: DBM_SETUP_ROUTE,
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
+
+// The same diagnosis the other server-fed tabs give: is the rest of DBM answering, is it on, and which setting is off.
+const logOffChecks = computed<DbmLockCheck[]>(() =>
+  buildDbmNotCollectingChecks(
+    "samples",
+    {
+      queryCount: queryCount.value,
+      databaseCount: databaseCount.value,
+      dbmEnabled: dbmEnabled.value,
+    },
+    t,
+    [
+      {
+        id: "log",
+        status: "fail",
+        title: t("dbm.samples.notCollecting.checks.log.no"),
+        detail: t("dbm.samples.notCollecting.checks.log.noDetail"),
+      },
+      {
+        id: "engines",
+        status: "note",
+        title: t("dbm.samples.notCollecting.checks.engines.title"),
+        detail: t("dbm.samples.notCollecting.checks.engines.detail"),
+      },
+    ],
+  ),
+);
+
+const logOffActions = computed<DbmLockEmptyAction[]>(() => [
+  {
+    id: "open-setup",
+    label: t("dbm.samples.notCollecting.setUp"),
+    primary: true,
+    icon: "settings",
+  },
+]);
+
+const onLogOffAction = (id: string) => {
+  if (id === "open-setup") openSetup();
+};
+
 const onEmptyAction = (cause: DbmEmptyCauseId) => {
   switch (dbmEmptyAction(cause)) {
     case "open-setup":
-      router.push({
-        name: DBM_SETUP_ROUTE,
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
+      openSetup();
       return;
     case "clear-filters":
       clearScope();

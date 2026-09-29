@@ -4090,6 +4090,7 @@
       "oracleTagline": "Collect Oracle DB metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
       "otlpFixBody": "Defining an exporter is not enough — it has to be listed in a pipeline. This is the single most common reason a correct-looking config sends nothing:",
       "otlpFixTitle": "Check The Exporter Is Actually Wired Into The Pipeline",
+      "otlpGrpcCloudNote": "OpenObserve Cloud's public gRPC gateway — lower overhead than HTTP for high span volumes, no self-hosted networking to configure.",
       "otlpGrpcNote": "Lower overhead than HTTP for high span volumes. Port 5081 must be reachable from the collector.",
       "otlpHttpNote": "The default for the OpenTelemetry Collector — works everywhere, including behind proxies and load balancers.",
       "otlpSdkEnvNote": "Standard OTEL_* environment variables — every OpenTelemetry SDK reads these, so no code change is needed.",
@@ -17976,7 +17977,34 @@
     },
     "samples": {
       "logOffTitle": "Your databases are not logging slow statements yet",
-      "logOffDescription": "Nothing traced these calls, so we asked the databases for their own slowest statements — and they log none. This list comes from PostgreSQL's statement log (log_min_duration_statement), which is off by default — the setup card's logging step turns it on. Per-statement capture is currently PostgreSQL-only, so MySQL and MariaDB can't feed this list yet. Top queries can still show you what runs most, because it reads the counter tables instead.",
+      "notCollecting": {
+        "description": "Nothing traced these calls, so we asked the databases for their own slowest statements — and they log none. We check four things.",
+        "checklistTitle": "What we checked",
+        "setUp": "Set up statement logging",
+        "checks": {
+          "queries": {
+            "ok": "Your query data is arriving",
+            "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "okDetailNoFleet": "{queries} — the Top queries tab works",
+            "no": "No query data is arriving either",
+            "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
+          },
+          "enabled": {
+            "ok": "Database monitoring is switched on",
+            "okDetail": "for this organization",
+            "no": "Database monitoring is switched off",
+            "noDetail": "Turn it on in Settings to start collecting."
+          },
+          "log": {
+            "no": "Slow statements aren't being logged",
+            "noDetail": "This list comes from PostgreSQL's statement log (log_min_duration_statement), which is off by default. The setup card's logging step turns it on."
+          },
+          "engines": {
+            "title": "PostgreSQL-only, for now",
+            "detail": "Per-statement capture is currently PostgreSQL-only, so MySQL and MariaDB can't feed this list yet. Top queries can still show you what runs most, because it reads the counter tables instead."
+          }
+        }
+      },
       "searchPlaceholder": "Search query text, service or database…",
       "columns": {
         "query": "Query",
@@ -18430,6 +18458,7 @@
       "never": "Never",
       "countersCumulative": "Scan and vacuum counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
       "tuplesEstimated": "Row counts and bloat percentage are statistics estimates from the database engine, not exact counts.",
+      "aboutNumbers": "About these numbers",
       "notCollectingTitle": "No table statistics yet",
       "notCollectingDescription": "Nothing has reported table statistics in this time range. This signal ships as a separate collector recipe.",
       "engineUnsupportedTitle": "Not collected for this engine",

@@ -51,11 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :toolbar-bordered="false"
         :error="error"
+        :forbidden="forbidden"
         sorting="client"
         expansion="multiple"
         :expand-on-row-click="true"
         :show-global-filter="false"
         table-id="dbm-deadlocks"
+        :footer-title="
+          grouping === 'pairs'
+            ? t('dbm.deadlocks.summary.pairs')
+            : t('dbm.deadlocks.summary.deadlocks')
+        "
+        persist-columns
         :get-row-style="rowStyle"
         :total-count-exact="!truncated"
         data-test="dbm-deadlocks-table"
@@ -68,19 +75,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-deadlocks-search"
             @search="load"
           >
-            <DbmScopeFilters
-              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-              :filters="dimensionFilters"
-              @clear="clearScope"
-            />
+            <template #filters>
+              <DbmScopeFilters
+                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
+                :filters="dimensionFilters"
+                @clear="clearScope"
+              />
+            </template>
             <!-- What a ROW means. Not a data-processing mode — the reader is
                  choosing between "name the bug" and "give me a timestamp". -->
             <OToggleGroup v-model="grouping" class="shrink-0" data-test="dbm-deadlocks-grouping">
-              <OToggleGroupItem value="pairs" size="sm">
+              <OToggleGroupItem value="pairs" size="sm" data-test="dbm-deadlocks-grouping-pairs">
                 {{ t("dbm.deadlocks.grouping.pairs") }}
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
               </OToggleGroupItem>
-              <OToggleGroupItem value="events" size="sm">
+              <OToggleGroupItem value="events" size="sm" data-test="dbm-deadlocks-grouping-events">
                 {{ t("dbm.deadlocks.grouping.events") }}
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
               </OToggleGroupItem>
@@ -90,12 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DbmRefreshButton
-              mode="status"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-deadlocks-refresh"
-            />
             <DateTime
               auto-apply
               menu-align="end"
@@ -106,11 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-8 max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
-            <DbmRefreshButton
-              mode="button"
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
               :loading="loading"
+              :last-run-at="lastRunAt"
               data-test="dbm-deadlocks-refresh"
-              @refresh="onRefresh"
+              @click="onRefresh()"
             />
           </div>
         </template>
@@ -277,16 +282,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     })
                   }}
                 </span>
-                <span
-                  class="bg-surface-subtle text-text-secondary rounded-default text-3xs px-1.5 py-px font-medium"
-                >
+                <OTag variant="default-soft" size="xs" shape="rounded">
                   {{
                     t("dbm.deadlocks.detail.nthOf", {
                       index: row.selectedEventIndex + 1,
                       total: row.count,
                     })
                   }}
-                </span>
+                </OTag>
                 <div class="flex-1"></div>
                 <OButton
                   variant="ghost-muted"
@@ -345,11 +348,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="border-border-subtle relative h-4 min-w-0 flex-1 border-b border-dashed"
                     >
+                      <!-- On phones a transparent ::before widens the 8px dot to a 24px tap target. -->
                       <button
                         v-for="point in lane.points"
                         :key="point.id"
                         type="button"
-                        class="absolute top-1 size-2 -translate-x-1/2 rounded-full"
+                        class="absolute top-1 size-2 -translate-x-1/2 rounded-full max-md:before:absolute max-md:before:-inset-2"
                         :class="
                           point.id === row.selectedEvent?.id
                             ? 'bg-status-error-text ring-accent ring-2'
@@ -421,7 +425,6 @@ import DbmDeadlockCycle from "@/components/dbm/DbmDeadlockCycle.vue";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -431,6 +434,7 @@ import DbmLockEmptyState, {
   type DbmLockCheck,
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -495,6 +499,7 @@ const {
   tabCountsContext,
   loading,
   error,
+  forbidden,
   search,
   lastRunAt,
   org,
@@ -733,6 +738,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "applications",
+    hideable: true,
     accessorKey: "applications",
     header: t("dbm.deadlocks.columns.applications"),
     size: 132,
@@ -741,6 +747,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "objects",
+    hideable: true,
     accessorKey: "objects",
     header: t("dbm.deadlocks.columns.objects"),
     size: 104,
@@ -749,6 +756,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "lastSeen",
+    hideable: true,
     accessorKey: "lastSeen",
     header: t("dbm.deadlocks.columns.lastSeen"),
     size: 96,
@@ -756,6 +764,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "count",
+    hideable: true,
     accessorKey: "count",
     header: t("dbm.deadlocks.columns.count"),
     size: 120,
@@ -921,7 +930,7 @@ const healthyChecks = computed<DbmLockCheck[]>(() => {
 
 /** `widen` is the only one `onEmptyAction` implements. */
 const healthyActions = computed<DbmLockEmptyAction[]>(() => [
-  { id: "widen", label: t("dbm.deadlocks.healthy.widen") },
+  { id: "widen", label: t("dbm.deadlocks.healthy.widen"), icon: "schedule" },
 ]);
 
 // The shared queries/enabled diagnostics in this page's namespace, plus the
