@@ -680,11 +680,21 @@ export default defineComponent({
         .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
         .then((list: any) => (templates.value = list));
     };
+    // Called both on mount and every time `getDestinations()` resolves (cache-hit
+    // paint and the async fetch that follows it), so it can run more than once for
+    // the same `?action=add|update` — guard against re-opening (and thereby
+    // re-toggling closed) an editor that's already showing the right target.
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
-      if (router.currentRoute.value.query.action === "import") showImportDestination.value = true;
+      const action = router.currentRoute.value.query.action;
+      if (action === "add") {
+        if (!showDestinationEditor.value || editingDestination.value) editDestination(null);
+      } else if (action === "update") {
+        const name = router.currentRoute.value.query.name as string;
+        if (!showDestinationEditor.value || editingDestination.value?.name !== name)
+          editDestination(getDestinationByName(name));
+      } else if (action === "import") {
+        showImportDestination.value = true;
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);

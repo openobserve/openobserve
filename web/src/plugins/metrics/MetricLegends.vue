@@ -8,7 +8,8 @@
         class="metric-legends-button"
       >
         <OIcon name="category" size="sm" />
-        <span>{{ t("search.legendLabel") }}</span>
+        <!-- Icon-only on phones so the editor header keeps its actions on one row. -->
+        <span class="max-md:sr-only">{{ t("search.legendLabel") }}</span>
       </OButton>
     </template>
     <div class="px-2 pt-1.5 pb-1">

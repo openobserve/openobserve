@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="refreshInterval"
         :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
         trigger
+        :is-compact="isMobile"
         class="app-performance-auto-refresh-interval"
         @trigger="refreshData"
       />
@@ -111,6 +112,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -126,6 +128,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
 
     const activePerformanceTab = ref("overview");
     const activePerformanceComponent = ref(null);
@@ -415,6 +418,7 @@ export default defineComponent({
       activePerformanceComponent,
       isVariablesChanged,
       shareUrl,
+      isMobile,
     };
   },
 });
