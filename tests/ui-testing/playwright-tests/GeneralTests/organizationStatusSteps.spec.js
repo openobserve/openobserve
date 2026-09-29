@@ -41,6 +41,7 @@ test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
         const currentTotalText = await pm.organizationManagementPage.getStatusStepsTotalText(org.identifier);
         const originalLimit = Number(currentTotalText.replace(/[^\d-]/g, ''));
         const newLimit = originalLimit + 1000;
+        let restoreStatus;
 
         try {
             await pm.organizationManagementPage.openUsageLimitsForOrg(org.identifier);
@@ -54,10 +55,11 @@ test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
             await pm.organizationManagementPage.expectUsageLimitsDialogClosed();
             await pm.organizationManagementPage.expectStatusStepsTotalCellEquals(org.identifier, newLimit);
         } finally {
-            // Soft, so a restore failure is reported without masking the original error.
-            const restoreStatus = await pm.organizationManagementPage.setStatusStepsLimitViaApi(org.identifier, originalLimit);
-            expect.soft(restoreStatus, `restore status-steps limit of ${org.identifier} to ${originalLimit}`).toBe(200);
+            // Asserted after the finally, so a failed restore never masks the original error.
+            restoreStatus = await pm.organizationManagementPage.setStatusStepsLimitViaApi(org.identifier, originalLimit);
+            if (restoreStatus !== 200) testLogger.error(`Failed to restore status-steps limit of ${org.identifier} to ${originalLimit}: ${restoreStatus}`);
         }
+        expect(restoreStatus, `restore status-steps limit of ${org.identifier} to ${originalLimit}`).toBe(200);
 
         testLogger.info('Status Steps allowance updated, reflected in the org list, and restored');
     });
