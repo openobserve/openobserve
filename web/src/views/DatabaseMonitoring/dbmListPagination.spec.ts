@@ -93,7 +93,8 @@ const CAPPED = new Set([
  * never satisfy an assertion about this one.
  */
 const tableTag = (source: string, dataTest: string): string => {
-  const at = source.indexOf("<OTable");
+  // `\s` so an OTableColumnToggle rendered above the table is not mistaken for it.
+  const at = source.search(/<OTable\s/);
   expect(at, "page must render an OTable").toBeGreaterThan(-1);
   const tag = source.slice(at, source.indexOf(">", at) + 1);
   expect(tag, `the first OTable must be the list table (${dataTest})`).toContain(

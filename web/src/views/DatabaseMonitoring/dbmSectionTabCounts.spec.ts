@@ -511,9 +511,8 @@ describe("no page re-fetches the badges the shell already owns", () => {
    * page must show is that its refresh button is wired to THAT handler, and
    * the composable must show the force itself.
    *
-   * The button itself is now the shared `DbmRefreshButton`, which emits
-   * `refresh`; a page that still hand-rolls the OButton binds `@click`. Either
-   * spelling satisfies the requirement — that the handler is reached.
+   * The button is the library `ORefreshButton`, whose `click` carries the
+   * MouseEvent, so pages call `onRefresh()` rather than passing the handler.
    */
   it.each(Object.keys(OWN_READ))("%s wires its refresh button to the shared handler", (page) => {
     const source = read(page);
@@ -521,7 +520,7 @@ describe("no page re-fetches the badges the shell already owns", () => {
     expect(
       source,
       `${page} never binds onRefresh, so its refresh button leaves the badges stale`,
-    ).toMatch(/@(?:click|refresh)="onRefresh"/);
+    ).toMatch(/@click="onRefresh\(\)"/);
   });
 
   it("the shared refresh handler forces the badge cache", () => {
