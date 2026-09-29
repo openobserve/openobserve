@@ -377,7 +377,7 @@ test.describe("Dashboard Create Alert testcases", () => {
 
   test(
     "should show alert context menu on right-clicking a scatter chart and navigate to alert creation via above threshold",
-    { tag: ["@dashboard-chart-context-menu", "@all", "@functional", "@P0"] },
+    { tag: ["@dashboardCreateAlert", "@functional", "@P0"] },
     async ({ page }) => {
       testLogger.info(
         "Testing alert context menu on scatter chart right-click (above threshold)"
@@ -389,57 +389,42 @@ test.describe("Dashboard Create Alert testcases", () => {
       const panelName =
         pm.dashboardPanelActions.generateUniquePanelName("alert-scatter");
 
-      // Navigate to dashboards and create a new dashboard with a scatter panel
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
 
       await pm.dashboardCreate.createDashboard(dashName);
 
-      // Add a scatter panel. Scatter needs numeric X and Y axes to render; the
-      // shared e2e_automate stream provides took (X) and FloatValue (Y). The
-      // builder seeds a histogram(_timestamp) X field, which blocks the second
-      // X add (scatter allows one X), so drop it before adding took.
       await pm.dashboardCreate.addPanel();
       await pm.dashboardPanelActions.addPanelName(panelName);
       await pm.chartTypeSelector.selectChartType("scatter");
-      // Guard: confirm scatter actually activated — a silent click failure
-      // leaves the panel as bar/line, which also opens the menu, so the
-      // downstream right-click assertion would pass without exercising scatter.
+      // A silent chart-type miss leaves bar/line, which also opens the menu and would pass vacuously.
       await expect(
         pm.chartTypeSelector.getSelectedChartItem("scatter")
       ).toHaveAttribute("data-selected", "true");
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
+      // Scatter allows one X field, so the seeded histogram(_timestamp) must go first.
       await pm.chartTypeSelector.removeField("x_axis_1", "x");
       await pm.chartTypeSelector.searchAndAddField("took", "x");
       // Field names are lowercased on ingest (FloatValue -> floatvalue).
       await pm.chartTypeSelector.searchAndAddField("floatvalue", "y");
 
-      // Apply query and wait for chart to render
       const streamPromise = waitForStreamComplete(page);
       await pm.dashboardPanelActions.applyDashboardBtn();
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data.
-      // _search_stream is SSE/chunked (progress events, then a final
-      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
-      // the first response event (headers), which fires as soon as the
-      // stream opens, not when it actually finishes. waitForStreamComplete
-      // reads the body and waits for the real [[DONE]] marker instead.
+      // waitForResponse resolves on SSE headers; waitForStreamComplete waits for the [[DONE]] marker.
       const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
 
-      // Right-click on the chart renderer to trigger alert context menu
       await pm.dashboardPanelEdit.rightClickChartForAlert();
 
-      // Verify the alert context menu appears
       await pm.dashboardPanelEdit.expectAlertContextMenuVisible();
       testLogger.info("Alert context menu is visible after scatter right-click");
 
-      // Verify menu items contain threshold text
       const aboveOption = pm.dashboardPanelEdit.getAlertContextMenuAbove();
       await expect(aboveOption).toBeVisible({ timeout: 5000 });
       await expect(aboveOption).toContainText("Create Alert with threshold above");
@@ -448,7 +433,6 @@ test.describe("Dashboard Create Alert testcases", () => {
       await expect(belowOption).toBeVisible({ timeout: 5000 });
       await expect(belowOption).toContainText("Create Alert with threshold below");
 
-      // Click "above threshold" option and wait for navigation simultaneously
       await Promise.all([
         page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
           timeout: 15000,
@@ -458,15 +442,13 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       const currentUrl = page.url();
       expect(currentUrl).toContain("prefill=panel");
-      // The panel payload rides sessionStorage now, not the URL — a query string
-      // long enough to be truncated by a browser or proxy was the reason.
+      // Panel payload rides sessionStorage, since a long query string can be truncated by a proxy.
       expect(currentUrl).not.toContain("panelData=");
 
       testLogger.info(
         "Navigated to alert creation page from scatter context menu (above threshold)"
       );
 
-      // Navigate back and clean up
       await returnToDashboardFolder(page, pm);
       await deleteDashboard(page, dashName);
 
@@ -478,7 +460,7 @@ test.describe("Dashboard Create Alert testcases", () => {
 
   test(
     "should not show alert context menu on right-clicking a pie chart (non-cartesian series)",
-    { tag: ["@dashboard-chart-context-menu", "@all", "@functional", "@P1"] },
+    { tag: ["@dashboardCreateAlert", "@functional", "@P1"] },
     async ({ page }) => {
       testLogger.info(
         "Testing no alert context menu on pie chart right-click (whitelist no-op)"
@@ -490,57 +472,43 @@ test.describe("Dashboard Create Alert testcases", () => {
       const panelName =
         pm.dashboardPanelActions.generateUniquePanelName("alert-pie");
 
-      // Navigate to dashboards and create a new dashboard with a pie panel
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
 
       await pm.dashboardCreate.createDashboard(dashName);
 
-      // Add a pie panel (non-cartesian). Pie needs a single numeric value.
       await pm.dashboardCreate.addPanel();
       await pm.dashboardPanelActions.addPanelName(panelName);
       await pm.chartTypeSelector.selectChartType("pie");
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
-      // Pie allows a single Y field; drop the seeded count(_timestamp) first,
-      // then add the numeric value field (lowercased on ingest).
+      // Pie allows a single Y field, so the seeded count(_timestamp) must go first.
       await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("floatvalue", "y");
 
-      // Apply query and wait for chart to render
       const streamPromise = waitForStreamComplete(page);
       await pm.dashboardPanelActions.applyDashboardBtn();
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data.
-      // _search_stream is SSE/chunked (progress events, then a final
-      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
-      // the first response event (headers), which fires as soon as the
-      // stream opens, not when it actually finishes. waitForStreamComplete
-      // reads the body and waits for the real [[DONE]] marker instead.
       const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
 
-      // Positive render guard: a persistent no-data overlay would swallow the
-      // right-click and let the "menu hidden" assertion pass vacuously.
+      // A lingering no-data overlay would swallow the right-click and make the hidden-menu check vacuous.
       await pm.dashboardPanelActions.expectCustomChartRendered(expect);
       await pm.dashboardPanelActions
         .getNoDataLocator()
         .first()
         .waitFor({ state: "hidden", timeout: 20000 });
 
-      // Right-click the chart center. A pie series type is not in the
-      // context-menu whitelist, so no menu may appear.
+      // Pie is outside CONTEXT_MENU_SERIES_TYPES, so no menu may appear.
       await pm.dashboardPanelEdit.rightClickChart();
 
-      // Verify the alert context menu does not appear
       await pm.dashboardPanelEdit.expectAlertContextMenuHidden();
       testLogger.info("No alert context menu after pie right-click (as expected)");
 
-      // Clean up
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashName);
 
