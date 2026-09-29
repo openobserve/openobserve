@@ -1589,6 +1589,7 @@
     "actionOperation": "Action : {type} sur {target}",
     "viewOperation": "Vue : {page}",
     "collapsedOtherActions": "[{count} autres actions]",
+    "collapsedOtherRequests": "[{count} autres requêtes sur cette page]",
     "collapsedMoreErrors": "[{count} autres erreurs]",
     "collapsedStaticAssets": "[{count} ressources statiques]",
     "collapsedLongTasks": "[{count} tâches longues]",
