@@ -1370,6 +1370,7 @@
     "sessionReplayLiveBadge": "LIVE",
     "sessionReplayLiveChip": "Live · new activity loads automatically",
     "sessionReplayLateRows": "Earlier activity arrived after the replay loaded. Reload to include it.",
+    "sessionReplayReload": "Reload",
     "seek": "Seek",
     "sessionMetricsAria": "Session metrics summary",
     "frustration": "{count} Frustration | {count} Frustrations",

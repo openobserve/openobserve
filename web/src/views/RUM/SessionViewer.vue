@@ -121,6 +121,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ segmentNotice }}
             </div>
+            <div
+              v-if="lateRows"
+              class="bg-card-glass-bg text-text-secondary border-card-glass-border flex items-center gap-2 border-b px-3 py-1 text-xs"
+              data-test="session-viewer-late-rows-notice"
+            >
+              <span class="min-w-0 flex-1">{{ t("rum.sessionReplayLateRows") }}</span>
+              <OButton
+                variant="outline"
+                size="xs"
+                data-test="session-viewer-late-rows-reload"
+                @click="reloadPage"
+                >{{ t("rum.sessionReplayReload") }}</OButton
+              >
+            </div>
             <!-- Mobile SDKs record wireframes (not a DOM); play them with the wireframe
                  player. Browser sessions use the rrweb-based VideoPlayer. -->
             <MobileSessionPlayer
@@ -209,6 +223,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 
@@ -523,10 +538,9 @@ const playerBindings = computed(() => ({
   retryAttempt: retryAttempt.value,
 }));
 
-// One notice at a time: a seek before the loaded window, then late earlier rows, then a manifest cut short.
+// One line over the player: a seek before the loaded window, else a manifest cut short.
 const segmentNotice = computed(() => {
   if (unreachableSeek.value) return t("rum.sessionReplaySeekBehindWindow");
-  if (lateRows.value) return t("rum.sessionReplayLateRows");
   if (manifestSummary.value?.truncated)
     return t("rum.sessionReplayTruncated", { count: manifestSummary.value.segmentCount });
   return "";
@@ -802,8 +816,8 @@ const segmentOrder = () =>
 const timestampField = () => store.state.zoConfig.timestamp_column || "_timestamp";
 
 // The arrival time is selected for the live upper bound only; it is not sorted on and not part of the segment id.
-const manifestSql = (minStart: number | null = null) =>
-  `select start, "end", has_full_snapshot, records_count${hasViewColumns() ? ", view_id, index_in_view" : ""}, ${timestampField()} from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)}${minStart === null ? "" : ` and start >= ${minStart}`} ${segmentOrder()}`;
+const manifestSql = () =>
+  `select start, "end", has_full_snapshot, records_count${hasViewColumns() ? ", view_id, index_in_view" : ""}, ${timestampField()} from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)} ${segmentOrder()}`;
 
 // Inclusive bounds: a tie fetched by two batches is matched by segment id and stored once.
 const bodiesSql = (lo: number, hi: number) =>
@@ -835,7 +849,6 @@ const resetLoader = () => {
   playerLoadedEndMs.value = null;
   playerTakenCount.value = 0;
   unreachableSeek.value = false;
-  lateRows.value = false;
   bumpLoader();
 };
 
@@ -1154,14 +1167,10 @@ const liveWindowUs = (cursorUs: number): QueryWindow => {
   return { start: from, end: Math.max(nowUs, upperTs) + LIVE_OVERLAP_US };
 };
 
-// New ids join the end of the manifest and load through the normal loader; a row sorting before the tail only raises the notice.
+// Selected by arrival time only, so a late row with an earlier start is seen; it raises the notice and is never inserted.
 const pollManifest = async () => {
-  const rows = manifest.value;
-  if (!rows.length || manifestSummary.value?.truncated) return;
-  const { hits } = await fetchAllPages(
-    manifestSql(rows[rows.length - 1].start),
-    liveWindowUs(upperTs),
-  );
+  if (!manifest.value.length || manifestSummary.value?.truncated) return;
+  const { hits } = await fetchAllPages(manifestSql(), liveWindowUs(upperTs));
   if (cancelled || !isLive.value) return;
   upperTs = raiseUpperTs(upperTs, hits, timestampField());
   const { appended, late } = mergeManifestTail(manifest.value, hits as ManifestEntry[], indexById);
@@ -1518,6 +1527,11 @@ const handlePlayerReady = () => {
 watch([run, playerLoadedEndMs, playerTakenCount, mobileRecords, loadState], resolvePendingSeek, {
   flush: "post",
 });
+
+// The late rows sort before segments the player already holds, so only a fresh load can place them.
+const reloadPage = () => {
+  window.location.reload();
+};
 
 const handleSidebarEvent = (event: string, payload: any) => {
   if (event === "event-click") {

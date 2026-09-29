@@ -1898,20 +1898,26 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
   const server = { rows: [] as any[], rum: [] as any[], logs: [] as any[] };
   let originalSearch: any;
 
-  // Arrival time half a second after the segment start, in µs like _timestamp.
+  // Every row arrives at the open's upper bound unless a test says otherwise, so each poll window re-returns it.
   const liveRow = (i: number, extra: Record<string, any> = {}) => ({
     start: L + i * 1000,
     end: L + i * 1000 + 999,
     has_full_snapshot: i === 0,
     records_count: 1,
-    _timestamp: (L + i * 1000 + 500) * 1000,
+    _timestamp: maxTs,
     ...extra,
   });
 
+  // The manifest query has no start filter, so it answers by arrival time inside the request's window.
   function liveResponder(sql: string, from: number) {
     if (from > 0) return [];
+    if (sql.includes("has_full_snapshot")) {
+      const window = queryPayload.build.mock.calls.at(-1)[0].timestamps;
+      return server.rows.filter(
+        (row) => row._timestamp >= window.startTime && row._timestamp <= window.endTime,
+      );
+    }
     const lo = Number(/start >= (\d+)/.exec(sql)?.[1] ?? 0);
-    if (sql.includes("has_full_snapshot")) return server.rows.filter((row) => row.start >= lo);
     const hi = Number(/start <= (\d+)/.exec(sql)?.[1] ?? 0);
     return server.rows.filter((row) => row.start >= lo && row.start <= hi).map(fixtureBody);
   }
@@ -1948,8 +1954,14 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
       .filter((payload: any) => payload.size === 1000)
       .map((payload: any) => payload.timestamps);
 
-  const manifestPolls = () =>
-    streaming.sqls.filter((sql) => sql.includes("has_full_snapshot") && sql.includes("start >="));
+  // The open's manifest window starts a second before min_ts; a poll's starts a minute before upperTs.
+  const manifestPolls = () => {
+    const windows = segmentWindows();
+    return streaming.sqls.filter(
+      (sql, i) =>
+        sql.includes("has_full_snapshot") && windows[i]?.startTime !== L * 1000 - 1_000_000,
+    );
+  };
 
   async function mountLive(endTime = NOW - 60_000) {
     serve(endTime);
@@ -2029,7 +2041,9 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     });
 
     // The manifest poll looks from a minute before the bound to a minute past the later of now and the bound.
-    const pollIndex = streaming.sqls.indexOf(manifestPolls()[0]);
+    const pollIndex = streaming.sqls.findIndex(
+      (sql, i) => i > 0 && sql.includes("has_full_snapshot"),
+    );
     expect(windows[pollIndex]).toEqual({
       startTime: maxTs - 60_000_000,
       endTime: (NOW + 30_000) * 1000 + 60_000_000,
@@ -2050,7 +2064,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     server.rows.push(liveRow(3), liveRow(600));
     await vi.advanceTimersByTimeAsync(30_000);
 
-    expect(manifestPolls()[0]).toContain(`and start >= ${L + 2000} `);
+    expect(manifestPolls()[0]).not.toContain("start >=");
     expect(vm.manifest).toHaveLength(5);
     expect(vm.segments).toHaveLength(5);
     expect(vm.segments[4].records[0].timestamp).toBe(L + 600_000);
@@ -2063,19 +2077,82 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     wrapper.unmount();
   });
 
-  it("does not insert a late row that sorts before the tail, and says so", async () => {
+  const lateNotice = (wrapper: VueWrapper) =>
+    wrapper.find('[data-test="session-viewer-late-rows-notice"]');
+
+  it("does not insert a late row with an earlier start, fetch it or feed it, and says so", async () => {
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    const manifestBefore = vm.manifest;
+    const statusBefore = [...vm.loader.status];
+    const bodiesBefore = bodySqls().length;
+
+    server.rows.push(liveRow(1, { end: L + 1500 }));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(manifestPolls()).toHaveLength(1);
+    expect(vm.manifest).toBe(manifestBefore);
+    expect(vm.loader.status).toEqual(statusBefore);
+    expect(vm.segmentIds).toHaveLength(3);
+    expect(bodySqls()).toHaveLength(bodiesBefore);
+    expect(vm.segments).toHaveLength(3);
+    expect(lateNotice(wrapper).text()).toContain(
+      "Earlier activity arrived after the replay loaded. Reload to include it.",
+    );
+    wrapper.unmount();
+  });
+
+  it("does nothing for a known row a poll returns again", async () => {
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    const manifestBefore = vm.manifest;
+    const bodiesBefore = bodySqls().length;
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(manifestPolls()).toHaveLength(1);
+    expect(vm.manifest).toBe(manifestBefore);
+    expect(bodySqls()).toHaveLength(bodiesBefore);
+    expect(vm.lateRows).toBe(false);
+    expect(lateNotice(wrapper).exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the notice once shown, and still appends a new row after the tail", async () => {
     const wrapper = await mountLive();
     const vm = wrapper.vm as any;
 
-    server.rows.push(liveRow(2, { end: L + 2500 }));
+    server.rows.push(liveRow(1, { end: L + 1500 }));
+    await vi.advanceTimersByTimeAsync(30_000);
+    server.rows = server.rows.filter((row) => row.end !== L + 1500);
+    server.rows.push(liveRow(3));
     await vi.advanceTimersByTimeAsync(30_000);
 
-    expect(vm.manifest).toHaveLength(3);
-    expect(vm.segmentNotice).toBe(
-      "Earlier activity arrived after the replay loaded. Reload to include it.",
-    );
-    expect(wrapper.find('[data-test="session-viewer-segment-notice"]').exists()).toBe(true);
+    expect(vm.manifest).toHaveLength(4);
+    expect(vm.segments).toHaveLength(4);
+    expect(lateNotice(wrapper).exists()).toBe(true);
     wrapper.unmount();
+  });
+
+  it("reloads the page from the notice's Reload button", async () => {
+    const reload = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", {
+      value: { ...original, reload },
+      configurable: true,
+    });
+    try {
+      const wrapper = await mountLive();
+      server.rows.push(liveRow(1, { end: L + 1500 }));
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      await wrapper.find('[data-test="session-viewer-late-rows-reload"]').trigger("click");
+
+      expect(reload).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    } finally {
+      Object.defineProperty(window, "location", { value: original, configurable: true });
+    }
   });
 
   it("dedups polled events by id, replaces a re-sent view, and pages past 150", async () => {
