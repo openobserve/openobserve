@@ -117,7 +117,7 @@ pub async fn init() -> errors::Result<()> {
     // clean orphan tmp pack files and rebuild the pack segment index
     pack::init().await?;
 
-    // replay wal files.
+    // replay wal files
     let process_start = std::time::SystemTime::now();
     tokio::task::spawn(async move {
         // wal/files can hold millions of files, clean orphans in the background
@@ -129,7 +129,6 @@ pub async fn init() -> errors::Result<()> {
             .await
             .unwrap_or_default();
         log::info!("Found {} wal files to replay", wal_files.len());
-
         if let Err(e) = wal::replay_wal_files(wal_dir, wal_files, process_start).await {
             log::error!("replay wal files error: {e}");
         }
