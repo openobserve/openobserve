@@ -4090,6 +4090,7 @@
       "oracleTagline": "Sammeln Sie Oracle-DB-Metriken mit dem OpenTelemetry Collector und senden Sie sie an OpenObserve.",
       "otlpFixBody": "Einen Exporter zu definieren reicht nicht — er muss in einer Pipeline aufgeführt sein. Dies ist der häufigste Grund dafür, dass eine korrekt aussehende Konfiguration nichts sendet:",
       "otlpFixTitle": "Prüfen Sie, ob der Exporter tatsächlich in die Pipeline eingebunden ist",
+      "otlpGrpcCloudNote": "Öffentliches gRPC-Gateway von OpenObserve Cloud — geringerer Overhead als HTTP bei hohen Span-Volumen, kein selbst gehostetes Netzwerk zu konfigurieren.",
       "otlpGrpcNote": "Geringerer Overhead als HTTP bei hohen Span-Volumina. Port 5081 muss vom Collector erreichbar sein.",
       "otlpHttpNote": "Der Standard für den OpenTelemetry Collector — funktioniert überall, auch hinter Proxys und Load Balancern.",
       "otlpSdkEnvNote": "Standard-OTEL_*-Umgebungsvariablen — jedes OpenTelemetry-SDK liest diese, daher ist keine Codeänderung erforderlich.",
