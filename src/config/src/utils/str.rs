@@ -113,6 +113,17 @@ pub fn mask_secret(secret: &str) -> String {
     format!("{head}****{tail}")
 }
 
+/// Render a license key as `abc*****xyz`; anything shorter than 7 characters is masked whole.
+pub fn mask_license_key(key: &str) -> String {
+    let chars: Vec<char> = key.chars().collect();
+    if chars.len() < 7 {
+        return "*****".to_string();
+    }
+    let head: String = chars[..3].iter().collect();
+    let tail: String = chars[chars.len() - 3..].iter().collect();
+    format!("{head}*****{tail}")
+}
+
 pub trait StringExt {
     fn find(&self, needle: &str) -> bool;
     fn optional(&self) -> Option<String>;
@@ -157,6 +168,27 @@ impl StringExt for String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mask_license_key_never_panics() {
+        let panicking: Vec<&str> = ["", "abc", "é日本語x"]
+            .into_iter()
+            .filter(|key| std::panic::catch_unwind(|| mask_license_key(key)).is_err())
+            .collect();
+        assert!(panicking.is_empty(), "panicked on {panicking:?}");
+
+        for (key, masked) in [
+            ("", "*****"),
+            ("abc", "*****"),
+            ("abcdef", "*****"),
+            ("é日本語x", "*****"),
+            ("abcdefg", "abc*****efg"),
+            ("eyJhbGciOiJFUzI1NiJ9.payload.sig", "eyJ*****sig"),
+            ("é日本語xyz語日é", "é日本*****語日é"),
+        ] {
+            assert_eq!(mask_license_key(key), masked, "{key:?}");
+        }
+    }
 
     #[test]
     fn test_is_ofga_unsupported() {

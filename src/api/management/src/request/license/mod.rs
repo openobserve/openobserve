@@ -17,6 +17,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
+use config::utils::str::mask_license_key;
 use db::license;
 use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
@@ -101,15 +102,6 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
     Ok(())
 }
 
-#[inline]
-fn redact(license: &str) -> String {
-    format!(
-        "{}*****{}",
-        &license[0..3],
-        &license[license.len() - 3..license.len()]
-    )
-}
-
 // the instance id (default internal gRPC token) and validator auth are secrets, also in the key
 fn viewer_license_fields(
     is_root: bool,
@@ -122,7 +114,7 @@ fn viewer_license_fields(
         license.validator_auth.clear();
     }
     let key = if redact_key || !is_root {
-        key.map(|v| redact(&v))
+        key.map(|v| mask_license_key(&v))
     } else {
         key
     };
