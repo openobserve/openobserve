@@ -96,6 +96,12 @@ use crate::{
 /// is refused rather than stored.
 pub const KEEP_FIRING_FOR_MAX_SECS: i64 = 24 * 60 * 60;
 
+/// Ceiling for `frequency`, `silence` and `tolerance_in_secs`, far below the overflow point.
+pub const SCHEDULE_FIELD_MAX_SECS: i64 = 365 * 24 * 60 * 60;
+
+/// `tz_offset` values `chrono::FixedOffset` can represent: strictly less than a day either way.
+pub const TZ_OFFSET_RANGE_MINUTES: std::ops::RangeInclusive<i32> = -1439..=1439;
+
 /// Errors that can occur when interacting with alerts.
 #[derive(Debug, thiserror::Error)]
 pub enum AlertError {
@@ -305,6 +311,16 @@ pub enum AlertError {
     NegativePendingPeriod,
     #[error("Alert keep_firing_for must be between 0 and {KEEP_FIRING_FOR_MAX_SECS} seconds")]
     KeepFiringForOutOfRange,
+    #[error("Alert frequency must be between 1 and {SCHEDULE_FIELD_MAX_SECS} seconds")]
+    FrequencyOutOfRange,
+    #[error("Alert silence must be between 0 and {SCHEDULE_FIELD_MAX_SECS} seconds")]
+    SilenceOutOfRange,
+    #[error("Alert tolerance_in_secs must be between 0 and {SCHEDULE_FIELD_MAX_SECS} seconds")]
+    ToleranceOutOfRange,
+    #[error("Alert tz_offset must be strictly between -1440 and 1440 minutes")]
+    TzOffsetOutOfRange,
+    #[error("Alert cron schedule '{cron}' has no future occurrence")]
+    CronHasNoFutureOccurrence { cron: String },
     #[error("Realtime alerts cannot notify on recovery or keep firing")]
     RecoveryOnRealtimeAlert,
     #[error("recovery destinations were set without notify_on_recovery, so nothing would use them")]
@@ -644,11 +660,21 @@ async fn prepare_alert(
         }
     }
 
+    if !TZ_OFFSET_RANGE_MINUTES.contains(&alert.tz_offset) {
+        return Err(AlertError::TzOffsetOutOfRange);
+    }
+
     if alert.trigger_condition.frequency_type == FrequencyType::Cron {
         let now = Utc::now().second();
         alert.trigger_condition.cron = update_cron_expression(&alert.trigger_condition.cron, now);
         // Check the cron expression
-        Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
+        let schedule =
+            Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
+        if schedule.upcoming(Utc).next().is_none() {
+            return Err(AlertError::CronHasNoFutureOccurrence {
+                cron: alert.trigger_condition.cron.clone(),
+            });
+        }
     } else {
         // if cron is not empty, set it to empty string
         if !alert.trigger_condition.cron.is_empty() {
@@ -659,6 +685,19 @@ async fn prepare_alert(
             alert.trigger_condition.frequency =
                 std::cmp::max(60, get_config().limit.alert_schedule_interval);
         }
+        if !(1..=SCHEDULE_FIELD_MAX_SECS).contains(&alert.trigger_condition.frequency) {
+            return Err(AlertError::FrequencyOutOfRange);
+        }
+    }
+
+    // `silence` is in minutes, unlike the other two fields
+    if !(0..=SCHEDULE_FIELD_MAX_SECS / 60).contains(&alert.trigger_condition.silence) {
+        return Err(AlertError::SilenceOutOfRange);
+    }
+    if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs
+        && !(0..=SCHEDULE_FIELD_MAX_SECS).contains(&tolerance)
+    {
+        return Err(AlertError::ToleranceOutOfRange);
     }
 
     // An SLO alert (§6b.6) runs no query and therefore has no stream. The
@@ -7555,6 +7594,87 @@ mod tests {
     fn test_workflow_alert_count_falls_back_to_rows_len() {
         let alert = Alert::default();
         assert_eq!(workflow_alert_count(&alert, 25, None), json!(25u64));
+    }
+
+    /// A new alert with no id reaches the schedule checks before any DB read.
+    async fn prepare_schedule(mutate: impl FnOnce(&mut Alert)) -> AlertError {
+        let mut alert = Alert::default();
+        mutate(&mut alert);
+        prepare_alert("default", "logs", "sched", &mut alert, true, false)
+            .await
+            .unwrap_err()
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_out_of_range_frequency() {
+        let err = prepare_schedule(|a| a.trigger_condition.frequency = i64::MAX).await;
+        assert!(matches!(err, AlertError::FrequencyOutOfRange), "{err:?}");
+        let err = prepare_schedule(|a| a.trigger_condition.frequency = -1).await;
+        assert!(matches!(err, AlertError::FrequencyOutOfRange), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_out_of_range_silence() {
+        let err = prepare_schedule(|a| a.trigger_condition.silence = i64::MAX).await;
+        assert!(matches!(err, AlertError::SilenceOutOfRange), "{err:?}");
+        let err = prepare_schedule(|a| a.trigger_condition.silence = -1).await;
+        assert!(matches!(err, AlertError::SilenceOutOfRange), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_out_of_range_tolerance() {
+        let err =
+            prepare_schedule(|a| a.trigger_condition.tolerance_in_secs = Some(i64::MAX)).await;
+        assert!(matches!(err, AlertError::ToleranceOutOfRange), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_a_full_day_tz_offset() {
+        for tz_offset in [1440, -1440, i32::MAX, i32::MIN] {
+            let err = prepare_schedule(|a| a.tz_offset = tz_offset).await;
+            assert!(
+                matches!(err, AlertError::TzOffsetOutOfRange),
+                "{tz_offset}: {err:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_a_cron_with_no_future_occurrence() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 0 0 1 1 * 2020".to_string();
+        })
+        .await;
+        assert!(
+            matches!(err, AlertError::CronHasNoFutureOccurrence { .. }),
+            "{err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_schedule_values_at_their_bounds() {
+        let err = prepare_schedule(|a| {
+            a.tz_offset = -1439;
+            a.trigger_condition.frequency = SCHEDULE_FIELD_MAX_SECS;
+            a.trigger_condition.silence = SCHEDULE_FIELD_MAX_SECS / 60;
+            a.trigger_condition.tolerance_in_secs = Some(SCHEDULE_FIELD_MAX_SECS);
+        })
+        .await;
+        assert!(
+            matches!(err, AlertError::AlertDestinationMissing),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.tz_offset = 1439;
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 0 * * * *".to_string();
+        })
+        .await;
+        assert!(
+            matches!(err, AlertError::AlertDestinationMissing),
+            "{err:?}"
+        );
     }
 }
 

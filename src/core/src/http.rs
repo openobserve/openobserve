@@ -92,6 +92,11 @@ impl From<AlertError> for Response {
             | AlertError::PendingPeriodOnRealtimeAlert
             | AlertError::NegativePendingPeriod
             | AlertError::KeepFiringForOutOfRange
+            | AlertError::FrequencyOutOfRange
+            | AlertError::SilenceOutOfRange
+            | AlertError::ToleranceOutOfRange
+            | AlertError::TzOffsetOutOfRange
+            | AlertError::CronHasNoFutureOccurrence { .. }
             | AlertError::RecoveryOnRealtimeAlert
             | AlertError::RecoveryDestinationsWithoutRecovery
             | AlertError::RecoveryDestinationIsPlatform { .. }
