@@ -455,18 +455,18 @@ describe("FrontendRumConfig", () => {
       expect(cdnVariant.code.raw).toContain(`href="${HTTPS_ENDPOINT}"`);
     });
 
-    it("CDN install code contains OO_RUM async loader global", () => {
+    it("CDN install code contains O2_RUM async loader global", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
-      expect(cdnVariant.code.raw).toContain("OO_RUM");
+      expect(cdnVariant.code.raw).toContain("O2_RUM");
     });
 
-    it("CDN install code contains OO_LOGS async loader global", () => {
+    it("CDN install code contains O2_LOGS async loader global", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
-      expect(cdnVariant.code.raw).toContain("OO_LOGS");
+      expect(cdnVariant.code.raw).toContain("O2_LOGS");
     });
   });
 

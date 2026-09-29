@@ -20,4 +20,6 @@ pub mod result_order;
 pub(crate) mod rewrite;
 pub(crate) mod selector_visitor;
 pub mod selector_window;
+pub mod subquery_grid;
+pub(crate) mod timestamp_selector;
 pub mod visitor;

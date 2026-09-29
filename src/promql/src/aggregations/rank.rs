@@ -22,17 +22,18 @@ use config::{
 use hashbrown::HashMap;
 
 use super::{Accumulate, AggFunc};
+use crate::scalar_param::ScalarParam;
 
 /// `topk` / `bottomk`: the k best series of a group at each evaluation slot.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct Rank {
-    k: usize,
+    k: ScalarParam,
     is_bottom: bool,
 }
 
 /// One bounded heap per slot: memory is `slots × k` whatever the series count.
 pub(crate) struct RankAccumulator {
-    k: usize,
+    k: ScalarParam,
     is_bottom: bool,
     heaps: Vec<BinaryHeap<Ranked>>,
 }
@@ -51,7 +52,7 @@ struct Ranked {
 }
 
 impl Rank {
-    pub(crate) fn new(k: usize, is_bottom: bool) -> Self {
+    pub(crate) fn new(k: ScalarParam, is_bottom: bool) -> Self {
         Self { k, is_bottom }
     }
 }
@@ -65,7 +66,7 @@ impl AggFunc for Rank {
 
     fn build(&self, slots: usize) -> Self::Accumulator {
         RankAccumulator {
-            k: self.k,
+            k: self.k.clone(),
             is_bottom: self.is_bottom,
             heaps: (0..slots).map(|_| BinaryHeap::new()).collect(),
         }
@@ -73,9 +74,14 @@ impl AggFunc for Rank {
 }
 
 impl RankAccumulator {
+    // a fractional k truncates and a negative or NaN one keeps nothing, as `k as usize` does
+    fn limit(&self, slot: usize) -> usize {
+        self.k.at_slot(slot) as usize
+    }
+
     fn admits(&self, slot: usize, value: f64, signature: impl FnOnce() -> u64) -> bool {
         let heap = &self.heaps[slot];
-        if heap.len() < self.k {
+        if heap.len() < self.limit(slot) {
             return true;
         }
         heap.peek().is_some_and(
@@ -94,8 +100,9 @@ impl RankAccumulator {
     }
 
     fn insert(&mut self, slot: usize, entry: Ranked) {
+        let limit = self.limit(slot);
         let heap = &mut self.heaps[slot];
-        if heap.len() == self.k {
+        if heap.len() == limit {
             heap.pop();
         }
         heap.push(entry);
@@ -256,7 +263,7 @@ mod tests {
         for is_bottom in [false, true] {
             for numeric in [f64::NEG_INFINITY, -1.0, 0.0, f64::INFINITY] {
                 for values in [[f64::NAN, numeric], [numeric, f64::NAN]] {
-                    let mut acc = Rank::new(1, is_bottom).build(1);
+                    let mut acc = Rank::new(ScalarParam::Const(1.0), is_bottom).build(1);
                     for (index, value) in values.into_iter().enumerate() {
                         acc.push_series(std::iter::once((0, value)), || {
                             vec![Arc::new(Label::new("s", &index.to_string()))]
@@ -267,7 +274,7 @@ mod tests {
                     assert_eq!(result[0].samples[0].value, numeric);
                 }
             }
-            let mut acc = Rank::new(1, is_bottom).build(1);
+            let mut acc = Rank::new(ScalarParam::Const(1.0), is_bottom).build(1);
             acc.push_series(std::iter::once((0, f64::NAN)), Vec::new);
             assert!(acc.evaluate(vec![], &[10])[0].samples[0].value.is_nan());
         }
@@ -285,7 +292,7 @@ mod tests {
         let Value::Matrix(result) = eval_aggregate(
             &None,
             Value::Matrix(matrix.clone()),
-            Rank::new(2, false),
+            Rank::new(ScalarParam::Const(2.0), false),
             &eval_ctx,
         )
         .unwrap() else {
@@ -302,9 +309,13 @@ mod tests {
                 .all(|s| s.time_window.is_none() && s.exemplars.is_none())
         );
 
-        let Value::Matrix(result) =
-            eval_aggregate(&None, Value::Matrix(matrix), Rank::new(2, true), &eval_ctx).unwrap()
-        else {
+        let Value::Matrix(result) = eval_aggregate(
+            &None,
+            Value::Matrix(matrix),
+            Rank::new(ScalarParam::Const(2.0), true),
+            &eval_ctx,
+        )
+        .unwrap() else {
             panic!("expected a matrix");
         };
         let mut values: Vec<f64> = result.iter().map(|s| s.samples[0].value).collect();
@@ -313,31 +324,68 @@ mod tests {
     }
 
     #[test]
+    fn test_rank_limit_is_read_per_slot_and_truncated() {
+        let k = ScalarParam::PerStep {
+            start: 10,
+            step: 10,
+            values: vec![-1.0, 1.7, f64::NAN, 3.0].into(),
+        };
+        for is_bottom in [false, true] {
+            let mut acc = Rank::new(k.clone(), is_bottom).build(4);
+            for (index, value) in [1.0, 2.0, 3.0, 4.0].into_iter().enumerate() {
+                acc.push_series((0..4).map(|slot| (slot, value)), || {
+                    vec![Arc::new(Label::new("s", &index.to_string()))]
+                });
+            }
+            let mut per_slot = [0; 4];
+            for series in acc.evaluate(vec![], &[10, 20, 30, 40]) {
+                for sample in series.samples {
+                    per_slot[(sample.timestamp / 10 - 1) as usize] += 1;
+                }
+            }
+            assert_eq!(per_slot, [0, 1, 0, 3], "bottom={is_bottom}");
+        }
+    }
+
+    #[test]
     fn test_rank_none_empty_k_zero_and_invalid_input() {
         let ts = 1_640_995_200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
-        for func in [Rank::new(2, false), Rank::new(2, true)] {
+        for func in [
+            Rank::new(ScalarParam::Const(2.0), false),
+            Rank::new(ScalarParam::Const(2.0), true),
+        ] {
             assert!(matches!(
-                eval_aggregate(&None, Value::None, func, &eval_ctx),
+                eval_aggregate(&None, Value::None, func.clone(), &eval_ctx),
                 Ok(Value::None)
             ));
             assert!(matches!(
-                eval_aggregate(&None, Value::Matrix(vec![]), func, &eval_ctx),
+                eval_aggregate(&None, Value::Matrix(vec![]), func.clone(), &eval_ctx),
                 Ok(Value::None)
             ));
             assert!(eval_aggregate(&None, Value::Float(1.0), func, &eval_ctx).is_err());
         }
         let data = Value::Matrix(vec![series("one", &[(ts, 10.5)])]);
         assert!(matches!(
-            eval_aggregate(&None, data.clone(), Rank::new(0, false), &eval_ctx),
+            eval_aggregate(
+                &None,
+                data.clone(),
+                Rank::new(ScalarParam::Const(0.0), false),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
         assert!(matches!(
-            eval_aggregate(&None, data, Rank::new(0, true), &eval_ctx),
+            eval_aggregate(
+                &None,
+                data,
+                Rank::new(ScalarParam::Const(0.0), true),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
         assert!(
-            Rank::new(0, false)
+            Rank::new(ScalarParam::Const(0.0), false)
                 .build(3)
                 .evaluate(vec![], &[1, 2, 3])
                 .is_empty()
@@ -383,7 +431,7 @@ mod tests {
                 eval_aggregate(
                     &None,
                     Value::Matrix(matrix.clone()),
-                    Rank::new(2, is_bottom),
+                    Rank::new(ScalarParam::Const(2.0), is_bottom),
                     &eval_ctx,
                 )
                 .unwrap(),
@@ -412,9 +460,13 @@ mod tests {
         let ts = 1_640_995_200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
         let matrix = vec![series("1", &[(ts, 5.0)]), series("2", &[(ts, 3.0)])];
-        let Value::Matrix(result) =
-            eval_aggregate(&None, Value::Matrix(matrix), Rank::new(5, false), &eval_ctx).unwrap()
-        else {
+        let Value::Matrix(result) = eval_aggregate(
+            &None,
+            Value::Matrix(matrix),
+            Rank::new(ScalarParam::Const(5.0), false),
+            &eval_ctx,
+        )
+        .unwrap() else {
             panic!("expected a matrix");
         };
         assert_eq!(result.len(), 2);
@@ -430,7 +482,7 @@ mod tests {
                 eval_aggregate(
                     &None,
                     Value::Matrix(tied.clone()),
-                    Rank::new(1, is_bottom),
+                    Rank::new(ScalarParam::Const(1.0), is_bottom),
                     &eval_ctx,
                 )
                 .unwrap(),
@@ -447,9 +499,13 @@ mod tests {
             series("dup", &[(1_000, 9.0), (1_010, 1.0)]),
             series("dup", &[(1_000, 1.0), (1_010, 9.0)]),
         ];
-        let Value::Matrix(result) =
-            eval_aggregate(&None, Value::Matrix(matrix), Rank::new(1, false), &eval_ctx).unwrap()
-        else {
+        let Value::Matrix(result) = eval_aggregate(
+            &None,
+            Value::Matrix(matrix),
+            Rank::new(ScalarParam::Const(1.0), false),
+            &eval_ctx,
+        )
+        .unwrap() else {
             panic!("expected a matrix");
         };
         assert_eq!(result.len(), 2);
@@ -477,7 +533,7 @@ mod tests {
         let timestamps = [10, 20, 30];
         for k in [0, 1, 2, 3, 10] {
             for is_bottom in [false, true] {
-                let func = Rank::new(k, is_bottom);
+                let func = Rank::new(ScalarParam::Const(k as f64), is_bottom);
                 let fold = |series: &[(Labels, Vec<(usize, f64)>)]| {
                     let mut acc = func.build(3);
                     for (labels, points) in series {

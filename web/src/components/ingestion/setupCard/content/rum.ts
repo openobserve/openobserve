@@ -30,7 +30,7 @@ import type { RichCardContent, RichCardStepVariant } from "../types";
  * Pinned browser SDK release the CDN URLs point at — bump in one place.
  * Pinning (vs @latest) gives immutable CDN caching and no surprise upgrades.
  */
-export const RUM_SDK_VERSION = "0.3.4";
+export const RUM_SDK_VERSION = "0.4.3";
 
 const CDN_HOST = "https://browsersdk.openobserve.ai";
 const cdnUrl = (bundle: string) => `${CDN_HOST}/${RUM_SDK_VERSION}/${bundle}`;
@@ -137,12 +137,12 @@ openobserveRum.startSessionReplayRecording();`;
 
 // ── CDN variant ──────────────────────────────────────────────────────────────
 
-// Standard RUM-agent async loader: creates an OO_RUM / OO_LOGS stub with an onReady
+// Standard RUM-agent async loader: creates an O2_RUM / O2_LOGS stub with an onReady
 // queue, then injects the bundle with `async` so it downloads in parallel and
 // never blocks parsing or first paint. Queued callbacks run when it lands.
 const cdnLoader = (globalName: string, src: string) => `  (function (h, o, u, n, d) {
     h = h[d] = h[d] || { q: [], onReady: function (c) { h.q.push(c); } };
-    d = o.createElement(u); d.async = 1; d.src = n;
+    d = o.createElement(u); d.async = 1; d.src = n; d.crossOrigin = 'anonymous';
     n = o.getElementsByTagName(u)[0]; n.parentNode.insertBefore(d, n);
   })(window, document, 'script', '${src}', '${globalName}');`;
 
@@ -158,22 +158,22 @@ const cdnInstall = (
 <!-- Async loaders: both bundles download in parallel without blocking
      rendering. init calls queued via onReady() run as each bundle arrives. -->
 <script>
-${cdnLoader("OO_RUM", cdnUrl("openobserve-rum.js"))}
-${cdnLoader("OO_LOGS", cdnUrl("openobserve-logs.js"))}
+${cdnLoader("O2_RUM", cdnUrl("openobserve-rum.js"))}
+${cdnLoader("O2_LOGS", cdnUrl("openobserve-logs.js"))}
 </script>`;
 
 const cdnInit = (subs: RumCardSubs, token: string) => `<script>
   var options = ${indent(optionsBlock(subs, token), 2).trimStart()};
 
-  OO_RUM.onReady(function () {
-    OO_RUM.init({
+  O2_RUM.onReady(function () {
+    O2_RUM.init({
 ${indent(RUM_INIT_FIELDS, 4)},
     });
-    OO_RUM.startSessionReplayRecording();
+    O2_RUM.startSessionReplayRecording();
   });
 
-  OO_LOGS.onReady(function () {
-    OO_LOGS.init({
+  O2_LOGS.onReady(function () {
+    O2_LOGS.init({
 ${indent(LOGS_INIT_FIELDS, 4)},
     });
   });

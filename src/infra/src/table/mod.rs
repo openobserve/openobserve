@@ -42,6 +42,7 @@ pub mod gen_ai_agents;
 pub mod incident_events;
 pub mod incident_integrations;
 pub mod kv_store;
+pub mod llm_prompts;
 pub mod llm_secrets;
 mod migration;
 pub mod model_pricing;
@@ -97,6 +98,8 @@ pub mod timed_annotation_panels;
 pub mod timed_annotations;
 #[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
+pub mod user_auth_state;
+pub mod user_password_history;
 pub mod users;
 pub mod workflows;
 
@@ -148,6 +151,8 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     organizations::create_table().await?;
     users::create_table().await?;
     org_users::create_table().await?;
+    user_password_history::create_table().await?;
+    user_auth_state::create_table().await?;
 
     Ok(())
 }

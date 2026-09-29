@@ -79,12 +79,16 @@ async fn add(msg: Message) -> Result<()> {
 
 async fn update(msg: Message) -> Result<()> {
     let user: UserUpdate = json::from_slice(&msg.value.unwrap())?;
+    // The originating cluster already decided this was a password change; replaying it as one here
+    // keeps the rotation clock and the reset flag consistent, instead of leaving this cluster
+    // holding the new password with the old deadline.
     if let Err(e) = users::update(
         &user.email,
         &user.first_name,
         &user.last_name,
         &user.password,
         user.password_ext,
+        user.password_changed,
     )
     .await
     {

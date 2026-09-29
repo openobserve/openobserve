@@ -90,6 +90,7 @@ test.describe("Pre-Test Cleanup", () => {
     // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
     await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
 
+
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
@@ -231,6 +232,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupFileEnrichmentTables([
       /^e2e_2937_/,                                                                          // enrichment-lifecycle.spec.js (#2937)
       /^e2e_2067_/,                                                                          // enrichment-lifecycle.spec.js (#2067)
+      /^e2e_enrich_/,                                                                        // enrichment-explore-context.spec.js (#7346, #6645)
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
@@ -297,6 +299,9 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
+        /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
+        /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
         /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
         /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
         /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
@@ -328,6 +333,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
         /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
         /^e2e_http_patterns/,                 // Pattern tests stream (searchPatterns.spec.js) — prefix covers the unique per-run e2e_http_patterns_<token> names
+        /^e2e_multi_patterns/,                // Multi-stream patterns guard streams (searchPatternsMultiStream.spec.js)
         /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
         /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
         /^join_[a-z0-9]+_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams with extra segment (join_<id1>_<id2>_requests, etc.)

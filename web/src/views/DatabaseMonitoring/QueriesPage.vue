@@ -204,7 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-count="errorCount"
             :filter-label="narrowingFilterLabel"
             data-test="dbm-queries-coverage"
-          />
+          >
+            <template v-if="hasAppSourcedRows" #legend>
+              <DbmAppSourceLegend data-test="dbm-queries-app-source-legend" />
+            </template>
+          </DbmCoverageLine>
           <DbmInsightStrip
             v-if="!insightsHidden && stripInsights.length"
             :insights="stripInsights"
@@ -561,6 +565,7 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmDeltaCell from "@/components/dbm/DbmDeltaCell.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
@@ -581,6 +586,7 @@ import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -628,6 +634,7 @@ import {
   type DbmServerCounters,
 } from "@/utils/dbm/overlapJoin";
 import {
+  APP_SOURCE_QUALIFIER,
   resolveCalls,
   resolveDatabaseTime,
   type DbmOverlapMetric,
@@ -753,8 +760,8 @@ const serverTruncated = ref(false);
  * the fallback deliberately skips.
  *
  * A failed read is not an observation: it leaves the map empty, every row
- * falls back to its client figure, and each one says `client-observed` rather
- * than the page silently presenting traced numbers as the database's.
+ * falls back to its client figure, marked as traced, rather than the page
+ * silently presenting traced numbers as the database's.
  */
 const serverCounters = shallowRef<Map<string, DbmServerCounters>>(new Map());
 
@@ -784,7 +791,7 @@ const serverTimeQualifier = (row: ServerQueryRow): string =>
 
 const clientOnlyMetric = (value: number | null | undefined): DbmOverlapMetric =>
   typeof value === "number" && Number.isFinite(value)
-    ? { value, source: "client", qualifierKey: "clientObserved" }
+    ? { value, source: "client", qualifierKey: APP_SOURCE_QUALIFIER }
     : { value: null, source: null, qualifierKey: null };
 
 // `loadServerQueries` lived here — a second, sequential request to
@@ -1065,14 +1072,18 @@ const overlapTotals = computed(() => {
           source: "server" as const,
           qualifierKey: "serverCounted",
         }
-      : { value: totalCalls.value, source: "client" as const, qualifierKey: "clientObserved" },
+      : { value: totalCalls.value, source: "client" as const, qualifierKey: APP_SOURCE_QUALIFIER },
     time: everyTimeServed
       ? {
           value: list.reduce((acc, row) => acc + (row.overlapTime.value ?? 0), 0),
           source: "server" as const,
           qualifierKey: uniformTimeQualifier(list.map((row) => row.overlapTime.qualifierKey)),
         }
-      : { value: scopeTotalTime.value, source: "client" as const, qualifierKey: "clientObserved" },
+      : {
+          value: scopeTotalTime.value,
+          source: "client" as const,
+          qualifierKey: APP_SOURCE_QUALIFIER,
+        },
   };
 });
 
@@ -1109,13 +1120,22 @@ const fallbackTimeQualifier = computed(() =>
 const summaryStats = computed<StatItem[]>(() => {
   const totals = overlapTotals.value;
   const qualifier = (key: string | null): I18nText =>
-    key === null ? raw("") : t(`dbm.list.overlap.${key}` as "dbm.list.overlap.serverWait");
+    key === null
+      ? raw("")
+      : key === APP_SOURCE_QUALIFIER
+        ? t("dbm.appSource.marker")
+        : t(`dbm.list.overlap.${key}` as "dbm.list.overlap.serverWait");
+  // An app-sourced total shows the traces glyph; `sub` becomes its accessible name.
+  const qualifierIcon = (key: string | null): { subIcon?: IconName; subTooltip?: I18nText } =>
+    key === APP_SOURCE_QUALIFIER
+      ? { subIcon: "account-tree", subTooltip: t("dbm.appSource.markerHint") }
+      : {};
 
   // Whether the vantage these totals were summed from produced ANY row. A sum
   // cannot say so itself — `[].reduce(+, 0)` is the same 0 as a row that
   // genuinely ran zero calls — so the population signal is read from the list
-  // the total was taken over. Without it the strip printed `0us
-  // client-observed` on a fleet whose trace vantage measured nothing.
+  // the total was taken over. Without it the strip printed a traced `0us`
+  // on a fleet whose trace vantage measured nothing.
   const measured = serverListShown.value
     ? filteredServerRows.value.length > 0
     : rows.value.length > 0 || other.value.length > 0;
@@ -1145,7 +1165,9 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("dbm.queries.summary.calls"),
       value: calls.value ?? raw("—"),
       // D2: the qualifier renders only alongside a value it can qualify.
-      ...(calls.qualified ? { sub: qualifier(totals.calls.qualifierKey) } : {}),
+      ...(calls.qualified
+        ? { sub: qualifier(totals.calls.qualifierKey), ...qualifierIcon(totals.calls.qualifierKey) }
+        : {}),
       icon: "bar-chart",
       tone: "info",
       dataTest: "dbm-queries-summary-calls",
@@ -1154,7 +1176,9 @@ const summaryStats = computed<StatItem[]>(() => {
       key: "time",
       label: t("dbm.queries.summary.time"),
       value: time.value ?? raw("—"),
-      ...(time.qualified ? { sub: qualifier(totals.time.qualifierKey) } : {}),
+      ...(time.qualified
+        ? { sub: qualifier(totals.time.qualifierKey), ...qualifierIcon(totals.time.qualifierKey) }
+        : {}),
       icon: "timer",
       tone: "teal",
       dataTest: "dbm-queries-summary-time",
@@ -1380,7 +1404,7 @@ const load = () =>
  * Deliberately NOT awaited into the failure path of the page: this read is an
  * IMPROVEMENT to two columns, not the page's data. A logs-stream permission
  * the reader lacks, or a stream that never carried counters, must leave the
- * table exactly as it was — client figures, each labelled `client-observed` —
+ * table exactly as it was — client figures, each marked as traced —
  * rather than failing a load that otherwise succeeded. So the catch clears the
  * map and says nothing.
  */
@@ -1819,6 +1843,13 @@ const tableRows = computed<QueryRow[]>(() => {
   }));
   return [...base, ...remainder];
 });
+
+/** Whether any row on screen carries the app-source marker, so the legend explains it. */
+const hasAppSourcedRows = computed(() =>
+  tableRows.value.some(
+    (row) => row.overlapCalls.source === "client" || row.overlapTime.source === "client",
+  ),
+);
 
 /**
  * Only two row tints, and neither washes the row: a left rail. Amber marks a

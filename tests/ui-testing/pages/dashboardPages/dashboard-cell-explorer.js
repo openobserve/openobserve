@@ -249,12 +249,17 @@ export default class DashboardCellExplorerPage {
     await expect(this.detailPrevBtn).toBeDisabled({ timeout: 10000 });
   }
 
+  // The spec reads the counter with a non-retrying assertion right after the click.
   async clickNext() {
+    const before = await this.getPositionCurrent();
     await this.detailNextBtn.click();
+    await expect.poll(() => this.getPositionCurrent(), { timeout: 10000 }).toBe(before + 1);
   }
 
   async clickPrev() {
+    const before = await this.getPositionCurrent();
     await this.detailPrevBtn.click();
+    await expect.poll(() => this.getPositionCurrent(), { timeout: 10000 }).toBe(before - 1);
   }
 
   // ── Shareable URL / copy-link ────────────────────────────────────────────
@@ -328,7 +333,6 @@ export default class DashboardCellExplorerPage {
       { timeout: 30000 }
     );
 
-    await this.surroundWindowBtn.click();
     const option = this.page.locator(
       `[data-test="log-explorer-surround-window-${value}"]`
     );
@@ -336,8 +340,12 @@ export default class DashboardCellExplorerPage {
     // naive click flakes with "element was detached". Poll the click until it
     // lands (option selected -> menu closes).
     await expect(async () => {
+      // A trigger click lost to a drawer re-render leaves the menu closed, so re-open it on each attempt.
+      if (!(await option.isVisible().catch(() => false))) {
+        await this.surroundWindowBtn.click({ timeout: 3000 });
+      }
       await option.click({ timeout: 3000 });
-    }).toPass({ timeout: 15000, intervals: [500] });
+    }).toPass({ timeout: 20000, intervals: [500] });
     // State guard: confirm the selection actually landed before trusting the
     // downstream result.
     await expect(this.surroundWindowBtn).toContainText(label);

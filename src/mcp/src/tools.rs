@@ -397,13 +397,16 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     ))
     .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
 
-    // Set default headers including x-o2-mcp for MCP-initiated calls
+    let mut mcp_marker =
+        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
+    mcp_marker.set_sensitive(true);
     let mut default_headers = reqwest::header::HeaderMap::new();
-    default_headers.insert("x-o2-mcp", "true".parse().unwrap());
+    default_headers.insert("x-o2-mcp", mcp_marker);
 
     let mut client_builder = reqwest::Client::builder()
         .user_agent(format!("openobserve/{}", config::VERSION))
-        .timeout(std::time::Duration::from_secs(30));
+        .timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none());
     if zo_config.http.tls_enabled {
         // Loopback to our own listener, whose cert is issued for the service name, not localhost
         client_builder = client_builder.danger_accept_invalid_certs(true);

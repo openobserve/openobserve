@@ -218,6 +218,20 @@ describe("OnCallSchedulePresets", () => {
     expect(wrapper.findAll('[data-test^="oncall-preset-row-"]').length).toBeGreaterThan(0);
   });
 
+  /// The catalogue is the same four shapes for every org, so reopening the
+  /// drawer must not re-ask the server for them.
+  it("serves the catalogue from the cache when the drawer is reopened", async () => {
+    const wrapper = await renderOpen();
+    expect(service.listSchedulePresets).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(service.listSchedulePresets).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-test="oncall-preset-row-groups-0"]').exists()).toBe(true);
+  });
+
   /// The form opens valid-shaped: the catalogue's own `min`, not a hardcoded
   /// count. A fifth preset with min 3 must open with three rows, unaided.
   it("generates a row per layer from the inputs schema, starting at min groups", async () => {

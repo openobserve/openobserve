@@ -15,15 +15,21 @@
 
 //! Metrics index layout, label pruning, and row-selection caching.
 
-mod cache;
+pub mod block;
+pub mod block_cache;
 pub mod layout;
+mod matcher;
 mod pruner;
 mod reader;
+mod selection_cache;
 
 pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
 };
-pub use pruner::search;
+pub use matcher::{matcher_predicates, matcher_residual_field};
+pub use pruner::{matching_blocks, search};
+pub use reader::fetch_parsed_index;
+pub use selection_cache::{cache_blocks, cached_blocks};
 
 #[cfg(test)]
 mod tests {
@@ -214,16 +220,16 @@ mod tests {
         }
         let schema = Arc::new(Schema::new(fields));
         let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
-        let mut writer = metrics_block::BlockWriter::new_pending(
+        let mut writer = crate::block::BlockWriter::new_pending(
             Vec::new(),
             schema.clone(),
-            metrics_block::MAX_BLOCK_ROWS,
+            crate::block::MAX_BLOCK_ROWS,
         )
         .unwrap();
         writer.write(&batch).unwrap();
         let bytes = writer
             .finish_for_vortex(
-                metrics_block::ParentMetadata {
+                crate::block::ParentMetadata {
                     rows: rows as u64,
                     compressed_size: 123,
                 },
@@ -232,7 +238,8 @@ mod tests {
             .unwrap();
         let id = config::ider::uuid();
         let account = format!("{id}:default");
-        let path = format!("files/test/midx/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
         let store = object_store::memory::InMemory::new();
         store
             .put_opts(
@@ -245,10 +252,13 @@ mod tests {
         infra::storage::add_account(&id, Box::new(store)).await;
         load_metrics_index_file(
             &account,
+            &data_path,
             &path,
             config::FileFormat::Vortex,
-            rows,
-            123,
+            crate::block::ParentMetadata {
+                rows: rows as u64,
+                compressed_size: 123,
+            },
             0,
             crate::reader::IndexLabels {
                 requested: Arc::new(requested.to_vec()),
