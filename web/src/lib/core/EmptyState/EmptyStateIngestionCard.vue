@@ -22,11 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="es-ing-card group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2 max-md:max-w-full max-md:basis-full"
+    class="es-ing-card group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2 max-md:min-h-0 max-md:max-w-full max-md:basis-full max-md:py-2"
     @click="emit('click')"
   >
     <span
-      class="es-ing-card__icon rounded-default group-hover:bg-button-primary inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150 group-hover:text-white"
+      class="es-ing-card__icon rounded-default group-hover:bg-button-primary inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150 group-hover:text-white max-md:size-8"
       :class="iconClass"
     >
       <OIcon :name="icon" size="md" />
