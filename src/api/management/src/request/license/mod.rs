@@ -110,7 +110,7 @@ fn redact(license: &str) -> String {
     )
 }
 
-// the instance id is the default internal gRPC token, and the key's payload carries it too
+// the instance id (default internal gRPC token) and validator auth are secrets, also in the key
 fn viewer_license_fields(
     is_root: bool,
     redact_key: bool,
@@ -119,6 +119,7 @@ fn viewer_license_fields(
 ) -> (Option<String>, Option<License>, String) {
     if !is_root && let Some(license) = license.as_mut() {
         license.installation_id.clear();
+        license.validator_auth.clear();
     }
     let key = if redact_key || !is_root {
         key.map(|v| redact(&v))
@@ -210,6 +211,7 @@ mod tests {
     use super::*;
 
     const INSTANCE_ID: &str = "license-instance-7f3a";
+    const VALIDATOR_AUTH: &str = "dmFsaWRhdG9yOnMzY3JldA-auth";
 
     fn stored_license() -> (String, License) {
         let payload = json::json!({
@@ -226,6 +228,8 @@ mod tests {
             "additional_emails": [],
             "base_urls": [],
             "limits": {},
+            "validator_url": "https://validator.example",
+            "validator_auth": VALIDATOR_AUTH,
         });
         let segment = base64::encode(&payload.to_string())
             .replace('+', "-")
@@ -266,8 +270,11 @@ mod tests {
     #[test]
     fn test_installation_id_is_visible_to_root_only() {
         let viewer = response_json(false);
-        assert!(!viewer.contains(INSTANCE_ID), "{viewer}");
-        assert!(!decoded_key_segments(&viewer).contains(INSTANCE_ID));
+        let viewer_key = decoded_key_segments(&viewer);
+        for secret in [INSTANCE_ID, VALIDATOR_AUTH] {
+            assert!(!viewer.contains(secret), "{viewer}");
+            assert!(!viewer_key.contains(secret));
+        }
         assert!(viewer.contains("lic-1"));
 
         let root = response_json(true);
@@ -277,5 +284,6 @@ mod tests {
         let root: json::Value = json::from_str(&root).unwrap();
         assert_eq!(root["installation_id"], INSTANCE_ID);
         assert_eq!(root["license"]["installation_id"], INSTANCE_ID);
+        assert_eq!(root["license"]["validator_auth"], VALIDATOR_AUTH);
     }
 }
