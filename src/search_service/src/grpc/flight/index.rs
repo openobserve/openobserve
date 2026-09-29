@@ -49,8 +49,7 @@ impl IndexPlan {
     }
 
     pub(super) fn use_metadata_count(&self) -> bool {
-        cfg!(feature = "enterprise")
-            && matches!(self.mode, Some(IndexOptimizeMode::SimpleCount))
+        matches!(self.mode, Some(IndexOptimizeMode::SimpleCount))
             && self
                 .condition
                 .as_ref()
@@ -307,5 +306,38 @@ mod tests {
             assert_eq!(index.mode, expected_mode);
             assert_eq!(index.condition.is_none(), is_metrics);
         }
+    }
+
+    #[test]
+    fn test_use_metadata_count_only_for_unfiltered_simple_count() {
+        let condition = |condition: Condition| {
+            let mut index_condition = IndexCondition::new();
+            index_condition.add_condition(condition);
+            Some(index_condition)
+        };
+        let plan = |condition, mode| IndexPlan { condition, mode };
+
+        assert!(
+            plan(
+                condition(Condition::All()),
+                Some(IndexOptimizeMode::SimpleCount)
+            )
+            .use_metadata_count()
+        );
+        assert!(
+            !plan(
+                condition(Condition::Equal("service".into(), "a".into())),
+                Some(IndexOptimizeMode::SimpleCount),
+            )
+            .use_metadata_count()
+        );
+        assert!(
+            !plan(
+                condition(Condition::All()),
+                Some(IndexOptimizeMode::SimpleHistogram(0, 1, 1, 0)),
+            )
+            .use_metadata_count()
+        );
+        assert!(!plan(None, Some(IndexOptimizeMode::SimpleCount)).use_metadata_count());
     }
 }
