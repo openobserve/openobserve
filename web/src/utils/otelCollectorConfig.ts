@@ -24,8 +24,16 @@
  */
 export const PRIMARY_CLOUD_WEB_URL = "https://cloud.openobserve.ai";
 
+/**
+ * There is no backend flag for "this region has a public gRPC gateway" today
+ * (zoConfig carries no such field) — this string match against web_url is the
+ * whole mechanism, so normalize away the variance that would otherwise flip a
+ * real primary-cloud org silently off: case, surrounding whitespace, and a
+ * trailing slash the config API is free to add or drop.
+ */
 export function isPrimaryCloudWebUrl(webUrl?: string | null): boolean {
-  return webUrl === PRIMARY_CLOUD_WEB_URL;
+  if (!webUrl) return false;
+  return webUrl.trim().toLowerCase().replace(/\/+$/, "") === PRIMARY_CLOUD_WEB_URL;
 }
 
 /**
@@ -42,12 +50,14 @@ export function getOtelCollectorGrpcYaml(params: {
 
   if (isPrimaryCloud) {
     return `exporters:
-  otlp_grpc/openobserve:
-    endpoint: https://grpc.openobserve.ai:443
+  otlp/openobserve:
+    endpoint: grpc.openobserve.ai:443
     headers:
       Authorization: "Basic [BASIC_PASSCODE]"
       organization: ${orgIdentifier}
       stream-name: default
+    tls:
+      insecure: false
 
 service:
   telemetry:
