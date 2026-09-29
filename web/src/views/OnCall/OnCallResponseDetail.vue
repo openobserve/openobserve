@@ -644,6 +644,7 @@ import {
   responsePriorCausesQuery,
   responseProgressQuery,
   responseQuery,
+  responseReportQuery,
   snoozeResponseMutation,
   teamMembersQuery,
   teamPolicyQuery,
@@ -1297,11 +1298,10 @@ async function fetchPriorCauses() {
 async function fetchReport() {
   reportLoading.value = true;
   try {
-    const res = await oncallService.responseReport({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
-    report.value = res.data ?? null;
+    report.value = await read<OnCallResponseReport | null>(
+      responseReportQuery(orgId.value, responseId.value),
+      false,
+    );
   } catch {
     report.value = null;
   } finally {
