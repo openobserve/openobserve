@@ -5823,6 +5823,7 @@
     "valueMappingTypeLte": "Minore o uguale a",
     "valueMappingEmptyTitle": "Nessuna mappatura dei valori",
     "valueMappingEmptyDescription": "Mappa valori, intervalli o pattern a testo e colori visualizzati.",
+    "valueMappingUnsafeRegex": "Questo pattern potrebbe bloccare la tabella. Usa al massimo 256 caratteri e non ripetere un gruppo che si ripete già, come (a+)+.",
     "configSectionFieldOverrides": "Sostituzioni dei campi",
     "configSectionFieldOverridesTooltip": "Mappa le unità sulle colonne selezionate per una migliore visualizzazione dei dati.",
     "addFieldOverride": "Aggiungi sovrascrittura dei campi",

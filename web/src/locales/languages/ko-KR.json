@@ -5823,6 +5823,7 @@
     "valueMappingTypeLte": "이하",
     "valueMappingEmptyTitle": "값 매핑 없음",
     "valueMappingEmptyDescription": "값, 범위 또는 패턴을 표시 텍스트 및 색상에 매핑합니다.",
+    "valueMappingUnsafeRegex": "이 패턴은 테이블을 멈추게 할 수 있습니다. 256자 이내로 작성하고 (a+)+처럼 이미 반복되는 그룹을 다시 반복하지 마세요.",
     "configSectionFieldOverrides": "필드 오버라이드",
     "configSectionFieldOverridesTooltip": "향상된 데이터 시각화를 위해 선택한 열에 단위를 매핑합니다.",
     "addFieldOverride": "필드 오버라이드 추가",

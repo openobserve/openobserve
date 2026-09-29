@@ -5823,6 +5823,7 @@
     "valueMappingTypeLte": "Inférieur ou égal à",
     "valueMappingEmptyTitle": "Aucune correspondance de valeur",
     "valueMappingEmptyDescription": "Faites correspondre des valeurs, des plages ou des motifs à du texte d'affichage et à des couleurs.",
+    "valueMappingUnsafeRegex": "Ce motif pourrait figer le tableau. Limitez-le à 256 caractères et ne répétez pas un groupe qui se répète déjà, comme (a+)+.",
     "configSectionFieldOverrides": "Dérogations de champs",
     "configSectionFieldOverridesTooltip": "Associez les unités aux colonnes sélectionnées pour une meilleure visualisation des données.",
     "addFieldOverride": "Ajouter un remplacement de champ",

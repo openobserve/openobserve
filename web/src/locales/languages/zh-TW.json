@@ -5818,6 +5818,7 @@
     "valueMappingTypeLte": "小於或等於",
     "valueMappingEmptyTitle": "沒有值對應",
     "valueMappingEmptyDescription": "將值、範圍或模式對應到顯示文字和顏色。",
+    "valueMappingUnsafeRegex": "此模式可能導致表格凍結。請控制在 256 個字元以內，且不要重複本身已在重複的群組，例如 (a+)+。",
     "configSectionFieldOverrides": "欄位覆寫",
     "configSectionFieldOverridesTooltip": "將單位對應至選取的欄位以增強資料視覺化。",
     "addFieldOverride": "新增欄位覆寫",

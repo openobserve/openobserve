@@ -5823,6 +5823,7 @@
     "valueMappingTypeLte": "Menor o igual que",
     "valueMappingEmptyTitle": "Sin asignaciones de valores",
     "valueMappingEmptyDescription": "Asigna valores, rangos o patrones a texto y colores de visualización.",
+    "valueMappingUnsafeRegex": "Este patrón podría bloquear la tabla. Usa como máximo 256 caracteres y no repitas un grupo que ya se repite, como (a+)+.",
     "configSectionFieldOverrides": "Anulaciones de campo",
     "configSectionFieldOverridesTooltip": "Asigne unidades a las columnas seleccionadas para mejorar la visualización de los datos.",
     "addFieldOverride": "Añadir anulación de campo",

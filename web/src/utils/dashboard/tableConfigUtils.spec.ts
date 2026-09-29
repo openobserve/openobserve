@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   OVERRIDE_CONFIG_TYPES,
   parseRegexPattern,
+  hasNestedQuantifier,
+  isSafeValueMappingPattern,
   buildValueMappingCache,
   lookupValueMapping,
   lookupValueMappingFull,
@@ -178,6 +180,90 @@ describe("tableConfigUtils", () => {
       ]);
       expect(lookupValueMapping(5, cache)).toBe("low"); // finds the text
       expect(lookupValueMappingFull(5, cache, "color")?.color).toBe("#ff0000");
+    });
+  });
+
+  describe("value-mapping regex safety", () => {
+    const NativeRegExp = RegExp;
+
+    afterEach(() => {
+      globalThis.RegExp = NativeRegExp;
+    });
+
+    it("flags nested quantifiers", () => {
+      for (const pattern of ["(a+)+", "(.*)*", "^(a+)+$", "(\\d+\\.?)+", "((ab)*c)+", "(x{2,})*"]) {
+        expect(hasNestedQuantifier(pattern)).toBe(true);
+      }
+    });
+
+    it("does not flag quantifiers that are not nested", () => {
+      for (const pattern of [
+        "^err",
+        ".*error.*",
+        "(a|b)+",
+        "[(+*)]+",
+        "\\(a+\\)+",
+        "(?:ab)+c*",
+        "(a?)",
+      ]) {
+        expect(hasNestedQuantifier(pattern)).toBe(false);
+      }
+    });
+
+    it("rejects unsafe or oversized patterns", () => {
+      expect(isSafeValueMappingPattern("^err")).toBe(true);
+      expect(isSafeValueMappingPattern("/^err/i")).toBe(true);
+      expect(isSafeValueMappingPattern("/^(a+)+$/")).toBe(false);
+      expect(isSafeValueMappingPattern("a".repeat(257))).toBe(false);
+    });
+
+    it("skips a nested-quantifier mapping and returns quickly on a catastrophic input", () => {
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^(a+)+$", text: "bad" }]);
+      const start = performance.now();
+
+      expect(lookupValueMappingFull("a".repeat(27) + "!", cache)).toBeNull();
+      expect(performance.now() - start).toBeLessThan(100);
+    });
+
+    it("skips a pattern longer than 256 characters", () => {
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: `${"a".repeat(300)}|^err`, text: "long" },
+      ]);
+
+      expect(lookupValueMapping("err_500", cache)).toBeNull();
+    });
+
+    it("does not run a regex against a value longer than 1024 characters", () => {
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^a", text: "a-prefixed" }]);
+
+      expect(lookupValueMapping("a".repeat(1024), cache)).toBe("a-prefixed");
+      expect(lookupValueMapping("a".repeat(1025), cache)).toBeNull();
+    });
+
+    it("compiles each pattern when the cache is built, not per lookup", () => {
+      let constructed = 0;
+      globalThis.RegExp = new Proxy(NativeRegExp, {
+        construct(target, args) {
+          constructed++;
+          return new target(...(args as [string, string]));
+        },
+      });
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^err", text: "error" }]);
+      const afterBuild = constructed;
+
+      for (let i = 0; i < 50; i++) lookupValueMapping(`err_${i}`, cache);
+
+      expect(constructed).toBe(afterBuild);
+    });
+
+    it("gives the same answer on every lookup for a pattern with the g flag", () => {
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "/err/g", text: "error" }]);
+
+      expect([1, 2, 3].map(() => lookupValueMapping("err", cache))).toEqual([
+        "error",
+        "error",
+        "error",
+      ]);
     });
   });
 

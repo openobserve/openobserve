@@ -522,6 +522,46 @@ describe("ValueMappingPopUp", () => {
       expect(wrapper.emitted("save")![0]).toEqual([wrapper.vm.editedValueMapping]);
     });
 
+    it("rejects saving a regex with nested quantifiers and shows the reason", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "regex", pattern: "^(a+)+$", text: "bad", color: null }],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toBeFalsy();
+      const error = wrapper.find(
+        '[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0-error"]',
+      );
+      expect(error.exists()).toBe(true);
+      expect(error.text()).toBe(i18n.global.t("dashboard.valueMappingUnsafeRegex"));
+    });
+
+    it("saves once an unsafe regex is fixed", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "regex", pattern: "^(a+)+$", text: "bad", color: null }],
+      });
+      const dialog = wrapper.findComponent(ODialogStub);
+      await dialog.vm.$emit("click:primary");
+      wrapper.vm.editedValueMapping[0].pattern = "^a+$";
+      await dialog.vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toHaveLength(1);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0-error"]')
+          .exists(),
+      ).toBe(false);
+    });
+
+    it("ignores the pattern of a mapping that is not a regex", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "value", value: "1", pattern: "^(a+)+$", text: "one", color: null }],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toHaveLength(1);
+    });
+
     it("should emit close when cancelEdit is called", () => {
       wrapper = createWrapper();
       wrapper.vm.cancelEdit();
