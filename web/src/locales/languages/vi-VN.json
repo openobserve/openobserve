@@ -1589,6 +1589,7 @@
     "actionOperation": "Hành động: {type} trên {target}",
     "viewOperation": "Trang: {page}",
     "collapsedOtherActions": "[{count} hành động khác]",
+    "collapsedOtherRequests": "[{count} yêu cầu khác trên trang này]",
     "collapsedMoreErrors": "[{count} lỗi khác]",
     "collapsedStaticAssets": "[{count} tài nguyên tĩnh]",
     "collapsedLongTasks": "[{count} tác vụ dài]",

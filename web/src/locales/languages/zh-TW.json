@@ -1589,6 +1589,7 @@
     "actionOperation": "動作：{type} 於 {target}",
     "viewOperation": "檢視：{page}",
     "collapsedOtherActions": "[{count} 個其他動作]",
+    "collapsedOtherRequests": "[此頁面上的 {count} 個其他請求]",
     "collapsedMoreErrors": "[另外 {count} 個錯誤]",
     "collapsedStaticAssets": "[{count} 個靜態資源]",
     "collapsedLongTasks": "[{count} 個長任務]",

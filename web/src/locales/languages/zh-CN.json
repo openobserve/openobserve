@@ -1589,6 +1589,7 @@
     "actionOperation": "操作：{type} 在 {target} 上",
     "viewOperation": "视图：{page}",
     "collapsedOtherActions": "[{count} 个其他操作]",
+    "collapsedOtherRequests": "[此页面上的 {count} 个其他请求]",
     "collapsedMoreErrors": "[{count} 个更多错误]",
     "collapsedStaticAssets": "[{count} 个静态资源]",
     "collapsedLongTasks": "[{count} 个长任务]",

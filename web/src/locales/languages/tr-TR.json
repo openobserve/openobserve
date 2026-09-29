@@ -1589,6 +1589,7 @@
     "actionOperation": "Eylem: {type} üzerinde {target}",
     "viewOperation": "Görünüm: {page}",
     "collapsedOtherActions": "[{count} diğer eylem]",
+    "collapsedOtherRequests": "[bu sayfadaki {count} diğer istek]",
     "collapsedMoreErrors": "[{count} hata daha]",
     "collapsedStaticAssets": "[{count} statik kaynak]",
     "collapsedLongTasks": "[{count} uzun görev]",

@@ -1589,6 +1589,7 @@
     "actionOperation": "الأكشن: {type} على {target}",
     "viewOperation": "العرض: {page}",
     "collapsedOtherActions": "[{count} أفعال أخرى]",
+    "collapsedOtherRequests": "[{count} طلبات أخرى في هذه الصفحة]",
     "collapsedMoreErrors": "[{count} أخطاء أخرى]",
     "collapsedStaticAssets": "[{count} الأصول الثابتة]",
     "collapsedLongTasks": "[{count} مهام طويلة]",

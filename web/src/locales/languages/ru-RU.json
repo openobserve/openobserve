@@ -1589,6 +1589,7 @@
     "actionOperation": "Действие: {type} на {target}",
     "viewOperation": "Просмотр: {page}",
     "collapsedOtherActions": "[{count} других действий]",
+    "collapsedOtherRequests": "[{count} других запросов на этой странице]",
     "collapsedMoreErrors": "[{count} еще ошибок]",
     "collapsedStaticAssets": "[{count} статических ресурсов]",
     "collapsedLongTasks": "[{count} длительных задач]",

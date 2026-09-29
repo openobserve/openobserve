@@ -1589,6 +1589,7 @@
     "actionOperation": "동작: {type} - 대상: {target}",
     "viewOperation": "보기: {page}",
     "collapsedOtherActions": "[{count} 기타 동작]",
+    "collapsedOtherRequests": "[이 페이지의 기타 요청 {count}개]",
     "collapsedMoreErrors": "[{count} 추가 오류]",
     "collapsedStaticAssets": "[{count} 정적 자산]",
     "collapsedLongTasks": "[{count} 긴 작업]",
