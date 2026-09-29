@@ -4765,19 +4765,41 @@ describe("BrowserJourney toolbar on a phone", () => {
     });
   });
 
-  it("on tablet the left and right groups wrap onto two rows; on desktop the spacer and separator split them", () => {
+  it("on tablet the left and right groups wrap onto two rows; on desktop a separator splits them", () => {
     wrapper = mountAt("desktop");
 
     const left = wrapper.find('[data-test="synthetics-journey-add-step-btn"]').element
       .parentElement!;
     expect(left.classList).toContain("max-lg:basis-full");
     expect(left.parentElement!.classList).toContain("max-lg:flex-wrap");
-    const spacer = left.nextElementSibling!;
-    const separator = spacer.nextElementSibling!;
-    expect(spacer.className).toContain("flex-1");
-    expect(spacer.className).toContain("max-lg:hidden");
+    const separator = left.nextElementSibling!;
     expect(separator.getAttribute("data-orientation")).toBe("vertical");
     expect(separator.className).toContain("max-lg:hidden");
+  });
+
+  it("filter, Add step and Add subtest sit on the right, after a spacer that follows select-all", () => {
+    wrapper = mountAt("desktop");
+
+    const spacer = wrapper.find('[data-test="synthetics-journey-toolbar-spacer"]').element;
+    const left = spacer.parentElement!;
+    expect(left.classList).toContain("flex-1");
+    expect(spacer.className).toContain("flex-1");
+    expect(spacer.className).toContain("max-md:hidden");
+    const selectAll = wrapper.find('[data-test="synthetics-journey-select-all"]').element;
+    expect(
+      selectAll.compareDocumentPosition(spacer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    for (const sel of [
+      '[data-test="synthetics-journey-filter-input"]',
+      '[data-test="synthetics-journey-add-step-btn"]',
+      '[data-test="synthetics-journey-add-subtest-btn"]',
+    ]) {
+      expect(
+        spacer.compareDocumentPosition(wrapper.find(sel).element) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        sel,
+      ).toBeTruthy();
+    }
   });
 
   const STEP_COUNT = '[data-test="synthetics-journey-toolbar-step-count"]';

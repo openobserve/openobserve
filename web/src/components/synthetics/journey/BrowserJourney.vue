@@ -1530,9 +1530,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 <template>
   <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
     <div class="ms-6.5 flex items-center gap-2 px-3 pb-3 max-lg:flex-wrap max-lg:gap-y-2">
-      <div
-        class="flex min-w-0 items-center gap-2 max-lg:basis-full max-md:flex-1 max-md:basis-auto"
-      >
+      <div class="flex min-w-0 flex-1 items-center gap-2 max-lg:basis-full max-md:basis-auto">
         <!-- Select-all — visibility:hidden during replay to preserve layout -->
         <OCheckbox
           :model-value="allSelected || undefined"
@@ -1541,11 +1539,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-select-all"
           @update:model-value="toggleSelectAll()"
         />
-        <OSeparator
-          vertical
-          class="ms-4 me-2"
-          data-test="synthetics-journey-select-all-separator"
-        />
+        <OSeparator vertical class="ms-4" data-test="synthetics-journey-select-all-separator" />
         <h3 class="sr-only">{{ t("synthetics.journey.steps") }}</h3>
         <JourneyStepCount
           :steps="modelValue"
@@ -1553,6 +1547,11 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :limit="maxSteps"
           class="md:hidden"
           data-test="synthetics-journey-toolbar-step-count"
+        />
+        <div
+          class="flex-1 max-md:hidden"
+          aria-hidden="true"
+          data-test="synthetics-journey-toolbar-spacer"
         />
         <OInput
           v-model="filterQuery"
@@ -1587,7 +1586,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </div>
       </div>
 
-      <div class="flex-1 max-lg:hidden" />
       <OSeparator vertical class="max-lg:hidden" />
 
       <div class="flex shrink-0 items-center gap-2">
