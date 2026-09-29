@@ -68,7 +68,7 @@ pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()>
 }
 
 /// Only broadcast-join results under `join/` may be read back from object storage.
-fn is_join_result_path(path: &str) -> bool {
+pub fn is_join_result_path(path: &str) -> bool {
     use std::path::{Component, Path};
     path.starts_with("join/")
         && Path::new(path)
