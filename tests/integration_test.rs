@@ -1353,7 +1353,20 @@ mod tests {
             value: f64::NAN,
             timestamp: Utc::now().timestamp_micros(),
         });
-        let loc_exemp: Vec<prometheus_rpc::Exemplar> = vec![];
+        let loc_exemp: Vec<prometheus_rpc::Exemplar> = vec![prometheus_rpc::Exemplar {
+            labels: vec![
+                prometheus_rpc::Label {
+                    name: "trace_id".to_string(),
+                    value: "abc".to_string(),
+                },
+                prometheus_rpc::Label {
+                    name: "span_id".to_string(),
+                    value: "def".to_string(),
+                },
+            ],
+            value: 1.0,
+            timestamp: Utc::now().timestamp_millis(),
+        }];
         let loc_hist: Vec<prometheus_rpc::Histogram> = vec![];
 
         let ts = prometheus_rpc::TimeSeries {
