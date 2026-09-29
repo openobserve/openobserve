@@ -850,15 +850,13 @@ pub async fn validate_credentials_ext(
         return Ok(TokenValidationResponse::default());
     }
 
-    let hashed_pass = get_hash(
-        &format!(
-            "{}{}",
-            get_hash(
-                &format!("{}{}", user.password_ext.unwrap(), auth_token.request_time),
-                password_ext_salt
-            ),
-            auth_token.expires_in
-        ),
+    let Some(password_ext) = user.password_ext.as_deref().filter(|ext| !ext.is_empty()) else {
+        return Ok(TokenValidationResponse::default());
+    };
+    let hashed_pass = password_ext_credential(
+        password_ext,
+        &auth_token.request_time.to_string(),
+        auth_token.expires_in,
         password_ext_salt,
     );
     if !hashed_pass.eq(&in_password) {
@@ -958,6 +956,17 @@ pub async fn validate_credentials_ext(
     Err(AuthError::Forbidden("Not allowed".to_string()))
 }
 
+/// Presigned/`auth_ext` credential from `password_ext`, matching `generate_presigned_url`.
+fn password_ext_credential(
+    password_ext: &str,
+    request_time: &str,
+    expires_in: i64,
+    salt: &str,
+) -> String {
+    let stage2 = get_hash(&format!("{password_ext}{request_time}"), salt);
+    get_hash(&format!("{stage2}{expires_in}"), salt)
+}
+
 async fn validate_user_from_db(
     db_user: Result<DBUser, anyhow::Error>,
     user_password: &str,
@@ -1002,23 +1011,13 @@ async fn validate_user_from_db(
                 }
                 let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                 Ok(resp)
-            } else if user.password_ext.is_some() && req_time.is_some() {
+            } else if let (Some(password_ext), Some(req_time)) = (
+                user.password_ext.as_deref().filter(|ext| !ext.is_empty()),
+                req_time,
+            ) {
                 log::debug!("Validating user for query params");
-                let hashed_pass = get_hash(
-                    &format!(
-                        "{}{}",
-                        get_hash(
-                            &format!(
-                                "{}{}",
-                                user.password_ext.as_ref().unwrap(),
-                                req_time.unwrap()
-                            ),
-                            password_ext_salt
-                        ),
-                        exp_in
-                    ),
-                    password_ext_salt,
-                );
+                let hashed_pass =
+                    password_ext_credential(password_ext, req_time, exp_in, password_ext_salt);
                 if hashed_pass.eq(&user_password) {
                     let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                     Ok(resp)
@@ -1631,6 +1630,60 @@ mod tests {
         assert!(resp_from_builder.given_name.eq(&resp.given_name));
     }
 
+    #[test]
+    fn password_ext_credential_matches_the_presigned_url() {
+        let (salt, pwd, time, exp_in) = ("openobserve", "Complexpass#123", 1_700_000_000, 300);
+        let url = openobserve_core::auth::generate_presigned_url(
+            "u@example.com",
+            pwd,
+            salt,
+            "http://o2",
+            exp_in,
+            time,
+        );
+        let auth = url.split("auth=").nth(1).unwrap();
+        let (_, carried) = get_user_details(base64::decode(auth).unwrap()).unwrap();
+        let password_ext = get_hash(pwd, salt);
+        assert_eq!(
+            password_ext_credential(&password_ext, &time.to_string(), exp_in, salt),
+            carried
+        );
+    }
+
+    #[tokio::test]
+    async fn presigned_login_refuses_a_blank_password_ext() {
+        let salt = "openobserve";
+        let req_time = "1700000000".to_string();
+        let user = |password_ext: &str| DBUser {
+            email: "sso@example.com".into(),
+            first_name: "Sso".into(),
+            last_name: "User".into(),
+            password: "".into(),
+            salt: "".into(),
+            organizations: vec![],
+            is_external: true,
+            password_ext: Some(password_ext.into()),
+        };
+
+        let real_ext = get_hash("Complexpass#123", salt);
+        let genuine = password_ext_credential(&real_ext, &req_time, 300, salt);
+        assert!(
+            validate_user_from_db(Ok(user(&real_ext)), &genuine, Some(&req_time), 300, salt)
+                .await
+                .unwrap()
+                .is_valid
+        );
+
+        // Anyone can derive this: the salt defaults to a public constant.
+        let forged = password_ext_credential("", &req_time, 300, salt);
+        assert!(
+            validate_user_from_db(Ok(user("")), &forged, Some(&req_time), 300, salt)
+                .await
+                .is_err(),
+            "an empty password_ext must not back a presigned login"
+        );
+    }
+
     #[tokio::test]
     async fn test_validation_response_default() {
         let actual = TokenValidationResponse {
@@ -2088,6 +2141,25 @@ mod tests {
             accepted.is_empty(),
             "empty password accepted: {accepted:#?}"
         );
+
+        #[cfg(feature = "enterprise")]
+        for email in [sre_agent, plain_user] {
+            let auth_token = AuthTokensExt {
+                auth_ext: String::new(),
+                refresh_token: String::new(),
+                request_time: 1_700_000_000,
+                expires_in: 300,
+            };
+            let salt = get_config().auth.ext_auth_salt.clone();
+            let forged = password_ext_credential("", "1700000000", 300, &salt);
+            assert!(
+                !validate_credentials_ext(email, &forged, "default/streams", auth_token, "GET")
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "auth_ext for {email} without a password_ext must be refused"
+            );
+        }
     }
 
     /// Root survives any number of wrong passwords, and a locked-out user is refused even once they
