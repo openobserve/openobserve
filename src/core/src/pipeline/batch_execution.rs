@@ -142,6 +142,10 @@ impl BatchBuffer {
     }
 }
 
+/// Largest destination response body echoed back into node outputs and errors.
+#[cfg(feature = "enterprise")]
+const DESTINATION_BODY_ECHO_LIMIT: usize = 4096;
+
 #[cfg(feature = "enterprise")]
 static BATCH_BUFFERS: Lazy<Mutex<HashMap<String, BatchBuffer>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -2889,35 +2893,27 @@ async fn process_destination_node(
                 )
                 .await;
             }
+            let client = destination_http_client(
+                &endpoint,
+                std::time::Duration::from_secs(cfg.pipeline.remote_request_timeout),
+            );
             let op_fmt = endpoint.output_format.unwrap_or_default();
             let send_data = op_fmt.get_body_from_data(&data, &endpoint.metadata);
             let content_type = op_fmt.get_content_type();
             let headers = endpoint.headers.unwrap_or_default();
-            let builder = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(
-                    cfg.pipeline.remote_request_timeout,
-                ))
-                .danger_accept_invalid_certs(endpoint.skip_tls_verify);
-            let client = match common::utils::ssrf_guard::build_safe_client(builder) {
-                Ok(client) => client,
-                Err(e) => {
-                    return drain_destination_node_with_error(
-                        &metadata,
-                        &mut channels,
-                        node,
-                        format!("Failed to build HTTP client: {e}"),
-                    )
-                    .await;
-                }
-            };
 
-            let mut client = client
-                .post(endpoint.url)
-                .header("Content-type", content_type);
-            for (name, val) in headers {
-                client = client.header(name, val);
-            }
-            let res = client.body(send_data).send().await;
+            let res = match client {
+                Ok(client) => {
+                    let mut req = client
+                        .post(endpoint.url)
+                        .header("Content-type", content_type);
+                    for (name, val) in headers {
+                        req = req.header(name, val);
+                    }
+                    req.body(send_data).send().await.map_err(|e| e.to_string())
+                }
+                Err(e) => Err(e),
+            };
 
             let res = match res {
                 Ok(v) => v,
@@ -2945,7 +2941,7 @@ async fn process_destination_node(
                 }
             };
             let status = res.status();
-            let body = res.text().await.unwrap_or_else(|e| e.to_string());
+            let body = read_body_capped(res, DESTINATION_BODY_ECHO_LIMIT).await;
             if !status.is_success() {
                 let data_copy: Vec<_> = data.into_iter().map(|v| v.as_ref().clone()).collect();
                 let data = Value::Array(data_copy);
@@ -2978,6 +2974,35 @@ async fn process_destination_node(
         }
     }
     Ok(data_count)
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn destination_http_client(
+    endpoint: &config::meta::destinations::Endpoint,
+    timeout: std::time::Duration,
+) -> Result<reqwest::Client, String> {
+    // The DNS guard in build_safe_client never sees a literal IP, so the URL is checked here.
+    config::utils::ssrf_guard::SsrfGuard::validate_url_with_config(&endpoint.url)?;
+    config::utils::ssrf_guard::build_safe_client(
+        reqwest::Client::builder()
+            .timeout(timeout)
+            .danger_accept_invalid_certs(endpoint.skip_tls_verify),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(any(feature = "enterprise", test))]
+async fn read_body_capped(mut res: reqwest::Response, limit: usize) -> String {
+    let mut buf = Vec::new();
+    while buf.len() < limit {
+        match res.chunk().await {
+            Ok(Some(chunk)) => buf.extend_from_slice(&chunk),
+            Ok(None) => break,
+            Err(e) => return e.to_string(),
+        }
+    }
+    let text = String::from_utf8_lossy(&buf);
+    config::meta::db_normalizer::truncate_at_boundary(&text, limit).to_string()
 }
 
 #[cfg(feature = "enterprise")]
@@ -5272,5 +5297,56 @@ mod tests {
                 "error should name the function and the reason, got: {err}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_destination_http_client_refuses_loopback() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nsecret")
+                    .await;
+            }
+        });
+        let endpoint = config::meta::destinations::Endpoint {
+            url: format!("http://127.0.0.1:{port}/"),
+            ..Default::default()
+        };
+        let timeout = std::time::Duration::from_secs(5);
+        let error = match destination_http_client(&endpoint, timeout) {
+            Err(e) => e,
+            Ok(client) => match client.post(&endpoint.url).send().await {
+                Ok(res) => panic!("reached {}: {}", endpoint.url, res.status()),
+                Err(e) => e.to_string(),
+            },
+        };
+        assert!(error.contains("not allowed"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn test_read_body_capped_stops_at_limit() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = sock.read(&mut buf).await;
+            let body = "é".repeat(50_000);
+            let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len());
+            let _ = sock.write_all(head.as_bytes()).await;
+            let _ = sock.write_all(body.as_bytes()).await;
+        });
+        let res = reqwest::get(format!("http://127.0.0.1:{port}/"))
+            .await
+            .unwrap();
+        let body = read_body_capped(res, 4097).await;
+        assert_eq!(body.len(), 4096);
+        assert!(body.chars().all(|c| c == 'é'));
     }
 }
