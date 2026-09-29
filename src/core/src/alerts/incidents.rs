@@ -1317,13 +1317,7 @@ async fn create_new_incident(
     // Trigger immediate RCA for new incident.
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-        let o2_cfg = get_o2_config();
-
-        if o2_cfg.incidents.enabled
-            && o2_cfg.incidents.rca_enabled
-            && !o2_cfg.ai.agent_url.is_empty()
-        {
+        if rca_will_run(org_id, &incident.id).await {
             #[cfg(feature = "cloud")]
             let usage_permit = {
                 let usage_context = crate::trial_quota::AiUsageContext {
@@ -1711,7 +1705,9 @@ async fn find_or_create_incident(
                     let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
                         .await
                         .unwrap_or_default();
-                    if !is_analysis_in_flight(&events, cooldown * 2) {
+                    if !is_analysis_in_flight(&events, cooldown * 2)
+                        && rca_will_run(&org_id_rca, &incident_id_rca).await
+                    {
                         #[cfg(feature = "cloud")]
                         let usage_permit = {
                             let usage_context = crate::trial_quota::AiUsageContext {
@@ -2375,6 +2371,24 @@ async fn emit_analysis_failure(
     }
 }
 
+/// Whether `trigger_rca_for_incident` would reach the agent for this incident. Callers check this
+/// before authorizing AI usage so a run the trigger would skip is never charged. When it returns
+/// false no verdict is coming, so any triage hold is released here.
+#[cfg(feature = "enterprise")]
+pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
+    use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
+
+    let cfg = get_config();
+    let will_run = cfg.incidents.enabled
+        && cfg.incidents.rca_enabled
+        && !cfg.ai.agent_url.is_empty()
+        && !rca_service::l0_off_for_incident(org_id, incident_id).await;
+    if !will_run {
+        rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+    }
+    will_run
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
@@ -2747,7 +2761,9 @@ pub async fn update_status(
         let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
             .await
             .unwrap_or_default();
-        if !is_analysis_in_flight(&events, cooldown * 2) {
+        if !is_analysis_in_flight(&events, cooldown * 2)
+            && rca_will_run(&org_id_rca, &incident_id_rca).await
+        {
             #[cfg(feature = "cloud")]
             let usage_permit = {
                 let usage_context = crate::trial_quota::AiUsageContext {

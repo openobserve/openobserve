@@ -499,6 +499,14 @@ pub async fn trigger_incident_rca(
         Err(e) => return MetaHttpResponse::internal_error(e),
     }
 
+    // A reanalysis runs through the shared trigger, which skips it when the team's L0 is off;
+    // refuse it before authorization so the skipped run is never charged.
+    if query.reanalysis
+        && !openobserve_core::alerts::incidents::rca_will_run(&org_id, &incident_id).await
+    {
+        return MetaHttpResponse::bad_request("AI SRE is turned off for this incident's priority");
+    }
+
     #[cfg(feature = "cloud")]
     let usage_permit = {
         let is_reanalysis = query.reanalysis
