@@ -19,7 +19,10 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
     }
 
     let haddr: SocketAddr = if cfg.report_server.ipv6_enabled {
-        format!("[::]:{}", cfg.report_server.port).parse()?
+        SocketAddr::new(
+            report_server_ipv6_bind_addr(&cfg.report_server.addr).into(),
+            cfg.report_server.port,
+        )
     } else {
         let ip = if !cfg.report_server.addr.is_empty() {
             cfg.report_server.addr.clone()
@@ -41,6 +44,18 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
 
     log::info!("Report server stopped");
     Ok(())
+}
+
+/// A non-IPv6 `addr` (e.g. the shared IPv4 default) would fail to bind, so fall back to the
+/// unspecified address rather than silently listening on the wrong interface.
+fn report_server_ipv6_bind_addr(addr: &str) -> std::net::Ipv6Addr {
+    if addr.is_empty() {
+        return std::net::Ipv6Addr::UNSPECIFIED;
+    }
+    addr.parse().unwrap_or_else(|_| {
+        log::warn!("ZO_REPORT_SERVER_HTTP_ADDR '{addr}' is not a valid IPv6 address; using ::");
+        std::net::Ipv6Addr::UNSPECIFIED
+    })
 }
 
 async fn shutdown_signal() {
@@ -74,5 +89,34 @@ async fn shutdown_signal() {
             _ = sigterm.recv() =>  log::info!("ctrl-close received"),
             _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ipv6_bind_addr_empty_falls_back_to_unspecified() {
+        assert_eq!(
+            report_server_ipv6_bind_addr(""),
+            std::net::Ipv6Addr::UNSPECIFIED
+        );
+    }
+
+    #[test]
+    fn test_ipv6_bind_addr_ipv4_default_falls_back_to_unspecified() {
+        assert_eq!(
+            report_server_ipv6_bind_addr("127.0.0.1"),
+            std::net::Ipv6Addr::UNSPECIFIED
+        );
+    }
+
+    #[test]
+    fn test_ipv6_bind_addr_respects_a_configured_ipv6_literal() {
+        assert_eq!(
+            report_server_ipv6_bind_addr("::1"),
+            std::net::Ipv6Addr::LOCALHOST
+        );
     }
 }

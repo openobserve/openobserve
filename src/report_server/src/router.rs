@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use axum::{
     Json, Router,
-    extract::{Path, Query},
+    extract::{Path, Query, Request},
     http::StatusCode,
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, put},
 };
@@ -13,6 +14,8 @@ use crate::{
     models::{self, ReportType},
     report::{SMTP_CLIENT, generate_report, send_email},
 };
+
+const REPORT_SECRET_HEADER: &str = "x-o2-report-secret";
 
 /// HTTP response
 /// code 200 is success
@@ -140,14 +143,91 @@ pub async fn send_report(
 
 /// Create the router for the report server
 pub fn create_router() -> Router {
+    router_with_secret(config::get_config().report_server.secret.clone())
+}
+
+fn router_with_secret(secret: String) -> Router {
     Router::new()
         .route("/api/healthz", get(healthz))
         .route("/api/{org_id}/reports/{name}/send", put(send_report))
+        .layer(middleware::from_fn(move |request, next| {
+            let secret = secret.clone();
+            async move { require_shared_secret(&secret, request, next).await }
+        }))
+}
+
+/// A blank configured secret means the standalone `o2_report_server` deployments that don't
+/// send this header yet must keep working, so the check is skipped entirely.
+async fn require_shared_secret(secret: &str, request: Request, next: Next) -> Response {
+    if secret.is_empty() {
+        return next.run(request).await;
+    }
+    let matches = request
+        .headers()
+        .get(REPORT_SECRET_HEADER)
+        .is_some_and(|v| constant_time_eq(v.as_bytes(), secret.as_bytes()));
+    if matches {
+        next.run(request).await
+    } else {
+        StatusCode::UNAUTHORIZED.into_response()
+    }
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
 }
 
 #[cfg(test)]
 mod tests {
+    use axum::body::Body;
+    use tower::ServiceExt;
+
     use super::*;
+
+    fn healthz_request() -> axum::http::Request<Body> {
+        axum::http::Request::builder()
+            .uri("/api/healthz")
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_request_without_secret_header_is_rejected_when_secret_set() {
+        let app = router_with_secret("topsecret".to_string());
+        let resp = app.oneshot(healthz_request()).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_request_with_matching_secret_header_passes() {
+        let app = router_with_secret("topsecret".to_string());
+        let req = axum::http::Request::builder()
+            .uri("/api/healthz")
+            .header(REPORT_SECRET_HEADER, "topsecret")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_request_with_wrong_secret_header_is_rejected() {
+        let app = router_with_secret("topsecret".to_string());
+        let req = axum::http::Request::builder()
+            .uri("/api/healthz")
+            .header(REPORT_SECRET_HEADER, "wrong")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_no_configured_secret_skips_check() {
+        let app = router_with_secret(String::new());
+        let resp = app.oneshot(healthz_request()).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
 
     #[test]
     fn test_http_response_internal_server_error_has_500_code() {
