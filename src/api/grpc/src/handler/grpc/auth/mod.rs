@@ -18,6 +18,8 @@ use config::meta::cluster::get_internal_grpc_token;
 use db::{org_users::get_cached_user_org, user::is_root_user};
 use http_auth_basic::Credentials;
 use infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX;
+use openobserve_core::auth::try_get_hash;
+#[cfg(test)]
 use openobserve_core::auth::get_hash;
 use tonic::{
     Request, Status,
@@ -79,6 +81,11 @@ fn check_auth_inner(
         }
     };
 
+    // A blank credential must never reach a comparison with a token that may be stored blank.
+    if credentials.password.is_empty() {
+        return Err(Status::unauthenticated("No valid auth token[5]"));
+    }
+
     let user_id = credentials.user_id;
     if allow_org_ingestion_token && credentials.password.starts_with(ORG_INGESTION_TOKEN_PREFIX) {
         let cache_key = db::org_ingestion_tokens::cache_key(org_id, &credentials.password);
@@ -101,7 +108,9 @@ fn check_auth_inner(
     if user.token.eq(&credentials.password) {
         return attach_user_id(req, &user_id);
     }
-    if user_id.eq(&user.email) && get_hash(&credentials.password, &user.salt).eq(&user.password) {
+    if user_id.eq(&user.email)
+        && try_get_hash(&credentials.password, &user.salt).is_some_and(|h| h == user.password)
+    {
         attach_user_id(req, &user_id)
     } else {
         Err(Status::unauthenticated("No valid auth token[5]"))
@@ -516,5 +525,55 @@ pub(crate) mod tests {
             .is_ok()
         );
         assert!(check_auth(basic_request("auth-hash", "hash@example.com", "hash-token")).is_ok());
+    }
+
+    #[test]
+    fn test_empty_password_does_not_match_empty_token() {
+        seed_org_user("auth-empty-token", "empty-token@example.com", "Pass#123", "");
+
+        let status =
+            check_auth(basic_request("auth-empty-token", "empty-token@example.com", ""))
+                .unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[test]
+    fn test_sso_user_with_empty_salt_does_not_panic() {
+        cache_instance_id("instance");
+        USERS.insert(
+            "sso@example.com".to_string(),
+            UserRecord {
+                email: "sso@example.com".to_string(),
+                first_name: "".to_string(),
+                last_name: "".to_string(),
+                password: "".to_string(),
+                salt: "".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        ORG_USERS.insert(
+            "auth-sso/sso@example.com".to_string(),
+            OrgUserRecord {
+                role: UserRole::Admin,
+                token: "".to_string(),
+                rum_token: None,
+                org_id: "auth-sso".to_string(),
+                email: "sso@example.com".to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+
+        let status = check_auth(basic_request("auth-sso", "sso@example.com", "anything"))
+            .unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
     }
 }
