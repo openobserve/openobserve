@@ -276,7 +276,6 @@ export class HeatmapConverter implements PromQLChartConverter {
                     config?.unit,
                     config?.unit_custom,
                     config?.decimals,
-                    config?.unit_locale,
                   ),
                 ) || params?.value?.[2]
               );
@@ -342,7 +341,6 @@ export class HeatmapConverter implements PromQLChartConverter {
                   config?.unit,
                   config?.unit_custom,
                   config?.decimals,
-                  config?.unit_locale,
                 ),
               ) || params?.value?.[2];
             return `${escapeHtml(seriesName)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
@@ -504,7 +502,6 @@ export class HeatmapConverter implements PromQLChartConverter {
                   config?.unit,
                   config?.unit_custom,
                   config?.decimals,
-                  config?.unit_locale,
                 ),
               ) || params?.value?.[2];
             return `le ${escapeHtml(bucketLabel)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;

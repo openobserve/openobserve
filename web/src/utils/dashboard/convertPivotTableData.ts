@@ -437,9 +437,6 @@ export const convertPivotTableData = (
       const yAliasLower = yField.alias.toLowerCase();
       const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;
       const customUnitToUse = unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
-      const localeToUse = unitConfigMap[yAliasLower]?.unit
-        ? unitConfigMap[yAliasLower].unitLocale
-        : config.unit_locale;
       const decimals = config.decimals ?? 2;
 
       columns.push({
@@ -459,7 +456,6 @@ export const convertPivotTableData = (
             customUnitToUse,
             decimals,
             missingValue,
-            localeToUse,
           ),
       });
     }
@@ -482,9 +478,6 @@ export const convertPivotTableData = (
       const yAliasLower = yField.alias.toLowerCase();
       const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;
       const customUnitToUse = unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
-      const localeToUse = unitConfigMap[yAliasLower]?.unit
-        ? unitConfigMap[yAliasLower].unitLocale
-        : config.unit_locale;
       const decimals = config.decimals ?? 2;
 
       columns.push({
@@ -506,7 +499,6 @@ export const convertPivotTableData = (
             customUnitToUse,
             decimals,
             missingValue,
-            localeToUse,
           ),
         headerStyle: "font-weight: bold",
       });

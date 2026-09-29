@@ -22,6 +22,8 @@ import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
 import {
   NUMBER_LOCALE_TAGS,
   getNumberLocale,
+  localeFromUnit,
+  toLocaleUnit,
   toSupportedNumberLocale,
 } from "@/locales/numberFormat";
 
@@ -46,13 +48,21 @@ export interface ColumnOverrideUI {
   fieldType: "auto" | "num" | "text";
   unit: string | null; // null === inherit panel-level unit
   customUnit: string | null;
-  unitLocale: string | null; // Locale Format tag; null === Auto
   alignment: string | null;
   textColor: string | null;
   bgColor: string | null;
   autoColor: boolean; // unique-value coloring
   conditions: ConditionalRuleUI[];
 }
+
+// A type alias, not an interface: OSelect's options are an index-signature type an interface can't satisfy.
+export type UnitOption = {
+  label: I18nText;
+  value?: string | null;
+  // OSelect nesting: the pinned locales are listed under the Other Locale row.
+  expandable?: boolean;
+  parentValue?: string;
+};
 
 export const TEXT_SWATCHES = [
   "#b91c1c",
@@ -79,7 +89,6 @@ export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   fieldType: "auto",
   unit: null,
   customUnit: null,
-  unitLocale: null,
   alignment: null,
   textColor: null,
   bgColor: null,
@@ -97,7 +106,6 @@ const applyConfigItems = (col: ColumnOverrideUI, items: any[]): void => {
       case OVERRIDE_CONFIG_TYPES.UNIT:
         col.unit = cfg.value?.unit ?? null;
         col.customUnit = cfg.value?.customUnit ?? null;
-        col.unitLocale = cfg.value?.unitLocale ?? null;
         break;
       case OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR:
         col.autoColor = !!cfg.autoColor;
@@ -145,11 +153,7 @@ export const serializeColumnOverride = (c: ColumnOverrideUI): any | null => {
   if (c.unit)
     config.push({
       type: OVERRIDE_CONFIG_TYPES.UNIT,
-      value: {
-        unit: c.unit,
-        customUnit: c.customUnit,
-        ...(c.unit === "locale" && c.unitLocale ? { unitLocale: c.unitLocale } : {}),
-      },
+      value: { unit: c.unit, customUnit: c.customUnit },
     });
   if (c.alignment) config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
   if (c.textColor) config.push({ type: OVERRIDE_CONFIG_TYPES.TEXT_COLOR, value: c.textColor });
@@ -188,13 +192,19 @@ export const serializeOverrides = (cols: ColumnOverrideUI[]): any[] =>
     .map((c) => serializeColumnOverride(c))
     .filter((entry) => entry != null);
 
-/** Canonical unit dropdown options shared by panel config and the dialog. */
-export const getUnitOptions = (
-  t: TranslateFn,
-): Array<{ label: I18nText; value: string | null }> => [
+// Nesting key of the Other Locale row; never saved as a unit.
+const OTHER_LOCALE_KEY = "other-locale";
+
+/**
+ * Canonical unit dropdown options shared by panel config and the dialog. Pass the
+ * current unit so a pinned locale outside the offered list stays selectable.
+ */
+export const getUnitOptions = (t: TranslateFn, currentUnit?: string | null): UnitOption[] => [
   { label: t("dashboard.default"), value: null },
   { label: t("dashboard.numbers"), value: "numbers" },
   { label: t("dashboard.localeFormat"), value: "locale" },
+  { label: t("dashboard.otherLocale"), value: OTHER_LOCALE_KEY, expandable: true },
+  ...getPinnedLocaleOptions(currentUnit),
   { label: t("dashboard.bytes"), value: "bytes" },
   { label: t("dashboard.kilobytes"), value: "kilobytes" },
   { label: t("dashboard.megabytes"), value: "megabytes" },
@@ -215,36 +225,36 @@ export const getUnitOptions = (
 
 const localeDisplayName = (names: Intl.DisplayNames, tag: string): string => {
   try {
-    // DisplayNames rejects Unicode extensions such as the Arabic UI's `-u-nu-latn`.
-    return names.of(new Intl.Locale(tag).baseName) ?? tag;
+    // baseName drops Unicode extensions such as the Arabic UI's `-u-nu-latn`.
+    const { language, region, baseName } = new Intl.Locale(tag);
+    const name = names.of(language) ?? language;
+    const code = baseName.replaceAll("-", "_");
+    return region ? `${name} - ${region} (${code})` : `${name} (${code})`;
   } catch {
     return tag;
   }
 };
 
-/** Locale choices for the Locale Format unit: Auto (null) first, then every locale this browser supports. */
-export const getUnitLocaleOptions = (
-  t: TranslateFn,
-  current?: string | null,
-): Array<{ label: I18nText; value: string | null }> => {
-  const currentTag = toSupportedNumberLocale(current);
-  const tags = currentTag ? [...new Set([...NUMBER_LOCALE_TAGS, currentTag])] : NUMBER_LOCALE_TAGS;
+/** Locale Format pinned to each offered locale, labelled like "English - US (en_US)" in the viewer's language and sorted. */
+const getPinnedLocaleOptions = (currentUnit?: string | null): UnitOption[] => {
+  const current = toSupportedNumberLocale(localeFromUnit(currentUnit));
+  const tags = current ? [...new Set([...NUMBER_LOCALE_TAGS, current])] : NUMBER_LOCALE_TAGS;
   const names = new Intl.DisplayNames([getNumberLocale()], { type: "language" });
 
-  const locales = tags
+  return tags
     .map((tag) => toSupportedNumberLocale(tag))
     .filter((tag): tag is string => tag !== null)
-    .map((tag) => ({ label: raw(localeDisplayName(names, tag)), value: tag }))
+    .map((tag) => ({
+      label: raw(localeDisplayName(names, tag)),
+      value: toLocaleUnit(tag),
+      parentValue: OTHER_LOCALE_KEY,
+    }))
     .sort((a, b) => a.label.localeCompare(b.label));
-
-  return [{ label: t("dashboard.unitLocaleAuto"), value: null }, ...locales];
 };
 
 /** i18n-bound option lists for the formatting controls. */
 export const useColumnFormattingOptions = () => {
   const { t } = useI18nTyped();
-
-  const unitOptions = getUnitOptions(t);
 
   const fieldTypeOptions = [
     { value: "auto", label: t("dashboard.auto") },
@@ -270,7 +280,6 @@ export const useColumnFormattingOptions = () => {
   ];
 
   return {
-    unitOptions,
     fieldTypeOptions,
     alignOptions,
     conditionOperators,

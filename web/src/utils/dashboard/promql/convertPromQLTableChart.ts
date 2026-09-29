@@ -110,12 +110,7 @@ export class TableConverter implements PromQLChartConverter {
       if (mapped != null) return mapped;
       const unitToUse = unitConfigMap[colNameLower]?.unit || config?.unit;
       const customUnitToUse = unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
-      const localeToUse = unitConfigMap[colNameLower]?.unit
-        ? unitConfigMap[colNameLower].unitLocale
-        : config?.unit_locale;
-      return formatUnitValue(
-        getUnitValue(val, unitToUse, customUnitToUse, config?.decimals, localeToUse),
-      );
+      return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
     };
 
     // `mono` on the timestamp and value columns matches the rule the SQL table

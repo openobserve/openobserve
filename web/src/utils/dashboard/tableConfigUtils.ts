@@ -275,7 +275,6 @@ export interface ColorConfig {
 export interface UnitConfig {
   unit: string;
   customUnit: string;
-  unitLocale: string;
 }
 
 export interface ColumnStyleConfig {
@@ -322,7 +321,6 @@ export const parseOverrideConfigs = (overrideConfigs: any[] | undefined): Overri
           unitConfigMap[aliasLower] = {
             unit: cfg.value?.unit ?? "",
             customUnit: cfg.value?.customUnit ?? "",
-            unitLocale: cfg.value?.unitLocale ?? "",
           };
           break;
         case OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR:
@@ -398,7 +396,6 @@ export const formatNumericValue = (
   customUnit: string | null | undefined,
   decimals: number,
   missingValue = "",
-  locale?: string | null,
 ): string => {
   if (val === null || val === undefined || val === "") return String(missingValue);
 
@@ -407,7 +404,7 @@ export const formatNumericValue = (
 
   // !Number.isNaN (not typeof number) so numeric strings format too.
   return !Number.isNaN(val)
-    ? `${formatUnitValue(getUnitValue(val, unit ?? "", customUnit ?? "", decimals, locale)) ?? 0}`
+    ? `${formatUnitValue(getUnitValue(val, unit ?? "", customUnit ?? "", decimals)) ?? 0}`
     : val;
 };
 
@@ -430,7 +427,6 @@ export interface MetricStyleOptions {
   customUnit: string | null | undefined;
   decimals: number | null | undefined;
   panelBackground: string;
-  locale?: string | null;
 }
 
 /**
@@ -444,7 +440,7 @@ export const resolveMetricValueStyle = (
   rawValue: unknown,
   opts: MetricStyleOptions,
 ): ResolvedMetricStyle => {
-  const { mappings, unit, customUnit, decimals, panelBackground, locale } = opts;
+  const { mappings, unit, customUnit, decimals, panelBackground } = opts;
   const cache = buildValueMappingCache(mappings);
   let mapping = lookupValueMappingFull(rawValue, cache);
 
@@ -463,7 +459,7 @@ export const resolveMetricValueStyle = (
     }
   }
 
-  const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2, "", locale);
+  const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
   const mappedText = mapping?.text;
   const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
   const textColor = mapping?.textColor || undefined;

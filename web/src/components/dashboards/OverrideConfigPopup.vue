@@ -301,10 +301,6 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    panelUnitLocale: {
-      type: String,
-      default: "",
-    },
     panelDecimals: {
       type: Number,
       default: 2,
@@ -408,7 +404,6 @@ export default defineComponent({
           if (prevType !== undefined && prevType !== c.fieldType && !isNumericColumn(c)) {
             c.unit = null;
             c.customUnit = null;
-            c.unitLocale = null;
             c.conditions = [];
           }
         });
@@ -431,12 +426,8 @@ export default defineComponent({
         const cache = buildValueMappingCache(props.valueMapping);
         const unit = maps.unitConfigMap[aliasLower]?.unit || props.panelUnit;
         const customUnit = maps.unitConfigMap[aliasLower]?.customUnit || props.panelUnitCustom;
-        const locale = maps.unitConfigMap[aliasLower]?.unit
-          ? maps.unitConfigMap[aliasLower].unitLocale
-          : props.panelUnitLocale;
         const decimals = props.panelDecimals ?? 2;
-        c.format = (val: any) =>
-          formatNumericValue(val, cache, unit, customUnit, decimals, "", locale);
+        c.format = (val: any) => formatNumericValue(val, cache, unit, customUnit, decimals);
       }
       return c;
     };

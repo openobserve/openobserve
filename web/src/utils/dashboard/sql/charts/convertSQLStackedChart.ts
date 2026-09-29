@@ -44,7 +44,6 @@ export function applyStackedChart(ctx: SQLContext): void {
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
               panelSchema.config?.decimals,
-              panelSchema.config?.unit_locale,
             ),
           );
         return params?.value?.toString();

@@ -942,7 +942,7 @@ describe("ConfigPanel", () => {
     });
   });
 
-  describe("Locale Format locale selector", () => {
+  describe("Locale Format in the Unit dropdown", () => {
     const makePanel = (config: Record<string, unknown>) =>
       reactive({
         ...mockDashboardPanelData,
@@ -951,43 +951,53 @@ describe("ConfigPanel", () => {
           config: { ...mockDashboardPanelData.data.config, ...config },
         },
       });
-    const findSelect = (dataTest: string) =>
+    const unitSelect = () =>
       wrapper
         .findAllComponents({ name: "OSelect" })
-        .find((c: any) => c.vm.$attrs["data-test"] === dataTest);
-    const trigger = () => wrapper.find('[data-test="dashboard-config-unit-locale-trigger"]');
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-config-unit");
+    const trigger = () => wrapper.find('[data-test="dashboard-config-unit-trigger"]');
 
-    it("renders only when the unit is Locale Format", () => {
-      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "bytes" }) });
-      expect(trigger().exists()).toBe(false);
-      wrapper.unmount();
-
-      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "locale" }) });
-      expect(trigger().exists()).toBe(true);
+    it("nests the locales under the expandable Other Locale row", () => {
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: null }) });
+      const select = unitSelect();
+      expect(select.props("collapsibleGroups")).toBe(false);
+      const options = select.props("options");
+      expect(options).toContainEqual(
+        expect.objectContaining({ label: "Locale Format (Auto)", value: "locale" }),
+      );
+      expect(options).toContainEqual(
+        expect.objectContaining({ label: "Other Locale", value: "other-locale", expandable: true }),
+      );
+      expect(options).toContainEqual(
+        expect.objectContaining({
+          label: "Czech - CZ (cs_CZ)",
+          value: "locale:cs-CZ",
+          parentValue: "other-locale",
+        }),
+      );
+      expect(options.some((o: any) => o.header)).toBe(false);
     });
 
-    it.each([null, "xx-ZZ"])("shows Auto when the stored locale is %j", (unitLocale) => {
-      wrapper = createWrapper({
-        dashboardPanelData: makePanel({ unit: "locale", unit_locale: unitLocale }),
-      });
-      expect(trigger().attributes("data-test-selected-label")).toBe("Auto (viewer's language)");
-    });
-
-    it("does not read the locale from unit_custom", () => {
-      wrapper = createWrapper({
-        dashboardPanelData: makePanel({ unit: "locale", unit_custom: "cs-CZ", unit_locale: null }),
-      });
-      expect(trigger().attributes("data-test-selected-label")).toBe("Auto (viewer's language)");
-    });
-
-    it("writes the chosen locale to unit_locale and leaves unit_custom alone", async () => {
-      const panel = makePanel({ unit: "locale", unit_custom: "req/s", unit_locale: null });
+    it("saves a picked locale in the unit and leaves unit_custom alone", async () => {
+      const panel = makePanel({ unit: "locale", unit_custom: "req/s" });
       wrapper = createWrapper({ dashboardPanelData: panel });
-      await findSelect("dashboard-config-unit-locale").vm.$emit("update:modelValue", "cs-CZ");
-      expect(panel.data.config.unit_locale).toBe("cs-CZ");
+      await unitSelect().vm.$emit("update:modelValue", "locale:cs-CZ");
+      expect(panel.data.config.unit).toBe("locale:cs-CZ");
       expect(panel.data.config.unit_custom).toBe("req/s");
       await flushPromises();
-      expect(trigger().attributes("data-test-selected-label")).toBe("Czech (Czechia)");
+      expect(trigger().attributes("data-test-selected-label")).toBe("Czech - CZ (cs_CZ)");
+    });
+
+    it("shows Auto for the plain Locale Format unit", () => {
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "locale" }) });
+      expect(trigger().attributes("data-test-selected-label")).toBe("Locale Format (Auto)");
+    });
+
+    it("keeps an unlisted pinned locale selectable", () => {
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "locale:sl-SI" }) });
+      expect(unitSelect().props("options")).toContainEqual(
+        expect.objectContaining({ value: "locale:sl-SI" }),
+      );
     });
   });
   describe("Table Configuration Options", () => {

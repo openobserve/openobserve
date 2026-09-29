@@ -28,7 +28,9 @@ import {
   getNumberLocale,
   APP_LOCALE_TO_BCP47,
   NUMBER_LOCALE_TAGS,
+  localeFromUnit,
   resolveNumberLocale,
+  toLocaleUnit,
   toSupportedNumberLocale,
 } from "@/locales/numberFormat";
 import { applyDocumentLocale, getLocale, isRtlLocale, localeFileMap } from "@/locales";
@@ -166,6 +168,18 @@ describe("panel-chosen number locale", () => {
     expect(NUMBER_LOCALE_TAGS).toEqual(expect.arrayContaining(["cs-CZ", "hi-IN"]));
     expect(new Set(NUMBER_LOCALE_TAGS).size).toBe(NUMBER_LOCALE_TAGS.length);
   });
+
+  it("round-trips a locale through a pinned unit value", () => {
+    expect(toLocaleUnit("cs-CZ")).toBe("locale:cs-CZ");
+    expect(localeFromUnit(toLocaleUnit("ar-SA-u-nu-latn"))).toBe("ar-SA-u-nu-latn");
+  });
+
+  it.each(["locale", "bytes", "custom", "", null, undefined])(
+    "finds no pinned locale in the unit %j",
+    (unit) => {
+      expect(localeFromUnit(unit)).toBeNull();
+    },
+  );
 });
 
 describe("navigator language detection", () => {

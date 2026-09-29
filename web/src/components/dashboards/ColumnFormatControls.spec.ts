@@ -23,7 +23,7 @@ import {
 } from "@/composables/dashboard/useColumnFormatting";
 import i18n from "@/locales";
 
-describe("ColumnFormatControls – Locale Format locale", () => {
+describe("ColumnFormatControls – Locale Format in the Unit dropdown", () => {
   let wrapper: any;
 
   afterEach(() => {
@@ -38,32 +38,38 @@ describe("ColumnFormatControls – Locale Format locale", () => {
     });
     return col;
   };
-  const findSelect = (dataTest: string) =>
+  const unitSelect = () =>
     wrapper
       .findAllComponents({ name: "OSelect" })
-      .find((c: any) => c.vm.$attrs["data-test"] === dataTest);
-  const trigger = () => wrapper.find('[data-test="o2-format-unit-locale-amount-trigger"]');
+      .find((c: any) => c.vm.$attrs["data-test"] === "o2-format-unit-amount");
 
-  it("shows the locale selector only for the Locale Format unit", () => {
-    mountWith({ unit: "bytes" });
-    expect(trigger().exists()).toBe(false);
-    wrapper.unmount();
-
-    mountWith({ unit: "locale" });
-    expect(trigger().exists()).toBe(true);
-    expect(trigger().attributes("data-test-selected-label")).toBe("Auto (viewer's language)");
+  it("nests the locales under the expandable Other Locale row", () => {
+    mountWith({ unit: null });
+    const options = unitSelect().props("options");
+    expect(options).toContainEqual(
+      expect.objectContaining({ label: "Other Locale", value: "other-locale", expandable: true }),
+    );
+    expect(options).toContainEqual(
+      expect.objectContaining({
+        label: "Hindi - IN (hi_IN)",
+        value: "locale:hi-IN",
+        parentValue: "other-locale",
+      }),
+    );
   });
 
-  it("writes the chosen locale to unitLocale and leaves customUnit alone", async () => {
+  it("saves a picked locale in the column unit and leaves customUnit alone", async () => {
     const col = mountWith({ unit: "locale", customUnit: "req/s" });
-    await findSelect("o2-format-unit-locale-amount").vm.$emit("update:modelValue", "hi-IN");
+    await unitSelect().vm.$emit("update:modelValue", "locale:hi-IN");
     await flushPromises();
-    expect(col.unitLocale).toBe("hi-IN");
+    expect(col.unit).toBe("locale:hi-IN");
     expect(col.customUnit).toBe("req/s");
   });
 
-  it("does not read the locale from customUnit", () => {
-    mountWith({ unit: "locale", customUnit: "cs-CZ" });
-    expect(trigger().attributes("data-test-selected-label")).toBe("Auto (viewer's language)");
+  it("keeps an unlisted pinned locale selectable", () => {
+    mountWith({ unit: "locale:sl-SI" });
+    expect(unitSelect().props("options")).toContainEqual(
+      expect.objectContaining({ value: "locale:sl-SI" }),
+    );
   });
 });

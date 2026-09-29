@@ -18,45 +18,76 @@ import type { TranslateFn } from "@/types/i18n";
 import {
   emptyColumnOverride,
   emptyConditionalRule,
-  getUnitLocaleOptions,
+  getUnitOptions,
   serializeColumnOverride,
   serializeOverrides,
   loadAllFromRaw,
   type ColumnOverrideUI,
 } from "./useColumnFormatting";
 
-describe("getUnitLocaleOptions", () => {
+describe("getUnitOptions", () => {
   const t = ((key: string) => key) as unknown as TranslateFn;
+  const pinned = (current?: string | null) =>
+    getUnitOptions(t, current).filter((o) => o.parentValue === "other-locale");
 
-  it("puts Auto first with a null value", () => {
-    expect(getUnitLocaleOptions(t)[0]).toEqual({ label: "dashboard.unitLocaleAuto", value: null });
+  it("keeps Locale Format as the plain Auto option", () => {
+    expect(getUnitOptions(t)).toContainEqual({ label: "dashboard.localeFormat", value: "locale" });
   });
 
-  it("offers locales that have no UI translation, labelled by name only", () => {
-    const options = getUnitLocaleOptions(t);
-    expect(options.find((o) => o.value === "cs-CZ")?.label).toBe("Czech (Czechia)");
-    expect(options.some((o) => o.value === "hi-IN")).toBe(true);
+  it("follows Auto with the expandable Other Locale row, its locales, then Bytes", () => {
+    const options = getUnitOptions(t);
+    const values = options.map((o) => o.value);
+    const rowIndex = values.indexOf("other-locale");
+    const pinnedCount = pinned().length;
+    expect(options[rowIndex]).toEqual({
+      label: "dashboard.otherLocale",
+      value: "other-locale",
+      expandable: true,
+    });
+    expect(values[rowIndex - 1]).toBe("locale");
+    expect(values.slice(rowIndex + 1, rowIndex + 1 + pinnedCount)).toEqual(
+      pinned().map((o) => o.value),
+    );
+    expect(values[rowIndex + 1 + pinnedCount]).toBe("bytes");
+    expect(values.at(-1)).toBe("custom");
+    expect(options.filter((o) => o.expandable)).toHaveLength(1);
+  });
+
+  it("uses no group headers", () => {
+    expect(getUnitOptions(t).some((o) => "header" in o)).toBe(false);
+  });
+
+  it("pins each nested locale in the unit value, named as language - country (code)", () => {
+    const czech = pinned().find((o) => o.value === "locale:cs-CZ");
+    expect(czech?.label).toBe("Czech - CZ (cs_CZ)");
+    expect(pinned().some((o) => o.value === "locale:hi-IN")).toBe(true);
+    expect(pinned().every((o) => String(o.value).startsWith("locale:"))).toBe(true);
   });
 
   it("names the Arabic UI locale despite its Unicode extension", () => {
-    const ar = getUnitLocaleOptions(t).find((o) => o.value === "ar-SA-u-nu-latn");
-    expect(ar?.label).toBe("Arabic (Saudi Arabia)");
+    expect(pinned().find((o) => o.value === "locale:ar-SA-u-nu-latn")?.label).toBe(
+      "Arabic - SA (ar_SA)",
+    );
   });
 
-  it("gives every locale a distinct name", () => {
-    const labels = getUnitLocaleOptions(t).map((o) => o.label);
+  it("gives every nested locale a distinct name", () => {
+    const labels = pinned().map((o) => o.label);
     expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it("appends a valid chosen locale that is not in the list", () => {
-    const options = getUnitLocaleOptions(t, "sl-SI");
-    expect(options.filter((o) => o.value === "sl-SI")).toHaveLength(1);
-    expect(options).toHaveLength(getUnitLocaleOptions(t).length + 1);
+  it("appends a valid pinned locale that is not in the list", () => {
+    const options = getUnitOptions(t, "locale:sl-SI");
+    expect(options.filter((o) => o.value === "locale:sl-SI")).toHaveLength(1);
+    expect(pinned("locale:sl-SI").some((o) => o.value === "locale:sl-SI")).toBe(true);
+    expect(options).toHaveLength(getUnitOptions(t).length + 1);
   });
 
-  it.each(["cs-CZ", "req/s", "xx-ZZ", null])("adds no entry for chosen locale %j", (current) => {
-    expect(getUnitLocaleOptions(t, current)).toHaveLength(getUnitLocaleOptions(t).length);
-  });
+  it.each(["locale:cs-CZ", "locale:xx-ZZ", "locale", "bytes", null])(
+    "adds no entry for the current unit %j",
+    (current) => {
+      expect(getUnitOptions(t, current)).toHaveLength(getUnitOptions(t).length);
+    },
+  );
 });
 
 describe("useColumnFormatting", () => {
@@ -67,7 +98,6 @@ describe("useColumnFormatting", () => {
         fieldType: "auto",
         unit: null,
         customUnit: null,
-        unitLocale: null,
         alignment: null,
         textColor: null,
         bgColor: null,
@@ -98,7 +128,6 @@ describe("useColumnFormatting", () => {
         fieldType: "auto", // detect
         unit: null, // "Default"
         customUnit: null,
-        unitLocale: null,
         alignment: null, // "None"
         textColor: null, // None swatch
         bgColor: null, // None swatch
@@ -130,23 +159,6 @@ describe("useColumnFormatting", () => {
       const col = { ...emptyColumnOverride("x"), unit: "bytes" };
       const entry = serializeColumnOverride(col);
       expect(entry.config).toEqual([{ type: "unit", value: { unit: "bytes", customUnit: null } }]);
-    });
-
-    it("persists the locale only for the Locale Format unit", () => {
-      const locale = serializeColumnOverride({
-        ...emptyColumnOverride("x"),
-        unit: "locale",
-        unitLocale: "cs-CZ",
-      });
-      expect(locale.config).toEqual([
-        { type: "unit", value: { unit: "locale", customUnit: null, unitLocale: "cs-CZ" } },
-      ]);
-      const stale = serializeColumnOverride({
-        ...emptyColumnOverride("x"),
-        unit: "bytes",
-        unitLocale: "cs-CZ",
-      });
-      expect(stale.config).toEqual([{ type: "unit", value: { unit: "bytes", customUnit: null } }]);
     });
 
     it("drops conditional rules with a blank/non-numeric threshold or no operator", () => {
@@ -191,7 +203,6 @@ describe("useColumnFormatting", () => {
         fieldType: "num",
         unit: "bytes",
         customUnit: "",
-        unitLocale: null,
         alignment: "center",
         textColor: "#111827",
         bgColor: "#f3f4f6",
@@ -215,9 +226,12 @@ describe("useColumnFormatting", () => {
       expect(loadAllFromRaw([entry])[0]).toEqual(original);
     });
 
-    it("round-trips a Locale Format locale", () => {
-      const original = { ...emptyColumnOverride("c"), unit: "locale", unitLocale: "hi-IN" };
+    it("round-trips a pinned Locale Format unit", () => {
+      const original = { ...emptyColumnOverride("c"), unit: "locale:hi-IN" };
       const entry = serializeColumnOverride(original);
+      expect(entry.config).toEqual([
+        { type: "unit", value: { unit: "locale:hi-IN", customUnit: null } },
+      ]);
       expect(loadAllFromRaw([entry])[0]).toEqual(original);
     });
   });

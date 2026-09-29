@@ -252,13 +252,7 @@ export function buildSQLContext(
     const configured = panelSchema?.config?.decimals ?? 2;
     const format = (v: number, decimals: number) =>
       formatUnitValue(
-        getUnitValue(
-          v,
-          panelSchema?.config?.unit,
-          panelSchema?.config?.unit_custom,
-          decimals,
-          panelSchema?.config?.unit_locale,
-        ),
+        getUnitValue(v, panelSchema?.config?.unit, panelSchema?.config?.unit_custom, decimals),
       );
     try {
       const usesStackExtent =
@@ -498,7 +492,6 @@ export function buildSQLContext(
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
                       panelSchema.config?.decimals,
-                      panelSchema.config?.unit_locale,
                     ),
                   );
 
@@ -521,7 +514,6 @@ export function buildSQLContext(
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
                     panelSchema.config?.decimals,
-                    panelSchema.config?.unit_locale,
                   ),
                 );
               for (
@@ -588,7 +580,6 @@ export function buildSQLContext(
                         panelSchema.config?.unit,
                         panelSchema.config?.unit_custom,
                         panelSchema.config?.decimals,
-                        panelSchema.config?.unit_locale,
                       ),
                     ),
                   )} </strong>`,
@@ -603,7 +594,6 @@ export function buildSQLContext(
                         panelSchema.config?.unit,
                         panelSchema.config?.unit_custom,
                         panelSchema.config?.decimals,
-                        panelSchema.config?.unit_locale,
                       ),
                     ),
                   )}`,
@@ -733,7 +723,6 @@ export function buildSQLContext(
                 panelSchema?.config?.unit,
                 panelSchema?.config?.unit_custom,
                 yAxisTickDecimals,
-                panelSchema?.config?.unit_locale,
               ),
             );
           } catch (error) {

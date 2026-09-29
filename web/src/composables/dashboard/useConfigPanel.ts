@@ -208,10 +208,6 @@ export function useConfigPanel(
         label: t("dashboard.customunitLabel"),
         visible: dashboardPanelData.data.config.unit === "custom",
       },
-      "unit-locale": {
-        label: t("dashboard.unitLocaleLabel"),
-        visible: dashboardPanelData.data.config.unit === "locale",
-      },
       decimals: { label: t("dashboard.decimals") },
       limit: {
         label: t("dashboard.queryLimit"),

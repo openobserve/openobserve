@@ -309,27 +309,27 @@ describe("Dashboard Data Conversion Utils", () => {
         expect(result.unit).toBe("");
       });
 
-      it("should use the panel's chosen locale over the viewer's language", () => {
-        expect(getUnitValue(14158, "locale", "", 2, "cs-CZ")).toEqual({
+      it("should use a pinned locale unit over the viewer's language", () => {
+        expect(getUnitValue(14158, "locale:cs-CZ", "", 2)).toEqual({
           value: "14\u00a0158,00",
           unit: "",
         });
-        expect(getUnitValue(14158, "locale", "", 2, "de-DE").value).toBe("14.158,00");
+        expect(getUnitValue(14158, "locale:de-DE", "", 2).value).toBe("14.158,00");
       });
 
-      it.each([null, undefined, "", "xx-ZZ", "not a locale!!"])(
-        "should treat panel locale %j as Auto",
-        (locale) => {
-          expect(getUnitValue(1234567.89, "locale", "", 2, locale).value).toBe("1,234,567.89");
+      it("should respect decimals for a pinned locale unit", () => {
+        expect(getUnitValue(1234.5, "locale:de-DE", "", 0).value).toBe("1.235");
+      });
+
+      it.each(["locale:", "locale:xx-ZZ", "locale:not a locale!!"])(
+        "should treat the unusable pinned unit %j as Auto",
+        (unit) => {
+          expect(getUnitValue(1234567.89, unit, "", 2).value).toBe("1,234,567.89");
         },
       );
 
       it("should not read the locale from the custom unit", () => {
         expect(getUnitValue(1234567.89, "locale", "de-DE", 2).value).toBe("1,234,567.89");
-      });
-
-      it("should ignore the locale for other units", () => {
-        expect(getUnitValue(1024, "bytes", "", 2, "de-DE")).toEqual({ value: "1.00", unit: "KB" });
       });
     });
 

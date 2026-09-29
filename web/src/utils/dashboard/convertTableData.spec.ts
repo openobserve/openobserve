@@ -16,7 +16,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convertTableData, convertMultiQueryTableData } from "@/utils/dashboard/convertTableData";
 import { isTimeSeries, isTimeStamp } from "@/utils/dashboard/dateTimeUtils";
-import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 // Mock external dependencies
 vi.mock("date-fns-tz", () => ({
@@ -173,50 +172,6 @@ describe("convertTableData", () => {
 
     expect(result.columns[1]).toHaveProperty("format");
     expect(typeof result.columns[1].format).toBe("function");
-  });
-
-  it("should pass the Locale Format locale from the panel and from a column override", () => {
-    const rows = [[{ timestamp: "2023-01-01T00:00:00", value: 1234.5 }]];
-
-    const panelLevel = {
-      ...mockPanelSchema,
-      config: { ...mockPanelSchema.config, unit: "locale", unit_locale: "de-DE" },
-    };
-    convertTableData(panelLevel, rows, mockStore).columns[1].format(1234.5);
-    expect(getUnitValue).toHaveBeenLastCalledWith(1234.5, "locale", "", 2, "de-DE");
-
-    const columnLevel = {
-      ...mockPanelSchema,
-      config: {
-        ...mockPanelSchema.config,
-        unit_locale: "de-DE",
-        override_config: [
-          {
-            field: { value: "value" },
-            config: [{ type: "unit", value: { unit: "locale", unitLocale: "cs-CZ" } }],
-          },
-        ],
-      },
-    };
-    convertTableData(columnLevel, rows, mockStore).columns[1].format(1234.5);
-    expect(getUnitValue).toHaveBeenLastCalledWith(1234.5, "locale", "", 2, "cs-CZ");
-  });
-
-  it("should keep a column's own Auto locale instead of the panel's locale", () => {
-    const rows = [[{ timestamp: "2023-01-01T00:00:00", value: 1234.5 }]];
-    const schema = {
-      ...mockPanelSchema,
-      config: {
-        ...mockPanelSchema.config,
-        unit: "locale",
-        unit_locale: "de-DE",
-        override_config: [
-          { field: { value: "value" }, config: [{ type: "unit", value: { unit: "locale" } }] },
-        ],
-      },
-    };
-    convertTableData(schema, rows, mockStore).columns[1].format(1234.5);
-    expect(getUnitValue).toHaveBeenLastCalledWith(1234.5, "locale", "", 2, "");
   });
 
   it("should handle override_config with invalid structure", () => {

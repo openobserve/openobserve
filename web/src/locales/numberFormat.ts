@@ -62,8 +62,17 @@ export const NUMBER_LOCALE_TAGS: readonly string[] = [
     "ro-RO",
     "bg-BG",
     "hr-HR",
+    "ur-PK",
+    "fa-IR",
+    "fil-PH",
+    "ms-MY",
+    "sw-TZ",
+    "sr-RS",
   ]),
 ];
+
+// The Locale Format unit pinned to one locale is saved as the unit itself, e.g. "locale:cs-CZ".
+const LOCALE_UNIT_PREFIX = "locale:";
 
 // Resolve the active app language without importing the i18n instance, so
 // widely-used utils don't pull `createI18n` into their import graph (which
@@ -100,3 +109,12 @@ export const toSupportedNumberLocale = (tag?: string | null): string | null => {
 /** Resolves a panel's chosen locale; empty or unusable values mean Auto (the viewer's UI language). */
 export const resolveNumberLocale = (tag?: string | null): string =>
   toSupportedNumberLocale(tag) ?? getNumberLocale();
+
+/** Unit value for the Locale Format unit pinned to `tag`. */
+export const toLocaleUnit = (tag: string): string => `${LOCALE_UNIT_PREFIX}${tag}`;
+
+/** The locale tag of a pinned Locale Format unit, or null for any other unit. */
+export const localeFromUnit = (unit?: string | null): string | null =>
+  typeof unit === "string" && unit.startsWith(LOCALE_UNIT_PREFIX)
+    ? unit.slice(LOCALE_UNIT_PREFIX.length)
+    : null;
