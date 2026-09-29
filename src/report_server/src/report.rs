@@ -156,7 +156,10 @@ pub async fn generate_report(
 
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
-        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+        dashb_vars = format!(
+            "{dashb_vars}&{}",
+            format_dashb_var(&variable.key, &variable.value)
+        );
     }
 
     if dashboard.tabs.is_empty() {
@@ -390,6 +393,16 @@ pub async fn generate_report(
     }
 
     Ok((pdf_data, email_dashb_url))
+}
+
+/// Percent-encodes the key and value so a variable containing `&`, `#` or `"` cannot inject
+/// extra query parameters or break out of the dashboard URL.
+fn format_dashb_var(key: &str, value: &str) -> String {
+    format!(
+        "var-{}={}",
+        urlencoding::encode(key),
+        urlencoding::encode(value)
+    )
 }
 
 /// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
@@ -701,9 +714,20 @@ mod tests {
 
         let mut dashb_vars = "".to_string();
         for variable in variables.iter() {
-            dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+            dashb_vars = format!(
+                "{dashb_vars}&{}",
+                format_dashb_var(&variable.key, &variable.value)
+            );
         }
 
         assert_eq!(dashb_vars, "&var-env=prod&var-region=us-west");
+    }
+
+    #[test]
+    fn test_format_dashb_var_encodes_special_characters() {
+        let encoded = format_dashb_var("k", "a&b#c\"d");
+        assert_eq!(encoded, "var-k=a%26b%23c%22d");
+        let decoded_value = urlencoding::decode(encoded.strip_prefix("var-k=").unwrap()).unwrap();
+        assert_eq!(decoded_value, "a&b#c\"d");
     }
 }
