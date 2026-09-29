@@ -385,7 +385,7 @@ pub async fn validate_credentials(
     method: &Method,
     from_session: bool,
 ) -> Result<TokenValidationResponse, AuthError> {
-    // A NULL `password_ext` or an empty token is blank, so blank input must never be compared.
+    // A blank credential must never reach a comparison with a token that may be stored blank.
     if user_password.is_empty() {
         return Ok(TokenValidationResponse::default());
     }
@@ -708,10 +708,6 @@ pub async fn validate_credentials(
     let password_check: PasswordCheck =
         enforce_lockout_and_compare_password(&user.email, !user.is_external, || {
             user.password.eq(&get_hash(user_password, &user.salt))
-                || user
-                    .password_ext
-                    .as_deref()
-                    .is_some_and(|ext| !ext.is_empty() && ext == user_password)
         })
         .await;
     // A lockout is the one refusal that carries an answer, so it is the one that does not collapse
@@ -2094,6 +2090,19 @@ mod tests {
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
+        let stored_ext = get_hash(pwd, &get_config().auth.ext_auth_salt);
+        for (path, method) in [
+            ("default/_bulk", Method::POST),
+            ("default/streams", Method::GET),
+        ] {
+            assert!(
+                !validate_credentials(init_user, &stored_ext, path, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "the stored password_ext must not work as a password on {method} /{path}"
+            );
+        }
 
         exercise_empty_password_rejected(org_id).await;
 
@@ -2102,7 +2111,13 @@ mod tests {
     }
 
     // NULL `password_ext`, exactly as the SRE-agent service-account migration writes it.
-    async fn seed_user_without_password_ext(org_id: &str, email: &str, role: UserRole, pwd: &str) {
+    async fn seed_user_without_password_ext(
+        org_id: &str,
+        email: &str,
+        role: UserRole,
+        pwd: &str,
+        token: &str,
+    ) {
         let salt = "no-ext-salt";
         infra::table::users::add(infra::table::users::UserRecord {
             email: email.to_string(),
@@ -2122,7 +2137,7 @@ mod tests {
         })
         .await
         .unwrap();
-        db::org_users::add_with_flags(org_id, email, role, &format!("tok-{email}"), None, true)
+        db::org_users::add_with_flags(org_id, email, role, token, None, true)
             .await
             .unwrap();
     }
@@ -2132,8 +2147,11 @@ mod tests {
         let pwd = "Complexpass#123";
         let sre_agent = "o2-sre-agent.org-default@openobserve.internal";
         let plain_user = "no-ext-user@example.com";
-        seed_user_without_password_ext(org_id, sre_agent, UserRole::SreAgent, pwd).await;
-        seed_user_without_password_ext(org_id, plain_user, UserRole::Admin, pwd).await;
+        let blank_token_sa = "blank-token-sa@example.com";
+        seed_user_without_password_ext(org_id, sre_agent, UserRole::SreAgent, pwd, "sre-tok").await;
+        seed_user_without_password_ext(org_id, plain_user, UserRole::Admin, pwd, "user-tok").await;
+        seed_user_without_password_ext(org_id, blank_token_sa, UserRole::ServiceAccount, pwd, "")
+            .await;
 
         assert!(
             validate_credentials(plain_user, pwd, "default/streams", &Method::GET, false)
@@ -2143,7 +2161,7 @@ mod tests {
             "the seeded user must still sign in with its real password"
         );
         let mut accepted = vec![];
-        for email in [sre_agent, plain_user] {
+        for email in [sre_agent, plain_user, blank_token_sa] {
             for (path, method) in [
                 ("default/streams", Method::GET),
                 ("default/_search", Method::POST),
