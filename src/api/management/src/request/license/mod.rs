@@ -110,7 +110,16 @@ fn redact(license: &str) -> String {
     )
 }
 
-pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> Response {
+// the instance id is also the default internal gRPC token
+fn visible_installation_id(user_id: &str) -> String {
+    if db::user::is_root_user(user_id) {
+        config::get_instance_id()
+    } else {
+        String::new()
+    }
+}
+
+pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
     // we want anyone to be able to see the license info, so we bypass
@@ -129,7 +138,7 @@ pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> Response {
     let res = LicenseResponse {
         key,
         license,
-        installation_id: config::get_instance_id(),
+        installation_id: visible_installation_id(&email.user_id),
         expired: license_expired().await,
         ingestion_exceeded: ingestion_limit_exceeded_count(),
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
@@ -176,5 +185,42 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
     match license::update().await {
         Ok(_) => (StatusCode::OK, Json("")).into_response(),
         Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::{DEFAULT_ORG, meta::user::UserRole};
+    use infra::table::org_users::OrgUserRecord;
+
+    use super::*;
+
+    fn join_default_org(email: &str, role: UserRole) {
+        common::infra::config::ORG_USERS.insert(
+            format!("{DEFAULT_ORG}/{email}"),
+            OrgUserRecord {
+                role,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: DEFAULT_ORG.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    #[test]
+    fn test_installation_id_is_visible_to_root_only() {
+        config::cache_instance_id("license-instance");
+        join_default_org("license-root@example.com", UserRole::Root);
+        join_default_org("license-admin@example.com", UserRole::Admin);
+
+        assert_eq!(
+            visible_installation_id("license-root@example.com"),
+            "license-instance"
+        );
+        assert_eq!(visible_installation_id("license-admin@example.com"), "");
+        assert_eq!(visible_installation_id("nobody@example.com"), "");
     }
 }
