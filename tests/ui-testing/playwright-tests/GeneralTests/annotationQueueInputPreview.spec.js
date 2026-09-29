@@ -1,91 +1,15 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { itemFixture, stubWorkbenchApi } = require('../utils/queue-workbench-fixtures.js');
 
-// The Queue Workbench enqueues items with a server-side captured input preview,
-// but the public API exposes no way to seed a machine score / canned preview. So
-// the spec serves deterministic fixture responses via route interception and
-// asserts the real rendered DOM (routing, layout, OTab tree) against them.
-
-const ORG = () => process.env['ORGNAME'] || 'default';
-
-// Queue Workbench is enterprise-only — its route is absent on the OSS binary. Cache
-// availability so the ENT route is probed once, then skip immediately on OSS.
+// Queue Workbench captures the input preview server-side with no API to seed a canned
+// preview, so the spec stubs deterministic responses (see queue-workbench-fixtures.js)
+// and asserts the real rendered DOM. The feature is enterprise-only — its route is absent
+// on the OSS binary, so tests probe availability once and skip on OSS.
 const featureAvailable = {};
 const WORKBENCH_ENT_ONLY =
     'AI Queue Workbench is an enterprise-only feature — absent in the OSS build';
-
-function queueFixture(queueId) {
-    return {
-        id: queueId,
-        name: 'Fixture Queue',
-        description: null,
-        target_dataset_id: null,
-        target_dataset_name: null,
-        allowed_ref_types: ['trace', 'span', 'session'],
-        score_configs: [],
-        reviewed_count: 0,
-        total_count: 0,
-    };
-}
-
-function itemFixture({ id, refId, inputPreview }) {
-    return {
-        id,
-        queue_id: null,
-        queue_name: 'Fixture Queue',
-        ref_type: 'trace',
-        ref_id: refId,
-        ref_trace_id: null,
-        ref_trace_start_time: 1700000000000000,
-        input_preview: inputPreview,
-        status: 'pending',
-        reviewed_at: null,
-        archived_at: null,
-        created_at: 1700000000000000,
-        updated_at: 1700000000000000,
-    };
-}
-
-function detailFixture(item) {
-    return {
-        item,
-        source_stream: '',
-        content: { input: null, output: null, trace: [] },
-        machine_scores: [],
-        reviews: [],
-    };
-}
-
-async function stubWorkbenchApi(page, { queueId, items, detailItem }) {
-    const org = ORG();
-    const itemMap = new Map(items.map((it) => [it.id, it]));
-
-    await page.route(
-        (url) => url.pathname === `/api/${org}/annotation_queues/${queueId}`,
-        (route) => route.fulfill({ json: queueFixture(queueId) }),
-    );
-
-    await page.route(
-        (url) => url.pathname === `/api/${org}/annotation_queues/items`,
-        (route) => route.fulfill({ json: { list: items } }),
-    );
-
-    await page.route(
-        (url) => url.pathname === `/api/${org}/score_configs`,
-        (route) => route.fulfill({ json: { list: [] } }),
-    );
-
-    await page.route(
-        (url) => url.pathname.startsWith(`/api/${org}/annotation_queues/${queueId}/items/`),
-        (route) => {
-            const itemId = route.request().url().split('/').pop();
-            const item =
-                detailItem && detailItem.id === itemId ? detailItem : itemMap.get(itemId) || {};
-            return route.fulfill({ json: detailFixture(item) });
-        },
-    );
-}
 
 test.describe("LLM Annotation Queue Input Preview testcases", { tag: '@enterprise' }, () => {
     test.describe.configure({ mode: 'parallel' });
