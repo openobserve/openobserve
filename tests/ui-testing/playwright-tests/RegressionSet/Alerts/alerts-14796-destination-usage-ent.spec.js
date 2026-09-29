@@ -39,6 +39,8 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
   let createdDestinations = [];
   // Each entry is a { url } the afterEach DELETEs before the destinations it holds.
   let createdConsumers = [];
+  // Streams ingested as anomaly-detection fixtures; deleted in afterEach.
+  let createdStreams = [];
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -46,6 +48,7 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
     createdTemplates = [];
     createdDestinations = [];
     createdConsumers = [];
+    createdStreams = [];
     await seedAlertFixtures(page);
     await navigateToBase(page);
   });
@@ -62,6 +65,9 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
     }
     for (const name of createdTemplates) {
       await api(page, 'delete', `${v1}/alerts/templates/${name}`).catch(() => {});
+    }
+    for (const name of createdStreams) {
+      await pm.apiCleanup.deleteStream(name, 'logs').catch(() => {});
     }
   });
 
@@ -106,6 +112,7 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
     testLogger.info('Seeding a destination referenced only by an anomaly detection config');
     const destinationName = await seedDestination(page, 'e2e_14796_anom');
     const stream = uniq('e2e_14796_anom_stream');
+    createdStreams.push(stream);
     await api(page, 'post', `${v1}/${stream}/_json`, [{ level: 'error', latency: 10 }]);
 
     const configName = uniq('e2e_14796_anom_cfg');

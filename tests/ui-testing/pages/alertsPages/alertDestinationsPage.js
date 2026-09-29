@@ -2810,7 +2810,8 @@ export class AlertDestinationsPage {
     async expectUsedByBadgeCount(name, kind, count) {
         const badge = this.getUsedByBadge(name, kind);
         await expect(badge).toBeVisible({ timeout: 30000 });
-        await expect(badge).toContainText(String(count), { timeout: 15000 });
+        // Standalone-token match so a badge of "13"/"21" cannot satisfy a count of "1" (badge also holds an icon).
+        await expect(badge).toContainText(new RegExp(`(?:^|\\D)${count}(?:\\D|$)`), { timeout: 15000 });
     }
 
     async expectUnusedChipVisible(name) {
@@ -2864,7 +2865,7 @@ export class AlertDestinationsPage {
         await expect(this.getImpactBody()).toHaveCount(0, { timeout: 15000 }).catch(() => {});
     }
 
-    /** Click a destination's delete button and confirm — for the delete-guard (409) path. */
+    /** Click a destination's delete button and confirm (blocked-delete 409 or successful delete); asserts neither outcome. */
     async attemptDeleteDestination(name) {
         const deleteBtn = this.getDeleteDestinationBtn(name);
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
