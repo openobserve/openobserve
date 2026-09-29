@@ -3748,6 +3748,8 @@
     "logstash": "Logstash",
     "syslogNg": "Syslog-ng",
     "loongCollector": "LoongCollector",
+    "kinesisFirehose": "Kinesis Firehose",
+    "gcpLogs": "سجلات GCP عبر (Pub/Sub)",
     "metrics": {
       "prometheus": "Prometheus",
       "vmagent": "vmagent",

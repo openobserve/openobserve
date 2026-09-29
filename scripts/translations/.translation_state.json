@@ -9517,6 +9517,7 @@
     "fluentbit": "b6344fe6e6115ccf",
     "fluentd": "4f2c848b37c5a944",
     "gactions": "fae83bd48c808f08",
+    "gcpLogs": "c54590f981ee31f1",
     "generateRUMTokenLabel": "475c7f1c1a5cff60",
     "generateRUMTokenMessage": "ea76eb1e37cb811f",
     "header": "a22bd608ff67405e",
@@ -9649,6 +9650,7 @@
       }
     },
     "jenkins": "9a4d10e69361c7d6",
+    "kinesisFirehose": "d1e2ebf59ff37b7d",
     "languagesLabel": "73d87075dd9f09ac",
     "launchCloudFormationStack": "2e4bfaf27c788b70",
     "linuxUnixMacosManualInstall": "4cce8d7c825eec13",

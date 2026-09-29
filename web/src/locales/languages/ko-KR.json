@@ -3748,6 +3748,8 @@
     "logstash": "Logstash",
     "syslogNg": "Syslog-ng",
     "loongCollector": "LoongCollector",
+    "kinesisFirehose": "Kinesis Firehose",
+    "gcpLogs": "Pub/Sub을 통한 GCP 로그",
     "metrics": {
       "prometheus": "Prometheus",
       "vmagent": "vmagent",
