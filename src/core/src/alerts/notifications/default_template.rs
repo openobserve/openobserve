@@ -43,7 +43,7 @@ pub fn compiled_default_content() -> ContentSpec {
     ContentSpec {
         title: "[{alert_level}] {alert_name} on {stream_name}".into(),
         title_overrides: Default::default(),
-        body: "**{alert_name}** fired for stream **{stream_name}**.\n\n{alert_description}".into(),
+        body: "**{alert_name}** is {alert_status} for stream **{stream_name}**.\n\n{alert_description}".into(),
         fields: vec![
             ContentField {
                 label: "Threshold".into(),

@@ -19,6 +19,7 @@ pub mod agent;
 pub mod contact;
 pub mod policy;
 pub mod preset;
+pub mod rca;
 pub mod response;
 pub mod rotation;
 pub mod routing;
@@ -47,6 +48,7 @@ pub use preset::{
     PresetDescriptor, PresetError, PresetId, PresetInput, PresetInputKind, PresetSpec,
     RESTRICTED_PRIORITY, RegionGroup, build as build_preset, catalogue as preset_catalogue,
 };
+pub use rca::RcaContext;
 pub use response::{
     DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NoBlastRadius, PageDecision, ResolutionCause,
     ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState, UpstreamRecovery,
