@@ -38,7 +38,7 @@ describe("ModuleRail - structure", () => {
   it("always offers the summary above the modules", async () => {
     const wrapper = await mountRail([makeModule("logs")]);
 
-    expect(item(wrapper, "summary").exists()).toBe(true);
+    expect(wrapper.find(`[data-test="edit-role-module-rail-overview"]`).exists()).toBe(true);
   });
 
   it("renders one heading per group and one row per module", async () => {
@@ -175,7 +175,7 @@ describe("ModuleRail - granted scope", () => {
 
     await wrapper.find('[data-test="edit-role-module-rail-scope-granted"]').trigger("click");
 
-    expect(item(wrapper, "summary").exists()).toBe(true);
+    expect(wrapper.find(`[data-test="edit-role-module-rail-overview"]`).exists()).toBe(true);
   });
 
   it("counts the modules that hold grants on the scope control", async () => {

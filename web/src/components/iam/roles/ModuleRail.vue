@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="edit-role-module-rail-tabs"
         @update:model-value="(value) => emit('update:modelValue', value as string)"
       >
-        <OTab :name="SUMMARY_KEY" class="w-full" data-test="edit-role-module-rail-item-summary">
+        <OTab :name="SUMMARY_KEY" class="w-full" data-test="edit-role-module-rail-overview">
           <OIcon name="assignment" size="sm" class="o-tab__icon shrink-0" />
           <span class="o-tab__label truncate">{{ t("iam.editRole.moduleOverviewTitle") }}</span>
         </OTab>
