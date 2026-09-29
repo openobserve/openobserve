@@ -33,7 +33,9 @@ use o2_enterprise::enterprise::password_policy::lockout::{self, LoginAttemptOutc
 pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
-    auth::{AuthExtractor, SESSION_AUTH_MARKER, V2_API_PREFIX, get_hash, get_user_details},
+    auth::{
+        AuthExtractor, SESSION_AUTH_MARKER, V2_API_PREFIX, get_hash, get_user_details, try_get_hash,
+    },
     users,
 };
 
@@ -707,7 +709,7 @@ pub async fn validate_credentials(
     }
     let password_check: PasswordCheck =
         enforce_lockout_and_compare_password(&user.email, !user.is_external, || {
-            user.password.eq(&get_hash(user_password, &user.salt))
+            password_matches(user_password, &user.password, &user.salt)
         })
         .await;
     // A lockout is the one refusal that carries an answer, so it is the one that does not collapse
@@ -952,6 +954,11 @@ pub async fn validate_credentials_ext(
     Err(AuthError::Forbidden("Not allowed".to_string()))
 }
 
+// External users are stored without a salt: they have no password to match, and argon2 rejects it.
+fn password_matches(candidate: &str, stored_hash: &str, salt: &str) -> bool {
+    try_get_hash(candidate, salt).is_some_and(|hash| hash == stored_hash)
+}
+
 /// Presigned/`auth_ext` credential from `password_ext`, matching `generate_presigned_url`.
 fn password_ext_credential(
     password_ext: &str,
@@ -979,7 +986,7 @@ async fn validate_user_from_db(
             // Only this branch is a raw password guess; the password_ext branches below are not.
             let password_check = if req_time.is_none() {
                 enforce_lockout_and_compare_password(&user.email, !user.is_external, || {
-                    user.password.eq(&get_hash(user_password, &user.salt))
+                    password_matches(user_password, &user.password, &user.salt)
                 })
                 .await
             } else {
@@ -2105,6 +2112,7 @@ mod tests {
         }
 
         exercise_empty_password_rejected(org_id).await;
+        exercise_saltless_sso_user_refused(org_id).await;
 
         #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
@@ -2140,6 +2148,53 @@ mod tests {
         db::org_users::add_with_flags(org_id, email, role, token, None, true)
             .await
             .unwrap();
+    }
+
+    // Stored the way the SSO/Dex callback creates external users: no password, no salt.
+    async fn exercise_saltless_sso_user_refused(org_id: &str) {
+        let sso_user = "saltless-sso@example.com";
+        infra::table::users::add(infra::table::users::UserRecord {
+            email: sso_user.to_string(),
+            first_name: "Sso".to_string(),
+            last_name: "User".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            is_root: false,
+            password_ext: Some(String::new()),
+            user_type: UserType::External,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        db::org_users::add_with_flags(org_id, sso_user, UserRole::Admin, "sso-tok", None, true)
+            .await
+            .unwrap();
+
+        for guess in ["anything", " "] {
+            assert!(
+                !validate_credentials(sso_user, guess, "default/streams", &Method::GET, false)
+                    .await
+                    .is_ok_and(|r| r.is_valid)
+            );
+            assert!(
+                !validate_user(sso_user, guess)
+                    .await
+                    .is_ok_and(|r| r.is_valid)
+            );
+        }
+        let credentials = base64::encode(&format!("{sso_user}:anything"));
+        let req_data = RequestData {
+            uri: "/api/default/streams".parse().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
+        assert!(oo_validator(&req_data, &auth_info).await.is_err());
     }
 
     // Folded into `test_validate`: a standalone test clearing the same user tables would race it.

@@ -952,7 +952,7 @@ pub async fn get_auth(
                         return unauthorized_error(resp);
                     }
                 };
-                if chrono::Utc::now().timestamp() - req_ts > expires_in {
+                if AuthTokensExt::is_expired(req_ts, expires_in) {
                     audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
@@ -1018,6 +1018,12 @@ pub async fn get_auth(
                 "email": name,
                 "name": name,
             });
+            let Some(expiry) =
+                time::OffsetDateTime::now_utc().checked_add(time::Duration::seconds(expires_in))
+            else {
+                audit_unauthorized_error(audit_message).await;
+                return unauthorized_error(resp);
+            };
             let cookie_name = "auth_tokens";
             let auth_cookie = if req_ts == 0 {
                 let access_token =
@@ -1028,7 +1034,6 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
-                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
@@ -1046,7 +1051,6 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
-                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
