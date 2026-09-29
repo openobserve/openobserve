@@ -20,6 +20,7 @@ import en from "@/locales/languages/en-US.json";
 import type { ReplayEnvironmentOption } from "@/components/synthetics/variables/replayInputs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ReplayEnvironmentMenu from "./ReplayEnvironmentMenu.vue";
+import ReplaySecretFailedDot from "./ReplaySecretFailedDot.vue";
 
 const i18n = createI18n({
   legacy: false,
@@ -203,6 +204,12 @@ describe("ReplayEnvironmentMenu", () => {
 
     await wrapper.setProps({ secretFailed: false });
     expect(wrapper.get(TRIGGER).find(DOT).exists()).toBe(false);
+  });
+
+  it("draws the trigger's and the Secrets entry's failure dot from one component", () => {
+    wrapper = mountMenu({ secretsNeeded: 1, secretsEntered: 1, secretFailed: true });
+
+    expect(wrapper.findAllComponents(ReplaySecretFailedDot)).toHaveLength(2);
   });
 
   it("says the choice is for this session only", () => {

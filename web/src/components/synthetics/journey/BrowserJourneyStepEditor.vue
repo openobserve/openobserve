@@ -18,7 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { BrowserStep, SettleResponse, StepAssertion, StepLocator } from "@/types/synthetics";
+import type {
+  BrowserStep,
+  SettleResponse,
+  StepAssertion,
+  StepLocator,
+  SubtestRef,
+} from "@/types/synthetics";
 import {
   CLICK_TYPE_VALUES,
   DEFAULT_SETTLE_BUDGET_MS,
@@ -274,7 +280,7 @@ const timeoutBelowDefault = computed(() => {
 // the fork served no case and is gone. See `showTarget` for the render condition.
 
 /** A name the author never changed still names the old child, so a re-pick replaces it. */
-function onSubtestPicked(picked: { id: string; name: string } | undefined) {
+function onSubtestPicked(picked: SubtestRef | undefined) {
   const current = props.step.name;
   const earlier = props.step.subtest?.name ?? props.childName;
   const keepName = !!current && current !== earlier;

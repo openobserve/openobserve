@@ -14276,7 +14276,8 @@
         "noMatch": "No tests match \"{query}\"",
         "addRow": "Add \"{name}\" as a subtest",
         "blockedGroup": "Can't be nested",
-        "tip": "Tip: select steps, then Extract to subtest to create one."
+        "tip": "Tip: select steps, then Extract to subtest to create one.",
+        "pickFailed": "Couldn't add {name}. Try again."
       },
       "replayValues": {
         "secretUnreadable": "{name} is a secret in {environment}. A replay runs in your browser, which can't read a stored secret.",
@@ -14314,7 +14315,8 @@
         "noAccess": "No access",
         "capLine": "{count} of {cap} · Global values always apply",
         "runsIn": "Runs in",
-        "envOverflow": "{first} +{count}"
+        "envOverflow": "{first} +{count}",
+        "urlNotChanged": "Starting URL not changed: {reason}"
       },
       "replayEnv": {
         "buttonLabel": "Replay · {environment}",

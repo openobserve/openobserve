@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import syntheticsService from "@/services/synthetics";
+import type { SubtestRef } from "@/types/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -28,8 +27,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import SubtestMenuRow from "./SubtestMenuRow.vue";
 import {
   candidateSummary,
+  loadPickedSubtest,
   useSubtestCandidates,
   type SubtestCandidate,
 } from "./useSubtestCandidates";
@@ -41,21 +42,21 @@ const props = defineProps<{
   compositionEnabled: boolean;
 }>();
 
-const emit = defineEmits<{ pick: [child: { id: string; name: string }] }>();
+const emit = defineEmits<{ pick: [child: SubtestRef] }>();
 
 const { t } = useI18nTyped();
-const store = useStore();
-const org = computed(() => store.state.selectedOrganization.identifier as string);
 
 const open = ref(false);
 const query = ref("");
 const pickingId = ref<string | null>(null);
 const searchRef = ref<HTMLElement | null>(null);
-const hasLoaded = ref(false);
+// Latched on first open so the page load never fetches the list; closing keeps the query alive.
+const hasOpened = ref(false);
 
-const { usable, blocked, isLoading, isEmpty, loadError, reload } = useSubtestCandidates(
+const { org, usable, blocked, isLoading, isEmpty, loadError, refetch } = useSubtestCandidates(
   () => props.ownCheckId,
   {
+    enabled: hasOpened,
     onError: (err) =>
       console.error("[synthetics] failed to load browser tests for the subtest menu", err),
   },
@@ -89,29 +90,27 @@ watch(open, (isOpen) => {
     query.value = "";
     return;
   }
-  // Fetched once per mount: the list only changes when another test is saved elsewhere.
-  if (!hasLoaded.value) {
-    hasLoaded.value = true;
-    void reload();
-  }
+  hasOpened.value = true;
   nextTick(() => searchRef.value?.querySelector("input")?.focus());
 });
 
 function onRetry() {
-  void reload();
+  void refetch();
 }
 
 async function onPick(c: SubtestCandidate) {
   if (pickingId.value) return;
   pickingId.value = c.id;
   try {
-    const check = (await syntheticsService.get(org.value, c.id)).data;
-    emit("pick", { id: c.id, name: check.name ?? c.name });
+    const { reference } = await loadPickedSubtest(org.value, c.id, c.name);
+    emit("pick", reference);
     open.value = false;
   } catch (err) {
-    // No emit: a pick whose GET failed would store a reference the journey cannot expand.
     console.error("[synthetics] failed to load the picked browser test", err);
-    toast({ variant: "error", message: t("synthetics.journey.subtest.pickLoadFailed") });
+    toast({
+      variant: "error",
+      message: t("synthetics.journey.subtestMenu.pickFailed", { name: c.name }),
+    });
   } finally {
     pickingId.value = null;
   }
@@ -193,26 +192,17 @@ async function onPick(c: SubtestCandidate) {
           data-test="synthetics-subtest-menu-no-match"
         />
         <template v-else>
-          <OButton
+          <SubtestMenuRow
             v-for="c in visibleUsable"
             :key="c.id"
-            variant="ghost"
-            size="md"
-            block
-            class="h-auto! justify-start! py-2! text-start whitespace-normal!"
+            :title="raw(c.name)"
+            :subtitle="rowSummary(c)"
             :loading="pickingId === c.id"
             :disabled="pickingId !== null && pickingId !== c.id"
             :aria-label="t('synthetics.journey.subtestMenu.addRow', { name: c.name })"
             :data-test="`synthetics-subtest-menu-row-${c.id}`"
-            @click="onPick(c)"
-          >
-            <span class="flex min-w-0 flex-1 flex-col">
-              <span class="text-text-body truncate text-sm">{{ c.name }}</span>
-              <span v-if="rowSummary(c)" class="text-text-secondary truncate text-xs font-normal">
-                {{ rowSummary(c) }}
-              </span>
-            </span>
-          </OButton>
+            @select="onPick(c)"
+          />
           <template v-if="visibleBlocked.length">
             <OSeparator class="my-1" />
             <span
@@ -221,23 +211,14 @@ async function onPick(c: SubtestCandidate) {
             >
               {{ t("synthetics.journey.subtestMenu.blockedGroup") }}
             </span>
-            <OButton
+            <SubtestMenuRow
               v-for="c in visibleBlocked"
               :key="c.id"
-              variant="ghost"
-              size="md"
-              block
+              :title="raw(c.name)"
+              :subtitle="t('synthetics.journey.subtest.pickNested')"
               disabled
-              class="h-auto! justify-start! py-2! text-start whitespace-normal!"
               :data-test="`synthetics-subtest-menu-row-${c.id}`"
-            >
-              <span class="flex min-w-0 flex-1 flex-col">
-                <span class="truncate text-sm">{{ c.name }}</span>
-                <span class="truncate text-xs font-normal">
-                  {{ t("synthetics.journey.subtest.pickNested") }}
-                </span>
-              </span>
-            </OButton>
+            />
           </template>
         </template>
       </div>

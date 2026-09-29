@@ -23,7 +23,14 @@ vi.mock("reka-ui", async (importOriginal) => {
   return { ...actual, PopoverPortal: actual.PopoverContent };
 });
 
+// The real toast is a no-op in jsdom, so the warning has to be observed through a mock.
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => mockToast(...args),
+}));
+
 import en from "@/locales/languages/en-US.json";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import JourneyStartPill from "./JourneyStartPill.vue";
 
@@ -109,6 +116,11 @@ async function openUrl(w: VueWrapper) {
   await flushPromises();
 }
 
+async function closeUrl(w: VueWrapper) {
+  w.findAllComponents(OPopover)[0].vm.$emit("update:open", false);
+  await flushPromises();
+}
+
 async function openEnvs(w: VueWrapper) {
   await w.get(ENVS_HALF).trigger("click");
   await flushPromises();
@@ -119,6 +131,7 @@ describe("JourneyStartPill", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    mockToast.mockReset();
   });
 
   it("shows the URL as written, with its variables", () => {
@@ -318,6 +331,41 @@ describe("JourneyStartPill", () => {
     );
     expect(wrapper.emitted("update:url")).toBeUndefined();
     expect(wrapper.find(URL_INPUT_FIELD).exists()).toBe(true);
+  });
+
+  it("closing on an invalid draft warns that the Starting URL was not changed, with the reason", async () => {
+    wrapper = mountPill();
+    await openUrl(wrapper);
+    await wrapper.get(URL_INPUT_FIELD).setValue("not a url");
+    await flushPromises();
+
+    await closeUrl(wrapper);
+
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "warning",
+      message:
+        "Starting URL not changed: Enter a URL starting with http://, https:// or a variable placeholder",
+    });
+    expect(wrapper.emitted("update:url")).toBeUndefined();
+
+    await openUrl(wrapper);
+    expect((wrapper.get(URL_INPUT_FIELD).element as HTMLInputElement).value).toBe(
+      "{{BASE_URL}}/login",
+    );
+  });
+
+  it("closing on a valid or untouched draft warns about nothing", async () => {
+    wrapper = mountPill();
+    await openUrl(wrapper);
+    await closeUrl(wrapper);
+
+    await openUrl(wrapper);
+    await wrapper.get(URL_INPUT_FIELD).setValue("https://shop.test/checkout");
+    await vi.waitFor(() => expect(wrapper.emitted("update:url")).toHaveLength(1));
+    await closeUrl(wrapper);
+
+    expect(mockToast).not.toHaveBeenCalled();
   });
 
   it("each checkbox change emits the new list at once, with no Cancel or Apply", async () => {

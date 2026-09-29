@@ -15,14 +15,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { defineComponent } from "vue";
+import { defineComponent, ref, type Ref } from "vue";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import en from "@/locales/languages/en-US.json";
-import { candidateSummary, useSubtestCandidates } from "./useSubtestCandidates";
+import { candidateSummary, loadPickedSubtest, useSubtestCandidates } from "./useSubtestCandidates";
 
 vi.mock("@/services/synthetics", () => ({
-  default: { listByFolderId: vi.fn() },
+  default: { listByFolderId: vi.fn(), get: vi.fn() },
 }));
 
 import syntheticsService from "@/services/synthetics";
@@ -35,6 +35,7 @@ const i18n = createI18n({
 });
 
 const list = syntheticsService.listByFolderId as ReturnType<typeof vi.fn>;
+const get = syntheticsService.get as ReturnType<typeof vi.fn>;
 
 const ROWS = [
   { id: "self", name: "Checkout", type: "browser", steps: 4, references: 0 },
@@ -63,11 +64,15 @@ const ROWS = [
 
 type Candidates = ReturnType<typeof useSubtestCandidates>;
 
-function mountHost(options: Parameters<typeof useSubtestCandidates>[1] = {}, ownId = "self") {
+function mountHost(
+  enabled: Ref<boolean> | boolean = true,
+  onError?: (err: unknown) => void,
+  ownId = "self",
+) {
   let api!: Candidates;
   const Host = defineComponent({
     setup() {
-      api = useSubtestCandidates(() => ownId, options);
+      api = useSubtestCandidates(() => ownId, { enabled, onError });
       return () => null;
     },
   });
@@ -82,27 +87,37 @@ describe("useSubtestCandidates", () => {
 
   afterEach(() => {
     list.mockReset();
+    get.mockReset();
   });
 
-  it("does not fetch until asked, unless immediate", async () => {
+  it("fetches nothing until enabled, then reads the org's whole list", async () => {
     list.mockResolvedValue({ data: { checks: ROWS } });
-    const lazy = mountHost();
+    const enabled = ref(false);
+    const { api } = mountHost(enabled);
     await flushPromises();
     expect(list).not.toHaveBeenCalled();
-    expect(lazy.api().isLoading.value).toBe(false);
-    lazy.wrapper.unmount();
+    expect(api().isLoading.value).toBe(false);
+    expect(api().isEmpty.value).toBe(false);
 
-    const eager = mountHost({ immediate: true });
-    expect(eager.api().isLoading.value).toBe(true);
+    enabled.value = true;
     await flushPromises();
     expect(list).toHaveBeenCalledWith("default", undefined);
-    expect(eager.api().isLoading.value).toBe(false);
+    expect(api().isLoading.value).toBe(false);
+    expect(api().usable.value).toHaveLength(2);
+  });
+
+  it("is loading from the moment it is enabled until the list lands", async () => {
+    list.mockReturnValue(new Promise(() => {}));
+    const { api } = mountHost();
+    expect(api().isLoading.value).toBe(true);
+    await flushPromises();
+    expect(api().isLoading.value).toBe(true);
   });
 
   it("excludes its own check and non-browser checks, and splits usable from nested-holding", async () => {
     list.mockResolvedValue({ data: { checks: ROWS } });
     const { api } = mountHost();
-    await api().reload();
+    await flushPromises();
 
     expect(api().usable.value.map((c) => c.id)).toEqual(["login", "paused"]);
     expect(api().blocked.value.map((c) => c.id)).toEqual(["holder"]);
@@ -112,13 +127,12 @@ describe("useSubtestCandidates", () => {
   it("resolves each row's labels from the list response alone", async () => {
     list.mockResolvedValue({ data: { checks: ROWS } });
     const { api } = mountHost();
-    await api().reload();
+    await flushPromises();
 
     const [login, paused] = api().usable.value;
     expect(login).toMatchObject({
       name: "Login",
       folderName: "Shared",
-      enabled: true,
       stepsLabel: "13 steps",
       usedByLabel: "Used by 5 tests",
       pausedLabel: "",
@@ -135,36 +149,67 @@ describe("useSubtestCandidates", () => {
     const { api } = mountHost();
     expect(api().isEmpty.value).toBe(false);
 
-    await api().reload();
+    await flushPromises();
 
     expect(api().isEmpty.value).toBe(true);
     expect(api().usable.value).toEqual([]);
     expect(api().blocked.value).toEqual([]);
   });
 
-  it("flags a failed load, reports it, and clears the flag on a successful retry", async () => {
+  it("flags a failed load, reports it, and clears the flag when refetch succeeds", async () => {
     const onError = vi.fn();
     list.mockRejectedValueOnce(new Error("boom"));
-    const { api } = mountHost({ onError });
+    const { api } = mountHost(true, onError);
+    await flushPromises();
 
-    expect(await api().reload()).toBe(false);
     expect(api().loadError.value).toBe(true);
     expect(api().isLoading.value).toBe(false);
     expect(api().isEmpty.value).toBe(false);
     expect(onError).toHaveBeenCalledWith(expect.any(Error));
 
     list.mockResolvedValue({ data: { checks: ROWS } });
-    expect(await api().reload()).toBe(true);
+    await api().refetch();
+    await flushPromises();
+    expect(list).toHaveBeenCalledTimes(2);
     expect(api().loadError.value).toBe(false);
     expect(api().usable.value).toHaveLength(2);
   });
 
-  it("joins a reload that is already in flight instead of fetching twice", async () => {
+  it("serves a second mount from the cache without a request", async () => {
     list.mockResolvedValue({ data: { checks: ROWS } });
-    const { api } = mountHost();
+    const first = mountHost();
+    await flushPromises();
+    first.wrapper.unmount();
 
-    await Promise.all([api().reload(), api().reload()]);
-
+    const second = mountHost();
+    expect(second.api().isLoading.value).toBe(false);
+    expect(second.api().usable.value.map((c) => c.id)).toEqual(["login", "paused"]);
+    await flushPromises();
     expect(list).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("loadPickedSubtest", () => {
+  afterEach(() => get.mockReset());
+
+  it("returns the reference and the child's step count", async () => {
+    get.mockResolvedValue({ data: { name: "Login", config: { steps: [{}, {}, {}] } } });
+
+    await expect(loadPickedSubtest("default", "login", "Stale")).resolves.toEqual({
+      reference: { id: "login", name: "Login" },
+      stepCount: 3,
+    });
+    expect(get).toHaveBeenCalledWith("default", "login");
+  });
+
+  it("falls back to the given name, and throws when the GET fails", async () => {
+    get.mockResolvedValueOnce({ data: {} });
+    await expect(loadPickedSubtest("default", "login", "Login")).resolves.toEqual({
+      reference: { id: "login", name: "Login" },
+      stepCount: 0,
+    });
+
+    get.mockRejectedValueOnce(new Error("gone"));
+    await expect(loadPickedSubtest("default", "login")).rejects.toThrow("gone");
   });
 });

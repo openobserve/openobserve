@@ -28,6 +28,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ReplaySecretFailedDot from "./ReplaySecretFailedDot.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -96,10 +97,8 @@ function itemKey(option: ReplayEnvironmentOption) {
           {{ t("synthetics.journey.replayEnv.inLabel") }}
         </span>
         <span class="max-w-40 truncate">{{ selectedName }}</span>
-        <span
+        <ReplaySecretFailedDot
           v-if="secretFailed"
-          class="bg-status-error-text size-2 shrink-0 rounded-full"
-          aria-hidden="true"
           data-test="synthetics-journey-replay-menu-secret-failed"
         />
         <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />
@@ -152,7 +151,7 @@ function itemKey(option: ReplayEnvironmentOption) {
       >
         <span>{{ t("synthetics.journey.replaySecrets.menuItem", secretCounts) }}</span>
         <template v-if="secretFailed" #icon-right>
-          <span class="bg-status-error-text ms-auto size-2 rounded-full" aria-hidden="true" />
+          <ReplaySecretFailedDot class="ms-auto" />
         </template>
       </ODropdownItem>
     </template>

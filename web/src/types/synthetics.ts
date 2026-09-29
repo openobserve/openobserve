@@ -203,6 +203,12 @@ export interface StepAssertion {
   attribute?: string;
 }
 
+/** A resolved subtest reference: the child check's id and its display name. */
+export interface SubtestRef {
+  id: string;
+  name: string;
+}
+
 export interface BrowserStep {
   id: string;
   action: StepAction;

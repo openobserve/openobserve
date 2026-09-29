@@ -19,6 +19,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import { MAX_CHECK_ENVIRONMENTS } from "@/constants/synthetics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
@@ -114,9 +115,10 @@ const envsTooltip = computed(() =>
   envsCollapsed.value ? envsFullLabel.value : t("synthetics.journey.startPill.editEnvironments"),
 );
 
+const schema = makeStartUrlSchema(t);
 const form = useOForm<StartUrlForm>({
   defaultValues: { url: props.url },
-  schema: makeStartUrlSchema(t),
+  schema,
   onSubmit: (values) => {
     const next = values.url.trim();
     if (next !== props.url) emit("update:url", next);
@@ -127,12 +129,27 @@ const urlDraft = form.useStore((state) => state.values.url);
 
 watch(urlOpen, (open) => {
   if (open) form.reset({ url: props.url });
+  else warnIfDraftDropped();
 });
 
 // No Apply: every valid edit goes to the check at once and the page's Save persists it.
 watch(urlDraft, () => {
   if (urlOpen.value) void form.handleSubmit();
 });
+
+// Closing discards an invalid draft, so the author has to hear that the check kept its old URL.
+function warnIfDraftDropped() {
+  const draft = urlDraft.value ?? "";
+  if (draft.trim() === props.url) return;
+  const parsed = schema.safeParse({ url: draft });
+  if (parsed.success) return;
+  toast({
+    variant: "warning",
+    message: t("synthetics.journey.startPill.urlNotChanged", {
+      reason: parsed.error.issues[0]?.message ?? "",
+    }),
+  });
+}
 
 function onToggleEnvironment(id: string) {
   emit("update:selected-ids", toggleEnvironment(props.selectedIds, id));

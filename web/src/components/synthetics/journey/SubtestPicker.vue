@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type { SubtestRef } from "@/types/synthetics";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -25,6 +26,7 @@ import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { browserMaxSteps } from "@/utils/synthetics/runBudget";
 import {
   candidateSummary,
+  loadPickedSubtest,
   useSubtestCandidates,
   type SubtestCandidate,
 } from "./useSubtestCandidates";
@@ -40,18 +42,17 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "update:modelValue": [value: { id: string; name: string } | undefined];
+  "update:modelValue": [value: SubtestRef | undefined];
 }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
-const org = computed(() => store.state.selectedOrganization.identifier as string);
 
 const DEFAULT_JOURNEY_BUDGET_MS = 300_000;
 
-const { usable, blocked, isLoading, isEmpty } = useSubtestCandidates(() => props.ownCheckId, {
-  immediate: true,
+const { org, usable, blocked, isLoading, isEmpty } = useSubtestCandidates(() => props.ownCheckId, {
+  enabled: true,
   onError: (err) => {
     console.error("[synthetics] failed to load browser tests for the subtest picker", err);
     toast({ variant: "error", message: t("synthetics.journey.subtest.pickLoadFailed") });
@@ -102,18 +103,18 @@ function optionGroup(label: I18nText, rows: SelectOption[]): SelectOption[] {
 }
 
 async function onPick(id: string) {
-  let check;
+  let picked;
   try {
-    check = (await syntheticsService.get(org.value, id)).data;
+    picked = await loadPickedSubtest(org.value, id);
   } catch (err) {
     // No emit: a pick whose GET failed would store a reference the caller cannot expand.
     console.error("[synthetics] failed to load the picked browser test", err);
     toast({ variant: "error", message: t("synthetics.journey.subtest.pickLoadFailed") });
     return;
   }
-  emit("update:modelValue", { id, name: check.name });
+  emit("update:modelValue", picked.reference);
   // After the emit, in one tick: a half-applied pick would pair the new child with the old count.
-  childSteps.value = check.config?.steps?.length ?? 0;
+  childSteps.value = picked.stepCount;
   // Cleared before the await so a previous pick's run time never shows against this child.
   lastRunSeconds.value = null;
   // A run-history failure must not undo the pick; the time impact just reads unknown.

@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, ref } from "vue";
+import { computed, toValue, watch, type MaybeRefOrGetter } from "vue";
 import { useStore } from "vuex";
+import { useQuery } from "@tanstack/vue-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { useI18nTyped } from "@/types/i18n";
+import type { SubtestRef } from "@/types/synthetics";
 import syntheticsService from "@/services/synthetics";
+import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
 import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { syntheticsFolderName } from "@/utils/synthetics/routes";
 
@@ -26,7 +30,6 @@ export interface SubtestCandidate {
   id: string;
   name: string;
   folderName: string;
-  enabled: boolean;
   /** "N steps", or "" when the list does not report a count. */
   stepsLabel: string;
   /** "Used by N tests", or "" when nothing references it. */
@@ -55,23 +58,33 @@ export function candidateSummary(parts: string[]): string {
   return parts.filter(Boolean).join(" · ");
 }
 
+/** GETs a picked test and throws when it cannot be loaded, so no caller stores a reference it cannot expand. */
+export async function loadPickedSubtest(
+  org: string,
+  id: string,
+  fallbackName = "",
+): Promise<{ reference: SubtestRef; stepCount: number }> {
+  const check = (await syntheticsService.get(org, id)).data;
+  return {
+    reference: { id, name: check.name ?? fallbackName },
+    stepCount: check.config?.steps?.length ?? 0,
+  };
+}
+
 /** The org's browser tests a journey can reference, split into usable and nested-holding. */
 export function useSubtestCandidates(
   ownCheckId: () => string | undefined,
-  options: { immediate?: boolean; onError?: (err: unknown) => void } = {},
+  options: { enabled: MaybeRefOrGetter<boolean>; onError?: (err: unknown) => void },
 ) {
   const { t } = useI18nTyped();
   const store = useStore();
-  const org = computed(() => store.state.selectedOrganization.identifier as string);
+  const org = useOrgId();
+  const enabled = computed(() => !!org.value && toValue(options.enabled));
 
-  const usable = ref<SubtestCandidate[]>([]);
-  /** Tests that already hold a subtest: listed so the author sees why, never pickable. */
-  const blocked = ref<SubtestCandidate[]>([]);
-  const isLoading = ref(!!options.immediate);
-  /** True only once the list has loaded and holds no other browser test. */
-  const isEmpty = ref(false);
-  const loadError = ref(false);
-  let pending: Promise<boolean> | null = null;
+  // undefined folder omits ?folder= so every folder is listed: references are cross-folder by design.
+  const list = useQuery(() =>
+    Object.assign(syntheticsMonitorsQuery(org.value), { enabled: enabled.value }),
+  );
 
   /** Everything on a row comes from the list response — nothing costs a request per option. */
   function toCandidate(r: ListRow): SubtestCandidate {
@@ -81,7 +94,6 @@ export function useSubtestCandidates(
       id: r.id,
       name: r.name,
       folderName: syntheticsFolderName(folders, r.folder_id),
-      enabled: r.enabled !== false,
       stepsLabel:
         r.steps != null
           ? t("synthetics.journey.subtest.pickSteps", { count: r.steps }, r.steps)
@@ -103,39 +115,29 @@ export function useSubtestCandidates(
     };
   }
 
-  async function load(): Promise<boolean> {
-    isLoading.value = true;
-    loadError.value = false;
-    try {
-      // undefined omits ?folder= so every folder is listed: references are cross-folder by design.
-      const res = await syntheticsService.listByFolderId(org.value, undefined);
-      const rows = ((res.data.checks ?? []) as ListRow[]).filter(
-        (r) => r.type === "browser" && r.id !== ownCheckId(),
-      );
-      // Nesting is one level deep, so a check that already holds a reference is shown but not pickable.
-      const holdsSubtest = (r: ListRow) => (r.references ?? 0) > 0;
-      usable.value = rows.filter((r) => !holdsSubtest(r)).map(toCandidate);
-      blocked.value = rows.filter(holdsSubtest).map(toCandidate);
-      isEmpty.value = rows.length === 0;
-      return true;
-    } catch (err) {
-      loadError.value = true;
-      options.onError?.(err);
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
-  }
+  const rows = computed(() =>
+    ((list.data.value ?? []) as ListRow[]).filter(
+      (r) => r.type === "browser" && r.id !== ownCheckId(),
+    ),
+  );
+  // Nesting is one level deep, so a check that already holds a reference is shown but not pickable.
+  const holdsSubtest = (r: ListRow) => (r.references ?? 0) > 0;
+  const usable = computed(() => rows.value.filter((r) => !holdsSubtest(r)).map(toCandidate));
+  /** Tests that already hold a subtest: listed so the author sees why, never pickable. */
+  const blocked = computed(() => rows.value.filter(holdsSubtest).map(toCandidate));
+  const hasData = computed(() => list.data.value !== undefined);
+  // A failed background refetch keeps the cached rows on screen instead of an error.
+  const loadError = computed(() => list.isError.value && !list.isFetching.value && !hasData.value);
+  const isLoading = computed(() => enabled.value && !hasData.value && !loadError.value);
+  /** True only once the list has loaded and holds no other browser test. */
+  const isEmpty = computed(() => hasData.value && rows.value.length === 0);
 
-  /** Fetches the list; a call while one is in flight joins it instead of racing it. */
-  function reload(): Promise<boolean> {
-    pending ??= load().finally(() => {
-      pending = null;
-    });
-    return pending;
-  }
+  watch(list.error, (err) => {
+    if (err) options.onError?.(err);
+  });
 
-  if (options.immediate) void reload();
+  /** Always reaches the server: it backs Retry. */
+  const refetch = () => list.refetch();
 
-  return { usable, blocked, isLoading, isEmpty, loadError, reload };
+  return { org, usable, blocked, isLoading, isEmpty, loadError, refetch };
 }

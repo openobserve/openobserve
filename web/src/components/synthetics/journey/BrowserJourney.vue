@@ -18,7 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
+import type {
+  BlockedReason,
+  BrowserStep,
+  ReplayPhase,
+  StepReplayResult,
+  SubtestRef,
+} from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder, {
   UnresolvedVariableError,
@@ -438,7 +444,7 @@ function deleteSelectedSteps() {
 /** Returns the reference step's id; clears the selection itself because a one-step range keeps the length. */
 function replaceRangeWithSubtest(
   range: { anchor: number; count: number },
-  child: { id: string; name: string },
+  child: SubtestRef,
 ): string {
   const step: BrowserStep = {
     id: getUUIDv7(true),
@@ -1292,11 +1298,8 @@ const addMenuItems = computed(() => [
   },
 ]);
 
-/** The value the removed toolbar slot passed as `locked`, now reported to the host. */
-const hostControlsLocked = computed(
-  () => !!props.readonly || isRecording.value || isReplayLocked.value || isRestoring.value,
-);
-watch(hostControlsLocked, (locked) => emit("locked-changed", locked), { immediate: true });
+// The host's own controls lock on exactly the conditions that stop a new row.
+watch(addDisabled, (locked) => emit("locked-changed", locked), { immediate: true });
 
 useShortcuts([
   {
@@ -1399,7 +1402,7 @@ function addSubtestStep() {
   appendStep({ id: getUUIDv7(true), action: "subtest", name: "", subtest: undefined });
 }
 /** Appends a reference the Add subtest menu already resolved, then loads its child like any subtest row. */
-function addSubtestReference(child: { id: string; name: string }) {
+function addSubtestReference(child: SubtestRef) {
   const step: BrowserStep = {
     id: getUUIDv7(true),
     action: "subtest",
@@ -1623,8 +1626,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         >
           {{ t("synthetics.journey.stop") }}
         </OButton>
-        <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
-             shift; disabled so a second click cannot queue another stopReplay. -->
+        <!-- Stop sent but unconfirmed: disabled so a second click cannot queue another stopReplay. -->
         <OButton
           v-else-if="isReplayStopping"
           variant="destructive"

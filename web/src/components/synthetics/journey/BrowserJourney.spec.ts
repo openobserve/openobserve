@@ -3862,6 +3862,21 @@ describe("BrowserJourney toolbar while recording", () => {
       wrapper.unmount();
     }
   });
+
+  it("reports the host controls locked exactly when Add step is disabled", async () => {
+    const addStepDisabled = (w: VueWrapper) =>
+      w.get('[data-test="synthetics-journey-add-step-btn"]').attributes("disabled") !== undefined;
+
+    wrapper = mountToolbar();
+    expect(lockedEvents(wrapper).at(-1)).toBe(addStepDisabled(wrapper));
+    await startRecording(wrapper);
+    expect(lockedEvents(wrapper).at(-1)).toBe(true);
+    expect(addStepDisabled(wrapper)).toBe(true);
+    wrapper.unmount();
+
+    wrapper = mountToolbar({ readonly: true });
+    expect(lockedEvents(wrapper).at(-1)).toBe(addStepDisabled(wrapper));
+  });
 });
 
 // ── When a restore does not reach the recording point ──────────────────────

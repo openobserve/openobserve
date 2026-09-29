@@ -255,12 +255,29 @@ describe("SubtestMenu", () => {
     consoleError.mockRestore();
   });
 
-  it("fetches the list once for the life of the menu", async () => {
+  it("fetches the list on the first open only", async () => {
     wrapper = mountMenu();
+    await flushPromises();
+    expect(list).not.toHaveBeenCalled();
+
     await open(wrapper);
     await open(wrapper);
     await open(wrapper);
 
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the cached rows at once when remounted, without a second request", async () => {
+    wrapper = mountMenu();
+    await open(wrapper);
+    wrapper.unmount();
+
+    wrapper = mountMenu();
+    await wrapper.get(TRIGGER).trigger("click");
+
+    expect(wrapper.find('[data-test="synthetics-subtest-menu-loading"]').exists()).toBe(false);
+    expect(rowIds(wrapper)).toEqual(["login", "staging", "holder"]);
+    await flushPromises();
     expect(list).toHaveBeenCalledTimes(1);
   });
 
@@ -307,7 +324,7 @@ describe("SubtestMenu", () => {
     expect(wrapper.emitted("pick")).toBeUndefined();
     expect(mockToast).toHaveBeenCalledWith({
       variant: "error",
-      message: "Couldn't load the list of browser tests. Try again.",
+      message: "Couldn't add Login. Try again.",
     });
     expect(wrapper.find(MENU).exists()).toBe(true);
     expect(wrapper.get(row("login")).attributes("disabled")).toBeUndefined();
