@@ -1056,6 +1056,91 @@ pub static COMPACT_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// metrics partition time level (daily partitions for low-volume metrics streams)
+pub static METRICS_PARTITION_LEVEL_CHANGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "metrics_partition_level_changes_total",
+            "Partition time level changes scheduled for streams, by source (auto = classifier, manual = settings API).".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "from", "to", "source"],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_PARTITION_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "metrics_partition_streams",
+            "Metrics streams by the partition time level in effect for today's data, and by whether a change is pending (state = current|pending), as of the last classifier run.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "level", "state"],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_PARTITION_CLASSIFIER_DECISIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "metrics_partition_classifier_decisions",
+            "Metrics streams per decision of the last partition classifier run (to_daily, to_hourly, keep, pinned, pending, dwell, too_young, no_stats, capped, error).".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["decision"],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_PARTITION_CLASSIFIER_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "metrics_partition_classifier_duration_seconds",
+            "Duration of a metrics partition classifier run in seconds.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 300.0, 900.0]),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_PARTITION_CLASSIFIER_LAST_RUN_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "metrics_partition_classifier_last_run_timestamp",
+            "Unix timestamp in microseconds of the last completed metrics partition classifier run."
+                .to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_PARTITION_CLASSIFIER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "metrics_partition_classifier_errors_total",
+            "Errors of the metrics partition classifier (stage = run|stats|save).".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["stage"],
+    )
+    .expect("Metric created")
+});
+
 // stream stats aggregation metrics
 pub static STREAM_STATS_SCAN_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
@@ -2775,6 +2860,28 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(BLOOM_PRUNE_DURATION.clone()))
         .expect("Metric registered");
 
+    // metrics partition time level
+    registry
+        .register(Box::new(METRICS_PARTITION_LEVEL_CHANGES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METRICS_PARTITION_STREAMS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METRICS_PARTITION_CLASSIFIER_DECISIONS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METRICS_PARTITION_CLASSIFIER_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(
+            METRICS_PARTITION_CLASSIFIER_LAST_RUN_TIMESTAMP.clone(),
+        ))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METRICS_PARTITION_CLASSIFIER_ERRORS.clone()))
+        .expect("Metric registered");
+
     // stream stats aggregation metrics
     registry
         .register(Box::new(STREAM_STATS_SCAN_DURATION.clone()))
@@ -3255,6 +3362,12 @@ mod tests {
         let _ = STREAM_STATS_SCAN_ERRORS_TOTAL.clone();
         let _ = STREAM_STATS_STREAMS_TOTAL.clone();
         let _ = STREAM_STATS_LAST_SCAN_TIMESTAMP.clone();
+        let _ = METRICS_PARTITION_LEVEL_CHANGES.clone();
+        let _ = METRICS_PARTITION_STREAMS.clone();
+        let _ = METRICS_PARTITION_CLASSIFIER_DECISIONS.clone();
+        let _ = METRICS_PARTITION_CLASSIFIER_DURATION.clone();
+        let _ = METRICS_PARTITION_CLASSIFIER_LAST_RUN_TIMESTAMP.clone();
+        let _ = METRICS_PARTITION_CLASSIFIER_ERRORS.clone();
     }
 
     #[test]

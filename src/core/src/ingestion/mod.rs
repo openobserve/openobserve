@@ -32,14 +32,11 @@ use config::{
         alerts::alert::Alert,
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
-        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        stream::{
+            PartitionTimeLevel, PartitionTimeLevels, StreamParams, StreamPartition, StreamType,
+        },
     },
-    utils::{
-        flatten,
-        json::*,
-        schema::format_partition_key,
-        time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
-    },
+    utils::{flatten, json::*, schema::format_partition_key},
 };
 use db::{
     self,
@@ -80,19 +77,26 @@ static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
 /// Memoizes the write partition per time bucket while no partition key is enabled.
 pub struct PartitionMemo<'a> {
     partition_keys: &'a Vec<StreamPartition>,
-    time_level: PartitionTimeLevel,
+    time_levels: PartitionTimeLevels,
     keyed_by_time_only: bool,
-    bucket_micros: i64,
     last: Option<(i64, String)>,
 }
 
 impl<'a> PartitionMemo<'a> {
     pub fn new(partition_keys: &'a Vec<StreamPartition>, time_level: PartitionTimeLevel) -> Self {
+        Self::with_levels(partition_keys, PartitionTimeLevels::uniform(time_level))
+    }
+
+    /// A memo for a stream whose level depends on the data timestamp (see
+    /// `infra::schema::get_stream_partition_time_levels`).
+    pub fn with_levels(
+        partition_keys: &'a Vec<StreamPartition>,
+        time_levels: PartitionTimeLevels,
+    ) -> Self {
         Self {
             partition_keys,
-            time_level,
+            time_levels,
             keyed_by_time_only: partition_keys.iter().all(|key| key.disabled),
-            bucket_micros: partition_bucket_micros(time_level),
             last: None,
         }
     }
@@ -106,7 +110,7 @@ impl<'a> PartitionMemo<'a> {
         partitions: &'p mut HashMap<String, SchemaRecords>,
         new_partition: impl FnOnce() -> SchemaRecords,
     ) -> &'p mut SchemaRecords {
-        let bucket = timestamp.div_euclid(self.bucket_micros);
+        let bucket = self.time_levels.bucket_start(timestamp);
         if let Some((last_bucket, key)) = &self.last
             && *last_bucket == bucket
         {
@@ -115,7 +119,7 @@ impl<'a> PartitionMemo<'a> {
         let key = get_write_partition_key(
             timestamp,
             self.partition_keys,
-            self.time_level,
+            self.time_levels.at(timestamp),
             record,
             Some(suffix),
         );
@@ -814,13 +818,6 @@ pub fn refactor_map(
 }
 
 /// The span of one write partition, which a record's time bucket is counted in.
-fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
-    match time_level {
-        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
-        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use arrow_schema::Field;

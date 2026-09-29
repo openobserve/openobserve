@@ -49,8 +49,7 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
-        get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
-        unwrap_stream_settings,
+        unwrap_stream_created_at, unwrap_stream_is_derived, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -489,6 +488,20 @@ pub async fn update_stream_settings(
     }
     if let Some(v) = new_settings.is_llm_stream {
         settings.is_llm_stream = v;
+    }
+    if let Some(v) = new_settings.partition_time_level {
+        // A level set here pins the stream (the classifier leaves it alone); `unset`
+        // falls back to the stream type default and hands the stream back to the
+        // classifier. Either way the change applies from a future UTC day on, see
+        // infra::schema::schedule_partition_time_level.
+        infra::schema::schedule_partition_time_level(
+            org_id,
+            stream_type,
+            &mut settings,
+            v,
+            false,
+            config::utils::time::now_micros(),
+        );
     }
 
     // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
@@ -932,7 +945,17 @@ pub async fn delete_stream_data_by_time_range(
 
     // Convert the time range to RFC3339 format
     // we need check the date is hour or day, user can't delete data with minute and second
-    let partition_time_level = get_partition_time_level(stream_type);
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    // a range touching any daily-partitioned data must be day-aligned, even if the
+    // stream switched level inside it
+    let partition_time_level =
+        if infra::schema::get_stream_partition_time_levels(stream_type, stream_settings.as_deref())
+            .any_in(time_range.start, time_range.end, PartitionTimeLevel::Daily)
+        {
+            PartitionTimeLevel::Daily
+        } else {
+            PartitionTimeLevel::Hourly
+        };
     let start_time = Utc.timestamp_nanos(time_range.start * 1000);
     let end_time = Utc.timestamp_nanos(time_range.end * 1000);
     let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {

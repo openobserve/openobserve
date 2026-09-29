@@ -22,7 +22,7 @@ use config::{
     utils::time::hour_micros,
 };
 use hashbrown::{HashMap, HashSet};
-use infra::{cache::file_data, file_list as infra_file_list, schema::get_partition_time_level};
+use infra::{cache::file_data, file_list as infra_file_list};
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
 use tokio::{
@@ -77,10 +77,19 @@ pub async fn merge_by_stream(
     // groups and carry the remainder, so each file is merged into a sealed output exactly
     // once. The scheduled hour-end pass seals whatever is left.
     let offset = offset - offset % hour_micros(1);
-    let is_incremental = !crate::is_past_hour(offset);
+    // the level of the data at this offset, not the stream's current level: a
+    // level change takes effect at a day boundary, so the whole day is one layout
+    let partition_time_level = infra::schema::get_stream_partition_time_level(
+        stream_type,
+        infra::schema::unwrap_stream_settings(&schema).as_ref(),
+        offset,
+    );
+    // For a daily-partitioned stream the range is the whole day: every hourly job
+    // before the day settles is an incremental round over the day, and the job
+    // whose range end has settled (the last hour of the day) seals it once.
+    let is_incremental = !crate::is_past_range_end(job_range_end(offset, partition_time_level));
 
     // check offset
-    let partition_time_level = get_partition_time_level(stream_type);
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
         (
@@ -302,8 +311,8 @@ pub async fn merge_by_stream(
         }
     }
 
-    // the hour settled mid-round: stay Running so check_running_jobs re-arms a whole-hour retry
-    if is_incremental && crate::is_past_hour(offset) {
+    // the range settled mid-round: stay Running so check_running_jobs re-arms a whole-range retry
+    if is_incremental && crate::is_past_range_end(range_end_ts) {
         log::warn!(
             "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] hour {date_start} settled during the incremental round, job {job_id} is left for the hour-end retry"
         );

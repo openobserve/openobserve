@@ -27,7 +27,7 @@ use config::{
         alerts::alert,
         pipeline::PipelineKind,
         self_reporting::usage::UsageType,
-        stream::{StreamPartition, StreamType},
+        stream::{PartitionTimeLevels, StreamPartition, StreamType},
     },
     metrics,
     utils::{
@@ -166,6 +166,16 @@ pub(super) async fn run_pipelines<T: Clone>(
     (outputs, failures)
 }
 
+/// Partition time levels of one metrics stream by data timestamp, read from the
+/// cached stream settings (see `infra::schema::get_stream_partition_time_levels`).
+pub(super) async fn stream_partition_time_levels(
+    org_id: &str,
+    stream_name: &str,
+) -> PartitionTimeLevels {
+    let settings = infra::schema::get_settings(org_id, stream_name, StreamType::Metrics).await;
+    infra::schema::get_stream_partition_time_levels(StreamType::Metrics, settings.as_deref())
+}
+
 /// The stream's schema once `records` are in it, as the write path keys and partitions by it.
 pub(super) async fn resolve_batch_schema(
     org_id: &str,
@@ -282,13 +292,13 @@ pub(super) async fn buffer_stream_records(
     records: impl IntoIterator<Item = (json::Map<String, json::Value>, i64)>,
     schema: &Arc<Schema>,
     schema_key: &str,
+    partition_time_levels: PartitionTimeLevels,
     partition_keys: Option<&Vec<StreamPartition>>,
     alerts: Option<&Vec<alert::Alert>>,
     partitions: &mut HashMap<String, SchemaRecords>,
 ) -> Option<TriggerAlertData> {
     let partition_keys = partition_keys.unwrap_or(&NO_PARTITION_KEYS);
-    let partition_time_level = infra::schema::get_partition_time_level(StreamType::Metrics);
-    let mut partition_memo = PartitionMemo::new(partition_keys, partition_time_level);
+    let mut partition_memo = PartitionMemo::with_levels(partition_keys, partition_time_levels);
     let alert_keys: Vec<String> = alerts
         .map(|alerts| {
             alerts
@@ -668,7 +678,19 @@ mod tests {
             (record, *ts)
         });
         let mut partitions = HashMap::new();
-        buffer_stream_records("org", records, &schema, "key", None, None, &mut partitions).await;
+        buffer_stream_records(
+            "org",
+            records,
+            &schema,
+            "key",
+            PartitionTimeLevels::uniform(infra::schema::get_partition_time_level(
+                StreamType::Metrics,
+            )),
+            None,
+            None,
+            &mut partitions,
+        )
+        .await;
 
         let level = infra::schema::get_partition_time_level(StreamType::Metrics);
         for ts in timestamps {
@@ -678,6 +700,60 @@ mod tests {
         }
         let written: usize = partitions.values().map(|p| p.records.len()).sum();
         assert_eq!(partitions.len(), 4);
+        assert_eq!(written, timestamps.len());
+    }
+
+    #[tokio::test]
+    async fn test_buffer_stream_records_keys_by_the_level_of_each_record() {
+        use config::meta::stream::PartitionTimeLevel;
+        const DAY: i64 = 86_400_000_000;
+        const HOUR: i64 = 3_600_000_000;
+        let switch = 20_000 * DAY;
+        // hourly before the switch, daily from it on
+        let levels = PartitionTimeLevels::from_changes([
+            (0, PartitionTimeLevel::Hourly),
+            (switch, PartitionTimeLevel::Daily),
+        ]);
+        let schema = Arc::new(Schema::empty());
+        let timestamps = [
+            switch - 2 * HOUR + 1,
+            switch - HOUR + 1,
+            switch + 1,
+            switch + 5 * HOUR,
+            switch + 23 * HOUR,
+            switch - HOUR + 2,
+        ];
+        let records = timestamps.iter().map(|ts| {
+            let mut record = json::Map::new();
+            record.insert("host".to_string(), json::json!("a"));
+            (record, *ts)
+        });
+        let mut partitions = HashMap::new();
+        buffer_stream_records(
+            "org",
+            records,
+            &schema,
+            "key",
+            levels.clone(),
+            None,
+            None,
+            &mut partitions,
+        )
+        .await;
+
+        for ts in timestamps {
+            let expected = get_write_partition_key(
+                ts,
+                &Vec::new(),
+                levels.at(ts),
+                &json::Map::new(),
+                Some("key"),
+            );
+            assert!(partitions.contains_key(&expected), "{ts}");
+        }
+        // two hours before the switch, one day after it
+        assert_eq!(partitions.len(), 3);
+        let written: usize = partitions.values().map(|p| p.records.len()).sum();
         assert_eq!(written, timestamps.len());
     }
 }
