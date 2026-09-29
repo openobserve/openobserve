@@ -140,6 +140,9 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
         defaultPrivacyLevel: "allow",
+        // Session renewal drops the forced replay start, so sampling must keep every renewed session recording.
+        sessionReplaySampleRate: 100,
+        startSessionReplayRecordingManually: true,
         // Same-origin only: cross-origin (dev against a remote cluster) the
         // injected headers fail the CORS preflight and kill every API call.
         // See shouldPropagateTracing.

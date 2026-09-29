@@ -117,8 +117,13 @@ test.describe("Enrichment data testcases", () => {
         const fileContentPath = "../test-data/enrichment_info.csv";
         await pm.enrichmentPage.uploadAndExploreEnrichmentTable(fileContentPath, fileName);
 
-        // Clean up - delete the uploaded table
+        // Verify the uploaded table actually landed in the enrichment tables list
+        // (the upload-and-explore workflow itself asserted nothing about persistence).
         await pm.enrichmentPage.navigateToEnrichmentTable();
+        await pm.enrichmentPage.searchEnrichmentTableInList(fileName);
+        await pm.enrichmentPage.verifyTableVisibleInList(fileName);
+
+        // Clean up - delete the uploaded table
         await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
 
         testLogger.info('Enrichment table upload test completed');
