@@ -258,7 +258,8 @@
       "theme.spec.js",
       "languageTranslation.spec.js",
       "edition-features.spec.js",
-      "onboarding-form-validation.spec.js"
+      "onboarding-form-validation.spec.js",
+      "settings-query-management-redirect.spec.js"
     ],
     "disabled": []
   },
