@@ -133,4 +133,18 @@ describe("OSearchInput", () => {
     expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("debounced");
     vi.useRealTimers();
   });
+
+  it("floors its phone width so a flex-1 search can share the toolbar row", () => {
+    wrapper = mount(OSearchInput, { attrs: { class: "flex-1" } });
+    expect(wrapper.classes()).toContain("max-md:min-w-32");
+    expect(wrapper.classes()).toContain("flex-1");
+  });
+
+  it.each(["min-w-0 flex-1", "flex-1 max-md:min-w-40", "min-w-48"])(
+    "keeps the caller's own width floor (%s)",
+    (cls) => {
+      wrapper = mount(OSearchInput, { attrs: { class: cls } });
+      expect(wrapper.classes()).not.toContain("max-md:min-w-32");
+    },
+  );
 });
