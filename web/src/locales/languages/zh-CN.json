@@ -14141,6 +14141,7 @@
       "removeVariable": "移除变量 {name}",
       "secretTooltip": "机密 — 该值会被隐藏并安全发送。",
       "collapsePanel": "折叠变量",
+      "closePanel": "关闭变量",
       "openPanel": "显示变量",
       "removeTitle": "移除变量？",
       "removeBody": "{name} 将从此检查中移除。",
@@ -14185,13 +14186,13 @@
       "namePlaceholder": "我的浏览器检查",
       "removeTag": "删除标签 {tag}",
       "startingUrl": "起始 URL",
+      "startingUrlNotOpened": "未打开 — 第一步执行导航。",
       "startingUrlPlaceholder": "https://example.com",
       "tagPlaceholder": "添加标签并按回车",
       "tags": "标签",
       "title": "检查详情",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health",
-      "startingUrlNotOpened": "未打开 — 第一步执行导航。"
+      "urlTargetPlaceholder": "https://api.example.com/health"
     },
     "createBrowserTest": {
       "buildManually": "手动构建",
@@ -14249,6 +14250,12 @@
       "deleteSingleTitle": "删除检查",
       "duplicateTitle": "复制检查"
     },
+    "delete": {
+      "blockedTitle": "“{name}”正被其他测试使用",
+      "blockedBulkTitle": "所选的 {count} 个测试正被此选择之外的测试使用",
+      "blockedBody": "请先移除这些引用，或将这些测试一起删除。",
+      "hiddenReferences": "{count} 个您无权访问的测试"
+    },
     "empty": {
       "browserTests": "未找到浏览器测试。",
       "checks": "未找到检查。调整筛选条件或创建您的第一个检查。"
@@ -14279,6 +14286,41 @@
       "checks": "检查"
     },
     "journey": {
+      "extract": {
+        "action": "提取为子测试",
+        "title": "将 {count} 个步骤提取到新测试",
+        "subtitle": "这些步骤将移入现在创建的新浏览器测试。此流程会在原位置保留一个子测试引用 — 保存此测试以保留它。",
+        "confirm": "提取",
+        "nameLabel": "测试名称",
+        "folderLabel": "文件夹",
+        "labelThisTest": "此测试",
+        "nameTooLong": "名称请保持在 256 字节以内",
+        "steps": "步骤 {first} · 从 {path} 开始 | 步骤 {first} – {last} · 从 {path} 开始",
+        "thisTest": "提取后 {authored} 个步骤 · 运行相同的 {executed} 个步骤",
+        "thisTestAuthored": "提取后 {authored} 个步骤",
+        "schedule": "{locations} · {frequency}（与此测试相同）",
+        "status": "以暂停状态创建。在您启用之前，仅作为此测试的一部分运行。",
+        "variablesCopied": "已复制到新测试：{names}。",
+        "variablesToDefine": "在单独运行之前，请在新测试中定义：{names}。",
+        "every": "每 {n} {unit}",
+        "unit": {
+          "minutes": "分钟",
+          "hours": "小时"
+        },
+        "historyNotice": "步骤历史将重新开始。这些步骤在新测试中会获得新的 ID，因此按步骤的图表从今天起拆分。",
+        "created": "已创建“{name}”。保存此测试以保留引用。",
+        "orphan": "已创建“{name}”，但无法更新此流程。请打开新测试或将其删除。",
+        "folderForbidden": "您无法在“{folder}”中创建测试。请选择其他文件夹。",
+        "reason": {
+          "not-contiguous": "请选择相邻的步骤",
+          "not-contiguous-filtered": "请选择相邻的步骤 — 清除筛选以查看完整列表",
+          "contains-subtest": "子测试不能包含另一个子测试",
+          "referenced": "此测试正被其他测试作为子测试使用，因此不能包含子测试",
+          "referenced-pending": "正在检查此测试的使用位置…",
+          "referenced-unknown": "无法检查此测试的使用位置",
+          "undefined-placeholder": "提取前请在“变量”中定义 {name}"
+        }
+      },
       "actionLabels": {
         "navigate": "导航",
         "click": "点击",
@@ -14414,7 +14456,6 @@
       "advancedSettleHeading": "操作之后——让页面稳定",
       "advancedTimeoutHeading": "操作期间——超时后放弃",
       "advancedFailureHeading": "如果失败",
-      "addStep": "添加步骤",
       "addStepManually": "手动添加步骤",
       "bulkDeleteStepsBody": "删除 {count} 个步骤？此操作无法撤消。 | 删除 {count} 个步骤？此操作无法撤消。",
       "bulkDeleteStepsTitle": "删除步骤",
@@ -14474,6 +14515,13 @@
       "stepNamePurposePlaceholder": "使用有效凭据登录",
       "stepNumberAria": "步骤 {number} {state}",
       "steps": "步骤",
+      "stepCount": {
+        "caption": "{count} 步 | {count} 步",
+        "captionWithSubtests": "{steps} 步（含 {count} 个子测试）| {steps} 步（含 {count} 个子测试）",
+        "tooltip": "{breakdown}。此测试执行允许的 {limit} 步中的 {count} 步。",
+        "tooltipOwn": "此测试中有 {count} 步 | 此测试中有 {count} 步",
+        "tooltipSubtest": "来自 \"{name}\" 的 {count} 个"
+      },
       "stop": "停止",
       "stopping": "正在停止…",
       "timeoutBelowDefaultWarning": "低于此步骤的 {default} 毫秒默认值。超时时间短于应用程序实际响应时间是导致误报的最常见原因。",
@@ -14482,78 +14530,136 @@
       "showSetupSteps": "显示设置步骤",
       "waitingForActions": "等待浏览器中的操作…",
       "unboundVariables": "{names} 未在此检查项、其环境或全局中定义，因此按原样输入。 | {names} 未在此检查项、其环境或全局中定义，因此按原样输入。",
-      "addSubtest": "添加子测试",
-      "extract": {
-        "action": "提取为子测试",
-        "confirm": "提取",
-        "created": "已创建“{name}”。保存此测试以保留引用。",
-        "every": "每 {n} {unit}",
-        "folderForbidden": "您无法在“{folder}”中创建测试。请选择其他文件夹。",
-        "folderLabel": "文件夹",
-        "historyNotice": "步骤历史将重新开始。这些步骤在新测试中会获得新的 ID，因此按步骤的图表从今天起拆分。",
-        "labelThisTest": "此测试",
-        "nameLabel": "测试名称",
-        "nameTooLong": "名称请保持在 256 字节以内",
-        "orphan": "已创建“{name}”，但无法更新此流程。请打开新测试或将其删除。",
-        "reason": {
-          "contains-subtest": "子测试不能包含另一个子测试",
-          "not-contiguous": "请选择相邻的步骤",
-          "not-contiguous-filtered": "请选择相邻的步骤 — 清除筛选以查看完整列表",
-          "referenced": "此测试正被其他测试作为子测试使用，因此不能包含子测试",
-          "referenced-pending": "正在检查此测试的使用位置…",
-          "referenced-unknown": "无法检查此测试的使用位置",
-          "undefined-placeholder": "提取前请在“变量”中定义 {name}"
-        },
-        "schedule": "{locations} · {frequency}（与此测试相同）",
-        "status": "以暂停状态创建。在您启用之前，仅作为此测试的一部分运行。",
-        "steps": "步骤 {first} · 从 {path} 开始 | 步骤 {first} – {last} · 从 {path} 开始",
-        "subtitle": "这些步骤将移入现在创建的新浏览器测试。此流程会在原位置保留一个子测试引用 — 保存此测试以保留它。",
-        "thisTest": "提取后 {authored} 个步骤 · 运行相同的 {executed} 个步骤",
-        "thisTestAuthored": "提取后 {authored} 个步骤",
-        "title": "将 {count} 个步骤提取到新测试",
-        "unit": {
-          "hours": "小时",
-          "minutes": "分钟"
-        },
-        "variablesCopied": "已复制到新测试：{names}。",
-        "variablesToDefine": "在单独运行之前，请在新测试中定义：{names}。"
-      },
       "subtest": {
-        "capChild": "来自“{name}”的 {count} 个",
-        "capOwn": "自身 {count} 个",
-        "capRemedy": "移除一个子测试，或缩减此测试自身的步骤。",
-        "capTitle": "此测试执行 {total} 个步骤 — 上限为 {limit}。",
+        "pickLabel": "在此运行的测试",
         "delta": "添加“{name}”后，此测试的执行步骤从 {before} → {after}。上限为 {limit}。",
-        "deltaUnknown": "步骤影响未知 — 无法加载被引用的测试。",
-        "failedAt": "{number} — {step}",
-        "ignoredEnv": "其起始 URL、变量、认证和 Cookie 在此被忽略 — 采用父测试的设置。",
         "lastRun": "其上次运行耗时 {seconds} 秒，允许上限为 {budget} 秒。",
+        "deltaUnknown": "步骤影响未知 — 无法加载被引用的测试。",
         "lastRunUnknown": "时间影响未知 — 此测试尚未完成任何运行。",
+        "raiseBudget": "如果此测试开始被中断，请提高其运行时长限制。",
+        "stepsBadge": "{count} 个步骤",
+        "ignoredEnv": "其起始 URL、变量、认证和 Cookie 在此被忽略 — 采用父测试的设置。",
         "noAccess": "您无权访问“{name}”，因此无法在此显示其步骤。",
-        "noAccessBadge": "无权访问",
+        "noAccessToast": "您无权访问此测试引用的某个测试。",
+        "progressAria": "{total} 个子步骤中已完成 {done} 个",
+        "previewLabel": "在此运行的步骤",
+        "openChild": "打开“{name}”",
         "noAccessRemedy": "请申请其所在文件夹的读取权限，或移除该引用。",
         "disabledTooltip": "此部署未启用子测试。",
         "loadFailed": "无法加载此子测试，因此其步骤和步骤数未知。",
         "missing": "此子测试已不存在。请移除引用，或选择其他测试。",
-        "noAccessToast": "您无权访问此测试引用的某个测试。",
-        "notRun": "未运行",
-        "openChild": "打开“{name}”",
-        "pickEmpty": "此组织中还没有其他浏览器测试。",
-        "pickLabel": "在此运行的测试",
-        "pickLastRun": "{status} {ago}",
-        "pickLoadFailed": "无法加载浏览器测试列表。请重试。",
+        "noAccessBadge": "无权访问",
         "pickNested": "已包含子测试 — 嵌套仅限一层",
         "pickGroupUsable": "可在此处使用",
         "pickGroupBlocked": "无法在此处使用",
-        "pickSteps": "{count} 个步骤",
         "pickUsedBy": "被 {count} 个测试使用",
-        "previewLabel": "在此运行的步骤",
-        "progressAria": "{total} 个子步骤中已完成 {done} 个",
-        "raiseBudget": "如果此测试开始被中断，请提高其运行时长限制。",
-        "stepsBadge": "{count} 个步骤",
+        "pickSteps": "{count} 个步骤",
+        "pickLastRun": "{status} {ago}",
+        "pickEmpty": "此组织中还没有其他浏览器测试。",
+        "pickLoadFailed": "无法加载浏览器测试列表。请重试。",
         "undefinedVariable": "“{name}”使用了此测试未定义的 {variable}。",
-        "undefinedVariableAction": "在“变量”中添加"
-      }
+        "undefinedVariableAction": "在“变量”中添加",
+        "failedAt": "{number} — {step}",
+        "notRun": "未运行",
+        "capTitle": "此测试执行 {total} 个步骤 — 上限为 {limit}。",
+        "capOwn": "自身 {count} 个",
+        "capChild": "来自“{name}”的 {count} 个",
+        "capRemedy": "移除一个子测试，或缩减此测试自身的步骤。"
+      },
+      "subtestMenu": {
+        "help": "复用共享流程。对其所做的编辑会更新所有使用它的测试。",
+        "searchPlaceholder": "搜索测试",
+        "loading": "正在加载测试…",
+        "noMatch": "没有匹配 \"{query}\" 的测试",
+        "addRow": "将 \"{name}\" 添加为子测试",
+        "blockedGroup": "无法嵌套",
+        "tip": "提示：选择步骤，然后点击“提取为子测试”来创建。",
+        "pickFailed": "无法添加 {name}。请重试。"
+      },
+      "replayValues": {
+        "secretUnreadable": "{name} 是 {environment} 中的密钥。回放会在您的浏览器中运行，无法读取已存储的密钥。",
+        "recordUnresolved": "无法开始录制：{name} 在 {environment} 中没有值。",
+        "global": "全局",
+        "saveFailed": "无法保存该值"
+      },
+      "missingValue": {
+        "title": "{name} 未在 {environment} 中定义",
+        "body": "步骤 {steps} 使用了 {placeholder}。{environment}、全局和此测试都没有为其提供值，因此 {environment} 中的定时运行也会失败。 | 步骤 {steps} 使用了 {placeholder}。{environment}、全局和此测试都没有为其提供值，因此 {environment} 中的定时运行也会失败。",
+        "bodyStartingUrl": "起始 URL 使用了 {placeholder}。{environment}、全局和此测试都没有为其提供值，因此 {environment} 中的定时运行也会失败。",
+        "valueLabel": "{environment} 中 {name} 的值",
+        "valueRequired": "输入值",
+        "storeAsSecret": "存储为密钥",
+        "sharedWarning": "{environment} 由 {count} 个检查共享。该值会立即保存并被所有检查使用；它不会等待“保存并退出”。 | {environment} 由 {count} 个检查共享。该值会立即保存并被所有检查使用；它不会等待“保存并退出”。",
+        "globalWarning": "全局值适用于每个检查。该值会立即保存并被所有检查使用；它不会等待“保存并退出”。",
+        "replayAnyway": "仍然回放",
+        "saveAndReplay": "保存并回放",
+        "bodyGlobal": "步骤 {steps} 使用了 {placeholder}。全局和此测试都没有为其提供值，因此定时运行也会失败。 | 步骤 {steps} 使用了 {placeholder}。全局和此测试都没有为其提供值，因此定时运行也会失败。",
+        "bodyStartingUrlGlobal": "起始 URL 使用了 {placeholder}。全局和此测试都没有为其提供值，因此定时运行也会失败。",
+        "kindLockedSecret": "该变量已存储为密钥。",
+        "kindLockedPlain": "该变量已存储为纯文本。"
+      },
+      "startPill": {
+        "urlAria": "起始 URL：{url}。编辑",
+        "editUrl": "编辑起始 URL",
+        "editEnvironments": "更改环境",
+        "noUrl": "设置起始 URL",
+        "urlTitle": "起始 URL",
+        "urlHelp": "在第 1 步之前打开。可使用变量按环境更改它。",
+        "opensIn": "在此测试的环境中打开：",
+        "envAria": "环境：无，仅使用全局值。更改 | 环境：已选择 {count} 个。更改 | 环境：已选择 {count} 个。更改",
+        "envTitle": "测试环境",
+        "envHelp": "随测试保存。每次定时运行会按环境和位置各执行一次，并打开：",
+        "noAccess": "无访问权限",
+        "capLine": "{cap} 中的 {count} · 全局值始终适用",
+        "runsIn": "运行于",
+        "envOverflow": "{first} +{count}",
+        "urlNotChanged": "起始 URL 未更改：{reason}"
+      },
+      "replayEnv": {
+        "buttonLabel": "回放 · {environment}",
+        "menuAria": "回放环境",
+        "menuTitle": "在其中回放和录制",
+        "sessionOnly": "仅本次会话 — 不会随测试保存。",
+        "inTest": "已选环境",
+        "notInTest": "其他环境",
+        "selected": "已选",
+        "inLabel": "测试环境",
+        "triggerAria": "重放环境:{environment}"
+      },
+      "replaySecrets": {
+        "title": "{environment} 中此次重放的密钥",
+        "fieldLabel": "{name} · {environment} 中的密钥 · 由步骤 {steps} 使用 | {name} · {environment} 中的密钥 · 由步骤 {steps} 使用",
+        "valueRequired": "输入密钥的值",
+        "why": "定时运行使用已存储的密钥。重放在浏览器中运行,无法读取该密钥。",
+        "memoryOnly": "保留在内存中,直到你关闭此标签页。永不保存。",
+        "lastFailed": "上次重放在步骤 {step} 使用此值失败。",
+        "forget": "忘记此值",
+        "replayIn": "在 {environment} 中重放",
+        "saveAndRerun": "保存并重新运行",
+        "menuItem": "密钥 · 已输入 {entered}/{needed}",
+        "menuAria": "{environment} 重放的密钥:已输入 {entered}/{needed}。编辑",
+        "usesTyped": "重放 · {environment} — 使用你输入的密钥",
+        "passedNote": "使用了你输入的密钥;未测试已存储的密钥。",
+        "failedTitle": "在 {environment} 中的重放在步骤 {failed}/{total} 失败",
+        "failedNote": "步骤 {step} 使用了 {name},这是你为本次会话输入的密钥。",
+        "changeValue": "更改值"
+      },
+      "addMenu": {
+        "addStep": "添加步骤",
+        "stepHint": "单个操作",
+        "subtestHint": "复用共享流程",
+        "addSubtest": "添加子测试"
+      },
+      "usedBy": {
+        "aria": "使用此测试的测试",
+        "help": "它们在自己的页面上运行这些步骤。此测试的起始 URL、环境和密钥在那里不会被使用。",
+        "viewAll": "查看全部 {count} 个测试",
+        "subtitle": "{folder} · 被 {count} 个测试使用 | {folder} · 被 {count} 个测试使用",
+        "subtitleNoFolder": "被 {count} 个测试使用 | 被 {count} 个测试使用"
+      },
+      "recordingIn": "正在 {environment} 中录制",
+      "needsDesktopRecorder": "需要桌面录制器扩展",
+      "moreActions": "更多操作"
     },
     "labels": {
       "copyOf": "{name} 的副本",
@@ -14887,9 +14993,11 @@
       "detailSelector": "选择器",
       "downloadTrace": "下载 {filename}",
       "errorFullscreenTitle": "步骤 {id}: {action} - 错误",
+      "failedAtStartLoad": "打开起始 URL 失败",
       "failedAtStep": "在步骤 {step} 失败",
       "failedCount": "{count} 失败",
       "failureScreenshot": "失败截图",
+      "startLoadLabel": "打开 {url}",
       "lightboxTitle": "步骤 {id}: {action}",
       "loadFailed": "加载运行数据失败",
       "locations": "位置",
@@ -14932,9 +15040,7 @@
       "pageActivity": "页面活动",
       "pageActivityEvents": "{count} 个事件 | {count} 个事件",
       "pageActivityViewAllShort": "在 Evidence 中查看全部",
-      "expandScreenshot": "展开",
-      "failedAtStartLoad": "打开起始 URL 失败",
-      "startLoadLabel": "打开 {url}"
+      "expandScreenshot": "展开"
     },
     "runRowExpansion": {
       "browserHeader": "浏览器",
@@ -14989,6 +15095,12 @@
       "windowMinutes": "过去 {minutes} 分钟",
       "filteringByErrorLabel": "按错误筛选：",
       "errorPatternsWindowDesc": "跨 {window} 归一化 · 点击行筛选运行"
+    },
+    "save": {
+      "usedByTitle": "使用“{name}”的 {count} 个测试将开始失败",
+      "usedByBody": "此更改新增了 {names}。上面列出的测试没有定义它，因此在它们下次运行时仍无法解析。",
+      "blockedBody": "保存未成功。请先移除这些引用，然后重新保存。",
+      "usedByCount": "被 {count} 个测试使用"
     },
     "scheduleAlert": {
       "addNewDestination": "添加新目标",
@@ -15165,6 +15277,8 @@
     "validation": {
       "locationsRequired": "至少选择一个位置",
       "nameRequired": "名称是必填项",
+      "startUrlHostMismatch": "此测试打开 {host}，但其步骤导航到 {other}。",
+      "stepIdReserved": "此步骤 ID 已保留给本次运行的起始 URL",
       "locatorRequired": "至少添加一个定位器，以便此步骤知道要对哪个元素执行操作。",
       "selectorRequired": "\"{step}\" 未指明要对哪个元素执行操作。",
       "stepNameRequired": "为此步骤命名 — 运行结果将显示该名称。",
@@ -15175,15 +15289,13 @@
       "urlRequired": "起始 URL 是必填项",
       "fixHighlightedFields": "保存前请修正高亮字段",
       "retiredAction": "\"{action}\" 不再受支持 — 请移除或替换 \"{step}\"。",
+      "subtestRequired": "请选择在此运行的测试",
+      "subtestFlags": "子测试不能设为可选或始终运行 — 它的失败总会导致此测试失败",
       "runBudgetExceeded": "此检查每次运行最多可能需要 {worstCase}，超过 {limit} 限制。请移除浏览器/设备组合，或降低重试次数。（{combos} 个组合 × {attempts} 次尝试 × 每次 {perAttempt}。）",
       "runBudgetRetriesHint": "降低重试次数可使此检查回到 {limit} 运行限制内。",
       "folderUnavailable": "文件夹 \"{folder}\" 在此组织中不可用 — 将保存到默认文件夹。",
       "compositionChildFailed": "“{name}”在保存时未通过校验 — 请打开它查看需要修复的步骤。",
-      "startUrlHostMismatch": "此测试打开 {host}，但其步骤导航到 {other}。",
-      "stepIdReserved": "此步骤 ID 已保留给本次运行的起始 URL",
-      "subtestCap": "执行的步骤过多 — 请查看步骤上方的提示。",
-      "subtestFlags": "子测试不能设为可选或始终运行 — 它的失败总会导致此测试失败",
-      "subtestRequired": "请选择在此运行的测试"
+      "subtestCap": "执行的步骤过多 — 请查看步骤上方的提示。"
     },
     "privateLocations": {
       "searchPlaceholder": "搜索位置...",
@@ -15273,19 +15385,7 @@
     "secondsAgo": "{count} 秒前",
     "stepsQueryFailed": "步骤查询失败",
     "queryFailed": "查询失败",
-    "relationNotContaining": "不包含",
-    "delete": {
-      "blockedBody": "请先移除这些引用，或将这些测试一起删除。",
-      "blockedBulkTitle": "所选的 {count} 个测试正被此选择之外的测试使用",
-      "blockedTitle": "“{name}”正被其他测试使用",
-      "hiddenReferences": "{count} 个您无权访问的测试"
-    },
-    "save": {
-      "blockedBody": "保存未成功。请先移除这些引用，然后重新保存。",
-      "usedByBody": "此更改新增了 {names}。上面列出的测试没有定义它，因此在它们下次运行时仍无法解析。",
-      "usedByTitle": "使用“{name}”的 {count} 个测试将开始失败",
-      "usedByCount": "被 {count} 个测试使用"
-    }
+    "relationNotContaining": "不包含"
   },
   "statusPages": {
     "tabTitle": "状态页",
@@ -15528,7 +15628,8 @@
       "actions": "操作",
       "rum": "RUM",
       "runningQueries": "运行中的查询",
-      "oncall": "值班"
+      "oncall": "值班",
+      "synthetics": "合成监控"
     },
     "pages": {
       "global": "全局",
@@ -15579,7 +15680,8 @@
       "rumSessions": "{product} — 会话",
       "sourceMaps": "RUM — 源映射",
       "oncall": "值班",
-      "oncallDetail": "值班页面"
+      "oncallDetail": "值班页面",
+      "syntheticsJourney": "合成监控旅程"
     },
     "actions": {
       "openCheatsheet": "打开键盘快捷键备忘单",
