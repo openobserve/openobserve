@@ -24,7 +24,7 @@ export const pagerdutyTemplate = {
   body: JSON.stringify(
     {
       payload: {
-        summary: "OpenObserve Alert: {alert_name}",
+        summary: "OpenObserve [{alert_status}]: {alert_name}",
         severity: "{severity}",
         source: "{source}",
         component: "{stream_name}",

@@ -354,6 +354,10 @@
       "title": "Keine Traces gefunden",
       "description": "Keine Traces entsprechen dem ausgewählten Dienst und Zeitraum. Versuchen Sie einen größeren Zeitraum oder einen anderen Dienst."
     },
+    "noProfiles": {
+      "title": "Keine Profile gefunden",
+      "description": "Ihr Zeitfenster enthält keine Profildaten aus diesem Stream. Versuchen Sie einen größeren Zeitraum oder einen anderen Dienst."
+    },
     "noServiceGraph": {
       "title": "Keine Service-Graph-Daten",
       "description": "Versuchen Sie, einen längeren Zeitraum abzufragen, oder stellen Sie sicher, dass Ihre Dienste Span-Metriken ausgeben."
@@ -421,6 +425,7 @@
       "alerts": "Warnungen",
       "incidents": "Vorfälle",
       "traces": "Traces",
+      "profiles": "Profile",
       "discoveryItems": "ungesunde Elemente",
       "datasetItems": "Elemente",
       "searches": "sucht",
@@ -1306,6 +1311,8 @@
     "tagKey": "Tag-Schlüssel",
     "tagValue": "Tag-Wert",
     "addFilter": "Filter hinzufügen",
+    "removeFilter": "Filter {key}={value} entfernen",
+    "searchFrames": "Frames durchsuchen",
     "runQuery": "Abfrage ausführen",
     "timeSeriesTitle": "Profilwerte im Zeitverlauf",
     "resultTitle": "Profilergebnis",
@@ -1314,14 +1321,28 @@
     "viewTree": "Stack-Baum",
     "self": "Eigen",
     "total": "Gesamt",
+    "share": "Teilen",
     "cpuDuration": "CPU-Dauer",
     "percent": "%",
+    "sortBySelf": "Nach Self sortieren",
+    "sortByTotal": "Nach Gesamt sortieren",
     "noStreams": "Keine Profil-Streams verfügbar",
-    "noSeries": "Keine Zeitreihendaten in diesem Bereich",
-    "noResults": "Kein Profilergebnis in diesem Bereich",
+    "noSeries": "Keine Daten",
+    "noResults": "Keine Profile gefunden",
+    "noProfilesFound": "Keine Profile gefunden",
+    "noProfilesFoundDesc": "Ihr Zeitfenster enthält keine Profildaten aus diesem Stream. Versuchen Sie einen größeren Zeitraum oder einen anderen Dienst.",
+    "loading": "Profile werden geladen…",
     "filters": "Filter",
     "expand": "Erweitern",
     "collapse": "Einklappen",
+    "resetFocus": "Fokus zurücksetzen",
+    "labelAlign": "Label-Ausrichtung",
+    "alignLeft": "Linksbündig",
+    "alignRight": "Rechtsbündig",
+    "inverted": "Invertiert",
+    "copyFunctionName": "Funktionsnamen kopieren",
+    "focusBlock": "Block fokussieren",
+    "focusOfTotal": "{percent}% der Gesamtsumme",
     "errors": {
       "loadFailed": "Profildaten konnten nicht geladen werden"
     }
@@ -2771,6 +2792,13 @@
         "node": "Alert-Trigger",
         "desc": "Ausführen, wenn ein Alert ausgelöst wird",
         "intro": "Wenn ein verknüpfter Alert ausgelöst wird, erhält jeder nachgelagerte Schritt diese Payload."
+      },
+      "alertResolved": {
+        "label": "Warnmeldung behoben",
+        "tab": "Behoben",
+        "node": "Auslöser: Warnmeldung behoben",
+        "desc": "Ausführen, wenn sich eine ausgelöste Warnmeldung erholt",
+        "intro": "Wenn sich eine ausgelöste Warnmeldung erholt, erhält jeder nachgelagerte Schritt diese Nutzlast."
       },
       "incidentEvent": {
         "label": "Incident-Ereignis",
@@ -7435,6 +7463,8 @@
         "streamName": "Name des Streams, den der Alert überwacht",
         "alertName": "Name des Alerts",
         "alertType": "Alert-Typ (z. B. geplant, Echtzeit)",
+        "alertStatus": "firing oder resolved – damit unterscheidet sich eine Wiederherstellungsnachricht von einer neuen Warnmeldung",
+        "episodeId": "Eindeutige ID für diese Auslösung, die auch für deren Wiederherstellung gilt. Wird automatisch an PagerDuty, Opsgenie und ServiceNow gesendet, damit die Warnmeldung behoben werden kann.",
         "alertPeriod": "Auswertungsfenster in Minuten",
         "alertOperator": "Schwellwert-Vergleichsoperator (>, <, =)",
         "alertThreshold": "Der konfigurierte Schwellwert",
@@ -7449,7 +7479,19 @@
         "alertTriggerTimeSeconds": "Auslösezeit in Epoch-Sekunden",
         "alertTriggerTimeStr": "Auslösezeit (menschenlesbar)",
         "rows": "Alle übereinstimmenden Zeilen, formatiert durch die Zeilenvorlage"
-      }
+      },
+      "notifyOnRecovery": "Bei Wiederherstellung benachrichtigen",
+      "notifyOnRecoveryTooltip": "Senden Sie eine Nachricht an die oben genannten Ziele, wenn diese Warnmeldung nicht mehr ausgelöst wird.",
+      "notifyOnRecoveryTemplateHint": "Ziele, die Ihre Vorlage wiederverwenden, müssen {'{'}alert_status{'}'} enthalten, sonst sieht die Wiederherstellungsnachricht wie eine neue Warnmeldung aus.",
+      "recoveryDestinations": "Wiederherstellungsziel",
+      "recoveryDestinationsTooltip": "Leer lassen, um die Wiederherstellung überall dort zu melden, wo die Warnmeldung ausgelöst wurde. Wählen Sie hier Ziele, um sie stattdessen woandershin zu senden. PagerDuty, Opsgenie und ServiceNow schließen weiterhin das Ticket, das ihre eigene Auslösung geöffnet hat.",
+      "recoveryResolvesIncident": "behebt den Vorfall",
+      "recoveryClosesAlert": "schließt die Warnmeldung",
+      "recoveryChatMessage": "neue \"Behoben\"-Nachricht",
+      "keepFiringFor": "Weiter auslösen für",
+      "keepFiringForTooltip": "So lange warten, nachdem die Bedingung nicht mehr erfüllt ist, bevor die Wiederherstellung erfolgt. 0 stellt sofort wieder her.",
+      "keepFiringForInvalid": "Geben Sie 0 oder mehr Sekunden ein",
+      "keepFiringForTooLong": "Geben Sie höchstens 86400 Sekunden (24 Stunden) ein"
     },
     "advanced": {
       "addVariable": "Variable hinzufügen",
@@ -7680,6 +7722,8 @@
       "servicenowPasswordHelp": "ServiceNow-Passwort oder API-Token",
       "servicenowAssignmentGroup": "Zuweisungsgruppe (optional)",
       "servicenowAssignmentGroupHelp": "Gruppe, der Vorfälle zugewiesen werden (z. B. IT-Betrieb)",
+      "servicenowResolutionCode": "Lösungscode (optional)",
+      "servicenowResolutionCodeHelp": "Muss mit einem gültigen Lösungscode in Ihrer ServiceNow-Instanz übereinstimmen. Wird verwendet, wenn OpenObserve den Vorfall behebt. Standard ist Solved (Permanently).",
       "usernameRequired": "Benutzername ist erforderlich",
       "passwordRequired": "Passwort ist erforderlich",
       "emailRecipients": "E-Mail-Adressen der Empfänger",
@@ -7976,7 +8020,8 @@
     "sloKind": "Bedingungstyp",
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
-    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden."
+    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
+    "seconds": "Sekunden"
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -8174,6 +8219,7 @@
     "filterPrebuilt": "Vorgefertigt",
     "filterCustom": "Benutzerdefiniert",
     "variableRowsDescription": "mehrere Zeilen der Zeilenvorlage",
+    "variableEpisodeIdDescription": "Eindeutige ID für diese Auslösung. Wird automatisch zu den PagerDuty-, Opsgenie- und ServiceNow-Nutzlasten hinzugefügt, damit die Warnmeldung behoben werden kann.",
     "variableStreamFields": "Alle Stream-Felder sind Variablen.",
     "variableLimits": "{'{'}rows:N{'}'} {'{'}var:N{'}'} wird verwendet, um Zeilen oder Zeichenfolgenlänge zu begrenzen.",
     "variableTimezoneNote": "Timestamp-Variablen ({'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'}, {'{'}alert_trigger_time_str{'}'}) werden in der lokalen Zeitzone des Servers gerendert.",

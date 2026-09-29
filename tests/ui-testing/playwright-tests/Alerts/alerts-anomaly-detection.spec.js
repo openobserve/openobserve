@@ -1182,6 +1182,72 @@ test.describe('Anomaly Detection', () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════════
+  // Look-back window floor — detection window must be at least
+  // Check Every (schedule) + one Detection Resolution (histogram).
+  //
+  // Only the cases that cross the client/server boundary live here: the floor
+  // arithmetic, the hint text and the legacy-row grandfathering are already
+  // pinned by web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.spec.ts
+  // ("look back window floor" and "client grandfathering of legacy rows"), which
+  // mounts the same component. Re-asserting them in a browser buys nothing.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Look-back window floor', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    test.beforeEach(async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('window'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+    });
+
+    // The boundary test saves successfully (wizard closes), so cancel only when
+    // the wizard is still open rather than failing on a missing cancel button.
+    test.afterEach(async () => {
+      if (await pm.anomalyDetectionPage.getSaveBtnLocator().isVisible()) {
+        await pm.anomalyDetectionPage.cancel();
+      }
+    });
+
+    test('a detection window below the floor blocks save and names the minimum', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h');
+      // 3600s is under the 1h 5m floor (schedule + histogram).
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+      await pm.anomalyDetectionPage.save();
+
+      const error = pm.anomalyDetectionPage.getDetectionWindowErrorLocator();
+      await expect(error).toBeVisible();
+      await expect(error).toContainText('at least 1h 5m');
+      // Rejected save keeps the wizard open — it did not create a config.
+      await expect(pm.anomalyDetectionPage.getSaveBtnLocator()).toBeVisible();
+    });
+
+    test('a new config defaults the detection window to 3 hours', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async () => {
+      expect(await pm.anomalyDetectionPage.getDetectionWindowValue()).toBe('3');
+      expect(await pm.anomalyDetectionPage.getDetectionWindowUnit()).toBe('h');
+    });
+
+    test('a window exactly at the floor is accepted', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P2', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h'); // floor 1h 5m
+      await pm.anomalyDetectionPage.setDetectionWindow(65, 'm'); // 3900s, exactly the floor
+
+      // Save must proceed: the boundary is valid, so a rejection here is the
+      // off-by-one regression the strict `<` comparison exists to prevent.
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(false);
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
+    });
+  });
+
   test.afterAll(async ({ browser }) => {
     if (
       !process.env.ZO_BASE_URL ||
