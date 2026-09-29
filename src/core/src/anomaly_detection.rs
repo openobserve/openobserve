@@ -61,9 +61,16 @@ const WINDOW_FLOOR_RULE: &str =
 #[cfg(feature = "enterprise")]
 const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
 
-/// Timestamp column names a result row is read from, in priority order.
+/// Timestamp column names a result row is read from, in priority order. `zo_sql_timestamp`
+/// is the histogram alias the Logs page generates, so queries copied from there train as-is.
 #[cfg(feature = "enterprise")]
-const TIMESTAMP_COLUMNS: [&str; 4] = ["_timestamp", "timestamp", "time", "time_bucket"];
+const TIMESTAMP_COLUMNS: [&str; 5] = [
+    "_timestamp",
+    "timestamp",
+    "time",
+    "time_bucket",
+    "zo_sql_timestamp",
+];
 
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
@@ -4224,8 +4231,8 @@ mod tests {
     fn test_an_unrecognised_timestamp_column_is_named_as_the_failure() {
         let resp = config::meta::search::Response {
             hits: vec![
-                serde_json::json!({"value": 5, "zo_sql_timestamp": "2026-02-20T13:15:00"}),
-                serde_json::json!({"value": 6, "zo_sql_timestamp": "2026-02-20T13:30:00"}),
+                serde_json::json!({"value": 5, "bucket_start": "2026-02-20T13:15:00"}),
+                serde_json::json!({"value": 6, "bucket_start": "2026-02-20T13:30:00"}),
             ],
             ..Default::default()
         };
@@ -4235,9 +4242,27 @@ mod tests {
         assert!(msg.contains("no usable timestamp column"), "{msg}");
         assert!(!msg.contains("value column"), "value blamed: {msg}");
         assert!(
-            msg.contains("zo_sql_timestamp"),
+            msg.contains("bucket_start"),
             "present columns not named: {msg}"
         );
+    }
+
+    /// `zo_sql_timestamp` is the Logs page's histogram alias; a query copied from there
+    /// must train without renaming it.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_logs_page_histogram_alias_is_accepted_as_the_timestamp() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"value": 6, "zo_sql_timestamp": "2026-02-20T13:30:00"}),
+                serde_json::json!({"value": 5, "zo_sql_timestamp": "2026-02-20T13:15:00"}),
+            ],
+            ..Default::default()
+        };
+        let points = parse_search_results_to_timeseries(&resp, "a1", None).unwrap();
+        assert_eq!(points.len(), 2);
+        assert!(points[0].timestamp_us < points[1].timestamp_us);
+        assert!((points[0].value - 5.0).abs() < f64::EPSILON);
     }
 
     /// The same result set becomes usable once the config declares its column — the
