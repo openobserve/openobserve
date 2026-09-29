@@ -14,12 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { generateTraceContext } from "@/utils/zincutils";
-import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
+import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
 import type {
   OrgTraceTimeRangeResponse,
   TraceTimeRangeOptions,
 } from "@/ts/interfaces/traces/traceTimeRange.types";
+import type { ExemplarApiResponse } from "@/ts/interfaces/exemplars";
+import type { AxiosResponse } from "axios";
 
 const search = {
   search: (
@@ -87,27 +89,21 @@ const search = {
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (validate) url += `&validate=${validate}`;
     // Built once and reused by every post() branch below, so the signal reaches the
-    // multi-stream and aggs paths too — not just the default one.
-    const baseAxiosConfig =
-      page_type === "traces"
-        ? {
-            transformResponse: [
-              (data: string) => {
-                try {
-                  return JSON.parse(patchNsFieldsInJson(data));
-                } catch {
-                  return JSON.parse(data);
-                }
-              },
-            ],
+    // multi-stream and aggs paths too — not just the default one. Always patches
+    // large integers (any field, e.g. a user-defined `userid`, #14376) so
+    // JSON.parse can't silently round them — not just for page_type "traces".
+    const baseAxiosConfig = {
+      transformResponse: [
+        (data: string) => {
+          try {
+            return JSON.parse(patchLargeNumbersInJson(data));
+          } catch {
+            return JSON.parse(data);
           }
-        : undefined;
-    // Only materialise a config object when there is something to put in it, so callers
-    // passing neither a traces transform nor a signal keep the previous `undefined`.
-    const axiosConfig =
-      signal || baseAxiosConfig
-        ? { ...(baseAxiosConfig ?? {}), ...(signal ? { signal } : {}) }
-        : undefined;
+        },
+      ],
+    };
+    const axiosConfig = signal ? { ...baseAxiosConfig, signal } : baseAxiosConfig;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
@@ -269,6 +265,54 @@ const search = {
     // that don't cancel keep the exact single-argument call they had before.
     return signal ? http().get(url, { signal }) : http().get(url);
   },
+  /** Exemplars for the selectors of `query`; the endpoint takes no step and is never cached. */
+  metrics_query_exemplars: ({
+    org_identifier,
+    query,
+    start_time,
+    end_time,
+    dashboard_id,
+    dashboard_name,
+    folder_id,
+    folder_name,
+    panel_id,
+    panel_name,
+    run_id,
+    tab_id,
+    tab_name,
+    signal,
+  }: {
+    org_identifier: string;
+    query: string;
+    start_time: number;
+    end_time: number;
+    dashboard_id?: string;
+    dashboard_name?: string;
+    folder_id?: string;
+    folder_name?: string;
+    panel_id?: string;
+    panel_name?: string;
+    run_id?: string;
+    tab_id?: string;
+    tab_name?: string;
+    signal?: AbortSignal;
+  }): Promise<AxiosResponse<ExemplarApiResponse>> => {
+    let url = `/api/${org_identifier}/prometheus/api/v1/query_exemplars?start=${start_time}&end=${end_time}&query=${encodeURIComponent(
+      query,
+    )}`;
+    if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (dashboard_name) url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
+    if (folder_id) url += `&folder_id=${folder_id}`;
+    if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
+    if (panel_id) url += `&panel_id=${panel_id}`;
+    if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
+    if (run_id) url += `&run_id=${run_id}`;
+    if (tab_id) url += `&tab_id=${tab_id}`;
+    if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
+    return signal
+      ? http().get<ExemplarApiResponse>(url, { signal })
+      : http().get<ExemplarApiResponse>(url);
+  },
   /**
    * A Prometheus INSTANT query: one sample evaluated at `end_time`. The
    * endpoint takes no range, so a caller that needs a window must use
@@ -352,6 +396,7 @@ const search = {
     end_time,
     hint_ts,
     streams,
+    signal,
   }: TraceTimeRangeOptions) => {
     const params = new URLSearchParams({ trace_id: trace_ids.join(",") });
     if (start_time != null && end_time != null) {
@@ -360,9 +405,10 @@ const search = {
     }
     if (hint_ts != null) params.set("hint_ts", String(hint_ts));
     if (streams?.length) params.set("streams", streams.join(","));
-    return http().get<OrgTraceTimeRangeResponse>(
-      `/api/${org_identifier}/traces/time_range?${params.toString()}`,
-    );
+    const url = `/api/${org_identifier}/traces/time_range?${params.toString()}`;
+    return signal
+      ? http().get<OrgTraceTimeRangeResponse>(url, { signal })
+      : http().get<OrgTraceTimeRangeResponse>(url);
   },
   getTraceDAG: (
     org_identifier: string,

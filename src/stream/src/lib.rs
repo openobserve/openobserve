@@ -24,10 +24,11 @@ use common::meta::{
     stream::{FieldUpdate, Stream, StreamCreate},
 };
 use config::{
-    SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
+        self_reporting::usage::AUDIT_STREAM,
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
@@ -740,6 +741,13 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
+    // The audit trail must not be destroyable through the same API it records.
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Ok(MetaHttpResponse::bad_request(
+            "Cannot delete the audit stream",
+        ));
+    }
+
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();
@@ -910,6 +918,12 @@ pub async fn delete_stream_data_by_time_range(
     stream_name: &str,
     time_range: TimeRange,
 ) -> Result<String, infra::errors::Error> {
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Err(infra::errors::Error::Message(
+            "Cannot delete the audit stream".to_string(),
+        ));
+    }
+
     if time_range.start > time_range.end {
         return Err(infra::errors::Error::Message(
             "Start time must be less than end time".to_string(),
@@ -1638,5 +1652,59 @@ mod tests {
         assert_eq!(parse_data_type("text"), None);
         assert_eq!(parse_data_type(""), None);
         assert_eq!(parse_data_type("int32"), None);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_with_cleanup_refuses_audit_stream() {
+        let res = delete_stream_with_cleanup(
+            META_ORG_ID,
+            AUDIT_STREAM,
+            StreamType::Logs,
+            false,
+            |_, _, _| async { Ok(()) },
+            |_, _, _| async {},
+        )
+        .await
+        .expect("the guard returns a response, not an error");
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_refuses_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("the audit stream must not be time-range deletable");
+        assert!(err.to_string().contains("Cannot delete the audit stream"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_customer_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            "customer_org",
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_meta_org_non_logs_audit() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Traces,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
     }
 }

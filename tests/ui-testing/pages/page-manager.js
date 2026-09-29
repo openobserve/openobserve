@@ -51,6 +51,7 @@ import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
+import { RouteGuardPage } from "./generalPages/routeGuardPage.js";
 import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
@@ -101,6 +102,7 @@ import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFor
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
 import { SettingsFormValidationPage } from "./generalPages/settingsFormValidationPage.js";
+import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
@@ -201,6 +203,7 @@ class PageManager {
     this.pipelinesFormValidation = new PipelinesFormValidationPage(page);
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
+    this.routeGuardPage = new RouteGuardPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
     this.splunkHecPage = new SplunkHecPage(page);
 
@@ -268,6 +271,7 @@ class PageManager {
     // ===== CIPHER KEYS PAGE OBJECTS =====
     this.cipherKeysFormValidation = new CipherKeysFormValidationPage(page);
     this.settingsFormValidation = new SettingsFormValidationPage(page);
+    this.passwordPolicyPage = new PasswordPolicyPage(page);
 
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);

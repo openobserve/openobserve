@@ -4602,6 +4602,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "transform",
+ "usage_reporting",
  "vrl",
 ]
 
@@ -5963,11 +5964,14 @@ dependencies = [
  "config",
  "datafusion",
  "futures",
+ "futures-util",
  "hashbrown 0.17.1",
  "hashlink 0.11.1",
+ "hex",
+ "hmac 0.12.1",
+ "http 1.5.0",
  "itertools 0.14.0",
  "log",
- "metrics_block",
  "object_store",
  "opentelemetry",
  "parking_lot 0.12.5",
@@ -5979,6 +5983,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1 0.10.7",
+ "sha2 0.10.9",
+ "sha256",
  "sqlx",
  "svix-ksuid",
  "tempfile",
@@ -5990,6 +5996,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "urlencoding",
 ]
 
 [[package]]
@@ -6935,24 +6942,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "metrics_block"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrow",
- "arrow-schema",
- "bytes",
- "parquet",
- "serde",
- "serde_json",
- "tempfile",
- "zstd",
-]
-
-[[package]]
 name = "metrics_index"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrow",
  "arrow-schema",
  "bytes",
@@ -6962,12 +6955,15 @@ dependencies = [
  "hashlink 0.11.1",
  "infra",
  "log",
- "metrics_block",
  "object_store",
- "promql",
+ "parquet",
  "promql-parser",
  "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
+ "zstd",
 ]
 
 [[package]]
@@ -8249,6 +8245,7 @@ dependencies = [
  "tower",
  "tracing",
  "transform",
+ "urlencoding",
  "usage_reporting",
  "utoipa",
 ]
@@ -8357,7 +8354,9 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "snap",
+ "sqlparser",
  "stream",
+ "strum 0.28.0",
  "svix-ksuid",
  "thiserror 2.0.19",
  "tiktoken-rs",
@@ -8394,6 +8393,7 @@ dependencies = [
  "enrichment-data",
  "futures",
  "hashbrown 0.17.1",
+ "http 1.5.0",
  "infra",
  "ingester",
  "ingestion-common",
@@ -8410,10 +8410,12 @@ dependencies = [
  "prometheus",
  "promql-service",
  "proto",
+ "rand 0.10.2",
  "regex",
  "report_server",
  "reqwest 0.13.4",
  "schema",
+ "sea-orm",
  "search",
  "search_service",
  "serde_json",
@@ -9423,8 +9425,10 @@ name = "promql"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
+ "anyhow",
  "async-recursion",
  "async-trait",
+ "bytes",
  "chrono",
  "config",
  "datafusion",
@@ -9435,12 +9439,16 @@ dependencies = [
  "infra",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
+ "object_store",
  "parking_lot 0.12.5",
+ "prometheus",
  "promql-parser",
  "rayon",
  "regex",
  "strum 0.28.0",
+ "tempfile",
  "tokio",
  "tracing",
 ]
@@ -11326,7 +11334,6 @@ dependencies = [
  "log",
  "md5",
  "memchr",
- "metrics_block",
  "metrics_index",
  "o2_enterprise",
  "object_store",

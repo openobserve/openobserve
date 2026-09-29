@@ -63,7 +63,7 @@ pub async fn unlock_with_trace_id(trace_id: &str, locker: &Option<Locker>) -> Re
     }
 }
 
-/// lock key in nats, wait_ttl is 0 means wait forever
+/// lock key in nats, wait_ttl is 0 means the nats `lock_wait_timeout` default, not forever
 #[inline(always)]
 pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
     let cfg = config::get_config();

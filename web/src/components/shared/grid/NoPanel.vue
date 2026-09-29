@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   lives in src/components/common/empty-states/NoPanels.vue.
 -->
 <template>
-  <NoPanels :view-only="viewOnly" @add="$emit('update:Panel')" />
+  <NoPanels :view-only="viewOnly" :hide-add-action="hideAddAction" @add="$emit('update:Panel')" />
 </template>
 
 <script lang="ts">
@@ -28,7 +28,7 @@ import NoPanels from "@/components/common/empty-states/NoPanels.vue";
 
 export default defineComponent({
   name: "NoPanel",
-  props: ["Panel", "viewOnly"],
+  props: ["Panel", "viewOnly", "hideAddAction"],
   emits: ["update:Panel"],
   components: { NoPanels },
 });
