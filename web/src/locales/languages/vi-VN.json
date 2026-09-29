@@ -18176,7 +18176,34 @@
     },
     "samples": {
       "logOffTitle": "Cơ sở dữ liệu của bạn chưa ghi nhật ký các câu lệnh chậm",
-      "logOffDescription": "Không có gì theo dõi các cuộc gọi này, vì vậy chúng tôi đã hỏi cơ sở dữ liệu về các câu lệnh chậm nhất của chúng — và chúng không ghi nhật ký nào. Danh sách này đến từ nhật ký câu lệnh của PostgreSQL (log_min_duration_statement), mặc định bị tắt — bước ghi nhật ký trong thẻ thiết lập sẽ bật nó. Việc thu thập theo từng câu lệnh hiện chỉ dành cho PostgreSQL, vì vậy MySQL và MariaDB chưa thể cung cấp cho danh sách này. Các truy vấn hàng đầu vẫn có thể cho bạn thấy điều gì chạy nhiều nhất, vì nó đọc bảng đếm thay thế.",
+      "notCollecting": {
+        "description": "Không có gì theo dõi các cuộc gọi này, vì vậy chúng tôi đã hỏi cơ sở dữ liệu về các câu lệnh chậm nhất của chúng — và chúng không ghi nhật ký nào. Chúng tôi kiểm tra bốn điều.",
+        "checklistTitle": "Những gì chúng tôi đã kiểm tra",
+        "setUp": "Thiết lập ghi nhật ký câu lệnh",
+        "checks": {
+          "queries": {
+            "ok": "Dữ liệu truy vấn của bạn đang đến",
+            "okDetail": "{queries} từ {databases} — tab Top queries hoạt động",
+            "okDetailNoFleet": "{queries} — tab Top queries hoạt động",
+            "no": "Không có dữ liệu truy vấn nào đến cả",
+            "noDetail": "Bắt đầu với tab Top queries — chưa có gì đến được với chúng tôi từ các cơ sở dữ liệu này."
+          },
+          "enabled": {
+            "ok": "Giám sát cơ sở dữ liệu đã bật",
+            "okDetail": "cho tổ chức này",
+            "no": "Giám sát cơ sở dữ liệu đã tắt",
+            "noDetail": "Bật nó trong Cài đặt để bắt đầu thu thập."
+          },
+          "log": {
+            "no": "Các câu lệnh chậm không được ghi nhật ký",
+            "noDetail": "Danh sách này đến từ nhật ký câu lệnh của PostgreSQL (log_min_duration_statement), mặc định bị tắt — bước ghi nhật ký trong thẻ thiết lập sẽ bật nó."
+          },
+          "engines": {
+            "title": "Hiện chỉ hỗ trợ PostgreSQL",
+            "detail": "Việc thu thập theo từng câu lệnh hiện chỉ dành cho PostgreSQL, vì vậy MySQL và MariaDB chưa thể cung cấp cho danh sách này. Các truy vấn hàng đầu vẫn có thể cho bạn thấy điều gì chạy nhiều nhất, vì nó đọc bảng đếm thay thế."
+          }
+        }
+      },
       "searchPlaceholder": "Tìm kiếm văn bản truy vấn, dịch vụ hoặc cơ sở dữ liệu…",
       "columns": {
         "query": "Truy vấn",
@@ -18630,6 +18657,7 @@
       "never": "Không bao giờ",
       "countersCumulative": "Số lần quét và vacuum là tổng tích lũy kể từ lần đặt lại số liệu thống kê gần nhất, không phải số đếm trong khoảng thời gian đã chọn.",
       "tuplesEstimated": "Số lượng hàng và phần trăm độ phình là ước tính thống kê từ công cụ cơ sở dữ liệu, không phải số đếm chính xác.",
+      "aboutNumbers": "Về các con số này",
       "notCollectingTitle": "Chưa có số liệu thống kê bảng",
       "notCollectingDescription": "Không có gì báo cáo số liệu thống kê bảng trong khoảng thời gian này. Tín hiệu này được cung cấp dưới dạng một công thức bộ thu thập riêng.",
       "engineUnsupportedTitle": "Không được thu thập cho công cụ này",

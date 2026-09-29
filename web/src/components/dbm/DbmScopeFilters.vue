@@ -83,65 +83,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The chips scroll rather than push: five set dimensions are wider than
          the toolbar, and a chip strip that grows must not shove the refresh and
          column controls off the right edge. -->
-    <!-- `overflow-x-auto` forces overflow-y to auto, clipping the remove badge that pokes above each chip; the `py-1`/`-my-1` pair grows the clip box to fit it. -->
-    <div class="-my-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-1">
-      <!-- Active scope, inline and clearable. The chip is the app-standard
-           ODimensionChip, so `service` here is the same colour it is on the
-           incident list. The remove button sits outside the chip because
-           ODimensionChip is a shared primitive with no slot for one. -->
-      <span
-        v-for="filter in activeFilters"
-        :key="filter.key"
-        class="group relative inline-flex min-w-0 shrink-0 items-center"
-        :data-test="`dbm-queries-scope-chip-${filter.key}`"
-      >
+    <div class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+      <!-- The wrapper keeps each chip at full width so a crowded strip scrolls instead of truncating it. -->
+      <span v-for="filter in activeFilters" :key="filter.key" class="inline-flex shrink-0">
         <ODimensionChip
           :dim-key="filter.key"
           :key-label="filter.dimension"
           :value="filter.value ?? ''"
-          class="min-w-0"
+          removable
+          :remove-label="t('dbm.filters.removeScope')"
+          :remove-data-test="`dbm-queries-scope-chip-${filter.key}-remove`"
+          :data-test="`dbm-queries-scope-chip-${filter.key}`"
+          @remove="filter.onChange(null)"
         />
-        <button
-          type="button"
-          :aria-label="t('dbm.filters.removeScope')"
-          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 max-md:opacity-100"
-          :data-test="`dbm-queries-scope-chip-${filter.key}-remove`"
-          @click="filter.onChange(null)"
-        >
-          <OIcon name="close" size="xs" />
-          <OTooltip side="bottom" :content="t('dbm.filters.removeScope')" />
-        </button>
       </span>
 
-      <!-- The insight filter deliberately stays amber and stays hand-rolled: it
-           is NOT a dimension the user picked, so giving it a dimension colour
-           would say the wrong thing. It borrows ODimensionChip's geometry (two
-           segments, sm badge metrics, rounded-default) so it sits level. -->
-      <span
-        v-if="insightChip"
-        class="group relative inline-flex min-w-0 shrink-0 items-center"
-        data-test="dbm-queries-scope-chip-insight"
-      >
-        <span
-          class="bg-badge-warning-soft-bg text-badge-warning-soft-text text-2xs rounded-default inline-flex min-w-0 items-stretch overflow-hidden font-medium"
-        >
-          <span class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90">{{
-            insightChip.dimension
-          }}</span>
-          <span class="min-w-0 truncate py-1.5 ps-1 pe-2.5 font-semibold">{{
-            insightChip.label
-          }}</span>
-        </span>
-        <button
-          type="button"
-          :aria-label="t('dbm.filters.removeScope')"
-          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 max-md:opacity-100"
-          data-test="dbm-queries-scope-chip-insight-remove"
-          @click="emit('clearInsight')"
-        >
-          <OIcon name="close" size="xs" />
-          <OTooltip side="bottom" :content="t('dbm.filters.removeScope')" />
-        </button>
+      <!-- Amber, not a dimension colour: the insight is a lens the reader applied, not a dimension they picked. -->
+      <span v-if="insightChip" class="inline-flex shrink-0">
+        <ODimensionChip
+          dim-key="insight"
+          :key-label="insightChip.dimension"
+          :value="insightChip.label"
+          variant="warning-soft"
+          removable
+          :remove-label="t('dbm.filters.removeScope')"
+          remove-data-test="dbm-queries-scope-chip-insight-remove"
+          data-test="dbm-queries-scope-chip-insight"
+          @remove="emit('clearInsight')"
+        />
       </span>
 
       <!-- Clear all, INLINE beside the chips.
@@ -171,10 +140,8 @@ import { computed, ref } from "vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 /** One scope dimension: its current value, the values available, and its setter. */

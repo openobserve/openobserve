@@ -288,6 +288,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "instance",
+    hideable: true,
     header: t("dbm.tableHealth.columns.instance"),
     accessorKey: "instance",
     sortable: true,
@@ -297,6 +298,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "total_bytes",
+    hideable: true,
     header: t("dbm.tableHealth.columns.totalBytes"),
     accessorKey: "total_bytes",
     sortable: true,
@@ -306,6 +308,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "heap_bytes",
+    hideable: true,
     header: t("dbm.tableHealth.columns.heapBytes"),
     accessorKey: "heap_bytes",
     sortable: true,
@@ -315,6 +318,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "overheadBytes",
+    hideable: true,
     header: t("dbm.tableHealth.columns.overheadBytes"),
     accessorKey: "overheadBytes",
     sortable: true,
@@ -324,6 +328,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "live_tuples",
+    hideable: true,
     header: t("dbm.tableHealth.columns.liveTuples"),
     accessorKey: "live_tuples",
     sortable: true,
@@ -333,6 +338,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "dead_tuples",
+    hideable: true,
     header: t("dbm.tableHealth.columns.deadTuples"),
     accessorKey: "dead_tuples",
     sortable: true,
@@ -342,6 +348,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "dead_tup_pct",
+    hideable: true,
     header: t("dbm.tableHealth.columns.deadTupPct"),
     accessorKey: "dead_tup_pct",
     sortable: true,
@@ -355,6 +362,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "mod_since_analyze",
+    hideable: true,
     header: t("dbm.tableHealth.columns.modSinceAnalyze"),
     accessorKey: "mod_since_analyze",
     sortable: true,
@@ -364,6 +372,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "seq_scan_count",
+    hideable: true,
     header: t("dbm.tableHealth.columns.seqScanCount"),
     accessorKey: "seq_scan_count",
     sortable: true,
@@ -373,6 +382,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "seq_tup_read",
+    hideable: true,
     header: t("dbm.tableHealth.columns.seqTupRead"),
     accessorKey: "seq_tup_read",
     sortable: true,
@@ -382,6 +392,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "idx_scan_count",
+    hideable: true,
     header: t("dbm.tableHealth.columns.idxScanCount"),
     accessorKey: "idx_scan_count",
     sortable: true,
@@ -391,6 +402,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "autovacuum_count",
+    hideable: true,
     header: t("dbm.tableHealth.columns.autovacuumCount"),
     accessorKey: "autovacuum_count",
     sortable: true,
@@ -400,6 +412,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "frozen_xid_age",
+    hideable: true,
     header: t("dbm.tableHealth.columns.frozenXidAge"),
     accessorKey: "frozen_xid_age",
     sortable: true,
@@ -409,6 +422,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "last_autovacuum",
+    hideable: true,
     header: t("dbm.tableHealth.columns.lastAutovacuum"),
     accessorKey: "last_autovacuum",
     sortable: true,
@@ -418,6 +432,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "last_vacuum",
+    hideable: true,
     header: t("dbm.tableHealth.columns.lastVacuum"),
     accessorKey: "last_vacuum",
     sortable: true,
@@ -427,6 +442,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
   },
   {
     id: "last_analyze",
+    hideable: true,
     header: t("dbm.tableHealth.columns.lastAnalyze"),
     accessorKey: "last_analyze",
     sortable: true,
