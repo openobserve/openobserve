@@ -749,8 +749,7 @@ async function fetchAll(force = false) {
   const org = orgId.value;
   const id = teamId.value;
 
-  // All six issued together, then branched on below — awaiting the org-level probe first
-  // turned every load into teams + max(the other five) instead of max(all six).
+  // Issued together rather than awaiting the teams probe first, which turned every load into teams + max(the other five).
   const [teamsSettled, teamSettled, memberSettled, scheduleSettled, policySettled, onCallSettled] =
     await Promise.allSettled([
       read<OnCallTeam[]>(oncallTeamsQuery(org), force),
@@ -761,8 +760,7 @@ async function fetchAll(force = false) {
       read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
     ]);
 
-  // The org-level list is the true entry probe: it exists in every on-call build regardless
-  // of whether this specific team id does, so only its failure means the feature is unavailable.
+  // The org-level list exists in every on-call build regardless of this team id, so only its failure means the feature is unavailable.
   if (teamsSettled.status === "rejected") {
     const err: any = teamsSettled.reason;
     if (isOnCallUnavailable(err)) {
@@ -773,24 +771,28 @@ async function fetchAll(force = false) {
     return;
   }
 
+  if (teamSettled.status === "rejected") {
+    const err: any = teamSettled.reason;
+    // The probe above already confirmed on-call is available, so a 404 on this query alone means the team id was deleted.
+    if (err?.response?.status === 404) {
+      teamNotFound.value = true;
+      return;
+    }
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    return;
+  }
+
   if (
-    teamSettled.status === "rejected" ||
     memberSettled.status === "rejected" ||
     scheduleSettled.status === "rejected" ||
     policySettled.status === "rejected" ||
     onCallSettled.status === "rejected"
   ) {
     const err: any = (
-      [teamSettled, memberSettled, scheduleSettled, policySettled, onCallSettled].find(
+      [memberSettled, scheduleSettled, policySettled, onCallSettled].find(
         (settled) => settled.status === "rejected",
       ) as PromiseRejectedResult
     ).reason;
-    // The probe above already confirmed on-call is available, so a 404 here means this team
-    // id was deleted (e.g. from another tab, or by navigating Back after deleting it).
-    if (err?.response?.status === 404) {
-      teamNotFound.value = true;
-      return;
-    }
     loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
     return;
   }
