@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
+use config::meta::stream::FileKey;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{
@@ -34,70 +34,44 @@ use crate::{
         distributed_plan::metadata_count_exec::MetadataCountExec,
         plan::tantivy_optimize_exec::TantivyOptimizeExec,
     },
-    tantivy::TantivyMultiResult,
+    tantivy::aggregate::IndexAggregate,
 };
 
 pub fn aggregate_optimize_rewrite(
     metadata_count_file_list: Vec<FileKey>,
-    tantivy_file_list: Vec<FileKey>,
-    result: Option<TantivyMultiResult>,
-    index_optimize_mode: Option<IndexOptimizeMode>,
+    index_aggregate: Option<IndexAggregate>,
     physical_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let metadata_records = metadata_count_file_list.iter().fold(0i64, |total, file| {
         total.saturating_add(file.meta.records.max(0))
     });
     let metadata_files = metadata_count_file_list.len();
-    if metadata_records == 0 && tantivy_file_list.is_empty() {
+    if metadata_records == 0 && index_aggregate.is_none() {
         return Ok(physical_plan);
     }
 
-    let mut visitor = AggregateOptimizeRewriter::new(
-        tantivy_file_list,
-        result,
-        index_optimize_mode,
-        metadata_records,
-        metadata_files,
-    );
+    let mut visitor =
+        AggregateOptimizeRewriter::new(index_aggregate, metadata_records, metadata_files);
     Ok(physical_plan.rewrite(&mut visitor)?.data)
 }
 
 pub struct AggregateOptimizeRewriter {
-    file_list: Vec<FileKey>,
-    result: Option<TantivyMultiResult>,
-    index_optimize_mode: Option<IndexOptimizeMode>,
+    index_aggregate: Option<IndexAggregate>,
     metadata_records: i64,
     metadata_files: usize,
 }
 
 impl AggregateOptimizeRewriter {
     pub fn new(
-        file_list: Vec<FileKey>,
-        result: Option<TantivyMultiResult>,
-        index_optimize_mode: Option<IndexOptimizeMode>,
+        index_aggregate: Option<IndexAggregate>,
         metadata_records: i64,
         metadata_files: usize,
     ) -> Self {
         Self {
-            file_list,
-            result,
-            index_optimize_mode,
+            index_aggregate,
             metadata_records,
             metadata_files,
         }
-    }
-
-    fn tantivy_exec(&mut self, schema: SchemaRef) -> Arc<dyn ExecutionPlan> {
-        Arc::new(TantivyOptimizeExec::new(
-            schema,
-            std::mem::take(&mut self.file_list),
-            self.result
-                .take()
-                .expect("prepared result must accompany index files"),
-            self.index_optimize_mode
-                .clone()
-                .expect("index optimize mode should exist when tantivy files are present"),
-        ))
     }
 
     fn metadata_count_exec(&self, schema: SchemaRef) -> Result<Arc<dyn ExecutionPlan>> {
@@ -115,8 +89,13 @@ impl AggregateOptimizeRewriter {
             inputs.push(self.metadata_count_exec(schema.clone())?);
         }
 
-        if !self.file_list.is_empty() {
-            inputs.push(self.tantivy_exec(schema));
+        if let Some(aggregate) = self.index_aggregate.take() {
+            inputs.push(Arc::new(TantivyOptimizeExec::new(
+                schema,
+                aggregate.files,
+                aggregate.result,
+                aggregate.mode,
+            )));
         }
 
         Ok(inputs)
@@ -147,7 +126,10 @@ mod tests {
 
     use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::stream::{FileKey, FileMeta};
+    use config::meta::{
+        inverted_index::IndexOptimizeMode,
+        stream::{FileKey, FileMeta},
+    };
     use datafusion::{
         common::Result,
         execution::context::SessionConfig,
@@ -167,6 +149,15 @@ mod tests {
     use parquet::arrow::ArrowWriter;
 
     use super::*;
+    use crate::tantivy::TantivyMultiResult;
+
+    fn index_count(count: u64) -> Option<IndexAggregate> {
+        Some(IndexAggregate {
+            mode: IndexOptimizeMode::SimpleCount,
+            files: vec![FileKey::default()],
+            result: TantivyMultiResult::Count(count),
+        })
+    }
 
     fn partial_count_exec() -> Result<Arc<dyn ExecutionPlan>> {
         let schema = Arc::new(Schema::new(vec![Field::new(
@@ -202,13 +193,7 @@ mod tests {
             ..Default::default()
         }];
 
-        let rewritten = aggregate_optimize_rewrite(
-            metadata_files,
-            vec![FileKey::default()],
-            Some(TantivyMultiResult::Count(7)),
-            Some(IndexOptimizeMode::SimpleCount),
-            plan,
-        )?;
+        let rewritten = aggregate_optimize_rewrite(metadata_files, index_count(7), plan)?;
 
         let union = rewritten
             .downcast_ref::<UnionExec>()
@@ -224,13 +209,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_optimize_rewrite_tantivy_only() -> Result<()> {
-        let rewritten = aggregate_optimize_rewrite(
-            vec![],
-            vec![FileKey::default()],
-            Some(TantivyMultiResult::Count(7)),
-            Some(IndexOptimizeMode::SimpleCount),
-            partial_count_exec()?,
-        )?;
+        let rewritten = aggregate_optimize_rewrite(vec![], index_count(7), partial_count_exec()?)?;
 
         let union = rewritten
             .downcast_ref::<UnionExec>()
@@ -311,13 +290,7 @@ mod tests {
         assert_eq!(partial.output_partitioning().partition_count(), 2);
         let input_schema = partial.children()[0].schema();
 
-        let merged = aggregate_optimize_rewrite(
-            vec![],
-            vec![FileKey::default()],
-            Some(TantivyMultiResult::Count(7)),
-            Some(IndexOptimizeMode::SimpleCount),
-            partial,
-        )?;
+        let merged = aggregate_optimize_rewrite(vec![], index_count(7), partial)?;
         assert_eq!(merged.output_partitioning().partition_count(), 3);
 
         let final_plan = Arc::new(AggregateExec::try_new(
@@ -349,13 +322,7 @@ mod tests {
         )
         .await?;
 
-        let merged = aggregate_optimize_rewrite(
-            vec![],
-            vec![FileKey::default()],
-            Some(TantivyMultiResult::Count(7)),
-            Some(IndexOptimizeMode::SimpleCount),
-            partial,
-        )?;
+        let merged = aggregate_optimize_rewrite(vec![], index_count(7), partial)?;
         assert!(collect(merged, ctx.task_ctx()).await.is_err());
 
         Ok(())

@@ -20,9 +20,18 @@ use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
 use super::{TantivyMultiResult, tantivy_search};
 use crate::{index::IndexCondition, types::QueryParams};
 
-pub struct PreparedAggregate {
+/// Aggregate the tantivy index answered exactly for a set of files.
+pub struct IndexAggregate {
+    /// Aggregate shape of `result`, used to turn it into record batches.
+    pub mode: IndexOptimizeMode,
+    /// Files covered by `result`; only read for scan stats and plan display.
     pub files: Vec<FileKey>,
-    pub result: Option<TantivyMultiResult>,
+    /// Final result over all of `files`, which are never scanned again.
+    pub result: TantivyMultiResult,
+}
+
+pub struct PreparedAggregate {
+    pub answered: Option<IndexAggregate>,
     pub fallback_files: Vec<FileKey>,
     pub took: usize,
 }
@@ -35,7 +44,14 @@ pub async fn prepare_aggregate(
 ) -> PreparedAggregate {
     let start = std::time::Instant::now();
     let mut fallback_files = files.clone();
-    match tantivy_search(query.clone(), &mut fallback_files, condition, Some(mode)).await {
+    match tantivy_search(
+        query.clone(),
+        &mut fallback_files,
+        condition,
+        Some(mode.clone()),
+    )
+    .await
+    {
         Ok((took, _, result)) => {
             let fallback_keys: HashSet<_> = fallback_files
                 .iter()
@@ -45,7 +61,6 @@ pub async fn prepare_aggregate(
                 .into_iter()
                 .filter(|file| !fallback_keys.contains(file.key.as_str()))
                 .collect();
-            let result = (!files.is_empty()).then_some(result);
             log::info!(
                 "[trace_id {}] search->tantivy: aggregate index answered {} files, {} files fall back to parquet, took: {took} ms",
                 query.trace_id,
@@ -53,8 +68,11 @@ pub async fn prepare_aggregate(
                 fallback_files.len(),
             );
             PreparedAggregate {
-                files,
-                result,
+                answered: (!files.is_empty()).then_some(IndexAggregate {
+                    mode,
+                    files,
+                    result,
+                }),
                 fallback_files,
                 took,
             }
@@ -65,8 +83,7 @@ pub async fn prepare_aggregate(
                 query.trace_id
             );
             PreparedAggregate {
-                files: vec![],
-                result: None,
+                answered: None,
                 fallback_files: files,
                 took: start.elapsed().as_millis() as usize,
             }
@@ -156,6 +173,17 @@ mod tests {
         (query, files)
     }
 
+    fn result(prepared: &PreparedAggregate) -> Option<&TantivyMultiResult> {
+        prepared.answered.as_ref().map(|answered| &answered.result)
+    }
+
+    fn answered_files(prepared: &PreparedAggregate) -> usize {
+        prepared
+            .answered
+            .as_ref()
+            .map_or(0, |answered| answered.files.len())
+    }
+
     fn condition() -> IndexCondition {
         let mut condition = IndexCondition::new();
         condition.add_condition(Condition::Equal("service_name".into(), "svc-a".into()));
@@ -174,9 +202,9 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert_eq!(prepared.fallback_files[0].key, files[0].key);
-        assert_eq!(prepared.files.len(), 2);
+        assert_eq!(answered_files(&prepared), 2);
         assert!(matches!(
-            prepared.result,
+            result(&prepared),
             Some(TantivyMultiResult::Count(2))
         ));
         let zero = prepare_aggregate(
@@ -187,7 +215,7 @@ mod tests {
         )
         .await;
         assert!(zero.fallback_files.is_empty());
-        assert!(matches!(zero.result, Some(TantivyMultiResult::Count(0))));
+        assert!(matches!(result(&zero), Some(TantivyMultiResult::Count(0))));
         let old = prepare_aggregate(
             query,
             vec![files[0].clone()],
@@ -195,7 +223,7 @@ mod tests {
             IndexOptimizeMode::SimpleCount,
         )
         .await;
-        assert!(old.result.is_none());
+        assert!(old.answered.is_none());
         assert_eq!(old.fallback_files.len(), 1);
     }
 
@@ -213,7 +241,7 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert!(matches!(
-            prepared.result,
+            result(&prepared),
             Some(TantivyMultiResult::Count(2))
         ));
         let mut or = IndexCondition::new();
@@ -225,7 +253,7 @@ mod tests {
             prepare_aggregate(query, files, Some(or), IndexOptimizeMode::SimpleCount).await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert!(matches!(
-            prepared.result,
+            result(&prepared),
             Some(TantivyMultiResult::Count(5))
         ));
     }
@@ -242,7 +270,7 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert!(
-            matches!(prepared.result, Some(TantivyMultiResult::Histogram(ref counts)) if counts.iter().sum::<u64>() == 2 && counts.iter().filter(|n| **n > 0).count() == 2)
+            matches!(result(&prepared), Some(TantivyMultiResult::Histogram(counts)) if counts.iter().sum::<u64>() == 2 && counts.iter().filter(|n| **n > 0).count() == 2)
         );
         let prepared = prepare_aggregate(
             query,
@@ -253,7 +281,7 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert!(
-            matches!(prepared.result, Some(TantivyMultiResult::MultiHistogram(ref buckets)) if buckets.iter().map(|(_, _, n)| n).sum::<u64>() == 2)
+            matches!(result(&prepared), Some(TantivyMultiResult::MultiHistogram(buckets)) if buckets.iter().map(|(_, _, n)| n).sum::<u64>() == 2)
         );
     }
 
@@ -269,9 +297,9 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert_eq!(prepared.fallback_files[0].key, files[0].key);
-        assert_eq!(prepared.files.len(), 2);
+        assert_eq!(answered_files(&prepared), 2);
         assert!(
-            matches!(prepared.result, Some(TantivyMultiResult::TopN(ref top)) if top.iter().map(|(_, n)| n).sum::<u64>() == 2)
+            matches!(result(&prepared), Some(TantivyMultiResult::TopN(top)) if top.iter().map(|(_, n)| n).sum::<u64>() == 2)
         );
 
         let mut filter = IndexCondition::new();
@@ -289,9 +317,9 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert_eq!(prepared.fallback_files[0].key, files[0].key);
-        assert_eq!(prepared.files.len(), 2);
+        assert_eq!(answered_files(&prepared), 2);
         assert!(
-            matches!(prepared.result, Some(TantivyMultiResult::Distinct(ref values)) if values.len() == 1 && values.contains("svc-a"))
+            matches!(result(&prepared), Some(TantivyMultiResult::Distinct(values)) if values.len() == 1 && values.contains("svc-a"))
         );
     }
 
@@ -308,7 +336,7 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert!(matches!(
-            prepared.result,
+            result(&prepared),
             Some(TantivyMultiResult::Count(2))
         ));
         let (query2, files2) = fixture().await;
@@ -323,7 +351,7 @@ mod tests {
         .await;
         assert_eq!(prepared.fallback_files.len(), 1);
         assert!(
-            matches!(prepared.result, Some(TantivyMultiResult::MultiHistogram(ref buckets)) if buckets.iter().map(|(_, _, n)| n).sum::<u64>() == 5)
+            matches!(result(&prepared), Some(TantivyMultiResult::MultiHistogram(buckets)) if buckets.iter().map(|(_, _, n)| n).sum::<u64>() == 5)
         );
     }
 }
