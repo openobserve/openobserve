@@ -564,22 +564,15 @@ export default defineComponent({
 }
 
 @media print {
-  // Grow with the table's natural content height instead of clipping at the
-  // panel height. The old height:100% + overflow:hidden pair sliced whichever
-  // row straddled the panel edge and hid every row after it, and the
-  // absolutely-pinned opaque footer then painted over the last visible row —
-  // so a 4-row table printed 3 rows under a footer still reading "1-4 of 4".
-  // Rows that don't fit the page now continue on the next page.
+  // Keep a grid-panel table at its panel height so the footer stays inside; a lone table's auto-height parents still let it grow onto the next pages.
   .table-wrapper {
     position: relative !important;
-    height: auto !important;
     min-height: 100% !important;
     max-height: none !important;
     overflow: visible !important;
   }
 
   .my-sticky-virtscroll-table {
-    height: auto !important;
     overflow: visible !important;
 
     // Remove sticky — no scroll container in print, sticky causes quirks.
@@ -593,9 +586,10 @@ export default defineComponent({
       display: table-header-group !important;
     }
 
-    // Let Quasar's scroll wrapper expand to content height.
+    // Clip instead of scroll: a clip box ignores the offset virtual scroll leaves while rows stream in, so rows start under the header.
     :deep(.q-table__middle) {
-      overflow: visible !important;
+      min-height: 0;
+      overflow: clip !important;
       height: auto !important;
     }
 

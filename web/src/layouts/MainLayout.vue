@@ -1254,6 +1254,10 @@ export default defineComponent({
   .tw-overflow-y-auto {
     overflow: visible !important;
   }
+
+  .printMode {
+    zoom: 0.67;
+  }
 }
 
 .q-drawer {
