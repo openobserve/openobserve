@@ -61,6 +61,10 @@ const WINDOW_FLOOR_RULE: &str =
 #[cfg(feature = "enterprise")]
 const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
 
+/// Timestamp column names a result row is read from, in priority order.
+#[cfg(feature = "enterprise")]
+const TIMESTAMP_COLUMNS: [&str; 4] = ["_timestamp", "timestamp", "time", "time_bucket"];
+
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
 const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
@@ -3032,6 +3036,8 @@ fn parse_search_results_to_timeseries(
 
     let mut data_points = Vec::new();
     let mut skipped = 0usize;
+    let mut timestamp_failures = 0usize;
+    let mut value_failures = 0usize;
 
     if let Some(first) = results.hits.first()
         && let Some(obj) = first.as_object()
@@ -3055,6 +3061,7 @@ fn parse_search_results_to_timeseries(
                     hit
                 );
                 skipped += 1;
+                timestamp_failures += 1;
                 continue;
             }
         };
@@ -3068,6 +3075,7 @@ fn parse_search_results_to_timeseries(
                     hit
                 );
                 skipped += 1;
+                value_failures += 1;
                 continue;
             }
         };
@@ -3100,17 +3108,31 @@ fn parse_search_results_to_timeseries(
         );
     }
 
-    // Total extraction loss on a non-empty result set is a misconfigured value column, not
-    // an absence of data. Returning Ok(empty) here is what made that present as "no data".
+    // Total extraction loss on a non-empty result set is a misconfigured column, not an
+    // absence of data. Returning Ok(empty) here is what made that present as "no data".
+    // The message names the column that actually failed: value is only read once the
+    // timestamp parsed, so a timestamp failure must never be reported as a value one.
     if data_points.is_empty() && !results.hits.is_empty() {
-        anyhow::bail!(
-            "[anomaly_detection {anomaly_id}] query returned {} rows but none had a usable \
-             value column ({}); columns present: [{}]",
-            results.hits.len(),
+        let timestamp_problem = format!(
+            "no usable timestamp column (expected one of: {})",
+            TIMESTAMP_COLUMNS.join(", ")
+        );
+        let value_problem = format!(
+            "no usable value column ({})",
             match value_column {
                 Some(c) => format!("configured: '{c}'"),
                 None => format!("expected one of: {}", LEGACY_VALUE_COLUMNS.join(", ")),
-            },
+            }
+        );
+        let problem = match (timestamp_failures, value_failures) {
+            (_, 0) => timestamp_problem,
+            (0, _) => value_problem,
+            (t, v) => format!("{t} rows had {timestamp_problem}, {v} rows had {value_problem}"),
+        };
+        anyhow::bail!(
+            "[anomaly_detection {anomaly_id}] query returned {} rows but none were usable: {problem}; \
+             columns present: [{}]",
+            results.hits.len(),
             columns_present(&results.hits).join(", "),
         );
     }
@@ -3124,7 +3146,7 @@ fn parse_search_results_to_timeseries(
 #[cfg(feature = "enterprise")]
 fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     // Try different timestamp field names
-    for field_name in &["_timestamp", "timestamp", "time", "time_bucket"] {
+    for field_name in &TIMESTAMP_COLUMNS {
         if let Some(ts_value) = hit.get(field_name) {
             // Numeric microseconds
             if let Some(ts_num) = ts_value.as_i64() {
@@ -4191,6 +4213,29 @@ mod tests {
         );
         assert!(
             msg.contains("request_count"),
+            "present columns not named: {msg}"
+        );
+    }
+
+    /// A result set whose only time column has an unrecognised name must be reported as a
+    /// timestamp problem. It used to blame the value column, which was present and fine.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_unrecognised_timestamp_column_is_named_as_the_failure() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"value": 5, "zo_sql_timestamp": "2026-02-20T13:15:00"}),
+                serde_json::json!({"value": 6, "zo_sql_timestamp": "2026-02-20T13:30:00"}),
+            ],
+            ..Default::default()
+        };
+        let msg = parse_search_results_to_timeseries(&resp, "a1", None)
+            .unwrap_err()
+            .to_string();
+        assert!(msg.contains("no usable timestamp column"), "{msg}");
+        assert!(!msg.contains("value column"), "value blamed: {msg}");
+        assert!(
+            msg.contains("zo_sql_timestamp"),
             "present columns not named: {msg}"
         );
     }
