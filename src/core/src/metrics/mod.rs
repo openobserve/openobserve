@@ -647,4 +647,37 @@ mod tests {
         let b = labels(&[("host", json::json!("b")), ("region", json::json!("eu"))]);
         assert_ne!(series_signature(&a), series_signature(&b));
     }
+
+    #[test]
+    fn series_signature_is_stable_over_a_hashed_record() {
+        let mut record = json::Map::new();
+        record.insert("__name__".to_string(), json::json!("http_requests"));
+        record.insert("region".to_string(), json::json!("us-east-1"));
+        record.insert(VALUE_LABEL.to_string(), json::json!(1.0));
+        let first = signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS);
+        record.insert(HASH_LABEL.to_string(), json::json!(first));
+        assert_eq!(
+            first,
+            signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS)
+        );
+    }
+
+    #[test]
+    fn a_dropped_label_gives_a_record_the_hash_of_the_series_it_became() {
+        // A DropField redaction makes these one series; a stale hash would split them in two.
+        let mut redacted = json::Map::new();
+        redacted.insert("__name__".to_string(), json::json!("http_requests"));
+        redacted.insert("env".to_string(), json::json!("prod"));
+        redacted.insert(HASH_LABEL.to_string(), json::json!(12345_u64));
+
+        let mut never_had_the_label = json::Map::new();
+        never_had_the_label.insert("__name__".to_string(), json::json!("http_requests"));
+        never_had_the_label.insert("env".to_string(), json::json!("prod"));
+
+        assert_eq!(
+            signature_without_labels(&redacted, METRICS_HASH_EXCLUDED_LABELS),
+            signature_without_labels(&never_had_the_label, METRICS_HASH_EXCLUDED_LABELS),
+            "the stale hash must not contribute to the recomputed signature"
+        );
+    }
 }

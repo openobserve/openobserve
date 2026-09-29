@@ -30,14 +30,14 @@ impl RangeFunc for IrateFunc {
         let [.., previous, last] = samples else {
             return None;
         };
-        let dt_seconds = (last.timestamp - previous.timestamp) as f64 / 1_000_000.0;
-        if dt_seconds == 0.0 {
-            return Some(0.0);
+        if last.timestamp == previous.timestamp {
+            return None;
         }
-        let dt_value = if last.value - previous.value >= 0.0 {
-            last.value - previous.value
-        } else {
+        let dt_seconds = (last.timestamp - previous.timestamp) as f64 / 1_000_000.0;
+        let dt_value = if last.value < previous.value {
             last.value
+        } else {
+            last.value - previous.value
         };
         Some(dt_value / dt_seconds)
     }
@@ -120,11 +120,24 @@ mod tests {
     }
 
     #[test]
-    fn test_irate_exec_same_timestamp_returns_zero() {
+    fn test_irate_exec_same_timestamp_returns_none() {
         let func = IrateFunc;
         let samples = vec![Sample::new(1000, 10.0), Sample::new(1000, 20.0)];
-        let result = func.exec(&samples, 1000, &Duration::ZERO);
-        assert_eq!(result, Some(0.0));
+        assert!(func.exec(&samples, 1000, &Duration::ZERO).is_none());
+    }
+
+    #[test]
+    fn test_irate_exec_nan_previous_propagates() {
+        let func = IrateFunc;
+        let samples = vec![
+            Sample::new(1_000_000, f64::NAN),
+            Sample::new(2_000_000, 5.0),
+        ];
+        assert!(
+            func.exec(&samples, 2_000_000, &Duration::ZERO)
+                .unwrap()
+                .is_nan()
+        );
     }
 
     #[test]

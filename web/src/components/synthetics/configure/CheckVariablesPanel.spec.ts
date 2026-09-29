@@ -205,6 +205,27 @@ describe("CheckVariablesPanel", () => {
       expect(wrapper.find(sel("-empty")).exists()).toBe(false);
       expect(wrapper.find(sel("-add-variable-btn")).exists()).toBe(true);
     });
+
+    it("the header ends with a Close variables button that emits close", async () => {
+      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
+
+      const close = wrapper
+        .findAllComponents(OButtonStub)
+        .find((b) => b.attributes("data-test") === "synthetics-check-variables-panel-close-btn");
+      expect(close).toBeDefined();
+      expect(close!.props("variant")).toBe("ghost");
+      expect(close!.props("size")).toBe("icon-xs-sq");
+      expect(close!.props("iconLeft")).toBe("close");
+      expect(close!.attributes("aria-label")).toBe("Close variables");
+      const headerRow = close!.element.parentElement!;
+      expect(headerRow.querySelector("h3")).not.toBeNull();
+      expect(headerRow.lastElementChild).toBe(close!.element);
+      const tips = wrapper.findAllComponents(OTooltipStub).map((c) => c.props("content"));
+      expect(tips).toContain("Close variables");
+
+      await close!.trigger("click");
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
   });
 
   // ── Add flow ──────────────────────────────────────────────────────────────
@@ -464,6 +485,35 @@ describe("CheckVariablesPanel", () => {
       // "BASE" is a prefix of "BASE_URL" — {{BASE_URL}} must not count for it.
       const varBase = { id: "var-c", name: "BASE", value: "x", secure: false, example: "" };
       wrapper = mountPanel({ check: checkWith([varBase], journey) });
+
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).not.toContain("referenced by");
+    });
+  });
+
+  // A variable used only inside a referenced check's steps must still count.
+  describe("composed usage", () => {
+    const composedCheck: BrowserCheck = checkWith(
+      [{ id: "var-pw", name: "PASSWORD", value: "", secure: true, example: "" }],
+      [
+        { id: "s1", action: "navigate", value: "https://x" },
+        { id: "s2", action: "subtest", name: "Login", subtest: { id: "login-test" } },
+      ],
+    );
+    const children = new Map<string, { steps: BrowserStep[] }>([
+      ["login-test", { steps: [{ id: "c1", action: "type", name: "pw", value: "{{PASSWORD}}" }] }],
+    ]);
+
+    it("counts a variable used only inside a referenced check", async () => {
+      wrapper = mountPanel({ check: composedCheck, childJourneys: children });
+
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).toContain("referenced by 1 step");
+    });
+
+    // `toBe(0)`: `not.toContain("1")` also passes in the always-0 bug state.
+    it("reads as unreferenced when the child journeys have not been loaded", async () => {
+      wrapper = mountPanel({ check: composedCheck });
 
       await wrapper.find(sel("-remove-0-btn")).trigger("click");
       expect(wrapper.find(sel("-remove-dialog")).text()).not.toContain("referenced by");

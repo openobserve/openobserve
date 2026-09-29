@@ -1147,6 +1147,8 @@ const showEmpty = computed(
     !props.streaming &&
     !props.error &&
     !showForbidden.value &&
+    // A leading body row is content of its own, so it paints even with no data rows.
+    !slots["body-start"] &&
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
@@ -1389,6 +1391,10 @@ defineExpose({
             // a leading checkbox/expand/drag gutter supplies the left inset on its
             // own (same token — see the CSS).
             'o2-table--edge-inset',
+            // With no body rows the sticky <thead> has nothing to stick within, so the table itself sticks.
+            props.stickyHeader && props.showHeader && (showEmpty || showForbidden || showError)
+              ? 'sticky top-0 z-10'
+              : '',
           ]"
           :style="{
             ...columnSizeVars,
@@ -1542,6 +1548,10 @@ defineExpose({
             <!-- Expansion slot -->
             <template v-if="slots.expansion" #expansion="expSlotProps">
               <slot name="expansion" :row="expSlotProps.row" />
+            </template>
+
+            <template v-if="slots['body-start']" #body-start>
+              <slot name="body-start" />
             </template>
 
             <!-- Section heading row -->

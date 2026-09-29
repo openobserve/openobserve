@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-date-time-dropdown"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8 max-lg:me-auto"
+            class="h-8 max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />

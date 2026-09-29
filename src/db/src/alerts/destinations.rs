@@ -57,10 +57,6 @@ pub enum DestinationError {
     AlreadyExists,
     #[error("Destination not found")]
     NotFound,
-    #[error("Destination is currently used by alert: {0}")]
-    UsedByAlert(String),
-    #[error("Destination is currently used by pipeline: {0}")]
-    UsedByPipeline(String),
     #[error("Prebuilt template not found for type: {0}")]
     PrebuiltTemplateNotFound(String),
     #[error("Failed to create template: {0}")]
@@ -71,8 +67,8 @@ pub enum DestinationError {
     EmailSendFailed(String),
     #[error("LLM Evaluation destinations are only supported for pipelines, not alerts")]
     NotSupportedAlertDestinationType,
-    #[error("Destination is currently used by workflow: {0}")]
-    UsedByWorkflow(String),
+    #[error("{0}")]
+    InUse(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -106,7 +102,8 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
         .await
     {
         log::error!(
-            "[Destination] error triggering super cluster event to add destination to cache: {e}"
+            "[Destination] error triggering super cluster event to add destination to cache: org_id: {}, error: {e}",
+            saved.org_id
         );
     }
 
@@ -134,7 +131,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
         .await
     {
         log::error!(
-            "[Destination] error triggering super cluster event to remove destination from cache: {e}"
+            "[Destination] error triggering super cluster event to remove destination from cache: org_id: {org_id}, error: {e}"
         );
     }
 
@@ -198,11 +195,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_value: Destination = match table::destinations::get(org_id, name).await {
                     Ok(Some(dest)) => dest,
                     Ok(None) => {
-                        log::error!("Destination not found in db");
+                        log::error!("Destination not found in db, org_id: {org_id}");
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting from db: {e}");
+                        log::error!("Error getting from db: org_id: {org_id}, error: {e}");
                         continue;
                     }
                 };
@@ -305,17 +302,17 @@ mod tests {
     }
 
     #[test]
-    fn test_destination_error_display_used_by_alert() {
-        let e = DestinationError::UsedByAlert("my-alert".to_string());
-        assert!(e.to_string().contains("my-alert"));
-    }
-
-    #[test]
     fn test_destination_error_display_already_exists() {
         let e = DestinationError::AlreadyExists;
         assert_eq!(
             e.to_string(),
             "Destination with the same name already exists"
         );
+    }
+
+    #[test]
+    fn test_destination_error_display_in_use() {
+        let e = DestinationError::InUse("'x' is used by 1 alert".to_string());
+        assert_eq!(e.to_string(), "'x' is used by 1 alert");
     }
 }

@@ -38,7 +38,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   than "estimated".
 -->
 <template>
-  <div class="flex flex-col" data-test="dbm-coverage">
+  <!-- Inline: one toolbar note, hidden while empty because the empty state already says so. -->
+  <DbmToolbarNote
+    v-if="inline && !isEmpty"
+    :tone="noteTone"
+    :icon="noteTone === 'neutral' ? 'data-usage' : undefined"
+    :text="summary"
+    :detail="noteDetail"
+    :compact="compact"
+    data-test="dbm-coverage"
+  />
+  <div v-else-if="!inline" class="flex flex-col" data-test="dbm-coverage">
     <!-- The line itself. `min-h-6.5` holds the 26px budget the space plan
          allocates it, so a healthy page spends no more than that. -->
     <div
@@ -67,37 +77,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div
-        v-if="countedTo"
-        class="text-text-muted flex shrink-0 items-center gap-1.5"
-        data-test="dbm-coverage-counted"
-      >
-        <OIcon name="access-time" size="xs" class="shrink-0" aria-hidden="true" />
-        <i18n-t
-          v-if="countedTo.behind !== null"
-          keypath="dbm.coverage.lineCountedToBehind"
-          tag="span"
-          class="text-2xs"
-          :class="toneText"
+      <div v-if="$slots.legend || countedTo" class="flex min-w-0 items-center gap-4">
+        <!-- The key for any marker in the rows below, where the eye meets the table. -->
+        <slot name="legend" />
+        <div
+          v-if="countedTo"
+          class="text-text-muted flex shrink-0 items-center gap-1.5"
+          data-test="dbm-coverage-counted"
         >
-          <template #time>
-            <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
-          </template>
-          <template #minutes>
-            <span class="font-semibold tabular-nums">{{ countedTo.behind }}</span>
-          </template>
-        </i18n-t>
-        <i18n-t
-          v-else
-          keypath="dbm.coverage.lineCountedTo"
-          tag="span"
-          class="text-2xs"
-          :class="toneText"
-        >
-          <template #time>
-            <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
-          </template>
-        </i18n-t>
+          <OIcon name="access-time" size="xs" class="shrink-0" aria-hidden="true" />
+          <i18n-t
+            v-if="countedTo.behind !== null"
+            keypath="dbm.coverage.lineCountedToBehind"
+            tag="span"
+            class="text-2xs"
+            :class="toneText"
+          >
+            <template #time>
+              <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
+            </template>
+            <template #minutes>
+              <span class="font-semibold tabular-nums">{{ countedTo.behind }}</span>
+            </template>
+          </i18n-t>
+          <i18n-t
+            v-else
+            keypath="dbm.coverage.lineCountedTo"
+            tag="span"
+            class="text-2xs"
+            :class="toneText"
+          >
+            <template #time>
+              <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
+            </template>
+          </i18n-t>
+        </div>
       </div>
     </div>
   </div>
@@ -106,10 +120,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import DbmToolbarNote, { type DbmToolbarNoteTone } from "./DbmToolbarNote.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { Freshness, QueryStatsRow } from "@/services/db_monitoring";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCount, formatPercent } from "@/utils/dbm/format";
 
 const props = withDefaults(
@@ -146,6 +161,10 @@ const props = withDefaults(
      * measurement was taken.
      */
     subject?: "list" | "query";
+    /** Renders as a toolbar note instead of a full-width line. */
+    inline?: boolean;
+    /** With `inline`, the icon alone, for a toolbar with no room left for text. */
+    compact?: boolean;
   }>(),
   {
     hits: () => [],
@@ -154,6 +173,8 @@ const props = withDefaults(
     exactPercentiles: false,
     filterLabel: null,
     subject: "list",
+    inline: false,
+    compact: false,
   },
 );
 
@@ -402,5 +423,21 @@ const summary = computed<I18nText>(() => {
     percent: pct(shownTime.value),
     count: formatCount(props.trackedCount ?? 200),
   });
+});
+
+const noteTone = computed<DbmToolbarNoteTone>(() => {
+  if (hasGap.value || neverAggregated.value) return "error";
+  return degraded.value ? "warning" : "neutral";
+});
+
+// The line shows "counted up to" beside the sentence; the note has one tooltip, so it rides there.
+const noteDetail = computed<I18nText>(() => {
+  const c = countedTo.value;
+  if (!c) return summary.value;
+  const counted =
+    c.behind !== null
+      ? t("dbm.coverage.lineCountedToBehind", { time: c.time, minutes: c.behind })
+      : t("dbm.coverage.lineCountedTo", { time: c.time });
+  return raw(`${summary.value} ${counted}`);
 });
 </script>

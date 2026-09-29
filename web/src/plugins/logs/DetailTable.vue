@@ -184,8 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <ODropdownItem
                         v-if="
-                          searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                            item.name === row.field ? item.isSchemaField : '',
+                          isFilterableLogField(
+                            row.field,
+                            searchObj.data.stream.selectedStreamFields,
                           )
                         "
                         data-test="log-details-include-field-btn"
@@ -196,8 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ODropdownItem>
                       <ODropdownItem
                         v-if="
-                          searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                            item.name === row.field ? item.isSchemaField : '',
+                          isFilterableLogField(
+                            row.field,
+                            searchObj.data.stream.selectedStreamFields,
                           )
                         "
                         data-test="log-details-exclude-field-btn"
@@ -515,6 +517,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -1106,6 +1109,7 @@ export default defineComponent({
       recordSizeOptions,
       getImageURL,
       tableDropdownOpenMap,
+      isFilterableLogField,
       shouldWrapValues,
       toggleWrapLogDetails,
       copyContentToClipboard,

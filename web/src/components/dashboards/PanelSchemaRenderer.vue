@@ -100,6 +100,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onChartClick"
           @contextmenu="onChartContextMenu"
           @domcontextmenu="onChartDomContextMenu"
+          @mouseover="exemplarInteraction.onMouseOver"
+          @mouseout="exemplarInteraction.onMouseOut"
+          @finished="onChartFinished"
+        />
+        <ExemplarMarkerList
+          v-if="exemplarPoints.length"
+          :points="exemplarPoints"
+          :timezone="store.state.timezone"
+          :format-value="formatExemplarValue"
+          @focus-marker="(point) => exemplarInteraction.openCard(point.marker, true)"
+          @activate-marker="(point) => exemplarInteraction.follow(point.marker)"
+        />
+        <ExemplarCard
+          v-if="exemplarActiveMarker"
+          :marker="exemplarActiveMarker"
+          :query-labels="exemplarQueryLabels"
+          :unit="exemplarActiveUnit.unit"
+          :unit-custom="exemplarActiveUnit.unitCustom ?? undefined"
+          :decimals="panelSchema.config?.decimals"
+          :timezone="store.state.timezone"
+          :verdict="exemplarVerdict"
+          :anchor="exemplarCardAnchor"
+          :clamped="exemplarActiveClamp"
+          @enter="exemplarInteraction.onCardEnter"
+          @leave="exemplarInteraction.onCardLeave"
+          @open-trace="exemplarInteraction.openTrace"
         />
       </div>
       <div
@@ -269,11 +295,12 @@ import {
   defineAsyncComponent,
   onMounted,
   onUnmounted,
+  type PropType,
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
@@ -286,6 +313,26 @@ import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { usePanelAlertCreation, usePanelDownload } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
+import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
+import { usePanelExemplarInteraction } from "@/composables/dashboard/usePanelExemplarInteraction";
+import { useExemplarTraceLookup } from "@/composables/dashboard/useExemplarTraceLookup";
+import {
+  applyExemplarSeries,
+  seriesValueExtent,
+  toChartTimeMs,
+} from "@/utils/dashboard/exemplars/applyExemplarSeries";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { buildExemplarTraceRoute } from "@/utils/dashboard/exemplars/exemplarTraceRoute";
+import {
+  exemplarBaseUnit,
+  exemplarPlacement,
+  interpolateParsed,
+  parseSeries,
+} from "@/utils/dashboard/exemplars/exemplarPlacement";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import ExemplarCard from "@/components/dashboards/exemplars/ExemplarCard.vue";
+import ExemplarMarkerList from "@/components/dashboards/exemplars/ExemplarMarkerList.vue";
+import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/interfaces/exemplars";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 
 const ChartRenderer = defineAsyncComponent(() => {
@@ -360,6 +407,8 @@ export default defineComponent({
     OEmptyState,
     ODrawer,
     DashboardLogDrawer,
+    ExemplarCard,
+    ExemplarMarkerList,
   },
   props: {
     selectedTimeObj: {
@@ -480,6 +529,18 @@ export default defineComponent({
      * normal dashboard panels, which fetch their own data.
      */
     injectedPromqlData: {
+      type: Object,
+      required: false,
+      default: undefined,
+    },
+    // A viewer's session choice; null defers to the panel's saved `show_exemplars`.
+    exemplarsOverride: {
+      type: Boolean as PropType<boolean | null>,
+      required: false,
+      default: null,
+    },
+    // Exemplar state owned by a caller that fetches them itself (the metrics explorer).
+    injectedExemplars: {
       type: Object,
       required: false,
       default: undefined,
@@ -682,6 +743,8 @@ export default defineComponent({
       shouldRefreshWithoutCache,
       regionClusterParams,
       injectedPromqlData,
+      exemplarsOverride,
+      injectedExemplars,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -828,6 +891,205 @@ export default defineComponent({
         : (lastEntry?.time_offset?.start_time ?? 0);
 
       return { boundaryTime, queryStart, queryEnd, isLTR };
+    });
+
+    const exemplarsEligible = computed(() => isExemplarEligible(panelSchema.value as any));
+    const exemplarsEnabled = computed(
+      () => exemplarsOverride.value ?? !!panelSchema.value?.config?.show_exemplars,
+    );
+    const exemplarRequestMeta = computed(() => ({
+      dashboard_id: dashboardId.value || undefined,
+      dashboard_name: dashboardName.value || undefined,
+      folder_id: folderId.value || undefined,
+      folder_name: folderName.value || undefined,
+      panel_id: panelSchema.value?.id,
+      panel_name: panelSchema.value?.title,
+      run_id: runId.value || undefined,
+      tab_id: tabId.value || undefined,
+      tab_name: tabName.value || undefined,
+    }));
+    const {
+      status: exemplarsStatus,
+      markers: exemplarMarkers,
+      errorMessage: exemplarsError,
+      retry: retryExemplars,
+    } = usePanelExemplars({
+      panelSchema: panelSchema as any,
+      metadata: metadata as any,
+      enabled: exemplarsEnabled,
+      hiddenQueries,
+      injected: injectedExemplars as any,
+      meta: exemplarRequestMeta,
+    });
+    const exemplarsCount = computed(() => exemplarMarkers.value.length);
+
+    const toExemplarChartX = (tsMs: number) => toChartTimeMs(tsMs, store.state.timezone);
+    const exemplarSeriesExtent = computed<[number, number]>(() =>
+      seriesValueExtent(
+        Array.isArray(filteredData.value) ? filteredData.value : [],
+        panelSchema.value?.config?.y_axis_min,
+        panelSchema.value?.config?.y_axis_max,
+      ),
+    );
+    const exemplarWindowMs = computed<[number, number]>(() => {
+      const first = metadata.value?.queries?.[0];
+      const start = Number(first?.startTime) / 1000;
+      const end = Number(first?.endTime) / 1000;
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return [NaN, NaN];
+      return [toExemplarChartX(start), toExemplarChartX(end)];
+    });
+    const navigateToExemplarTrace = (marker: ExemplarMarker, verdict: TraceVerdict) => {
+      const target = buildExemplarTraceRoute(
+        marker,
+        verdict,
+        store.state.selectedOrganization?.identifier,
+      );
+      if (target) router.push(target).catch(() => {});
+    };
+    const exemplarQueryText = (index: number): string =>
+      String(
+        metadata.value?.queries?.[index]?.query ?? panelSchema.value?.queries?.[index]?.query ?? "",
+      );
+    const exemplarValueUnits = computed(() =>
+      (panelSchema.value?.queries ?? []).map((_: unknown, index: number) => {
+        const injected = injectedExemplars.value as InjectedExemplars | undefined;
+        if (injected?.valueUnit) {
+          return { unit: injected.valueUnit, unitCustom: injected.valueUnitCustom ?? null };
+        }
+        return exemplarBaseUnit(exemplarQueryText(index));
+      }),
+    );
+    const exemplarPlacements = computed(() =>
+      exemplarValueUnits.value.map((unit: { unit: string }, index: number) =>
+        exemplarPlacement(exemplarQueryText(index), panelSchema.value?.config?.unit, unit as any),
+      ),
+    );
+    const exemplarLineSeries = computed(() =>
+      (Array.isArray(filteredData.value) ? filteredData.value : []).map((query: any) =>
+        parseSeries(query?.result?.[0]?.values),
+      ),
+    );
+    // Every chart paint re-asks for each marker's y, so it is computed once per data or placement change.
+    const exemplarLineYs = computed(() => {
+      void exemplarLineSeries.value;
+      void exemplarPlacements.value;
+      return new Map<string, number | null>();
+    });
+    const placeExemplarY = (marker: ExemplarMarker): number | null => {
+      const queryIndex = marker.queryIndexes[0];
+      if (exemplarPlacements.value[queryIndex] !== "line") return null;
+      const cache = exemplarLineYs.value;
+      if (cache.has(marker.id)) return cache.get(marker.id) ?? null;
+      const series = exemplarLineSeries.value[visibleQueryIndexes.value.indexOf(queryIndex)];
+      const y = series ? interpolateParsed(series, marker.tsMs / 1000) : null;
+      cache.set(marker.id, y);
+      return y;
+    };
+    const exemplarUnitOf = (marker: ExemplarMarker | null | undefined) =>
+      exemplarValueUnits.value[marker?.queryIndexes[0] ?? 0] ?? { unit: "", unitCustom: null };
+    const formatExemplarValue = (point: { marker: ExemplarMarker }): string => {
+      const unit = exemplarUnitOf(point.marker);
+      return String(
+        formatUnitValue(
+          getUnitValue(
+            point.marker.value,
+            unit.unit,
+            unit.unitCustom ?? "",
+            panelSchema.value?.config?.decimals,
+          ),
+        ),
+      );
+    };
+
+    const exemplarInteraction = usePanelExemplarInteraction({
+      chartRendererRef,
+      markers: exemplarMarkers,
+      seriesExtent: exemplarSeriesExtent,
+      windowMs: exemplarWindowMs,
+      lookup: useExemplarTraceLookup(),
+      toChartX: toExemplarChartX,
+      navigate: navigateToExemplarTrace,
+      placeY: placeExemplarY,
+    });
+    const {
+      points: exemplarPoints,
+      activeMarker: exemplarActiveMarker,
+      cardAnchor: exemplarCardAnchor,
+      verdict: exemplarVerdict,
+    } = exemplarInteraction;
+    const exemplarActiveUnit = computed(() => exemplarUnitOf(exemplarActiveMarker.value));
+    const exemplarActiveClamp = computed(
+      () =>
+        exemplarPoints.value.find((p) => p.marker.id === exemplarActiveMarker.value?.id)?.clamped ??
+        false,
+    );
+
+    const visibleQueryIndexes = computed(() =>
+      (panelSchema.value?.queries ?? [])
+        .map((_: unknown, i: number) => i)
+        .filter((i: number) => !hiddenQueries.value.includes(i)),
+    );
+    // First series per visible query, by panel query index.
+    const firstSeriesByQuery = (): Map<number, { series: any; seriesIndex: number }> => {
+      const out = new Map<number, { series: any; seriesIndex: number }>();
+      (panelData.value?.options?.series ?? []).forEach((series: any, seriesIndex: number) => {
+        if (typeof series?._queryIndex !== "number") return;
+        const queryIndex = visibleQueryIndexes.value[series._queryIndex];
+        if (queryIndex !== undefined && !out.has(queryIndex)) {
+          out.set(queryIndex, { series, seriesIndex });
+        }
+      });
+      return out;
+    };
+    // Configured colours are known before paint, so the first frame is already right in the common case.
+    const configuredQueryColors = computed(() => {
+      const colors: Record<number, string> = {};
+      firstSeriesByQuery().forEach(({ series }, queryIndex) => {
+        const color = series?.itemStyle?.color;
+        if (typeof color === "string") colors[queryIndex] = color;
+      });
+      return colors;
+    });
+    const paintedQueryColors = ref<Record<number, string>>({});
+    const exemplarQueryColors = computed(() => {
+      const fallback = (void isDark.value, chartColor("--color-accent"));
+      return visibleQueryIndexes.value.reduce((acc: string[], i: number) => {
+        acc[i] = paintedQueryColors.value[i] ?? configuredQueryColors.value[i] ?? fallback;
+        return acc;
+      }, []);
+    });
+    const readExemplarQueryColors = () => {
+      const chart = chartRendererRef.value?.chart;
+      const painted: Record<number, string> = {};
+      firstSeriesByQuery().forEach(({ seriesIndex }, queryIndex) => {
+        let color: unknown;
+        try {
+          color = chart?.getVisual?.({ seriesIndex }, "color");
+        } catch {
+          // The chart may not have painted this option yet; the configured colour stands in.
+        }
+        if (typeof color === "string" && color !== configuredQueryColors.value[queryIndex]) {
+          painted[queryIndex] = color;
+        }
+      });
+      if (JSON.stringify(painted) !== JSON.stringify(paintedQueryColors.value)) {
+        paintedQueryColors.value = painted;
+      }
+    };
+    const onChartFinished = () => {
+      if (!exemplarMarkers.value.length) return;
+      readExemplarQueryColors();
+      exemplarInteraction.onFinished();
+    };
+    const exemplarQueryLabels = computed(() => {
+      const injectedLabels: string[] | undefined = (injectedExemplars.value as any)?.queryLabels;
+      return (panelSchema.value?.queries ?? []).map((q: any, index: number) => ({
+        index,
+        name: injectedLabels?.[index]
+          ? raw(injectedLabels[index])
+          : t("dashboard.exemplars.query", { name: String.fromCharCode(65 + index) }),
+        query: String(metadata.value?.queries?.[index]?.query ?? q?.query ?? ""),
+      }));
     });
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -1515,6 +1777,23 @@ export default defineComponent({
     // Determines what data to pass to ChartRenderer.
     // noData check is evaluated first so promql panels with no results
     // also get the transparent background instead of showing a skeleton.
+    const withExemplars = (value: any) => {
+      if (!exemplarMarkers.value.length || !value?.options) return value;
+      if (!exemplarsEligible.value && !injectedExemplars.value) return value;
+      return {
+        ...value,
+        options: applyExemplarSeries(value.options, exemplarMarkers.value, {
+          yExtent: exemplarInteraction.yExtent.value,
+          xExtent: exemplarInteraction.xExtent.value,
+          queryColors: exemplarQueryColors.value,
+          haloColor: (void isDark.value, chartColor("--color-surface-base")),
+          edgeColor: (void isDark.value, chartColor("--color-text-heading")),
+          toChartX: toExemplarChartX,
+          placeY: placeExemplarY,
+        }),
+      };
+    };
+
     const chartRendererData = computed(() => {
       if (noData.value === "No Data") {
         return { options: { backgroundColor: "transparent" } };
@@ -1526,9 +1805,9 @@ export default defineComponent({
           panelData.value.chartType !== "maps" &&
           loading.value)
       ) {
-        return panelData.value;
+        return withExemplars(panelData.value);
       }
-      return panelData.value;
+      return withExemplars(panelData.value);
     });
 
     // when the error changes, emit the error
@@ -1577,6 +1856,7 @@ export default defineComponent({
       isCursorOverPanel,
       showErrorNotification,
       t,
+      onExemplarClick: exemplarInteraction.onExemplarClick,
     });
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
@@ -1873,6 +2153,22 @@ export default defineComponent({
       onCellSendToAiChat,
       exploreCellInLogs,
       onCellDrawerOpenChange,
+      exemplarsEligible,
+      exemplarsEnabled,
+      exemplarsStatus,
+      exemplarsCount,
+      exemplarsError,
+      retryExemplars,
+      exemplarInteraction,
+      exemplarPoints,
+      exemplarActiveMarker,
+      exemplarCardAnchor,
+      exemplarVerdict,
+      exemplarActiveClamp,
+      exemplarQueryLabels,
+      exemplarActiveUnit,
+      formatExemplarValue,
+      onChartFinished,
     };
   },
 });

@@ -18,8 +18,9 @@ use sqlparser::{dialect::GenericDialect, parser::Parser};
 /// Validate that `filter` is a single well-formed SQL boolean expression suitable
 /// for splicing into a WHERE clause. Rejects empty input, multi-statement payloads,
 /// and fragments that only parse because a comment (`--`, `/*`) swallowed the
-/// closing context. Defense-in-depth for endpoints that accept raw filter fragments
-/// (traces latest/latest_stream) — clients must still escape values.
+/// closing context. Defense-in-depth for the traces list endpoints that splice a
+/// raw `filter` query param (latest, latest_stream, user, session). Clients must
+/// still escape values.
 ///
 /// It intentionally does NOT reject tautologies (`a='x' OR 1=1` is valid SQL); the
 /// client-side escaping is the real fix, this is the backstop for direct API callers.
@@ -33,6 +34,15 @@ pub fn validate_where_fragment(filter: &str) -> Result<(), String> {
         Ok(statements) if statements.len() == 1 => Ok(()),
         Ok(_) => Err("filter must be a single expression".to_string()),
         Err(e) => Err(format!("invalid filter expression: {e}")),
+    }
+}
+
+/// An empty filter is allowed. Any other value must pass [`validate_where_fragment`].
+pub fn validate_optional_where_fragment(filter: &str) -> Result<(), String> {
+    if filter.is_empty() {
+        Ok(())
+    } else {
+        validate_where_fragment(filter)
     }
 }
 
@@ -69,5 +79,34 @@ mod tests {
         assert!(validate_where_fragment("a='x') OR 1=1 --").is_ok());
         // ...but the same shape cannot smuggle a second statement:
         assert!(validate_where_fragment("a='x') ; DROP TABLE t --").is_err());
+    }
+
+    #[test]
+    fn test_validate_optional_where_fragment() {
+        assert!(validate_optional_where_fragment("").is_ok());
+        assert!(
+            validate_optional_where_fragment("service_name = 'api' AND duration > 100").is_ok()
+        );
+        assert!(
+            validate_optional_where_fragment(
+                "gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2'"
+            )
+            .is_ok()
+        );
+        // The session list's legacy agent filter is one boolean expression (an IN subquery).
+        let legacy = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
+        assert!(validate_optional_where_fragment(legacy).is_ok());
+
+        for bad in [
+            "   ",
+            "a='x' --",
+            "a='x' /*",
+            "a='x",
+            "a='x' UNION SELECT 1",
+            "1=1; DROP TABLE t",
+        ] {
+            let err = validate_optional_where_fragment(bad).unwrap_err();
+            assert!(!err.is_empty(), "{bad}");
+        }
     }
 }

@@ -124,12 +124,14 @@ pub async fn init() -> errors::Result<()> {
         if let Err(e) = wal::clean_orphan_par_files(process_start).await {
             log::error!("Clean orphan par files error: {e}");
         }
+        // Wal directory can have millions of files. Hence scanning must happen in async context to
+        // avoid blocking ingestion path.
         log::info!("Scanning wal files from {wal_dir:?}");
         let wal_files = wal::wal_scan_files(&wal_dir, "wal")
             .await
             .unwrap_or_default();
         log::info!("Found {} wal files to replay", wal_files.len());
-        if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
+        if let Err(e) = wal::replay_wal_files(wal_dir, wal_files, process_start).await {
             log::error!("replay wal files error: {e}");
         }
         log::info!("Replay wal files done");

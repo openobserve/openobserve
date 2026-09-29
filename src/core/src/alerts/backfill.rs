@@ -480,7 +480,8 @@ pub async fn delete_backfill_jobs_by_pipeline(
         // Delete the trigger from scheduled_jobs
         if let Err(e) = db::scheduler::delete(org_id, TriggerModule::Backfill, &job.id).await {
             log::warn!(
-                "[BACKFILL] Failed to delete trigger for job {} from scheduled_jobs: {}",
+                "[BACKFILL] Failed to delete trigger for job {}/{} from scheduled_jobs: {}",
+                org_id,
                 job.id,
                 e
             );
@@ -490,7 +491,8 @@ pub async fn delete_backfill_jobs_by_pipeline(
         // Delete from backfill_jobs table
         if let Err(e) = db::backfill::delete(org_id, &job.id).await {
             log::error!(
-                "[BACKFILL] Failed to delete backfill job {} from backfill_jobs table: {}",
+                "[BACKFILL] Failed to delete backfill job {}/{} from backfill_jobs table: {}",
+                org_id,
                 job.id,
                 e
             );

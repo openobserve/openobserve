@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAlertSelected"
         :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5 max-md:hidden"
+        class="o2-search-input min-w-62.5 max-lg:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         icon-left="search"
         size="icon-sm"
-        class="max-md:hidden"
+        class="max-lg:hidden"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <div
-      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 md:hidden"
+      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 lg:hidden"
     >
       <OSelect
         v-model="selectedAlert"

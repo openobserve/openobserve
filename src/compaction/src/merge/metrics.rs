@@ -20,15 +20,13 @@
 use config::meta::stream::FileKey;
 use metrics_index::MetricsFileLayout;
 
-/// Indexed `indexed-v1-*` files a closed hour may hold beyond the ideal
-/// `total_size / max_file_size` before the whole hour is rewritten.
+/// Extra indexed files tolerated before rewriting the closed hour.
 const METRICS_INDEX_REWRITE_SLACK: usize = 4;
 
 /// What the merge of a closed indexed metrics hour covers.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum MetricsIndexMergeScope {
-    /// Every file is `indexed-v1-*` and the count fits the current
-    /// `max_file_size`: leave the hour alone.
+    /// Leaves the hour unchanged when indexed-file fragmentation is within the size target.
     Skip,
     /// Merge only the late, non-indexed files into one new indexed file;
     /// existing indexed files stay. Their hash ranges may overlap, which

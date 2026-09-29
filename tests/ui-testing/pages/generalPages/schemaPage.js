@@ -917,6 +917,20 @@ class SchemaPage {
         expect(streamsPageVisible).toBe(true);
         return streamsPageVisible;
     }
+
+    /**
+     * Assert the stream's schema editor actually rendered: the schema ODrawer is
+     * open, its title is shown, and the field-mapping table (the stream's field
+     * list) is visible. This is the real, environment-independent outcome of
+     * opening a stream's schema detail — the add-field / delete-field controls
+     * are gated behind isSchemaUDSEnabled (User-Defined Schema, enterprise/config)
+     * so they are NOT a reliable cross-environment signal.
+     */
+    async verifySchemaEditorLoaded() {
+        await expect(this.schemaDrawer).toBeVisible({ timeout: 30000 });
+        await expect(this.schemaTitleText).toBeVisible({ timeout: 15000 });
+        await expect(this.schemaLogStreamFieldMappingTable.first()).toBeVisible({ timeout: 15000 });
+    }
 }
 
 module.exports = SchemaPage;

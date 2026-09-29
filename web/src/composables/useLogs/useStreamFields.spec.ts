@@ -19,6 +19,7 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useStreamFields from "./useStreamFields";
+import { searchState } from "./searchState";
 
 // Create i18n instance
 const i18n = createI18n({
@@ -122,6 +123,46 @@ describe("useStreamFields Composable", () => {
       const { loadStreamLists } = wrapper.vm;
       await loadStreamLists(false);
       expect(loadStreamLists).toHaveBeenCalled;
+    });
+  });
+
+  describe("updateGridColumns stream name column", () => {
+    const { searchObj } = searchState();
+
+    beforeEach(() => {
+      searchObj.meta.sqlMode = false;
+      searchObj.data.stream.selectedFields = [];
+      searchObj.data.stream.selectedStream = ["app", "rum"];
+      searchObj.data.queryResults = {
+        hits: [
+          { _timestamp: 2, _stream_name: "rum", message: "b" },
+          { _timestamp: 1, _stream_name: "app", message: "a" },
+        ],
+      } as any;
+    });
+
+    const columnIds = () => searchObj.data.resultGrid.columns.map((column: any) => column.id);
+
+    it("adds _stream_name after the timestamp for a multi-stream result", () => {
+      wrapper.vm.updateGridColumns();
+
+      expect(columnIds()).toEqual(["_timestamp", "_stream_name", "source"]);
+    });
+
+    it("adds _stream_name before the selected fields", () => {
+      searchObj.data.stream.selectedFields = ["message"];
+
+      wrapper.vm.updateGridColumns();
+
+      expect(columnIds()).toEqual(["_timestamp", "_stream_name", "message"]);
+    });
+
+    it("leaves a single-stream result unchanged", () => {
+      searchObj.data.stream.selectedStream = ["app"];
+
+      wrapper.vm.updateGridColumns();
+
+      expect(columnIds()).toEqual(["_timestamp", "source"]);
     });
   });
 });
