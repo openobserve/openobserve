@@ -1539,7 +1539,11 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-select-all"
           @update:model-value="toggleSelectAll()"
         />
-        <OSeparator vertical class="ms-4" data-test="synthetics-journey-select-all-separator" />
+        <OSeparator
+          vertical
+          class="ms-4 me-2"
+          data-test="synthetics-journey-select-all-separator"
+        />
         <h3 class="sr-only">{{ t("synthetics.journey.steps") }}</h3>
         <JourneyStepCount
           :steps="modelValue"
