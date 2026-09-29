@@ -24,7 +24,7 @@ use config::{
         inverted_index::IndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
-        stream::{FileKey, StreamSettings, StreamType},
+        stream::{FileKey, StreamSettings},
     },
 };
 use hashbrown::HashMap;
@@ -50,13 +50,15 @@ use crate::{
 };
 
 /// Stream settings narrowed to the fields that exist in the query schema.
+#[derive(Default)]
 pub(super) struct StreamSearchSettings {
     pub(super) settings: Option<StreamSettings>,
     pub(super) created_at: Option<i64>,
     pub(super) fts_fields: Vec<String>,
     pub(super) index_fields: Vec<String>,
     pub(super) bloom_fields: Vec<String>,
-    pub(super) partition_keys: Vec<(String, String)>,
+    /// The request's `equal_keys` filters, not the stream's partition key settings.
+    pub(super) search_partition_keys: Vec<(String, String)>,
 }
 
 impl StreamSearchSettings {
@@ -95,7 +97,7 @@ impl StreamSearchSettings {
             .into_iter()
             .filter(|v| schema_fields.contains_key(v))
             .collect_vec();
-        let partition_keys = req
+        let search_partition_keys = req
             .index_info
             .equal_keys
             .iter()
@@ -108,7 +110,7 @@ impl StreamSearchSettings {
             fts_fields,
             index_fields,
             bloom_fields,
-            partition_keys,
+            search_partition_keys,
         }
     }
 
@@ -140,36 +142,27 @@ impl StreamSearchSettings {
     }
 }
 
-/// Where each object-storage file of this partition is read from.
+/// Object-storage files whose aggregate is answered without a storage scan.
 #[derive(Default)]
-pub(super) struct RoutedFiles {
+pub(super) struct PrecomputedAggregates {
     pub(super) metadata_count_files: Vec<FileKey>,
     pub(super) index_aggregate: Option<IndexAggregate>,
-    /// Parquet or vortex files left for the storage scan; `None` when the request has no file ids.
-    pub(super) scan_files: Option<Vec<FileKey>>,
 }
 
+/// Also returns the files left for the storage scan, `None` when the request has no file ids.
 pub(super) async fn route_files(
     query: &Arc<QueryParams>,
     req: &FlightSearchRequest,
     settings: &StreamSearchSettings,
     index: &IndexPlan,
     scan_stats: &mut ScanStats,
-) -> Result<RoutedFiles, Error> {
+) -> Result<(PrecomputedAggregates, Option<Vec<FileKey>>), Error> {
     if req.search_info.file_id_list.is_empty() {
-        return Ok(RoutedFiles::default());
+        return Ok((PrecomputedAggregates::default(), None));
     }
     let trace_id = query.trace_id.as_str();
-    let (mut scan_files, file_list_took) = get_file_list_by_ids(
-        trace_id,
-        &query.org_id,
-        query.stream_type,
-        &query.stream_name,
-        Some(query.time_range),
-        &settings.partition_keys,
-        &req.search_info.file_id_list,
-    )
-    .await?;
+    let (mut scan_files, file_list_took) =
+        get_file_list_by_ids(query, settings, &req.search_info.file_id_list).await?;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -265,11 +258,11 @@ pub(super) async fn route_files(
         );
     }
 
-    Ok(RoutedFiles {
+    let aggregates = PrecomputedAggregates {
         metadata_count_files,
         index_aggregate,
-        scan_files: Some(scan_files),
-    })
+    };
+    Ok((aggregates, Some(scan_files)))
 }
 
 pub(super) async fn search_tables(
@@ -330,7 +323,7 @@ pub(super) async fn search_tables(
     let (tbls, stats, memtable_ids) = wal::search_memtable(
         query.clone(),
         source.schema.clone(),
-        &settings.partition_keys,
+        &settings.search_partition_keys,
         source.sort_order,
         index.condition.clone(),
         settings.fts_fields.clone(),
@@ -346,7 +339,7 @@ pub(super) async fn search_tables(
     let (tbls, stats, _) = wal::search_parquet(
         query.clone(),
         source.schema.clone(),
-        &settings.partition_keys,
+        &settings.search_partition_keys,
         source.sort_order,
         file_stats_cache,
         index.condition.clone(),
@@ -375,36 +368,38 @@ pub(super) fn collect_stats(files: &[FileKey]) -> ScanStats {
     scan_stats
 }
 
-#[allow(clippy::too_many_arguments)]
-#[tracing::instrument(skip_all, fields(org_id = org_id, stream_name = stream_name))]
+#[tracing::instrument(skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
 async fn get_file_list_by_ids(
-    trace_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_range: Option<(i64, i64)>,
-    equal_items: &[(String, String)],
+    query: &QueryParams,
+    settings: &StreamSearchSettings,
     ids: &[i64],
 ) -> Result<(Vec<FileKey>, usize), Error> {
     let start = std::time::Instant::now();
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or_default();
-    let partition_keys = &stream_settings.partition_keys;
-    let file_list =
-        crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
-            .await?;
+    let time_range = Some(query.time_range);
+    let partition_keys = settings
+        .settings
+        .as_ref()
+        .map_or(&[][..], |settings| &settings.partition_keys);
+    let file_list = crate::file_list::query_by_ids(
+        &query.trace_id,
+        &query.org_id,
+        query.stream_type,
+        &query.stream_name,
+        time_range,
+        ids,
+    )
+    .await?;
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
         if match_file(
-            org_id,
-            stream_type,
-            stream_name,
+            &query.org_id,
+            query.stream_type,
+            &query.stream_name,
             time_range,
             &file,
             partition_keys,
-            equal_items,
+            &settings.search_partition_keys,
         )
         .await
         {

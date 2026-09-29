@@ -39,26 +39,20 @@ pub async fn search(
     req: &FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
     log::info!("[trace_id {trace_id}] flight->search: start");
-    // 1. Decode the leader's plan; its empty exec names the stream and schema to read.
     let (ctx, physical_plan, source) = decode_plan(trace_id, req).await?;
-
-    // 2. Index, FTS and bloom fields from stream settings, limited to fields in the query schema.
     let settings = StreamSearchSettings::load(req, &source).await;
 
     let time_range = (req.search_info.start_time, req.search_info.end_time);
-    // 3. Pull the index condition out of the plan and pick what the index answers.
     let (physical_plan, index) = optimizer_physical_plan(
         physical_plan,
         &ctx,
         &source.schema,
         source.stream_type,
         time_range,
-        settings.fts_fields.clone(),
-        settings.index_fields.clone(),
+        &settings,
         req.index_info.index_optimize_mode.clone().map(Into::into),
     )?;
 
-    // 4. Shared by the index search, the storage scan and the WAL scan.
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: req.query_identifier.org_id.to_string(),
@@ -77,29 +71,27 @@ pub async fn search(
     );
 
     let mut scan_stats = ScanStats::new();
-    // 5. Decide per file: metadata count, exact index aggregate, or storage scan.
-    let mut routed = route_files(&query, req, &settings, &index, &mut scan_stats).await?;
-    // 6. Table providers for the storage files, plus this node's WAL when it is an ingester.
+    let (aggregates, scan_files) =
+        route_files(&query, req, &settings, &index, &mut scan_stats).await?;
+    // Moved in so the file list is freed right after the storage load, before the WAL.
     let tables = search_tables(
         &query,
         &ctx,
         &source,
         &settings,
         &index,
-        // Moved out so the file list is freed right after the storage load, before the WAL.
-        routed.scan_files.take(),
+        scan_files,
         &mut scan_stats,
     )
     .await?;
 
-    // 7. Replace the empty exec with a union of those tables and add the precomputed aggregates.
     let physical_plan = finalize_plan(
         &query,
         req,
         &ctx,
         physical_plan,
         tables,
-        routed,
+        aggregates,
         &mut scan_stats,
     )
     .await?;

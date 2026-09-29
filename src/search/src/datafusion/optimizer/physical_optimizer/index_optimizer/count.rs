@@ -21,7 +21,10 @@ use datafusion::{
         Result,
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
-    physical_plan::{ExecutionPlan, aggregates::AggregateExec},
+    physical_plan::{
+        ExecutionPlan,
+        aggregates::{AggregateExec, AggregateMode},
+    },
 };
 
 use crate::datafusion::optimizer::physical_optimizer::{
@@ -74,7 +77,10 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
                 && aggregate.aggr_expr().len() == 1
                 && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
             {
-                self.is_simple_count = true;
+                // The index count is merged under the partial aggregate, so only that one counts.
+                if *aggregate.mode() == AggregateMode::Partial {
+                    self.is_simple_count = true;
+                }
             } else {
                 self.is_simple_count = false;
                 return Ok(TreeNodeRecursion::Stop);
@@ -93,7 +99,10 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion::{common::Result, prelude::SessionContext};
+    use datafusion::{
+        common::Result,
+        prelude::{SessionConfig, SessionContext},
+    };
 
     use super::*;
     use crate::datafusion::table_provider::empty_table::NewEmptyTable;
@@ -105,9 +114,14 @@ mod tests {
             Field::new("name", DataType::Utf8, false),
         ]));
 
-        let ctx = SessionContext::new();
-        let provider = NewEmptyTable::new("t", schema);
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(12));
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
         ctx.register_table("t", Arc::new(provider)).unwrap();
+        // One partition plans a single-mode aggregate, which has no partial side to merge into.
+        let single_ctx =
+            SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+        let provider = NewEmptyTable::new("t", schema);
+        single_ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let cases = vec![
             (
@@ -136,6 +150,13 @@ mod tests {
 
             assert_eq!(expected, is_simple_count(physical_plan));
         }
+
+        let plan = single_ctx
+            .state()
+            .create_logical_plan("SELECT count(*) from t")
+            .await?;
+        let physical_plan = single_ctx.state().create_physical_plan(&plan).await?;
+        assert_eq!(None, is_simple_count(physical_plan));
 
         Ok(())
     }

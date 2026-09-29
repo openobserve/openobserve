@@ -40,7 +40,7 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::errors::{Error, ErrorCodes};
 
-use super::scan::{RoutedFiles, collect_stats};
+use super::scan::{PrecomputedAggregates, collect_stats};
 use crate::{
     datafusion::{
         distributed_plan::{
@@ -136,7 +136,7 @@ pub(super) async fn finalize_plan(
     ctx: &SessionContext,
     physical_plan: Arc<dyn ExecutionPlan>,
     mut tables: Vec<Arc<dyn TableProvider>>,
-    routed: RoutedFiles,
+    aggregates: PrecomputedAggregates,
     scan_stats: &mut ScanStats,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let trace_id = query.trace_id.as_str();
@@ -221,8 +221,8 @@ pub(super) async fn finalize_plan(
         ctx,
         physical_plan,
         scan_stats,
-        routed.metadata_count_files,
-        routed.index_aggregate,
+        aggregates.metadata_count_files,
+        aggregates.index_aggregate,
     )?;
 
     log::info!(

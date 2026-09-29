@@ -26,6 +26,7 @@ use hashbrown::HashSet;
 use infra::errors::Error;
 use parking_lot::Mutex;
 
+use super::scan::StreamSearchSettings;
 use crate::{
     datafusion::optimizer::physical_optimizer::{
         index::IndexRule, index_optimizer::FollowerIndexOptimizerRule,
@@ -66,20 +67,19 @@ impl IndexPlan {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn optimizer_physical_plan(
     plan: Arc<dyn ExecutionPlan>,
     ctx: &SessionContext,
     schema: &Schema,
     stream_type: StreamType,
     time_range: (i64, i64),
-    fst_fields: Vec<String>,
-    index_fields: Vec<String>,
-    requested_mode: Option<IndexOptimizeMode>,
+    settings: &StreamSearchSettings,
+    index_mode: Option<IndexOptimizeMode>,
 ) -> Result<(Arc<dyn ExecutionPlan>, IndexPlan), Error> {
     let index_condition_ref = Arc::new(Mutex::new(None));
-    let index_optimizer_rule_ref = Arc::new(Mutex::new(requested_mode));
-    let index_fields: HashSet<String> = index_fields.iter().cloned().collect();
+    let index_optimizer_rule_ref = Arc::new(Mutex::new(index_mode));
+    let index_fields: HashSet<String> = settings.index_fields.iter().cloned().collect();
+
     let index_rule = IndexRule::new(index_fields.clone(), index_condition_ref.clone());
     let original_plan = Arc::clone(&plan);
     let plan = index_rule.optimize(plan, ctx.state().config_options())?;
@@ -110,13 +110,13 @@ pub(super) fn optimizer_physical_plan(
     }
 
     let rewrite_match_rule = RewriteMatchPhysical::new(
-        fst_fields
-            .clone()
-            .into_iter()
+        settings
+            .fts_fields
+            .iter()
             .map(|f| {
                 (
                     f.clone(),
-                    schema.field_with_name(&f).unwrap().data_type().clone(),
+                    schema.field_with_name(f).unwrap().data_type().clone(),
                 )
             })
             .collect(),
@@ -214,8 +214,10 @@ mod tests {
             &schema,
             StreamType::Logs,
             (start_time, end_time),
-            vec![],
-            vec!["kubernetes_namespace_name".to_string()],
+            &StreamSearchSettings {
+                index_fields: vec!["kubernetes_namespace_name".to_string()],
+                ..Default::default()
+            },
             None,
         )
         .unwrap();
@@ -297,14 +299,55 @@ mod tests {
                 &schema,
                 stream_type,
                 (0, 100),
-                vec![],
-                vec![],
+                &StreamSearchSettings::default(),
                 None,
             )
             .unwrap();
 
             assert_eq!(index.mode, expected_mode);
             assert_eq!(index.condition.is_none(), is_metrics);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_needs_partial_aggregate_for_count() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+        for (partitions, expected_mode) in [(12, Some(IndexOptimizeMode::SimpleCount)), (1, None)] {
+            let state = SessionStateBuilder::new()
+                .with_config(SessionConfig::new().with_target_partitions(partitions))
+                .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+                .with_default_features()
+                .build();
+            let ctx = SessionContext::new_with_state(state);
+            let provider =
+                NewEmptyTable::new("default", schema.clone()).with_partitions(partitions);
+            ctx.register_table("default", Arc::new(provider)).unwrap();
+            let logical_plan = ctx
+                .state()
+                .create_logical_plan("SELECT count(*) FROM default")
+                .await
+                .unwrap();
+            let physical_plan = ctx
+                .state()
+                .create_physical_plan(&logical_plan)
+                .await
+                .unwrap();
+
+            let (_plan, index) = optimizer_physical_plan(
+                physical_plan,
+                &ctx,
+                &schema,
+                StreamType::Logs,
+                (0, 100),
+                &StreamSearchSettings::default(),
+                None,
+            )
+            .unwrap();
+
+            assert_eq!(index.mode, expected_mode, "target partitions: {partitions}");
         }
     }
 
@@ -339,5 +382,32 @@ mod tests {
             .use_metadata_count()
         );
         assert!(!plan(None, Some(IndexOptimizeMode::SimpleCount)).use_metadata_count());
+    }
+
+    #[test]
+    fn test_scan_mode_excludes_aggregate_modes() {
+        let aggregates = [
+            IndexOptimizeMode::SimpleCount,
+            IndexOptimizeMode::SimpleHistogram(0, 1, 1, 0),
+            IndexOptimizeMode::SimpleMultiHistogram(0, 1, 1, 0, "service".into()),
+            IndexOptimizeMode::SimpleTopN(vec!["service".into()], 10, false),
+            IndexOptimizeMode::SimpleDistinct("service".into(), 10, false),
+        ];
+        for mode in aggregates {
+            let plan = IndexPlan {
+                condition: None,
+                mode: Some(mode.clone()),
+            };
+            assert_eq!(plan.scan_mode(), None, "{mode:?}");
+            assert_eq!(plan.aggregate_mode(), Some(&mode));
+        }
+
+        let select = IndexOptimizeMode::SimpleSelect(10, false);
+        let plan = IndexPlan {
+            condition: None,
+            mode: Some(select.clone()),
+        };
+        assert_eq!(plan.scan_mode(), Some(select));
+        assert_eq!(plan.aggregate_mode(), None);
     }
 }
