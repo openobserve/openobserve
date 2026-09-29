@@ -342,7 +342,7 @@ pub(super) async fn search_tables(
         file_stats_cache,
         index.condition.clone(),
         stream.fts_fields.clone(),
-        memtable_ids.into_iter().collect(),
+        memtable_ids,
     )
     .await
     .inspect_err(|e| {
