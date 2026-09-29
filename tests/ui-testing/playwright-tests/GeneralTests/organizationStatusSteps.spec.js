@@ -6,8 +6,6 @@ const { isCloudEnvironment } = require('../utils/cloud-auth.js');
 test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
     test.describe.configure({ mode: 'parallel' });
 
-    // Cloud-only: the Organization Management page and the
-    // synthetics_status_protocol pool are gated by isCloud + meta-org.
     test.skip(!isCloudEnvironment(), 'Organization Management page and status-steps pool are cloud-only (meta-org admin)');
 
     let pm;
@@ -22,70 +20,77 @@ test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
     });
 
     test("should render Status Steps Used and Total columns in the org list", {
-        tag: ['@synthetics-status-steps-quota', '@all', '@p0']
+        tag: ['@synthetics-status-steps-quota', '@cloud', '@p0']
     }, async ({ page }) => {
         testLogger.info('Testing Status Steps columns render in the org list');
 
         await pm.organizationManagementPage.expectStatusStepsColumnsVisible();
 
-        const orgName = await pm.organizationManagementPage.getFirstOrgName();
-        await pm.organizationManagementPage.expectStatusStepsCellsNumeric(orgName);
+        const org = await pm.organizationManagementPage.getFirstOrg();
+        await pm.organizationManagementPage.expectStatusStepsCellsNumeric(org.identifier);
 
         testLogger.info('Status Steps columns render with numeric cells');
     });
 
     test("should set the Status Steps allowance from the Status Steps tab", {
-        tag: ['@synthetics-status-steps-quota', '@all', '@p0']
+        tag: ['@synthetics-status-steps-quota', '@cloud', '@p0']
     }, async ({ page }) => {
         testLogger.info('Testing Status Steps allowance write path');
 
-        const orgName = await pm.organizationManagementPage.getFirstOrgName();
-        const currentTotalText = await pm.organizationManagementPage.getStatusStepsTotalText(orgName);
-        const currentLimit = Number(currentTotalText.replace(/[^\d-]/g, ''));
-        const newLimit = currentLimit + 1000;
+        const org = await pm.organizationManagementPage.getFirstOrg();
+        const currentTotalText = await pm.organizationManagementPage.getStatusStepsTotalText(org.identifier);
+        const originalLimit = Number(currentTotalText.replace(/[^\d-]/g, ''));
+        const newLimit = originalLimit + 1000;
 
-        await pm.organizationManagementPage.openUsageLimitsForOrg(orgName);
-        await pm.organizationManagementPage.selectStatusStepsTab();
-        await pm.organizationManagementPage.expectStatusStepsInputValue(currentLimit);
+        try {
+            await pm.organizationManagementPage.openUsageLimitsForOrg(org.identifier);
+            await pm.organizationManagementPage.selectStatusStepsTab();
+            await pm.organizationManagementPage.expectStatusStepsInputValue(originalLimit);
 
-        await pm.organizationManagementPage.fillStatusStepsLimit(newLimit);
-        await pm.organizationManagementPage.saveUsageLimits();
+            await pm.organizationManagementPage.fillStatusStepsLimit(newLimit);
+            await pm.organizationManagementPage.saveUsageLimits();
 
-        await pm.organizationManagementPage.expectStatusStepsUpdatedToast();
-        await pm.organizationManagementPage.expectUsageLimitsDialogClosed();
-        await pm.organizationManagementPage.expectStatusStepsTotalCellEquals(orgName, newLimit);
+            await pm.organizationManagementPage.expectStatusStepsUpdatedToast();
+            await pm.organizationManagementPage.expectUsageLimitsDialogClosed();
+            await pm.organizationManagementPage.expectStatusStepsTotalCellEquals(org.identifier, newLimit);
+        } finally {
+            // Soft, so a restore failure is reported without masking the original error.
+            const restoreStatus = await pm.organizationManagementPage.setStatusStepsLimitViaApi(org.identifier, originalLimit);
+            expect.soft(restoreStatus, `restore status-steps limit of ${org.identifier} to ${originalLimit}`).toBe(200);
+        }
 
-        testLogger.info('Status Steps allowance updated and reflected in the org list');
+        testLogger.info('Status Steps allowance updated, reflected in the org list, and restored');
     });
 
     test("should show its own wording and used-count on the Status Steps tab", {
-        tag: ['@synthetics-status-steps-quota', '@all', '@p1']
+        tag: ['@synthetics-status-steps-quota', '@cloud', '@p1']
     }, async ({ page }) => {
         testLogger.info('Testing Status Steps tab wording and used-count');
 
-        const orgName = await pm.organizationManagementPage.getFirstOrgName();
-        const usedText = await pm.organizationManagementPage.getStatusStepsUsedText(orgName);
+        const org = await pm.organizationManagementPage.getFirstOrg();
+        const usedText = await pm.organizationManagementPage.getStatusStepsUsedText(org.identifier);
 
-        await pm.organizationManagementPage.openUsageLimitsForOrg(orgName);
+        await pm.organizationManagementPage.openUsageLimitsForOrg(org.identifier);
         await pm.organizationManagementPage.expectAiCreditsTabActive();
 
         await pm.organizationManagementPage.selectProtocolStepsTab();
-        await pm.organizationManagementPage.expectProtocolStepsWording(orgName);
+        await pm.organizationManagementPage.expectProtocolStepsWording(org.name);
 
         await pm.organizationManagementPage.selectStatusStepsTab();
-        await pm.organizationManagementPage.expectStatusStepsWording(orgName, usedText);
+        await pm.organizationManagementPage.expectStatusStepsWording(org.name, usedText);
 
         testLogger.info('Status Steps tab shows distinct wording and used-count');
     });
 
     test("should reject non-integer and negative Status Steps values", {
-        tag: ['@synthetics-status-steps-quota', '@all', '@p1', '@validation']
+        tag: ['@synthetics-status-steps-quota', '@cloud', '@p1', '@validation']
     }, async ({ page }) => {
         testLogger.info('Testing Status Steps input validation');
 
-        const orgName = await pm.organizationManagementPage.getFirstOrgName();
-        await pm.organizationManagementPage.openUsageLimitsForOrg(orgName);
+        const org = await pm.organizationManagementPage.getFirstOrg();
+        await pm.organizationManagementPage.openUsageLimitsForOrg(org.identifier);
         await pm.organizationManagementPage.selectStatusStepsTab();
+        await pm.organizationManagementPage.expectStatusStepsTabActive(org.name);
 
         await pm.organizationManagementPage.fillStatusStepsLimit('12.5');
         await pm.organizationManagementPage.saveUsageLimits();
@@ -96,16 +101,17 @@ test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
         await pm.organizationManagementPage.saveUsageLimits();
         await pm.organizationManagementPage.expectStatusStepsValidationError('negative');
         await pm.organizationManagementPage.expectUsageLimitsDialogVisible();
+        await pm.organizationManagementPage.expectStatusStepsTabActive(org.name);
 
         testLogger.info('Status Steps input rejected non-integer and negative values');
     });
 
     test("should expose status-step fields via the admin org-list API", {
-        tag: ['@synthetics-status-steps-quota', '@all', '@p2', '@api']
+        tag: ['@synthetics-status-steps-quota', '@cloud', '@p2', '@api']
     }, async ({ page }) => {
         testLogger.info('Testing GET /api/_meta/organizations status-step fields');
 
-        const { status, data } = await pm.createOrgPage.getAdminOrgs();
+        const { status, data } = await pm.organizationManagementPage.getAdminOrgsViaSession();
 
         expect(status).toBe(200);
         expect(data.list.length).toBeGreaterThan(0);
