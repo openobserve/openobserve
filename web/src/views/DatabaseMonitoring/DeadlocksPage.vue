@@ -75,11 +75,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-deadlocks-search"
             @search="load"
           >
-            <DbmScopeFilters
-              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-              :filters="dimensionFilters"
-              @clear="clearScope"
-            />
+            <template #filters>
+              <DbmScopeFilters
+                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
+                :filters="dimensionFilters"
+                @clear="clearScope"
+              />
+            </template>
             <!-- What a ROW means. Not a data-processing mode — the reader is
                  choosing between "name the bug" and "give me a timestamp". -->
             <OToggleGroup v-model="grouping" class="shrink-0" data-test="dbm-deadlocks-grouping">

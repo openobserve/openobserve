@@ -64,11 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-blocked-search"
             @search="load"
           >
-            <DbmScopeFilters
-              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-              :filters="dimensionFilters"
-              @clear="clearScope"
-            />
+            <template #filters>
+              <DbmScopeFilters
+                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
+                :filters="dimensionFilters"
+                @clear="clearScope"
+              />
+            </template>
             <!-- Which question the table answers. Defaults to "who's stuck". -->
             <OToggleGroup
               v-model="perspective"

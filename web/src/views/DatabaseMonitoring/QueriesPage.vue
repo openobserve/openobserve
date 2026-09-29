@@ -81,7 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
       <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
-        <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full">
+        <DbmScopeFilters
+          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
+          :filters="dimensionFilters"
+          :insight-chip="activeInsightChip"
+          @clear="clearScope"
+          @clear-insight="activeInsightId = null"
+        />
+        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.queries.searchPlaceholder')"
@@ -91,13 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onSearchInput"
           />
         </div>
-        <DbmScopeFilters
-          class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-          :filters="dimensionFilters"
-          :insight-chip="activeInsightChip"
-          @clear="clearScope"
-          @clear-insight="activeInsightId = null"
-        />
         <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
         <span
           class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
@@ -181,9 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-8 max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
+        <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
         <ORefreshButton
           layout="inline"
           variant="outline"
+          class="ms-auto"
           :loading="loading"
           :last-run-at="lastRunAt"
           data-test="dbm-queries-refresh"

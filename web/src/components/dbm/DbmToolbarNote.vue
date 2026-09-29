@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <span
-    class="flex min-w-0 items-center gap-1 text-xs"
+    class="flex max-w-80 min-w-0 items-center gap-1 text-xs"
     :class="TONE_TEXT[tone]"
     :data-test="dataTest"
   >

@@ -55,7 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
       <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
-        <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full">
+        <DbmScopeFilters
+          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
+          :filters="dimensionFilters"
+          @clear="clearScope"
+        />
+        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.samples.searchPlaceholder')"
@@ -65,11 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v: unknown) => (search = typeof v === 'string' ? v : '')"
           />
         </div>
-        <DbmScopeFilters
-          class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-          :filters="dimensionFilters"
-          @clear="clearScope"
-        />
         <DbmToolbarNote
           v-if="!serverListShown"
           class="ms-auto"
@@ -96,9 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-8 max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
+        <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
         <ORefreshButton
           layout="inline"
           variant="outline"
+          class="ms-auto"
           :loading="loading"
           :last-run-at="lastRunAt"
           data-test="dbm-samples-refresh"

@@ -46,6 +46,10 @@ describe("DbmToolbarNote", () => {
     );
   });
 
+  it("never takes more than 20rem of the toolbar, so the search keeps its room", () => {
+    expect(mountNote().classes()).toContain("max-w-80");
+  });
+
   it("renders only the icon when compact, keeping the text for the tooltip", () => {
     const wrapper = mountNote({ compact: true });
     expect(wrapper.find('[data-test="dbm-toolbar-note-text"]').exists()).toBe(false);
