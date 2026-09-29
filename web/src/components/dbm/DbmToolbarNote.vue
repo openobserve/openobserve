@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
   >
     <OIcon :name="icon ?? TONE_ICON[tone]" size="sm" class="shrink-0" />
-    <span class="min-w-0 truncate max-lg:hidden" :data-test="`${dataTest}-text`">{{ text }}</span>
+    <span v-if="!compact" class="min-w-0 truncate max-xl:hidden" :data-test="`${dataTest}-text`">
+      {{ text }}
+    </span>
     <OTooltip side="bottom" :content="detail ?? text" />
   </span>
 </template>
@@ -48,13 +50,21 @@ const TONE_ICON: Record<DbmToolbarNoteTone, IconName> = {
 
 withDefaults(
   defineProps<{
-    /** The short form, always one line; hidden below lg, where the icon carries the tooltip alone. */
+    /** The short form, always one line; hidden below xl so it never starves the filter chips beside it. */
     text: I18nText;
     detail?: I18nText;
     tone?: DbmToolbarNoteTone;
     icon?: IconName;
+    /** Icon only at every width, for a toolbar with no room left for text. */
+    compact?: boolean;
     dataTest?: string;
   }>(),
-  { detail: undefined, tone: "neutral", icon: undefined, dataTest: "dbm-toolbar-note" },
+  {
+    detail: undefined,
+    tone: "neutral",
+    icon: undefined,
+    compact: false,
+    dataTest: "dbm-toolbar-note",
+  },
 );
 </script>

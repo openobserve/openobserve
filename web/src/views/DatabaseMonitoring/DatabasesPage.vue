@@ -91,6 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filters="dimensionFilters"
               @clear="clearScope"
             />
+            <DbmCoverageLine
+              inline
+              class="ms-auto"
+              :freshness="freshness"
+              :hits="rows"
+              :top-n-subset="topNSubset"
+              :error-count="errorCount"
+              exact-percentiles
+              data-test="dbm-databases-coverage"
+            />
           </DbmTableToolbar>
         </template>
 
@@ -134,14 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="onStatSelect"
             />
           </DbmSubheaderBand>
-          <DbmCoverageLine
-            :freshness="freshness"
-            :hits="rows"
-            :top-n-subset="topNSubset"
-            :error-count="errorCount"
-            exact-percentiles
-            data-test="dbm-databases-coverage"
-          />
         </template>
 
         <!-- One name column at three grains: a database, a schema or service

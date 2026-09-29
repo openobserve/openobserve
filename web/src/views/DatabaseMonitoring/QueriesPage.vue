@@ -134,6 +134,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
+        <!-- Icons only: at 1280 any text here would take the filter chips' last room. Each follows the list on screen. -->
+        <DbmCoverageLine
+          v-if="!serverListShown"
+          inline
+          compact
+          :freshness="freshness"
+          :hits="rows"
+          :other="other"
+          :top-n-subset="topNSubset"
+          :error-count="errorCount"
+          :filter-label="narrowingFilterLabel"
+          data-test="dbm-queries-coverage"
+        />
+        <DbmCoverageLine
+          v-else
+          inline
+          compact
+          :freshness="freshness"
+          :hits="serverCoverageHits"
+          :top-n-subset="serverTruncated"
+          :filter-label="narrowingFilterLabel"
+          data-test="dbm-server-queries-coverage"
+        />
+        <DbmAppSourceLegend
+          v-if="hasAppSourcedRows && !serverListShown"
+          compact
+          data-test="dbm-queries-app-source-legend"
+        />
         <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
         <OTableColumnToggle
           v-if="!serverListShown"
@@ -213,19 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="onStatSelect"
             />
           </DbmSubheaderBand>
-          <DbmCoverageLine
-            :freshness="freshness"
-            :hits="rows"
-            :other="other"
-            :top-n-subset="topNSubset"
-            :error-count="errorCount"
-            :filter-label="narrowingFilterLabel"
-            data-test="dbm-queries-coverage"
-          >
-            <template v-if="hasAppSourcedRows" #legend>
-              <DbmAppSourceLegend data-test="dbm-queries-app-source-legend" />
-            </template>
-          </DbmCoverageLine>
           <DbmInsightStrip
             v-if="!insightsHidden && stripInsights.length"
             :insights="stripInsights"
@@ -501,23 +516,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DbmSubheaderBand data-test="dbm-server-queries-summary">
               <OStatStrip :items="visibleSummaryStats" :loading="loading" />
             </DbmSubheaderBand>
-            <!-- Coverage follows the TABLE too, for the same reason the stat
-                 band above does. It used to live only in the client table's
-                 subheader, so freshness, the top-N truncation disclosure and
-                 the "counted to" timestamp all vanished at exactly the moment
-                 the numbers changed vantage — the one moment a reader most
-                 needs to be told what they are looking at. `hits` is the
-                 fallback list, so the line counts the rows actually on screen;
-                 the error count is withheld because the server feed carries
-                 none, and a `0` there would read as an all-clear nobody
-                 measured. -->
-            <DbmCoverageLine
-              :freshness="freshness"
-              :hits="serverCoverageHits"
-              :top-n-subset="serverTruncated"
-              :filter-label="narrowingFilterLabel"
-              data-test="dbm-server-queries-coverage"
-            />
           </template>
           <template #cell-query="{ row }">
             <DbmQueryCell

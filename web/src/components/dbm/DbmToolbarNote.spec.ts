@@ -40,10 +40,16 @@ describe("DbmToolbarNote", () => {
     expect(mountNote().findComponent(OTooltip).props("content")).toBe("Sampled on a schedule");
   });
 
-  it("collapses to its icon below lg so a phone toolbar keeps one row", () => {
+  it("collapses to its icon below xl so the filter chips keep their room", () => {
     expect(mountNote().find('[data-test="dbm-toolbar-note-text"]').classes()).toContain(
-      "max-lg:hidden",
+      "max-xl:hidden",
     );
+  });
+
+  it("renders only the icon when compact, keeping the text for the tooltip", () => {
+    const wrapper = mountNote({ compact: true });
+    expect(wrapper.find('[data-test="dbm-toolbar-note-text"]').exists()).toBe(false);
+    expect(wrapper.findComponent(OTooltip).props("content")).toBe("Sampled on a schedule");
   });
 
   it.each([
