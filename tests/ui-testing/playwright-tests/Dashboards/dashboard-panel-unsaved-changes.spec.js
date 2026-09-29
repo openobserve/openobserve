@@ -26,41 +26,7 @@ const UNSAVED_MESSAGE = "You have unsaved changes. Are you sure you want to leav
 
 const CLEANUP_BUDGET_MS = 90000;
 
-const FIELD_SEARCH_INPUT = '[data-test="o-field-list-search-field"]';
-const DRILLDOWN_INFO_ICON = '[data-test="dashboard-addpanel-config-drilldown-info"]';
-const TOOLTIP_CONTENT = '[data-test="o-tooltip-content"]';
-
 const uniqueSuffix = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-// PanelEditor.vue mounts ConfigPanel and the field list twice (one branch per
-// layout), so every data-test inside them matches 2 nodes and a bare locator
-// trips strict mode. Only the branch for the current breakpoint is visible.
-const visibleFirst = (page, selector) =>
-  page.locator(`${selector} >> visible=true`).first();
-
-/**
- * Hover whichever copy of `selector` actually produces a tooltip. The dormant
- * layout branch still satisfies `visible=true` but is parked off-viewport, so
- * hovering it silently never opens the bubble — only the rendered bubble proves
- * the right copy was hit.
- */
-async function hoverForTooltip(page, selector) {
-  const candidates = page.locator(selector);
-  const total = await candidates.count();
-  for (let i = 0; i < total; i++) {
-    try {
-      await candidates.nth(i).hover({ timeout: 5000 });
-      const tooltip = visibleFirst(page, TOOLTIP_CONTENT);
-      await tooltip.waitFor({ state: "visible", timeout: 5000 });
-      return tooltip;
-    } catch {
-      // Dormant layout branch — try the next copy.
-    }
-  }
-  throw new Error(
-    `hoverForTooltip("${selector}"): none of the ${total} matches opened a tooltip`
-  );
-}
 
 /**
  * Record every native dialog raised while the returned watcher is installed.
@@ -89,7 +55,8 @@ async function waitForEditorSettled(page, pm) {
   await pm.dashboardPanelActions
     .getPanelSaveBtn()
     .waitFor({ state: "visible", timeout: 30000 });
-  await visibleFirst(page, FIELD_SEARCH_INPUT)
+  await pm.dashboardPanelActions
+    .getFieldListSearchInput()
     .waitFor({ state: "visible", timeout: 30000 })
     .catch(() => {});
   await safeWaitForNetworkIdle(page, { timeout: 10000 });
@@ -100,8 +67,8 @@ async function createDashboardWithPanel(page, pm, panelName) {
   const dashboardName = `Dashboard_Unsaved_${uniqueSuffix()}`;
   await setupTestDashboard(page, pm, dashboardName);
   await addSimplePanel(pm, panelName);
-  await page
-    .locator('[data-test="dashboard-panel-bar"]')
+  await pm.dashboardPanelActions
+    .getPanelBar()
     .first()
     .waitFor({ state: "visible", timeout: 30000 });
   return dashboardName;
@@ -115,7 +82,7 @@ async function openSavedPanelEditor(page, pm, panelName) {
 }
 
 /** Click Discard and assert the editor closed without ever asking to confirm. */
-async function discardExpectingNoPrompt(page, pm) {
+async function expectDiscardWithoutPrompt(page, pm) {
   const watcher = captureDialogs(page);
   try {
     await pm.dashboardPanelActions.getPanelDiscardBtn().click();
@@ -130,7 +97,7 @@ async function discardExpectingNoPrompt(page, pm) {
 }
 
 /** Click Discard, accept the expected confirm, and return the dialog messages. */
-async function discardExpectingPrompt(page, pm) {
+async function expectDiscardPrompts(page, pm) {
   const watcher = captureDialogs(page, { accept: true });
   try {
     await pm.dashboardPanelActions.getPanelDiscardBtn().click();
@@ -206,7 +173,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       dashboardName = await createDashboardWithPanel(page, pm, panelName);
 
       await openSavedPanelEditor(page, pm, panelName);
-      await discardExpectingNoPrompt(page, pm);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Editor closed with no confirm after a no-op edit session");
     }
   );
@@ -222,12 +189,12 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
 
       // Searching the field list arms the baseline (pointerdown + keydown) while
       // leaving dashboardPanelData.data untouched.
-      const fieldSearch = visibleFirst(page, FIELD_SEARCH_INPUT);
+      const fieldSearch = pm.dashboardPanelActions.getFieldListSearchInput();
       await fieldSearch.click();
       await fieldSearch.fill("kubernetes");
       await fieldSearch.fill("");
 
-      await discardExpectingNoPrompt(page, pm);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Non-mutating interaction did not arm the unsaved warning");
     }
   );
@@ -242,7 +209,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await openSavedPanelEditor(page, pm, panelName);
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 
-      const messages = await discardExpectingPrompt(page, pm);
+      const messages = await expectDiscardPrompts(page, pm);
       expect(
         messages,
         "an actual panel edit must still raise the unsaved-changes confirm"
@@ -263,7 +230,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await pm.dashboardPanelActions.addPanelName(panelName);
       await expect(pm.dashboardPanelActions.panelNameInput).toHaveValue(panelName);
 
-      await discardExpectingNoPrompt(page, pm);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Reverted edit did not raise the unsaved-changes confirm");
     }
   );
@@ -279,7 +246,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
       await waitForEditorSettled(page, pm);
 
-      await discardExpectingNoPrompt(page, pm);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Fresh editor closed without a confirm");
     }
   );
@@ -308,7 +275,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
         "saving commits the edit, so leaving the editor must not warn"
       ).toEqual([]);
       await expect(
-        page.locator(`[data-test="dashboard-edit-panel-${renamed}-dropdown"]`)
+        pm.dashboardPanelActions.getEditPanelDropdown(renamed)
       ).toBeVisible({ timeout: 30000 });
       testLogger.info("Save navigated away with no confirm", { renamed });
     }
@@ -324,7 +291,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await openSavedPanelEditor(page, pm, panelName);
       await pm.dashboardPanelConfigs.openConfigPanel();
 
-      const tooltip = await hoverForTooltip(page, DRILLDOWN_INFO_ICON);
+      const tooltip = await pm.dashboardPanelConfigs.hoverDrilldownInfoForTooltip();
       await expect(tooltip).toContainText("Navigate to another dashboard");
       expect(
         await tooltip.innerText(),
