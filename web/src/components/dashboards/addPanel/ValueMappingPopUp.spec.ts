@@ -553,6 +553,15 @@ describe("ValueMappingPopUp", () => {
       ).toBe(false);
     });
 
+    it("saves a regex whose group repeat is bounded", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "regex", pattern: "^(\\d+\\.){3}\\d+$", text: "ip", color: null }],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toHaveLength(1);
+    });
+
     it("ignores the pattern of a mapping that is not a regex", async () => {
       wrapper = createWrapper({
         valueMapping: [{ type: "value", value: "1", pattern: "^(a+)+$", text: "one", color: null }],
