@@ -90,12 +90,12 @@ impl AggregateOptimizeRewriter {
         }
 
         if let Some(aggregate) = self.index_aggregate.take() {
-            inputs.push(Arc::new(TantivyOptimizeExec::new(
+            inputs.push(Arc::new(TantivyOptimizeExec::try_new(
                 schema,
                 aggregate.files,
                 aggregate.result,
                 aggregate.mode,
-            )));
+            )?));
         }
 
         Ok(inputs)

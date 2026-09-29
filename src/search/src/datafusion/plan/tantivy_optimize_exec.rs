@@ -36,10 +36,8 @@ use datafusion::{
         execution_plan::{Boundedness, EmissionType},
         memory::MemoryStream,
         metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
-        stream::RecordBatchStreamAdapter,
     },
 };
-use futures::TryStreamExt;
 
 use crate::tantivy::TantivyMultiResult;
 
@@ -47,29 +45,30 @@ use crate::tantivy::TantivyMultiResult;
 pub struct TantivyOptimizeExec {
     schema: SchemaRef,       // The schema for the produced row
     file_list: Vec<FileKey>, // The list of files to read
-    result: TantivyMultiResult,
+    batches: Vec<RecordBatch>,
     cache: Arc<PlanProperties>, // Cached properties of this plan
     index_optimize_mode: IndexOptimizeMode, // Type of query the ttv index optimizes
     metrics: ExecutionPlanMetricsSet,
 }
 
 impl TantivyOptimizeExec {
-    /// Create a new TantivyOptimizeExec
-    pub fn new(
+    /// Create a TantivyOptimizeExec that emits `result` converted to `schema`.
+    pub fn try_new(
         schema: SchemaRef,
         file_list: Vec<FileKey>,
         result: TantivyMultiResult,
         index_optimize_mode: IndexOptimizeMode,
-    ) -> Self {
+    ) -> Result<Self> {
+        let batches = tantivy_result_batches(result, &schema, &index_optimize_mode)?;
         let cache = Self::compute_properties(Arc::clone(&schema));
-        TantivyOptimizeExec {
+        Ok(TantivyOptimizeExec {
             schema,
             file_list,
-            result,
+            batches,
             cache,
             index_optimize_mode,
             metrics: ExecutionPlanMetricsSet::new(),
-        }
+        })
     }
 
     fn compute_properties(schema: SchemaRef) -> Arc<PlanProperties> {
@@ -142,17 +141,12 @@ impl ExecutionPlan for TantivyOptimizeExec {
         }
 
         let metrics = BaselineMetrics::new(&self.metrics, partition);
-        let fut = adapt_tantivy_result(
-            self.result.clone(),
+        metrics.record_output(self.batches.iter().map(RecordBatch::num_rows).sum());
+        Ok(Box::pin(MemoryStream::try_new(
+            self.batches.clone(),
             self.schema.clone(),
-            self.index_optimize_mode.clone(),
-            metrics,
-        );
-        let stream = futures::stream::once(fut).try_flatten();
-        Ok(Box::pin(RecordBatchStreamAdapter::new(
-            self.schema.clone(),
-            stream,
-        )))
+            None,
+        )?))
     }
 
     fn metrics(&self) -> Option<MetricsSet> {
@@ -160,13 +154,11 @@ impl ExecutionPlan for TantivyOptimizeExec {
     }
 }
 
-async fn adapt_tantivy_result(
+fn tantivy_result_batches(
     result: TantivyMultiResult,
-    schema: SchemaRef,
-    idx_optimize_mode: IndexOptimizeMode,
-    metrics: BaselineMetrics,
-) -> Result<SendableRecordBatchStream> {
-    let timer = metrics.elapsed_compute().timer();
+    schema: &SchemaRef,
+    idx_optimize_mode: &IndexOptimizeMode,
+) -> Result<Vec<RecordBatch>> {
     // first level is for each record batch
     // second level is each array in record batch
     let array: Vec<Vec<Arc<dyn Array>>> = match idx_optimize_mode {
@@ -177,22 +169,22 @@ async fn adapt_tantivy_result(
         }
         IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, _ts_offset) => {
             vec![create_histogram_arrow_array(
-                &schema,
+                schema,
                 result.histogram(),
-                min_value,
-                bucket_width,
-                num_buckets,
+                *min_value,
+                *bucket_width,
+                *num_buckets,
             )?]
         }
         IndexOptimizeMode::SimpleMultiHistogram(..) => {
             vec![create_multi_histogram_arrow_array(
-                &schema,
+                schema,
                 &result.multi_histogram(),
             )?]
         }
-        IndexOptimizeMode::SimpleTopN(..) => create_top_n_arrow_array(&schema, result.top_n())?,
+        IndexOptimizeMode::SimpleTopN(..) => create_top_n_arrow_array(schema, result.top_n())?,
         IndexOptimizeMode::SimpleDistinct(_field, _limit, _ascend) => {
-            vec![create_distinct_arrow_array(&schema, result.distinct())?]
+            vec![create_distinct_arrow_array(schema, result.distinct())?]
         }
         _ => {
             return internal_err!(
@@ -201,7 +193,7 @@ async fn adapt_tantivy_result(
         }
     };
 
-    let record_batches = array
+    array
         .into_iter()
         .map(|array| {
             RecordBatch::try_new(schema.clone(), array).map_err(|e| {
@@ -210,17 +202,7 @@ async fn adapt_tantivy_result(
                 ))
             })
         })
-        .collect::<Result<Vec<_>>>()?;
-
-    // record output metrics
-    metrics.record_output(record_batches.iter().map(|b| b.num_rows()).sum());
-    timer.done();
-
-    Ok(Box::pin(MemoryStream::try_new(
-        record_batches,
-        schema,
-        None,
-    )?))
+        .collect()
 }
 
 /// Creates a RecordBatch containing histogram data with timestamps and counts
@@ -1049,8 +1031,8 @@ mod tests {
     #[test]
     fn test_tantivy_optimize_exec_new() {
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1065,12 +1047,13 @@ mod tests {
         let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = TantivyOptimizeExec::new(
+        let exec = TantivyOptimizeExec::try_new(
             schema.clone(),
             file_list.clone(),
             result.clone(),
             index_optimize_mode.clone(),
-        );
+        )
+        .unwrap();
 
         assert_eq!(exec.file_list.len(), 1);
         assert_eq!(exec.index_optimize_mode, index_optimize_mode);
@@ -1079,8 +1062,8 @@ mod tests {
     #[test]
     fn test_tantivy_optimize_exec_display() {
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![
@@ -1142,12 +1125,9 @@ mod tests {
         let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = Arc::new(TantivyOptimizeExec::new(
-            schema,
-            file_list,
-            result,
-            index_optimize_mode,
-        ));
+        let exec = Arc::new(
+            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap(),
+        );
 
         let display = format!(
             "{}",
@@ -1163,8 +1143,8 @@ mod tests {
     #[test]
     fn test_tantivy_optimize_exec_execution_plan() {
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1179,7 +1159,8 @@ mod tests {
         let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = TantivyOptimizeExec::new(schema, file_list, result, index_optimize_mode);
+        let exec =
+            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap();
 
         assert_eq!(exec.name(), "TantivyOptimizeExec");
         assert!(exec.children().is_empty());
@@ -1189,8 +1170,8 @@ mod tests {
     #[test]
     fn test_tantivy_optimize_exec_with_new_children() {
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1205,12 +1186,9 @@ mod tests {
         let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = Arc::new(TantivyOptimizeExec::new(
-            schema,
-            file_list,
-            result,
-            index_optimize_mode,
-        ));
+        let exec = Arc::new(
+            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap(),
+        );
 
         let result = exec.replace_children(
             vec![],
@@ -1224,8 +1202,8 @@ mod tests {
     #[test]
     fn test_tantivy_optimize_exec_statistics() {
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1240,7 +1218,8 @@ mod tests {
         let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = TantivyOptimizeExec::new(schema, file_list, result, index_optimize_mode);
+        let exec =
+            TantivyOptimizeExec::try_new(schema, file_list, result, index_optimize_mode).unwrap();
 
         let stats = datafusion::physical_plan::StatisticsContext::new()
             .compute(&exec, &datafusion::physical_plan::StatisticsArgs::new());
@@ -1250,5 +1229,52 @@ mod tests {
             stats.num_rows,
             datafusion::common::stats::Precision::Absent
         ));
+    }
+
+    #[tokio::test]
+    async fn test_tantivy_optimize_exec_replays_prepared_result() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "count",
+            DataType::Int64,
+            false,
+        )]));
+        let exec = Arc::new(
+            TantivyOptimizeExec::try_new(
+                schema,
+                vec![],
+                TantivyMultiResult::Count(7),
+                IndexOptimizeMode::SimpleCount,
+            )
+            .unwrap(),
+        );
+
+        for _ in 0..2 {
+            let batches =
+                datafusion::physical_plan::collect(exec.clone(), Arc::new(TaskContext::default()))
+                    .await
+                    .unwrap();
+            let counts = batches[0]
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            assert_eq!(counts.value(0), 7);
+        }
+    }
+
+    #[test]
+    fn test_tantivy_optimize_exec_rejects_result_not_matching_schema() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let exec = TantivyOptimizeExec::try_new(
+            schema,
+            vec![],
+            TantivyMultiResult::Count(7),
+            IndexOptimizeMode::SimpleCount,
+        );
+        assert!(exec.is_err());
     }
 }
