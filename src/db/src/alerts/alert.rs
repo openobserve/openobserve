@@ -93,7 +93,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Ok(t) => t,
                     Err(e) => {
                         log::error!(
-                            "Failed to compute next trigger time for alert {schedule_key}: {e}"
+                            "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
                         );
                         now_micros()
                     }
@@ -115,7 +115,9 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                 match db::scheduler::push(trigger).await {
                     Ok(_) => Ok(alert),
                     Err(e) => {
-                        log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+                        log::error!(
+                            "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                        );
                         Err(e)
                     }
                 }
@@ -130,7 +132,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                             Ok(_) => Ok(alert),
                             Err(e) => {
                                 log::error!(
-                                    "Failed to update trigger for alert {schedule_key}: {e}"
+                                    "Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
                                 );
                                 Ok(alert)
                             }
@@ -139,7 +141,9 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Err(_) => match db::scheduler::push(trigger).await {
                         Ok(_) => Ok(alert),
                         Err(e) => {
-                            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+                            log::error!(
+                                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                            );
                             Ok(alert)
                         }
                     },
@@ -190,7 +194,9 @@ pub async fn create<C: TransactionTrait>(
         {
             Ok(t) => t,
             Err(e) => {
-                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                log::error!(
+                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                );
                 now_micros()
             }
         }
@@ -207,7 +213,9 @@ pub async fn create<C: TransactionTrait>(
     };
 
     let _ = db::scheduler::push(trigger).await.map_err(|e| {
-        log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+        log::error!(
+            "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+        );
         e
     });
 
@@ -250,7 +258,9 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         {
             Ok(t) => t,
             Err(e) => {
-                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                log::error!(
+                    "Failed to compute next trigger time for alert {schedule_key}: org_id: {org_id}, error: {e}"
+                );
                 now_micros()
             }
         }
@@ -274,11 +284,13 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         let _ = db::scheduler::update_trigger(trigger, false, "")
             .await
             .map_err(|e| {
-                log::error!("Failed to update trigger for alert {schedule_key}: {e}");
+                log::error!("Failed to update trigger for alert {schedule_key}: org_id: {org_id}, error: {e}");
             });
     } else {
         let _ = db::scheduler::push(trigger).await.map_err(|e| {
-            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
+            log::error!(
+                "Failed to save trigger for alert {schedule_key}: org_id: {org_id}, error: {e}"
+            );
             e
         });
     }
@@ -318,7 +330,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     if let Err(e) =
         db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
-        log::error!("Failed to delete trigger: {e}");
+        log::error!("Failed to delete trigger: org_id: {org_id}, error: {e}");
     };
     Ok(())
 }
@@ -356,7 +368,7 @@ pub async fn delete_by_name(
     if let Err(e) =
         db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
-        log::error!("Failed to delete trigger: {e}");
+        log::error!("Failed to delete trigger: org_id: {org_id}, error: {e}");
     };
     Ok(())
 }
@@ -441,17 +453,19 @@ async fn put_into_cache(
 ) -> Result<(), anyhow::Error> {
     let client = get_orm_client_rw().await;
     let Ok(alert_id_ksuid) = svix_ksuid::Ksuid::from_str(&alert_id) else {
-        log::error!("Error parsing alert id into Ksuid while putting the alert into cache");
+        log::error!(
+            "Error parsing alert id into Ksuid while putting the alert into cache, org_id: {org}"
+        );
         return Ok(());
     };
     let item_value = match table::get_by_id(client, &org, alert_id_ksuid).await {
         Ok(Some(val)) => val,
         Ok(None) => {
-            log::error!("Tried to get alert that does not exist in DB");
+            log::error!("Tried to get alert that does not exist in DB, org_id: {org}");
             return Ok(());
         }
         Err(e) => {
-            log::error!("Error getting value: {e}");
+            log::error!("Error getting value: org_id: {org}, error: {e}");
             return Ok(());
         }
     };
