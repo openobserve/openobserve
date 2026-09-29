@@ -146,7 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref, watch, computed, onUnmounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  computed,
+  onUnmounted,
+  nextTick,
+} from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -468,6 +475,16 @@ export default defineComponent({
       },
     );
 
+    // Virtual scroll can keep a scrolled offset while rows stream in, and print captures whatever is in view.
+    watch(
+      () => [props.data?.rows, store.state.printMode],
+      async () => {
+        if (!store.state.printMode) return;
+        await nextTick();
+        tableRef.value?.scrollTo(0, "start");
+      },
+    );
+
     return {
       pagination,
       paginationOptions,
@@ -564,48 +581,22 @@ export default defineComponent({
 }
 
 @media print {
-  // Grow with the table's natural content height instead of clipping at the
-  // panel height. The old height:100% + overflow:hidden pair sliced whichever
-  // row straddled the panel edge and hid every row after it, and the
-  // absolutely-pinned opaque footer then painted over the last visible row —
-  // so a 4-row table printed 3 rows under a footer still reading "1-4 of 4".
-  // Rows that don't fit the page now continue on the next page.
-  .table-wrapper {
-    position: relative !important;
-    height: auto !important;
-    min-height: 100% !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
+  // A grid panel has a fixed height, so clip the rows area and keep the footer below it like on screen.
   .my-sticky-virtscroll-table {
-    height: auto !important;
-    overflow: visible !important;
+    height: 100% !important;
+    overflow: hidden !important;
 
-    // Remove sticky — no scroll container in print, sticky causes quirks.
+    // Sticky offsets assume a scroll container, which print doesn't have.
     :deep(thead tr th) {
       position: static !important;
       top: auto !important;
     }
 
-    // Repeat the column headers at the top of every printed page.
-    :deep(thead) {
-      display: table-header-group !important;
-    }
-
-    // Let Quasar's scroll wrapper expand to content height.
     :deep(.q-table__middle) {
-      overflow: visible !important;
-      height: auto !important;
+      min-height: 0;
+      overflow: hidden !important;
     }
 
-    // Never slice a row across a page boundary — move it whole to the next page.
-    :deep(tbody tr) {
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-
-    // Footer flows below the last row instead of being pinned over it.
     :deep(.q-table__bottom) {
       position: static !important;
     }

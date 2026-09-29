@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             panels.length === 1 &&
             panels[0]?.type === 'table'
           "
+          class="print-single-table"
           style="height: 100%; width: 100%"
         >
           <PanelContainer
@@ -985,6 +986,34 @@ export default defineComponent({
    * offsets — causing visible overlap across printed pages. */
   .grid-stack-item-content {
     overflow: hidden !important;
+  }
+
+  // A lone table owns the whole page, so let it grow and continue its rows onto the next pages.
+  .print-single-table {
+    :deep(.table-wrapper) {
+      height: auto !important;
+      min-height: 100% !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+
+    :deep(.table-wrapper .my-sticky-virtscroll-table) {
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    :deep(.table-wrapper .my-sticky-virtscroll-table .q-table__middle) {
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    :deep(thead) {
+      display: table-header-group !important;
+    }
+
+    :deep(tbody tr) {
+      break-inside: avoid;
+    }
   }
 
   /* Quasar virtual-scroll inserts padding divs above/below the rendered

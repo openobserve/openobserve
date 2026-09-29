@@ -17,7 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier" class="tw-h-full">
+  <q-page
+    :key="store.state.selectedOrganization.identifier"
+    class="tw-h-full"
+    :class="{ 'print-mode-page': store.state.printMode }"
+    :style="printPageWidthStyle"
+  >
     <div
       ref="fullscreenDiv"
       :class="{
@@ -1066,6 +1071,45 @@ export default defineComponent({
     const fullscreenDiv = ref(null);
     const isFullscreen = ref(false);
 
+    // GridStack sizes panels in %, so print would reflow them to the paper width; print CSS pins this on-screen width so Chrome shrinks the page to fit instead, as with the old px grid.
+    const printPageWidth = ref<number | null>(null);
+
+    const updatePrintPageWidth = () => {
+      // Measure the page, not the inner container, so its side margins sit inside the pinned width that Chrome fits.
+      const container = (fullscreenDiv.value as HTMLElement | null)
+        ?.parentElement;
+      if (!store.state.printMode || !container) {
+        printPageWidth.value = null;
+        return;
+      }
+      if (window.matchMedia("print").matches) return;
+      printPageWidth.value = container.getBoundingClientRect().width;
+    };
+
+    const printPageWidthStyle = computed(() =>
+      printPageWidth.value === null
+        ? undefined
+        : { "--print-page-width": `${printPageWidth.value / 16}rem` },
+    );
+
+    watch(
+      () => store.state.printMode,
+      async () => {
+        await nextTick();
+        updatePrintPageWidth();
+      },
+    );
+
+    onMounted(async () => {
+      await nextTick();
+      updatePrintPageWidth();
+      window.addEventListener("resize", updatePrintPageWidth);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("resize", updatePrintPageWidth);
+    });
+
     const toggleFullscreen = () => {
       if (!quasar.fullscreen.isActive) {
         quasar.fullscreen
@@ -1224,6 +1268,7 @@ export default defineComponent({
       currentDashboardData,
       toggleFullscreen,
       fullscreenDiv,
+      printPageWidthStyle,
       isFullscreen,
       goBackToDashboardList,
       addPanelData,
@@ -1341,6 +1386,11 @@ export default defineComponent({
 }
 
 @media print {
+  .print-mode-page {
+    width: var(--print-page-width, auto) !important;
+    min-height: 0 !important;
+  }
+
   .print-mode-container {
     height: auto !important;
     overflow: visible !important;
