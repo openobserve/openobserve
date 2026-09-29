@@ -23,12 +23,11 @@ use arrow::{
     datatypes::Schema,
 };
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
     meta::{
         promql::{NAME_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label},
         stream::{FileKey, FileSelection},
     },
-    metrics,
 };
 use datafusion::{
     common::{DFSchema, DataFusionError, Result},
@@ -44,7 +43,6 @@ use crate::{
     block::Index,
     layout::MetricsFileLayout,
     reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
-    selection_cache::METRICS_INDEX_SELECTION_CACHE,
 };
 
 pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>> {
@@ -115,10 +113,6 @@ pub async fn search(
         return Ok(None);
     }
 
-    // Keep the complete matcher set in the key. A short hash collision could
-    // otherwise reuse physical row ranges selected by a different query.
-    let filter_key = format!("{matchers:?}");
-    let selection_cache_enabled = get_config().search.metrics_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
         // Zero size means this finalized file was published without a sidecar.
@@ -143,23 +137,11 @@ pub async fn search(
             );
             continue;
         };
-        let cache_key = if selection_cache_enabled {
-            selection_cache_key(
-                &file.account,
-                &sidecar_path,
-                expected_rows,
-                &matcher_labels,
-                &filter_key,
-            )
-        } else {
-            String::new()
-        };
         index_files.insert(
             file.key.clone(),
             (
                 file.account.clone(),
                 sidecar_path,
-                cache_key,
                 expected_rows,
                 file.meta.compressed_size,
                 file.meta.mindex_size,
@@ -173,56 +155,6 @@ pub async fn search(
 
     let start = std::time::Instant::now();
     let mut evaluated = Vec::with_capacity(index_files.len());
-    let mut misses = Vec::new();
-    if selection_cache_enabled {
-        let mut cache = METRICS_INDEX_SELECTION_CACHE
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (
-            data_path,
-            (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
-        ) in index_files
-        {
-            metrics::promql::INDEX_SELECTION_CACHE_REQUESTS_TOTAL
-                .with_label_values::<&str>(&[])
-                .inc();
-            if let Some((ranges, row_group_size)) = cache.get(&cache_key) {
-                metrics::promql::INDEX_SELECTION_CACHE_HITS_TOTAL
-                    .with_label_values::<&str>(&[])
-                    .inc();
-                // only complete selections are cached, so a hit implies exactness
-                evaluated.push((data_path, ranges, true, row_group_size));
-            } else {
-                misses.push((
-                    data_path,
-                    account,
-                    sidecar_path,
-                    cache_key,
-                    expected_rows,
-                    compressed_size,
-                    mindex_size,
-                ));
-            }
-        }
-    } else {
-        misses.extend(index_files.into_iter().map(
-            |(
-                data_path,
-                (account, sidecar_path, cache_key, expected_rows, compressed_size, mindex_size),
-            )| {
-                (
-                    data_path,
-                    account,
-                    sidecar_path,
-                    cache_key,
-                    expected_rows,
-                    compressed_size,
-                    mindex_size,
-                )
-            },
-        ));
-    }
-    let cache_hits = evaluated.len();
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
     let regex_labels = Arc::new(
         matchers
@@ -233,16 +165,8 @@ pub async fn search(
             .collect::<Vec<_>>(),
     );
     let matchers = Arc::new(matchers.clone());
-    let mut evaluations = stream::iter(misses.into_iter().map(
-        |(
-            data_path,
-            account,
-            sidecar_path,
-            cache_key,
-            expected_rows,
-            compressed_size,
-            mindex_size,
-        )| {
+    let mut evaluations = stream::iter(index_files.into_iter().map(
+        |(data_path, (account, sidecar_path, expected_rows, compressed_size, mindex_size))| {
             let labels = Arc::clone(&matcher_labels);
             let regex_labels = Arc::clone(&regex_labels);
             let matchers = Arc::clone(&matchers);
@@ -274,7 +198,7 @@ pub async fn search(
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
-                            .map(|ranges| (cache_key, Arc::new(ranges), complete, row_group_size))
+                            .map(|ranges| (Arc::new(ranges), complete, row_group_size))
                     })
                     .await
                     .map_err(|error| DataFusionError::External(Box::new(error)))?
@@ -292,13 +216,7 @@ pub async fn search(
     let mut failed_files = 0usize;
     while let Some((data_path, result)) = evaluations.next().await {
         match result {
-            Ok((cache_key, ranges, complete, row_group_size)) => {
-                if complete && selection_cache_enabled {
-                    METRICS_INDEX_SELECTION_CACHE
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .insert(cache_key, (Arc::clone(&ranges), row_group_size));
-                }
+            Ok((ranges, complete, row_group_size)) => {
                 evaluated.push((data_path, ranges, complete, row_group_size));
             }
             Err(error) => {
@@ -347,7 +265,7 @@ pub async fn search(
 
     let took_ms = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, selection cache hits: {cache_hits}, exact: {exact}, took: {took_ms} ms",
+        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, exact: {exact}, took: {took_ms} ms",
         trace_id,
         indexed_file_count,
     );
@@ -359,18 +277,6 @@ pub(super) fn sidecar_covers_labels(sidecar_schema: &Schema, labels: &[String]) 
     labels
         .iter()
         .all(|label| sidecar_schema.index_of(label).is_ok())
-}
-
-/// The label set is part of the key: schema evolution must not revive a
-/// selection evaluated against fewer labels.
-pub(super) fn selection_cache_key(
-    account: &str,
-    sidecar_path: &str,
-    expected_rows: usize,
-    matcher_labels: &[String],
-    filter_key: &str,
-) -> String {
-    format!("{account}\0{sidecar_path}\0{expected_rows}\0{matcher_labels:?}\0{filter_key}")
 }
 
 /// Whether every matcher the query would re-apply on the table is one the

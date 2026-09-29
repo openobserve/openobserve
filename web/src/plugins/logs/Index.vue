@@ -609,11 +609,19 @@ export default defineComponent({
       { immediate: true },
     );
     // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+    let preTabletSplitter: number | null = null;
     watch(
       isTablet,
-      (tablet) => {
+      (tablet, wasTablet) => {
         if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+          preTabletSplitter = searchObj.config.splitterModel;
           searchObj.config.splitterModel = 30;
+        } else if (wasTablet && !tablet && !isMobile.value && preTabletSplitter !== null) {
+          // Back on a laptop: undo the floor unless the reader dragged the pane since.
+          if (searchObj.config.splitterModel === 30) {
+            searchObj.config.splitterModel = preTabletSplitter;
+          }
+          preTabletSplitter = null;
         }
       },
       { immediate: true },
