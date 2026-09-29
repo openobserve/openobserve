@@ -87,6 +87,7 @@ test.describe("Service Account for API access", () => {
 
         await navigateToBase(page);
         pageManager = new PageManager(page);
+        const uniqueEmail = pageManager.iamPage.serviceAccountEmailFor(uniqueName);
 
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
@@ -94,6 +95,12 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.enterDescriptionSA();
         await pageManager.iamPage.clickCancelServiceAccount();
+
+        // Cancel must close the drawer and create nothing.
+        await pageManager.iamPage.verifyServiceAccountDrawerClosed();
+        await pageManager.iamPage.reloadServiceAccountPage();
+        await pageManager.iamPage.searchServiceAccount(uniqueName);
+        await pageManager.iamPage.verifyServiceAccountNotInList(uniqueEmail);
 
         testLogger.info('Test completed successfully');
     });
@@ -111,6 +118,8 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
         await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
+        // Assert the token reveal dialog is actually shown before copying.
+        await pageManager.iamPage.validateServiceAccountToken();
         await pageManager.iamPage.clickCopyToken();
 
         testLogger.info('Test completed successfully');
@@ -130,6 +139,8 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.clickSaveServiceAccount();
         await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
+        // Closing the popup must actually dismiss the token reveal dialog.
+        await pageManager.iamPage.verifyTokenDialogClosed();
 
         testLogger.info('Test completed successfully');
     });
@@ -179,6 +190,8 @@ test.describe("Service Account for API access", () => {
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.deletedServiceAccount(uniqueEmail);
         await pageManager.iamPage.requestServiceAccountCancel();
+        // Cancelling the delete confirmation must leave the account in the list.
+        await pageManager.iamPage.verifyServiceAccountInList(uniqueEmail);
 
         testLogger.info('Test completed successfully');
     });
