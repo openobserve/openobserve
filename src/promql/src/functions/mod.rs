@@ -56,7 +56,7 @@ mod sum_over_time;
 mod time_operations;
 mod vector;
 
-pub(crate) use absent::absent;
+pub(crate) use absent::{absent, absent_labels};
 pub(crate) use absent_over_time::absent_over_time;
 pub(crate) use clamp::clamp;
 pub(crate) use histogram::histogram_quantile;
@@ -162,8 +162,6 @@ impl Func {
             Self::Sgn => SingleArgFunc::Value(sgn),
             Self::Sqrt => SingleArgFunc::Value(sqrt),
             Self::Timestamp => SingleArgFunc::Value(timestamp),
-            Self::Absent => SingleArgFunc::Context(absent),
-            Self::AbsentOverTime => SingleArgFunc::Context(absent_over_time),
             Self::Scalar => SingleArgFunc::Context(scalar),
             Self::Vector => SingleArgFunc::Context(vector),
             Self::DayOfMonth => SingleArgFunc::Date(day_of_month),

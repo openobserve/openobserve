@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import DbmLockEmptyState, { type DbmLockCheck } from "./DbmLockEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { raw } from "@/types/i18n";
 
 /**
@@ -58,7 +59,8 @@ describe("DbmLockEmptyState", () => {
     });
 
     it("keeps the success tone on the healthy reassurance", () => {
-      expect(mountWith({ healthy: true }).html()).toContain("bg-status-success-bg");
+      const pill = mountWith({ healthy: true }).findComponent(OTag);
+      expect(pill.props("variant")).toBe("success-soft");
     });
   });
 

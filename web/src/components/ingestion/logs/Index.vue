@@ -78,6 +78,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.vector')"
       />
       <ORouteTab
+        name="kinesisfirehose"
+        data-test="ingestion-logs-tab-kinesisfirehose"
+        :to="{
+          name: 'kinesisfirehose',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
+        :label="t('ingestion.kinesisFirehose')"
+      />
+      <ORouteTab
+        name="gcpLogs"
+        data-test="ingestion-logs-tab-gcplogs"
+        :to="{
+          name: 'gcpLogs',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
+        :label="t('ingestion.gcpLogs')"
+      />
+      <ORouteTab
         name="ingestLogsFromOtel"
         :to="{
           name: 'ingestLogsFromOtel',
@@ -187,7 +211,9 @@ export default defineComponent({
       "curl",
       "fluentbit",
       "fluentd",
+      "kinesisfirehose",
       "vector",
+      "gcpLogs",
       "syslogNg",
       "splunkHec",
       "loongcollector",

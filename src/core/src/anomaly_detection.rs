@@ -61,6 +61,17 @@ const WINDOW_FLOOR_RULE: &str =
 #[cfg(feature = "enterprise")]
 const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
 
+/// Timestamp column names a result row is read from, in priority order. `zo_sql_timestamp`
+/// is the histogram alias the Logs page generates, so queries copied from there train as-is.
+#[cfg(feature = "enterprise")]
+const TIMESTAMP_COLUMNS: [&str; 5] = [
+    "_timestamp",
+    "timestamp",
+    "time",
+    "time_bucket",
+    "zo_sql_timestamp",
+];
+
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
 const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
@@ -3032,6 +3043,8 @@ fn parse_search_results_to_timeseries(
 
     let mut data_points = Vec::new();
     let mut skipped = 0usize;
+    let mut timestamp_failures = 0usize;
+    let mut value_failures = 0usize;
 
     if let Some(first) = results.hits.first()
         && let Some(obj) = first.as_object()
@@ -3055,6 +3068,7 @@ fn parse_search_results_to_timeseries(
                     hit
                 );
                 skipped += 1;
+                timestamp_failures += 1;
                 continue;
             }
         };
@@ -3068,6 +3082,7 @@ fn parse_search_results_to_timeseries(
                     hit
                 );
                 skipped += 1;
+                value_failures += 1;
                 continue;
             }
         };
@@ -3100,17 +3115,31 @@ fn parse_search_results_to_timeseries(
         );
     }
 
-    // Total extraction loss on a non-empty result set is a misconfigured value column, not
-    // an absence of data. Returning Ok(empty) here is what made that present as "no data".
+    // Total extraction loss on a non-empty result set is a misconfigured column, not an
+    // absence of data. Returning Ok(empty) here is what made that present as "no data".
+    // The message names the column that actually failed: value is only read once the
+    // timestamp parsed, so a timestamp failure must never be reported as a value one.
     if data_points.is_empty() && !results.hits.is_empty() {
-        anyhow::bail!(
-            "[anomaly_detection {anomaly_id}] query returned {} rows but none had a usable \
-             value column ({}); columns present: [{}]",
-            results.hits.len(),
+        let timestamp_problem = format!(
+            "no usable timestamp column (expected one of: {})",
+            TIMESTAMP_COLUMNS.join(", ")
+        );
+        let value_problem = format!(
+            "no usable value column ({})",
             match value_column {
                 Some(c) => format!("configured: '{c}'"),
                 None => format!("expected one of: {}", LEGACY_VALUE_COLUMNS.join(", ")),
-            },
+            }
+        );
+        let problem = match (timestamp_failures, value_failures) {
+            (_, 0) => timestamp_problem,
+            (0, _) => value_problem,
+            (t, v) => format!("{t} rows had {timestamp_problem}, {v} rows had {value_problem}"),
+        };
+        anyhow::bail!(
+            "[anomaly_detection {anomaly_id}] query returned {} rows but none were usable: {problem}; \
+             columns present: [{}]",
+            results.hits.len(),
             columns_present(&results.hits).join(", "),
         );
     }
@@ -3124,7 +3153,7 @@ fn parse_search_results_to_timeseries(
 #[cfg(feature = "enterprise")]
 fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     // Try different timestamp field names
-    for field_name in &["_timestamp", "timestamp", "time", "time_bucket"] {
+    for field_name in &TIMESTAMP_COLUMNS {
         if let Some(ts_value) = hit.get(field_name) {
             // Numeric microseconds
             if let Some(ts_num) = ts_value.as_i64() {
@@ -3196,70 +3225,45 @@ fn columns_present(hits: &[serde_json::Value]) -> Vec<String> {
 
 /// Write anomaly events to the _anomalies stream.
 ///
-/// Uses HTTP POST to an ingester node so this works from any node role
-/// (including scheduler nodes, which are not ingesters and cannot call
-/// service::logs::ingest::ingest() directly).
+/// Goes through internal gRPC ingestion so this works from any node role (including
+/// scheduler nodes, which are not ingesters) and never depends on a user login: root
+/// Basic auth is refused wherever native login is disabled, as on cloud.
 #[cfg(feature = "enterprise")]
 pub async fn write_anomalies_to_stream(
     org_id: &str,
     anomalies: Vec<serde_json::Value>,
 ) -> Result<()> {
+    use proto::cluster_rpc;
+
     if anomalies.is_empty() {
         return Ok(());
     }
 
-    // Pick an online ingester node to forward the write to.
-    let ingester = infra::cluster::get_cached_online_ingester_nodes()
+    let anomaly_count = anomalies.len();
+    let req = cluster_rpc::IngestionRequest {
+        org_id: org_id.to_string(),
+        stream_type: StreamType::Logs.as_str().to_string(),
+        stream_name: "_anomalies".to_string(),
+        data: Some(cluster_rpc::IngestionData::from(anomalies)),
+        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+        metadata: None,
+    };
+
+    let resp = crate::ingestion::ingestion_service::ingest(req)
         .await
-        .and_then(|nodes| nodes.into_iter().next())
-        .ok_or_else(|| anyhow::anyhow!("No online ingester node available to write _anomalies"))?;
-
-    let cfg = config::get_config();
-    let url = format!(
-        "{}{}/api/{org_id}/_anomalies/_json",
-        ingester.http_addr, cfg.common.base_uri,
-    );
-
-    tracing::info!(
-        org_id = %org_id,
-        anomaly_count = anomalies.len(),
-        ingester = %ingester.name,
-        "Writing anomalies to _anomalies stream via ingester HTTP"
-    );
-
-    let json_body = serde_json::to_string(&anomalies)?;
-
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header(
-            "Authorization",
-            format!(
-                "Basic {}",
-                base64::Engine::encode(
-                    &base64::engine::general_purpose::STANDARD,
-                    format!(
-                        "{}:{}",
-                        cfg.auth.root_user_email, cfg.auth.root_user_password
-                    )
-                )
-            ),
-        )
-        .body(json_body)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("HTTP request to ingester failed: {e}"))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("Ingester returned {status} writing _anomalies: {body}");
+        .map_err(|e| anyhow::anyhow!("internal ingestion of _anomalies failed: {e}"))?;
+    if resp.status_code != 200 {
+        anyhow::bail!(
+            "ingester returned {} writing _anomalies: {}",
+            resp.status_code,
+            resp.message
+        );
     }
 
     tracing::info!(
         org_id = %org_id,
-        "Successfully wrote anomalies to _anomalies stream"
+        anomaly_count,
+        "Wrote anomalies to _anomalies stream"
     );
 
     Ok(())
@@ -3375,6 +3379,9 @@ fn anomaly_alert_payload(
     serde_json::json!({
         "text": message,
         "alert_type": alert_type,
+        // The same field an alert recovery carries, so one webhook can read
+        // both message classes without knowing which produced it.
+        "alert_status": if ctx.kind == AnomalyAlertKind::Recovery { "resolved" } else { "firing" },
         "kind": ctx.kind,
         "anomaly_id": ctx.anomaly_id,
         "config_name": ctx.config_name,
@@ -4215,6 +4222,47 @@ mod tests {
             msg.contains("request_count"),
             "present columns not named: {msg}"
         );
+    }
+
+    /// A result set whose only time column has an unrecognised name must be reported as a
+    /// timestamp problem. It used to blame the value column, which was present and fine.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_unrecognised_timestamp_column_is_named_as_the_failure() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"value": 5, "bucket_start": "2026-02-20T13:15:00"}),
+                serde_json::json!({"value": 6, "bucket_start": "2026-02-20T13:30:00"}),
+            ],
+            ..Default::default()
+        };
+        let msg = parse_search_results_to_timeseries(&resp, "a1", None)
+            .unwrap_err()
+            .to_string();
+        assert!(msg.contains("no usable timestamp column"), "{msg}");
+        assert!(!msg.contains("value column"), "value blamed: {msg}");
+        assert!(
+            msg.contains("bucket_start"),
+            "present columns not named: {msg}"
+        );
+    }
+
+    /// `zo_sql_timestamp` is the Logs page's histogram alias; a query copied from there
+    /// must train without renaming it.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_logs_page_histogram_alias_is_accepted_as_the_timestamp() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"value": 6, "zo_sql_timestamp": "2026-02-20T13:30:00"}),
+                serde_json::json!({"value": 5, "zo_sql_timestamp": "2026-02-20T13:15:00"}),
+            ],
+            ..Default::default()
+        };
+        let points = parse_search_results_to_timeseries(&resp, "a1", None).unwrap();
+        assert_eq!(points.len(), 2);
+        assert!(points[0].timestamp_us < points[1].timestamp_us);
+        assert!((points[0].value - 5.0).abs() < f64::EPSILON);
     }
 
     /// The same result set becomes usable once the config declares its column — the

@@ -250,8 +250,9 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
                             }
                             Err(e) => {
                                 log::error!(
-                                    "[TEMPLATES] Failed to update system template '{}': {}",
+                                    "[TEMPLATES] Failed to update system template '{}' in {}: {}",
                                     template.name,
+                                    DEFAULT_ORG,
                                     e
                                 );
                             }
@@ -278,8 +279,9 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
                         }
                         Err(e) => {
                             log::error!(
-                                "[TEMPLATES] Failed to create system template '{}': {}",
+                                "[TEMPLATES] Failed to create system template '{}' in {}: {}",
                                 template.name,
+                                DEFAULT_ORG,
                                 e
                             );
                         }
@@ -287,8 +289,9 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
                 }
                 Err(e) => {
                     log::error!(
-                        "[TEMPLATES] Error checking system template '{}': {}",
+                        "[TEMPLATES] Error checking system template '{}' in {}: {}",
                         template.name,
+                        DEFAULT_ORG,
                         e
                     );
                 }

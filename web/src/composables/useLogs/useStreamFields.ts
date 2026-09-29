@@ -44,6 +44,7 @@ import {
   CATEGORY,
   type FieldObj,
 } from "@/utils/fieldCategories";
+import { buildStreamNameColumn, shouldShowStreamNameColumn } from "@/utils/logs/streamNameColumn";
 import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServiceCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
@@ -1043,6 +1044,13 @@ export const useStreamFields = () => {
 
       const parsedSQL: any = fnParsedSQL();
 
+      // Multi-stream hits carry _stream_name; show it next to the timestamp.
+      const showStreamName = shouldShowStreamNameColumn(
+        searchObj.data.stream.selectedStream,
+        searchObj.data.queryResults?.hits,
+        selectedFields,
+      );
+
       // By default when no fields are selected. Timestamp and Source will be visible. If user selects field, then only selected fields will be visible in table
       // In SQL and Quick mode.
       // If user adds timestamp manually then only we get it in response.
@@ -1091,6 +1099,10 @@ export const useStreamFields = () => {
             // ever stops being first), so its width comes out of this budget.
             size: 236,
           });
+        }
+
+        if (showStreamName) {
+          searchObj.data.resultGrid.columns.push(buildStreamNameColumn());
         }
 
         if (selectedFields.length == 0) {
@@ -1153,6 +1165,10 @@ export const useStreamFields = () => {
             // ever stops being first), so its width comes out of this budget.
             size: 236,
           });
+        }
+
+        if (showStreamName) {
+          searchObj.data.resultGrid.columns.push(buildStreamNameColumn());
         }
 
         let sizes: any;

@@ -452,9 +452,9 @@ function sqlEntry(
     "COALESCE(o2_dbm_metrics_are_delta, true) = true",
   ]);
 
-  // GROUP BY repeats the expression — the planner refuses a SELECT alias
-  // there. The trailing LIMIT is load-bearing: the search API returns at most
-  // 1000 rows unless the SQL itself carries an outer LIMIT (the server lifts
+  // GROUP BY repeats every expression, `ts` included: a stream column of the same
+  // name (the log recipes write `ts`) outranks a SELECT alias there.
+  // The trailing LIMIT is load-bearing: the search API returns at most 1000 rows unless the SQL itself carries an outer LIMIT (the server lifts
   // the result cap from the SQL text), and segments x buckets exceeds 1000 on
   // routine windows, silently truncating the time axis. That same extraction
   // reads ANY LIMIT in the text — a `LIMIT 10` inside a top-N subquery caps
@@ -462,7 +462,7 @@ function sqlEntry(
   // a window predicate instead, which also scans the stream once, not twice.
   const base =
     `SELECT histogram(_timestamp) AS ts, ${dim} AS segment, ${def.valueExpr} AS value ` +
-    `FROM "${SERVER_STREAM}" WHERE ${where} GROUP BY ts, ${dim}`;
+    `FROM "${SERVER_STREAM}" WHERE ${where} GROUP BY histogram(_timestamp), ${dim}`;
   const sql = UNBOUNDED_SQL_DIMS.has(byKey)
     ? `SELECT ts, segment, value FROM ` +
       `(SELECT ts, segment, value, DENSE_RANK() OVER (ORDER BY total DESC, segment) AS rnk FROM ` +
@@ -512,7 +512,7 @@ function rateEntry(
     `(SELECT ts, segment, cum${denCarry}, ` +
     `MAX(cum) OVER (PARTITION BY segment) - MIN(cum) OVER (PARTITION BY segment) AS span FROM ` +
     `(SELECT histogram(_timestamp) AS ts, ${dim} AS segment, MAX(${def.counter}) AS cum${den} ` +
-    `FROM "${SERVER_STREAM}" WHERE ${where} GROUP BY ts, ${dim}) AS a) AS s) AS r) AS f ` +
+    `FROM "${SERVER_STREAM}" WHERE ${where} GROUP BY histogram(_timestamp), ${dim}) AS a) AS s) AS r) AS f ` +
     `WHERE ${guards.join(" AND ")} ORDER BY ts ASC LIMIT 30000`;
 
   return sqlPanelEntry(def, title, t, sql);

@@ -102,7 +102,7 @@ pub(super) async fn run_pipelines<T: Clone>(
             let message = format!(
                 "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
             );
-            log::error!("{message}");
+            log::error!("{message}, org_id: {org_id}");
             failures.push(PipelineFailure::MissingInputs { message });
             continue;
         };
@@ -119,7 +119,7 @@ pub(super) async fn run_pipelines<T: Clone>(
                     let message = format!(
                         "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}"
                     );
-                    log::error!("{message}");
+                    log::error!("{message}, org_id: {org_id}");
                     failures.push(PipelineFailure::Batch {
                         stream_name: stream_name.clone(),
                         records: records.len(),
@@ -257,11 +257,15 @@ pub(super) async fn apply_redaction<T>(
                 stream_name,
                 &mut rows,
             ) {
-                log::error!("[METRICS] error applying SDR patterns for stream {stream_name}: {e}");
+                log::error!(
+                    "[METRICS] error applying SDR patterns for stream {org_id}/{stream_name}: {e}"
+                );
             }
         }
         Err(e) => {
-            log::error!("[METRICS] failed to get pattern manager for SDR redaction: {e}");
+            log::error!(
+                "[METRICS] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
             crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                 org_id,
                 StreamType::Metrics,
@@ -383,7 +387,7 @@ pub(super) async fn write_streams(
             &stream_name,
             None,
         ) {
-            log::warn!("stream [{stream_name}] is being deleted");
+            log::warn!("stream [{org_id}/{stream_name}] is being deleted");
             continue;
         }
         timings.deletion_check_micros += t.elapsed().as_micros();

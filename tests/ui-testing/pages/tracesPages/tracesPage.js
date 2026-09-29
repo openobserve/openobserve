@@ -83,6 +83,7 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsViewSessionReplayButton = '[data-test="trace-details-view-session-replay-btn"]';
 
     // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
     // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
@@ -136,6 +137,14 @@ export class TracesPage {
     // Metrics dashboard container
     // Source: web/src/plugins/traces/metrics/TracesMetricsDashboard.vue
     this.tracesMetricsDashboard = '[data-test="traces-metrics-dashboard"]';
+    // No-stream prompt rendered before a stream is selected
+    // Source: web/src/plugins/traces/TracesNoStreamState.vue
+    this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
+    // Right-click Duration gte/lte context menu
+    // Source: web/src/plugins/traces/metrics/TracesMetricsContextMenu.vue
+    this.metricsContextMenu = '[data-test="traces-metrics-context-menu"]';
+    this.metricsContextMenuGte = '[data-test="context-menu-gte"]';
+    this.metricsContextMenuLte = '[data-test="context-menu-lte"]';
     // Analysis Dashboard Tabs — source: web/src/plugins/traces/metrics/TracesAnalysisDashboard.vue
     // Tabs render as <OTab data-test="traces-analysis-dashboard-${name}-tab"> where name ∈ {volume,duration,error}
     this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"]';
@@ -385,6 +394,33 @@ export class TracesPage {
     await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
   }
 
+  /** `fromUs` / `toUs` are microsecond epoch bounds (traceDetails.utils.ts resolveUrlTimeRange). */
+  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default' }) {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const url = `${baseUrl}/web/traces/trace-details?trace_id=${traceId}&stream=${stream}&from=${fromUs}&to=${toUs}&org_identifier=${org}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async expectTraceTreeSpanOperationName(spanId, operationName) {
+    await expect(this.page.locator(`[data-test="trace-tree-span-operation-name-${spanId}"]`)).toHaveText(operationName, { timeout: 30000 });
+  }
+
+  async expectSessionReplayButtonVisible() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Callers must first prove the RUM bridge span rendered, or an absent button proves nothing. */
+  async expectSessionReplayButtonHidden() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toHaveCount(0);
+  }
+
+  async clickSessionReplayButton() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+    await this.page.locator(this.traceDetailsViewSessionReplayButton).click();
+  }
+
   async navigateBackFromTraceDetails() {
     // Try to click back button if visible
     const backButton = this.page.locator(this.traceDetailsBackButton);
@@ -475,6 +511,18 @@ export class TracesPage {
 
   async switchToSearchView() {
     await this.page.locator(this.searchToggle).click();
+  }
+
+  // Verify the toggle flipped, so a silently-failed click cannot green downstream assertions.
+  async switchToSpansMode() {
+    await this.page.locator(this.spansToggle).click();
+    await this.expectSpansModeActive();
+  }
+
+  // The active search-mode toggle carries data-state="on" (OToggleGroupItem).
+  async expectSpansModeActive() {
+    await expect(this.page.locator(this.spansToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
   async expectServiceGraphVisible() {
@@ -573,6 +621,11 @@ export class TracesPage {
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
+  }
+
+  // Guards that a time-range change took effect before asserting downstream re-renders.
+  async getTimeRangeLabel() {
+    return (await this.page.locator(this.dateTimeButton).textContent().catch(() => '')) || '';
   }
 
   async setDateTime() {
@@ -2100,6 +2153,23 @@ export class TracesPage {
     await this.page.waitForTimeout(1000);
   }
 
+  /**
+   * Whether the error-only filter is currently active. The badge (SearchResult.vue)
+   * swaps its fill class when showErrorOnly is true, so this reads that class as the
+   * state guard for the toggle.
+   * @returns {Promise<boolean>}
+   */
+  async isErrorOnlyFilterActive() {
+    const badge = this.page.locator(this.errorOnlyToggle);
+    const shown = await badge
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!shown) return false;
+    const cls = (await badge.getAttribute('class').catch(() => '')) || '';
+    return cls.includes('bg-badge-error-solid-bg');
+  }
+
   // --- Metrics Dashboard ---
 
   /**
@@ -2191,6 +2261,15 @@ export class TracesPage {
       if (ok) rendered.push(title);
     }
     return rendered;
+  }
+
+  /**
+   * Assert the no-stream prompt is absent, i.e. a stream was auto-selected.
+   * @param {string} message - Assertion message
+   */
+  async expectNoStreamCardHidden(message) {
+    await expect(this.page.locator(this.tracesNoStreamCard), message)
+      .toBeHidden({ timeout: 15000 });
   }
 
   /**
@@ -2414,6 +2493,7 @@ export class TracesPage {
       .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
       .first();
     for (let attempt = 0; attempt < QUERY_CLEAR_ATTEMPTS; attempt++) {
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
       await input.click({ force: true });
       await this.page.waitForTimeout(250);
       await this.page.keyboard.press('ControlOrMeta+A');
@@ -2437,6 +2517,7 @@ export class TracesPage {
       const input = this.page
         .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
         .first();
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
       await input.click({ force: true });
       await this.page.keyboard.type(query, { delay: 25 });
       await this.page.waitForTimeout(600);
@@ -2479,6 +2560,176 @@ export class TracesPage {
       .catch(() => false);
   }
 
+  // --- Right-click Context Menu (TracesMetricsContextMenu.vue) ---
+
+  /**
+   * Record which metrics panel each contextmenu event reaches.
+   * Capture phase runs before ChartRenderer's handler, so the record survives its
+   * stopPropagation() and a "menu did not open" result can be told apart from a
+   * right-click that simply missed the canvas.
+   */
+  async armMetricsContextMenuProbe() {
+    await this.page.evaluate(() => {
+      window.__o2CtxMenuHits = [];
+      if (window.__o2CtxMenuProbe) return;
+      window.__o2CtxMenuProbe = (e) => {
+        const panel = e.target && e.target.closest && e.target.closest('[data-test-panel-title]');
+        if (panel) window.__o2CtxMenuHits.push(panel.getAttribute('data-test-panel-title'));
+      };
+      document.addEventListener('contextmenu', window.__o2CtxMenuProbe, true);
+    });
+  }
+
+  /**
+   * Panel titles that received a contextmenu event since the probe was armed.
+   * @returns {Promise<string[]>}
+   */
+  async getMetricsContextMenuProbeHits() {
+    return await this.page.evaluate(() => window.__o2CtxMenuHits || []);
+  }
+
+  /**
+   * Viewport points on a panel canvas that sit on a plotted series mark.
+   * ECharts fires its contextmenu event only on a data item, and Duration is a
+   * scatter of 5px dots, so a right-click on empty plot space never reaches it.
+   * Scans the canvas for saturated (series-coloured) pixels whose 3x3 neighbourhood
+   * is also coloured, i.e. the inside of a mark rather than an anti-aliased edge.
+   * @param {import('@playwright/test').Locator} canvas
+   * @param {number} max - Maximum number of points to return
+   * @returns {Promise<{x: number, y: number}[]>}
+   */
+  async findPlottedPoints(canvas, max = 5) {
+    return await canvas.evaluate((el, limit) => {
+      const ctx = el.getContext('2d');
+      if (!ctx || !el.width || !el.height) return [];
+      const { data, width, height } = ctx.getImageData(0, 0, el.width, el.height);
+      const coloured = (x, y) => {
+        const i = (y * width + x) * 4;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        return data[i + 3] > 200 && Math.max(r, g, b) - Math.min(r, g, b) > 60;
+      };
+      const rect = el.getBoundingClientRect();
+      const sx = rect.width / width, sy = rect.height / height;
+      const points = [];
+      const step = Math.max(1, Math.floor(width / 200));
+      for (let x = 1; x < width - 1 && points.length < limit; x += step) {
+        for (let y = 1; y < height - 1; y++) {
+          if (!coloured(x, y)) continue;
+          let solid = true;
+          for (let dx = -1; dx <= 1 && solid; dx++) {
+            for (let dy = -1; dy <= 1 && solid; dy++) solid = coloured(x + dx, y + dy);
+          }
+          if (!solid) continue;
+          points.push({ x: rect.left + x * sx, y: rect.top + y * sy });
+          x += Math.floor(width / limit);
+          break;
+        }
+      }
+      return points;
+    }, max);
+  }
+
+  /**
+   * Right-click a plotted point of a metrics panel chart to open the Duration-only
+   * gte/lte context menu, retrying because ECharts arms its contextmenu handler a
+   * beat after the panel data resolves. Falls back to the canvas centre when no
+   * plotted point can be located.
+   * @param {string} title - Panel title ('Duration', 'Rate', 'Errors')
+   * @returns {Promise<{ dispatched: boolean, opened: boolean }>} whether the
+   *   right-click reached the panel, and whether the menu opened
+   */
+  async openMetricsContextMenu(title = 'Duration') {
+    await this.armMetricsContextMenuProbe();
+    const canvas = this.metricsPanelLocator(title).locator('canvas').first();
+    const ready = await canvas
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ready) return { dispatched: false, opened: false };
+    const box = await canvas.boundingBox();
+    if (!box) return { dispatched: false, opened: false };
+    // ECharts stacks canvas layers, so a locator click hits the wrong one — drive the mouse instead.
+    const points = await this.findPlottedPoints(canvas);
+    const targets = points.length ? points : [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
+    let opened = false;
+    for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+      for (const point of targets) {
+        await this.page.mouse.click(point.x, point.y, { button: 'right' });
+        opened = await this.isMetricsContextMenuVisible(1000);
+        if (opened) break;
+      }
+    }
+    const hits = await this.getMetricsContextMenuProbeHits();
+    return { dispatched: hits.includes(title), opened };
+  }
+
+  /**
+   * Whether the metrics context menu is currently open.
+   * @param {number} timeout - How long to wait for it to appear
+   * @returns {Promise<boolean>}
+   */
+  async isMetricsContextMenuVisible(timeout = 3000) {
+    return await this.page
+      .locator(this.metricsContextMenu)
+      .waitFor({ state: 'visible', timeout })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /**
+   * Assert the metrics context menu is visible.
+   */
+  async expectMetricsContextMenuVisible() {
+    await expect(this.page.locator(this.metricsContextMenu)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Assert the metrics context menu is hidden.
+   */
+  async expectMetricsContextMenuHidden() {
+    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 5000 });
+  }
+
+  /**
+   * Assert the metrics context menu never opens. A right-click on a non-Duration
+   * panel must be a no-op, so settle briefly (a buggy late render is caught) then
+   * assert the menu is still absent.
+   */
+  async expectMetricsContextMenuStaysHidden() {
+    await this.page.waitForTimeout(600);
+    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 1000 });
+  }
+
+  /**
+   * Whether a context menu item is visible.
+   * @param {'gte'|'lte'} condition
+   * @returns {Promise<boolean>}
+   */
+  async isMetricsContextMenuItemVisible(condition) {
+    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
+    return await this.page
+      .locator(selector)
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /**
+   * Click a context menu item to write a single-sided duration bound.
+   * @param {'gte'|'lte'} condition
+   */
+  async selectMetricsContextMenuItem(condition) {
+    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
+    await this.page.locator(selector).click();
+  }
+
+  /**
+   * Dismiss the metrics context menu with Escape.
+   */
+  async dismissMetricsContextMenu() {
+    await this.page.keyboard.press('Escape');
+  }
+
   /**
    * Per-dimension panel tally inside the Insights drawer.
    * @returns {Promise<{ panels: number, charts: number, errors: number, errorText: string }>}
@@ -2491,9 +2742,12 @@ export class TracesPage {
       const errored = panels.filter((p) =>
         p.querySelector('[data-test="panel-schema-renderer-error-message"]')
       );
+      // The no-data overlay coexists with an empty canvas, so exclude it to keep charts/noData disjoint.
       return {
         panels: panels.length,
-        charts: panels.filter((p) => p.querySelector('canvas')).length,
+        charts: panels.filter(
+          (p) => p.querySelector('canvas') && !p.querySelector('[data-test="no-data"]')
+        ).length,
         noData: panels.filter((p) => p.querySelector('[data-test="no-data"]')).length,
         errors: errored.length,
         errorText: errored.length ? errored[0].textContent.trim().slice(0, 300) : '',
@@ -3283,6 +3537,47 @@ export class TracesPage {
    */
   async expectThreadViewContains(text) {
     await expect(this.page.locator(this.llmThreadView)).toContainText(text, { timeout: 15000 });
+  }
+
+  async getResultCountBadgeText() {
+    return ((await this.page.locator(this.tracesCountBadge).first().textContent().catch(() => '')) || '').trim();
+  }
+
+  // The first run can fire before the editor commits a typed filter, and fresh spans lag ingestion.
+  async searchUntilResultCount(expected, timeout = 90000) {
+    await expect(async () => {
+      await this.runTraceSearch();
+      expect(await this.getResultCountBadgeText()).toContain(expected);
+    }).toPass({ timeout, intervals: [2000, 3000, 5000] });
+  }
+
+  async getResultOperationNames() {
+    return await this.page.locator(`${this.searchResultList} [data-test="trace-row-operation-name"]`).allInnerTexts();
+  }
+
+  async getResultSpanStatuses() {
+    return await this.page.locator(`${this.searchResultList} [data-test="span-row-status-pill"]`).allInnerTexts();
+  }
+
+  async getResultPageCount() {
+    return await this.page.locator('[data-test^="traces-search-result-pagination-page-"]').count();
+  }
+
+  async goToResultPage(pageNumber) {
+    await this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`).click();
+  }
+
+  async clickResultPaginationNext() {
+    await this.page.locator('[data-test="traces-search-result-pagination-next"]').click();
+  }
+
+  async clickResultPaginationPrev() {
+    await this.page.locator('[data-test="traces-search-result-pagination-prev"]').click();
+  }
+
+  async setResultRecordsPerPage(size) {
+    await this.page.locator('[data-test="traces-search-result-records-per-page-trigger"]').click();
+    await this.page.getByRole('option', { name: String(size), exact: true }).click();
   }
 
 }

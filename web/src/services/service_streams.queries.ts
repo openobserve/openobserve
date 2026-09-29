@@ -14,11 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { queryOptions } from "@tanstack/vue-query";
-import serviceStreamsApi, { type FieldAlias, type ServiceIdentityConfig } from "./service_streams";
+import serviceStreamsApi, {
+  type DimensionAnalyticsSummary,
+  type FieldAlias,
+  type ServiceIdentityConfig,
+} from "./service_streams";
 import { serviceStreamKeys } from "./service_streams.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
-/** `retry: false` because both callers treat a miss as "no config" and carry on, so retries would only hold the traces field list behind backoffs. */
+/** `retry: false` on every read here: each caller treats a miss as empty and carries on, so retries would only hold its screen behind backoffs. */
 export const semanticGroupsQuery = (org: string) =>
   queryOptions({
     queryKey: serviceStreamKeys.semanticGroups(org),
@@ -33,6 +37,26 @@ export const identityConfigQuery = (org: string) =>
     queryKey: serviceStreamKeys.identityConfig(org),
     queryFn: async (): Promise<ServiceIdentityConfig> =>
       (await serviceStreamsApi.getIdentityConfig(org)).data,
+    staleTime: MEDIUM_STALE_TIME,
+    retry: false,
+  });
+
+export const servicesListQuery = (org: string) =>
+  queryOptions({
+    queryKey: serviceStreamKeys.servicesList(org),
+    queryFn: async (): Promise<Record<string, any>[]> => {
+      const data = (await serviceStreamsApi.getServicesList(org)).data;
+      return Array.isArray(data) ? data : (data?.list ?? []);
+    },
+    staleTime: MEDIUM_STALE_TIME,
+    retry: false,
+  });
+
+export const dimensionAnalyticsQuery = (org: string) =>
+  queryOptions({
+    queryKey: serviceStreamKeys.dimensionAnalytics(org),
+    queryFn: async (): Promise<DimensionAnalyticsSummary> =>
+      (await serviceStreamsApi.getDimensionAnalytics(org)).data,
     staleTime: MEDIUM_STALE_TIME,
     retry: false,
   });

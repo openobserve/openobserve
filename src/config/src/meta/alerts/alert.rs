@@ -152,6 +152,23 @@ pub struct Alert {
 
     #[serde(default)]
     pub pending_period_sec: i64,
+
+    /// Send one notification when this alert stops firing. Off by default: an existing template
+    /// that never mentions `{alert_status}` would otherwise render the firing wording twice.
+    #[serde(default)]
+    pub notify_on_recovery: bool,
+
+    /// Where the recovery MESSAGE goes when it should not follow the firing. Empty = the firing's
+    /// own destinations. Ticket closes are unaffected either way — a resolve has to carry the
+    /// correlation key of the trigger that opened it, so it cannot be redirected.
+    #[serde(default)]
+    pub recovery_destinations: Vec<String>,
+
+    /// Seconds the condition must stay clear before the episode recovers.
+    /// 0 recovers on the first clear evaluation, which is what every alert does
+    /// today. Named after Prometheus' `keep_firing_for`, with the same meaning.
+    #[serde(default)]
+    pub keep_firing_for: i64,
 }
 
 /// Accept a runbook link, or say why not.
@@ -252,6 +269,9 @@ impl Default for Alert {
             priority: None,
             tags: vec![],
             pending_period_sec: 0,
+            notify_on_recovery: false,
+            recovery_destinations: vec![],
+            keep_firing_for: 0,
         }
     }
 }
