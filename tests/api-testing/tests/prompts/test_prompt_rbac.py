@@ -183,7 +183,13 @@ def test_scoped_user_resolves_only_granted_prompt(env, base_url):
     s, names = env["scoped"], env["names"]
     resolve = f"{base_url}api/{ORG_ID}/prompts/resolve"
     assert s.get(resolve, params={"name": names["a"]}).status_code == 200
-    assert s.get(resolve, params={"name": names["b"]}).status_code == 403
+    # An unreadable prompt must look exactly like a missing one, whatever the selector.
+    for params in ({"name": names["b"]}, {"name": names["b"], "label": "no-such-label"}):
+        resp = s.get(resolve, params=params)
+        assert resp.status_code == 404, resp.text
+        assert resp.json()["code"] == "prompt_not_found", resp.text
+    resp = s.get(resolve, params={"name": f"prompt_rbac_missing_{uuid.uuid4().hex[:6]}"})
+    assert resp.json()["code"] == "prompt_not_found", resp.text
 
 
 def test_scoped_user_writes_only_granted_prompt(env, base_url):

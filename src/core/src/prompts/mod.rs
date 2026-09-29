@@ -10,9 +10,9 @@ mod service;
 
 pub use cache::watch_invalidation;
 pub use service::{
-    append_version, archive, create_prompt, delete_label, find_content_matches, get_prompt,
-    get_version, list_label_activity, list_prompts, list_versions, move_label, resolve_by_name,
-    resolve_prompt, update_head,
+    append_version, archive, create_prompt, delete_label, entity_id_by_name, find_content_matches,
+    get_prompt, get_version, list_label_activity, list_prompts, list_versions, move_label,
+    resolve_by_name, resolve_prompt, update_head,
 };
 
 /// System-managed label that advances automatically and cannot be moved or deleted.

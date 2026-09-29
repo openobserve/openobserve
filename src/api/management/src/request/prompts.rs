@@ -91,8 +91,7 @@ async fn can_move_protected_label(
     Ok(can_manage_protected_labels(org_id, _user_id).await)
 }
 
-/// Org-wide grant on `prompt_labels`. Editors are not blanket-approved for it,
-/// so only admins and roles granted it explicitly pass.
+/// Org-wide `prompt_label` grant; editors need it explicitly, admins always pass.
 async fn can_manage_protected_labels(org_id: &str, _user_id: &str) -> bool {
     #[cfg(feature = "enterprise")]
     {
@@ -128,8 +127,7 @@ async fn readable_prompts(org_id: &str, user_id: &str) -> Result<Option<Vec<Stri
         })
 }
 
-/// `/resolve` names the prompt by name, so the route table can only check the
-/// org-wide LIST; the per-prompt GET happens here once the name is resolved.
+/// `/resolve` addresses prompts by name, so the per-prompt GET is checked here.
 async fn can_read_prompt(org_id: &str, _user_id: &str, _entity_id: &str) -> bool {
     #[cfg(feature = "enterprise")]
     {
@@ -394,14 +392,19 @@ pub async fn resolve_prompt(
     .await
     {
         Ok(resolved) => resolved,
-        Err(error) => return prompt_error_response(error),
+        Err(error) => {
+            // Errors past the name lookup prove the prompt exists, so non-readers get not-found.
+            if !matches!(error, PromptError::PromptNotFound)
+                && let Ok(Some(entity_id)) = prompts::entity_id_by_name(&org_id, &query.name).await
+                && !can_read_prompt(&org_id, &user.user_id, &entity_id).await
+            {
+                return prompt_error_response(PromptError::PromptNotFound);
+            }
+            return prompt_error_response(error);
+        }
     };
     if !can_read_prompt(&org_id, &user.user_id, &resolved.prompt.entity_id).await {
-        return machine_error(
-            StatusCode::FORBIDDEN,
-            "unauthorized_access",
-            "Unauthorized Access",
-        );
+        return prompt_error_response(PromptError::PromptNotFound);
     }
     let etag = format!(
         "\"{}\"",
@@ -477,8 +480,7 @@ pub async fn update_prompt_settings(
             return internal_error();
         }
     };
-    // Unprotecting a label is as good as moving it, so changing the set needs
-    // the same grant. An empty set is stored as the default.
+    // Unprotecting a label is as good as moving it; an empty set is stored as the default.
     let requested = if body.protected_labels.is_empty() {
         db::prompt_settings::PromptSettings::default().protected_labels
     } else {
