@@ -4383,4 +4383,35 @@ export class PipelinesPage {
         testLogger.info('✅ Run Query button is enabled as expected');
     }
 
+    /** Open the delete dialog for an output node without confirming it. */
+    async openOutputStreamNodeDeleteDialog(index = 0) {
+        await this.pipelineNodeOutputStreamNode.nth(index).hover();
+        await this.pipelineNodeOutputDeleteBtn.nth(index).click();
+        await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /** The warning only fires for a destination that mirrors the source stream. */
+    getDefaultDestinationWarning() {
+        return this.page
+            .locator('[data-test="confirm-dialog"]')
+            .getByText(/default destination node/i);
+    }
+
+    async expectDefaultDestinationWarningVisible() {
+        await expect(this.getDefaultDestinationWarning()).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectDefaultDestinationWarningAbsent() {
+        await expect(this.getDefaultDestinationWarning()).toHaveCount(0);
+    }
+
+    async cancelConfirmDialog() {
+        await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
+        await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 10000 });
+    }
+
+    async countOutputStreamNodes() {
+        return await this.pipelineNodeOutputStreamNode.count();
+    }
+
 }

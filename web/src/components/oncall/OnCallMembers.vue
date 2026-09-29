@@ -675,6 +675,8 @@ function focusMemberPicker() {
   memberPickerRef.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" });
   memberPickerRef.value?.focus();
 }
+// Exposed so the attention banner's "Add a member" can land the cursor here even when this tab is already open.
+defineExpose({ focusMemberPicker });
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);
 // Losing the picker must not lose the ability to add anybody.

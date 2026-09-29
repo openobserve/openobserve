@@ -1055,6 +1055,10 @@ receivers:
             warn: WARNING
             info: [LOG, INFO, NOTICE]
             debug: [DEBUG1, DEBUG2, DEBUG3, DEBUG4, DEBUG5, STATEMENT, DETAIL, HINT, CONTEXT]
+      # Already the record timestamp; left in place it lands as a stray ts column.
+      - type: remove
+        if: 'attributes.ts != nil'
+        field: attributes.ts
 
       # 2) classify
       - type: add
@@ -1215,6 +1219,10 @@ receivers:
         timestamp:
           parse_from: attributes.ts
           layout: "%Y-%m-%dT%H:%M:%S.%fZ"
+      # Already the record timestamp; left in place it lands as a stray ts column.
+      - type: remove
+        if: 'attributes.ts != nil'
+        field: attributes.ts
       - type: add
         field: attributes.o2_my_event
         value: other
@@ -1297,6 +1305,10 @@ receivers:
         timestamp:
           parse_from: attributes.ts
           layout: "%Y-%m-%d %H:%M:%S"
+      # Already the record timestamp; left in place it lands as a stray ts column.
+      - type: remove
+        if: 'attributes.ts != nil'
+        field: attributes.ts
       - type: add
         field: attributes.o2_maria_event
         value: other

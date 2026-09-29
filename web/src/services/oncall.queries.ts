@@ -31,6 +31,7 @@ import type {
   OnCallPolicy,
   OnCallPosition,
   OnCallResponse,
+  OnCallResponseReport,
   OnCallSchedule,
   OnCallTeam,
   OnCallTeamMember,
@@ -292,6 +293,16 @@ export const responsePriorCausesQuery = (org: string, responseId: string) =>
       (await oncallService.priorCauses({ org_identifier: org, response_id: responseId })).data ??
       [],
     staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Lands minutes after the page opens; a 404 until then is thrown, so it is never cached as absent. */
+export const responseReportQuery = (org: string, responseId: string) =>
+  queryOptions({
+    queryKey: oncallKeys.responseReport(org, responseId),
+    queryFn: async (): Promise<OnCallResponseReport | null> =>
+      (await oncallService.responseReport({ org_identifier: org, response_id: responseId })).data ??
+      null,
+    staleTime: LIVE_STALE_TIME,
   });
 
 export const responseHistoryQuery = (org: string, responseId: string, limit?: number) =>

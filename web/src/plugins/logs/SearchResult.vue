@@ -888,6 +888,7 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   buildPatternVolumeContext,
@@ -2237,10 +2238,7 @@ export default defineComponent({
     const contextCellIsStreamField = computed(() => {
       const columnId = contextCell.value?.columnId;
       if (!columnId) return false;
-      return (
-        searchObj.data.stream.selectedStreamFields?.find((field: any) => field.name === columnId)
-          ?.isSchemaField ?? false
-      );
+      return isFilterableLogField(columnId, searchObj.data.stream.selectedStreamFields);
     });
 
     // Mirrors O2AIContextAddBtn's own gate — the AI actions only exist on

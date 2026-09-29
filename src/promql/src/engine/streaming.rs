@@ -26,13 +26,14 @@ use promql_parser::{
 
 use super::{
     Engine,
-    selector::{SelectorContexts, named_selector, plain_selector},
+    selector::{SelectorContexts, SelectorOutput, named_selector, plain_selector},
 };
 use crate::{
     aggregations::AggOp,
     functions, micros,
-    series_stream::plan::{
-        LabelColumns, StreamingSelector, execute_partitioned, series_label_columns,
+    series_stream::{
+        blocks,
+        plan::{LabelColumns, StreamingSelector, execute_partitioned, series_label_columns},
     },
     streaming_eval,
 };
@@ -46,6 +47,40 @@ struct SelectorScan {
     offset: i64,
     label_selector: hashbrown::HashSet<String>,
     ctxs: SelectorContexts,
+}
+
+impl SelectorScan {
+    fn streaming_selector(&self) -> StreamingSelector<'_> {
+        StreamingSelector {
+            table_name: self.selector.name.as_deref().unwrap_or_default(),
+            matchers: &self.scan_matchers,
+            offset: self.offset,
+        }
+    }
+}
+
+struct InstantSelectorFunc {
+    output: SelectorOutput,
+    offset: i64,
+}
+
+impl functions::RangeFunc for InstantSelectorFunc {
+    fn name(&self) -> &'static str {
+        if self.output.keep_metric_name() {
+            functions::KEEP_METRIC_NAME_FUNC
+        } else {
+            "timestamp"
+        }
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        let sample = samples.last()?;
+        // Streaming windows shift sample times by the offset; projection needs the stored time.
+        Some(
+            self.output
+                .project(&Sample::new(sample.timestamp - self.offset, sample.value)),
+        )
+    }
 }
 
 impl Engine {
@@ -132,12 +167,16 @@ impl Engine {
     pub(super) async fn try_streaming_instant_selector(
         &mut self,
         vs: &VectorSelector,
+        output: SelectorOutput,
     ) -> Result<Option<Vec<RangeValue>>> {
         let lookback = self.ctx.lookback();
         let Some(scan) = self.selector_scan(vs, lookback, "VectorSelector").await? else {
             return Ok(None);
         };
-        let func = functions::instant_lookback_func();
+        let func = Arc::new(InstantSelectorFunc {
+            output,
+            offset: scan.offset,
+        });
         if let Some((mut series, _)) = self.stream_range_func(&scan, func, lookback).await? {
             if self.result_type.is_none() {
                 self.result_type = Some("vector".to_string());
@@ -150,7 +189,7 @@ impl Engine {
         }
 
         // the layout cannot stream: select on the contexts already created
-        self.eval_vector_selector(&scan.selector, Some(scan.ctxs))
+        self.eval_vector_selector(&scan.selector, Some(scan.ctxs), output)
             .await
             .map(Some)
     }
@@ -296,8 +335,9 @@ impl Engine {
         let selector = named_selector(plain_selector(vs, kind)?, kind)?;
         let (start, end, offset) = self.selector_time_range(&selector, Some(range));
         let label_selector = self.selector_labels();
+        let prefer_blocks = blocks::query_window(&self.eval_ctx, offset, micros(range)).is_some();
         let ctxs = self
-            .create_selector_contexts(&selector, (start, end), &label_selector)
+            .create_selector_contexts(&selector, (start, end), &label_selector, prefer_blocks)
             .await?;
         let scan_matchers = match ctxs.as_slice() {
             [(_, _, _, false)] => Matchers::empty(),
@@ -310,16 +350,6 @@ impl Engine {
             label_selector,
             ctxs,
         }))
-    }
-}
-
-impl SelectorScan {
-    fn streaming_selector(&self) -> StreamingSelector<'_> {
-        StreamingSelector {
-            table_name: self.selector.name.as_deref().unwrap_or_default(),
-            matchers: &self.scan_matchers,
-            offset: self.offset,
-        }
     }
 }
 
@@ -355,6 +385,7 @@ mod tests {
     struct StreamingProvider {
         ctx: SessionContext,
         calls: Arc<AtomicUsize>,
+        prefer_calls: Arc<AtomicUsize>,
         canceled: bool,
         // a dropped sender reads as a cancel, so a live registration keeps it
         cancel: std::sync::Mutex<Option<oneshot::Sender<()>>>,
@@ -378,6 +409,27 @@ mod tests {
                 ScanStats::default(),
                 true,
             )])
+        }
+
+        async fn create_context_prefer_blocks(
+            &self,
+            org_id: &str,
+            stream_name: &str,
+            time_range: (i64, i64),
+            matchers: Matchers,
+            label_selector: HashSet<String>,
+            filters: &mut [(String, Vec<String>)],
+        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            self.prefer_calls.fetch_add(1, Ordering::SeqCst);
+            self.create_context(
+                org_id,
+                stream_name,
+                time_range,
+                matchers,
+                label_selector,
+                filters,
+            )
+            .await
         }
 
         async fn register_cancellation(
@@ -406,12 +458,24 @@ mod tests {
 
     /// Two counters sampled every 20 s; the hash-sorted table exists only when `streams`.
     fn provider(streams: bool, canceled: bool) -> StreamingProvider {
+        provider_sampled_at(streams, canceled, 10, |step| BASE + step * 20 * SECOND)
+    }
+
+    /// Two series sampled `3 * step` at `sample_ts(step)` for `steps` steps.
+    fn provider_sampled_at(
+        streams: bool,
+        canceled: bool,
+        steps: i64,
+        sample_ts: fn(i64) -> i64,
+    ) -> StreamingProvider {
         let rows: Vec<(i64, u64, f64)> = [7u64, u64::MAX / 2]
             .into_iter()
-            .flat_map(|hash| {
-                (0..10).map(move |step| (BASE + step * 20 * SECOND, hash, (step * 3) as f64))
-            })
+            .flat_map(|hash| (0..steps).map(move |step| (sample_ts(step), hash, (step * 3) as f64)))
             .collect();
+        provider_rows(streams, canceled, &rows)
+    }
+
+    fn provider_rows(streams: bool, canceled: bool, rows: &[(i64, u64, f64)]) -> StreamingProvider {
         let batch = RecordBatch::try_new(
             metrics_schema(),
             vec![
@@ -441,6 +505,7 @@ mod tests {
         StreamingProvider {
             ctx,
             calls: Default::default(),
+            prefer_calls: Default::default(),
             canceled,
             cancel: Default::default(),
         }
@@ -509,7 +574,12 @@ mod tests {
         else {
             panic!("{selector} is not a vector selector");
         };
-        Value::Matrix(engine.eval_vector_selector(&vs, None).await.unwrap())
+        Value::Matrix(
+            engine
+                .eval_vector_selector(&vs, None, SelectorOutput::Value)
+                .await
+                .unwrap(),
+        )
     }
 
     async fn eval_sum_rate(provider: StreamingProvider, timeout: u64) -> Result<Value> {
@@ -529,7 +599,10 @@ mod tests {
         else {
             panic!("{selector} is not a vector selector");
         };
-        let data = engine.eval_vector_selector(&vs, None).await.unwrap();
+        let data = engine
+            .eval_vector_selector(&vs, None, SelectorOutput::Value)
+            .await
+            .unwrap();
         let eval_ctx = engine.eval_ctx.clone();
         agg(modifier, Value::Matrix(data), &eval_ctx).unwrap()
     }
@@ -576,6 +649,24 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn sparse_window_still_prefers_blocks_before_registration() {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse("m{instance=\"a\"}").unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        let provider = provider(true, false);
+        let prefer_calls = Arc::clone(&provider.prefer_calls);
+        let mut engine = engine_at(provider, 30, BASE + 60 * SECOND, 30 * SECOND, None);
+        engine
+            .selector_scan(&selector, Duration::from_secs(5), "VectorSelector")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(prefer_calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
@@ -703,9 +794,12 @@ mod tests {
         let mut engine = engine(provider, 30);
         let input = match expr.as_ref() {
             Expr::Call(call) => generic_range_func_on(&mut engine, call).await,
-            Expr::VectorSelector(vs) => {
-                matrix_or_none(engine.eval_vector_selector(vs, None).await.unwrap())
-            }
+            Expr::VectorSelector(vs) => matrix_or_none(
+                engine
+                    .eval_vector_selector(vs, None, SelectorOutput::Value)
+                    .await
+                    .unwrap(),
+            ),
             _ => panic!("{query} is not over a range function or a selector"),
         };
         let param = match param.as_deref() {
@@ -1086,6 +1180,162 @@ mod tests {
                     pinned_values(streams, query).await,
                     on_every_step(expected),
                     "{query}, streams {streams}"
+                );
+            }
+        }
+    }
+
+    /// `3 * k` at `1003.7 s + 15 s * k`, sample times off the whole second.
+    fn provider_off_the_second(streams: bool) -> StreamingProvider {
+        provider_sampled_at(streams, false, 12, |step| {
+            BASE + 3_700_000 + step * 15 * SECOND
+        })
+    }
+
+    #[tokio::test]
+    async fn test_timestamp_of_a_selector_is_the_selected_sample_time() {
+        let cases = [
+            ("timestamp(m)", [1063.7, 1108.7, 1153.7]),
+            ("timestamp(((m)))", [1063.7, 1108.7, 1153.7]),
+            // the offset moves the selection, the value stays the stored time
+            ("timestamp(m offset 30s)", [1033.7, 1078.7, 1123.7]),
+            ("timestamp(m offset -10s)", [1078.7, 1123.7, 1168.7]),
+            // any other argument carries the step, not a sample time
+            ("timestamp(m * 1)", [1070.0, 1115.0, 1160.0]),
+            ("timestamp(timestamp(m))", [1070.0, 1115.0, 1160.0]),
+        ];
+        let (start, step) = (BASE + 70 * SECOND, 45 * SECOND);
+        for (query, values) in cases {
+            let steps = [70, 115, 160].map(|second| BASE + second * SECOND);
+            let expected: Vec<(i64, f64)> = steps.into_iter().zip(values).collect();
+            for streams in [true, false] {
+                let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
+                let expr = promql_parser::parser::parse(query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let series = canonical(value);
+                assert_eq!(series.len(), 2, "{query}, streams {streams}");
+                for (labels, samples) in series {
+                    assert!(
+                        labels.iter().all(|(name, _)| name != NAME_LABEL),
+                        "{query}, streams {streams}: {labels:?}"
+                    );
+                    assert_eq!(samples, expected, "{query}, streams {streams}");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_time_minus_timestamp_is_the_age_of_the_sample() {
+        let instant = BASE + 180 * SECOND;
+        for streams in [true, false] {
+            let mut engine = engine_at(provider_off_the_second(streams), 30, instant, 0, None);
+            let expr = promql_parser::parser::parse("time() - timestamp(m)").unwrap();
+            let (value, _) = engine.exec(&expr).await.unwrap();
+            for (_, samples) in canonical(value) {
+                assert_eq!(samples, [(instant, 1180.0 - 1168.7)], "streams {streams}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_timestamp_of_a_pinned_selector_is_its_sample_time_on_every_step() {
+        for (query, expected) in [
+            ("timestamp(m @ 1100)", 1100.0),
+            ("timestamp(m @ 1110)", 1100.0),
+            ("timestamp((m @ 1110))", 1100.0),
+            ("timestamp(m @ 1100 offset 20s)", 1080.0),
+            ("timestamp(m @ 1100 offset -20s)", 1120.0),
+            ("sum(timestamp(m @ 1110))", 2200.0),
+        ] {
+            for streams in [true, false] {
+                assert_eq!(
+                    pinned_values(streams, query).await,
+                    on_every_step(expected),
+                    "{query}, streams {streams}"
+                );
+            }
+        }
+        // the pinned inner result sits on the steps, so the outer timestamp() reads them
+        let steps: Vec<_> = on_every_step(0.0)
+            .into_iter()
+            .map(|(ts, _)| (ts, (ts / SECOND) as f64))
+            .collect();
+        for streams in [true, false] {
+            for query in [
+                "timestamp(timestamp(m @ 1100))",
+                "timestamp((m @ 1100) * 1)",
+            ] {
+                assert_eq!(
+                    pinned_values(streams, query).await,
+                    steps,
+                    "{query}, streams {streams}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_timestamp_selector_lookback_boundaries() {
+        for streams in [true, false] {
+            for (sample_time, present) in [
+                (150 * SECOND, false),
+                (150 * SECOND + 1_000, true),
+                (180 * SECOND, true),
+                (180 * SECOND + 1_000, false),
+            ] {
+                let provider = provider_rows(streams, false, &[(BASE + sample_time, 7, 1.0)]);
+                let mut engine = engine_at(provider, 30, BASE + 180 * SECOND, 0, Some(30 * SECOND));
+                let expr = promql_parser::parser::parse("timestamp(m)").unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let series = if matches!(value, Value::None) {
+                    vec![]
+                } else {
+                    canonical(value)
+                };
+                assert_eq!(
+                    !series.is_empty(),
+                    present,
+                    "sample {sample_time}, streams {streams}"
+                );
+                if present {
+                    assert_eq!(
+                        series[0].1,
+                        [(
+                            BASE + 180 * SECOND,
+                            (BASE + sample_time) as f64 / SECOND as f64
+                        )]
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_timestamp_selector_subquery_uses_child_steps() {
+        for streams in [true, false] {
+            let mut engine = engine_at(
+                provider_off_the_second(streams),
+                30,
+                BASE + 70 * SECOND,
+                45 * SECOND,
+                None,
+            );
+            let expr =
+                promql_parser::parser::parse("max_over_time(timestamp(m)[30s:20s])").unwrap();
+            let (value, _) = engine.exec(&expr).await.unwrap();
+            let series = canonical(value);
+            assert_eq!(series.len(), 2);
+            for (labels, samples) in series {
+                assert!(labels.iter().all(|(name, _)| name != NAME_LABEL));
+                assert_eq!(
+                    samples,
+                    [
+                        (BASE + 70 * SECOND, 1048.7),
+                        (BASE + 115 * SECOND, 1093.7),
+                        (BASE + 160 * SECOND, 1153.7)
+                    ],
+                    "streams {streams}"
                 );
             }
         }

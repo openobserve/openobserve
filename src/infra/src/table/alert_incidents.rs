@@ -223,6 +223,7 @@ pub async fn add_alert_to_incident(
         alert_kind: Set(alert_kind.to_string()),
         correlation_reason: Set(Some(correlation_reason.to_string())),
         created_at: Set(now),
+        resolved_at: Set(None),
     };
 
     alert_link
@@ -389,6 +390,32 @@ pub async fn list(
         .fetch_page(offset / page_size)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Mark every open firing of `alert_id` in this incident as recovered.
+///
+/// Keyed on the alert rather than one `alert_fired_at` because the episode's
+/// clock is the evaluation's, not the junction row's, and a firing that landed
+/// twice in the same incident recovers once. Idempotent: rows already carrying
+/// a `resolved_at` are left at their first value.
+pub async fn resolve_alert_firings(
+    incident_id: &str,
+    alert_id: &str,
+    resolved_at: i64,
+) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let res = alert_incident_alerts::Entity::update_many()
+        .col_expr(
+            alert_incident_alerts::Column::ResolvedAt,
+            Expr::value(Some(resolved_at)),
+        )
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .filter(alert_incident_alerts::Column::ResolvedAt.is_null())
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(res.rows_affected)
 }
 
 /// Get alerts for an incident

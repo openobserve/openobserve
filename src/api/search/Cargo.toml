@@ -62,6 +62,7 @@ tokio.workspace = true
 tokio-stream.workspace = true
 tower.workspace = true
 tracing.workspace = true
+urlencoding.workspace = true
 utoipa.workspace = true
 transform.workspace = true
 vector-enrichment.workspace = true

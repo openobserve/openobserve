@@ -99,9 +99,10 @@ const appendProfilesQuery = (
   if (payload.profile_unit) query.set("profile_unit", payload.profile_unit);
   if (payload.tag) query.set("tag", payload.tag);
   if (payload.filters?.length) {
+    // Percent-encode each side so a comma inside a value is not a pair separator.
     const filters = payload.filters
       .filter((f) => f.key && f.value && f.op === "=")
-      .map((f) => `${f.key}=${f.value}`)
+      .map((f) => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`)
       .join(",");
     if (filters) query.set("filters", filters);
   }

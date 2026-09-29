@@ -52,6 +52,9 @@ fn folder_error_response(value: FolderError) -> Response {
         FolderError::DeleteWithWorkflows => MetaHttpResponse::bad_request(
             "Folder contains workflows, please move/delete workflows from folder",
         ),
+        FolderError::DeleteWithPrompts => MetaHttpResponse::bad_request(
+            "Folder contains prompts, please move/delete prompts from folder",
+        ),
         FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
         FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
         FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
@@ -585,6 +588,7 @@ mod tests {
             (FolderError::DeleteWithAlerts, 400),
             (FolderError::DeleteWithReports, 400),
             (FolderError::DeleteWithSynthetics, 400),
+            (FolderError::DeleteWithPrompts, 400),
             (FolderError::PermittedFoldersMissingUser, 403),
             (
                 FolderError::PermittedFoldersValidator("test".to_string()),
