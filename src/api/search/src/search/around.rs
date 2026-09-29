@@ -22,7 +22,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::{base64, json},
+    utils::{base64, json, sql::quote_identifier},
 };
 use hashbrown::HashMap;
 use search::sql::rewriter::{
@@ -43,7 +43,6 @@ pub(crate) async fn around(
     stream_name: &str,
     stream_type: StreamType,
     query: Query<HashMap<String, String>>,
-    sql: Option<String>,
     body: Option<bytes::Bytes>,
     user_id: Option<String>,
 ) -> Result<config::meta::search::Response, infra::errors::Error> {
@@ -63,30 +62,7 @@ pub(crate) async fn around(
         query_fn = Some(format!("{vrl_function} \n ."));
     }
 
-    // For around search, we only use the stream name and ignore any SQL query
-    // Extract stream name from SQL if provided, otherwise use the stream_name parameter
-    let actual_stream_name = if let Some(sql) = sql.as_ref() {
-        // Extract stream name from SQL
-        config::meta::sql::resolve_stream_names_with_type(sql)
-            .ok()
-            .and_then(|tables| tables.first().map(|t| t.to_string()))
-            .unwrap_or_else(|| stream_name.to_string())
-    } else if let Some(sql_param) = query.get("sql") {
-        // Decode and extract stream name from SQL parameter
-        base64::decode_url(sql_param)
-            .ok()
-            .and_then(|sql| {
-                config::meta::sql::resolve_stream_names_with_type(&sql)
-                    .ok()
-                    .and_then(|tables| tables.first().map(|t| t.to_string()))
-            })
-            .unwrap_or_else(|| stream_name.to_string())
-    } else {
-        stream_name.to_string()
-    };
-
-    // Build the base SQL using only the stream name
-    let mut around_sql = format!("SELECT * FROM \"{}\" ", actual_stream_name);
+    let mut around_sql = around_base_sql(stream_name);
 
     // check playload
     let mut filters = HashMap::new();
@@ -290,4 +266,76 @@ pub(crate) async fn around(
     .await;
 
     Ok(resp)
+}
+
+/// The stream an around search reads, so the one to authorize, which `sql` overrides.
+pub(crate) fn resolve_around_stream(
+    stream_name: &str,
+    sql: Option<&str>,
+    query: &HashMap<String, String>,
+) -> String {
+    let sql = match sql {
+        Some(sql) => Some(sql.to_string()),
+        None => query.get("sql").and_then(|v| base64::decode_url(v).ok()),
+    };
+    sql.and_then(|sql| {
+        config::meta::sql::resolve_stream_names_with_type(&sql)
+            .ok()
+            .and_then(|tables| tables.first().map(|t| t.to_string()))
+    })
+    .unwrap_or_else(|| stream_name.to_string())
+}
+
+pub(crate) fn around_base_sql(stream_name: &str) -> String {
+    format!("SELECT * FROM {} ", quote_identifier(stream_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::sql::resolve_stream_names;
+
+    use super::*;
+
+    fn sql_query(sql: &str) -> HashMap<String, String> {
+        HashMap::from([("sql".to_string(), base64::encode_url(sql))])
+    }
+
+    #[test]
+    fn test_resolve_around_stream_uses_sql_param_table() {
+        let query = sql_query("SELECT * FROM \"victim\"");
+        assert_eq!(resolve_around_stream("allowed", None, &query), "victim");
+    }
+
+    #[test]
+    fn test_resolve_around_stream_uses_explicit_sql_table() {
+        let query = sql_query("SELECT * FROM \"other\"");
+        assert_eq!(
+            resolve_around_stream("allowed", Some("SELECT * FROM victim"), &query),
+            "victim"
+        );
+    }
+
+    #[test]
+    fn test_resolve_around_stream_falls_back_to_path() {
+        assert_eq!(
+            resolve_around_stream("allowed", None, &HashMap::new()),
+            "allowed"
+        );
+        let query = sql_query("not sql at all");
+        assert_eq!(resolve_around_stream("allowed", None, &query), "allowed");
+    }
+
+    #[test]
+    fn test_around_base_sql_reads_only_the_resolved_stream() {
+        let name = resolve_around_stream(
+            "allowed",
+            Some("SELECT * FROM \"allowed\"\" , \"\"victim\""),
+            &HashMap::new(),
+        );
+        assert_eq!(name, "allowed\" , \"victim");
+        assert_eq!(
+            resolve_stream_names(&around_base_sql(&name)).unwrap(),
+            vec![name]
+        );
+    }
 }

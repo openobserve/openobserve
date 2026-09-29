@@ -760,6 +760,15 @@ pub async fn _search_partition_multi(
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    for sql in &req.sql {
+        if let Some(res) =
+            super::check_sql_stream_permissions(sql, &org_id, user_id, stream_type, &trace_id).await
+        {
+            return res;
+        }
+    }
+
     let search_fut =
         SearchService::search_partition_multi(&trace_id, &org_id, user_id, stream_type, &req);
     let search_res = if cfg.common.should_create_span() {
@@ -898,19 +907,10 @@ pub async fn around_multi(
         }
     };
     let stream_names = stream_names.split(',').collect::<Vec<&str>>();
-
-    let mut around_sqls = stream_names
-        .iter()
-        .map(|name| format!("SELECT * FROM \"{name}\" "))
-        .collect::<Vec<String>>();
-    if let Some(v) = query.get("sql") {
-        let sqls = v.split(',').collect::<Vec<&str>>();
-        for (i, sql) in sqls.into_iter().enumerate() {
-            if let Ok(sql) = base64::decode_url(sql) {
-                around_sqls[i] = sql;
-            }
-        }
-    }
+    let around_sqls = match around_multi_sqls(&stream_names, query.get("sql").map(String::as_str)) {
+        Ok(sqls) => sqls,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
 
     let around_size = query
         .get("size")
@@ -918,11 +918,29 @@ pub async fn around_multi(
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    let mut resolved_streams = Vec::with_capacity(stream_names.len());
+    for (stream_name, sql) in stream_names.iter().zip(&around_sqls) {
+        let stream_name = super::around::resolve_around_stream(stream_name, Some(sql), &query);
+        #[cfg(feature = "enterprise")]
+        if let Some(res) = crate::search::utils::check_stream_permissions(
+            &stream_name,
+            &org_id,
+            &user_email.user_id,
+            &stream_type,
+            crate::search::utils::StreamPermissionResourceType::Search,
+        )
+        .await
+        {
+            return res;
+        }
+        resolved_streams.push(stream_name);
+    }
+
     let mut multi_resp = search::Response {
         size: around_size,
         ..Default::default()
     };
-    for (i, stream_name) in stream_names.iter().enumerate() {
+    for (i, stream_name) in resolved_streams.iter().enumerate() {
         let trace_id = format!("{trace_id}-{i}");
         let search_res = super::around::around(
             &trace_id,
@@ -931,7 +949,6 @@ pub async fn around_multi(
             stream_name,
             stream_type,
             Query(query.clone()),
-            Some(around_sqls[i].clone()),
             None,
             user_id.clone(),
         )
@@ -1048,6 +1065,34 @@ fn parse_simple_multi_stream_request(
 
 const fn default_size() -> i64 {
     10
+}
+
+/// One SQL per stream: the caller's base64 entry where given, else a plain select of the stream.
+fn around_multi_sqls(
+    stream_names: &[&str],
+    sql_param: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let mut sqls = stream_names
+        .iter()
+        .map(|name| super::around::around_base_sql(name))
+        .collect::<Vec<String>>();
+    let Some(sql_param) = sql_param else {
+        return Ok(sqls);
+    };
+    let given = sql_param.split(',').collect::<Vec<&str>>();
+    if given.len() > sqls.len() {
+        return Err(format!(
+            "{} sql entries given for {} streams",
+            given.len(),
+            sqls.len()
+        ));
+    }
+    for (slot, sql) in sqls.iter_mut().zip(given) {
+        if let Ok(sql) = base64::decode_url(sql) {
+            *slot = sql;
+        }
+    }
+    Ok(sqls)
 }
 
 /// SearchStreamMulti HTTP2 streaming endpoint
@@ -2197,5 +2242,30 @@ mod tests {
             queries[0].query.query_fn.is_some(),
             "per_query_response=false should always set query_fn on requests"
         );
+    }
+
+    #[tokio::test]
+    async fn test_around_multi_rejects_more_sqls_than_streams() {
+        use axum::{
+            extract::{Path, Query},
+            http::{HeaderMap, StatusCode},
+        };
+        use config::utils::base64;
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let sql = base64::encode_url("SELECT * FROM \"a\"");
+        let query = HashMap::from([("sql".to_string(), format!("{sql},{sql}"))]);
+        let resp = super::around_multi(
+            Path(("default".to_string(), base64::encode_url("a"))),
+            HeaderMap::new(),
+            Query(query),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }
