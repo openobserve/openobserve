@@ -23,6 +23,7 @@ import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 import Vector from "@/components/ingestion/logs/Vector.vue";
 import Curl from "@/components/ingestion/logs/Curl.vue";
+import KinesisFirehose from "@/components/ingestion/logs/KinesisFirehose.vue";
 import AWSConfig from "@/components/ingestion/recommended/AWSConfig.vue";
 import GCPConfig from "@/components/ingestion/recommended/GCPConfig.vue";
 import AzureConfig from "@/components/ingestion/recommended/AzureConfig.vue";
@@ -195,6 +196,22 @@ const useIngestionRoutes = () => {
                   path: "vector",
                   name: "vector",
                   component: Vector,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "kinesisfirehose",
+                  name: "kinesisfirehose",
+                  component: KinesisFirehose,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "gcp",
+                  name: "gcpLogs",
+                  component: GCPConfig,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },

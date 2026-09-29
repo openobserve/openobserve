@@ -29,6 +29,7 @@ import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { b64EncodeStandard } from "@/utils/zincutils";
+import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import useIngestion from "@/composables/useIngestion";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -67,6 +68,7 @@ const subs = computed<CardSubstitutions>(() => {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
     token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    isPrimaryCloud: isPrimaryCloudWebUrl(store.state.zoConfig?.web_url),
   };
 });
 

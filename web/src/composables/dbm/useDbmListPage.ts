@@ -146,6 +146,8 @@ export function useDbmListPage(options: DbmListPageOptions) {
 
   const loading = ref(false);
   const error = ref<string | null>(null);
+  // A 403 on a page without its own permission diagnosis: the table shows "no access", not the raw error.
+  const forbidden = ref(false);
   const search = ref("");
 
   /**
@@ -184,6 +186,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
     const token = requestSeq.begin();
     loading.value = true;
     error.value = null;
+    forbidden.value = false;
     scope.refresh();
     runOptions.before?.();
 
@@ -203,6 +206,8 @@ export function useDbmListPage(options: DbmListPageOptions) {
         runOptions.onNotCollecting();
       } else if (status === 403 && runOptions.onForbidden) {
         runOptions.onForbidden();
+      } else if (status === 403) {
+        forbidden.value = true;
       } else if (runOptions.onError) {
         runOptions.onError(serverMessage, err);
       } else {
@@ -299,6 +304,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
     tabCountsContext,
     loading,
     error,
+    forbidden,
     search,
     lastRunAt,
     org,

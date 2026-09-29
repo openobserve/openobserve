@@ -201,6 +201,11 @@ export default class DashboardactionPage {
     ]).catch(() => {});
   }
 
+  async getErrorToastText() {
+    await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
+    return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
+  }
+
   /**
    * Discard the current panel and return to the dashboard view page.
    * Use this for teardown when the panel intentionally holds an

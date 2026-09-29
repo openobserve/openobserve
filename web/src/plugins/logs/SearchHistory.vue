@@ -39,11 +39,13 @@
         </div>
       </div>
       <div class="[&_#date-time-button]:h-9!">
+        <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <DateTime
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
           auto-apply
           menu-align="end"
+          :hide-range-shift="isMobile"
           :default-type="searchObj.data.datetime.type"
           @on:date-change="updateDateTime"
         />
@@ -308,6 +310,7 @@ import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
 
@@ -363,6 +366,7 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
     const { searchObj } = searchState();
@@ -752,6 +756,7 @@ export default defineComponent({
       getManager()?.setScope("logs");
     });
     return {
+      isMobile,
       searchObj,
       activeStreamType,
       activeStreamName,
