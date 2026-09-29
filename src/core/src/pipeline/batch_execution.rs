@@ -1654,6 +1654,7 @@ async fn process_llm_evaluation_node(
                         error_kind: None,
                         error_message: None,
                         skip_reason: Some("sampling".to_string()),
+                        prompt_attribution: None,
                         prompt: None,
                         response: None,
                     },

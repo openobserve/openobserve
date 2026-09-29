@@ -57,12 +57,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :frame="false"
       :loading="loading"
+      :error="error || null"
       show-index
+      :global-filter="search"
       :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-unrouted-queue"
+      :persist-columns="true"
+      :enable-column-resize="true"
       data-test="oncall-unrouted-table"
     >
+      <template v-if="$slots.toolbar" #toolbar><slot name="toolbar" /></template>
+      <template v-if="$slots['toolbar-trailing']" #toolbar-trailing>
+        <slot name="toolbar-trailing" />
+      </template>
+
+      <!-- Inside the table, so the host's toolbar — and the way back to the other tab — stays up. -->
+      <template #error>
+        <OEmptyState
+          size="inline"
+          variant="error"
+          :title="error || undefined"
+          :action-label="t('oncall.retry')"
+          data-test="oncall-unrouted-error"
+          @action="emit('retry')"
+        />
+      </template>
+
       <template #cell-signal="{ row }">
         <span class="flex min-w-0 items-center gap-2">
           <!-- Dismissing stamps the field and keeps the row — the evidence that
@@ -150,7 +171,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Silence here is the good outcome, so it gets a sentence rather than
            an empty panel somebody has to interpret. -->
       <template #empty>
+        <!-- An empty search result says nothing about whether alerts reached a team. -->
         <OEmptyState
+          v-if="search"
+          size="hero"
+          preset="no-data"
+          :filtered="!!search"
+          data-test="oncall-unrouted-empty"
+          @action="onEmptyAction"
+        />
+        <OEmptyState
+          v-else
           size="inline"
           preset="no-data"
           :title="t('oncall.unroutedNoneTitle')"
@@ -194,6 +225,9 @@ const props = withDefaults(
     /** Hosts that already name the section — a tab strip, a page header — turn
      *  the title row off rather than repeat themselves. */
     showHeader?: boolean;
+    search?: string;
+    /** The queue's own failure, shown in the table body with a Retry. */
+    error?: I18nText | "";
   }>(),
   {
     signals: () => [],
@@ -202,6 +236,8 @@ const props = withDefaults(
     loading: false,
     claiming: false,
     showHeader: true,
+    search: "",
+    error: "",
   },
 );
 
@@ -209,6 +245,8 @@ const emit = defineEmits<{
   (e: "claim", signal: UnroutedSignal): void;
   (e: "claim-all", signals: UnroutedSignal[]): void;
   (e: "dismiss", signal: UnroutedSignal): void;
+  (e: "retry"): void;
+  (e: "clear-search"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -224,12 +262,14 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     id: "path",
     header: t("oncall.unroutedPath"),
     sortable: false,
+    hideable: true,
     accessorFn: (row: UnroutedSignal) => routablePathOf(row),
   },
   {
     id: "fires",
     header: t("oncall.unroutedFiresHeader"),
     size: 150,
+    hideable: true,
     accessorFn: (row: UnroutedSignal) => row.occurrences,
   },
   {
@@ -237,7 +277,12 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     header: t("oncall.unroutedOutcome"),
     size: 170,
     sortable: false,
-    accessorFn: (row: UnroutedSignal) => row.defaulted_team_id ?? "",
+    hideable: true,
+    // The team's name, not its id: search has to match what the cell shows.
+    accessorFn: (row: UnroutedSignal) =>
+      row.defaulted_team_id
+        ? teamNameOf(row.defaulted_team_id)
+        : String(t("oncall.unroutedPagedNobody")),
   },
   {
     id: "actions",
@@ -281,5 +326,9 @@ function teamNameOf(teamId: string): string {
 function routablePathOf(signal: UnroutedSignal): string {
   const kept = identityDimensions(signal.dimensions);
   return Object.keys(kept).length ? dimensionsSentence(kept) : pathOf(signal);
+}
+
+function onEmptyAction(id?: string) {
+  if (id === "clear-filters") emit("clear-search");
 }
 </script>

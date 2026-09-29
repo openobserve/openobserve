@@ -38,6 +38,7 @@ impl StreamServiceImpl {
             storage_size: stats.storage_size,
             compressed_size: stats.compressed_size,
             index_size: stats.index_size,
+            mindex_size: stats.mindex_size,
         }
     }
 
@@ -156,10 +157,13 @@ mod tests {
             storage_size: 1024.0,
             compressed_size: 512.0,
             index_size: 256.0,
+            mindex_size: 37.0,
         };
 
         let proto_stats = StreamServiceImpl::convert_to_stream_stats(&mock_stats);
 
+        assert_eq!(proto_stats.mindex_size, 37.0);
+        assert_eq!(proto_stats.index_size, 256.0);
         assert_eq!(proto_stats.created_at, mock_stats.created_at);
         assert_eq!(proto_stats.doc_time_min, mock_stats.doc_time_min);
         assert_eq!(proto_stats.doc_time_max, mock_stats.doc_time_max);

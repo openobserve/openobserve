@@ -106,13 +106,17 @@ jobs:
           WRITE: ${{ steps.ctx.outputs.write }}
           ACTOR: ${{ steps.ctx.outputs.actor }}
         run: |
+          # One trace id spans the OSS dispatch → the ENT engine run, so the whole flow is
+          # one OpenObserve trace. The engine mints its own if this is empty.
+          TRACE_ID=$(openssl rand -hex 16)
           gh workflow run test-assist.yml --repo openobserve/o2-enterprise \
             -f source_repo=openobserve \
             -f issue_number="$ISSUE" \
             -f fixture_mode="$FIXTURE" \
             -f write_mode="$WRITE" \
-            -f actor="$ACTOR"
-          echo "Dispatched Test-Assist engine for openobserve issue #$ISSUE (fixture=$FIXTURE, write=$WRITE, by @$ACTOR)."
+            -f actor="$ACTOR" \
+            -f o2_trace_id="$TRACE_ID"
+          echo "Dispatched Test-Assist engine for openobserve issue #$ISSUE (fixture=$FIXTURE, write=$WRITE, by @$ACTOR, trace=$TRACE_ID)."
 
       - name: Acknowledge on the source issue
         # success() => only ack if the dispatch actually succeeded (don't mislead the commenter if

@@ -33,11 +33,13 @@ cloud = [
     "stream/cloud",
 ]
 vectorscan = [
+    "enrichment-data/vectorscan",
     "openobserve-core/vectorscan",
     "promql-service/vectorscan",
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
+profiling = ["openobserve-core/profiling"]
 
 [dependencies]
 audit.workspace = true
@@ -67,6 +69,7 @@ chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
 futures.workspace = true
+http.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
@@ -77,6 +80,8 @@ o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
 prometheus.workspace = true
+rand.workspace = true
+sea-orm.workspace = true
 proto.workspace = true
 regex.workspace = true
 report_server.workspace = true

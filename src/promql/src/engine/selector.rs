@@ -39,13 +39,42 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 use super::Engine;
 use crate::{
     ast::rewrite::remove_filter_all,
-    micros,
+    functions, micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     utils::{metric_name, offset_micros},
 };
 
 /// One context per selected schema with its scan stats and whether the matchers still apply.
 pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
+
+/// What an instant selection emits at each step for the sample it picks there.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SelectorOutput {
+    Value,
+    /// The sample's own time in seconds, as `timestamp()` of a selector reads it.
+    SampleTimestamp,
+}
+
+impl SelectorOutput {
+    pub(super) fn project(self, sample: &Sample) -> f64 {
+        match self {
+            Self::Value => sample.value,
+            Self::SampleTimestamp => functions::timestamp_seconds(sample.timestamp),
+        }
+    }
+
+    pub(super) fn keep_metric_name(self) -> bool {
+        self == Self::Value
+    }
+
+    fn labels(self, labels: Labels) -> Labels {
+        if self.keep_metric_name() {
+            labels
+        } else {
+            labels.without_metric_name()
+        }
+    }
+}
 
 impl Engine {
     pub(super) fn selector_time_range(
@@ -72,18 +101,57 @@ impl Engine {
         selector: &VectorSelector,
         time_range: (i64, i64),
         labels: &hashbrown::HashSet<String>,
+        prefer_blocks: bool,
     ) -> Result<SelectorContexts> {
-        self.ctx
-            .table_provider
-            .create_context(
-                &self.ctx.query_ctx.org_id,
-                selector.name.as_deref().unwrap(),
-                time_range,
-                selector.matchers.clone(),
-                labels.clone(),
-                &mut equal_matcher_filters(&selector.matchers),
-            )
-            .await
+        let org_id = &self.ctx.query_ctx.org_id;
+        let name = selector.name.as_deref().unwrap();
+        let matchers = selector.matchers.clone();
+        let mut filters = equal_matcher_filters(&selector.matchers);
+        if prefer_blocks {
+            self.ctx
+                .table_provider
+                .create_context_prefer_blocks(
+                    org_id,
+                    name,
+                    time_range,
+                    matchers,
+                    labels.clone(),
+                    &mut filters,
+                )
+                .await
+        } else {
+            self.ctx
+                .table_provider
+                .create_context(
+                    org_id,
+                    name,
+                    time_range,
+                    matchers,
+                    labels.clone(),
+                    &mut filters,
+                )
+                .await
+        }
+    }
+
+    /// An instant selector, streamed when the layout allows it; `None` when nothing is selected.
+    pub(super) async fn exec_vector_selector(
+        &mut self,
+        vs: &VectorSelector,
+        output: SelectorOutput,
+    ) -> Result<Value> {
+        let data = match self.try_streaming_instant_selector(vs, output).await? {
+            Some(data) => data,
+            None => {
+                let vs = plain_selector(vs, "VectorSelector")?;
+                self.eval_vector_selector(&vs, None, output).await?
+            }
+        };
+        Ok(if data.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(data)
+        })
     }
 
     /// Instant vector selector --- select a single sample at each evaluation
@@ -94,6 +162,7 @@ impl Engine {
         &mut self,
         selector: &VectorSelector,
         ctxs: Option<SelectorContexts>,
+        output: SelectorOutput,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
@@ -112,8 +181,19 @@ impl Engine {
         let eval_timestamps = self.eval_ctx.timestamps();
 
         let lookback_delta = self.ctx.lookback_delta;
-        // exemplar series carry no samples, so they must survive an empty selection
-        let keep_sampleless = self.ctx.query_ctx.query_exemplars;
+        // Exemplar series carry no samples, so there is nothing to select at each timestamp.
+        if self.ctx.query_ctx.query_exemplars {
+            return Ok(metrics_cache
+                .into_iter()
+                .map(|metric| RangeValue {
+                    labels: metric.labels,
+                    samples: Vec::new(),
+                    exemplars: metric.exemplars,
+                    time_window: metric.time_window,
+                })
+                .collect());
+        }
+
         // every series selects independently, so fan the selection out
         let result = metrics_cache.into_par_iter().filter_map(|metric| {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
@@ -141,16 +221,14 @@ impl Engine {
                     None
                 };
 
-                // Add the matched sample (already validated to be within range)
                 if let Some(sample) = match_sample {
-                    // Use eval_ts as the timestamp for the selected sample
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    selected_samples.push(Sample::new(eval_ts, sample.value));
+                    selected_samples.push(Sample::new(eval_ts, output.project(sample)));
                 }
             }
 
-            (keep_sampleless || !selected_samples.is_empty()).then_some(RangeValue {
-                labels: metric.labels,
+            let labels = output.labels(metric.labels);
+            (!selected_samples.is_empty()).then_some(RangeValue {
+                labels,
                 samples: selected_samples,
                 exemplars: metric.exemplars,
                 time_window: metric.time_window,
@@ -311,7 +389,7 @@ impl Engine {
         let ctxs = match ctxs {
             Some(ctxs) => ctxs,
             None => {
-                self.create_selector_contexts(selector, (start, end), &label_selector)
+                self.create_selector_contexts(selector, (start, end), &label_selector, false)
                     .await?
             }
         };
@@ -684,7 +762,10 @@ mod tests {
             at: None,
         };
 
-        engine.eval_vector_selector(&selector, None).await.unwrap();
+        engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await
+            .unwrap();
 
         let matchers = captured.lock().unwrap().take().unwrap();
         assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
@@ -722,7 +803,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -758,7 +841,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -794,7 +879,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -867,7 +954,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
 
         assert!(result.is_err(), "expected an error, not a panic");
         assert!(
@@ -1027,7 +1116,10 @@ mod tests {
             at: None,
         };
 
-        let values = engine.eval_vector_selector(&selector, None).await.unwrap();
+        let values = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await
+            .unwrap();
         assert_eq!(values.len(), 1);
         assert!(values[0].samples.is_empty());
         assert_eq!(values[0].exemplars.as_ref().unwrap().len(), 1);

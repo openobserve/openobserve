@@ -106,6 +106,8 @@ vi.mock("@/constants/config", () => ({
 const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 const mockRouterBack = vi.fn();
+// Captures the leave guard ViewDashboard registers so tests can invoke it.
+const routeLeaveGuards: Array<() => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
@@ -131,6 +133,9 @@ vi.mock("vue-router", () => ({
       },
     },
   }),
+  onBeforeRouteLeave: (guard: () => unknown) => {
+    routeLeaveGuards.push(guard);
+  },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
     query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
@@ -645,6 +650,31 @@ describe("ViewDashboard", () => {
       // Manually trigger the method to test print mode functionality
       await wrapper.vm.printDashboard();
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", true);
+    });
+
+    it("should clear print mode when leaving the page without the close button", async () => {
+      routeLeaveGuards.length = 0;
+      wrapper = createWrapper();
+      await flushPromises();
+      Object.assign(global.mockStoreState, { printMode: true });
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.forEach((guard) => guard());
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", false);
+      Object.assign(global.mockStoreState, { printMode: false });
+    });
+
+    it("should not touch print mode on leave when it is already off", async () => {
+      routeLeaveGuards.length = 0;
+      wrapper = createWrapper();
+      await flushPromises();
+      Object.assign(global.mockStoreState, { printMode: false });
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.forEach((guard) => guard());
+
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setPrintMode", expect.anything());
     });
 
     it("should show correct print button icon based on print mode", async () => {
