@@ -170,9 +170,12 @@ impl SsrfGuard {
         }
 
         let port = parsed.port_or_known_default().unwrap_or(80);
-        let addrs = tokio::net::lookup_host((host, port))
-            .await
-            .map_err(|e| format!("Failed to resolve host {}: {}", host, e))?;
+        let addrs = match tokio::net::lookup_host((host, port)).await {
+            Ok(addrs) => addrs,
+            // SsrfDnsResolver still checks every address at connect time.
+            Err(_) if allow_loopback => return Ok(()),
+            Err(e) => return Err(format!("Failed to resolve host {}: {}", host, e)),
+        };
 
         let mut saw_any = false;
         for sa in addrs {
@@ -180,7 +183,7 @@ impl SsrfGuard {
             Self::check_ip_inner(&sa.ip(), allow_loopback)?;
         }
 
-        if !saw_any {
+        if !saw_any && !allow_loopback {
             return Err(format!("Host {} resolved to no addresses", host));
         }
 
@@ -406,6 +409,22 @@ mod tests {
             let res = SsrfGuard::validate_url_async_inner(url, true, false).await;
             assert!(res.is_err(), "{url} must be rejected");
         }
+    }
+
+    #[tokio::test]
+    async fn test_async_allow_loopback_passes_unresolvable_host() {
+        let unresolvable = "http://no-such-host.invalid/";
+        let res = SsrfGuard::validate_url_async_inner(unresolvable, true, false).await;
+        assert!(res.is_ok(), "{res:?}");
+        let res = SsrfGuard::validate_url_async_inner("http://10.0.0.1/", true, false).await;
+        assert!(res.is_err());
+        let res = SsrfGuard::validate_url_async_inner("http://127.0.0.1/", true, false).await;
+        assert!(res.is_ok(), "{res:?}");
+        let res = SsrfGuard::validate_url_async_inner(unresolvable, false, false).await;
+        assert!(
+            res.is_err(),
+            "the default path must still reject an unresolvable host"
+        );
     }
 
     #[tokio::test]
