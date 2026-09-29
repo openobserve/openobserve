@@ -30,6 +30,16 @@ pub async fn get_prompt(org_id: &str, entity_id: &str) -> Result<Prompt, PromptE
     prompt_from_model(db, model, true).await
 }
 
+pub async fn entity_id_by_name(org_id: &str, name: &str) -> Result<Option<String>, PromptError> {
+    let Ok(name) = validate_prompt_name(name) else {
+        return Ok(None);
+    };
+    let db = infra::db::get_orm_client_ro().await;
+    Ok(llm_prompts::get_head_by_name(db, org_id, &name)
+        .await?
+        .map(|head| head.entity_id))
+}
+
 pub async fn list_prompts(
     org_id: &str,
     include_archived: bool,
