@@ -76,22 +76,7 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
                             if field.is_empty() {
                                 None
                             } else {
-                                field.sort_by(|a, b| {
-                                    // Assuming the array having elements of same type
-                                    if a.is_f64() {
-                                        a.as_f64().unwrap().total_cmp(b.as_f64().as_ref().unwrap())
-                                    } else if a.is_i64() {
-                                        a.as_i64().unwrap().cmp(b.as_i64().as_ref().unwrap())
-                                    } else if a.is_u64() {
-                                        a.as_u64().unwrap().cmp(b.as_u64().as_ref().unwrap())
-                                    } else if a.is_string() {
-                                        a.as_str().unwrap().cmp(b.as_str().unwrap())
-                                    } else if a.is_boolean() {
-                                        a.as_bool().unwrap().cmp(b.as_bool().as_ref().unwrap())
-                                    } else {
-                                        Ordering::Less
-                                    }
-                                });
+                                field.sort_by(json_total_cmp);
                                 json::to_string(&field).ok()
                             }
                         } else {
@@ -105,6 +90,33 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.
     Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+}
+
+/// Rank used to order values of different JSON types in [`json_total_cmp`].
+fn type_rank(value: &json::Value) -> u8 {
+    match value {
+        json::Value::Null => 0,
+        json::Value::Bool(_) => 1,
+        json::Value::Number(_) => 2,
+        json::Value::String(_) => 3,
+        json::Value::Array(_) => 4,
+        json::Value::Object(_) => 5,
+    }
+}
+
+/// Total order over arbitrary JSON values, shared by `arrsort` and `arr_descending`.
+pub(crate) fn json_total_cmp(a: &json::Value, b: &json::Value) -> Ordering {
+    match (a, b) {
+        (json::Value::Number(a), json::Value::Number(b)) => match (a.as_f64(), b.as_f64()) {
+            (Some(a), Some(b)) => a.total_cmp(&b),
+            // arbitrary_precision numbers with no f64 representation: compare their text form.
+            _ => a.to_string().cmp(&b.to_string()),
+        },
+        (json::Value::String(a), json::Value::String(b)) => a.cmp(b),
+        (json::Value::Bool(a), json::Value::Bool(b)) => a.cmp(b),
+        (json::Value::Null, json::Value::Null) => Ordering::Equal,
+        _ => type_rank(a).cmp(&type_rank(b)),
+    }
 }
 
 #[cfg(test)]
@@ -356,5 +368,59 @@ mod tests {
         // Test with multiple arguments
         let result = ctx.sql("select arrsort('a', 'b') as ret").await;
         assert!(result.is_err());
+    }
+
+    fn call_arr_sort(json_array: &str) -> String {
+        let input = StringArray::from(vec![json_array]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_sort_impl(&args).unwrap();
+        match result {
+            ColumnarValue::Array(out) => out
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .value(0)
+                .to_string(),
+            _ => panic!("expected array result"),
+        }
+    }
+
+    #[test]
+    fn test_arr_sort_mixed_number_and_string_does_not_panic() {
+        call_arr_sort(r#"[1.5,"a"]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_float_and_int_does_not_panic() {
+        call_arr_sort(r#"[2.5,1]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_negative_and_huge_unsigned_does_not_panic() {
+        call_arr_sort(r#"[-1,18446744073709551615]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_null_mixed_with_strings_does_not_panic() {
+        call_arr_sort(r#"[null,"a","b"]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_large_shuffled_mixed_type_array_does_not_panic() {
+        use rand::prelude::SliceRandom;
+
+        let mut values: Vec<json::Value> = Vec::with_capacity(200);
+        for i in 0..200 {
+            values.push(match i % 5 {
+                0 => json::Value::from(i as i64),
+                1 => json::Value::from(i as f64 + 0.5),
+                2 => json::Value::from(format!("s{i}")),
+                3 => json::Value::Bool(i % 2 == 0),
+                _ => json::Value::Null,
+            });
+        }
+        values.shuffle(&mut rand::rng());
+        let json_array = json::to_string(&values).unwrap();
+        call_arr_sort(&json_array);
     }
 }
