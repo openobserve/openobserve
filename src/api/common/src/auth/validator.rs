@@ -1303,13 +1303,10 @@ async fn oo_validator_internal(
             Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
         } else {
             log::debug!("Auth ext token found: decoding");
-            let decoded = match base64::decode(
-                auth_tokens
-                    .auth_ext
-                    .strip_prefix("auth_ext")
-                    .unwrap()
-                    .trim(),
-            ) {
+            let Some(encoded) = auth_tokens.auth_ext.strip_prefix("auth_ext") else {
+                return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+            };
+            let decoded = match base64::decode(encoded.trim()) {
                 Ok(val) => val,
                 Err(_) => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
             };
@@ -1463,6 +1460,33 @@ mod tests {
 
         let result = oo_validator(&req_data, &auth_info).await;
         assert!(matches!(result, Err(AuthError::Unauthorized(_))));
+    }
+
+    #[tokio::test]
+    async fn auth_ext_token_without_its_prefix_is_rejected() {
+        let now = Utc::now().timestamp();
+        let req_data = RequestData {
+            uri: "/api/default/streams".parse::<Uri>().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        for auth in [
+            format!(
+                r#"{{"auth_ext":"x","refresh_token":"","request_time":{now},"expires_in":300}}"#
+            ),
+            format!(
+                r#"{{"refresh_token":"","expires_in":300,"request_time":{now},"auth_ext":"x"}}"#
+            ),
+        ] {
+            let auth_info = AuthExtractor::bypass(auth.clone(), String::new());
+            assert!(
+                matches!(
+                    oo_validator(&req_data, &auth_info).await,
+                    Err(AuthError::Unauthorized(_))
+                ),
+                "{auth} must be refused"
+            );
+        }
     }
 
     #[tokio::test]
