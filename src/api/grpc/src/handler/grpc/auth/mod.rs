@@ -18,9 +18,9 @@ use config::meta::cluster::get_internal_grpc_token;
 use db::{org_users::get_cached_user_org, user::is_root_user};
 use http_auth_basic::Credentials;
 use infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX;
-use openobserve_core::auth::try_get_hash;
 #[cfg(test)]
 use openobserve_core::auth::get_hash;
+use openobserve_core::auth::try_get_hash;
 use tonic::{
     Request, Status,
     metadata::{MetadataMap, MetadataValue},
@@ -529,11 +529,19 @@ pub(crate) mod tests {
 
     #[test]
     fn test_empty_password_does_not_match_empty_token() {
-        seed_org_user("auth-empty-token", "empty-token@example.com", "Pass#123", "");
+        seed_org_user(
+            "auth-empty-token",
+            "empty-token@example.com",
+            "Pass#123",
+            "",
+        );
 
-        let status =
-            check_auth(basic_request("auth-empty-token", "empty-token@example.com", ""))
-                .unwrap_err();
+        let status = check_auth(basic_request(
+            "auth-empty-token",
+            "empty-token@example.com",
+            "",
+        ))
+        .unwrap_err();
         assert_eq!(status.code(), tonic::Code::Unauthenticated);
     }
 
@@ -572,8 +580,8 @@ pub(crate) mod tests {
             },
         );
 
-        let status = check_auth(basic_request("auth-sso", "sso@example.com", "anything"))
-            .unwrap_err();
+        let status =
+            check_auth(basic_request("auth-sso", "sso@example.com", "anything")).unwrap_err();
         assert_eq!(status.code(), tonic::Code::Unauthenticated);
     }
 }
