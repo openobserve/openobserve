@@ -22,7 +22,7 @@
  * gateway (grpc.openobserve.ai) is live. Other cloud regions fall back to the
  * self-hosted-only gRPC guidance until their own gateway ships.
  */
-export const PRIMARY_CLOUD_WEB_URL = "https://cloud.openobserve.ai";
+export const PRIMARY_CLOUD_WEB_URL = "https://alpha.common-dev.external.zinclabs.dev";
 
 export function isPrimaryCloudWebUrl(webUrl?: string | null): boolean {
   return webUrl === PRIMARY_CLOUD_WEB_URL;
