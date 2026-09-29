@@ -156,8 +156,8 @@ fn router_with_secret(secret: String) -> Router {
         }))
 }
 
-/// A blank configured secret means the standalone `o2_report_server` deployments that don't
-/// send this header yet must keep working, so the check is skipped entirely.
+/// A blank secret skips the check, since standalone `o2_report_server` doesn't send this header
+/// yet.
 async fn require_shared_secret(secret: &str, request: Request, next: Next) -> Response {
     if secret.is_empty() {
         return next.run(request).await;
