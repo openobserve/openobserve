@@ -411,6 +411,7 @@ pub async fn send_grouped_notification(
             // part of that fingerprint, so the whole batch is one group.
             batch.group_labels.as_ref(),
             &[],
+            None,
         )
         .await
     {

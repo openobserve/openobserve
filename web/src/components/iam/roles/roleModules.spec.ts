@@ -109,6 +109,12 @@ describe("buildRoleModules - grouping", () => {
   });
 
   // Synthetic Environments arrived after the group map was written; unmapped, it would sit under Other.
+  it("groups prompts with AI", () => {
+    const modules = buildRoleModules([{ key: "prompt", parent: "", has_entities: false }]);
+    expect(modules[0].group).toBe("ai");
+    expect(modules[0].icon).toBe("edit-note");
+  });
+
   it("groups synthetic environments with monitoring", () => {
     const modules = buildRoleModules([
       { key: "synthetic_environment", parent: "", has_entities: true },

@@ -438,3 +438,28 @@ describe("Prebuilt Templates Index", () => {
     });
   });
 });
+
+// These bodies are a THIRD copy of the shipped templates, after
+// config/prebuilt-destinations.json and the Rust builtin in prebuilt_loader.rs.
+// They are the fallback the destination preview and its copy action render when
+// the backend's cached template is not loaded, so a user reads them and pastes
+// them into their own template. A body with no {alert_status} renders a
+// recovery byte-identical to the firing it answers, and the alert save then
+// refuses it — for a template the user copied from us.
+describe("prebuilt template bodies can announce a recovery", () => {
+  const bodies = Object.entries(PREBUILT_CONFIGS).map(
+    ([name, cfg]) => [name, cfg.templateBody] as [string, string],
+  );
+
+  it("covers every prebuilt type", () => {
+    expect(bodies.length).toBe(PREBUILT_DESTINATION_TYPES.length);
+  });
+
+  it.each(bodies)("%s carries {alert_status}", (_name, body) => {
+    expect(body).toContain("{alert_status}");
+  });
+
+  it.each(bodies)("%s hardcodes no status that would lie on recovery", (_name, body) => {
+    expect(body.toLowerCase()).not.toContain("firing");
+  });
+});

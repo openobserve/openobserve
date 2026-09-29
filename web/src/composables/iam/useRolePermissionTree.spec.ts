@@ -325,6 +325,14 @@ describe("useRolePermissionTree - modifyResourcePermissions new resource types",
     expect(r.permission.AllowDelete.show).toBe(true);
   });
 
+  it("prompt hides AllowDelete only", () => {
+    const r = makeResource("prompt");
+    modifyResourcePermissions(r);
+    expect(r.permission.AllowDelete.show).toBe(false);
+    expect(r.permission.AllowGet.show).toBe(true);
+    expect(r.permission.AllowPut.show).toBe(true);
+  });
+
   it("logs_pattern and logs_insights have identical permission restrictions", () => {
     const r1 = makeResource("logs_pattern");
     const r2 = makeResource("logs_insights");

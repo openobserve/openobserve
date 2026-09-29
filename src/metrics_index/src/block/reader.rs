@@ -18,8 +18,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, Int64Array, RecordBatch, RecordBatchOptions, UInt32Array,
-        UInt64Array,
+        Array, ArrayRef, Int64Array, RecordBatch, RecordBatchOptions, UInt32Array, UInt64Array,
     },
     datatypes::Schema,
 };
@@ -106,14 +105,12 @@ impl BlockDecoder {
         let planes: [&[u8]; 8] =
             std::array::from_fn(|byte| &value_bytes[byte * count..(byte + 1) * count]);
         let mut previous: Option<i64> = None;
-        let mut strictly_increasing = true;
         for (i, bytes) in timestamp_bytes.chunks_exact(8).enumerate() {
             // chunks_exact guarantees the width; no unchecked reads or casts.
             let encoded = i64::from_le_bytes(bytes.try_into().expect("8-byte timestamp chunk"));
             let timestamp = previous.map_or(encoded, |last| last.wrapping_add(encoded));
             if let Some(last) = previous {
                 ensure!(timestamp >= last, "decoded timestamps decreased");
-                strictly_increasing &= timestamp > last;
             }
             previous = Some(timestamp);
             self.timestamps.push(timestamp);
@@ -132,10 +129,6 @@ impl BlockDecoder {
             self.timestamps[0] == block.min_timestamp
                 && self.timestamps[count - 1] == block.max_timestamp,
             "decoded timestamp bounds mismatch"
-        );
-        ensure!(
-            strictly_increasing == block.strictly_increasing,
-            "decoded strictness mismatch"
         );
         Ok(())
     }
@@ -168,9 +161,70 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
         )?);
     }
     let blocks = decode_directory(&arrays, &header.parent, header.blocks_end)?;
+    let labels = decode_labels(header, &columns[1..], &projection, &mut decoder)?;
+    for i in 1..rows {
+        if blocks.block(i).hash == blocks.block(i - 1).hash {
+            for column in labels.columns() {
+                ensure!(
+                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
+                    "label metadata changes within one series"
+                );
+            }
+        }
+    }
+    Ok(Index {
+        base: Arc::new(IndexBase {
+            row_group_size: header.row_group_size,
+            parent: header.parent.clone(),
+            source_schema: Arc::clone(&header.source_schema),
+            blocks,
+            header: header.clone(),
+        }),
+        labels,
+        missing,
+    })
+}
+
+pub fn decode_additional_labels(
+    prior: &Index,
+    columns: &[Bytes],
+    names: &[String],
+) -> Result<Index> {
+    let header = &prior.base.header;
+    let (projection, missing) = header.projection(names)?;
+    ensure!(
+        columns.len() == projection.len(),
+        "MIDX label count mismatch"
+    );
+    let mut decoder = super::compact::frame_decoder()?;
+    let labels = decode_labels(header, columns, &projection, &mut decoder)?;
+    for i in 1..header.blocks {
+        if prior.blocks.block(i).hash == prior.blocks.block(i - 1).hash {
+            for column in labels.columns() {
+                ensure!(
+                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
+                    "label metadata changes within one series"
+                );
+            }
+        }
+    }
+    Ok(Index {
+        base: Arc::clone(&prior.base),
+        labels,
+        missing,
+    })
+}
+
+fn decode_labels(
+    header: &Header,
+    columns: &[Bytes],
+    projection: &[usize],
+    decoder: &mut zstd::bulk::Decompressor<'static>,
+) -> Result<RecordBatch> {
+    let rows = header.blocks;
     let mut fields = Vec::with_capacity(projection.len());
     let mut label_columns: Vec<ArrayRef> = Vec::with_capacity(projection.len());
-    for (bytes, index) in columns[1..].iter().zip(&projection) {
+    for (bytes, index) in columns.iter().zip(projection) {
         let label = &header.labels[*index];
         ensure!(
             bytes.len() as u64 == label.column.range.end - label.column.range.start,
@@ -178,7 +232,7 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
         );
         let field = header.source_schema.field_with_name(&label.name)?;
         let column = super::compact::decode_frame(
-            &mut decoder,
+            decoder,
             bytes,
             label.column.raw,
             field.data_type(),
@@ -193,29 +247,11 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
         ));
         label_columns.push(column);
     }
-    let labels = RecordBatch::try_new_with_options(
+    Ok(RecordBatch::try_new_with_options(
         Arc::new(Schema::new(fields)),
         label_columns,
         &RecordBatchOptions::new().with_row_count(Some(rows)),
-    )?;
-    for i in 1..rows {
-        if blocks.block(i).hash == blocks.block(i - 1).hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
-    Ok(Index {
-        row_group_size: header.row_group_size,
-        parent: header.parent.clone(),
-        source_schema: Arc::clone(&header.source_schema),
-        blocks,
-        labels,
-        missing,
-    })
+    )?)
 }
 
 /// Decodes an index from the complete bytes of one MIDX file.
@@ -276,10 +312,6 @@ fn decode_directory(
         .as_any()
         .downcast_ref::<UInt32Array>()
         .context("length type")?;
-    let strict = columns[7]
-        .as_any()
-        .downcast_ref::<BooleanArray>()
-        .context("strict type")?;
     let mut blocks = super::directory::DirectoryBuilder::new(count, parent.rows, blocks_end);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
@@ -293,7 +325,6 @@ fn decode_directory(
             max_timestamp: max_times.value(i),
             block_offset: offsets.value(i),
             block_length: lengths.value(i),
-            strictly_increasing: strict.value(i),
         };
         ensure!(
             block.row_count > 0 && block.row_count as usize <= MAX_BLOCK_ROWS,
@@ -317,13 +348,8 @@ fn decode_directory(
         );
         if block.row_count == 1 {
             ensure!(
-                block.min_timestamp == block.max_timestamp && block.strictly_increasing,
+                block.min_timestamp == block.max_timestamp,
                 "invalid single-sample descriptor"
-            );
-        } else if block.strictly_increasing {
-            ensure!(
-                block.min_timestamp < block.max_timestamp,
-                "invalid strict time bounds"
             );
         }
         next_row = next_row
@@ -374,7 +400,6 @@ mod decoder_tests {
             max_timestamp: samples.last().unwrap().0,
             block_offset: 0,
             block_length: block_bytes.len() as u32,
-            strictly_increasing: samples.windows(2).all(|w| w[0].0 < w[1].0),
         };
         (block_bytes, block)
     }
@@ -443,15 +468,12 @@ mod decoder_tests {
         bad_frame.block_length = bad_zstd.len() as u32;
         let mut bad_endpoint = block.clone();
         bad_endpoint.max_timestamp += 1;
-        let mut bad_strict = block.clone();
-        bad_strict.strictly_increasing = false;
         let mut too_many = block.clone();
         too_many.row_count = MAX_BLOCK_ROWS as u32 + 1;
         for (bytes, metadata) in [
             (&corrupt[..], &block),
             (&bad_zstd[..], &bad_frame),
             (&block_bytes[..], &bad_endpoint),
-            (&block_bytes[..], &bad_strict),
             (&block_bytes[..], &too_many),
         ] {
             assert!(decoder.decode(bytes, metadata).is_err());

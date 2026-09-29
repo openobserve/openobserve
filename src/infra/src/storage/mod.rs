@@ -34,6 +34,7 @@ use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
 pub mod accounts;
 mod local;
+pub(crate) mod range_plan;
 mod remote;
 pub mod wal;
 
@@ -178,6 +179,41 @@ pub async fn get_ranges(
     MULTI_ACCOUNTS
         .get_ranges(account, &file.into(), ranges)
         .await
+}
+
+pub(crate) async fn get_ranges_opt<F, Fut>(ranges: &[Range<u64>], fetch: F) -> Result<Vec<Bytes>>
+where
+    F: FnOnce(Vec<Range<u64>>) -> Fut + Send,
+    Fut: std::future::Future<Output = Result<Vec<Bytes>>> + Send,
+{
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ordered = ranges.iter().all(|range| range.start < range.end)
+        && ranges.windows(2).all(|pair| pair[0].end <= pair[1].start);
+    let plan = if ranges.len() > 1 && ordered {
+        Some(range_plan::plan_coalesced_ranges(ranges).map_err(|error| {
+            object_store::Error::Generic {
+                store: "RangePlan",
+                source: Box::new(std::io::Error::other(error.to_string())),
+            }
+        })?)
+    } else {
+        None
+    };
+    let fetched_ranges = plan
+        .as_ref()
+        .map_or_else(|| ranges.to_vec(), |plan| plan.ranges.clone());
+    let data = fetch(fetched_ranges).await?;
+    match plan {
+        Some(plan) => plan
+            .into_payloads(data)
+            .map_err(|error| object_store::Error::Generic {
+                store: "RangePlan",
+                source: Box::new(std::io::Error::other(error.to_string())),
+            }),
+        None => Ok(data),
+    }
 }
 
 /// Clipped fetches must still contain the start of every requested nonempty subrange.
@@ -590,6 +626,22 @@ impl From<Error> for object_store::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn optimized_ranges_share_one_batch_and_preserve_eof_clipping() {
+        let mut fetched = Vec::new();
+        let result = get_ranges_opt(&[0..2, 4..20], |planned| {
+            fetched = planned;
+            std::future::ready(Ok(vec![Bytes::from_static(b"0123456789")]))
+        })
+        .await
+        .unwrap();
+        assert_eq!(fetched, vec![0..20]);
+        assert_eq!(
+            result,
+            vec![Bytes::from_static(b"01"), Bytes::from_static(b"456789")]
+        );
+    }
 
     #[tokio::test]
     async fn test_coalesce_ranges_checked_order_clipping_and_zero_width() {

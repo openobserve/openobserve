@@ -356,6 +356,14 @@ jobs:
           - label: join_match_one_false
             env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
             target: tests/regression/test_logs_to_logs_join.py
+          # A free-space requirement no runner meets keeps the disk circuit breaker tripped.
+          - label: otlp_grpc_backpressure
+            env: "ZO_DISK_CIRCUIT_BREAKER_ENABLED=true ZO_DISK_CIRCUIT_BREAKER_THRESHOLD=900000000"
+            target: tests/regression/test_otlp_grpc_backpressure.py
+          # Spawns and restarts its own server from target/debug/openobserve.
+          - label: sqlite_meta_invalid_utf8
+            env: ""
+            target: tests/regression/test_sqlite_invalid_utf8_meta_startup.py
     steps:
       - uses: actions/checkout@v5
 

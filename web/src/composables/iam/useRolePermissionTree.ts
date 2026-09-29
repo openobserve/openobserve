@@ -147,6 +147,10 @@ export const useRolePermissionTree = (deps: TreeDeps) => {
       resource.permission.AllowPost.show = false;
       resource.permission.AllowPut.show = false;
     }
+    if (resource.resourceName === "prompt") {
+      // Prompt deletion is archival and label deletion is a pointer update.
+      resource.permission.AllowDelete.show = false;
+    }
   };
 
   const getDefaultResource = (): Resource => {
