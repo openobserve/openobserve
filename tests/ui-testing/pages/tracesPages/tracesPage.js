@@ -83,6 +83,7 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsViewSessionReplayButton = '[data-test="trace-details-view-session-replay-btn"]';
 
     // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
     // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
@@ -391,6 +392,33 @@ export class TracesPage {
 
   async expectTraceDetailsVisible() {
     await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
+  }
+
+  /** `fromUs` / `toUs` are microsecond epoch bounds (traceDetails.utils.ts resolveUrlTimeRange). */
+  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default' }) {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const url = `${baseUrl}/web/traces/trace-details?trace_id=${traceId}&stream=${stream}&from=${fromUs}&to=${toUs}&org_identifier=${org}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async expectTraceTreeSpanOperationName(spanId, operationName) {
+    await expect(this.page.locator(`[data-test="trace-tree-span-operation-name-${spanId}"]`)).toHaveText(operationName, { timeout: 30000 });
+  }
+
+  async expectSessionReplayButtonVisible() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Callers must first prove the RUM bridge span rendered, or an absent button proves nothing. */
+  async expectSessionReplayButtonHidden() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toHaveCount(0);
+  }
+
+  async clickSessionReplayButton() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+    await this.page.locator(this.traceDetailsViewSessionReplayButton).click();
   }
 
   async navigateBackFromTraceDetails() {
@@ -3509,6 +3537,47 @@ export class TracesPage {
    */
   async expectThreadViewContains(text) {
     await expect(this.page.locator(this.llmThreadView)).toContainText(text, { timeout: 15000 });
+  }
+
+  async getResultCountBadgeText() {
+    return ((await this.page.locator(this.tracesCountBadge).first().textContent().catch(() => '')) || '').trim();
+  }
+
+  // The first run can fire before the editor commits a typed filter, and fresh spans lag ingestion.
+  async searchUntilResultCount(expected, timeout = 90000) {
+    await expect(async () => {
+      await this.runTraceSearch();
+      expect(await this.getResultCountBadgeText()).toContain(expected);
+    }).toPass({ timeout, intervals: [2000, 3000, 5000] });
+  }
+
+  async getResultOperationNames() {
+    return await this.page.locator(`${this.searchResultList} [data-test="trace-row-operation-name"]`).allInnerTexts();
+  }
+
+  async getResultSpanStatuses() {
+    return await this.page.locator(`${this.searchResultList} [data-test="span-row-status-pill"]`).allInnerTexts();
+  }
+
+  async getResultPageCount() {
+    return await this.page.locator('[data-test^="traces-search-result-pagination-page-"]').count();
+  }
+
+  async goToResultPage(pageNumber) {
+    await this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`).click();
+  }
+
+  async clickResultPaginationNext() {
+    await this.page.locator('[data-test="traces-search-result-pagination-next"]').click();
+  }
+
+  async clickResultPaginationPrev() {
+    await this.page.locator('[data-test="traces-search-result-pagination-prev"]').click();
+  }
+
+  async setResultRecordsPerPage(size) {
+    await this.page.locator('[data-test="traces-search-result-records-per-page-trigger"]').click();
+    await this.page.getByRole('option', { name: String(size), exact: true }).click();
   }
 
 }

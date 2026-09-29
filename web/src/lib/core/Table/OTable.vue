@@ -1391,6 +1391,10 @@ defineExpose({
             // a leading checkbox/expand/drag gutter supplies the left inset on its
             // own (same token — see the CSS).
             'o2-table--edge-inset',
+            // With no body rows the sticky <thead> has nothing to stick within, so the table itself sticks.
+            props.stickyHeader && props.showHeader && (showEmpty || showForbidden || showError)
+              ? 'sticky top-0 z-10'
+              : '',
           ]"
           :style="{
             ...columnSizeVars,

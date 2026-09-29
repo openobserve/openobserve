@@ -29,6 +29,7 @@ import useCheckWizardUi, {
   VARIABLES_SPLITTER_LIMITS,
 } from "@/composables/synthetics/useCheckWizardUi";
 import CheckDetails from "./CheckDetails.vue";
+import type { VariableSuggestion } from "../variables/suggestions";
 import CheckAuthNetwork from "./CheckAuthNetwork.vue";
 import CheckVariablesPanel from "./CheckVariablesPanel.vue";
 import CheckSchedule from "./CheckSchedule.vue";
@@ -56,6 +57,8 @@ const props = withDefaults(
     loadingLocations?: boolean;
     /** Forwarded verbatim to `CheckDetails`: the hint under the Starting URL field. */
     targetHint?: I18nText;
+    /** Rows offered on `{{` in the target field; the protocol view passes nothing. */
+    variableSuggestions?: VariableSuggestion[];
     /** Host-owned Variables panel state; undefined keeps the panel always open. */
     variablesPanelOpen?: boolean;
   }>(),
@@ -131,6 +134,7 @@ function handleUpdate(value: BrowserCheck) {
               :target-label="targetLabel"
               :target-placeholder="targetPlaceholder"
               :target-hint="targetHint"
+              :variable-suggestions="variableSuggestions"
               data-test="synthetics-check-configure-details"
               @update:check="handleUpdate"
             />

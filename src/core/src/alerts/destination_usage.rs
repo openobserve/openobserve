@@ -800,6 +800,7 @@ mod tests {
             histogram_interval: "1h".to_string(),
             schedule_interval: "5m".to_string(),
             detection_window_seconds: 3600,
+            level_half_width_seconds: None,
             training_window_days: 7,
             retrain_interval_days: 1,
             threshold: 95,

@@ -194,7 +194,8 @@
       "dashboard-variables-default-values-chain.spec.js",
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-variables-stream-field.spec.js",
-      "dashboard-mustache-variables.spec.js"
+      "dashboard-mustache-variables.spec.js",
+      "dashboard-variable-select-all.spec.js"
     ],
     "disabled": []
   },
@@ -259,7 +260,9 @@
       "connectDataSourcePopup.spec.js",
       "otableSelectCell.spec.js",
       "theme.spec.js",
-      "passwordPolicy.spec.js"
+      "passwordPolicy.spec.js",
+      "ingestion-passcode-forbidden.spec.js",
+      "dateTime.spec.js"
     ],
     "disabled": []
   },
@@ -326,7 +329,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "searchPatternsMultiStream.spec.js"
     ],
     "disabled": [
       {
@@ -468,7 +472,8 @@
       "tracesAnalyzeDimensions.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
-      "tracesCharts.spec.js"
+      "tracesCharts.spec.js",
+      "traceSessionReplay.spec.js"
     ],
     "disabled": []
   },

@@ -118,12 +118,11 @@ pub(crate) fn histogram_quantile(
                 {
                     *cursor += 1;
                 }
-                let sample = bucket_rv
+                if let Some(sample) = bucket_rv
                     .samples
                     .get(*cursor)
                     .filter(|sample| sample.timestamp == eval_ts)
-                    .or_else(|| bucket_rv.samples.first());
-                if let Some(sample) = sample {
+                {
                     buckets.push(Bucket::new(*upper_bound, sample.value));
                 }
             }
@@ -317,12 +316,11 @@ mod tests {
                         {
                             *cursor += 1;
                         }
-                        let sample = bucket_rv
+                        if let Some(sample) = bucket_rv
                             .samples
                             .get(*cursor)
                             .filter(|sample| sample.timestamp == eval_ts)
-                            .or_else(|| bucket_rv.samples.first());
-                        if let Some(sample) = sample {
+                        {
                             buckets.push(Bucket::new(*upper_bound, sample.value));
                         }
                     }
@@ -752,11 +750,9 @@ mod tests {
             time_window: None,
         };
         let input = Value::Matrix(vec![
-            // Intentionally put +Inf before the finite bound. Timestamp 2 is
-            // absent, so the established fallback-to-first-sample behavior is
-            // exercised as well as the cursor fast path.
+            // +Inf comes first on purpose; no bucket has a sample at 2, and only +Inf at 3
             series("+Inf", vec![Sample::new(1, 10.0), Sample::new(3, 30.0)]),
-            series("1", vec![Sample::new(1, 5.0), Sample::new(3, 15.0)]),
+            series("1", vec![Sample::new(1, 5.0)]),
         ]);
 
         let Value::Matrix(result) =
@@ -769,9 +765,9 @@ mod tests {
             result[0]
                 .samples
                 .iter()
-                .map(|sample| (sample.timestamp, sample.value))
+                .map(|sample| (sample.timestamp, sample.value.to_bits()))
                 .collect::<Vec<_>>(),
-            vec![(1, 1.0), (2, 1.0), (3, 1.0)],
+            vec![(1, 1.0f64.to_bits()), (3, f64::NAN.to_bits())],
         );
     }
 

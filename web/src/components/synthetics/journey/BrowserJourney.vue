@@ -61,6 +61,7 @@ import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
+import type { VariableSuggestion } from "@/components/synthetics/variables/suggestions";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
@@ -91,6 +92,8 @@ const props = defineProps<{
   typedSecretReport?: { names: string[]; stepByName: Record<string, number[]> } | null;
   /** Names the check resolves; a step value naming anything else is warned about. */
   knownVariables?: ReadonlySet<string>;
+  /** Rows offered on `{{` in a step value; absent keeps the value field plain. */
+  variableSuggestions?: VariableSuggestion[];
   /**
    * DOM attribute the recorder selects on, from the monitor's config.
    * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
@@ -2279,6 +2282,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :value-error-message="fieldError(row.id, 'value')"
           :expected-error-message="fieldError(row.id, 'assertion.expected')"
           :known-variables="knownVariables"
+          :variable-suggestions="variableSuggestions"
           @update:step="(next: BrowserStep) => handleStepReplace(row, next)"
           @action-edited="clearFieldError(row.id, 'action')"
           @selector-edited="

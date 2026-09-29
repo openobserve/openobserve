@@ -47,7 +47,11 @@ import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import type { WireStep } from "@/types/synthetics";
-import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved";
+import {
+  buildResolvedGrouped,
+  knownVariableNames,
+} from "@/components/synthetics/variables/resolved";
+import { buildVariableSuggestions } from "@/components/synthetics/variables/suggestions";
 import {
   classifyReplayNames,
   defaultReplayEnvironmentId,
@@ -102,6 +106,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
+import VariableSuggestionRow from "@/components/synthetics/variables/VariableSuggestionRow.vue";
 import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupChecklist.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
@@ -1428,21 +1434,28 @@ const replayInputsForCheck = computed(() =>
   replayInputsFor(replayEnvironmentId.value, secrets.valuesFor(replayEnvironmentId.value)),
 );
 
-/** Every name the check resolves in any of its environments; undefined until the shared tiers load. */
-const knownVariableNames = computed(() => {
+/** The check's variables resolved across its tiers; undefined until the shared tiers load. */
+const resolvedGrouped = computed(() => {
   if (!sharedVariablesLoaded.value) return undefined;
-  const grouped = buildResolvedGrouped(
+  return buildResolvedGrouped(
     sharedEnvironments.value,
     sharedGlobals.value,
     check.value.environments ?? [],
     check.value.variables ?? [],
   );
-  return new Set(
-    Object.values(grouped.resolved)
-      .flat()
-      .map((v) => v.name),
-  );
 });
+
+/** Every name the check resolves in any of its environments; undefined until the shared tiers load. */
+const knownNames = computed(() =>
+  resolvedGrouped.value ? knownVariableNames(resolvedGrouped.value) : undefined,
+);
+
+/** Rows offered on `{{` in the gate, details, and step editor; every name is in knownNames. */
+const variableSuggestions = computed(() =>
+  resolvedGrouped.value
+    ? buildVariableSuggestions(resolvedGrouped.value, check.value.variables ?? [])
+    : undefined,
+);
 
 /** The texts replay substitutes, keyed by authored step number; 0 is the Starting URL. */
 function replayTexts(authored: BrowserStep[], wire: WireStep[], map: ExpansionMap) {
@@ -1885,12 +1898,13 @@ function onClearResults() {
             {{ t("synthetics.createBrowserTest.startingUrl") }}
             <span class="text-status-error-text">*</span>
           </label>
-          <OInput
+          <OTemplateInput
             id="synthetics-start-url"
             v-model="startUrl"
             :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
             :error-message="raw(urlError)"
+            :suggestions="variableSuggestions"
             data-test="synthetics-create-url-input"
             @update:model-value="clearUrlError"
             @blur="validateGateUrl"
@@ -1898,7 +1912,10 @@ function onClearResults() {
             <template #prefix>
               <OIcon name="link" size="sm" />
             </template>
-          </OInput>
+            <template #suggestion="{ suggestion, active }">
+              <VariableSuggestionRow :suggestion="suggestion" :active="active" />
+            </template>
+          </OTemplateInput>
           <small class="mt-1 block" data-test="synthetics-create-url-hint">{{
             t("synthetics.createBrowserTest.variablesHint", variablesHintParams)
           }}</small>
@@ -2057,7 +2074,8 @@ function onClearResults() {
                     :secret-names="replaySecretNames"
                     :uses-typed-secrets="typedSecretNames.size > 0"
                     :typed-secret-report="typedSecretReport"
-                    :known-variables="knownVariableNames"
+                    :known-variables="knownNames"
+                    :variable-suggestions="variableSuggestions"
                     :extension-ready="extensionReady"
                     :can-record-from="canRecordFrom"
                     :can-record-from-failure="canRecordFromFailure"
@@ -2150,6 +2168,7 @@ function onClearResults() {
               :folders="folders"
               :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
+              :variable-suggestions="variableSuggestions"
               :allow-private-locations="privateLocationsEnabled"
               :target-hint="targetHint"
               :variables-panel-open="variablesPanelOpen"

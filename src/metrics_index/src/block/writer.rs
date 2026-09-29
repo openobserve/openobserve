@@ -18,8 +18,8 @@ use std::{collections::HashSet, io::Write, sync::Arc};
 use anyhow::{Context, Result, anyhow, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch,
-        StringArray, StringViewArray, UInt32Array, UInt64Array,
+        Array, ArrayRef, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
+        StringViewArray, UInt32Array, UInt64Array,
     },
     datatypes::{DataType, SchemaRef},
 };
@@ -367,7 +367,6 @@ impl<W: Write> BlockWriter<W> {
             max_timestamp: self.timestamps[count - 1],
             block_offset: self.offset,
             block_length,
-            strictly_increasing: self.timestamps.windows(2).all(|w| w[0] < w[1]),
         };
         self.offset = self
             .offset
@@ -403,12 +402,6 @@ impl<W: Write> BlockWriter<W> {
             )),
             Arc::new(UInt32Array::from_iter_values(
                 self.blocks.iter().map(|b| b.block_length),
-            )),
-            Arc::new(BooleanArray::from(
-                self.blocks
-                    .iter()
-                    .map(|b| b.strictly_increasing)
-                    .collect::<Vec<_>>(),
             )),
         ]
     }

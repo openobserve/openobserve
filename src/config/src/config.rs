@@ -86,8 +86,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 87: add input_preview to llm_annotation_queue_items.
 // 88: add iam password policy tables.
 // 89: add level_half_width_seconds to anomaly_detection_config.
-// 90: create synthetics_refs.
-pub const DB_SCHEMA_VERSION: u64 = 90;
+// 90: create the Prompt registry, webhook outbox, and Experiment attribution columns.
+// 91: add firing-episode columns for alert recovery.
+// 92: add recovery_destinations to alerts.
+// 93: create synthetics_refs.
+pub const DB_SCHEMA_VERSION: u64 = 93;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1736,17 +1739,11 @@ pub struct Search {
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
-        default = false,
-        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+        name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
+        default = 0,
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
     )]
-    pub metrics_index_selection_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
-        default = 256,
-        help = "Maximum memory size in MB of the metrics index selection cache."
-    )]
-    pub metrics_index_selection_cache_max_size: usize,
+    pub metrics_blocks_cache_max_size: usize,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -4301,18 +4298,18 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.search.inverted_index_footer_cache_max_size == 0 {
         cfg.search.inverted_index_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     if cfg.search.bloom_footer_cache_max_size == 0 {
-        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // 1% of total mem, clamped to [4, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
         cfg.search.bloom_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(4, 256)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
@@ -4320,7 +4317,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
         cfg.limit.datafusion_file_stat_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
@@ -4339,7 +4336,19 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_result_cache_max_size =
             cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
+    cfg.search.metrics_blocks_cache_max_size = metrics_blocks_cache_size_mb(
+        cfg.search.metrics_blocks_cache_max_size,
+        cfg.limit.mem_total,
+    );
     Ok(())
+}
+
+fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
+    match configured {
+        0 => (mem_total / SIZE_IN_MB as usize / 50).clamp(128, 1024),
+        1..=9 => 0,
+        size => size,
+    }
 }
 
 /// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
@@ -4841,6 +4850,18 @@ mod tests {
     #[test]
     fn every_env_config_default_parses() {
         let _ = super::Config::init().expect("a default failed to parse");
+    }
+
+    #[test]
+    fn metrics_blocks_cache_auto_budget_preserves_explicit_limits() {
+        let gib = 1024 * 1024 * 1024;
+        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 128);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 983);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 64 * gib), 1024);
+        assert_eq!(metrics_blocks_cache_size_mb(1, 48 * gib), 0);
+        assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
+        assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);
+        assert_eq!(metrics_blocks_cache_size_mb(2048, 48 * gib), 2048);
     }
 
     use super::*;
