@@ -54,6 +54,20 @@ fn may_skip_permission_check(
     is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
+/// Foreign-`aud` MCP tokens pass only on /{org}/mcp or our own loopback calls.
+#[cfg(any(feature = "enterprise", test))]
+fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
+    let is_mcp_endpoint = path_columns.len() == 2 && path_columns[1] == "mcp";
+    is_mcp_endpoint
+        || mcp_marker
+            .is_some_and(|v| constant_time_eq(v, config::cluster::MCP_LOOPBACK_SECRET.as_bytes()))
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(
     req_data: &RequestData,
@@ -74,18 +88,9 @@ pub async fn token_validator(
     let path = path.strip_prefix("/").unwrap_or(path);
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    // Check if this is an MCP endpoint request or has the MCP header
-    let is_mcp_endpoint = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
-    let has_mcp_header = req_data
-        .headers
-        .get("x-o2-mcp")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v == "true")
-        .unwrap_or_default();
-    let is_mcp_request = is_mcp_endpoint || has_mcp_header;
-
-    // For MCP requests with dynamic clients, skip audience validation
-    let login_flow = !is_mcp_request;
+    let mcp_marker = req_data.headers.get("x-o2-mcp").map(|v| v.as_bytes());
+    // MCP clients register dynamically with Dex, so their `aud` cannot match our client_id
+    let login_flow = !relaxes_audience_check(&path_columns, mcp_marker);
 
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
@@ -326,5 +331,41 @@ mod tests {
              (allow_nonexistent_user) was a cross-org authorization bypass and \
              must not return."
         );
+    }
+
+    #[test]
+    fn mcp_endpoint_relaxes_audience_check() {
+        assert!(relaxes_audience_check(&["default", "mcp"], None));
+    }
+
+    #[test]
+    fn paths_below_mcp_keep_audience_check() {
+        assert!(!relaxes_audience_check(&["default", "mcp", "_json"], None));
+        assert!(!relaxes_audience_check(&["default", "mcp", "x"], None));
+    }
+
+    #[test]
+    fn non_mcp_path_without_marker_keeps_audience_check() {
+        assert!(!relaxes_audience_check(&["default", "_search"], None));
+    }
+
+    #[test]
+    fn client_supplied_mcp_marker_keeps_audience_check() {
+        let same_length = vec![b'0'; config::cluster::MCP_LOOPBACK_SECRET.len()];
+        for forged in [&b"true"[..], b"", b"not-the-secret", &same_length] {
+            assert!(!relaxes_audience_check(
+                &["default", "_search"],
+                Some(forged)
+            ));
+        }
+    }
+
+    #[test]
+    fn loopback_secret_relaxes_audience_check() {
+        let secret = config::cluster::MCP_LOOPBACK_SECRET.as_bytes();
+        assert!(relaxes_audience_check(
+            &["default", "_search"],
+            Some(secret)
+        ));
     }
 }
