@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                       </div>
                     </div>
-                    <div class="flex w-full items-center justify-between">
+                    <div class="flex w-full items-center justify-between py-2">
                       <div class="flex items-center">
                         <div class="app-tabs-container">
                           <OToggleGroup
@@ -293,7 +293,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :disabled="isDialogOpen"
                           variant="outline"
                           size="icon-sm"
-                          class="my-2"
                           @click.stop="openDialog"
                           :title="t('logStream.addFieldsTitle')"
                           icon-left="add"
@@ -407,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="indexTypeOptionsForRow(row)"
                               label-key="label"
                               value-key="value"
-                              class="text-compact h-6! max-h-6! min-h-6!"
+                              class="text-compact"
                               multiple
                               clearable
                               size="sm"

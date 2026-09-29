@@ -37,6 +37,7 @@ o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
 opentelemetry.workspace = true
+opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prost.workspace = true
 reqwest.workspace = true

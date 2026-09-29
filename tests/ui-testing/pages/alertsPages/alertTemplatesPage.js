@@ -146,6 +146,50 @@ export class AlertTemplatesPage {
     }
 
     /**
+     * Deep-link straight to the templates list with a given `page` query param,
+     * exercising TemplateList's URL-restored `currentPage` on a cold mount.
+     * @param {number} page
+     */
+    async gotoTemplatesWithPageParam(page) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        await this.page.goto(
+            `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}&page=${page}`,
+            { waitUntil: 'domcontentloaded' }
+        );
+        await this.waitForTemplateListReady();
+    }
+
+    // ==================== LIST PAGINATION (OTable pagination bar) ====================
+
+    async clickNextPage() {
+        const nextPageBtn = this.page.locator('[data-test="o2-table-next-page-btn"]');
+        await nextPageBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await nextPageBtn.click();
+    }
+
+    async getPaginationInfoText() {
+        const text = await this.page.locator('[data-test="o2-table-pagination-info"]').textContent().catch(() => null);
+        return (text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    async expectPaginationInfoToMatch(pattern) {
+        await expect
+            .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })
+            .toMatch(pattern);
+    }
+
+    async expectUrlHasPageParam(pageValue) {
+        await expect.poll(() => this.page.url(), { timeout: 15000 }).toContain(`page=${pageValue}`);
+    }
+
+    async expectAtLeastOneListRow() {
+        await expect(
+            this.page.locator('[data-test^="o2-table-row-"]').first(),
+        ).toBeVisible({ timeout: 20000 });
+    }
+
+    /**
      * Create a template via API first, fall back to UI if API fails
      * @param {string} templateName - Name of the template
      */

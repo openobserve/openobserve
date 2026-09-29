@@ -8,6 +8,10 @@ export class RumSessionsPage {
         // Locators
         this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
         this.tableRow = page.locator('[data-test^="o2-table-row-"]');
+        this.sessionViewerNoReplay = '[data-test="session-viewer-no-replay"]';
+        this.sessionViewerSubtitle = '[data-test="session-viewer-subtitle"]';
+        this.sessionViewerShareLinkBtn = '[data-test="session-viewer-share-link-btn"]';
+        this.sessionViewerBackBtn = '[data-test="session-viewer-back-btn"]';
     }
 
     /**
@@ -50,5 +54,42 @@ export class RumSessionsPage {
         await expect(this.page).toHaveURL(new RegExp(`/rum/sessions/view/${sessionId}`), {
             timeout: timeoutMs,
         });
+    }
+
+    /** `startTimeUs` / `endTimeUs` are microsecond epoch bounds. */
+    async gotoSessionViewer(sessionId, { startTimeUs, endTimeUs } = {}) {
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        const nowUs = Date.now() * 1000;
+        const start = startTimeUs || nowUs - 3600 * 1000 * 1000;
+        const end = endTimeUs || nowUs;
+        const url = `${base}/web/rum/sessions/view/${sessionId}?start_time=${start}&end_time=${end}&org_identifier=${org}`;
+        await this.page.goto(url);
+        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    }
+
+    async expectNoReplayEmptyState(sessionId) {
+        const empty = this.page.locator(this.sessionViewerNoReplay);
+        await expect(empty).toBeVisible({ timeout: 15000 });
+        await expect(empty).toContainText('No replay was recorded for this session');
+        await expect(empty).toContainText(sessionId);
+    }
+
+    async expectSessionViewerSubtitleHidden() {
+        await expect(this.page.locator(this.sessionViewerSubtitle)).toHaveCount(0);
+    }
+
+    async expectSessionViewerShareLinkHidden() {
+        await expect(this.page.locator(this.sessionViewerShareLinkBtn)).toHaveCount(0);
+    }
+
+    async expectSessionViewerBackVisible() {
+        await expect(this.page.locator(this.sessionViewerBackBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+    // SessionViewer's back is router.back(), so it leaves the viewer route for whatever page preceded it.
+    async clickSessionViewerBackAndExpectLeft(sessionId) {
+        await this.page.locator(this.sessionViewerBackBtn).click();
+        await expect(this.page).not.toHaveURL(new RegExp(`/rum/sessions/view/${sessionId}`), { timeout: 15000 });
     }
 }

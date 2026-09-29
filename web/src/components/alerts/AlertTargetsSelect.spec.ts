@@ -147,6 +147,35 @@ describe("AlertTargetsSelect", () => {
       expect(select(wrapper).props("options")).toEqual([{ label: "slack", value: "dest:slack" }]);
     });
 
+    it("flags a selected destination absent from the options as Missing, not dropped", () => {
+      const wrapper = createWrapper({
+        destinations: ["slack", "deleted-dest"],
+        destinationOptions: ["slack"],
+      });
+      expect(select(wrapper).props("options")).toEqual([
+        { label: "slack", value: "dest:slack" },
+        {
+          label: "deleted-dest",
+          value: "dest:deleted-dest",
+          badge: "Missing",
+          badgeMuted: true,
+        },
+      ]);
+      // Not silently dropped: the missing name stays in the tagged model value too.
+      expect(select(wrapper).props("modelValue")).toContain("dest:deleted-dest");
+    });
+
+    it("flags a selected workflow absent from the options as Missing", () => {
+      const wrapper = createWrapper({
+        workflows: ["deleted-wf"],
+        workflowsEnabled: true,
+      });
+      const values = (select(wrapper).props("options") as any[])
+        .filter((o) => !o.header)
+        .map((o) => o.value);
+      expect(values).toEqual(["wf:deleted-wf"]);
+    });
+
     it("tolerates null/undefined option lists", () => {
       const wrapper = createWrapper({
         destinationOptions: undefined as any,

@@ -57,6 +57,12 @@ pub enum AssociationDeleteEvent {
 pub enum WorkflowTriggerType {
     #[default]
     AlertFired,
+    /// Its own type rather than an event_type on AlertFired, or every workflow built to page on a
+    /// firing would page on the recovery too.
+    // TODO: not reachable yet — associating a workflow with an alert hardcodes AlertFired, so no
+    // row is ever written with this type. Needs a trigger-type choice on the link, then a consumer
+    // in `alerts::recovery::dispatch_recovery`, then `enabled: true` on the UI card.
+    AlertResolved,
     IncidentEvent,
     Webhook,
     Manual,
@@ -64,6 +70,9 @@ pub enum WorkflowTriggerType {
     Retry,
     // A trigger type written by a newer node. Decoding to a real variant instead would
     // relabel it as that trigger, and run history is searched across regions.
+    // `other` covers the JSON envelope too: without it an unknown tag fails the whole
+    // `WorkflowTrigger` parse, so one new variant stops an old node reading any trigger.
+    #[serde(other)]
     Unknown,
 }
 
@@ -71,6 +80,7 @@ impl From<&str> for WorkflowTriggerType {
     fn from(value: &str) -> Self {
         match value {
             "AlertFired" => Self::AlertFired,
+            "AlertResolved" => Self::AlertResolved,
             "IncidentEvent" => Self::IncidentEvent,
             "Webhook" => Self::Webhook,
             "Manual" => Self::Manual,
@@ -85,6 +95,7 @@ impl std::fmt::Display for WorkflowTriggerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AlertFired => write!(f, "AlertFired"),
+            Self::AlertResolved => write!(f, "AlertResolved"),
             Self::IncidentEvent => write!(f, "IncidentEvent"),
             Self::Webhook => write!(f, "Webhook"),
             Self::Manual => write!(f, "Manual"),
@@ -603,9 +614,24 @@ mod tests {
     }
 
     #[test]
+    fn an_unknown_trigger_type_decodes_from_json_rather_than_failing_the_envelope() {
+        // `From<&str>` covers the database and the history key. The envelope is what
+        // crosses regions, and one unknown tag used to fail the whole `WorkflowTrigger`.
+        assert_eq!(
+            serde_json::from_str::<WorkflowTriggerType>(r#""AlertResolved""#).unwrap(),
+            WorkflowTriggerType::Unknown
+        );
+        assert_eq!(
+            serde_json::from_str::<WorkflowTriggerType>(r#""AlertFired""#).unwrap(),
+            WorkflowTriggerType::AlertFired
+        );
+    }
+
+    #[test]
     fn known_trigger_types_round_trip_through_the_history_key() {
         for ty in [
             WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::AlertResolved,
             WorkflowTriggerType::IncidentEvent,
             WorkflowTriggerType::Webhook,
         ] {

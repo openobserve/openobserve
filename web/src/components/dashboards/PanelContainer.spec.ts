@@ -2046,4 +2046,96 @@ describe("PanelContainer", () => {
       expect(next?.className).toContain("flex-1");
     });
   });
+
+  describe("exemplars", () => {
+    const promqlPanel = (over: Record<string, unknown> = {}) => ({
+      ...mockPanelData,
+      id: `exemplar-panel-${Math.random()}`,
+      type: "line",
+      queryType: "promql",
+      queries: [{ query: "rate(x[5m])", config: { query_type: "range" } }],
+      config: {},
+      ...over,
+    });
+
+    const rendererStub = (status: string, error = "") => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height", "exemplarsOverride"],
+        data: () => ({
+          noData: "",
+          exemplarsStatus: status,
+          exemplarsCount: 0,
+          exemplarsError: error,
+        }),
+        methods: { retryExemplars: vi.fn() },
+      },
+    });
+
+    beforeEach(() => {
+      window.sessionStorage.clear();
+    });
+
+    it("shows the header toggle only for an eligible PromQL panel", () => {
+      wrapper = createWrapper({ data: promqlPanel() }, rendererStub("off"));
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ data: promqlPanel({ type: "h-bar" }) }, rendererStub("off"));
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ data: mockPanelData }, rendererStub("off"));
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper(
+        { data: promqlPanel({ queries: [{ query: "up", config: { query_type: "instant" } }] }) },
+        rendererStub("off"),
+      );
+      expect(wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').exists()).toBe(false);
+    });
+
+    it("toggling writes a session override for this panel without touching the saved config", async () => {
+      const panel = promqlPanel();
+      wrapper = createWrapper({ data: panel }, rendererStub("off"));
+      const toggle = wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]');
+      expect(toggle.attributes("aria-pressed")).toBe("false");
+      await toggle.trigger("click");
+      expect(
+        window.sessionStorage.getItem(`o2.exemplars.test-org.test-dashboard-id.${panel.id}`),
+      ).toBe("1");
+      expect(panel.config).toEqual({});
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("exemplarsOverride")).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-panel-exemplars-toggle"]').attributes("aria-pressed"),
+      ).toBe("true");
+    });
+
+    it("shows the empty indicator when exemplars are on and none came back", async () => {
+      wrapper = createWrapper(
+        { data: promqlPanel({ config: { show_exemplars: true } }) },
+        rendererStub("empty"),
+      );
+      await flushPromises();
+      const tag = wrapper.find('[data-test="dashboard-panel-exemplars-empty"]');
+      expect(tag.exists()).toBe(true);
+      expect(tag.attributes("aria-label")).toBe("No exemplars in this time range");
+    });
+
+    it("hands the exemplar error to the warning cluster", async () => {
+      wrapper = createWrapper(
+        { data: promqlPanel({ config: { show_exemplars: true } }) },
+        {
+          ...rendererStub("error", "scan failed"),
+          PanelErrorButtons: {
+            name: "PanelErrorButtons",
+            props: ["exemplarError"],
+            template: "<div data-test='errors-stub'>{{ exemplarError }}</div>",
+          },
+        },
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
+    });
+  });
 });

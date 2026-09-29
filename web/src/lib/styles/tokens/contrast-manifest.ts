@@ -1353,6 +1353,36 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "syntax colours are painted on the code block, not the page",
   },
   {
+    fg: "--color-query-syntax-keyword",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-function",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-string",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-number",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-comment",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
     fg: "--color-text-inverse",
     bg: "--color-button-primary",
     category: "text",
