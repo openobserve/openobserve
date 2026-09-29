@@ -3196,70 +3196,45 @@ fn columns_present(hits: &[serde_json::Value]) -> Vec<String> {
 
 /// Write anomaly events to the _anomalies stream.
 ///
-/// Uses HTTP POST to an ingester node so this works from any node role
-/// (including scheduler nodes, which are not ingesters and cannot call
-/// service::logs::ingest::ingest() directly).
+/// Goes through internal gRPC ingestion so this works from any node role (including
+/// scheduler nodes, which are not ingesters) and never depends on a user login: root
+/// Basic auth is refused wherever native login is disabled, as on cloud.
 #[cfg(feature = "enterprise")]
 pub async fn write_anomalies_to_stream(
     org_id: &str,
     anomalies: Vec<serde_json::Value>,
 ) -> Result<()> {
+    use proto::cluster_rpc;
+
     if anomalies.is_empty() {
         return Ok(());
     }
 
-    // Pick an online ingester node to forward the write to.
-    let ingester = infra::cluster::get_cached_online_ingester_nodes()
+    let anomaly_count = anomalies.len();
+    let req = cluster_rpc::IngestionRequest {
+        org_id: org_id.to_string(),
+        stream_type: StreamType::Logs.as_str().to_string(),
+        stream_name: "_anomalies".to_string(),
+        data: Some(cluster_rpc::IngestionData::from(anomalies)),
+        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+        metadata: None,
+    };
+
+    let resp = crate::ingestion::ingestion_service::ingest(req)
         .await
-        .and_then(|nodes| nodes.into_iter().next())
-        .ok_or_else(|| anyhow::anyhow!("No online ingester node available to write _anomalies"))?;
-
-    let cfg = config::get_config();
-    let url = format!(
-        "{}{}/api/{org_id}/_anomalies/_json",
-        ingester.http_addr, cfg.common.base_uri,
-    );
-
-    tracing::info!(
-        org_id = %org_id,
-        anomaly_count = anomalies.len(),
-        ingester = %ingester.name,
-        "Writing anomalies to _anomalies stream via ingester HTTP"
-    );
-
-    let json_body = serde_json::to_string(&anomalies)?;
-
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header(
-            "Authorization",
-            format!(
-                "Basic {}",
-                base64::Engine::encode(
-                    &base64::engine::general_purpose::STANDARD,
-                    format!(
-                        "{}:{}",
-                        cfg.auth.root_user_email, cfg.auth.root_user_password
-                    )
-                )
-            ),
-        )
-        .body(json_body)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("HTTP request to ingester failed: {e}"))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("Ingester returned {status} writing _anomalies: {body}");
+        .map_err(|e| anyhow::anyhow!("internal ingestion of _anomalies failed: {e}"))?;
+    if resp.status_code != 200 {
+        anyhow::bail!(
+            "ingester returned {} writing _anomalies: {}",
+            resp.status_code,
+            resp.message
+        );
     }
 
     tracing::info!(
         org_id = %org_id,
-        "Successfully wrote anomalies to _anomalies stream"
+        anomaly_count,
+        "Wrote anomalies to _anomalies stream"
     );
 
     Ok(())
