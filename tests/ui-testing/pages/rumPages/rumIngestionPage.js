@@ -32,8 +32,8 @@ export class RumIngestionPage {
         await expect(this.resetTokenButton).toBeVisible({ timeout: timeoutMs });
     }
 
-    /** The first CopyContent block holds the npm install command. */
-    async expectNpmSnippetContains(text) {
+    /** The first CopyContent block holds the install snippet (npm command or CDN loader); `text` may be a string or RegExp. */
+    async expectInstallSnippetContains(text) {
         await expect(this.contentBlocks.first()).toContainText(text);
     }
 
@@ -54,8 +54,8 @@ export class RumIngestionPage {
     async switchToCdnVariant() {
         await expect(this.variantCdnButton).toBeVisible();
         await this.variantCdnButton.click();
-        // Guard: the shared "pkg" group flips both steps together, so wait for the CDN loader to land before trusting a downstream assertion.
-        await expect(this.contentBlocks.first()).toContainText('O2_RUM');
+        // Wait on the CDN host, not the O2_* globals, so a global-rename regression fails at the test's own assertion.
+        await expect(this.contentBlocks.first()).toContainText('browsersdk.openobserve.ai');
     }
 
     async switchToNpmVariant() {
@@ -63,11 +63,6 @@ export class RumIngestionPage {
         await this.variantNpmButton.click();
         // Guard: confirm the default NPM install command is restored.
         await expect(this.contentBlocks.first()).toContainText('npm i @openobserve/browser-rum');
-    }
-
-    /** The first CopyContent block (install step) holds the install snippet. */
-    async expectInstallSnippetContains(text) {
-        await expect(this.contentBlocks.first()).toContainText(text);
     }
 
     /** Negative regression guard: the whole card must not contain `text`. */
