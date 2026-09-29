@@ -210,6 +210,36 @@ describe("tableConfigUtils", () => {
       }
     });
 
+    it("flags an unbounded repeat of a group holding an unbounded quantifier", () => {
+      for (const pattern of ["(a+){2,}", "((a+){3})+", "(?:a*b)*"]) {
+        expect(hasNestedQuantifier(pattern)).toBe(true);
+      }
+    });
+
+    it("accepts a bounded repeat of a group, or an unbounded repeat of a bounded group", () => {
+      for (const pattern of [
+        "^(\\d+\\.){3}\\d+$",
+        "(a+){1,5}",
+        "(a+){0,3}b",
+        "(a{2,5})+",
+        "(ab?)*",
+      ]) {
+        expect(hasNestedQuantifier(pattern)).toBe(false);
+      }
+    });
+
+    it("keeps a bounded-repeat IPv4 mapping working at save and at render time", () => {
+      expect(isSafeValueMappingPattern("^(\\d+\\.){3}\\d+$")).toBe(true);
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: "^(\\d+\\.){3}\\d+$", text: "ipv4" },
+      ]);
+
+      expect(lookupValueMapping("1.2.3.4", cache)).toBe("ipv4");
+      expect(lookupValueMapping("1.2.3", cache)).toBeNull();
+      expect(isSafeValueMappingPattern("^(a+)+$")).toBe(false);
+      expect(isSafeValueMappingPattern("(.*)*")).toBe(false);
+    });
+
     it("rejects unsafe or oversized patterns", () => {
       expect(isSafeValueMappingPattern("^err")).toBe(true);
       expect(isSafeValueMappingPattern("/^err/i")).toBe(true);

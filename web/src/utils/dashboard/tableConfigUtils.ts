@@ -66,7 +66,7 @@ export const parseRegexPattern = (input: string): { pattern: string; flags: stri
   return { pattern: input, flags: "" };
 };
 
-/** True when a quantified group itself contains a quantifier, e.g. `(a+)+` or `(.*)*`, the shape behind catastrophic backtracking. */
+/** True when a group holding an unbounded quantifier is itself repeated without bound, e.g. `(a+)+` or `(.*)*`; `(\d+\.){3}` passes. */
 export const hasNestedQuantifier = (pattern: string): boolean => {
   const groupRepeats: boolean[] = [];
   let repeats = false;
@@ -84,9 +84,9 @@ export const hasNestedQuantifier = (pattern: string): boolean => {
       repeats = false;
     } else if (ch === ")") {
       const inner: boolean = repeats;
-      if (inner && isRepetitionAt(pattern, i + 1)) return true;
+      if (inner && isUnboundedRepetitionAt(pattern, i + 1)) return true;
       repeats = (groupRepeats.pop() ?? false) || inner;
-    } else if (isRepetitionAt(pattern, i)) {
+    } else if (isUnboundedRepetitionAt(pattern, i)) {
       repeats = true;
     }
   }
@@ -509,9 +509,9 @@ export const resolveMetricValueStyle = (
   return { text, textColor, bgColor };
 };
 
-const isRepetitionAt = (pattern: string, index: number): boolean => {
+const isUnboundedRepetitionAt = (pattern: string, index: number): boolean => {
   const ch = pattern[index];
-  return ch === "*" || ch === "+" || (ch === "{" && /^\{\d+(,\d*)?\}/.test(pattern.slice(index)));
+  return ch === "*" || ch === "+" || (ch === "{" && /^\{\d+,\}/.test(pattern.slice(index)));
 };
 
 // g and y are dropped because a shared compiled regex with lastIndex state would alternate results.
