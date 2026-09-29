@@ -943,9 +943,9 @@ pub async fn get_auth(
                     }
                 };
 
-                match query.get("exp_in") {
-                    Some(exp_in_str) => {
-                        expires_in = exp_in_str.parse::<i64>().unwrap();
+                match query.get("exp_in").and_then(|v| v.parse::<i64>().ok()) {
+                    Some(exp_in) => {
+                        expires_in = exp_in;
                     }
                     None => {
                         audit_unauthorized_error(audit_message).await;
@@ -1314,6 +1314,21 @@ pub async fn list_invitations(Headers(_): Headers<UserEmail>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn login_with_a_non_numeric_exp_in_is_unauthorized() {
+        let query = HashMap::from([
+            ("auth".to_string(), "x".to_string()),
+            (
+                "request_time".to_string(),
+                chrono::Utc::now().timestamp().to_string(),
+            ),
+            ("exp_in".to_string(), "abc".to_string()),
+        ]);
+        let resp = get_auth(http::HeaderMap::new(), Query(query)).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
 
     #[test]
     fn test_presigned_url_generator_default() {

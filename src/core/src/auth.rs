@@ -514,8 +514,8 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
                 .unwrap_or_default()
         } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
             access_token
-        } else if access_token.starts_with("session") {
-            let session_key = access_token.strip_prefix("session ").unwrap().to_string();
+        } else if let Some(session_key) = access_token.strip_prefix("session ") {
+            let session_key = session_key.to_string();
             match crate::db::session::get(&session_key).await {
                 Ok(token) => {
                     log::debug!("Session '{}' resolved to token", session_key);
@@ -1178,6 +1178,21 @@ mod tests {
                 reject_forged_session_marker(untouched.to_string()),
                 untouched,
                 "ordinary credentials must pass through unchanged"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn session_cookie_without_a_space_does_not_panic() {
+        for access_token in ["sessionX", "session"] {
+            let tokens = format!(r#"{{"access_token":"{access_token}","refresh_token":""}}"#);
+            let cookie = format!("auth_tokens={}", config::utils::base64::encode(&tokens));
+            let mut headers = HeaderMap::new();
+            headers.insert(http::header::COOKIE, cookie.parse().unwrap());
+            assert_eq!(
+                extract_auth_str_from_headers(&headers).await,
+                format!("Bearer {access_token}")
             );
         }
     }
