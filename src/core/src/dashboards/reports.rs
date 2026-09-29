@@ -363,14 +363,12 @@ pub async fn trigger(org_id: &str, folder_id: &str, name: &str) -> Result<(), Re
             return Err(ReportError::ReportNotFound);
         }
     };
-    ensure_dashboards_readable(org_id, &report.dashboards).await?;
     report.send_subscribers().await?;
     Ok(())
 }
 
 pub async fn trigger_by_id(org_id: &str, report_id: &str) -> Result<(), ReportError> {
     let (_, report) = get_by_id(org_id, report_id).await?;
-    ensure_dashboards_readable(org_id, &report.dashboards).await?;
     report.send_subscribers().await?;
     Ok(())
 }
@@ -458,7 +456,12 @@ pub async fn update_by_id(
     }) {
         return Err(ReportError::InlineAttachmentTypeNotSupportedForPdf);
     }
-    ensure_dashboards_readable(org_id, &report.dashboards).await?;
+    if ensure_dashboards_readable(org_id, &report.dashboards)
+        .await
+        .is_err()
+    {
+        return Err(ReportError::DashboardTabNotFound);
+    }
 
     let (curr_folder, old_report) = get_by_id(org_id, report_id).await?;
     report.owner = old_report.owner;
@@ -536,6 +539,9 @@ pub enum SendReportError {
     #[error("Atleast one dashboard is required")]
     NoDashboards,
 
+    #[error("A referenced dashboard is no longer in this report's org")]
+    DashboardNotInOrg,
+
     #[error("Error contacting report server: {0}")]
     ReportServerClientError(#[from] reqwest::Error),
 
@@ -571,6 +577,7 @@ impl SendReport for Report {
         if self.dashboards.is_empty() {
             return Err(SendReportError::NoDashboards);
         }
+        ensure_dashboards_readable(&self.org_id, &self.dashboards).await?;
 
         let cfg = get_config();
         let mut recipients = vec![];
@@ -968,8 +975,7 @@ async fn generate_report(
     Ok((pdf_data, email_dashb_url))
 }
 
-/// Percent-encodes the key and value so a variable containing `&`, `#` or `"` cannot inject
-/// extra query parameters or break out of the dashboard URL.
+/// Percent-encodes both sides so a `&`, `#` or `"` in a variable can't break out of the URL.
 fn format_dashb_var(key: &str, value: &str) -> String {
     format!(
         "var-{}={}",
@@ -1012,13 +1018,11 @@ fn sanitize_filename(filename: &str) -> String {
         .collect()
 }
 
-/// Confirms every dashboard a report renders still belongs to the report's own org — the same
-/// existence-scoped check the dashboards GET handler uses — so a report can't be repointed at,
-/// or outlive a move of, a dashboard in another org.
+/// Same existence-scoped org check the dashboards GET handler uses.
 async fn ensure_dashboards_readable(
     org_id: &str,
     dashboards: &[ReportDashboard],
-) -> Result<(), ReportError> {
+) -> Result<(), SendReportError> {
     let checks = dashboards
         .iter()
         .map(|d| dashboard_in_org(org_id, &d.dashboard));
@@ -1026,12 +1030,11 @@ async fn ensure_dashboards_readable(
     if all_dashboards_readable(&results) {
         Ok(())
     } else {
-        Err(ReportError::DashboardTabNotFound)
+        Err(SendReportError::DashboardNotInOrg)
     }
 }
 
-/// A report with zero dashboards has nothing to withhold, so it passes trivially; that case is
-/// already rejected earlier by [`ReportError::NoDashboards`].
+/// An empty slice passes trivially; callers reject zero dashboards earlier.
 fn all_dashboards_readable(results: &[bool]) -> bool {
     results.iter().all(|readable| *readable)
 }
@@ -1237,5 +1240,28 @@ mod tests {
     #[test]
     fn all_dashboards_readable_is_true_for_no_dashboards() {
         assert!(all_dashboards_readable(&[]));
+    }
+
+    /// With no DB configured, `dashboard_in_org` fails closed, so this proves the check runs.
+    #[tokio::test]
+    async fn send_subscribers_rejects_a_report_before_rendering_when_the_dashboard_check_fails() {
+        let report = Report {
+            org_id: "org_a".to_string(),
+            dashboards: vec![ReportDashboard {
+                dashboard: "some-dashboard".to_string(),
+                folder: "default".to_string(),
+                tabs: vec!["tab1".to_string()],
+                variables: vec![],
+                timerange: config::meta::dashboards::reports::ReportTimerange::default(),
+                report_type: ReportMediaType::default(),
+                email_attachment_type: ReportEmailAttachmentType::default(),
+                attachment_dimensions: None,
+            }],
+            ..Default::default()
+        };
+        assert!(matches!(
+            report.send_subscribers().await,
+            Err(SendReportError::DashboardNotInOrg)
+        ));
     }
 }
