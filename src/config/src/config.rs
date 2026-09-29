@@ -86,7 +86,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 87: add input_preview to llm_annotation_queue_items.
 // 88: add iam password policy tables.
 // 89: add level_half_width_seconds to anomaly_detection_config.
-pub const DB_SCHEMA_VERSION: u64 = 89;
+// 90: create the Prompt registry, webhook outbox, and Experiment attribution columns.
+// 91: add firing-episode columns for alert recovery.
+// 92: add recovery_destinations to alerts.
+// 93: create oncall_response_reports.
+pub const DB_SCHEMA_VERSION: u64 = 93;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1713,18 +1717,6 @@ pub struct Search {
         help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_SELECTION_CACHE_ENABLED",
-        default = false,
-        help = "Cache per-file PromQL metric selections: block IDs for MIDX block reads, or source row ranges for Parquet/Vortex reads."
-    )]
-    pub metrics_selection_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
-        default = 256,
-        help = "Maximum memory size in MB of the metrics index selection cache."
-    )]
-    pub metrics_index_selection_cache_max_size: usize,
     #[env_config(
         name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
@@ -4285,18 +4277,18 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.search.inverted_index_footer_cache_max_size == 0 {
         cfg.search.inverted_index_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     if cfg.search.bloom_footer_cache_max_size == 0 {
-        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // 1% of total mem, clamped to [4, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
         cfg.search.bloom_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(4, 256)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
@@ -4304,7 +4296,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
         cfg.limit.datafusion_file_stat_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;

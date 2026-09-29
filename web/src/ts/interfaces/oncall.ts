@@ -451,8 +451,10 @@ export type L0Mode =
   | "parallel"
   /** The page is held for the triage budget, or until the verdict lands. */
   | "gate"
-  /** The agent investigates and nobody is paged. */
-  | "only";
+  /** The agent investigates; whether the priority also pages is the team's ladder, not this mode. */
+  | "only"
+  /** The agent never runs; the page behaves exactly as it did without AI triage. */
+  | "off";
 
 /**
  * Per-severity modes, keyed by the UPPERCASE strings the wire uses
@@ -460,13 +462,14 @@ export type L0Mode =
  * Both forms in one policy object; this is not a mistake (API-FOR-UI §H).
  */
 export interface L0Modes {
-  /** Pinned `parallel` server-side — holding a critical page behind a model
-   *  is not a setting the product offers. The server 400s anything else. */
+  /** `parallel` or `off` only — holding, or silencing, a critical page is not
+   *  a setting the product offers. The server 400s anything else. */
   P1: L0Mode;
+  /** `gate`, `parallel` or `off` — `only` would silence a paging severity. */
   P2: L0Mode;
   P3: L0Mode;
-  /** Covers P4 AND P5 — neither pages a human, so neither has a gate to set.
-   *  Pinned `only`; the server 400s anything else. */
+  /** Covers P4 AND P5 — neither pages a human, so `only` or `off` alone; the
+   *  server 400s anything else. */
   P4: L0Mode;
 }
 
@@ -716,8 +719,8 @@ export interface PreviewRung {
  * The L0 agent's part in one priority's ladder, as the preview reports it.
  *
  * `mode` arrives **already resolved for this priority** — the server applies
- * the P1 invariant (always `parallel`) and the pages-nobody rule (P4/P5 →
- * `only`) before answering. Never re-derive it from `policy.l0.mode`: two
+ * the P1 invariant (never held) and the pages-nobody rule (P4/P5 → `only` or
+ * `off`) before answering. Never re-derive it from `policy.l0.mode`: two
  * places deciding what P1 means is how they come to disagree.
  */
 export interface PreviewL0 {
@@ -922,6 +925,14 @@ export interface CauseGroup {
   note?: string | null;
   last_response_id: string;
   last_closed_at?: number | null;
+}
+
+/// What the agent wrote for this page, kept per record — the verdict card's
+/// one sentence is the conclusion, this is the working behind it.
+export interface OnCallResponseReport {
+  report: string;
+  model?: string | null;
+  generated_at: number;
 }
 
 /// One row of the pages list when grouping is on: the most recent firing of
