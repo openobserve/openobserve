@@ -8,7 +8,6 @@ export class RumSessionsPage {
         // Locators
         this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
         this.tableRow = page.locator('[data-test^="o2-table-row-"]');
-        // Session Viewer empty-state + chrome (SessionViewer.vue).
         this.sessionViewerNoReplay = '[data-test="session-viewer-no-replay"]';
         this.sessionViewerSubtitle = '[data-test="session-viewer-subtitle"]';
         this.sessionViewerShareLinkBtn = '[data-test="session-viewer-share-link-btn"]';
@@ -57,10 +56,7 @@ export class RumSessionsPage {
         });
     }
 
-    /**
-     * Navigate directly to the Session Viewer route for a known session id.
-     * `start_time` / `end_time` are microsecond epoch bounds.
-     */
+    /** `startTimeUs` / `endTimeUs` are microsecond epoch bounds. */
     async gotoSessionViewer(sessionId, { startTimeUs, endTimeUs } = {}) {
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const org = process.env.ORGNAME || 'default';
@@ -72,10 +68,6 @@ export class RumSessionsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
-    /**
-     * Assert the "No replay was recorded" empty state renders for the session
-     * id: visible, naming the session, with the human title intact.
-     */
     async expectNoReplayEmptyState(sessionId) {
         const empty = this.page.locator(this.sessionViewerNoReplay);
         await expect(empty).toBeVisible({ timeout: 15000 });
@@ -93,5 +85,11 @@ export class RumSessionsPage {
 
     async expectSessionViewerBackVisible() {
         await expect(this.page.locator(this.sessionViewerBackBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+    // SessionViewer's back is router.back(), so it leaves the viewer route for whatever page preceded it.
+    async clickSessionViewerBackAndExpectLeft(sessionId) {
+        await this.page.locator(this.sessionViewerBackBtn).click();
+        await expect(this.page).not.toHaveURL(new RegExp(`/rum/sessions/view/${sessionId}`), { timeout: 15000 });
     }
 }

@@ -1,8 +1,4 @@
-// traceSessionReplay.spec.js
-// RUM Session Replay — gated Play button (Trace Details) + no-replay empty
-// state (Session Viewer). Data setup: a dangling-parent OTLP trace in `default`
-// matched by `_rumdata` rows (with/without `session_has_replay`) drives the
-// gate, and a present `_sessionreplay` stream makes the empty state reachable.
+// A dangling-parent trace matched by a `_rumdata` row drives the replay gate; `_sessionreplay` must exist for the empty state.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -15,17 +11,17 @@ const BASE = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/,
 const ORG = getOrgIdentifier() || 'default';
 const AUTH_HEADERS = getAuthHeaders();
 const RUN_ID = Date.now();
+const RUM_BRIDGE_OPERATION = 'GET https://e2e.example.com/api/data';
 
-// Seeded in beforeAll (shared/read-only) — read by the replayable/regular tests.
 const seeded = {
   replayableTraceId: null,
+  replayableBridgeSpanId: null,
   sessionId: null,
   regularTraceId: null,
   fromUs: null,
   toUs: null,
 };
 
-/** Poll the traces search API until the ingested span is searchable. */
 async function pollForTraceSpan(page, streamName, operationName, maxAttempts = 20) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const endTime = (Date.now() + 60000) * 1000;
@@ -45,17 +41,12 @@ async function pollForTraceSpan(page, streamName, operationName, maxAttempts = 2
       hits = [];
     }
     if (hits.length >= 1) return true;
-    // Poll interval between search-API attempts — not a UI-sync sleep; the
-    // terminal condition is the search-API hit count below.
+    // Poll interval for the search-API hit check above, not a UI-sync sleep.
     await page.waitForTimeout(3000);
   }
   throw new Error(`trace span "${operationName}" not searchable in stream ${streamName} after ${maxAttempts} attempts`);
 }
 
-/**
- * Seed one dangling-parent trace into `default` plus its matching `_rumdata`
- * resource row. Returns the trace id / session id / µs window for navigation.
- */
 async function ingestDanglingTraceWithRumRow(page, { sessionHasReplay }) {
   const traceId = generateHexId(16); // 32-hex
   const rootSpanId = generateHexId(8);
@@ -106,7 +97,8 @@ async function ingestDanglingTraceWithRumRow(page, { sessionHasReplay }) {
     _oo_trace_id: traceId,
     _oo_span_id: danglingParentSpanId,
     type: 'resource',
-    resource_url: 'https://e2e.example.com/api/data',
+    // The UI names the bridge span `${resource_method} ${resource_url}` (useRumSpanBuilder createLeafSpan).
+    resource_url: RUM_BRIDGE_OPERATION.replace(/^GET /, ''),
     resource_method: 'GET',
     resource_type: 'fetch',
     resource_duration: 250000, // µs
@@ -131,17 +123,14 @@ async function ingestDanglingTraceWithRumRow(page, { sessionHasReplay }) {
 
   return {
     traceId,
+    bridgeSpanId: danglingParentSpanId,
     sessionId,
     fromUs: nowMs * 1000 - 600 * 1000 * 1000, // 10 min before
     toUs: nowMs * 1000 + 600 * 1000 * 1000, // 10 min after
   };
 }
 
-/**
- * Seed one well-formed (non-dangling) trace into `default`. Every span's
- * parent is owned, so `hasDanglingParent` is false and the RUM bridge never
- * runs — the "regular trace" negative-control for the Play button.
- */
+// Every parent is owned, so hasDanglingParent is false and the RUM bridge never runs.
 async function ingestRegularTrace(page) {
   const traceId = generateHexId(16); // 32-hex
   const rootSpanId = generateHexId(8);
@@ -206,44 +195,45 @@ test.describe('RUM Session Replay testcases', () => {
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    // Replayable path — the shared read-only dangling trace the button-visible test uses.
-    const replayable = await ingestDanglingTraceWithRumRow(page, { sessionHasReplay: true });
-    seeded.replayableTraceId = replayable.traceId;
-    seeded.sessionId = replayable.sessionId;
-    seeded.fromUs = replayable.fromUs;
-    seeded.toUs = replayable.toUs;
+    try {
+      const replayable = await ingestDanglingTraceWithRumRow(page, { sessionHasReplay: true });
+      seeded.replayableTraceId = replayable.traceId;
+      seeded.replayableBridgeSpanId = replayable.bridgeSpanId;
+      seeded.sessionId = replayable.sessionId;
+      seeded.fromUs = replayable.fromUs;
+      seeded.toUs = replayable.toUs;
 
-    // Regular (non-dangling) trace — negative control for the no-RUM path.
-    const regular = await ingestRegularTrace(page);
-    seeded.regularTraceId = regular.traceId;
+      const regular = await ingestRegularTrace(page);
+      seeded.regularTraceId = regular.traceId;
 
-    // `_sessionreplay` must EXIST for the empty state to render (its schema is
-    // dereferenced before the lookup). Seed one row for a different session id.
-    const seedSessionId = `e2e-sessionreplay-seed-${generateHexId(6)}`;
-    const nowMs = Date.now();
-    const replayRow = {
-      session_id: seedSessionId,
-      start: nowMs,
-      end: nowMs + 30000,
-      segment: JSON.stringify({ start: nowMs, end: nowMs + 30000, size: 12345 }),
-      source: 'browser',
-      ip: '127.0.0.1',
-      user_agent_user_agent_family: 'Chrome',
-      user_agent_os_family: 'Mac OS',
-      geo_info_city: 'San Francisco',
-      geo_info_country: 'United States',
-    };
-    const replayRes = await page.request.post(`${BASE}/api/${ORG}/_sessionreplay/_json`, {
-      headers: AUTH_HEADERS,
-      data: [replayRow],
-    });
-    expect(replayRes.ok(), `_sessionreplay ingestion should succeed (HTTP ${replayRes.status()})`).toBe(true);
-    await waitForStreamRows(page, {
-      sql: `SELECT * FROM "_sessionreplay" WHERE session_id = '${seedSessionId}'`,
-      minRows: 1,
-      timeoutMs: 45000,
-    });
-    await page.close();
+      // SessionViewer dereferences the `_sessionreplay` schema before the lookup, so the stream must exist.
+      const seedSessionId = `e2e-sessionreplay-seed-${generateHexId(6)}`;
+      const nowMs = Date.now();
+      const replayRow = {
+        session_id: seedSessionId,
+        start: nowMs,
+        end: nowMs + 30000,
+        segment: JSON.stringify({ start: nowMs, end: nowMs + 30000, size: 12345 }),
+        source: 'browser',
+        ip: '127.0.0.1',
+        user_agent_user_agent_family: 'Chrome',
+        user_agent_os_family: 'Mac OS',
+        geo_info_city: 'San Francisco',
+        geo_info_country: 'United States',
+      };
+      const replayRes = await page.request.post(`${BASE}/api/${ORG}/_sessionreplay/_json`, {
+        headers: AUTH_HEADERS,
+        data: [replayRow],
+      });
+      expect(replayRes.ok(), `_sessionreplay ingestion should succeed (HTTP ${replayRes.status()})`).toBe(true);
+      await waitForStreamRows(page, {
+        sql: `SELECT * FROM "_sessionreplay" WHERE session_id = '${seedSessionId}'`,
+        minRows: 1,
+        timeoutMs: 45000,
+      });
+    } finally {
+      await page.close();
+    }
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -267,7 +257,7 @@ test.describe('RUM Session Replay testcases', () => {
     testLogger.info('Play Session Replay button is correctly absent for a regular trace');
   });
 
-  test('should show the Play Session Replay button for a replayable RUM session and navigate to its Session Viewer', {
+  test('should show the Play Session Replay button for a replayable RUM session and open its Session Viewer (no-replay state, no recording stored)', {
     tag: ['@rum-session-replay', '@traces', '@all', '@P1'],
   }, async ({ page }) => {
     testLogger.info('Opening the replayable trace and asserting the Play button + navigation');
@@ -277,9 +267,12 @@ test.describe('RUM Session Replay testcases', () => {
       toUs: seeded.toUs,
     });
     await pm.tracesPage.expectTraceDetailsVisible();
+    await pm.tracesPage.expectTraceTreeSpanOperationName(seeded.replayableBridgeSpanId, RUM_BRIDGE_OPERATION);
     await pm.tracesPage.expectSessionReplayButtonVisible();
     await pm.tracesPage.clickSessionReplayButton();
     await pm.rumSessionsPage.expectSessionViewerFor(seeded.sessionId);
+    // The seeded session has no `_sessionreplay` rows, so the viewer lands on the empty state.
+    await pm.rumSessionsPage.expectNoReplayEmptyState(seeded.sessionId);
     testLogger.info('Play Session Replay navigated to the Session Viewer for the replayable session');
   });
 
@@ -294,6 +287,8 @@ test.describe('RUM Session Replay testcases', () => {
       toUs: nonReplay.toUs,
     });
     await pm.tracesPage.expectTraceDetailsVisible();
+    // Proves the RUM bridge ran; otherwise a hidden button would pass vacuously.
+    await pm.tracesPage.expectTraceTreeSpanOperationName(nonReplay.bridgeSpanId, RUM_BRIDGE_OPERATION);
     await pm.tracesPage.expectSessionReplayButtonHidden();
     testLogger.info('Play Session Replay button is correctly hidden for a non-replayable session');
   });
@@ -311,6 +306,7 @@ test.describe('RUM Session Replay testcases', () => {
     await pm.rumSessionsPage.expectSessionViewerSubtitleHidden();
     await pm.rumSessionsPage.expectSessionViewerShareLinkHidden();
     await pm.rumSessionsPage.expectSessionViewerBackVisible();
+    await pm.rumSessionsPage.clickSessionViewerBackAndExpectLeft(neverRecordedId);
     testLogger.info('No-replay empty state rendered with the session id and retained back navigation');
   });
 });
