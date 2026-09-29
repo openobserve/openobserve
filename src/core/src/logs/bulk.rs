@@ -116,7 +116,7 @@ pub async fn ingest(
 
             if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
                 let err_msg = "Invalid stream name: ".to_string() + &line_str;
-                log::warn!("[LOGS:BULK] {err_msg}");
+                log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.to_string(),
@@ -151,7 +151,7 @@ pub async fn ingest(
                 let err_msg = format!(
                     "stream '{stream_name}' is an internal rollup stream and cannot be ingested into"
                 );
-                log::warn!("[LOGS:BULK] {err_msg}");
+                log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.clone(),

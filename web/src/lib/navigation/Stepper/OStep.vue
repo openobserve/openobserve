@@ -4,6 +4,7 @@ import type { StepperContext, StepperRegisterAPI } from "./OStepper.types";
 import {
   computed,
   inject,
+  markRaw,
   onMounted,
   onUnmounted,
   watch,
@@ -26,7 +27,7 @@ const props = withDefaults(defineProps<OStepProps>(), {
   navigable: undefined,
 });
 
-defineSlots<OStepSlots>();
+const slots = defineSlots<OStepSlots>();
 
 // ΓöÇΓöÇ Context injection ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const context = inject<ComputedRef<StepperContext>>(STEPPER_CONTEXT_KEY);
@@ -113,6 +114,8 @@ function buildRegistration() {
     error: props.error ?? false,
     description: props.description,
     navigable: props.navigable,
+    // The reactive registry must not proxy Vue's own slots object.
+    slots: markRaw(slots),
   };
 }
 

@@ -161,10 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- max-w-full + shrink let the group wrap within its row; shrink-0 alone runs it off-screen. -->
+      <!-- max-w-full + shrink let the group wrap within its row (shrink-0 alone runs it off-screen); phone date pickers go icon-only to share the title row. -->
       <div
         v-if="hasActions() || hasActionsOverflow()"
-        class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end @max-4xl/page:ms-auto @max-4xl/page:max-w-full @max-4xl/page:shrink @max-4xl/page:flex-wrap @max-4xl/page:justify-end"
+        class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end @max-4xl/page:ms-auto @max-4xl/page:max-w-full @max-4xl/page:shrink @max-4xl/page:flex-wrap @max-4xl/page:justify-end max-md:[&_.date-time-label]:hidden"
       >
         <slot v-if="hasActionsOverflow() && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
