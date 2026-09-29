@@ -124,4 +124,63 @@ mod tests {
 
         Ok(())
     }
+
+    fn invalid_utf8_ipc() -> (Arc<Schema>, Vec<u8>) {
+        use arrow::array::{Array, BinaryArray, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let binary = BinaryArray::from_iter_values([b"ok".as_slice(), &[0xff, 0xfe, 0xfd]]);
+        // SAFETY: deliberately invalid UTF-8 to exercise the reader's validation
+        let strings = unsafe {
+            StringArray::new_unchecked(
+                binary.offsets().clone(),
+                binary.values().clone(),
+                binary.nulls().cloned(),
+            )
+        };
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(strings)]).unwrap();
+        let mut buffer = Cursor::new(Vec::new());
+        let mut writer = FileWriter::try_new(&mut buffer, &schema).unwrap();
+        writer.write(&batch).unwrap();
+        writer.finish().unwrap();
+        (schema, buffer.into_inner())
+    }
+
+    async fn decode_and_collect(schema: Arc<Schema>, data: Vec<u8>) -> Result<Vec<RecordBatch>> {
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(TmpExec::new(
+            "trace".to_string(),
+            config::get_cluster_name(),
+            "join/x.arrow".to_string(),
+            Some(data),
+            schema,
+        ));
+        let codec = super::super::get_physical_extension_codec();
+        let bytes = physical_plan_to_bytes_with_extension_codec(plan, &codec)?;
+        let ctx = datafusion::prelude::SessionContext::new();
+        let decoded =
+            physical_plan_from_bytes_with_extension_codec(&bytes, &ctx.task_ctx(), &codec)?;
+        let stream = decoded.execute(0, ctx.task_ctx())?;
+        datafusion::physical_plan::common::collect(stream).await
+    }
+
+    #[tokio::test]
+    async fn test_decoded_invalid_ipc_data_is_error() {
+        let (schema, data) = invalid_utf8_ipc();
+
+        let ret = decode_and_collect(schema, data).await;
+
+        assert!(
+            ret.is_err(),
+            "invalid IPC data was accepted: {:?}",
+            ret.map(|b| b.iter().map(|b| b.num_rows()).sum::<usize>())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_decoded_truncated_ipc_data_is_error() {
+        let (schema, mut data) = invalid_utf8_ipc();
+        data.truncate(data.len() / 2);
+
+        assert!(decode_and_collect(schema, data).await.is_err());
+    }
 }
