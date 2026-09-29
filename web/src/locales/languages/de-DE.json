@@ -5231,6 +5231,7 @@
     "valueMappingTypeLte": "Kleiner oder gleich",
     "valueMappingEmptyTitle": "Keine Wertzuordnungen",
     "valueMappingEmptyDescription": "Ordnen Sie Werte, Bereiche oder Muster Anzeigetexten und Farben zu.",
+    "valueMappingUnsafeRegex": "Dieses Muster kann die Tabelle einfrieren. Verwenden Sie höchstens 256 Zeichen und wiederholen Sie keine Gruppe, die sich bereits wiederholt, wie (a+)+.",
     "configSectionFieldOverrides": "Feldüberschreibungen",
     "configSectionFieldOverridesTooltip": "Ordnen Sie den ausgewählten Spalten Einheiten zu, um die Datenvisualisierung zu verbessern.",
     "addFieldOverride": "Feldüberschreibung hinzufügen",

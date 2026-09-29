@@ -5231,6 +5231,7 @@
     "valueMappingTypeLte": "Kleiner dan of gelijk aan",
     "valueMappingEmptyTitle": "Geen waardetoewijzingen",
     "valueMappingEmptyDescription": "Wijs waarden, bereiken of patronen toe aan weergavetekst en kleuren.",
+    "valueMappingUnsafeRegex": "Dit patroon kan de tabel laten vastlopen. Gebruik maximaal 256 tekens en herhaal geen groep die zichzelf al herhaalt, zoals (a+)+.",
     "configSectionFieldOverrides": "Veldoverschrijvingen",
     "configSectionFieldOverridesTooltip": "Wijs eenheden toe aan de geselecteerde kolommen voor verbeterde datavisualisatie.",
     "addFieldOverride": "Veldoverride toevoegen",

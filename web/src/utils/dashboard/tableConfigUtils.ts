@@ -37,6 +37,15 @@ export const OVERRIDE_CONFIG_TYPES = {
   FIELD_TYPE: "field_type",
 } as const;
 
+// Value-mapping regexes run synchronously on every table cell, so both sides are bounded.
+const MAX_VALUE_MAPPING_PATTERN_LENGTH = 256;
+const MAX_VALUE_MAPPING_TEST_LENGTH = 1024;
+
+const REGEX_KEY_PREFIX = "__regex_";
+
+// Compiled at cache build so a table never recompiles a pattern per cell.
+const compiledRegexByCache = new WeakMap<Map<any, any>, Map<string, RegExp | null>>();
+
 /** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
 export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
   fieldType === "num" ? true : fieldType === "text" ? false : detected;
@@ -57,6 +66,38 @@ export const parseRegexPattern = (input: string): { pattern: string; flags: stri
   return { pattern: input, flags: "" };
 };
 
+/** True when a quantified group itself contains a quantifier, e.g. `(a+)+` or `(.*)*`, the shape behind catastrophic backtracking. */
+export const hasNestedQuantifier = (pattern: string): boolean => {
+  const groupRepeats: boolean[] = [];
+  let repeats = false;
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") {
+      i++;
+    } else if (inClass) {
+      inClass = ch !== "]";
+    } else if (ch === "[") {
+      inClass = true;
+    } else if (ch === "(") {
+      groupRepeats.push(repeats);
+      repeats = false;
+    } else if (ch === ")") {
+      const inner: boolean = repeats;
+      if (inner && isRepetitionAt(pattern, i + 1)) return true;
+      repeats = (groupRepeats.pop() ?? false) || inner;
+    } else if (isRepetitionAt(pattern, i)) {
+      repeats = true;
+    }
+  }
+  return false;
+};
+
+/** Whether a value-mapping regex is short enough and free of nested quantifiers to run on every table cell. */
+export const isSafeValueMappingPattern = (input: string): boolean =>
+  input.length <= MAX_VALUE_MAPPING_PATTERN_LENGTH &&
+  !hasNestedQuantifier(parseRegexPattern(input).pattern);
+
 /** Build a fast-lookup cache from `config.mappings`, storing the full mapping object. */
 export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   if (!mappings || !Array.isArray(mappings)) {
@@ -64,6 +105,7 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   }
 
   const cache = new Map<any, any>();
+  const compiled = new Map<string, RegExp | null>();
 
   mappings.forEach((mapping: any) => {
     if (!mapping) return;
@@ -82,8 +124,9 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
     const type = mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
 
     if (type === "regex") {
-      // Regex mapping – stored with a special prefix; pattern tested during lookup
-      cache.set(`__regex_${mapping.pattern ?? ""}`, mapping);
+      const key = `${REGEX_KEY_PREFIX}${mapping.pattern ?? ""}`;
+      cache.set(key, mapping);
+      compiled.set(key, compileValueMappingRegex(String(mapping.pattern ?? "")));
     } else if (type === "range") {
       // Range mapping – encoded key so direct + range share the same Map
       cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
@@ -94,7 +137,9 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
     }
   });
 
-  return cache.size > 0 ? cache : null;
+  if (cache.size === 0) return null;
+  compiledRegexByCache.set(cache, compiled);
+  return cache;
 };
 
 /**
@@ -156,17 +201,13 @@ export const lookupValueMappingFull = (
     if (thresholdHit) return thresholdHit;
   }
 
-  // Regex match
+  if (strValue.length > MAX_VALUE_MAPPING_TEST_LENGTH) return null;
+  const compiled = compiledRegexByCache.get(cache);
   for (const [key, mapping] of cache.entries()) {
-    if (typeof key === "string" && key.startsWith("__regex_")) {
-      const rawPattern = key.slice(8); // "__regex_".length === 8
-      try {
-        const { pattern, flags } = parseRegexPattern(rawPattern);
-        if (new RegExp(pattern, flags).test(strValue) && ok(mapping)) {
-          return mapping;
-        }
-      } catch {
-        // invalid regex pattern, skip
+    if (typeof key === "string" && key.startsWith(REGEX_KEY_PREFIX)) {
+      const regex = compiled?.get(key);
+      if (regex && regex.test(strValue) && ok(mapping)) {
+        return mapping;
       }
     }
   }
@@ -466,4 +507,20 @@ export const resolveMetricValueStyle = (
   const bgColor = mapping?.color || panelBackground || "";
 
   return { text, textColor, bgColor };
+};
+
+const isRepetitionAt = (pattern: string, index: number): boolean => {
+  const ch = pattern[index];
+  return ch === "*" || ch === "+" || (ch === "{" && /^\{\d+(,\d*)?\}/.test(pattern.slice(index)));
+};
+
+// g and y are dropped because a shared compiled regex with lastIndex state would alternate results.
+const compileValueMappingRegex = (input: string): RegExp | null => {
+  if (!isSafeValueMappingPattern(input)) return null;
+  const { pattern, flags } = parseRegexPattern(input);
+  try {
+    return new RegExp(pattern, flags.replace(/[gy]/g, ""));
+  } catch {
+    return null;
+  }
 };

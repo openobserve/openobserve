@@ -5231,6 +5231,7 @@
     "valueMappingTypeLte": "Küçük veya eşit",
     "valueMappingEmptyTitle": "Değer eşlemesi yok",
     "valueMappingEmptyDescription": "Değerleri, aralıkları veya desenleri görüntüleme metni ve renklere eşleyin.",
+    "valueMappingUnsafeRegex": "Bu desen tabloyu dondurabilir. En fazla 256 karakter kullanın ve (a+)+ gibi zaten tekrar eden bir grubu tekrarlamayın.",
     "configSectionFieldOverrides": "Alan Geçersiz Kılma",
     "configSectionFieldOverridesTooltip": "Gelişmiş veri görselleştirmesi için birimleri seçilen sütunlara eşleyin.",
     "addFieldOverride": "Alan geçersiz kılma ekle",

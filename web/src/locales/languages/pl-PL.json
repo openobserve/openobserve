@@ -5231,6 +5231,7 @@
     "valueMappingTypeLte": "Mniejsze lub równe",
     "valueMappingEmptyTitle": "Brak odwzorowań wartości",
     "valueMappingEmptyDescription": "Odwzoruj wartości, zakresy lub wzorce na tekst i kolory.",
+    "valueMappingUnsafeRegex": "Ten wzorzec może zamrozić tabelę. Użyj maksymalnie 256 znaków i nie powtarzaj grupy, która już się powtarza, np. (a+)+.",
     "configSectionFieldOverrides": "Formatowanie kolumn",
     "configSectionFieldOverridesTooltip": "Skonfiguruj typy komórek, kolory, jednostki i reguły warunkowe dla każdej kolumny.",
     "addFieldOverride": "Skonfiguruj formatowanie kolumn",

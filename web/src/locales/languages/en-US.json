@@ -5231,6 +5231,7 @@
     "valueMappingTypeLte": "Less than or equal",
     "valueMappingEmptyTitle": "No value mappings",
     "valueMappingEmptyDescription": "Map values, ranges, or patterns to display text and colors.",
+    "valueMappingUnsafeRegex": "This pattern could freeze the table. Keep it to 256 characters and do not repeat a group that already repeats, like (a+)+.",
     "configSectionFieldOverrides": "Column Formatting",
     "configSectionFieldOverridesTooltip": "Configure cell types, colors, units, and conditional rules per column.",
     "addFieldOverride": "Configure column formatting",
