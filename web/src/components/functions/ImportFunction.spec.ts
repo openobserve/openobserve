@@ -128,6 +128,11 @@ describe("ImportFunction", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // clearAllMocks drops call history but keeps queued `...Once` outcomes, and a
+    // rejection queued for a write this screen no longer makes would be served to
+    // whichever test writes next.
+    mockCreate.mockReset();
+    mockUpdate.mockReset();
     mockList.mockResolvedValue({ data: { list: existing } });
     mockCreate.mockResolvedValue({ data: { code: 200 } });
     mockUpdate.mockResolvedValue({ data: { code: 200 } });
@@ -277,16 +282,32 @@ describe("ImportFunction", () => {
         response: { data: { message: "Function already exist" } },
       });
 
-    it("sends the item and reports what the server said", async () => {
-      serverRejectsClash();
+    it("asks the server nothing while a name is taken, and everything once it is freed", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      expect(mockCreate).not.toHaveBeenCalled();
+
+      // Replacing is a choice about the same name, so the write is intended and
+      // goes out -- the clash is no longer an error to answer.
+      await wrapper.vm.onOverrideChoice("parse_nginx", 0, true);
+      await flushPromises();
+      await pressImport(wrapper);
+
+      expect(wrapper.text()).not.toContain("already exists");
+    });
+
+    it("raises the clash without sending the item", async () => {
       const wrapper = mountScreen();
       await flushPromises();
 
       await importJson(wrapper, conflicting);
 
-      // Sent, not withheld: no press of this screen quietly declines to try.
-      expect(mockCreate).toHaveBeenCalledTimes(1);
-      expect(wrapper.text()).toContain("already exist");
+      // The org already holds the name, so the rename box answers it before a
+      // write is attempted rather than after one is refused.
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("already exists");
       expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
@@ -312,8 +333,9 @@ describe("ImportFunction", () => {
       await nextTick();
       await pressImport(wrapper);
 
-      expect(mockCreate).toHaveBeenCalledTimes(2);
-      expect(mockCreate.mock.calls[1][1]).toMatchObject({
+      // Only the renamed press reaches the server; the clashing one never did.
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({
         name: "parse_nginx_v2",
         function: ".b = 2",
       });
@@ -384,9 +406,53 @@ describe("ImportFunction", () => {
       await nextTick();
       expect(wrapper.vm.nameInputError[0]).toContain("Enter a function name");
 
+      // The same list the press checks, so the box says now what the press
+      // would say next.
+      wrapper.vm.updateFunctionName("parse_json", 0);
+      await nextTick();
+      expect(wrapper.vm.nameInputError[0]).toContain("already taken");
+
       wrapper.vm.updateFunctionName("parse_nginx_v2", 0);
       await nextTick();
       expect(wrapper.vm.nameInputError[0]).toBeNull();
+    });
+
+    // The clash check reads a list of the org's names. Kept across an org switch
+    // it would report names that are free here and miss the ones that are not.
+    it("forgets the names it read when the org changes", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      expect(wrapper.text()).toContain("already exists");
+
+      mockList.mockResolvedValue({ data: { list: [] } });
+      store.state.selectedOrganization = { identifier: "other-org" };
+      await flushPromises();
+
+      await pressImport(wrapper);
+
+      // Free in the new org, so it is written rather than reported as taken.
+      expect(wrapper.text()).not.toContain("already exists");
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
+    // Re-sending a function THIS run created is an update of our own work. It
+    // only avoided being reported as taken because the list was read before the
+    // write; that is luck, not a rule.
+    it("does not report the function it just wrote as a name that is taken", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "brand_new", function: ".a = 1" });
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+
+      // The list now holds it, the way a re-read would find it.
+      (wrapper.vm as any).existingNames = new Set(["brand_new"]);
+      await pressImport(wrapper);
+
+      expect(wrapper.text()).not.toContain("already exists");
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
     });
 
     it("catches a rename that collides with another item in the same file", async () => {

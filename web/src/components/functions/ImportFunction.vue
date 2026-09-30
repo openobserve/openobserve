@@ -309,6 +309,26 @@ export default defineComponent({
     // it must not have the server reject everything the first press created.
     const writtenByThisRun = ref<Map<string, string>>(new Map());
 
+    // Names the org already holds, read once per import so a taken name is answered
+    // by the rename box before anything is sent rather than by a failed write.
+    // Declared beside the other per-run state because both the org watcher and the
+    // name box read it, and both sit above where it used to live.
+    const existingNames = ref<Set<string> | null>(null);
+
+    const loadExistingNames = async () => {
+      if (existingNames.value) return;
+      try {
+        const res: any = await jsTransformService.list(1, 100000, "name", false, "", orgId.value);
+        existingNames.value = new Set(
+          (res.data?.list ?? []).map((fn: any) => fn.name).filter(Boolean),
+        );
+      } catch (err) {
+        console.error("Error while reading existing functions", err);
+        // Unreadable list means the server judges the clash, as it did before.
+        existingNames.value = new Set();
+      }
+    };
+
     // The same entitlement the Add Function form applies. Offering JavaScript
     // where the build cannot run it would only trade this validation error for a
     // server-side one.
@@ -353,6 +373,7 @@ export default defineComponent({
     // Describes one org's functions and means nothing in the next.
     watch(orgId, () => {
       writtenByThisRun.value = new Map();
+      existingNames.value = null;
     });
 
     // ── Document identity ──────────────────────────────────────────────────
@@ -427,8 +448,15 @@ export default defineComponent({
       if (items.some((other, i) => i !== index && other?.name === name)) {
         return t("function.import.nameInputDuplicate");
       }
-      // Whether the org already holds this name is not asked here: that is the
-      // server's answer, and it arrives as a rejection carrying this same box.
+      // Same list the press checks against, so the box says what the next press
+      // would say rather than waiting for it.
+      if (
+        !writtenByThisRun.value.has(name) &&
+        existingNames.value?.has(name) &&
+        !overrideExisting.value[name]
+      ) {
+        return t("function.import.nameInputExists");
+      }
       return null;
     };
 
@@ -521,15 +549,21 @@ export default defineComponent({
         errors.push(
           nameError(t("function.import.duplicateName", { index, name }), itemIndex, name),
         );
+      } else if (
+        !writtenByThisRun.value.has(name) &&
+        existingNames.value?.has(name) &&
+        overrideExisting.value[name] !== true
+      ) {
+        // A name the org already holds is answered by the rename box, so it is
+        // raised before anything is sent. Ticking replace makes the clash the
+        // intent rather than a problem, so it stops being an error.
+        //
+        // A name THIS RUN wrote is not a clash with anyone: re-sending it is an
+        // update of our own work. Without this, fixing one item and pressing
+        // again would report the item the last press created as taken.
+        errors.push(conflictError(item, index, itemIndex));
       }
       if (name) seen.add(name);
-
-      // Whether the ORG already has this name is deliberately not checked here.
-      // Every other import screen validates the shape of the document and lets
-      // the server judge the rest, so a clash arrives as a rejection carrying the
-      // box that renames it. Pre-empting it needed a prompt that was raised on
-      // one press and acted on by the next, which is what produced a press that
-      // silently kept the existing function.
 
       if (!item?.function || typeof item.function !== "string" || !item.function.trim()) {
         errors.push({
@@ -674,6 +708,8 @@ export default defineComponent({
       }
 
       isImporting.value = true;
+
+      await loadExistingNames();
 
       const seen = new Set<string>();
       const errorGroups = items

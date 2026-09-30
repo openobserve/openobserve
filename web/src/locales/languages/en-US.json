@@ -3681,6 +3681,7 @@
       "nameInputRequired": "Enter a function name",
       "nameInputInvalid": "Use letters, numbers and underscores, starting with a letter or underscore",
       "nameInputDuplicate": "Another function in this file already uses this name",
+      "nameInputExists": "This name is already taken in this organization",
       "overrideAffects": "Override also changes these pipelines: {pipelines}",
       "createSuccess": "Function - {index}: \"{name}\" imported",
       "overridden": "Function - {index}: \"{name}\" overridden",
