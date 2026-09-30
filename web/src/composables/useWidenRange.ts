@@ -39,21 +39,38 @@ export function periodToLabel(period: string): string {
   return gt(units[unit] ?? "common.pastUnit", { count: value });
 }
 
+const UNIT_TO_MINS: Record<string, number> = {
+  s: 1 / 60,
+  m: 1,
+  h: 60,
+  d: 1440,
+  w: 10080,
+  M: 43200,
+};
+
+// Ordered widen tiers, smallest first. `nextWiderPeriod` returns the first tier
+// strictly larger than the input, so the suggestion always grows the window.
+const WIDER_TIERS: Array<{ period: string; mins: number }> = [
+  { period: "1h", mins: 60 },
+  { period: "6h", mins: 360 },
+  { period: "12h", mins: 720 },
+  { period: "1d", mins: 1440 },
+  { period: "2d", mins: 2880 },
+  { period: "7d", mins: 10080 },
+  { period: "30d", mins: 43200 },
+  { period: "90d", mins: 129600 },
+  { period: "6M", mins: 259200 },
+  { period: "12M", mins: 518400 },
+];
+
 export function nextWiderPeriod(period: string): string {
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
-  const toMins: Record<string, number> = {
-    s: 1 / 60,
-    m: 1,
-    h: 60,
-    d: 1440,
-    w: 10080,
-    M: 43200,
-  };
-  const mins = value * (toMins[unit] ?? 1);
-  if (mins <= 60) return "1d";
-  if (mins <= 1440) return "7d";
-  return "30d";
+  const mins = value * (UNIT_TO_MINS[unit] ?? 1);
+  const tier = WIDER_TIERS.find((t) => t.mins > mins);
+  if (tier) return tier.period;
+  // Already at or beyond the widest tier: double it so the suggestion still grows.
+  return `${value * 2}${unit}`;
 }
 
 /**
