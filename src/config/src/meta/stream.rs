@@ -821,13 +821,8 @@ pub struct UpdateStreamSettings {
     pub store_original_data: Option<bool>,
     #[serde(default)]
     pub approx_partition: Option<bool>,
-    /// Missing = unchanged, `null` = follow `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`, bool = set.
-    #[serde(
-        default,
-        deserialize_with = "serde_with::rust::double_option::deserialize"
-    )]
-    #[schema(value_type = Option<bool>, nullable)]
-    pub dynamic_merge: Option<Option<bool>>,
+    #[serde(default)]
+    pub dynamic_merge: Option<bool>,
     #[serde(default)]
     pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
     #[serde(default)]
@@ -2621,12 +2616,12 @@ mod tests {
     }
 
     #[test]
-    fn test_update_stream_settings_dynamic_merge_three_states() {
+    fn test_update_stream_settings_dynamic_merge_null_is_unchanged() {
         let missing: UpdateStreamSettings = json::from_str("{}").unwrap();
         assert_eq!(missing.dynamic_merge, None);
-        let cleared: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": null}"#).unwrap();
-        assert_eq!(cleared.dynamic_merge, Some(None));
+        let null: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": null}"#).unwrap();
+        assert_eq!(null.dynamic_merge, None);
         let set: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": false}"#).unwrap();
-        assert_eq!(set.dynamic_merge, Some(Some(false)));
+        assert_eq!(set.dynamic_merge, Some(false));
     }
 }

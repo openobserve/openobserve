@@ -484,7 +484,7 @@ pub async fn update_stream_settings(
                 "dynamic_merge is only supported for logs, metrics and traces streams",
             ));
         }
-        settings.dynamic_merge = v;
+        settings.dynamic_merge = Some(v);
     }
     if let Some(v) = new_settings.index_original_data {
         settings.index_original_data = v;

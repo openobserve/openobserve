@@ -389,8 +389,7 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-/// Stream types whose closed days the compactor merges across hours, from
-/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; validated by `check_compact_config`.
+/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
 pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
     parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
         .expect("validated at startup")

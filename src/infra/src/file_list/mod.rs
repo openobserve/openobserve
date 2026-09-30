@@ -739,9 +739,7 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
     Ok(())
 }
 
-/// The level the `max_ts` bound of `stream_name`'s file-list queries is widened by: daily
-/// when the stream is dynamically merged (its files can span a day), else
-/// [`query_retention_level`].
+/// Daily when the stream is dynamically merged (its files can span a day), else the type's level.
 pub async fn max_ts_bound_level(
     org_id: &str,
     stream_type: StreamType,
@@ -758,8 +756,7 @@ pub async fn max_ts_bound_level(
     }
 }
 
-/// `ZO_*_QUERY_RETENTION` of the type; `Filelist` is daily because the dump file of a
-/// dynamically merged day spans that day.
+/// `ZO_*_QUERY_RETENTION` of the type; `Filelist` is daily, a dump file can hold a merged day.
 pub fn query_retention_level(stream_type: StreamType) -> PartitionTimeLevel {
     let cfg = get_config();
     let level = match stream_type {
