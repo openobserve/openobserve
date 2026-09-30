@@ -20,4 +20,5 @@ export const publicLinkKeys = {
   org: (org: string) => orgKey(org, "public_links", "org"),
   byDashboard: (org: string, dashboardId: string) =>
     orgKey(org, "public_links", "dashboard", dashboardId),
+  access: (org: string, dashboardId: string) => orgKey(org, "public_links", "access", dashboardId),
 };

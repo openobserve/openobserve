@@ -29,9 +29,13 @@ use config::{
             SnapshotData, TimeRangePolicy,
         },
         search,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
-    utils::{rand::generate_random_string, time::now_micros},
+    utils::{
+        query_select_utils::replace_o2_custom_patterns, rand::generate_random_string,
+        time::now_micros,
+    },
 };
 use infra::table::{
     dashboards, entity::public_dashboards::Model as PublicDashboard, public_dashboards as pd_table,
@@ -117,64 +121,91 @@ async fn build_panels(
     let Some(v8) = dash.v8.as_ref() else {
         return out;
     };
-    for tab in &v8.tabs {
-        for panel in &tab.panels {
-            let mut data = Vec::new();
-            let mut result_meta_data = Vec::new();
-            let mut queries_meta = Vec::new();
-            let mut any_ok = false;
-            let mut reason = "no_query".to_string();
-            for (qi, q) in panel.queries.iter().enumerate() {
-                // Same per-query metadata the live loader builds for an unshifted query.
-                queries_meta.push(serde_json::json!({
-                    "startTime": start,
-                    "endTime": end,
-                    "queryType": panel.query_type,
-                    "timeRangeGap": { "seconds": 0, "periodAsStr": "" },
-                    "panelQueryIndex": qi,
-                }));
-                match run_query(
-                    org,
-                    publisher,
-                    &panel.query_type,
-                    q,
-                    vars,
-                    start,
-                    end,
-                    authorized,
-                    unauthorized,
-                )
-                .await
-                {
-                    Ok((resp, meta)) => {
-                        any_ok = true;
-                        data.push(resp);
-                        result_meta_data.push(meta);
+    for panel in v8.tabs.iter().flat_map(|tab| &tab.panels) {
+        let is_promql = panel.query_type == "promql";
+        let mut results = Vec::with_capacity(panel.queries.len());
+        let mut failure = None;
+        for q in &panel.queries {
+            match run_query(
+                org,
+                publisher,
+                &panel.query_type,
+                q,
+                vars,
+                start,
+                end,
+                authorized,
+                unauthorized,
+            )
+            .await
+            {
+                Ok(result) => results.push(Some(result)),
+                // As on the live dashboard: SQL is one request, PromQL queries are independent.
+                Err(reason) => {
+                    failure = Some(reason);
+                    if !is_promql {
+                        break;
                     }
-                    Err(r) => {
-                        reason = r;
-                        data.push(serde_json::Value::Null);
-                        result_meta_data.push(serde_json::Value::Null);
-                    }
+                    results.push(None);
                 }
             }
-            let state = if any_ok {
-                PanelState::Ok
-            } else {
-                PanelState::NotAvailable { reason }
-            };
-            out.insert(
-                panel.id.clone(),
-                PanelSnapshot {
-                    state,
-                    data,
-                    result_meta_data,
-                    metadata: serde_json::json!({ "queries": queries_meta }),
-                },
-            );
         }
+        let snapshot = panel_snapshot(&panel.query_type, start, end, results, failure);
+        out.insert(panel.id.clone(), snapshot);
     }
     out
+}
+
+/// SQL needs every query; PromQL needs one, with the rest stored as empty results.
+fn panel_snapshot(
+    query_type: &str,
+    start: i64,
+    end: i64,
+    results: Vec<Option<(serde_json::Value, serde_json::Value)>>,
+    failure: Option<String>,
+) -> PanelSnapshot {
+    let is_promql = query_type == "promql";
+    let any_ok = results.iter().any(Option::is_some);
+    if !any_ok || (!is_promql && failure.is_some()) {
+        return PanelSnapshot {
+            state: PanelState::NotAvailable {
+                reason: failure.unwrap_or_else(|| "no_query".to_string()),
+            },
+            data: Vec::new(),
+            result_meta_data: Vec::new(),
+            metadata: serde_json::Value::Null,
+        };
+    }
+    // Same per-query metadata the live loader builds for an unshifted query.
+    let queries_meta = (0..results.len())
+        .map(|qi| {
+            serde_json::json!({
+                "startTime": start,
+                "endTime": end,
+                "queryType": query_type,
+                "timeRangeGap": { "seconds": 0, "periodAsStr": "" },
+                "panelQueryIndex": qi,
+            })
+        })
+        .collect::<Vec<_>>();
+    // An empty matrix, not null, since the PromQL converter reads `.result` on every entry.
+    let (data, result_meta_data) = results
+        .into_iter()
+        .map(|r| {
+            r.unwrap_or_else(|| {
+                (
+                    serde_json::json!({ "resultType": "matrix", "result": [] }),
+                    serde_json::Value::Null,
+                )
+            })
+        })
+        .unzip();
+    PanelSnapshot {
+        state: PanelState::Ok,
+        data,
+        result_meta_data,
+        metadata: serde_json::json!({ "queries": queries_meta }),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -232,30 +263,8 @@ async fn run_sql(
         return Err("no_query".to_string());
     };
     let sql = substitute_vars(sql_tmpl, vars);
-    let stream = q.fields.stream.clone();
     let stream_type = q.fields.stream_type;
-
-    // Explicit per-stream RBAC — `search_service::search` does not enforce it.
-    // Enterprise only; OSS has no fine-grained stream perms (org membership is
-    // the boundary), so the check is a no-op there.
-    #[cfg(feature = "enterprise")]
-    {
-        use crate::authz::{StreamPermissionResourceType, check_stream_permissions};
-        if check_stream_permissions(
-            &stream,
-            org,
-            publisher,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        .is_some()
-        {
-            unauthorized.insert(stream);
-            return Err("unauthorized".to_string());
-        }
-    }
-    authorized.insert(stream);
+    authorize_query(org, publisher, "sql", &sql, q, authorized, unauthorized).await?;
 
     let req = search::Request {
         query: search::Query {
@@ -315,30 +324,7 @@ async fn run_promql(
         &substitute_vars(expr_tmpl, &promql_fixed_vars(start, end)),
         vars,
     );
-    let stream = q.fields.stream.clone();
-
-    // Best-effort RBAC on the declared metric (a PromQL expr may span several
-    // metrics; the publisher's own read perms still bound execution).
-    #[cfg(feature = "enterprise")]
-    if !stream.is_empty() {
-        use crate::authz::{StreamPermissionResourceType, check_stream_permissions};
-        if check_stream_permissions(
-            &stream,
-            org,
-            publisher,
-            &StreamType::Metrics,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        .is_some()
-        {
-            unauthorized.insert(stream);
-            return Err("unauthorized".to_string());
-        }
-    }
-    if !stream.is_empty() {
-        authorized.insert(stream);
-    }
+    authorize_query(org, publisher, "promql", &expr, q, authorized, unauthorized).await?;
 
     let step = ((end - start) / 400).max(1_000_000);
     let req = promql_service::MetricsQueryRequest {
@@ -469,15 +455,91 @@ fn parse_frozen_vars(json: Option<&str>) -> BTreeMap<String, serde_json::Value> 
         .unwrap_or_default()
 }
 
+/// Checks every stream the final query reads, since SQL and PromQL can read beyond the picked one.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+async fn authorize_query(
+    org: &str,
+    user_id: &str,
+    query_type: &str,
+    text: &str,
+    q: &config::meta::dashboards::v8::Query,
+    authorized: &mut BTreeSet<String>,
+    unauthorized: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::authz::{
+            StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
+        };
+        // An unreadable query can't be proven safe, so it is withheld rather than run.
+        let streams = query_streams(query_type, text, q.fields.stream_type)
+            .map_err(|_| "unauthorized".to_string())?;
+        for (stream, stream_type) in &streams {
+            let denied = check_stream_permissions(
+                stream,
+                org,
+                user_id,
+                stream_type,
+                StreamPermissionResourceType::Search,
+            )
+            .await
+            .is_some();
+            if denied {
+                unauthorized.insert(stream.clone());
+                return Err("unauthorized".to_string());
+            }
+        }
+        if query_type != "promql"
+            && check_cipher_key_permissions(org, user_id, text)
+                .await
+                .is_some()
+        {
+            return Err("unauthorized".to_string());
+        }
+        authorized.extend(streams.into_iter().map(|(stream, _)| stream));
+    }
+    #[cfg(not(feature = "enterprise"))]
+    if !q.fields.stream.is_empty() {
+        authorized.insert(q.fields.stream.clone());
+    }
+    Ok(())
+}
+
+/// The distinct streams a SQL or PromQL query reads; an unqualified table takes `default_type`.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn query_streams(
+    query_type: &str,
+    text: &str,
+    default_type: StreamType,
+) -> Result<Vec<(String, StreamType)>, String> {
+    let mut out: Vec<(String, StreamType)> = Vec::new();
+    if query_type == "promql" {
+        let ast = promql_parser::parser::parse(text).map_err(|e| e.to_string())?;
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
+        promql::ast::visitor::walk_expr(&mut visitor, &ast).map_err(|e| e.to_string())?;
+        let mut names: Vec<String> = visitor.into_names().into_iter().collect();
+        names.sort();
+        out.extend(names.into_iter().map(|n| (n, StreamType::Metrics)));
+        return Ok(out);
+    }
+    let sql = replace_o2_custom_patterns(text).unwrap_or_else(|_| text.to_string());
+    for table in resolve_stream_names_with_type(&sql).map_err(|e| e.to_string())? {
+        let pair = (table.stream_name(), table.get_stream_type(default_type));
+        if !out.contains(&pair) {
+            out.push(pair);
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(out)
+}
+
 /// Identifiers returned after publishing.
 pub struct PublishResult {
     pub id: String,
     pub slug: String,
 }
 
-/// Publish a public link for a dashboard: extract its streams, authorize the
-/// publisher on each, capture the config, insert the row, register the rebuild
-/// trigger, and build the first snapshots synchronously so the link works now.
+/// Publish a link; the rebuild withholds panels on streams the publisher can't read.
 pub async fn create(
     org: &str,
     dashboard_id: &str,
@@ -487,30 +549,6 @@ pub async fn create(
     let Some((folder, dash)) = dashboards::get_by_id(org, dashboard_id).await? else {
         return Err(anyhow::anyhow!("dashboard not found"));
     };
-
-    // Publish-time authz gate: the publisher must read every referenced stream.
-    // Enterprise only; OSS has no fine-grained stream perms (org membership is
-    // the boundary).
-    #[cfg(feature = "enterprise")]
-    {
-        use crate::authz::{StreamPermissionResourceType, check_stream_permissions};
-        for (stream, stream_type) in extract_streams(&dash) {
-            if check_stream_permissions(
-                &stream,
-                org,
-                publisher,
-                &stream_type,
-                StreamPermissionResourceType::Search,
-            )
-            .await
-            .is_some()
-            {
-                return Err(anyhow::anyhow!(
-                    "publisher lacks read permission on stream {stream}"
-                ));
-            }
-        }
-    }
 
     let id = ider::uuid();
     let slug = gen_unique_slug().await?;
@@ -561,8 +599,7 @@ pub async fn list_for_dashboard(
     Ok(pd_table::list_by_dashboard(org, dashboard_id).await?)
 }
 
-/// A link as the admin API returns it; the slug is a bearer secret, so only authenticated routes
-/// carry it.
+/// A link as the admin API returns it; the slug is a bearer secret for authenticated routes only.
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct PublicLinkView {
     pub id: String,
@@ -787,25 +824,6 @@ async fn gen_unique_slug() -> Result<String, anyhow::Error> {
     Err(anyhow::anyhow!("could not generate a unique slug"))
 }
 
-/// The (stream, stream_type) pairs a v8 dashboard's panel queries read.
-#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
-fn extract_streams(dash: &Dashboard) -> Vec<(String, StreamType)> {
-    let mut out: Vec<(String, StreamType)> = Vec::new();
-    if let Some(v8) = dash.v8.as_ref() {
-        for tab in &v8.tabs {
-            for panel in &tab.panels {
-                for q in &panel.queries {
-                    let pair = (q.fields.stream.clone(), q.fields.stream_type);
-                    if !q.fields.stream.is_empty() && !out.contains(&pair) {
-                        out.push(pair);
-                    }
-                }
-            }
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -944,5 +962,111 @@ mod tests {
         assert_eq!(m["__interval"], json!("15s"));
         assert_eq!(m["__range_s"], json!("200"));
         assert_eq!(m["__range_ms"], json!("200000"));
+    }
+
+    fn names(streams: Vec<(String, StreamType)>) -> Vec<String> {
+        streams.into_iter().map(|(s, _)| s).collect()
+    }
+
+    #[test]
+    fn query_streams_reads_every_stream_the_sql_touches() {
+        let sql = r#"WITH x AS (SELECT * FROM "b") SELECT a.k FROM "a" a JOIN "c" c ON a.k = c.k
+            WHERE a.k IN (SELECT k FROM "d") UNION ALL SELECT k FROM x"#;
+        let got = names(query_streams("sql", sql, StreamType::Logs).unwrap());
+        assert_eq!(got, ["a", "b", "c", "d"]);
+    }
+
+    #[test]
+    fn query_streams_takes_the_type_from_a_qualified_table() {
+        let got = query_streams(
+            "sql",
+            r#"SELECT * FROM "metrics"."cpu" JOIN "e" ON true"#,
+            StreamType::Logs,
+        )
+        .unwrap();
+        assert_eq!(
+            got,
+            [
+                ("cpu".to_string(), StreamType::Metrics),
+                ("e".to_string(), StreamType::Logs)
+            ]
+        );
+    }
+
+    #[test]
+    fn query_streams_reads_every_promql_metric() {
+        let got = query_streams(
+            "promql",
+            "sum(rate(errors_total[5m])) / sum(rate(requests_total[5m]))",
+            StreamType::Logs,
+        )
+        .unwrap();
+        assert_eq!(
+            got,
+            [
+                ("errors_total".to_string(), StreamType::Metrics),
+                ("requests_total".to_string(), StreamType::Metrics)
+            ]
+        );
+    }
+
+    #[test]
+    fn query_streams_rejects_what_it_cant_tie_to_a_stream() {
+        assert!(query_streams("promql", r#"{job="x"}"#, StreamType::Logs).is_err());
+        assert!(query_streams("sql", "SELEC * FRM", StreamType::Logs).is_err());
+    }
+
+    #[test]
+    fn panel_snapshot_sql_needs_every_query() {
+        let ok = |n: i64| Some((json!([{ "n": n }]), json!({ "took": n })));
+
+        let all = panel_snapshot("sql", 1, 2, vec![ok(1), ok(2)], None);
+        assert_eq!(all.state, PanelState::Ok);
+        assert_eq!(all.data, [json!([{ "n": 1 }]), json!([{ "n": 2 }])]);
+        assert_eq!(all.metadata["queries"][1]["panelQueryIndex"], json!(1));
+
+        let partial = panel_snapshot("sql", 1, 2, vec![ok(1)], Some("unauthorized".into()));
+        assert_eq!(
+            partial.state,
+            PanelState::NotAvailable {
+                reason: "unauthorized".into()
+            }
+        );
+        assert!(partial.data.is_empty() && partial.result_meta_data.is_empty());
+
+        let none = panel_snapshot("sql", 1, 2, vec![], None);
+        assert_eq!(
+            none.state,
+            PanelState::NotAvailable {
+                reason: "no_query".into()
+            }
+        );
+    }
+
+    #[test]
+    fn panel_snapshot_promql_serves_the_queries_that_ran() {
+        let hit = json!({ "resultType": "matrix", "result": [1] });
+        let ok = Some((hit.clone(), json!(null)));
+        let empty = json!({ "resultType": "matrix", "result": [] });
+
+        let partial = panel_snapshot("promql", 1, 2, vec![None, ok], Some("unauthorized".into()));
+        assert_eq!(partial.state, PanelState::Ok);
+        assert_eq!(partial.data[0], empty);
+        assert_eq!(partial.data[1], hit);
+        assert_eq!(partial.metadata["queries"].as_array().unwrap().len(), 2);
+
+        let all_failed = panel_snapshot(
+            "promql",
+            1,
+            2,
+            vec![None, None],
+            Some("unauthorized".into()),
+        );
+        assert_eq!(
+            all_failed.state,
+            PanelState::NotAvailable {
+                reason: "unauthorized".into()
+            }
+        );
     }
 }
