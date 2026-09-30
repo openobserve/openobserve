@@ -235,18 +235,10 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
     let mut writer = test_writer(2);
     writer.write(&batch(&rows())).unwrap();
     assert_eq!(writer.finish().unwrap(), blob);
-    assert_eq!(
-        index
-            .label_values(0, &["label_a".into(), "label_b".into()])
-            .unwrap(),
-        vec![None, Some("".into())]
-    );
-    assert_eq!(
-        index
-            .label_values(2, &["label_a".into(), "label_b".into()])
-            .unwrap(),
-        vec![Some("".into()), None]
-    );
+    assert_eq!(index.label_value(0, "label_a").unwrap(), None);
+    assert_eq!(index.label_value(0, "label_b").unwrap(), Some(""));
+    assert_eq!(index.label_value(2, "label_a").unwrap(), Some(""));
+    assert_eq!(index.label_value(2, "label_b").unwrap(), None);
     assert!(index.label_value(0, "not_projected").is_err());
 }
 
