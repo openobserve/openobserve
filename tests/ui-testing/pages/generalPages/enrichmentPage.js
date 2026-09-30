@@ -1,6 +1,9 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+
+// The dropdown trigger intermittently drops the opening click, so it is re-tried.
+const HELP_MENU_OPEN_ATTEMPTS = 3;
 import { openNavFlyoutChild } from '../commonActions.js';
 
 class EnrichmentPage {
@@ -246,7 +249,23 @@ class EnrichmentPage {
      */
     async clickHelpMenuItem() {
         await this.helpMenuItem.waitFor({ state: 'visible', timeout: 10000 });
-        await this.helpMenuItem.click();
+
+        // The trigger intermittently swallows the first click and stays closed, which
+        // then reads as the menu's items being missing rather than never rendered.
+        // `data-state` is the dropdown's own signal, so it separates the two.
+        for (let attempt = 1; attempt <= HELP_MENU_OPEN_ATTEMPTS; attempt++) {
+            await this.helpMenuItem.click();
+            try {
+                await expect(this.helpMenuItem)
+                    .toHaveAttribute('data-state', 'open', { timeout: 3000 });
+                return;
+            } catch (e) {
+                testLogger.warn(`clickHelpMenuItem: menu still closed after attempt ${attempt}`);
+            }
+        }
+        throw new Error(
+            `help menu did not open after ${HELP_MENU_OPEN_ATTEMPTS} attempts`
+        );
     }
 
     /**

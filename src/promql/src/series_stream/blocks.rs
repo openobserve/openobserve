@@ -948,7 +948,7 @@ mod tests {
     use async_trait::async_trait;
     use config::{
         meta::{
-            promql::{HASH_SORTED_TABLE_SUFFIX, value::Label},
+            promql::value::Label,
             stream::{FileMeta, FileSelection},
         },
         metrics::promql::IndexBlocksCacheMetrics,
@@ -1534,7 +1534,6 @@ mod tests {
             &eval,
         )
         .await
-        .unwrap()
         .unwrap();
         for source in sources {
             assert!(matches!(source.await.unwrap(), SeriesSource::Block(_)));
@@ -1985,8 +1984,7 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
+            ctx.register_table("m", Arc::new(table)).unwrap();
             let matchers = Matchers::empty();
             let selector = StreamingSelector {
                 table_name: "m",
@@ -2002,7 +2000,6 @@ mod tests {
                 &eval,
             )
             .await
-            .unwrap()
             .unwrap();
             let func: Arc<dyn functions::RangeFunc> =
                 Arc::from(functions::fusable_range_func("rate").unwrap());
@@ -2075,8 +2072,7 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
+            ctx.register_table("m", Arc::new(table)).unwrap();
             contexts.push((ctx, source));
         }
         for name in [
@@ -2114,7 +2110,6 @@ mod tests {
                     &eval,
                 )
                 .await
-                .unwrap()
                 .unwrap();
                 let func: Arc<dyn functions::RangeFunc> =
                     Arc::from(functions::fusable_range_func(name).unwrap());
@@ -2244,7 +2239,6 @@ mod tests {
                 &eval,
             )
             .await
-            .unwrap()
             .unwrap();
             let func: Arc<dyn functions::RangeFunc> =
                 Arc::from(functions::fusable_range_func(name).unwrap());
@@ -2275,8 +2269,7 @@ mod tests {
                 col("__hash__").sort(true, false),
                 col("_timestamp").sort(true, false),
             ]]);
-        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-            .unwrap();
+        ctx.register_table("m", Arc::new(table)).unwrap();
         let matchers = Matchers::empty();
         let selector = StreamingSelector {
             table_name: "m",
@@ -2343,8 +2336,7 @@ mod tests {
                         col("__hash__").sort(true, false),
                         col("_timestamp").sort(true, false),
                     ]]);
-                ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                    .unwrap();
+                ctx.register_table("m", Arc::new(table)).unwrap();
                 let matchers = Matchers::empty();
                 let selector = StreamingSelector {
                     table_name: "m",
@@ -2365,7 +2357,7 @@ mod tests {
                     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
                     continue;
                 }
-                let sources = result.unwrap().unwrap();
+                let sources = result.unwrap();
                 let mut actual = Vec::new();
                 for source in sources {
                     let mut source = source.await.unwrap();
