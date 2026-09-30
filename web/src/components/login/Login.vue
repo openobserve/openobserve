@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
           href="https://openobserve.ai/"
           target="_blank"
-          rel="noopener noreferrer nofollow"
+          rel="nofollow"
         >
           <img
             class="appLogo h-auto"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </a>
       </div>
       <div class="mb-4 flex justify-center" v-else>
-        <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer nofollow">
+        <a href="https://openobserve.ai/" target="_blank" rel="nofollow">
           <img
             class="appLogo h-auto"
             :style="
