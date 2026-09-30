@@ -233,12 +233,12 @@ mod tests {
         matrix
     }
 
-    /// The sorted table's streams, projected to `label_cols`; `None` when it cannot stream.
+    /// The sorted table's streams, projected to `label_cols`; an error when it cannot stream.
     pub(super) async fn sorted_table_sources(
         ctx: &SessionContext,
         label_cols: LabelColumns,
         range: Duration,
-    ) -> Option<Vec<impl Future<Output = Result<SeriesSource>> + Send + 'static>> {
+    ) -> Result<Vec<impl Future<Output = Result<SeriesSource>> + Send + 'static>> {
         let selector = StreamingSelector {
             table_name: "m",
             matchers: &Matchers::empty(),
@@ -253,23 +253,23 @@ mod tests {
             &eval_ctx(),
         )
         .await
-        .unwrap()
     }
 
     /// The aggregate over the sorted table's streams, keyed by the group columns and, for a
-    /// ranking, carrying every label column; `None` when it cannot stream.
+    /// ranking, carrying every label column; an error when it cannot stream.
     pub(super) async fn run_streaming(
         ctx: &SessionContext,
         modifier: &Option<LabelModifier>,
         func_name: &str,
         op: AggOp,
         range: Duration,
-    ) -> Option<Value> {
+    ) -> Result<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
         let label_cols =
-            LabelColumns::for_op(&op, modifier, &arrow_schema(), &HashSet::new(), func_name)?;
+            LabelColumns::for_op(&op, modifier, &arrow_schema(), &HashSet::new(), func_name)
+                .expect("by() keys the series by columns");
         let sources = sorted_table_sources(ctx, label_cols, range).await?;
         let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
-        Some(aggregate(sources, op, eval).await.unwrap().0)
+        Ok(aggregate(sources, op, eval).await?.0)
     }
 }
