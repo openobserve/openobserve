@@ -84,7 +84,23 @@ test.describe('Metrics Explorer Stream List Cache testcases', () => {
 
   // ═══ P0: MANUAL REFRESH ═══════════════════════════════════════════════════
 
-  test("Manual refresh reloads streams without blanking the grid", {
+  // SKIPPED — races on an enterprise build. Owned by openobserve#15006, which added it.
+  //
+  // expectRefreshBusy() waits to OBSERVE the refresh button loading and disabled, a
+  // state that exists only while the reload is in flight. On an enterprise build the
+  // request returns before the poll catches it, so the state is never seen:
+  //   Expected: disabled / Received: enabled — 14 x locator resolved to <button ...>
+  // The retry then fails a line earlier, on the .toBe(true) poll, which is what a
+  // timing race looks like rather than a broken assertion.
+  //
+  // It passed on #15006's own PR because that ran the OSS Playwright workflow. The
+  // first enterprise run to reach it was o2-enterprise#2772, where the spec is red in
+  // every shard attempt — so every ENT PR merged after 2026-09-30 13:28 inherits it.
+  //
+  // To re-enable: assert the OUTCOME rather than the transient busy state — the grid
+  // stays mounted and the cards re-render — or have clickRefresh() hold the request
+  // via page.route so the busy state is observable for a deterministic window.
+  test.fixme("Manual refresh reloads streams without blanking the grid", {
     tag: ['@metrics-explorer-stream-cache', '@metrics', '@P0', '@refresh', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
