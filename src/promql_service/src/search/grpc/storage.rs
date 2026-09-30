@@ -37,15 +37,18 @@ use metrics_index::MetricsFileLayout;
 use promql::{ScanContext, ScanSource};
 use promql_parser::label::Matchers;
 use search::{
-    datafusion::{exec::register_metrics_table, sort_order::FileSortOrder},
+    datafusion::{
+        exec::{metrics_session_context, register_metrics_table},
+        sort_order::FileSortOrder,
+    },
     file_cache::{cache_files, calc_target_partitions, inspect_file_cache},
 };
 use search_service::match_source;
 use tracing::Instrument;
 
 #[derive(Debug)]
-pub(super) struct BlockPreference<'a> {
-    pub enabled: bool,
+pub(super) struct SourcePreference<'a> {
+    pub streaming: bool,
     pub output_labels: &'a HashSet<String>,
 }
 
@@ -57,7 +60,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
-    block_preference: BlockPreference<'_>,
+    preference: SourcePreference<'_>,
 ) -> Result<Option<ScanContext>> {
     let enter_span = tracing::span::Span::current();
 
@@ -137,12 +140,12 @@ pub(crate) async fn create_context(
     // load files to local cache
     let cache_start = std::time::Instant::now();
     let hash_streams = hash_column_streams(&schema);
-    let block_eligible = block_preference.enabled
+    let block_eligible = preference.streaming
         && get_config().compact.metrics_index_enabled
         && get_config().search.feature_metrics_streaming_agg_enabled
         && hash_streams
         && files.iter().all(block_parent_eligible)
-        && block_output_labels_supported(&schema, block_preference.output_labels)
+        && block_output_labels_supported(&schema, preference.output_labels)
         && block_matchers_supported(&schema, &matchers);
     let cache_inputs = files
         .iter()
@@ -276,11 +279,21 @@ pub(crate) async fn create_context(
 
     let source = match block_scan_candidate(&files, sort_order, block_eligible) {
         Some(scan) => ScanSource::Blocks(scan),
-        None if sort_order.is_sorted() && hash_streams => ScanSource::HashSorted,
+        None if preference.streaming && sort_order.is_sorted() && hash_streams => {
+            ScanSource::HashSorted
+        }
         None => ScanSource::Table,
     };
-    let ctx =
-        register_metrics_table(&session, schema.clone(), stream_name, files, sort_order).await?;
+    let ctx = metrics_session_context(&session, sort_order).await?;
+    // declaring the order on a materialized table would change its file grouping
+    let table_order = match &source {
+        ScanSource::Blocks(_) => None,
+        ScanSource::HashSorted => Some(sort_order),
+        ScanSource::Table => Some(FileSortOrder::None),
+    };
+    if let Some(order) = table_order {
+        register_metrics_table(&ctx, &session, schema.clone(), stream_name, files, order).await?;
+    }
 
     // keep_filters=false only when the pruner proved its selections exact
     Ok(Some(ScanContext {

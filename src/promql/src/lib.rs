@@ -58,15 +58,17 @@ const MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING: i64 = 10; // Adjust this value as
 pub trait TableProvider: Sync + Send + 'static {
     /// Creates the contexts that scan `stream_name` over `time_range` for one selector.
     ///
-    /// Each returned [`ScanContext`] names the [`ScanSource`] it can be streamed from, decided
-    /// here from the stream's schema and files.
+    /// Each returned [`ScanContext`] names the [`ScanSource`] it must be read from, decided
+    /// here from the stream's schema and files; the evaluator reads exactly that source and
+    /// never retries a context another way.
     ///
     /// - `matchers` are the selector's label matchers; `filters` are its equality matchers, which
     ///   the provider may rewrite into partition values.
     /// - `label_selector` limits the label columns the evaluation reads; empty means all.
-    /// - `streaming` lets the provider return [`ScanSource::Blocks`], whose files are read by range
-    ///   instead of cached and index-selected up front; a caller that loads the table whole passes
-    ///   `false`.
+    /// - `streaming` says the caller consumes [`ScanSource::HashSorted`] and [`ScanSource::Blocks`]
+    ///   series by series. Only then may a provider return [`ScanSource::Blocks`], whose files are
+    ///   read by range instead of cached and index-selected up front; a materializing caller passes
+    ///   `false` and reads the table.
     #[allow(clippy::too_many_arguments)]
     async fn create_context(
         &self,
@@ -125,10 +127,16 @@ impl ScanContext {
 pub enum ScanSource {
     /// The plain table, loaded whole by the materializing path.
     Table,
-    /// The `HASH_SORTED_TABLE_SUFFIX` table, streamed series by series in hash order.
+    /// The table with its `(__hash__, _timestamp)` order declared, streamed series by series.
     HashSorted,
     /// The MIDX blocks of these files, streamed series by series.
     Blocks(Arc<MetricsBlockScan>),
+}
+
+impl ScanSource {
+    pub fn streams(&self) -> bool {
+        !matches!(self, Self::Table)
+    }
 }
 
 /// Converts `t` to the number of microseconds elapsed since the beginning of

@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OPageLayout
+    :title="raw(monitorName)"
     data-test="synthetic-monitor-results-page"
     :subtitle="raw(folderName)"
     :back="{
@@ -30,12 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <template #title>
-      <span class="inline-flex min-w-0 items-center gap-2">
-        <span class="truncate">{{ monitorName }}</span>
-        <BetaBadge />
-      </span>
-    </template>
     <template #actions>
       <OSelect
         v-if="envNames.length >= 2"
@@ -182,7 +177,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";

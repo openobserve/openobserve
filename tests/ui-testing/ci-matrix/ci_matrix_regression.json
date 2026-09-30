@@ -9,7 +9,9 @@
       "logs-result-display.spec.js",
       "logs-nonsql-limit.spec.js",
       "logs-stream-type-scope.spec.js",
-      "logs-14376-int64-precision.spec.js"
+      "logs-14376-int64-precision.spec.js",
+      "logs-stream-selector.spec.js",
+      "logs-table-stream-switch.spec.js"
     ],
     "disabled": []
   },

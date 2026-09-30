@@ -208,9 +208,6 @@ const stubs = {
     template: '<span class="obadge-stub"><slot /></span>',
     props: ["variant", "size", "icon"],
   },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
-  },
   // Protocol (non-browser) runs delegate entirely to ProtocolRunSummary —
   // stub it so branch-selection tests don't need to satisfy its own
   // composable/service dependencies.
@@ -277,10 +274,6 @@ describe("RunDetail", () => {
 
   it("should render the back button", () => {
     expect(wrapper.find('[data-test="synthetics-run-detail-back-btn"]').exists()).toBe(true);
-  });
-
-  it("should render the Beta badge in the page title", () => {
-    expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
   });
 
   describe("monitor type resolution (drawer mode override)", () => {

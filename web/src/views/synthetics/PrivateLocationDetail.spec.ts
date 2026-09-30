@@ -132,9 +132,6 @@ const baseStubs = {
     props: ["preset", "size", "title"],
     inheritAttrs: true,
   },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
-  },
   AgentSetupDrawer: {
     template: '<div data-test="synthetics-private-location-agent-setup-drawer" />',
     props: [
@@ -196,11 +193,6 @@ describe("PrivateLocationDetail", () => {
     it("should render the page shell", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should render the Beta badge in the page title", () => {
-      wrapper = mountPage();
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should render the status badge when detail is loaded", async () => {
