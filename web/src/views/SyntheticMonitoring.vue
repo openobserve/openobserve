@@ -17,17 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="relative"
+    :title="t('synthetics.pageTitle')"
     :subtitle="t('synthetics.pageSubtitle')"
     icon="radar"
     bleed
     tabs-below
   >
-    <template #title>
-      <span class="inline-flex items-center gap-2">
-        {{ t("synthetics.pageTitle") }}
-        <BetaBadge />
-      </span>
-    </template>
     <template #actions>
       <OButton
         v-if="activeSection === 'checks'"
@@ -513,7 +508,6 @@ import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import {
   mapResponseToBrowserCheck,
   buildCreateBrowserTestPayload,

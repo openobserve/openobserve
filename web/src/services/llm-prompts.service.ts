@@ -148,7 +148,8 @@ const llmPromptsService = {
     const response = await http().get(base(orgId), {
       params: {
         includeArchived: options.includeArchived ?? false,
-        ...(options.folderId ? { folderId: options.folderId } : {}),
+        // `folder` is what the permission check reads; it also filters.
+        ...(options.folderId ? { folder: options.folderId } : {}),
       },
     });
     return response.data?.list ?? [];
@@ -160,6 +161,7 @@ const llmPromptsService = {
     idempotencyKey?: string,
   ): Promise<PromptMutationResult> {
     const response = await http().post(base(orgId), input, {
+      params: { folder: input.folderId || "default" },
       ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
     });
     return response.data;
@@ -234,8 +236,11 @@ const llmPromptsService = {
   async match(
     orgId: string,
     input: PromptContentInput & { type: PromptType },
+    folderId?: string,
   ): Promise<PromptMatch[]> {
-    const response = await http().post(`${base(orgId)}/match`, input);
+    const response = await http().post(`${base(orgId)}/match`, input, {
+      params: folderId ? { folder: folderId } : undefined,
+    });
     return response.data?.matches ?? [];
   },
 

@@ -73,6 +73,7 @@ struct PendingMigrations {
     workflow_folders: bool,
     synthetic_environments: bool,
     prompts: bool,
+    prompt_folders: bool,
     downtimes: bool,
 }
 
@@ -338,66 +339,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         );
                     }
                 }
-                if pending.alert_folders {
-                    match migrations::migrate_alert_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Alert folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating alert folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.workflow_folders {
-                    match migrations::migrate_workflow_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Workflow folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating workflow folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.report_folders {
-                    match migrations::migrate_report_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Report folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating report folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.anomaly_detection {
-                    match migrations::migrate_anomaly_detection().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating anomaly detection to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.stream_names {
-                    match migrations::migrate_stream_names().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Stream names migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating stream names to openfga: {e}"
-                            );
-                        }
-                    }
-                }
+                run_folder_and_data_migrations(&pending).await;
             }
 
             // Check if there are init ofga tuples that needs to be added now
@@ -431,6 +373,72 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to release lock");
 
     Ok(())
+}
+
+/// Database sweeps a pending back-fill needs beyond its ownership tuples.
+///
+/// Kept out of `init` so that function stays within the cognitive-complexity limit.
+async fn run_folder_and_data_migrations(pending: &PendingMigrations) {
+    if pending.alert_folders {
+        match migrations::migrate_alert_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Alert folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating alert folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.workflow_folders {
+        match migrations::migrate_workflow_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Workflow folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating workflow folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.prompt_folders {
+        match migrations::migrate_prompt_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Prompt folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating prompt folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.report_folders {
+        match migrations::migrate_report_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Report folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating report folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.anomaly_detection {
+        match migrations::migrate_anomaly_detection().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating anomaly detection to openfga: {e}");
+            }
+        }
+    }
+    if pending.stream_names {
+        match migrations::migrate_stream_names().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Stream names migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating stream names to openfga: {e}");
+            }
+        }
+    }
 }
 
 /// The resources a pending back-fill needs nothing but an `_all_` org tuple for.
@@ -519,6 +527,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.prompts {
         keys.extend(["prompts", "prompt_labels"]);
     }
+    if pending.prompt_folders {
+        keys.push("prompt_folders");
+    }
     if pending.downtimes {
         keys.extend(["downtime_folders", "downtimes"]);
     }
@@ -561,6 +572,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
+    let v0_0_52 = version_compare::Version::from("0.0.52").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -672,6 +684,10 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         pending.prompts = true;
     }
     if existing_model_version < v0_0_51 {
+        log::info!("[OFGA:Local] prompt folders permissions migration needed");
+        pending.prompt_folders = true;
+    }
+    if existing_model_version < v0_0_52 {
         log::info!("[OFGA:Local] downtimes permissions migration needed");
         pending.downtimes = true;
     }

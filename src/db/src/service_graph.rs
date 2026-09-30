@@ -21,9 +21,6 @@ use infra::{
 
 use crate as db;
 
-const V4_STARTED_AT_KEY: &str = "/service_graph/v4/started_at";
-const V1_STOPPED_KEY: &str = "/service_graph/v1/stopped";
-
 pub(crate) fn mk_key() -> String {
     "/service_graph/node/offsets".to_string()
 }
@@ -97,35 +94,7 @@ pub async fn set_v4_offset(
     Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
 
-pub async fn get_started_at() -> Option<i64> {
-    get_i64(V4_STARTED_AT_KEY).await
-}
-
-pub async fn set_started_at_if_absent(now: i64) -> Result<(), anyhow::Error> {
-    put_once(V4_STARTED_AT_KEY, now.to_string()).await
-}
-
-pub async fn is_v1_stopped() -> bool {
-    is_flag(V1_STOPPED_KEY).await
-}
-
-pub async fn set_v1_stopped_if_absent() -> Result<(), anyhow::Error> {
-    put_once(V1_STOPPED_KEY, "true".to_string()).await
-}
-
-async fn get_i64(key: &str) -> Option<i64> {
-    let ret = db::get(key).await.ok()?;
-    String::from_utf8_lossy(&ret).trim().parse::<i64>().ok()
-}
-
-async fn is_flag(key: &str) -> bool {
-    match db::get(key).await {
-        Ok(ret) => String::from_utf8_lossy(&ret).trim() == "true",
-        Err(_) => false,
-    }
-}
-
-/// Write-once: re-read under the lock because two schedulers may reach the same switch together.
+/// Write-once: re-read under the lock because two schedulers may seed the same key together.
 pub(crate) async fn put_once(key: &str, value: String) -> Result<(), anyhow::Error> {
     if missing_as_none(db::get(key).await)?.is_some() {
         return Ok(());
@@ -168,8 +137,6 @@ mod tests {
             v4_offset_key("default", "traces"),
             "/service_graph/v4/offsets/default/traces"
         );
-        assert_eq!(V4_STARTED_AT_KEY, "/service_graph/v4/started_at");
-        assert_eq!(V1_STOPPED_KEY, "/service_graph/v1/stopped");
     }
 
     #[test]
