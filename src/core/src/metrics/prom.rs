@@ -170,7 +170,7 @@ pub async fn remote_write(
             db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
                 .await
         {
-            log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
+            log::error!("Error updating metadata for stream: {org_id}/{metric_name}, err: {e}");
         }
     }
 
@@ -477,7 +477,9 @@ pub async fn remote_write(
 
     // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
-        log::warn!("[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted");
+        log::warn!(
+            "[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
+        );
     }
 
     let parse_timeseries_ms = step_start.elapsed().as_millis();
@@ -756,7 +758,7 @@ pub async fn get_series(
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
-            log::error!("search series error: {err}");
+            log::error!("search series error: org_id: {org_id}, error: {err}");
             return Err(err);
         }
         Ok(resp) => resp
@@ -933,7 +935,7 @@ pub async fn get_label_values(
             .map(|v| v.as_str().unwrap().to_string())
             .collect::<Vec<_>>(),
         Err(err) => {
-            log::error!("search values error: {err:?}");
+            log::error!("search values error: org_id: {org_id}, error: {err:?}");
             return Err(err);
         }
     };
@@ -1050,11 +1052,15 @@ async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [Pendi
                 stream_name,
                 &mut rows,
             ) {
-                log::error!("[METRICS] error applying SDR patterns for stream {stream_name}: {e}");
+                log::error!(
+                    "[METRICS] error applying SDR patterns for stream {org_id}/{stream_name}: {e}"
+                );
             }
         }
         Err(e) => {
-            log::error!("[METRICS] failed to get pattern manager for SDR redaction: {e}");
+            log::error!(
+                "[METRICS] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
             crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                 org_id,
                 StreamType::Metrics,

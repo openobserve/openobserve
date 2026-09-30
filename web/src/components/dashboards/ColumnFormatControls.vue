@@ -209,6 +209,7 @@ import ColorSwatchPicker from "./ColorSwatchPicker.vue";
 import {
   type ColumnOverrideUI,
   emptyConditionalRule,
+  getUnitOptions,
   useColumnFormattingOptions,
   TEXT_SWATCHES,
   BG_SWATCHES,
@@ -231,11 +232,12 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18nTyped();
-    const { unitOptions, fieldTypeOptions, alignOptions, conditionOperators } =
-      useColumnFormattingOptions();
+    const { fieldTypeOptions, alignOptions, conditionOperators } = useColumnFormattingOptions();
 
     // Alias preserves the same prop reference for in-place mutation via v-model.
     const colModel = computed(() => props.col);
+
+    const unitOptions = computed(() => getUnitOptions(t, props.col.unit));
 
     // Explicit "Auto" replaces tap-to-clear: null ⇄ the "auto" sentinel item.
     const alignmentModel = computed({

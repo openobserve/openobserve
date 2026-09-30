@@ -54,6 +54,10 @@ export interface SelectOption {
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
   header?: boolean;
+  /** Makes this a non-selectable row that shows or hides the options whose `parentValue` is its `value`. */
+  expandable?: boolean;
+  /** Nests this option under the `expandable` row with this value. */
+  parentValue?: SelectValue;
   [key: string]: unknown;
 }
 

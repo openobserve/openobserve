@@ -46,6 +46,11 @@ export interface SyntheticsVariablePayload {
   tags?: string[];
 }
 
+/** A variable's kind is fixed once created, so an update may leave it out. */
+export type SyntheticsVariableUpdatePayload = Omit<SyntheticsVariablePayload, "kind"> & {
+  kind?: SyntheticsVariablePayload["kind"];
+};
+
 export interface SyntheticsEnvironmentPayload {
   name: string;
   description?: string;
@@ -131,6 +136,15 @@ const syntheticsService = {
   getRun: (orgIdentifier: string, id: string, runId: string, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
     return http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}${params}`);
+  },
+
+  /** Checks that reference `id` as a subtest — used to warn before deleting or unpublishing it. */
+  referencedBy: (orgIdentifier: string, id: string, placeholders?: string[]) => {
+    // Absent means "do not evaluate breakage" — an empty value would read as an empty name list.
+    const query = placeholders?.length
+      ? `?placeholders=${encodeURIComponent(placeholders.join(","))}`
+      : "";
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}/referenced-by${query}`);
   },
 
   artifactUrl: (orgIdentifier: string, key: string, folderId?: string) => {
@@ -228,7 +242,7 @@ const syntheticsService = {
   updateGlobalVariable: (
     orgIdentifier: string,
     id: string,
-    body: SyntheticsVariablePayload,
+    body: SyntheticsVariableUpdatePayload,
     force = false,
   ) => http().put(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`, body),
 
@@ -270,7 +284,7 @@ const syntheticsService = {
     orgIdentifier: string,
     env: string,
     id: string,
-    body: SyntheticsVariablePayload,
+    body: SyntheticsVariableUpdatePayload,
     force = false,
   ) =>
     http().put(

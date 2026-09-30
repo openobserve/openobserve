@@ -392,4 +392,24 @@ export default class DashboardCellExplorerPage {
       this.page.locator(`[data-test="log-detail-${field}-key"]`)
     ).toBeHidden({ timeout: 15000 });
   }
+
+  /** First rendered KV key whose name is not a substring of `excluded`, so searching it hides `excluded`. */
+  async firstKvKeyOtherThan(excluded) {
+    const keys = this.kvTable.locator('[data-test^="log-detail-"][data-test$="-key"]');
+    let picked = null;
+    await expect
+      .poll(
+        async () => {
+          const attrs = await keys.evaluateAll((els) => els.map((el) => el.getAttribute("data-test")));
+          picked =
+            attrs
+              .map((a) => a.slice("log-detail-".length, -"-key".length))
+              .find((k) => k && !excluded.includes(k)) ?? null;
+          return picked;
+        },
+        { timeout: 15000 }
+      )
+      .not.toBeNull();
+    return picked;
+  }
 }

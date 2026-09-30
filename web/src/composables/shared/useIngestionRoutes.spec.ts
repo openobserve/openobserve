@@ -33,6 +33,7 @@ vi.mock("@/components/ingestion/logs/FluentBit.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/Fluentd.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/Vector.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/Curl.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/logs/KinesisFirehose.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/recommended/AWSConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/recommended/GCPConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/recommended/AzureConfig.vue", () => ({ default: {} }));
@@ -206,6 +207,8 @@ describe("useIngestionRoutes", () => {
       expect(logRouteNames).toContain("logstash");
       expect(logRouteNames).toContain("syslogNg");
       expect(logRouteNames).toContain("loongcollector");
+      expect(logRouteNames).toContain("kinesisfirehose");
+      expect(logRouteNames).toContain("gcpLogs");
     });
 
     it("should have metrics routes under custom", () => {
@@ -963,6 +966,38 @@ describe("useIngestionRoutes", () => {
       expect(fluentbitRoute.path).toBe("fluentbit");
       expect(fluentbitRoute.component).toBeDefined();
       expect(typeof fluentbitRoute.beforeEnter).toBe("function");
+    });
+
+    it("should have kinesisfirehose route with correct configuration", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const logsRoute = customRoute.children.find((child: any) => child.name === "ingestLogs");
+      const firehoseRoute = logsRoute.children.find(
+        (child: any) => child.name === "kinesisfirehose",
+      );
+
+      expect(firehoseRoute).toBeDefined();
+      expect(firehoseRoute.path).toBe("kinesisfirehose");
+      expect(firehoseRoute.component).toBeDefined();
+      expect(typeof firehoseRoute.beforeEnter).toBe("function");
+    });
+
+    it("should have gcpLogs route reusing the recommended GCP page", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const logsRoute = customRoute.children.find((child: any) => child.name === "ingestLogs");
+      const gcpLogsRoute = logsRoute.children.find((child: any) => child.name === "gcpLogs");
+      const recommendedRoute = routes[0].children.find(
+        (child: any) => child.name === "recommended",
+      );
+      const gcpConfigRoute = recommendedRoute.children.find(
+        (child: any) => child.name === "GCPConfig",
+      );
+
+      expect(gcpLogsRoute).toBeDefined();
+      expect(gcpLogsRoute.path).toBe("gcp");
+      expect(gcpLogsRoute.component).toBe(gcpConfigRoute.component);
+      expect(typeof gcpLogsRoute.beforeEnter).toBe("function");
     });
 
     it("should have prometheus route with correct configuration", () => {

@@ -15,6 +15,14 @@
 
 import http from "./http";
 
+export interface AiUsage {
+  credits_used: number;
+  credits_limit: number;
+  credits_remaining: number;
+  mode: string;
+  requires_additional_credits: boolean;
+}
+
 const billings = {
   get_quota_threshold: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billings/quota_threshold`);
@@ -65,7 +73,7 @@ const billings = {
     return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
   },
   get_ai_usage: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/ai/usage`);
+    return http().get<AiUsage>(`/api/${org_identifier}/ai/usage`);
   },
   list_billing_group_members: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billing_group/members`);

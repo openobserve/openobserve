@@ -91,9 +91,16 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 const mockGetNumberLocale = vi.fn(() => "en-GB");
-vi.mock("@/locales/numberFormat", () => ({
-  getNumberLocale: () => mockGetNumberLocale(),
-}));
+vi.mock("@/locales/numberFormat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/locales/numberFormat")>();
+  return {
+    ...actual,
+    getNumberLocale: () => mockGetNumberLocale(),
+    // The real resolveNumberLocale calls the unmocked getNumberLocale internally.
+    resolveNumberLocale: (tag?: string | null) =>
+      actual.toSupportedNumberLocale(tag) ?? mockGetNumberLocale(),
+  };
+});
 
 describe("Dashboard Data Conversion Utils", () => {
   // Use actual checkTimestampAlias from logsUtils
@@ -300,6 +307,29 @@ describe("Dashboard Data Conversion Utils", () => {
         const result = getUnitValue(NaN, "locale", "", 2);
         expect(Number.isNaN(result.value)).toBe(true);
         expect(result.unit).toBe("");
+      });
+
+      it("should use a pinned locale unit over the viewer's language", () => {
+        expect(getUnitValue(14158, "locale:cs-CZ", "", 2)).toEqual({
+          value: "14\u00a0158,00",
+          unit: "",
+        });
+        expect(getUnitValue(14158, "locale:de-DE", "", 2).value).toBe("14.158,00");
+      });
+
+      it("should respect decimals for a pinned locale unit", () => {
+        expect(getUnitValue(1234.5, "locale:de-DE", "", 0).value).toBe("1.235");
+      });
+
+      it.each(["locale:", "locale:xx-ZZ", "locale:not a locale!!"])(
+        "should treat the unusable pinned unit %j as Auto",
+        (unit) => {
+          expect(getUnitValue(1234567.89, unit, "", 2).value).toBe("1,234,567.89");
+        },
+      );
+
+      it("should not read the locale from the custom unit", () => {
+        expect(getUnitValue(1234567.89, "locale", "de-DE", 2).value).toBe("1,234,567.89");
       });
     });
 

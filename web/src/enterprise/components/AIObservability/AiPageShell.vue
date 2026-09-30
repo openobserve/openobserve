@@ -88,7 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${dataTest}-refresh-btn`"
         @click="$emit('refresh')"
       >
-        {{ t("common.refresh") }}
+        <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
+        <span class="max-md:sr-only">{{ t("common.refresh") }}</span>
       </OButton>
     </template>
 
