@@ -162,7 +162,10 @@ export const getUnitValue = (
       }
       // zero has nothing to scale, so it stays in the panel's own unit (divisor 1)
       if (absValue === 0) {
-        unitIndex = units[unit].findIndex((entry: { divisor: number }) => entry.divisor === 1);
+        const ownUnit = units[unit].findIndex((entry: { divisor: number }) => entry.divisor === 1);
+        if (ownUnit !== -1) {
+          unitIndex = ownUnit;
+        }
       }
 
       // calculate the final value: sign * absValue / divisor
