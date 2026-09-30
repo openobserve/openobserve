@@ -27,7 +27,6 @@ pub use layout::{
 };
 pub use matcher::{matcher_predicates, matcher_residual_field};
 pub use pruner::{matching_blocks, search};
-pub use reader::fetch_parsed_index;
 
 #[cfg(test)]
 mod tests {
@@ -230,15 +229,17 @@ mod tests {
             .unwrap();
         infra::storage::add_account(&id, Box::new(store)).await;
         load_metrics_index_file(
-            &account,
-            &data_path,
-            &path,
-            config::FileFormat::Vortex,
-            crate::block::ParentMetadata {
-                rows: rows as u64,
-                compressed_size: 123,
+            &crate::block_cache::Sidecar {
+                account,
+                data_path,
+                path,
+                parent: crate::block::ParentMetadata {
+                    rows: rows as u64,
+                    compressed_size: 123,
+                },
+                size: 0,
             },
-            0,
+            config::FileFormat::Vortex,
             crate::reader::IndexLabels {
                 requested: Arc::new(requested.to_vec()),
                 flat: Arc::new(Vec::new()),

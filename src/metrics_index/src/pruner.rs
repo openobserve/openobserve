@@ -39,6 +39,7 @@ use promql_parser::label::{MatchOp, Matchers};
 
 use crate::{
     block::Index,
+    block_cache::Sidecar,
     layout::MetricsFileLayout,
     reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
 };
@@ -116,31 +117,15 @@ pub async fn search(
         {
             continue;
         }
-        let Some(sidecar_path) = MetricsFileLayout::metrics_index_path(&file.key) else {
-            log::warn!(
-                "[trace_id {trace_id}] promql->metrics-index: indexed file {} has no metrics-index path, leaving the file unpruned",
+        match Sidecar::of(file) {
+            Ok(sidecar) => {
+                index_files.insert(file.key.clone(), sidecar);
+            }
+            Err(error) => log::warn!(
+                "[trace_id {trace_id}] promql->metrics-index: indexed file {} has no usable sidecar, leaving the file unpruned: {error}",
                 file.key,
-            );
-            continue;
-        };
-        let Ok(expected_rows) = usize::try_from(file.meta.records) else {
-            log::warn!(
-                "[trace_id {trace_id}] promql->metrics-index: invalid record count {} for {}, leaving the file unpruned",
-                file.meta.records,
-                file.key,
-            );
-            continue;
-        };
-        index_files.insert(
-            file.key.clone(),
-            (
-                file.account.clone(),
-                sidecar_path,
-                expected_rows,
-                file.meta.compressed_size,
-                file.meta.mindex_size,
             ),
-        );
+        }
     }
     if index_files.is_empty() {
         return Ok(None);
@@ -159,45 +144,36 @@ pub async fn search(
             .collect::<Vec<_>>(),
     );
     let matchers = Arc::new(matchers.clone());
-    let mut evaluations = stream::iter(index_files.into_iter().map(
-        |(data_path, (account, sidecar_path, expected_rows, compressed_size, mindex_size))| {
-            let labels = Arc::clone(&matcher_labels);
-            let regex_labels = Arc::clone(&regex_labels);
-            let matchers = Arc::clone(&matchers);
-            async move {
-                let result = async {
-                    let data = load_metrics_index_file(
-                        &account,
-                        &data_path,
-                        &sidecar_path,
-                        config::FileFormat::from_extension(&data_path)
-                            .context("Unsupported metrics source format")?,
-                        crate::block::ParentMetadata {
-                            rows: u64::try_from(expected_rows)?,
-                            compressed_size: u64::try_from(compressed_size)?,
-                        },
-                        mindex_size,
-                        IndexLabels {
-                            requested: Arc::clone(&labels),
-                            flat: regex_labels,
-                        },
-                    )
-                    .await?;
-                    tokio::task::spawn_blocking(move || {
-                        let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
-                        let row_group_size = data.row_group_size;
-                        let physical_filter =
-                            create_physical_filter(data.schema.as_ref(), &matchers)?;
-                        evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
-                            .map(|ranges| (Arc::new(ranges), complete, row_group_size))
-                    })
-                    .await?
-                }
-                .await;
-                (data_path, result)
+    let mut evaluations = stream::iter(index_files.into_iter().map(|(data_path, sidecar)| {
+        let labels = Arc::clone(&matcher_labels);
+        let regex_labels = Arc::clone(&regex_labels);
+        let matchers = Arc::clone(&matchers);
+        async move {
+            let result = async {
+                let expected_rows = usize::try_from(sidecar.parent.rows)?;
+                let data = load_metrics_index_file(
+                    &sidecar,
+                    config::FileFormat::from_extension(&data_path)
+                        .context("Unsupported metrics source format")?,
+                    IndexLabels {
+                        requested: Arc::clone(&labels),
+                        flat: regex_labels,
+                    },
+                )
+                .await?;
+                tokio::task::spawn_blocking(move || {
+                    let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
+                    let row_group_size = data.row_group_size;
+                    let physical_filter = create_physical_filter(data.schema.as_ref(), &matchers)?;
+                    evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
+                        .map(|ranges| (Arc::new(ranges), complete, row_group_size))
+                })
+                .await?
             }
-        },
-    ))
+            .await;
+            (data_path, result)
+        }
+    }))
     .buffer_unordered(concurrency);
 
     // Consume each result as soon as it is decoded and evaluated. This keeps

@@ -24,9 +24,7 @@ use bytes::Bytes;
 use datafusion::physical_plan::PhysicalExpr;
 
 use crate::{
-    block_cache::{
-        CacheKey, CachedIndex, INDEX_CACHE, ParentIdentity, SidecarBinding, cache_limit,
-    },
+    block_cache::{CachedIndex, Sidecar, SidecarBinding, covers, load_index},
     layout::METRICS_INDEX_ROW_COUNT,
 };
 
@@ -66,45 +64,11 @@ impl Tail {
 }
 
 pub(super) async fn load_metrics_index_file(
-    account: &str,
-    data_path: &str,
-    path: &str,
+    sidecar: &Sidecar,
     format: config::FileFormat,
-    parent: crate::block::ParentMetadata,
-    index_size: i64,
     labels: IndexLabels,
 ) -> Result<MetricsIndexData> {
-    let key = CacheKey {
-        account: account.to_owned(),
-        parent: ParentIdentity {
-            object_key: data_path.to_owned(),
-            rows: parent.rows,
-            compressed_size: parent.compressed_size,
-        },
-    };
-    let limit = cache_limit();
-    let cached = {
-        let mut cache = INDEX_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        cache.trim(limit);
-        cache.get(&key)
-    };
-    let entry = if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(&labels.requested))
-        .transpose()?
-        .is_some_and(|missing| missing.is_empty())
-    {
-        cached.unwrap()
-    } else {
-        let loaded =
-            fetch_parsed_index(account, path, parent, index_size, &labels.requested, cached)
-                .await?;
-        INDEX_CACHE
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(key, loaded, limit)?
-    };
-    let index = entry.index.project(&labels.requested)?;
+    let index = load_index(sidecar, &labels.requested).await?;
     tokio::task::spawn_blocking(move || metrics_block_index_data(&index, format, &labels.flat))
         .await?
 }
@@ -175,36 +139,37 @@ pub(super) fn evaluate_metrics_index(
     Ok(ranges)
 }
 
-pub async fn fetch_parsed_index(
-    account: &str,
-    path: &str,
-    parent: crate::block::ParentMetadata,
-    index_size: i64,
+/// Reads the sidecar columns `cached` lacks for `labels` and decodes them into a new entry.
+pub(crate) async fn fetch_parsed_index(
+    sidecar: &Sidecar,
     labels: &[String],
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(labels))
-        .transpose()?
-        .is_some_and(|missing| missing.is_empty())
+    if let Some(entry) = &cached
+        && covers(entry, labels)?
     {
-        return Ok(cached.unwrap());
+        return Ok(Arc::clone(entry));
     }
+    let (account, path, parent) = (
+        sidecar.account.as_str(),
+        sidecar.path.as_str(),
+        &sidecar.parent,
+    );
+    let index_size = sidecar.size;
     let known_size = u64::try_from(index_size).ok().filter(|size| *size > 0);
     let size = if let Some(size) = known_size {
         size
     } else {
         head_size(account, path).await?
     };
-    let (header, tail, size) = match read_header(account, path, size, &parent).await {
+    let (header, tail, size) = match read_header(account, path, size, parent).await {
         Ok((header, tail)) => (header, tail, size),
         Err(error) if known_size.is_some() => {
             let actual_size = head_size(account, path).await?;
             if actual_size == size {
                 return Err(error);
             }
-            let (header, tail) = read_header(account, path, actual_size, &parent).await?;
+            let (header, tail) = read_header(account, path, actual_size, parent).await?;
             (header, tail, actual_size)
         }
         Err(error) => return Err(error),
@@ -524,17 +489,11 @@ mod tests {
     async fn stale_mindex_size_retries_with_object_size() {
         let (_, file, bytes) = fixture(config::FileFormat::Parquet).await;
         store(&file, Some(bytes)).await;
-        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+        let mut sidecar = Sidecar::of(&file).unwrap();
+        sidecar.size += 1;
         let data = load_metrics_index_file(
-            &file.account,
-            &file.key,
-            &path,
+            &sidecar,
             config::FileFormat::Parquet,
-            crate::block::ParentMetadata {
-                rows: file.meta.records as u64,
-                compressed_size: file.meta.compressed_size as u64,
-            },
-            file.meta.mindex_size + 1,
             IndexLabels {
                 requested: Arc::new(vec!["path".to_string()]),
                 flat: Arc::new(Vec::new()),
@@ -549,18 +508,10 @@ mod tests {
     async fn equality_keeps_dictionary_and_regex_flattens_label() {
         let (_, file, bytes) = fixture(config::FileFormat::Vortex).await;
         store(&file, Some(bytes)).await;
-        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
         for flat in [false, true] {
             let data = load_metrics_index_file(
-                &file.account,
-                &file.key,
-                &path,
+                &Sidecar::of(&file).unwrap(),
                 config::FileFormat::Vortex,
-                crate::block::ParentMetadata {
-                    rows: file.meta.records as u64,
-                    compressed_size: file.meta.compressed_size as u64,
-                },
-                file.meta.mindex_size,
                 IndexLabels {
                     requested: Arc::new(vec!["path".to_string()]),
                     flat: Arc::new(if flat {

@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod loads;
-
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, VecDeque},
     hash::Hasher,
     ops::Range,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicU64, Ordering},
     },
     time::Instant,
@@ -44,7 +42,7 @@ use hashbrown::{HashMap, HashSet};
 use itertools::Either;
 use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
-    block_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
+    block_cache::{INDEX_CACHE, Sidecar},
 };
 use promql_parser::label::Matchers;
 use tokio::task::JoinSet;
@@ -55,106 +53,6 @@ use crate::series_loader::label_interner::LabelInterner;
 const PREFLIGHT_YIELD_INTERVAL: usize = 1024;
 const PREFETCH_BLOCKS: usize = 512;
 const PREFETCH_BYTES: usize = 16 * 1024 * 1024;
-
-struct MetadataLoad<'a> {
-    file: &'a FileKey,
-    labels: &'a [String],
-    key: CacheKey,
-    sidecar: String,
-    limit: usize,
-    cache: &'a Mutex<IndexCache>,
-    flights: &'a Arc<loads::LoadRegistry>,
-}
-
-impl MetadataLoad<'_> {
-    async fn run(self, mut seed: Option<Arc<CachedIndex>>) -> Result<Arc<LoadedFile>> {
-        let Self {
-            file,
-            labels,
-            key,
-            sidecar,
-            limit,
-            cache,
-            flights,
-        } = self;
-        loop {
-            if seed
-                .as_ref()
-                .map(|entry| entry.index.missing_labels(labels))
-                .transpose()?
-                .is_some_and(|missing| missing.is_empty())
-            {
-                let binding = seed.as_ref().map(|entry| entry.binding.clone());
-                let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
-                let entry = match loaded {
-                    Ok(value) => value,
-                    Err(error) => {
-                        cache
-                            .lock()
-                            .unwrap_or_else(|e| e.into_inner())
-                            .remove_bound(&key, binding.as_ref());
-                        return Err(error);
-                    }
-                };
-                return Ok(Arc::new(LoadedFile {
-                    account: file.account.clone(),
-                    sidecar,
-                    index: Arc::new(entry.index.project(labels)?),
-                }));
-            }
-            match flights.claim(key.clone()) {
-                loads::Claim::Waiter(flight) => {
-                    if let Some(loaded) = flight.wait().await? {
-                        seed = Some(loaded);
-                    }
-                }
-                loads::Claim::Owner(owner) => {
-                    if limit > 0
-                        && let Some(current) =
-                            cache.lock().unwrap_or_else(|e| e.into_inner()).peek(&key)
-                    {
-                        seed = Some(current);
-                    }
-                    let binding = seed.as_ref().map(|entry| entry.binding.clone());
-                    let prior = seed.clone();
-                    let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
-                    match loaded {
-                        Ok(entry) => {
-                            let admitted = if prior
-                                .as_ref()
-                                .is_some_and(|prior| Arc::ptr_eq(prior, &entry))
-                            {
-                                Ok(entry)
-                            } else {
-                                cache.lock().unwrap_or_else(|e| e.into_inner()).insert(
-                                    key.clone(),
-                                    entry,
-                                    limit,
-                                )
-                            };
-                            owner.complete(&admitted);
-                            let entry = admitted?;
-                            return Ok(Arc::new(LoadedFile {
-                                account: file.account.clone(),
-                                sidecar,
-                                index: Arc::new(entry.index.project(labels)?),
-                            }));
-                        }
-                        Err(error) => {
-                            cache
-                                .lock()
-                                .unwrap_or_else(|e| e.into_inner())
-                                .remove_bound(&key, binding.as_ref());
-                            let failed = Err(anyhow::anyhow!("{error:#}"));
-                            owner.complete(&failed);
-                            return Err(error);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 struct ReadStats {
     trace_id: String,
@@ -713,78 +611,13 @@ async fn load_metadata(
 }
 
 async fn load_index(file: &FileKey, labels: &[String]) -> Result<Arc<LoadedFile>> {
-    let limit = cache_limit();
-    load_index_cached(file, labels, &INDEX_CACHE, &loads::FILE_LOADS, limit).await
-}
-
-async fn load_index_cached(
-    file: &FileKey,
-    labels: &[String],
-    cache: &Mutex<IndexCache>,
-    flights: &Arc<loads::LoadRegistry>,
-    limit: usize,
-) -> Result<Arc<LoadedFile>> {
-    let parent = ParentIdentity {
-        object_key: file.key.clone(),
-        rows: u64::try_from(file.meta.records)?,
-        compressed_size: u64::try_from(file.meta.compressed_size)?,
-    };
-    ensure!(
-        parent.rows > 0 && parent.compressed_size > 0,
-        "invalid block parent identity"
-    );
-    ensure!(
-        file.meta.mindex_size > 0,
-        "block sidecar size is not recorded"
-    );
-    let sidecar = config::meta::promql::index::metrics_index_path(&file.key)
-        .context("unsupported block parent layout")?;
-    let key = CacheKey {
-        account: file.account.clone(),
-        parent: parent.clone(),
-    };
-    let cached = {
-        let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
-        cache.trim(limit);
-        cache.get(&key)
-    };
-    MetadataLoad {
-        file,
-        labels,
-        key,
-        sidecar,
-        limit,
-        cache,
-        flights,
-    }
-    .run(cached)
-    .await
-}
-
-async fn load_entry(
-    file: &FileKey,
-    labels: &[String],
-    parent: &ParentIdentity,
-    sidecar: &str,
-    cached: Option<Arc<CachedIndex>>,
-) -> Result<Arc<CachedIndex>> {
-    if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(labels))
-        .transpose()?
-        .is_some_and(|missing| missing.is_empty())
-    {
-        return Ok(cached.unwrap());
-    }
-    metrics_index::fetch_parsed_index(
-        &file.account,
-        sidecar,
-        parent.metadata(),
-        file.meta.mindex_size,
-        labels,
-        cached,
-    )
-    .await
+    let sidecar = Sidecar::of(file)?;
+    let index = metrics_index::block_cache::load_index(&sidecar, labels).await?;
+    Ok(Arc::new(LoadedFile {
+        account: sidecar.account,
+        sidecar: sidecar.path,
+        index: Arc::new(index),
+    }))
 }
 
 pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
@@ -943,7 +776,10 @@ async fn validate_partition(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, AtomicUsize};
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicBool, AtomicUsize},
+    };
 
     use async_trait::async_trait;
     use config::{
@@ -964,7 +800,9 @@ mod tests {
     use futures::stream::BoxStream;
     use metrics_index::{
         block::{BlockWriter, ParentMetadata},
-        block_cache::{CacheWeight, SidecarBinding},
+        block_cache::{
+            CacheKey, CacheWeight, CachedIndex, IndexCache, ParentIdentity, SidecarBinding,
+        },
     };
     use object_store::{
         CopyOptions, GetOptions, GetRange, GetResult, ListResult, MultipartUpload, ObjectMeta,
@@ -1831,16 +1669,20 @@ mod tests {
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
         let file = fixture.scan([data.0]).files.remove(0);
         let cache = Mutex::new(IndexCache::default());
-        let flights = Arc::new(loads::LoadRegistry::default());
-        let loaded = load_index_cached(&file, &["group".into()], &cache, &flights, 0)
-            .await
-            .unwrap();
+        let loaded = metrics_index::block_cache::load_index_in(
+            &cache,
+            0,
+            &Sidecar::of(&file).unwrap(),
+            &["group".into()],
+        )
+        .await
+        .unwrap();
         assert!(cache.lock().unwrap().is_empty());
         let reads = fixture.metadata_calls.load(Ordering::SeqCst);
         assert!(reads > 0);
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "group", "x")]);
         assert_eq!(
-            metrics_index::matching_blocks(&loaded.index, &matchers).unwrap(),
+            metrics_index::matching_blocks(&loaded, &matchers).unwrap(),
             vec![0]
         );
         assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), reads);
