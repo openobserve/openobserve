@@ -14,6 +14,8 @@ on:
   # a paired branch in the OSS repository.
   pull_request_target:
     types: [opened, reopened, synchronize, edited, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
+  pull_request: # TEMP smoke test, remove before merge
+    types: [synchronize]
   repository_dispatch:
     types: [sister-enterprise-changed]
   # Required statuses must also appear on merge-queue commits; the PR head was checked first.
