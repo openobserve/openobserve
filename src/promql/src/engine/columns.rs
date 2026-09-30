@@ -603,6 +603,7 @@ mod tests {
             ("max by (job) (m - 1)", 199.0),
             ("sum by (job) (m + m)", 600.0),
             ("sum by (job) (abs(m))", 300.0),
+            ("sum by (job) (ceil(max_over_time(m[5m])))", 300.0),
         ];
         for (query, expected) in cases {
             let trace_id = "test_trace";
