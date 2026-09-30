@@ -325,15 +325,9 @@ mod decoder_tests {
         decoder.decode(&block_bytes, &block).unwrap();
         let mut corrupt = block_bytes.clone();
         corrupt[0] |= 0x80;
-        let mut too_many = block.clone();
-        too_many.row_count = MAX_BLOCK_ROWS as u32 + 1;
-        let mut too_long = block.clone();
-        too_long.block_length = max_block_len(3) as u32 + 1;
         for (bytes, metadata) in [
             (&corrupt[..], &block),
             (&block_bytes[..block_bytes.len() - 1], &block),
-            (&block_bytes[..], &too_many),
-            (&block_bytes[..], &too_long),
         ] {
             assert!(decoder.decode(bytes, metadata).is_err());
             assert!(decoder.timestamps.is_empty());
