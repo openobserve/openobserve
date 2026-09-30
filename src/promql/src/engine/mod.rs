@@ -34,7 +34,7 @@ use promql_parser::parser::{
 use crate::{
     ast::{
         at_modifier::{Pin, pin, uses_at},
-        label_usage::labels_dropped_at_root,
+        label_usage::{grouping_labels_suffice, labels_dropped_at_root},
     },
     binary,
     exec::PromqlContext,
@@ -48,11 +48,6 @@ pub struct Engine {
     eval_ctx: EvalContext,
     /// Only select columns with certain labels
     label_selector: HashSet<String>,
-    /// If true, skip column pruning and load all label columns. Set when the
-    /// expression contains label-creating functions (`label_replace`,
-    /// `label_join`) whose output labels don't exist in the source schema and
-    /// whose source labels may not be in the aggregation grouping set.
-    disable_label_selector: bool,
     /// If true, the query provably discards all labels (e.g.
     /// `sum(rate(m[5m]))` without a modifier), so series labels are never
     /// loaded at all.
@@ -69,7 +64,6 @@ impl Engine {
             ctx,
             eval_ctx,
             label_selector: HashSet::new(),
-            disable_label_selector: false,
             skip_labels: false,
             result_type: None,
             has_at_modifier: true,
@@ -79,7 +73,7 @@ impl Engine {
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
         self.extract_columns_from_prom_expr(prom_expr)?;
-        if self.disable_label_selector {
+        if !grouping_labels_suffice(prom_expr) {
             self.label_selector.clear();
         }
         self.skip_labels = !self.ctx.query_ctx.query_exemplars
