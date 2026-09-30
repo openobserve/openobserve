@@ -403,7 +403,14 @@ pub async fn delete_all(
     }
 
     // delete from file list
-    delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
+    delete_from_file_list(
+        org_id,
+        stream_type,
+        stream_name,
+        (start_time, end_time),
+        false,
+    )
+    .await?;
     super::dump::delete_all(org_id, stream_type, stream_name).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
@@ -511,13 +518,13 @@ pub async fn delete_by_date(
         get_ymdh_from_micros(time_range.0, HourFormat::Real),
         get_ymdh_from_micros(time_range.1, HourFormat::Real),
     );
-    delete_from_file_list(org_id, stream_type, stream_name, time_range)
+    delete_from_file_list(org_id, stream_type, stream_name, time_range, true)
         .await
         .map_err(|e| {
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
+    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range, true)
         .await
         .map_err(|e| {
             log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
@@ -560,11 +567,13 @@ pub async fn delete_by_date(
     handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await
 }
 
+/// With `strict`, a file whose data reaches outside `time_range` (a merged day) is skipped.
 pub async fn delete_from_file_list(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     time_range: (i64, i64),
+    strict: bool,
 ) -> Result<(), anyhow::Error> {
     let task_id = tokio::task::try_id()
         .map(|id| id.to_string())
@@ -589,6 +598,17 @@ pub async fn delete_from_file_list(
 
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for mut file in files {
+        if strict && !file.meta.within(time_range) {
+            log::warn!(
+                "[COMPACTOR] delete_from_file_list [{org_id}/{stream_type}/{stream_name}] skip {}: its data [{}, {}] reaches outside the requested range [{}, {}], the data is stored by day",
+                file.key,
+                file.meta.min_ts,
+                file.meta.max_ts,
+                time_range.0,
+                time_range.1
+            );
+            continue;
+        }
         let columns: Vec<_> = file.key.split('/').collect();
         let hour_key = format!(
             "{}/{}/{}/{}",
@@ -751,7 +771,7 @@ async fn handle_delete_by_date_done(
 
 #[cfg(test)]
 mod tests {
-    use config::utils::time::parse_str_to_timestamp_micros;
+    use config::{meta::stream::FileMeta, utils::time::parse_str_to_timestamp_micros};
     use itertools::Itertools;
 
     use super::*;
@@ -1263,5 +1283,60 @@ mod tests {
                 "ranges overlap or are out of order"
             );
         }
+    }
+
+    fn hour_file(stream: &str, hour: u32, min_ts: i64, max_ts: i64) -> FileKey {
+        FileKey::new(
+            0,
+            "default".to_string(),
+            format!("files/strict/logs/{stream}/2026/09/30/{hour:02}/{min_ts}.parquet"),
+            FileMeta {
+                min_ts,
+                max_ts,
+                records: 1,
+                original_size: 1,
+                compressed_size: 1,
+                ..Default::default()
+            },
+            false,
+        )
+    }
+
+    /// With `strict`, a file whose data reaches outside the range stays; the others go.
+    #[tokio::test]
+    async fn test_delete_from_file_list_strict_keeps_files_exceeding_the_range() {
+        infra_file_list::create_table().await.unwrap();
+        // the sqlite file outlives a test run
+        let stream = &format!("strict_delete_{}", config::ider::generate());
+        let day = parse_str_to_timestamp_micros("2026-09-30T00:00:00Z").unwrap();
+        // the last hour: the hourly query bound selects the merged day, so `strict` decides
+        let hour23 = day + hour_micros(23);
+        let in_hour = hour_file(stream, 23, hour23 + 1, hour23 + hour_micros(1) - 2);
+        let merged_day = hour_file(stream, 0, day + 1, day + hour_micros(24) - 2);
+        infra_file_list::batch_add(&[in_hour, merged_day.clone()])
+            .await
+            .unwrap();
+        let range = (hour23, hour23 + hour_micros(1) - 1);
+        let left = |strict: bool| async move {
+            delete_from_file_list("strict", StreamType::Logs, stream, range, strict)
+                .await
+                .unwrap();
+            infra_file_list::query(
+                "strict",
+                StreamType::Logs,
+                stream,
+                PartitionTimeLevel::Unset,
+                (day, day + hour_micros(24) - 1),
+                None,
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|f| f.key)
+            .collect::<Vec<_>>()
+        };
+
+        assert_eq!(left(true).await, vec![merged_day.key]);
+        assert!(left(false).await.is_empty());
     }
 }
