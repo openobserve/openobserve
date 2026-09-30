@@ -79,7 +79,11 @@ pub async fn get_current_topology(
 
     let use_v4 = super::use_v4_source(&org_id, query.source.as_deref()).await;
     if use_v4 {
-        return match topology_v4(&org_id, &query, start_time, end_time).await {
+        let filter = v4_read_filter(&query);
+        if let Err(e) = filter.validate() {
+            return MetaHttpResponse::bad_request(e);
+        }
+        return match topology_v4(&org_id, &filter, start_time, end_time).await {
             Ok(data) => MetaHttpResponse::json(data),
             Err(e) => {
                 log::warn!("[ServiceGraph] v4 topology read failed for org '{org_id}': {e}");
@@ -93,7 +97,7 @@ pub async fn get_current_topology(
 #[cfg(feature = "enterprise")]
 async fn topology_v4(
     org_id: &str,
-    query: &ServiceGraphQuery,
+    filter: &super::v4::read::ReadFilter,
     start_time: i64,
     end_time: i64,
 ) -> Result<config::meta::service_graph::ServiceGraphData, anyhow::Error> {
@@ -101,8 +105,7 @@ async fn topology_v4(
 
     use super::v4::read::fetch_topology;
 
-    let filter = v4_read_filter(query);
-    let (input, meta) = fetch_topology(org_id, &filter, start_time, end_time).await?;
+    let (input, meta) = fetch_topology(org_id, filter, start_time, end_time).await?;
     let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology_v4(input);
     Ok(ServiceGraphData {
         nodes,
@@ -123,7 +126,8 @@ fn v4_read_filter(query: &ServiceGraphQuery) -> super::v4::read::ReadFilter {
     }
 }
 
-/// Stream-backed topology (`_o2_service_graph`); removed together with v1 at N+2.
+/// Stream-backed topology (`_o2_service_graph`); removed together with v1 in the next major
+/// version.
 #[cfg(feature = "enterprise")]
 async fn topology_v1(
     org_id: &str,
