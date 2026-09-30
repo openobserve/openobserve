@@ -344,21 +344,6 @@ fn scan_source(
     }
 }
 
-fn cache_inputs(files: &[FileKey]) -> Vec<(i64, &String, &String, i64, i64)> {
-    files
-        .iter()
-        .map(|f| {
-            (
-                f.id,
-                &f.account,
-                &f.key,
-                f.meta.compressed_size,
-                f.meta.max_ts,
-            )
-        })
-        .collect_vec()
-}
-
 fn block_parent_eligible(file: &FileKey) -> bool {
     !file.deleted
         && config::FileFormat::from_extension(&file.key).is_some()
@@ -500,6 +485,21 @@ async fn get_file_list(
         }
     }
     Ok(files)
+}
+
+fn cache_inputs(files: &[FileKey]) -> Vec<(i64, &String, &String, i64, i64)> {
+    files
+        .iter()
+        .map(|f| {
+            (
+                f.id,
+                &f.account,
+                &f.key,
+                f.meta.compressed_size,
+                f.meta.max_ts,
+            )
+        })
+        .collect_vec()
 }
 
 #[cfg(test)]
