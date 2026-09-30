@@ -223,7 +223,7 @@ describe("PublicLinksTable", () => {
   it("opens the dashboard and its edit panel from the row", async () => {
     const w = build();
     await flushPromises();
-    await find(w, "dashboards-public-links-l1-dashboard-btn").trigger("click");
+    await find(w, "dashboards-public-links-l1-dashboard-menu").trigger("click");
     expect(push).toHaveBeenCalledWith({
       path: "/dashboards/view",
       query: { org_identifier: "default", dashboard: "dash-1", folder: "f1" },
@@ -244,10 +244,10 @@ describe("PublicLinksTable", () => {
     const w = build();
     await flushPromises();
     await selectTile(w, "attention");
-    for (const id of ["dashboard-btn", "edit-btn", "pause-btn", "dashboard-menu", "edit-menu"]) {
+    for (const id of ["edit-btn", "pause-btn", "dashboard-menu", "edit-menu"]) {
       expect(find(w, `dashboards-public-links-l3-${id}`).exists()).toBe(false);
     }
-    expect(find(w, "dashboards-public-links-l3-revoke-btn").exists()).toBe(true);
+    expect(find(w, "dashboards-public-links-l3-revoke-menu").exists()).toBe(true);
     expect(find(w, "dashboards-public-links-l5-pause-btn").exists()).toBe(true);
   });
 
@@ -278,7 +278,7 @@ describe("PublicLinksTable", () => {
     await selectTile(w, "attention");
 
     confirm.mockResolvedValueOnce(false);
-    await find(w, "dashboards-public-links-l3-revoke-btn").trigger("click");
+    await find(w, "dashboards-public-links-l3-revoke-menu").trigger("click");
     await flushPromises();
     expect(admin.revoke).not.toHaveBeenCalled();
 

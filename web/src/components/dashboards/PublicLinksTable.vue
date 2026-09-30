@@ -177,17 +177,6 @@
             v-if="hasDashboard(row)"
             variant="ghost"
             size="icon-xs-sq"
-            icon-left="dashboard"
-            class="max-md:hidden"
-            :data-test="`dashboards-public-links-${row.id}-dashboard-btn`"
-            @click="openDashboard(row)"
-          >
-            <OTooltip side="bottom" :content="t('dashboard.publicLinks.openDashboard')" />
-          </OButton>
-          <OButton
-            v-if="hasDashboard(row)"
-            variant="ghost"
-            size="icon-xs-sq"
             icon-left="edit"
             class="max-md:hidden"
             :data-test="`dashboards-public-links-${row.id}-edit-btn`"
@@ -211,30 +200,19 @@
               "
             />
           </OButton>
-          <OButton
-            variant="ghost-destructive"
-            size="icon-xs-sq"
-            icon-left="delete"
-            class="max-md:hidden"
-            :data-test="`dashboards-public-links-${row.id}-revoke-btn`"
-            @click="revokeLink(row)"
-          >
-            <OTooltip side="bottom" :content="t('dashboard.publicDashboard.revoke')" />
-          </OButton>
-
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
                 icon-left="more-vert"
                 variant="ghost"
                 size="icon-xs-sq"
-                class="md:hidden"
                 :title="t('dashboard.moreActions')"
                 :data-test="`dashboards-public-links-${row.id}-menu-btn`"
               />
             </template>
             <ODropdownItem
               icon-left="content-copy"
+              class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-copy-menu`"
               @select="copyLink(row)"
             >
@@ -242,6 +220,7 @@
             </ODropdownItem>
             <ODropdownItem
               icon-left="open-in-new"
+              class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-open-menu`"
               @select="openPublicPage(row)"
             >
@@ -258,6 +237,7 @@
             <ODropdownItem
               v-if="hasDashboard(row)"
               icon-left="edit"
+              class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-edit-menu`"
               @select="editLink(row)"
             >
@@ -266,6 +246,7 @@
             <ODropdownItem
               v-if="canPause(row)"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
               @select="setPaused(row, row.enabled)"
             >
@@ -463,7 +444,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "name",
     sortable: true,
     resizable: true,
-    size: 240,
+    size: 200,
     minSize: 160,
     meta: { align: "left", flex: true },
   },
@@ -474,7 +455,7 @@ const columns: OTableColumnDef[] = [
     sortable: true,
     resizable: true,
     hideable: true,
-    size: 150,
+    size: 120,
     meta: { align: "left" },
   },
   {
@@ -483,7 +464,7 @@ const columns: OTableColumnDef[] = [
     sortable: false,
     resizable: true,
     hideable: true,
-    size: 150,
+    size: 120,
     meta: { align: "left" },
   },
   {
@@ -493,7 +474,7 @@ const columns: OTableColumnDef[] = [
     sortable: true,
     resizable: true,
     hideable: true,
-    size: 120,
+    size: 110,
     meta: { align: "left" },
   },
   {
@@ -503,7 +484,7 @@ const columns: OTableColumnDef[] = [
     sortable: true,
     resizable: true,
     hideable: true,
-    size: 140,
+    size: 120,
     meta: { align: "left" },
   },
   {
@@ -523,7 +504,7 @@ const columns: OTableColumnDef[] = [
     sortable: true,
     resizable: true,
     hideable: true,
-    size: 200,
+    size: 170,
     meta: { align: "left" },
   },
   {
@@ -531,8 +512,8 @@ const columns: OTableColumnDef[] = [
     header: t("dashboard.actions"),
     isAction: true,
     sortable: false,
-    size: 176,
-    meta: { align: "center", actionCount: 6 },
+    size: 150,
+    meta: { align: "center", actionCount: 5 },
   },
 ];
 
