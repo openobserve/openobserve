@@ -145,6 +145,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="getAssociatedPipelines({ row })"
                 />
                 <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="download"
+                  :title="t('common.export')"
+                  data-test="function-list-export-function-btn"
+                  data-row-action="export"
+                  class="max-md:hidden"
+                  @click="exportFunction(row)"
+                />
+                <OButton
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('function.delete')"
@@ -154,23 +164,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="showDeleteDialogFn({ row })"
                   icon-left="delete"
                 />
-                <!-- Hidden proxy so the row-hover shortcut reaches Export,
-                     which lives in the more-menu (teleported out of the row). -->
-                <button
-                  type="button"
-                  data-row-action="export"
-                  data-test="function-list-export-function-btn"
-                  class="hidden"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @click.stop="exportFunction(row)"
-                />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
                       icon-left="more-vert"
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
+                      class="md:hidden"
                       data-test="function-list-row-more-actions"
                       @click.stop
                     />
@@ -184,20 +184,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("function.updateTitle") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="download"
-                    shortcut-id="functionsRowExport"
-                    data-test="function-list-export-function-btn-menu"
-                    @select="exportFunction(row)"
-                  >
-                    <span>{{ t("common.export") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
                     icon-left="account-tree"
                     class="md:hidden"
                     data-test="function-list-associated-pipelines-menu"
                     @select="getAssociatedPipelines({ row })"
                   >
                     <span>{{ t("function.associatedPipelines") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="download"
+                    class="md:hidden"
+                    data-test="function-list-export-function-btn-menu"
+                    @select="exportFunction(row)"
+                  >
+                    <span>{{ t("common.export") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
                     icon-left="delete"
@@ -297,24 +297,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </ODialog>
-
-    <ExportResourceDialog
-      v-model:open="showExportDialog"
-      :items="functionsToExport"
-      :terraform="functionsTerraform"
-      :show-terraform="false"
-      :title="
-        t(
-          'function.exportDialogTitle',
-          { count: functionsToExport.length },
-          functionsToExport.length,
-        )
-      "
-      :sub-title="t('function.exportDialogSubtitle')"
-      file-prefix="functions"
-      data-test="function-export-dialog"
-      @download="onExportDownloaded"
-    />
   </div>
 </template>
 
@@ -340,13 +322,12 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
-import type { TerraformExport } from "@/utils/terraform/hcl";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { downloadFile } from "@/utils/dom";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   bulkDeleteFunctionsMutation,
@@ -371,7 +352,6 @@ export default defineComponent({
     ODropdownItem,
     OSearchInput,
     ORefreshButton,
-    ExportResourceDialog,
   },
   emits: [
     "updated:fields",
@@ -748,14 +728,15 @@ export default defineComponent({
     // ── Export ────────────────────────────────────────────────────────────
     // The list query already carries every field the file needs, so export reads
     // from it instead of fetching each definition again.
-    const showExportDialog = ref(false);
-    const functionsToExport = ref<Record<string, unknown>[]>([]);
-    // The provider has no openobserve_function resource yet, so the dialog is
-    // JSON-only; drop in an exporter here once one exists.
-    const functionsTerraform: TerraformExport = { hcl: "", unsupported: [], droppedFields: [] };
+    //
+    // No dialog: unlike alerts and SLOs there is no second format to choose
+    // between (the provider has no openobserve_function resource), so a preview
+    // modal would be a format picker with one format. Export writes the file.
 
     // `streams` is left out: the deprecated stream association names streams that
-    // mean nothing in the org the file is imported into.
+    // mean nothing in the org the file is imported into. `numArgs` is left out
+    // too — the server derives it from `params` on the way back in, so carrying
+    // it would put a field in the file that import reads from nowhere.
     const exportPayload = (name: string) => {
       const fn: any = (functions.data.value ?? []).find((item: any) => item.name === name);
       if (!fn) return null;
@@ -764,7 +745,6 @@ export default defineComponent({
         function: fn.function,
         params: fn.params,
         transType: fn.transType,
-        numArgs: fn.numArgs,
       };
     };
 
@@ -785,7 +765,17 @@ export default defineComponent({
       };
     };
 
-    const openExportDialog = async (names: string[]) => {
+    // One function keeps its own name so re-importing it is self-describing; a
+    // multi-function file is dated, matching how the other lists name a bundle.
+    const exportFileName = (payloads: Record<string, unknown>[]) => {
+      if (payloads.length !== 1) {
+        return `functions-${new Date().toISOString().slice(0, 10)}.json`;
+      }
+      const name = String(payloads[0]?.name ?? "").replace(/[^A-Za-z0-9._-]+/g, "-");
+      return `${name || "function"}.json`;
+    };
+
+    const runExport = async (names: string[]) => {
       if (exportLoading.value) return;
       exportLoading.value = true;
       try {
@@ -803,8 +793,24 @@ export default defineComponent({
             ),
           });
         }
-        functionsToExport.value = payloads;
-        showExportDialog.value = true;
+        // A single function is written as an object, several as an array — both
+        // are what the import screen accepts, and the object form is what a
+        // hand-edited one-function file looks like.
+        const written = downloadFile(
+          exportFileName(payloads),
+          JSON.stringify(payloads.length === 1 ? payloads[0] : payloads, null, 2),
+          "application/json",
+        );
+        if (!written) throw new Error("download refused");
+        toast({
+          variant: "success",
+          message: t(
+            "toastMessages.functions.successfullyExportedFunctions",
+            { count: payloads.length },
+            payloads.length,
+          ),
+        });
+        selectedFunctionIds.value = [];
       } catch (error) {
         toast({
           variant: "error",
@@ -815,17 +821,9 @@ export default defineComponent({
       }
     };
 
-    const exportFunction = (row: any) => openExportDialog([row.name]);
+    const exportFunction = (row: any) => runExport([row.name]);
 
-    const exportSelectedFunctions = () => openExportDialog([...selectedFunctionIds.value]);
-
-    const onExportDownloaded = ({ count }: { format: string; count: number }) => {
-      toast({
-        variant: "success",
-        message: t("toastMessages.functions.successfullyExportedFunctions", { count }, count),
-      });
-      selectedFunctionIds.value = [];
-    };
+    const exportSelectedFunctions = () => runExport([...selectedFunctionIds.value]);
 
     const goToImportFunction = () => {
       router.push({
@@ -996,13 +994,9 @@ export default defineComponent({
       visibleRows,
       hasVisibleRows,
       openBulkDeleteDialog,
-      showExportDialog,
-      functionsToExport,
-      functionsTerraform,
       exportLoading,
       exportFunction,
       exportSelectedFunctions,
-      onExportDownloaded,
       goToImportFunction,
       bulkDeleteFunctions,
       bulkDeleteLoading,

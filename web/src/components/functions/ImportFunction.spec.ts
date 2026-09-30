@@ -20,6 +20,7 @@ import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
 import ImportFunction from "@/components/functions/ImportFunction.vue";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 
 const { mockList, mockCreate, mockUpdate, mockGetAssociatedPipelines, mockToastFn } = vi.hoisted(
@@ -31,6 +32,12 @@ const { mockList, mockCreate, mockUpdate, mockGetAssociatedPipelines, mockToastF
     mockToastFn: vi.fn(),
   }),
 );
+
+// Mutable so a test can pick the entitlement before mounting — the JS gate is a
+// computed over this plain object, evaluated per component instance.
+vi.mock("@/aws-exports", () => ({
+  default: { isEnterprise: "false", isCloud: "false" },
+}));
 
 vi.mock("@/services/jstransform", () => ({
   default: {
@@ -301,12 +308,12 @@ describe("ImportFunction", () => {
       expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
-    it("overrides through PUT once the user picks override", async () => {
+    it("overrides through PUT once the user asks to replace the existing one", async () => {
       const wrapper = mountScreen();
       await flushPromises();
 
       await importJson(wrapper, conflicting);
-      await wrapper.vm.onConflictChoice("parse_nginx", "override");
+      await wrapper.vm.onOverrideChoice("parse_nginx", 0, true);
       await flushPromises();
       await pressImport(wrapper);
 
@@ -323,7 +330,7 @@ describe("ImportFunction", () => {
       await flushPromises();
 
       await importJson(wrapper, conflicting);
-      await wrapper.vm.onConflictChoice("parse_nginx", "override");
+      await wrapper.vm.onOverrideChoice("parse_nginx", 0, true);
       await flushPromises();
       await nextTick();
 
@@ -338,7 +345,7 @@ describe("ImportFunction", () => {
       await flushPromises();
 
       await importJson(wrapper, conflicting);
-      await wrapper.vm.onConflictChoice("parse_nginx", "override");
+      await wrapper.vm.onOverrideChoice("parse_nginx", 0, true);
       await flushPromises();
 
       // A different file, a different existing function, same position.
@@ -347,7 +354,85 @@ describe("ImportFunction", () => {
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockCreate).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain('"parse_json" already exists');
-      expect(wrapper.vm.conflictChoice).toEqual({});
+      expect(wrapper.vm.overrideExisting).toEqual({});
+    });
+
+    // Skipping and overriding were the only two ways out of a clash, so the
+    // obvious third — bring it in under a free name — meant hand-editing the JSON.
+    it("imports under a new name when the clash is renamed away", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      expect(wrapper.text()).toContain('"parse_nginx" already exists');
+
+      wrapper.vm.updateFunctionName("parse_nginx_v2", 0);
+      await nextTick();
+      await pressImport(wrapper);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({
+        name: "parse_nginx_v2",
+        function: ".b = 2",
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    // The rename box wrote whatever was typed and only complained on the next
+    // press, so a name that could never work took a round trip to find out.
+    it("judges what is typed into the name box as it is typed", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+
+      wrapper.vm.updateFunctionName("not a name", 0);
+      await nextTick();
+      expect(wrapper.vm.nameInputError[0]).toContain("letters, numbers and underscores");
+
+      wrapper.vm.updateFunctionName("parse_json", 0);
+      await nextTick();
+      expect(wrapper.vm.nameInputError[0]).toContain("already taken");
+
+      wrapper.vm.updateFunctionName("", 0);
+      await nextTick();
+      expect(wrapper.vm.nameInputError[0]).toContain("Enter a function name");
+
+      wrapper.vm.updateFunctionName("parse_nginx_v2", 0);
+      await nextTick();
+      expect(wrapper.vm.nameInputError[0]).toBeNull();
+    });
+
+    // Two items may not both claim one name, and the box has to say so before
+    // the press turns it into a server 400 that reads like an unrelated clash.
+    it("catches a rename that collides with another item in the same file", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, [
+        { name: "fn_a", function: ".a = 1" },
+        { name: "fn_b", function: "  " },
+      ]);
+
+      wrapper.vm.updateFunctionName("fn_a", 1);
+      await nextTick();
+      expect(wrapper.vm.nameInputError[1]).toContain("Another function in this file");
+    });
+
+    // Replacing the existing one is a decision about that name, so the box has
+    // nothing left to object to.
+    it("drops the name box's objection once the user chooses to replace", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      wrapper.vm.updateFunctionName("parse_nginx", 0);
+      await nextTick();
+      expect(wrapper.vm.nameInputError[0]).toContain("already taken");
+
+      await wrapper.vm.onOverrideChoice("parse_nginx", 0, true);
+      await flushPromises();
+      expect(wrapper.vm.nameInputError[0]).toBeNull();
     });
 
     // The clash was reported once per screen, so a name typed into the rename
@@ -387,6 +472,105 @@ describe("ImportFunction", () => {
     });
   });
 
+  // Every check the import runs has to be answerable from the output pane. A
+  // message with no control beside it sends the user back into the raw JSON.
+  describe("fixing a rejected item in place", () => {
+    it("takes the missing body from the editor it offers", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "fn_a", function: "" });
+      expect(wrapper.text()).toContain("function body is required");
+
+      wrapper.vm.updateFunctionBody(".a = 1", 0);
+      await nextTick();
+      await pressImport(wrapper);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({ name: "fn_a", function: ".a = 1" });
+    });
+
+    // A JavaScript function written against VRL tokenizing reads as broken.
+    it("opens the body editor in the language the item declares", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "fn_a", function: "", transType: 1 });
+      expect(wrapper.vm.bodyLanguage(0)).toBe("javascript");
+
+      await importJson(wrapper, { name: "fn_b", function: "", transType: 0 });
+      expect(wrapper.vm.bodyLanguage(0)).toBe("vrl");
+    });
+
+    it("takes an unusable type from the language picker", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "fn_a", function: ".a = 1", transType: "vrl" });
+      expect(wrapper.text()).toContain("type must be 0 for VRL");
+
+      wrapper.vm.updateTransType("0", 0);
+      await nextTick();
+      await pressImport(wrapper);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({ transType: 0 });
+    });
+
+    // OSS builds cannot run JavaScript, so offering it would only trade this
+    // validation error for a server-side one.
+    it("offers VRL only on OSS", async () => {
+      (config as any).isEnterprise = "false";
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      expect(wrapper.vm.transTypeOptions.map((o: any) => o.value)).toEqual(["0"]);
+    });
+
+    it("offers JavaScript where the build can run it", async () => {
+      (config as any).isEnterprise = "true";
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      expect(wrapper.vm.transTypeOptions.map((o: any) => o.value)).toEqual(["0", "1"]);
+    });
+
+    it("takes unusable params from the params box", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "fn_a", function: ".a = 1", params: ["row"] });
+      expect(wrapper.text()).toContain("params must be a string");
+
+      wrapper.vm.updateParams("row", 0);
+      await nextTick();
+      await pressImport(wrapper);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({ params: "row" });
+    });
+
+    // Whatever is typed on the right has to be what leaves on the next press,
+    // and the JSON pane on the left is how the user checks that.
+    it("writes every fix-up back into the document", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "", function: "", params: ["row"] });
+
+      wrapper.vm.updateFunctionName("fn_a", 0);
+      wrapper.vm.updateFunctionBody(".a = 1", 0);
+      wrapper.vm.updateParams("row", 0);
+      await nextTick();
+
+      expect(JSON.parse(wrapper.vm.baseImportRef.jsonStr)[0]).toMatchObject({
+        name: "fn_a",
+        function: ".a = 1",
+        params: "row",
+      });
+    });
+  });
+
   // Under RBAC the list is filtered, so a name can be taken without the screen
   // ever seeing it; the 400 is the only signal.
   it("turns a server-reported clash into the same conflict prompt", async () => {
@@ -402,7 +586,7 @@ describe("ImportFunction", () => {
     expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
 
     // Override then writes through PUT, even though the list never showed it.
-    await wrapper.vm.onConflictChoice("hidden_fn", "override");
+    await wrapper.vm.onOverrideChoice("hidden_fn", 0, true);
     await flushPromises();
     await pressImport(wrapper);
 
