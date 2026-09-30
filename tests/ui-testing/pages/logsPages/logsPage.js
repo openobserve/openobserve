@@ -13016,6 +13016,37 @@ export class LogsPage {
         return values;
     }
 
+    /**
+     * Poll the search API until a seeded window is fully searchable.
+     *
+     * Ingest acknowledges before every row is indexed, so a page loaded straight
+     * after seeding queries an arbitrary prefix. Settling over the API first costs
+     * one request per poll, where settling through the UI re-runs the whole render.
+     */
+    async waitForSearchableRowCount(stream, expected, startTimeMicros, endTimeMicros, timeout = 90000) {
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.ZO_BASE_URL}/api/${orgId}/_search?type=logs&use_cache=false`;
+        let last = null;
+        await expect.poll(async () => {
+            const resp = await this.page.request.post(url, {
+                headers: getAuthHeaders(),
+                data: {
+                    query: {
+                        sql: `SELECT COUNT(*) AS cnt FROM "${stream}"`,
+                        start_time: startTimeMicros,
+                        end_time: endTimeMicros,
+                        size: -1,
+                    },
+                },
+            });
+            if (!resp.ok()) return -1;
+            const hits = (await resp.json().catch(() => ({}))).hits || [];
+            last = hits.length ? hits[0].cnt : 0;
+            return last;
+        }, { timeout, intervals: [1000, 2000, 3000] }).toBe(expected);
+        return last;
+    }
+
     getWrapContentButton() {
         return this.page.locator('[data-test="logs-search-result-wrap-table-content-btn"]');
     }
