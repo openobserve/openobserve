@@ -478,6 +478,14 @@ pub async fn update_stream_settings(
     if let Some(v) = new_settings.approx_partition {
         settings.approx_partition = v;
     }
+    if let Some(v) = new_settings.dynamic_merge {
+        if !stream_type.support_dynamic_merge() {
+            return Ok(MetaHttpResponse::bad_request(
+                "dynamic_merge is only supported for logs, metrics and traces streams",
+            ));
+        }
+        settings.dynamic_merge = v;
+    }
     if let Some(v) = new_settings.index_original_data {
         settings.index_original_data = v;
     }
