@@ -301,6 +301,23 @@ describe("DiscoveryPage fetching", () => {
     expect(mockSearch).toHaveBeenCalledTimes(1);
   });
 
+  it("finds a trace row by its id when the score carries no trace_id", async () => {
+    mockSearch.mockResolvedValue(
+      searchResult({
+        items: [
+          ...searchResult().items,
+          { ...searchResult().items[0], targetId: "trace-9", traceId: null },
+        ],
+      }),
+    );
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+
+    state.search = "trace-9";
+    await flushPromises();
+    expect(state.visibleItems.map((r: any) => r.targetId)).toEqual(["trace-9"]);
+  });
+
   it("clears the search when the scope changes", async () => {
     const wrapper = await mountPage();
     const state = (wrapper.vm as any).$.setupState;

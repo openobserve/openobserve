@@ -134,8 +134,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-trace="{ row }">
           <div class="flex min-w-0 flex-col">
             <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
-            <span v-if="row.traceId" class="text-text-secondary text-2xs truncate font-mono">
-              {{ raw(row.traceId) }}
+            <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
+            <span
+              v-if="row.traceId || row.targetId"
+              class="text-text-secondary text-2xs truncate font-mono"
+            >
+              {{ raw(row.traceId || row.targetId) }}
             </span>
           </div>
         </template>
@@ -370,6 +374,7 @@ const visibleItems = computed(() => {
       item.operationName,
       item.genAiOperationName,
       item.traceId,
+      item.targetId,
       item.sessionId,
       item.userEmail,
       item.quality,
