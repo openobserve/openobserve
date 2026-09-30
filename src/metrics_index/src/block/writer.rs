@@ -19,7 +19,7 @@ use anyhow::{Context, Result, anyhow, ensure};
 use arrow::{
     array::{
         Array, ArrayRef, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
-        StringViewArray, UInt32Array, UInt64Array,
+        StringViewArray, UInt64Array,
     },
     datatypes::{DataType, SchemaRef},
 };
@@ -29,7 +29,9 @@ use parquet::{
 };
 
 use super::{
+    compact::{encode_frame, encode_label_column, put_varint, zigzag},
     header::{HeaderData, LabelSection},
+    samples::SampleEncoder,
     *,
 };
 
@@ -48,6 +50,8 @@ pub struct BlockWriter<W: Write> {
     current_labels: Vec<Option<String>>,
     timestamps: Vec<i64>,
     values: Vec<u64>,
+    encoder: SampleEncoder,
+    block_bytes: Vec<u8>,
     rows: u64,
     offset: u64,
     blocks: Vec<BlockMeta>,
@@ -121,12 +125,12 @@ impl<W: Write> BlockWriter<W> {
             directory: Vec::with_capacity(DIRECTORY_FIELDS),
         };
         for (name, column) in self.label_columns()? {
-            let (section, frame) = super::compact::encode_frame(column.as_ref())?;
+            let (section, frame) = encode_frame(&encode_label_column(column.as_ref())?)?;
             self.output.write_all(&frame)?;
             header.labels.push(LabelSection { name, section });
         }
         for column in self.directory_columns() {
-            let (section, frame) = super::compact::encode_frame(column.as_ref())?;
+            let (section, frame) = encode_frame(&column)?;
             self.output.write_all(&frame)?;
             header.directory.push(section);
         }
@@ -260,6 +264,8 @@ impl<W: Write> BlockWriter<W> {
             current_labels: Vec::new(),
             timestamps: Vec::with_capacity(max_block_rows),
             values: Vec::with_capacity(max_block_rows),
+            encoder: SampleEncoder::default(),
+            block_bytes: Vec::new(),
             rows: 0,
             offset: 0,
             blocks: Vec::new(),
@@ -339,23 +345,10 @@ impl<W: Write> BlockWriter<W> {
             return Ok(());
         }
         let count = self.timestamps.len();
-        let raw_size = count.checked_mul(16).context("sample bytes overflow")?;
-        let mut raw = Vec::with_capacity(raw_size);
-        raw.extend_from_slice(&self.timestamps[0].to_le_bytes());
-        for pair in self.timestamps.windows(2) {
-            raw.extend_from_slice(&pair[1].wrapping_sub(pair[0]).to_le_bytes());
-        }
-        for byte in 0..8 {
-            for value in &self.values {
-                raw.push((value >> (byte * 8)) as u8);
-            }
-        }
-        let block_bytes = zstd::bulk::compress(&raw, 1)?;
-        let block_length = u32::try_from(block_bytes.len())?;
-        ensure!(
-            block_bytes.len() <= max_compressed_block_len(u32::try_from(count)?)?,
-            "compressed block exceeds format bound"
-        );
+        self.block_bytes.clear();
+        self.encoder
+            .encode_block(&self.timestamps, &self.values, &mut self.block_bytes)?;
+        let block_length = u32::try_from(self.block_bytes.len())?;
         let meta = BlockMeta {
             hash: self.current_hash.context("missing series hash")?,
             row_start: self
@@ -372,7 +365,7 @@ impl<W: Write> BlockWriter<W> {
             .offset
             .checked_add(u64::from(block_length))
             .context("block offset overflow")?;
-        self.output.write_all(&block_bytes)?;
+        self.output.write_all(&self.block_bytes)?;
         self.blocks.push(meta);
         self.labels.push(self.current_labels.clone());
         self.timestamps.clear();
@@ -380,30 +373,25 @@ impl<W: Write> BlockWriter<W> {
         Ok(())
     }
 
-    fn directory_columns(&self) -> Vec<ArrayRef> {
-        vec![
-            Arc::new(UInt64Array::from_iter_values(
-                self.blocks.iter().map(|b| b.hash),
-            )),
-            Arc::new(UInt64Array::from_iter_values(
-                self.blocks.iter().map(|b| b.row_start),
-            )),
-            Arc::new(UInt32Array::from_iter_values(
-                self.blocks.iter().map(|b| b.row_count),
-            )),
-            Arc::new(Int64Array::from_iter_values(
-                self.blocks.iter().map(|b| b.min_timestamp),
-            )),
-            Arc::new(Int64Array::from_iter_values(
-                self.blocks.iter().map(|b| b.max_timestamp),
-            )),
-            Arc::new(UInt64Array::from_iter_values(
-                self.blocks.iter().map(|b| b.block_offset),
-            )),
-            Arc::new(UInt32Array::from_iter_values(
-                self.blocks.iter().map(|b| b.block_length),
-            )),
-        ]
+    /// Varint columns: hash delta, row count, zigzag min-time delta, time span, block length.
+    fn directory_columns(&self) -> [Vec<u8>; DIRECTORY_FIELDS] {
+        let mut columns: [Vec<u8>; DIRECTORY_FIELDS] = Default::default();
+        let (mut hash, mut min) = (0u64, 0i64);
+        for block in &self.blocks {
+            put_varint(&mut columns[0], block.hash.wrapping_sub(hash));
+            put_varint(&mut columns[1], u64::from(block.row_count));
+            put_varint(
+                &mut columns[2],
+                zigzag(block.min_timestamp.wrapping_sub(min)),
+            );
+            put_varint(
+                &mut columns[3],
+                (block.max_timestamp as u64).wrapping_sub(block.min_timestamp as u64),
+            );
+            put_varint(&mut columns[4], u64::from(block.block_length));
+            (hash, min) = (block.hash, block.min_timestamp);
+        }
+        columns
     }
 
     fn label_columns(&self) -> Result<Vec<(String, ArrayRef)>> {

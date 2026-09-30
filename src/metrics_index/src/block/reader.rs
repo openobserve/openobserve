@@ -17,18 +17,19 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
 use arrow::{
-    array::{
-        Array, ArrayRef, Int64Array, RecordBatch, RecordBatchOptions, UInt32Array, UInt64Array,
-    },
+    array::{Array, ArrayRef, RecordBatch, RecordBatchOptions},
     datatypes::Schema,
 };
 use bytes::Bytes;
 
-use super::*;
+use super::{
+    compact::{decode_frame, decode_label_column, frame_decoder, get_varint, unzigzag},
+    samples::SampleDecoder,
+    *,
+};
 
 pub struct BlockDecoder {
-    decoder: zstd::bulk::Decompressor<'static>,
-    raw: Box<[u8]>,
+    samples: SampleDecoder,
     timestamps: Vec<i64>,
     value_bits: Vec<u64>,
 }
@@ -43,8 +44,6 @@ impl BlockDecoder {
         block_bytes: &[u8],
         block: &BlockMeta,
     ) -> Result<DecodedBlockRef<'a>> {
-        self.timestamps.clear();
-        self.value_bits.clear();
         if let Err(error) = self.decode_inner(block_bytes, block) {
             self.timestamps.clear();
             self.value_bits.clear();
@@ -61,11 +60,8 @@ impl BlockDecoder {
             rows > 0 && rows <= MAX_BLOCK_ROWS,
             "invalid decoder capacity"
         );
-        let mut decoder = zstd::bulk::Decompressor::new()?;
-        decoder.set_parameter(zstd::zstd_safe::DParameter::WindowLogMax(18))?;
         Ok(Self {
-            decoder,
-            raw: vec![0; rows * 16].into_boxed_slice(),
+            samples: SampleDecoder::with_capacity(rows),
             timestamps: Vec::with_capacity(rows),
             value_bits: Vec::with_capacity(rows),
         })
@@ -73,64 +69,19 @@ impl BlockDecoder {
 
     fn decode_inner(&mut self, block_bytes: &[u8], block: &BlockMeta) -> Result<()> {
         ensure!(
-            block.row_count > 0 && block.row_count as usize <= MAX_BLOCK_ROWS,
-            "invalid decoded row count"
-        );
-        ensure!(
-            block.block_length as usize <= max_compressed_block_len(block.row_count)?,
-            "compressed block length exceeds format bound"
+            block.block_length as usize <= max_block_len(block.row_count)?,
+            "block length exceeds format bound"
         );
         ensure!(
             block_bytes.len() == block.block_length as usize,
             "block length mismatch"
         );
-        ensure!(
-            zstd::zstd_safe::find_frame_compressed_size(block_bytes)
-                .map_err(|error| anyhow!("invalid sample frame: {error:?}"))?
-                == block_bytes.len(),
-            "extra sample frame bytes"
-        );
-        let count = block.row_count as usize;
-        let size = count.checked_mul(16).context("decoded size overflow")?;
-        ensure!(
-            size <= self.raw.len(),
-            "decoded block exceeds scratch capacity"
-        );
-        let raw = &mut self.raw[..size];
-        ensure!(
-            self.decoder.decompress_to_buffer(block_bytes, raw)? == size,
-            "decoded size mismatch"
-        );
-        let (timestamp_bytes, value_bytes) = raw.split_at(count * 8);
-        let planes: [&[u8]; 8] =
-            std::array::from_fn(|byte| &value_bytes[byte * count..(byte + 1) * count]);
-        let mut previous: Option<i64> = None;
-        for (i, bytes) in timestamp_bytes.chunks_exact(8).enumerate() {
-            // chunks_exact guarantees the width; no unchecked reads or casts.
-            let encoded = i64::from_le_bytes(bytes.try_into().expect("8-byte timestamp chunk"));
-            let timestamp = previous.map_or(encoded, |last| last.wrapping_add(encoded));
-            if let Some(last) = previous {
-                ensure!(timestamp >= last, "decoded timestamps decreased");
-            }
-            previous = Some(timestamp);
-            self.timestamps.push(timestamp);
-            self.value_bits.push(u64::from_le_bytes([
-                planes[0][i],
-                planes[1][i],
-                planes[2][i],
-                planes[3][i],
-                planes[4][i],
-                planes[5][i],
-                planes[6][i],
-                planes[7][i],
-            ]));
-        }
-        ensure!(
-            self.timestamps[0] == block.min_timestamp
-                && self.timestamps[count - 1] == block.max_timestamp,
-            "decoded timestamp bounds mismatch"
-        );
-        Ok(())
+        self.samples.decode(
+            block_bytes,
+            block,
+            &mut self.timestamps,
+            &mut self.value_bits,
+        )
     }
 }
 
@@ -147,20 +98,18 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
         "MIDX directory byte length mismatch"
     );
     let rows = header.blocks;
-    let mut decoder = super::compact::frame_decoder()?;
-    let mut arrays = Vec::with_capacity(DIRECTORY_FIELDS);
-    for (column, kind) in header.directory.iter().zip(DIRECTORY_TYPES) {
+    let mut decoder = frame_decoder()?;
+    let mut raw = Vec::with_capacity(DIRECTORY_FIELDS);
+    for column in &header.directory {
         let start = usize::try_from(column.range.start - directory.start)?;
         let end = usize::try_from(column.range.end - directory.start)?;
-        arrays.push(super::compact::decode_frame(
+        raw.push(decode_frame(
             &mut decoder,
             &columns[0][start..end],
             column.raw,
-            &kind,
-            rows,
         )?);
     }
-    let blocks = decode_directory(&arrays, &header.parent, header.blocks_end)?;
+    let blocks = decode_directory(&raw, rows, &header.parent, header.blocks_end)?;
     let labels = decode_labels(header, &columns[1..], &projection, &mut decoder)?;
     for i in 1..rows {
         if blocks.block(i).hash == blocks.block(i - 1).hash {
@@ -196,7 +145,7 @@ pub fn decode_additional_labels(
         columns.len() == projection.len(),
         "MIDX label count mismatch"
     );
-    let mut decoder = super::compact::frame_decoder()?;
+    let mut decoder = frame_decoder()?;
     let labels = decode_labels(header, columns, &projection, &mut decoder)?;
     for i in 1..header.blocks {
         if prior.blocks.block(i).hash == prior.blocks.block(i - 1).hash {
@@ -231,10 +180,8 @@ fn decode_labels(
             "MIDX label byte length mismatch"
         );
         let field = header.source_schema.field_with_name(&label.name)?;
-        let column = super::compact::decode_frame(
-            decoder,
-            bytes,
-            label.column.raw,
+        let column = decode_label_column(
+            &decode_frame(decoder, bytes, label.column.raw)?,
             field.data_type(),
             rows,
         )?;
@@ -278,66 +225,48 @@ pub fn decode_block(block_bytes: &[u8], block: &BlockMeta) -> Result<DecodedBloc
     })
 }
 
+/// Rebuilds row starts and block offsets as prefix sums of the stored counts and lengths.
 fn decode_directory(
-    columns: &[ArrayRef],
+    columns: &[Vec<u8>],
+    count: usize,
     parent: &ParentMetadata,
     blocks_end: u64,
 ) -> Result<BlockDirectory> {
-    let count = columns[0].len();
-    let hashes = columns[0]
-        .as_any()
-        .downcast_ref::<UInt64Array>()
-        .context("hash type")?;
-    let row_starts = columns[1]
-        .as_any()
-        .downcast_ref::<UInt64Array>()
-        .context("row offset type")?;
-    let counts = columns[2]
-        .as_any()
-        .downcast_ref::<UInt32Array>()
-        .context("count type")?;
-    let min_times = columns[3]
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .context("min time type")?;
-    let max_times = columns[4]
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .context("max time type")?;
-    let offsets = columns[5]
-        .as_any()
-        .downcast_ref::<UInt64Array>()
-        .context("offset type")?;
-    let lengths = columns[6]
-        .as_any()
-        .downcast_ref::<UInt32Array>()
-        .context("length type")?;
+    ensure!(
+        columns.len() == DIRECTORY_FIELDS,
+        "invalid directory column count"
+    );
+    let mut positions = [0usize; DIRECTORY_FIELDS];
+    let mut next = |field: usize| get_varint(&columns[field], &mut positions[field]);
     let mut blocks = super::directory::DirectoryBuilder::new(count, parent.rows, blocks_end);
+    let (mut hash, mut min_timestamp) = (0u64, 0i64);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
     let mut previous: Option<(u64, i64)> = None;
-    for i in 0..count {
+    for _ in 0..count {
+        hash = hash.wrapping_add(next(0)?);
+        let row_count = u32::try_from(next(1)?).context("invalid block row count")?;
+        min_timestamp = min_timestamp.wrapping_add(unzigzag(next(2)?));
+        let max_timestamp = min_timestamp.wrapping_add(next(3)? as i64);
+        let block_length = u32::try_from(next(4)?).context("block length exceeds format bound")?;
         let block = BlockMeta {
-            hash: hashes.value(i),
-            row_start: row_starts.value(i),
-            row_count: counts.value(i),
-            min_timestamp: min_times.value(i),
-            max_timestamp: max_times.value(i),
-            block_offset: offsets.value(i),
-            block_length: lengths.value(i),
+            hash,
+            row_start: next_row,
+            row_count,
+            min_timestamp,
+            max_timestamp,
+            block_offset: next_offset,
+            block_length,
         };
         ensure!(
             block.row_count > 0 && block.row_count as usize <= MAX_BLOCK_ROWS,
             "invalid block row count"
         );
         ensure!(
-            block.block_length as usize <= max_compressed_block_len(block.row_count)?,
-            "compressed block length exceeds format bound"
+            block.block_length as usize <= max_block_len(block.row_count)?,
+            "block length exceeds format bound"
         );
-        ensure!(
-            block.row_start == next_row && block.block_length > 0,
-            "noncontiguous row or block directory"
-        );
+        ensure!(block.block_length > 0, "empty sample block");
         ensure!(
             block.min_timestamp <= block.max_timestamp,
             "invalid time bounds"
@@ -355,10 +284,6 @@ fn decode_directory(
         next_row = next_row
             .checked_add(u64::from(block.row_count))
             .context("row end overflow")?;
-        ensure!(
-            block.block_offset == next_offset,
-            "noncontiguous block directory"
-        );
         next_offset = next_offset
             .checked_add(u64::from(block.block_length))
             .context("blocks end overflow")?;
@@ -369,6 +294,13 @@ fn decode_directory(
         previous = Some((block.hash, block.max_timestamp));
         blocks.push(block);
     }
+    ensure!(
+        positions
+            .iter()
+            .zip(columns)
+            .all(|(position, column)| *position == column.len()),
+        "directory column has unused bytes"
+    );
     ensure!(
         next_row == parent.rows && next_offset == blocks_end,
         "directory does not tile source rows and blocks"
@@ -381,17 +313,12 @@ mod decoder_tests {
     use super::*;
 
     fn fixture(samples: &[(i64, u64)]) -> (Vec<u8>, BlockMeta) {
-        let mut raw = Vec::with_capacity(samples.len() * 16);
-        raw.extend_from_slice(&samples[0].0.to_le_bytes());
-        for pair in samples.windows(2) {
-            raw.extend_from_slice(&pair[1].0.wrapping_sub(pair[0].0).to_le_bytes());
-        }
-        for byte in 0..8 {
-            for sample in samples {
-                raw.push((sample.1 >> (byte * 8)) as u8);
-            }
-        }
-        let block_bytes = zstd::bulk::compress(&raw, 1).unwrap();
+        let timestamps: Vec<_> = samples.iter().map(|s| s.0).collect();
+        let bits: Vec<_> = samples.iter().map(|s| s.1).collect();
+        let mut block_bytes = Vec::new();
+        super::super::samples::SampleEncoder::default()
+            .encode_block(&timestamps, &bits, &mut block_bytes)
+            .unwrap();
         let block = BlockMeta {
             hash: 7,
             row_start: 0,
@@ -407,20 +334,9 @@ mod decoder_tests {
     #[test]
     fn reusable_decoder_keeps_bounded_allocations_across_block_sizes() {
         let mut decoder = BlockDecoder::new().unwrap();
-        let pointers = (
-            decoder.raw.as_ptr(),
-            decoder.timestamps.as_ptr(),
-            decoder.value_bits.as_ptr(),
-        );
-        let capacities = (
-            decoder.raw.len(),
-            decoder.timestamps.capacity(),
-            decoder.value_bits.capacity(),
-        );
-        assert_eq!(
-            capacities,
-            (MAX_BLOCK_ROWS * 16, MAX_BLOCK_ROWS, MAX_BLOCK_ROWS)
-        );
+        let pointers = (decoder.timestamps.as_ptr(), decoder.value_bits.as_ptr());
+        let capacities = (decoder.timestamps.capacity(), decoder.value_bits.capacity());
+        assert_eq!(capacities, (MAX_BLOCK_ROWS, MAX_BLOCK_ROWS));
         for count in [1, 64, MAX_BLOCK_ROWS, 3, MAX_BLOCK_ROWS, 1] {
             let samples: Vec<_> = (0..count)
                 .map(|i| (i as i64 * 15_000_000, (i as u64).rotate_left(31)))
@@ -437,19 +353,11 @@ mod decoder_tests {
                 samples
             );
             assert_eq!(
-                (
-                    decoder.raw.as_ptr(),
-                    decoder.timestamps.as_ptr(),
-                    decoder.value_bits.as_ptr()
-                ),
+                (decoder.timestamps.as_ptr(), decoder.value_bits.as_ptr()),
                 pointers
             );
             assert_eq!(
-                (
-                    decoder.raw.len(),
-                    decoder.timestamps.capacity(),
-                    decoder.value_bits.capacity()
-                ),
+                (decoder.timestamps.capacity(), decoder.value_bits.capacity()),
                 capacities
             );
         }
@@ -457,38 +365,38 @@ mod decoder_tests {
 
     #[test]
     fn reusable_decoder_recovers_after_integrity_and_native_errors() {
-        let samples = [(0, 0), (15_000_000, 1f64.to_bits())];
+        let samples = [(0, 0), (15_000_000, 1f64.to_bits()), (45_000_000, 0)];
         let (block_bytes, block) = fixture(&samples);
         let mut decoder = BlockDecoder::new().unwrap();
         decoder.decode(&block_bytes, &block).unwrap();
         let mut corrupt = block_bytes.clone();
-        corrupt[0] ^= 1;
-        let bad_zstd = [1, 2, 3, 4];
-        let mut bad_frame = block.clone();
-        bad_frame.block_length = bad_zstd.len() as u32;
+        corrupt[0] |= 0x80;
         let mut bad_endpoint = block.clone();
         bad_endpoint.max_timestamp += 1;
         let mut too_many = block.clone();
         too_many.row_count = MAX_BLOCK_ROWS as u32 + 1;
+        let mut too_long = block.clone();
+        too_long.block_length = max_block_len(3).unwrap() as u32 + 1;
         for (bytes, metadata) in [
             (&corrupt[..], &block),
-            (&bad_zstd[..], &bad_frame),
+            (&block_bytes[..block_bytes.len() - 1], &block),
             (&block_bytes[..], &bad_endpoint),
             (&block_bytes[..], &too_many),
+            (&block_bytes[..], &too_long),
         ] {
             assert!(decoder.decode(bytes, metadata).is_err());
             assert!(decoder.timestamps.is_empty());
             assert!(decoder.value_bits.is_empty());
             let actual = decoder.decode(&block_bytes, &block).unwrap();
-            assert_eq!(actual.timestamps, &[0, 15_000_000]);
-            assert_eq!(actual.value_bits, &[0, 1f64.to_bits()]);
+            assert_eq!(actual.timestamps, &[0, 15_000_000, 45_000_000]);
+            assert_eq!(actual.value_bits, &[0, 1f64.to_bits(), 0]);
         }
     }
 
     #[test]
     fn reusable_decoder_rejects_bad_order_and_exact_decoded_lengths() {
         let mut decoder = BlockDecoder::new().unwrap();
-        let (decreased, metadata) = fixture(&[(100, 0), (99, 1)]);
+        let (decreased, metadata) = fixture(&[(0, 0), (10, 1), (5, 2)]);
         assert!(
             decoder
                 .decode(&decreased, &metadata)
@@ -497,15 +405,14 @@ mod decoder_tests {
                 .contains("timestamps decreased")
         );
         assert!(decoder.timestamps.is_empty());
-        for length in [15, 17] {
-            let bytes = zstd::bulk::compress(&vec![0; length], 1).unwrap();
-            let (_, mut metadata) = fixture(&[(0, 0)]);
+        let (valid, metadata) = fixture(&[(0, 0)]);
+        for bytes in [&valid[..0], &[valid.as_slice(), &[0]].concat()] {
+            let mut metadata = metadata.clone();
             metadata.block_length = bytes.len() as u32;
-            assert!(decoder.decode(&bytes, &metadata).is_err());
+            assert!(decoder.decode(bytes, &metadata).is_err());
             assert!(decoder.timestamps.is_empty());
             assert!(decoder.value_bits.is_empty());
         }
-        let (valid, metadata) = fixture(&[(0, 0)]);
         assert_eq!(decoder.decode(&valid, &metadata).unwrap().timestamps, &[0]);
     }
 
