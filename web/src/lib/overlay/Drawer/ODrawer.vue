@@ -433,8 +433,8 @@ watch(internalOpen, (open) => {
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="min-w-0 shrink-0">
+            <!-- Below lg a subtitle longer than the panel must truncate, or it pushes the close button off screen. -->
+            <div v-if="title || subTitle" class="min-w-0 shrink-0 max-lg:shrink">
               <span
                 v-if="title"
                 class="text-dialog-header-text block truncate text-base font-semibold"
