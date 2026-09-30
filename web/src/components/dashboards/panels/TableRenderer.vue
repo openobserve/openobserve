@@ -335,22 +335,15 @@ export default defineComponent({
 }
 
 @media print {
-  // Grow with the table's natural content height instead of clipping at the
-  // panel height. The old height:100% + overflow:hidden pair sliced whichever
-  // row straddled the panel edge and hid every row after it, and the
-  // absolutely-pinned opaque footer then painted over the last visible row —
-  // so a 4-row table printed 3 rows under a footer still reading "1-4 of 4".
-  // Rows that don't fit the page now continue on the next page.
+  // Keep the table at its panel height: the grid cell clips overflow in print, so a grown table would push the footer out of view.
   .table-wrapper {
     position: relative !important;
-    height: auto !important;
     min-height: 100% !important;
     max-height: none !important;
     overflow: visible !important;
   }
 
   .my-sticky-virtscroll-table {
-    height: auto !important;
     overflow: visible !important;
 
     // Remove sticky — no scroll container in print, sticky causes quirks.
@@ -364,10 +357,9 @@ export default defineComponent({
       display: table-header-group !important;
     }
 
-    // Let the scroll container expand to show all rows.
+    // Clip instead of scroll so the rows fill the space above the footer without a scrollbar.
     :deep(.table-container) {
-      overflow: visible !important;
-      height: auto !important;
+      overflow: clip !important;
     }
 
     // Never slice a row across a page boundary — move it whole to the next page.
