@@ -67,7 +67,7 @@ impl Engine {
                     ));
                 };
                 let input = self.exec_expr(expr).await?;
-                aggregations::quantile(phi, input, &eval_ctx)
+                aggregations::quantile(phi, modifier, input, &eval_ctx)
             }
             token::T_COUNT_VALUES => {
                 let Some(Value::String(label_name)) = param else {
@@ -263,6 +263,33 @@ mod tests {
             assert_eq!(series.len(), 1, "{query}");
             assert_eq!(series[0].samples[0].value, 5.0, "{query}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_quantile_by_reaches_the_grouping_fold() {
+        use crate::{engine::tests::*, exec::PromqlContext};
+
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        // `label_replace` adds `x`, so keeping it proves the modifier reached the fold.
+        let expr =
+            parse(r#"quantile by (x) (0.9, label_replace(vector(5), "x", "a", "", ""))"#).unwrap();
+        let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+            panic!("expected matrix for quantile by (x)");
+        };
+        assert_eq!(series.len(), 1);
+        assert_eq!(
+            series[0].labels.as_slice(),
+            &[Arc::new(Label::new("x", "a"))]
+        );
+        assert_eq!(series[0].samples[0].value, 5.0);
     }
 
     fn shape(query: &str) -> Option<(String, bool, Option<Option<Duration>>)> {

@@ -941,6 +941,39 @@ describe("OTable", () => {
     });
   });
 
+  // ── Header over a non-row state ────────────────────────────
+
+  describe("header over a non-row state", () => {
+    const isPinned = (w: VueWrapper) =>
+      w.find('[data-test="o2-table"]').classes().includes("sticky");
+
+    it("pins the header-only table above the empty state", () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns() } });
+      expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(true);
+      expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("pins it above the error and no-access states too", async () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), error: "API Error" } });
+      expect(isPinned(wrapper)).toBe(true);
+      await wrapper.setProps({ error: null, forbidden: true });
+      expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
+      expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("leaves pinning to the <thead> while rows show", () => {
+      wrapper = mount(OTable, { props: { data: makeRows(5), columns: makeColumns() } });
+      expect(isPinned(wrapper)).toBe(false);
+    });
+
+    it("stays unpinned when the header is not sticky or not shown", async () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), stickyHeader: false } });
+      expect(isPinned(wrapper)).toBe(false);
+      await wrapper.setProps({ stickyHeader: true, showHeader: false });
+      expect(isPinned(wrapper)).toBe(false);
+    });
+  });
+
   // ── Column Features ────────────────────────────────────────
 
   describe("column features", () => {

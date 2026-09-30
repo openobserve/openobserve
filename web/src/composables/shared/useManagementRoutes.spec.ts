@@ -602,7 +602,7 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 21 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 22 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
       expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise (incl. passwordPolicy) + 1 cloud
     });

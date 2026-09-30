@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::prompt_template::template_variables;
 use infra::table::scorers::ScorerType;
 use openobserve_core::llm_evaluations::scorers::schema_derivation::ExtraMetadataField;
 use serde::{Deserialize, Serialize};
@@ -243,25 +244,6 @@ pub struct LlmJudgeOutputSchemaResponseBody {
     pub output_schema: Value,
 }
 
-pub fn extract_template_variables(template: &str) -> Vec<String> {
-    let mut variables = Vec::new();
-    let mut start = 0;
-    while let Some(open) = template[start..].find("{{") {
-        let abs_open = start + open;
-        if let Some(close) = template[abs_open + 2..].find("}}") {
-            let abs_close = abs_open + 2 + close;
-            let variable = template[abs_open + 2..abs_close].trim();
-            if !variable.is_empty() && !variables.iter().any(|v| v == variable) {
-                variables.push(variable.to_string());
-            }
-            start = abs_close + 2;
-        } else {
-            break;
-        }
-    }
-    variables
-}
-
 /// HTTP response body for scorer test results.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -405,7 +387,7 @@ impl From<infra::table::scorers::Scorer> for ScorerResponseBody {
             produces_score_config_id: value.produces_score_config_id,
             produces_score_config_version: value.produces_score_config_version,
             template: value.template.clone(),
-            variables: extract_template_variables(&value.template),
+            variables: template_variables(&value.template),
             reference_based,
             output_schema: value.output_schema,
             params: value.params,

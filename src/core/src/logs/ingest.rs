@@ -25,6 +25,7 @@ use chrono::Utc;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
+        db_monitoring::is_dbm_server_stream,
         self_reporting::usage::{UsageType, is_internal_rollup_stream},
         stream::{StreamParams, StreamType},
     },
@@ -143,7 +144,9 @@ pub async fn ingest(
         Err(_) if !should_apply_sdr(org_id, in_stream_name) => None,
         Err(e) => {
             // Reported once the destination streams and their records are known, below.
-            log::error!("[LOGS:JSON] failed to get pattern manager for SDR redaction: {e}");
+            log::error!(
+                "[LOGS:JSON] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
             None
         }
     };
@@ -158,6 +161,7 @@ pub async fn ingest(
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
+    let dbm_gate = cfg.db_monitoring.enabled && is_dbm_server_stream(&stream_name);
 
     // Block user ingestion into internal rollup streams (_o2_*,
     // _agent_signals) in ALL editions — they are written only by internal
@@ -305,7 +309,7 @@ pub async fn ingest(
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {
-                log::error!("IngestionError: {e:?}");
+                log::error!("[LOGS:JSON] IngestionError: org_id: {org_id}, error: {e:?}");
                 return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
             }
         };
@@ -360,7 +364,7 @@ pub async fn ingest(
                 streams_need_all_values_map: &streams_need_all_values_map,
                 need_usage_report,
                 log_ingestion_errors,
-                dbm_enabled: cfg.db_monitoring.enabled,
+                dbm_enabled: dbm_gate,
                 stream_status: &mut stream_status,
                 json_data_by_stream: &mut json_data_by_stream,
             },
@@ -440,6 +444,8 @@ pub async fn ingest(
                         }
 
                         let destination_stream = stream_params.stream_name.to_string();
+                        let dest_dbm_gate =
+                            cfg.db_monitoring.enabled && is_dbm_server_stream(&destination_stream);
                         if !derived_streams.contains(&destination_stream) {
                             derived_streams.insert(destination_stream.clone());
                         }
@@ -488,6 +494,13 @@ pub async fn ingest(
                                 json::Value::Object(val) => val,
                                 _ => unreachable!(),
                             };
+
+                            // Keyed on the destination: client `o2_dbm_*` keys must not land raw.
+                            if dest_dbm_gate {
+                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                                    &mut local_val,
+                                );
+                            }
 
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
@@ -610,7 +623,7 @@ pub async fn ingest(
                         streams_need_all_values_map: &streams_need_all_values_map,
                         need_usage_report,
                         log_ingestion_errors,
-                        dbm_enabled: cfg.db_monitoring.enabled,
+                        dbm_enabled: dbm_gate,
                         stream_status: &mut stream_status,
                         json_data_by_stream: &mut json_data_by_stream,
                     },
@@ -670,7 +683,9 @@ pub async fn ingest(
             if let Err(e) =
                 pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0)
             {
-                log::error!("error in processing records for patterns for stream {stream} : {e}");
+                log::error!(
+                    "[LOGS:JSON] error in processing records for patterns for stream {org_id}/{stream} : {e}"
+                );
             }
             super::refresh_derived_columns(&before, &mut data.0);
         }
@@ -710,7 +725,7 @@ pub async fn ingest(
         match write_result {
             Ok(skipped) => ("200", stream_status, skipped),
             Err(e) => {
-                log::error!("Error while writing logs: {e}");
+                log::error!("[LOGS:JSON] Error while writing logs: org_id: {org_id}, error: {e}");
                 ("500", stream_status, false)
             }
         }

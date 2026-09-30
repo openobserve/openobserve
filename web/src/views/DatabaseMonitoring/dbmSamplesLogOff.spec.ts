@@ -163,12 +163,22 @@ describe("the slow-query-log-off state names itself", () => {
     const en = JSON.parse(
       readFileSync(join(here, "../../locales/languages/en-US.json"), "utf8"),
     ) as Record<string, never>;
-    const samples = (en as unknown as { dbm: { samples: Record<string, string> } }).dbm.samples;
+    const { checks } = (
+      en as unknown as {
+        dbm: {
+          samples: {
+            notCollecting: {
+              checks: { log: { noDetail: string }; engines: { detail: string } };
+            };
+          };
+        };
+      }
+    ).dbm.samples.notCollecting;
 
-    expect(samples.logOffDescription).toContain("log_min_duration_statement");
-    expect(samples.logOffDescription).not.toContain("long_query_time");
-    expect(samples.logOffDescription).toMatch(/PostgreSQL-only/);
-    expect(samples.logOffDescription).toContain("Top queries");
+    expect(checks.log.noDetail).toContain("log_min_duration_statement");
+    expect(checks.log.noDetail).not.toContain("long_query_time");
+    expect(checks.engines.detail).toMatch(/PostgreSQL-only/);
+    expect(checks.engines.detail).toContain("Top queries");
   });
 
   /**

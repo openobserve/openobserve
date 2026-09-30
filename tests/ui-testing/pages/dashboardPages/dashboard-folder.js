@@ -90,7 +90,26 @@ export default class DashboardFolder {
     await this.dismissNavFlyout();
     const folderCard = this.getFolderCardByName(folderName);
     await folderCard.waitFor({ state: "visible", timeout: 10000 });
-    await folderCard.click();
+    const tabTestId = await folderCard
+      .locator('xpath=ancestor::*[starts-with(@data-test,"dashboard-folder-tab-")][1]')
+      .getAttribute("data-test", { timeout: 5000 })
+      .catch(() => null);
+    const folderId = tabTestId?.replace("dashboard-folder-tab-", "");
+    if (!folderId) {
+      await folderCard.click();
+      return;
+    }
+    // Dashboards.vue onMounted re-applies route.query.folder after the rail renders, silently discarding an early click.
+    const folderInUrl = new RegExp(`[?&]folder=${folderId}(?:&|$)`);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await folderCard.click();
+      try {
+        await this.page.waitForURL(folderInUrl, { timeout: 5000 });
+        return;
+      } catch (e) {
+        if (attempt === 3) throw e;
+      }
+    }
   }
 
   // Create folder

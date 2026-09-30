@@ -169,6 +169,7 @@ import useRum from "@/composables/rum/useRum";
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
 
 const defaultEvent = {
   id: "",
@@ -523,12 +524,16 @@ const getSessionEvents = () => {
       if (!sessionState.data.selectedSession?.user_email)
         sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
-      segmentEvents.value = res.data.hits.filter((hit: any) => {
-        return (
-          !!events.includes(hit.type) &&
-          hit.date >= Number(sessionState.data.selectedSession.start_time)
-        );
-      });
+      // Each view arrives once per SDK update (same view_id, rising document
+      // version); collapse them so one navigation reads as one breadcrumb.
+      segmentEvents.value = collapseViewDocuments(
+        res.data.hits.filter((hit: any) => {
+          return (
+            !!events.includes(hit.type) &&
+            hit.date >= Number(sessionState.data.selectedSession.start_time)
+          );
+        }),
+      );
       segmentEvents.value = segmentEvents.value.map((hit: any) => {
         // Store raw event data for detail view
         const eventId = hit[`${hit.type}_id`];

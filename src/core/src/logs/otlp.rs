@@ -20,6 +20,7 @@ use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
+        db_monitoring::is_dbm_server_stream,
         otlp::OtlpRequestType,
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
@@ -43,7 +44,7 @@ use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, otlp::otlp_export_response},
+    common::meta::otlp::{otlp_export_response, otlp_rejection_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
@@ -208,6 +209,9 @@ pub async fn handle_request(
     let normalize_keys = executable_pipelines.is_empty() && !need_original;
     let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
     let dbm_enabled = cfg.db_monitoring.enabled;
+    let dbm_gate = dbm_enabled && is_dbm_server_stream(&stream_name);
+    // A pipeline may route to a DBM stream, and its restore reads the name off the input record.
+    let event_name_gate = dbm_gate || (dbm_enabled && !executable_pipelines.is_empty());
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
@@ -326,13 +330,11 @@ pub async fn handle_request(
                 //   * BEFORE the flatten/branch below, so ONE write serves both the pipeline and
                 //     non-pipeline branches.
                 //
-                // Gated on `db_monitoring.enabled` to match `apply_to_record`, which
-                // early-returns when it is off: without the gate an operator who disabled
-                // DBM would still get a DBM column written onto every receiver record.
+                // Gated like canonicalization, or every OTLP stream gains a DBM column.
                 //
                 // Only when non-empty, so records without an event name — every ordinary
                 // log line in the product — are byte-identical to before.
-                if !log_record.event_name.is_empty() && cfg.db_monitoring.enabled {
+                if !log_record.event_name.is_empty() && event_name_gate {
                     rec[O2_EVENT_NAME] = log_record.event_name.as_str().into();
                 }
 
@@ -352,7 +354,7 @@ pub async fn handle_request(
 
                     // DBM server-vantage canonicalization — the shipped collector recipes all
                     // export over OTLP, so this path is the one that matters for them.
-                    if dbm_enabled {
+                    if dbm_gate {
                         crate::db_monitoring::server_vantage::canonicalize_dbm_record(
                             &mut local_val,
                         );
@@ -367,7 +369,7 @@ pub async fn handle_request(
                     // any attempt to keep "the trusted one" could only guess from the record
                     // shape — which is precisely what a spoofer controls. Restoring it here,
                     // where `log_record` is still in scope, is what makes the value trusted.
-                    if !log_record.event_name.is_empty() && cfg.db_monitoring.enabled {
+                    if !log_record.event_name.is_empty() && event_name_gate {
                         local_val.insert(
                             O2_EVENT_NAME.to_string(),
                             log_record.event_name.as_str().into(),
@@ -455,6 +457,8 @@ pub async fn handle_request(
                         }
 
                         let destination_stream = stream_params.stream_name.to_string();
+                        let dest_dbm_gate =
+                            dbm_enabled && is_dbm_server_stream(&destination_stream);
                         if !derived_streams.contains(&destination_stream) {
                             derived_streams.insert(destination_stream.clone());
                         }
@@ -516,7 +520,7 @@ pub async fn handle_request(
 
                             // Pipeline-routed records are canonicalized too: a VRL transform may
                             // have produced the receiver fields we dispatch on.
-                            if dbm_enabled {
+                            if dest_dbm_gate {
                                 crate::db_monitoring::server_vantage::canonicalize_dbm_record(
                                     &mut local_val,
                                 );
@@ -640,7 +644,7 @@ pub async fn handle_request(
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
 
                 // DBM server-vantage canonicalization (see the note at the first call site).
-                if dbm_enabled {
+                if dbm_gate {
                     crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
                 }
 
@@ -747,14 +751,16 @@ pub async fn handle_request(
                         &mut data.0,
                     ) {
                         log::error!(
-                            "[LOGS:OTLP] error applying SDR patterns for stream {stream}: {e}"
+                            "[LOGS:OTLP] error applying SDR patterns for stream {org_id}/{stream}: {e}"
                         );
                     }
                     super::refresh_derived_columns(&before, &mut data.0);
                 }
             }
             Err(e) => {
-                log::error!("[LOGS:OTLP] failed to get pattern manager for SDR redaction: {e}");
+                log::error!(
+                    "[LOGS:OTLP] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Logs,
@@ -806,8 +812,9 @@ pub async fn handle_request(
         .inc();
 
     if let Err(e) = write_result {
-        log::error!("Error while writing logs: {e}");
-        return Ok(MetaHttpResponse::error_with_header(
+        log::error!("[LOGS:OTLP] Error while writing logs: org_id: {org_id}, error: {e}");
+        return Ok(otlp_rejection_response(
+            req_type,
             status,
             format!("error while writing log data: {e}"),
         ));
@@ -1869,5 +1876,61 @@ mod tests {
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_request_columns_limit_is_rpc_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let log_rec = LogRecord {
+            time_unix_nano: chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            attributes: (0..=limit)
+                .map(|i| kv(&format!("attr_{i}"), IntValue(i as i64)))
+                .collect(),
+            ..Default::default()
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![log_rec],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_request(
+            0,
+            "test_org_id",
+            request,
+            Some("test_columns_limit"),
+            "a@a.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await
+        .unwrap();
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            headers[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        let status = GoogleRpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .starts_with("error while writing log data: Error# Got ")
+        );
+        assert!(status.message.contains(&format!(
+            "columns for stream test_org_id/logs/test_columns_limit, only {limit} columns accept"
+        )));
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
     }
 }

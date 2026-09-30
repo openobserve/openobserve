@@ -209,6 +209,7 @@ vi.mock("@/utils/telemetryCorrelation", async () => {
 
 // Import after all vi.mock() declarations so the mocks are in place
 import { useSearchQuery } from "./useSearchQuery";
+import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { gt } from "@/types/i18n";
 
 // ---------------------------------------------------------------------------
@@ -824,6 +825,68 @@ describe("useSearchQuery › handleMultiStream WHERE rewrite", () => {
     expect(result).toBeNull();
     expect(mockState.searchObj.data.filterErrMsg).toContain("nonexistent");
     expect(mockState.searchObj.data.filterErrMsg).toContain("does not exist");
+  });
+});
+
+describe("useSearchQuery › handleMultiStream _stream_name filter", () => {
+  let buildSearch: ReturnType<typeof useSearchQuery>["buildSearch"];
+  const parser = new SqlParser();
+
+  beforeEach(() => {
+    mockState = createMockState();
+    vi.clearAllMocks();
+    mockSemanticGroups.value = [];
+    ({ buildSearch } = useSearchQuery(gt));
+
+    mockState.searchObj.meta.sqlMode = false;
+    mockState.searchObj.meta.quickMode = false;
+    mockState.searchObj.data.stream.selectedStream = ["app", "rum"];
+    mockState.searchObj.data.stream.selectedStreamFields = [
+      { name: "level", streams: ["app", "rum"] },
+    ];
+
+    // The real parser, so the arms are exactly what the backend receives.
+    fnParsedSQLMock.mockImplementation((sql?: string) => (sql ? parser.astify(sql) : {}) as any);
+    fnUnparsedSQLMock.mockImplementation((ast: any) => parser.sqlify(ast));
+  });
+
+  const armFor = (sql: string, stream: string) =>
+    sql.split(" UNION ALL BY NAME ").find((arm: string) => arm.includes(`FROM "${stream}"`));
+
+  it("accepts a _stream_name filter and resolves it to each stream's own name", () => {
+    mockState.searchObj.data.query = "_stream_name = 'rum'";
+
+    const result = buildSearch(false, false);
+
+    expect(result).not.toBeNull();
+    expect(mockState.searchObj.data.filterErrMsg).toBe("");
+    const sql = getSql(result);
+    expect(armFor(sql, "app")).toContain("WHERE 'app' = 'rum'");
+    expect(armFor(sql, "rum")).toContain("WHERE 'rum' = 'rum'");
+    expect(armFor(sql, "rum")).toContain("'rum' as _stream_name");
+  });
+
+  it("keeps other conditions and excludes with !=", () => {
+    mockState.searchObj.data.query = "level = 'error' and _stream_name != 'rum'";
+
+    const sql = getSql(buildSearch(false, false));
+
+    expect(armFor(sql, "app")).toMatch(/level.* = 'error' AND 'app' != 'rum'/);
+    expect(armFor(sql, "rum")).toMatch(/level.* = 'error' AND 'rum' != 'rum'/);
+  });
+
+  it("still rewrites an equivalent field alongside _stream_name", () => {
+    mockState.searchObj.data.stream.selectedStreamFields = [
+      { name: "msg", streams: ["app"] },
+      { name: "message", streams: ["rum"] },
+    ];
+    mockSemanticGroups.value = [{ id: "group-1", display: "Message", fields: ["msg", "message"] }];
+    mockState.searchObj.data.query = "msg = 'boom' and _stream_name = 'rum'";
+
+    const sql = getSql(buildSearch(false, false));
+
+    expect(armFor(sql, "rum")).toMatch(/message.* = 'boom' AND 'rum' = 'rum'/);
+    expect(armFor(sql, "app")).toMatch(/msg.* = 'boom' AND 'app' = 'rum'/);
   });
 });
 

@@ -25,6 +25,7 @@ vi.mock("reka-ui", async (importOriginal) => {
 });
 
 import en from "@/locales/languages/en-US.json";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { JourneySuggestion } from "@/utils/synthetics/journeySuggestions";
 
@@ -110,6 +111,50 @@ describe("JourneySuggestions", () => {
     expect(render([ZERO_ASSERTION, NO_TEST_ATTRIBUTE]).find(CHIP).text()).toBe("2");
   });
 
+  it("the trigger is an outline icon button with a warning light bulb and a corner count badge", () => {
+    const wrapper = mount(JourneySuggestions, {
+      props: { suggestions: [ZERO_ASSERTION] },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ...STUBS,
+          OButton: { ...OButtonStub, name: "OButton", props: ["variant", "size"] },
+          OIcon: { props: ["name"], template: '<i v-bind="$attrs" :data-icon="name" />' },
+        },
+      },
+    });
+    const chip = wrapper.find(CHIP);
+    const button = wrapper.findComponent({ name: "OButton" });
+
+    expect(chip.element.tagName).toBe("BUTTON");
+    expect(button.props("variant")).toBe("outline");
+    expect(button.props("size")).toBe("icon-xs-sq");
+    const bulb = chip.find('[data-icon="lightbulb"]');
+    expect(bulb.exists()).toBe(true);
+    expect(bulb.classes()).toContain("text-status-warning-text");
+    expect(chip.find('[data-icon="warning"]').exists()).toBe(false);
+    const badge = wrapper.findComponent(OBadge);
+    expect(badge.props("variant")).toBe("warning");
+    expect(badge.classes()).toEqual(expect.arrayContaining(["absolute", "-top-1.5", "-end-1.5"]));
+    expect(chip.text()).toBe("1");
+    expect(wrapper.find(".o-tooltip-stub").attributes("data-content")).toContain("1 suggestion");
+  });
+
+  it("aligns its panel to the end of the trigger", () => {
+    const wrapper = mount(JourneySuggestions, {
+      props: { suggestions: [ZERO_ASSERTION] },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ...STUBS,
+          OPopover: { ...OPopoverStub, name: "OPopover", props: ["open", "ariaLabel", "align"] },
+        },
+      },
+    });
+
+    expect(wrapper.findComponent({ name: "OPopover" }).props("align")).toBe("end");
+  });
+
   it("names itself on hover and to assistive tech, from the same string", () => {
     const wrapper = render([ZERO_ASSERTION]);
 
@@ -164,7 +209,6 @@ describe("JourneySuggestions", () => {
     expect(two.findAllComponents(OSeparator)).toHaveLength(2);
   });
 
-  // The warning colour asks whether the author is stuck; one line answers it.
   it("says that suggestions never block saving or running", async () => {
     const wrapper = render([ZERO_ASSERTION]);
 

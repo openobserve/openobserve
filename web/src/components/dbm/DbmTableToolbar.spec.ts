@@ -35,14 +35,8 @@ const mountToolbar = (props: Record<string, unknown> = {}, slot?: string) =>
   });
 
 describe("DbmTableToolbar", () => {
-  /**
-   * The row's shape is what eight tables shared: a flex row that may shrink to
-   * nothing, with a FIXED-width search box that may not. Lose `w-64` and the
-   * search box grows with the page, pushing the scope chips off the row.
-   * Below lg the row wraps and the search drops to its own line, because
-   * `overflow-hidden` cut the trailing controls off instead of moving them.
-   */
-  it("keeps the search box at a fixed width inside a shrinkable row", () => {
+  // The search fills what the filters leave, as on other list pages; its floor yields before the chips do.
+  it("fills the row after the filters, down to a floor, inside a shrinkable row", () => {
     const wrapper = mountToolbar();
 
     expect(wrapper.classes()).toEqual(
@@ -57,8 +51,24 @@ describe("DbmTableToolbar", () => {
       ]),
     );
     expect(wrapper.get('[data-test="dbm-samples-search"]').element.parentElement?.className).toBe(
-      "w-64 shrink-0 max-lg:order-last max-lg:w-full max-lg:basis-full",
+      "min-w-48 flex-1 max-lg:order-last max-lg:w-full max-lg:basis-full",
     );
+  });
+
+  it("puts the filters before the search box and the page's notes after it", () => {
+    const wrapper = mount(DbmTableToolbar, {
+      props: { search: "", placeholder: raw("Search…"), searchDataTest: "dbm-samples-search" },
+      slots: {
+        filters: '<button data-test="filters">Filters</button>',
+        default: '<span data-test="note">Sampled</span>',
+      },
+      global: { plugins: [i18n] },
+    });
+    const order = [...wrapper.element.children].map(
+      (el) =>
+        el.getAttribute("data-test") ?? el.querySelector("[data-test]")?.getAttribute("data-test"),
+    );
+    expect(order).toEqual(["filters", "dbm-samples-search", "note"]);
   });
 
   it("passes the page's placeholder and data-test to the search box", () => {

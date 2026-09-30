@@ -293,6 +293,7 @@ use crate::{
         synthetics::move_synthetics,
         synthetics::set_synthetic_enabled,
         synthetics::run_synthetic_now,
+        synthetics::get_referenced_by,
         synthetics::list_locations,
         synthetics::list_synthetics_variables,
         synthetics::create_synthetics_variable,
@@ -558,6 +559,22 @@ pub struct ApiDoc;
 #[cfg(feature = "enterprise")]
 #[derive(OpenApi)]
 #[openapi(paths(
+    openobserve_api_management::request::prompts::list_prompts,
+    openobserve_api_management::request::prompts::create_prompt,
+    openobserve_api_management::request::prompts::match_prompts,
+    openobserve_api_management::request::prompts::resolve_prompt,
+    openobserve_api_management::request::prompts::get_prompt_settings,
+    openobserve_api_management::request::prompts::update_prompt_settings,
+    openobserve_api_management::request::prompts::update_prompt_secret,
+    openobserve_api_management::request::prompts::get_prompt,
+    openobserve_api_management::request::prompts::update_prompt,
+    openobserve_api_management::request::prompts::archive_prompt,
+    openobserve_api_management::request::prompts::list_prompt_versions,
+    openobserve_api_management::request::prompts::create_prompt_version,
+    openobserve_api_management::request::prompts::get_prompt_version,
+    openobserve_api_management::request::prompts::list_prompt_activity,
+    openobserve_api_management::request::prompts::move_prompt_label,
+    openobserve_api_management::request::prompts::delete_prompt_label,
     openobserve_api_management::request::experiments::preview_experiment,
     openobserve_api_management::request::experiments::create_experiment,
     openobserve_api_management::request::experiments::list_experiments,
@@ -610,6 +627,14 @@ pub struct ApiDoc;
 )))]
 struct EnterpriseExperimentApiDoc;
 
+#[cfg(feature = "cloud")]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::organization::org::get_paid_overage_status,
+    openobserve_api_management::request::organization::org::set_paid_overage_status,
+))]
+struct CloudQuotaApiDoc;
+
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
@@ -623,6 +648,17 @@ impl Modify for SecurityAddon {
             {
                 components.schemas.extend(enterprise_components.schemas);
                 components.responses.extend(enterprise_components.responses);
+            }
+        }
+        #[cfg(feature = "cloud")]
+        {
+            let cloud = CloudQuotaApiDoc::openapi();
+            openapi.paths.paths.extend(cloud.paths.paths);
+            if let (Some(components), Some(cloud_components)) =
+                (openapi.components.as_mut(), cloud.components)
+            {
+                components.schemas.extend(cloud_components.schemas);
+                components.responses.extend(cloud_components.responses);
             }
         }
         let cfg = get_config();
@@ -751,6 +787,20 @@ mod experiment_tests {
         assert!(comparison.responses.responses.contains_key("400"));
         assert!(comparison.responses.responses.contains_key("403"));
     }
+
+    #[test]
+    fn prompt_paths_are_registered_in_enterprise_openapi() {
+        let api = EnterpriseExperimentApiDoc::openapi();
+        for path in [
+            "/api/{org_id}/prompts",
+            "/api/{org_id}/prompts/resolve",
+            "/api/{org_id}/prompts/settings",
+            "/api/{org_id}/prompts/{entity_id}",
+            "/api/{org_id}/prompts/{entity_id}/versions",
+        ] {
+            assert!(api.paths.paths.contains_key(path), "missing {path}");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -795,5 +845,20 @@ mod tests {
             }
         }
         assert!(missing.is_empty(), "{missing:#?}");
+    }
+
+    #[test]
+    fn prompt_paths_are_absent_from_oss_openapi() {
+        let api = ApiDoc::openapi();
+        let prompt_paths = api
+            .paths
+            .paths
+            .keys()
+            .filter(|path| path.contains("/prompts"))
+            .collect::<Vec<_>>();
+        assert!(
+            prompt_paths.is_empty(),
+            "OSS Prompt paths: {prompt_paths:?}"
+        );
     }
 }

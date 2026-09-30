@@ -226,6 +226,7 @@ const globalStubs = {
           @click="$emit('row-click', row)"
         >
           <slot name="cell-timestamp" :row="row" :value="null" :column="{}" />
+          <slot name="cell-page"      :row="row" :value="null" :column="{}" />
           <slot name="cell-route"     :row="row" :value="null" :column="{}" />
           <slot name="cell-duration"  :row="row" :value="null" :column="{}" />
           <slot name="cell-status"    :row="row" :value="null" :column="{}" />
@@ -886,6 +887,27 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("should render the hash-routed page of each row", async () => {
+      wrapper.unmount();
+
+      mockSearch.mockImplementation((_params: any, source: string) => {
+        if (source === "RUM") {
+          return Promise.resolve({
+            data: { hits: [createRumHit({ _view_url: "https://app.example.com/#/file-manager" })] },
+          });
+        }
+        return Promise.resolve({ data: { hits: [] } });
+      });
+      mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+        handlers.error(null, new Error("Metadata fetch failed"));
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("/#/file-manager");
+    });
+
     it("should render available RUM views when metadata fetch errors", async () => {
       wrapper.unmount();
 
@@ -917,6 +939,29 @@ describe("PlayerTracesTab", () => {
       expect((wrapper.vm as any).shortRoute("https://example.com/products?page=1")).toBe(
         "/products?page=1",
       );
+    });
+
+    it("should keep the hash route of a hash-routed SPA", () => {
+      expect((wrapper.vm as any).shortRoute("https://app.example.com/#/file-manager")).toBe(
+        "/#/file-manager",
+      );
+      expect((wrapper.vm as any).shortRoute("https://example.com/app/#/orders?tab=2")).toBe(
+        "/app/#/orders?tab=2",
+      );
+    });
+
+    it("should ignore an in-page anchor that is not a route", () => {
+      expect((wrapper.vm as any).shortRoute("https://example.com/docs#install")).toBe("/docs");
+    });
+
+    it("should label each row with its browser page, separately from the request", () => {
+      const row = {
+        route: "https://app.example.com/#/PatientCharts",
+        metadata: { httpOperation: "GET /api/v1/patients" },
+      };
+      expect((wrapper.vm as any).pageRoute(row)).toBe("/#/PatientCharts");
+      expect((wrapper.vm as any).traceDisplayName(row)).toBe("GET /api/v1/patients");
+      expect((wrapper.vm as any).pageRoute({ route: "" })).toBe("");
     });
 
     it("should return the original string for an invalid URL", () => {

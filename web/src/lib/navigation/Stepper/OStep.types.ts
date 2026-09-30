@@ -35,4 +35,6 @@ export interface OStepSlots {
    * Vertical orientation only (in horizontal mode the header is owned by OStepper).
    */
   "title-suffix"?: () => unknown;
+  /** Rich caption under the step's header, outside its trigger button. Horizontal orientation only. */
+  description?: () => unknown;
 }

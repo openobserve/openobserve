@@ -26,7 +26,8 @@
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
-      "alertDestinationsPagination.spec.js"
+      "alertDestinationsPagination.spec.js",
+      "alerts-destinations-usage.spec.js"
     ],
     "disabled": [
       {
@@ -194,7 +195,8 @@
       "dashboard-variables-default-values-chain.spec.js",
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-variables-stream-field.spec.js",
-      "dashboard-mustache-variables.spec.js"
+      "dashboard-mustache-variables.spec.js",
+      "dashboard-variable-select-all.spec.js"
     ],
     "disabled": []
   },
@@ -232,34 +234,43 @@
     "browser": "chrome",
     "run_files": [
       "sanity.spec.js",
-      "changeOrg.spec.js",
-      "enrichment.spec.js",
-      "schema.spec.js",
-      "schemaload.spec.js",
-      "serviceAccount.spec.js",
-      "usersOrg.spec.js",
-      "org.spec.js",
-      "theme-management.spec.js",
-      "ingestion-config.spec.js",
-      "ingestionTokens.spec.js",
       "landingPage.spec.js",
-      "languageTranslation.spec.js",
-      "edition-features.spec.js",
+      "datetime-picker-copy-paste.spec.js",
+      "dateTime.spec.js",
+      "otableSelectCell.spec.js",
+      "shared-components-form-validation.spec.js",
+      "ai-toolsets-form-validation.spec.js",
+      "annotationQueueInputPreview.spec.js",
+      "login-form-validation.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Management",
+    "actual_folder": "Management",
+    "browser": "chrome",
+    "run_files": [
       "iam-form-validation.spec.js",
-      "regex-patterns-form-validation.spec.js",
+      "serviceAccount.spec.js",
+      "users.spec.js",
+      "passwordPolicy.spec.js",
       "cipher-keys-form-validation.spec.js",
       "settings-form-validation.spec.js",
-      "ai-toolsets-form-validation.spec.js",
-      "shared-components-form-validation.spec.js",
-      "onboarding-form-validation.spec.js",
-      "rum-form-validation.spec.js",
-      "login-form-validation.spec.js",
-      "datetime-picker-copy-paste.spec.js",
-      "splunk-hec-ingestion-window.spec.js",
-      "connectDataSourcePopup.spec.js",
-      "otableSelectCell.spec.js",
       "theme.spec.js",
-      "passwordPolicy.spec.js"
+      "languageTranslation.spec.js",
+      "edition-features.spec.js",
+      "onboarding-form-validation.spec.js",
+      "settings-query-management-redirect.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Org",
+    "actual_folder": "Org",
+    "browser": "chrome",
+    "run_files": [
+      "org.spec.js",
+      "changeOrg.spec.js"
     ],
     "disabled": []
   },
@@ -326,7 +337,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "searchPatternsMultiStream.spec.js"
     ],
     "disabled": [
       {
@@ -424,7 +436,8 @@
       "rum-page-dataflow.spec.js",
       "rum-onboarding-snippets.spec.js",
       "sourcemap-ui.spec.js",
-      "sourcemap-upload-pretty.spec.js"
+      "sourcemap-upload-pretty.spec.js",
+      "rum-form-validation.spec.js"
     ],
     "disabled": []
   },
@@ -450,7 +463,14 @@
       "streamname.spec.js",
       "streaming.spec.js",
       "stream-settings.spec.js",
-      "streams-form-validation.spec.js"
+      "streams-form-validation.spec.js",
+      "ingestion-config.spec.js",
+      "ingestionTokens.spec.js",
+      "ingestion-passcode-forbidden.spec.js",
+      "connectDataSourcePopup.spec.js",
+      "splunk-hec-ingestion-window.spec.js",
+      "enrichment.spec.js",
+      "schema.spec.js"
     ],
     "disabled": []
   },
@@ -468,7 +488,8 @@
       "tracesAnalyzeDimensions.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
-      "tracesCharts.spec.js"
+      "tracesCharts.spec.js",
+      "traceSessionReplay.spec.js"
     ],
     "disabled": []
   },

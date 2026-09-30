@@ -755,9 +755,9 @@ mod tests {
             _matchers: promql_parser::label::Matchers,
             _label_selector: hashbrown::HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>
-        {
-            Ok(vec![(
+            _streaming: bool,
+        ) -> datafusion::error::Result<Vec<promql::ScanContext>> {
+            Ok(vec![promql::ScanContext::table(
                 self.ctx.clone(),
                 self.schema.clone(),
                 ScanStats::default(),
