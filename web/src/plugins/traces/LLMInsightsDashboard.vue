@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          solidAgentTrigger keeps the "All Agents" empty state in solid text. -->
     <AiScopeBar
       v-if="availableStreams.length > 0"
-      v-model:filter-mode="filterMode"
+      :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
       v-model:selected-agent-name="selectedAgentName"
@@ -601,13 +601,18 @@ watch(
 // This SAME id is the canonical "which selection are we looking at" key for the
 // whole page: it's the panel dashboardId, the KPI cache key, AND the error
 // table's cache key (passed down as a prop) — so all three caches agree on one
-// identity instead of each deriving its own. `agentKey` is the agent's name, or
+// identity instead of each deriving its own. `agentKey` is the agent variant, or
 // a placeholder when there's no agent (`_stream` on the Stream tab, `_none` on
 // the Agent tab before one resolves) — handled here, in one place.
 const PANEL_CACHE_FOLDER = "ai-llm-insights";
+// Env/version are part of the key: each variant filters to different data, so sharing a name must not share a cache slot.
+function selectionAgentKey(): string {
+  if (filterMode.value !== "agent") return "_stream";
+  const a = effectiveAgent.value;
+  return a ? `${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "_none";
+}
 const panelCacheDashboardId = computed(() => {
-  const agentKey =
-    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
+  const agentKey = selectionAgentKey();
   return selectionKey(
     store.state.selectedOrganization?.identifier ?? "",
     effectiveStream.value,
@@ -891,8 +896,7 @@ const kpiCards = computed<KpiCard[]>(() => {
 // llmInsightsCache.ts) is its in-memory equivalent, keyed by the same
 // stream+agent+window scope and restored on a tab toggle / same-window revisit.
 function kpiCacheKey(start: number, end: number): string {
-  const agentKey =
-    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
+  const agentKey = selectionAgentKey();
   return selectionKey(
     store.state.selectedOrganization?.identifier ?? "",
     effectiveStream.value,
