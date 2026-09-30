@@ -583,6 +583,33 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
 }
 
 /// Create proxy routes
+/// Public dashboard links admin CRUD; handlers 404 when the feature is off.
+fn public_dashboard_admin_routes(router: Router) -> Router {
+    router
+        .route(
+            "/{org_id}/public_dashboards",
+            get(public_dashboards::admin::list_org),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links",
+            get(public_dashboards::admin::list).post(public_dashboards::admin::create),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+            get(public_dashboards::admin::get)
+                .put(public_dashboards::admin::update)
+                .delete(public_dashboards::admin::delete),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+            post(public_dashboards::admin::pause),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+            post(public_dashboards::admin::resume),
+        )
+}
+
 pub fn proxy_routes(enable_auth: bool) -> Router {
     let mut router = Router::new().route("/proxy/{org_id}/{*target_url}", get(proxy));
 
@@ -1664,31 +1691,7 @@ pub fn service_routes() -> Router {
         }
     }
 
-    // Public dashboard links — authenticated admin CRUD; the anonymous read plane lives in
-    // basic_routes. The feature flag is checked in-handler so disabled routes 404.
-    router = router
-        .route(
-            "/{org_id}/public_dashboards",
-            get(public_dashboards::admin::list_org),
-        )
-        .route(
-            "/{org_id}/dashboards/{dashboard_id}/public_links",
-            get(public_dashboards::admin::list).post(public_dashboards::admin::create),
-        )
-        .route(
-            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
-            get(public_dashboards::admin::get)
-                .put(public_dashboards::admin::update)
-                .delete(public_dashboards::admin::delete),
-        )
-        .route(
-            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
-            post(public_dashboards::admin::pause),
-        )
-        .route(
-            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
-            post(public_dashboards::admin::resume),
-        );
+    router = public_dashboard_admin_routes(router);
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
