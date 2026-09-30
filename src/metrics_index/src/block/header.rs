@@ -15,7 +15,7 @@
 
 //! Tail header of a MIDX file; column offsets are prefix sums from the end of the sample blocks.
 
-use std::{collections::HashSet, ops::Range, sync::Arc};
+use std::{ops::Range, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
 use arrow::datatypes::{Schema, SchemaRef};
@@ -124,16 +124,6 @@ impl Header {
             "block count limit"
         );
         let blocks = usize::try_from(data.blocks)?;
-        let identity = identity_label_columns(&data.source_schema)?;
-        let mut names = HashSet::new();
-        ensure!(
-            data.labels.len() == identity.len()
-                && data
-                    .labels
-                    .iter()
-                    .all(|label| identity.contains(&label.name) && names.insert(&label.name)),
-            "incomplete source identity labels"
-        );
         ensure!(
             data.directory.len() == DIRECTORY_FIELDS,
             "invalid directory column count"

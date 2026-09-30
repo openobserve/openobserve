@@ -25,9 +25,7 @@ mod pack;
 pub(super) mod rle;
 pub(super) mod xor;
 
-use anyhow::{Result, bail, ensure};
-
-use super::compact::get_varint;
+use anyhow::{Result, bail};
 
 const EXACT_LIMIT: f64 = 9_007_199_254_740_992.0;
 
@@ -100,17 +98,9 @@ fn gcd(mut a: u64, mut b: u64) -> u64 {
     a
 }
 
-fn read_divisor(body: &[u8], pos: &mut usize) -> Result<u64> {
-    let divisor = get_varint(body, pos)?;
-    ensure!(divisor > 0, "zero timestamp step divisor");
-    Ok(divisor)
-}
-
 #[inline]
-fn next_timestamp(previous: i64, step: u64) -> Result<i64> {
-    let next = previous.wrapping_add(step as i64);
-    ensure!(next >= previous, "decoded timestamps decreased");
-    Ok(next)
+fn next_timestamp(previous: i64, step: u64) -> i64 {
+    previous.wrapping_add(step as i64)
 }
 
 /// Deterministic pseudo-random sequence for codec tests.

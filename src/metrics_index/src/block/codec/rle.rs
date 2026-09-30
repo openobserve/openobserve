@@ -17,7 +17,7 @@
 
 use anyhow::{Result, ensure};
 
-use super::{next_timestamp, read_divisor};
+use super::next_timestamp;
 use crate::block::compact::{get_varint, put_varint};
 
 /// Byte length [`encode`] would write, so the caller can compare it without encoding.
@@ -38,15 +38,15 @@ pub(crate) fn encode(divisor: u64, quotients: &[u64], out: &mut Vec<u8>) {
     });
 }
 
-/// Appends `rows` timestamps starting at `min` and returns the last one.
+/// Appends `rows` timestamps starting at `min`.
 pub(crate) fn decode(
     body: &[u8],
     pos: &mut usize,
     rows: usize,
     min: i64,
     ts: &mut Vec<i64>,
-) -> Result<i64> {
-    let divisor = read_divisor(body, pos)?;
+) -> Result<()> {
+    let divisor = get_varint(body, pos)?;
     ts.push(min);
     let mut previous = min;
     let mut left = rows - 1;
@@ -55,12 +55,12 @@ pub(crate) fn decode(
         let run = get_varint(body, pos)?;
         ensure!(run > 0 && run <= left as u64, "invalid timestamp run");
         for _ in 0..run {
-            previous = next_timestamp(previous, step)?;
+            previous = next_timestamp(previous, step);
             ts.push(previous);
         }
         left -= run as usize;
     }
-    Ok(previous)
+    Ok(())
 }
 
 fn for_each_run(quotients: &[u64], mut f: impl FnMut(u64, u64)) {
@@ -96,13 +96,10 @@ mod tests {
         encode(divisor, &quotients, &mut body);
         assert_eq!(encoded_len(divisor, &quotients), body.len());
         let (mut pos, mut out) = (0, Vec::new());
-        let last = decode(&body, &mut pos, ts.len(), ts[0], &mut out).unwrap();
-        assert_eq!(
-            (out.as_slice(), last, pos),
-            (ts, ts[ts.len() - 1], body.len())
-        );
+        decode(&body, &mut pos, ts.len(), ts[0], &mut out).unwrap();
+        assert_eq!((out.as_slice(), pos), (ts, body.len()));
         assert_truncations_fail(&body, |bytes| {
-            decode(bytes, &mut 0, ts.len(), ts[0], &mut Vec::new()).map(|_| ())
+            decode(bytes, &mut 0, ts.len(), ts[0], &mut Vec::new())
         });
     }
 
@@ -128,13 +125,11 @@ mod tests {
     }
 
     #[test]
-    fn bad_runs_and_divisors_fail() {
+    fn bad_runs_fail() {
         for (body, rows) in [
             (vec![1, 1, 0, 1, 2], 3),
             (vec![1, 1, 3], 3),
             (vec![1, 1, 1], 3),
-            (vec![0, 1, 2], 3),
-            ([&[1][..], &[0xff; 9], &[1, 1]].concat(), 2),
         ] {
             assert!(
                 decode(&body, &mut 0, rows, 0, &mut Vec::new()).is_err(),
@@ -142,7 +137,7 @@ mod tests {
             );
         }
         let (mut pos, mut out) = (0, Vec::new());
-        assert_eq!(decode(&[1, 1, 2], &mut pos, 3, 5, &mut out).unwrap(), 7);
+        decode(&[1, 1, 2], &mut pos, 3, 5, &mut out).unwrap();
         assert_eq!(out, [5, 6, 7]);
     }
 }

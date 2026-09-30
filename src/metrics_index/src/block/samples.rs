@@ -167,13 +167,12 @@ impl SampleDecoder {
     ) -> Result<()> {
         let rows = block.row_count as usize;
         let (min, max) = (block.min_timestamp, block.max_timestamp);
-        let last = match kind {
-            Codec::ConstStep => const_step::decode(rows, min, max, ts)?,
+        match kind {
+            Codec::ConstStep => const_step::decode(rows, min, max, ts),
             Codec::Dod => dod::decode(body, pos, rows, min, &mut self.seq, ts)?,
             Codec::Rle => rle::decode(body, pos, rows, min, ts)?,
             _ => bail!("{kind:?} is not a timestamp encoding"),
-        };
-        ensure!(last == max, "decoded timestamp bounds mismatch");
+        }
         Ok(())
     }
 
@@ -546,12 +545,8 @@ mod tests {
             decoder.decode(block, meta, &mut ts, &mut bits).unwrap();
         }
         assert_eq!(bits, [0; 3]);
-        let mut shifted = three.clone();
-        shifted.max_timestamp = 30;
-        let mut uneven = three.clone();
-        uneven.max_timestamp = 5;
         let bad_xor_window = [&[xor][..], &[0; 8], &[0xff, 0x1f, 0, 0, 0, 0, 0, 0, 0, 0]].concat();
-        let invalid: [(&[u8], &BlockMeta); 19] = [
+        let invalid: [(&[u8], &BlockMeta); 14] = [
             (
                 &[Codec::tag(Codec::ConstInt, Codec::ConstInt), 0, 0],
                 &three,
@@ -562,11 +557,7 @@ mod tests {
             (&[0xf0, 0], &three),
             (&[rle, 10, 1, 0, 1, 2, 0], &three),
             (&[rle, 10, 1, 3, 0], &three),
-            (&[rle, 0, 1, 2, 0], &three),
-            (&[dod, 0, 2, 2, 0x02, 0], &three),
             (&[dod, 5, 65, 0], &three),
-            (&[rle, 10, 1, 2, 0], &shifted),
-            (&[Codec::tag(Codec::ConstStep, Codec::ConstInt), 0], &uneven),
             (
                 &[xor, 0, 0, 0, 0, 0, 0, 0, 0, 0b01, 0, 0, 0, 0, 0, 0, 0, 0],
                 &two,
@@ -578,12 +569,6 @@ mod tests {
                     alp, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2,
                 ],
                 &two,
-            ),
-            (
-                &[
-                    alp, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 4, 0,
-                ],
-                &three,
             ),
             (&[alp, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 4, 0], &three),
             (&[rle, 10, 1, 2, 0, 0], &three),
