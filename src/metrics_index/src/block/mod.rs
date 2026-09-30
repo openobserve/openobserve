@@ -230,86 +230,6 @@ impl Index {
         self
     }
 
-    pub fn select_blocks(
-        &self,
-        ranges: Option<&[Range<usize>]>,
-        hash_interval: Option<(u64, u64)>,
-        time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<usize>> {
-        let mut normalized: Vec<Range<u64>> = Vec::new();
-        if let Some(ranges) = ranges {
-            for range in ranges {
-                let start = u64::try_from(range.start)?;
-                let end = u64::try_from(range.end)?;
-                ensure!(
-                    start < end && end <= self.parent.rows,
-                    "selection range out of bounds"
-                );
-                if let Some(last) = normalized.last_mut() {
-                    ensure!(
-                        last.end <= start,
-                        "selection ranges overlap or are unsorted"
-                    );
-                    if last.end == start {
-                        last.end = end;
-                        continue;
-                    }
-                }
-                normalized.push(start..end);
-            }
-        } else if self.parent.rows > 0 {
-            normalized.push(0..self.parent.rows);
-        }
-        let mut selected_spans = Vec::with_capacity(normalized.len());
-        for range in normalized {
-            let start = self
-                .blocks
-                .row_boundary(range.start)
-                .map_err(|_| anyhow!("selection starts inside a sample block"))?;
-            let end = if range.end == self.parent.rows {
-                self.blocks.len()
-            } else {
-                self.blocks
-                    .row_boundary(range.end)
-                    .map_err(|_| anyhow!("selection ends inside a sample block"))?
-            };
-            ensure!(start < end, "empty block selection");
-            ensure!(
-                self.blocks.row_start(start) == range.start
-                    && (end == self.blocks.len() || self.blocks.row_start(end) == range.end),
-                "row lookup/descriptor endpoint mismatch"
-            );
-            ensure!(
-                start == 0 || self.blocks.hash(start - 1) != self.blocks.hash(start),
-                "selection starts inside a source series"
-            );
-            ensure!(
-                end == self.blocks.len() || self.blocks.hash(end - 1) != self.blocks.hash(end),
-                "selection ends inside a source series"
-            );
-            selected_spans.push(start..end);
-        }
-        let hash_span = match hash_interval {
-            Some((lo, hi)) if lo <= hi => {
-                self.blocks.hash_partition_point(|hash| hash < lo)
-                    ..self.blocks.hash_partition_point(|hash| hash <= hi)
-            }
-            Some(_) => 0..0,
-            None => 0..self.blocks.len(),
-        };
-        let mut result = Vec::new();
-        for span in selected_spans {
-            let start = span.start.max(hash_span.start);
-            let end = span.end.min(hash_span.end);
-            for index in start..end {
-                if time_range.is_none_or(|(lo, hi)| self.blocks.overlaps_time(index, lo, hi)) {
-                    result.push(index);
-                }
-            }
-        }
-        Ok(result)
-    }
-
     #[inline]
     pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
         ensure!(block < self.blocks.len(), "block index out of bounds");
@@ -321,16 +241,6 @@ impl Index {
             return Ok(None);
         };
         label_value(column.as_ref(), block)
-    }
-
-    pub fn label_values(&self, block: usize, names: &[String]) -> Result<Vec<Option<String>>> {
-        names
-            .iter()
-            .map(|name| {
-                self.label_value(block, name)
-                    .map(|value| value.map(str::to_owned))
-            })
-            .collect()
     }
 }
 
