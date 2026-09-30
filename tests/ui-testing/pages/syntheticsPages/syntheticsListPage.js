@@ -59,8 +59,6 @@ export class SyntheticsListPage {
   rowSelect(index) { return `[data-test="o2-table-select-${index}"]`; }
   rowAction(action) { return `[data-test="${TABLE}-${action}"]`; }
 
-  // ---------------------------------------------------------------- navigation
-
   async goto(orgId, { folder = null, section = null } = {}) {
     const params = new URLSearchParams({ org_identifier: orgId });
     if (folder) params.set('folder', folder);
@@ -81,8 +79,6 @@ export class SyntheticsListPage {
     await openNavFlyoutChild(this.page, 'synthetics');
     await expect(this.page).toHaveURL(/\/synthetics/, { timeout: 30000 });
   }
-
-  // ------------------------------------------------------------------- actions
 
   async openTypePicker() {
     await this.page.locator(this.locators.newCheckButton).click();
@@ -173,8 +169,6 @@ export class SyntheticsListPage {
   async bulkPause() { await this.page.locator(this.locators.pauseSelectedButton).click(); }
   async bulkEnable() { await this.page.locator(this.locators.enableSelectedButton).click(); }
   async bulkTrigger() { await this.page.locator(this.locators.triggerSelectedButton).click(); }
-
-  // ---------------------------------------------------------------- assertions
 
   async expectListVisible() {
     await expect(this.page.locator(this.locators.newCheckButton)).toBeVisible();

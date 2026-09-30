@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics run detail over seeded rows — passed, failed, dispatch error, quota row, retries (plan §6); serial on one beforeAll seed.
+// Synthetics run detail over seeded rows — passed, failed, dispatch error, quota row, retries; serial on one beforeAll seed.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');

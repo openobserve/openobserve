@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics OSS gating negatives for the private-location slice (plan §9); self-skips on enterprise builds via /config build_type.
+// Synthetics OSS gating negatives for the private-location slice; self-skips on enterprise builds via /config build_type.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');

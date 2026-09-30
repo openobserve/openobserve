@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics results over seeded rows (plan §4.2, §5); serial on one beforeAll seed that leaves the 15 m window 12 min after seeding, so never waitForTimeout here.
+// Synthetics results over seeded rows; serial on one beforeAll seed that leaves the 15 m window 12 min after seeding, so never waitForTimeout here.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');

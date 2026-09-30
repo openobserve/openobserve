@@ -216,7 +216,10 @@
       "web/src/components/synthetic-monitoring/**",
       "web/src/components/settings/*Synthetics*",
       "web/src/components/iam/SyntheticsTokens.vue",
-      "web/src/services/synthetics.ts",
+      "web/src/services/synthetics*",
+      "web/src/types/synthetics.ts",
+      "web/src/services/status_pages.ts",
+      "tests/ui-testing/pages/generalPages/statusPagesPage.js",
       "tests/ui-testing/pages/syntheticsPages/**"
     ]
   }

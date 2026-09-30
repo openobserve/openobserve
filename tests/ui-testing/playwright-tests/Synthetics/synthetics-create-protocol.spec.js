@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics create — TCP / TLS / SSH through the protocol form (plan §2.2–§2.4, §2.8).
+// Synthetics create — TCP / TLS / SSH through the protocol form.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -84,7 +84,7 @@ test.describe('Synthetics create — TCP / TLS / SSH', { tag: ['@synthetics', '@
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('example.com');
     await pm.syntheticsCreatePage.fillTls({ port: 443, minDays: 7 });
-    await pm.syntheticsCreatePage.setTlsVerifyChain(true);
+    await pm.syntheticsCreatePage.setTlsVerifyChain(false);
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);
     await pm.syntheticsCreatePage.save();
@@ -95,7 +95,7 @@ test.describe('Synthetics create — TCP / TLS / SSH', { tag: ['@synthetics', '@
     const { body } = await getCheck(page, created.id);
     expect(body.type).toBe('tls');
     expect(body.config.min_days_until_expiry).toBe(7);
-    expect(body.config.verify_chain).toBe(true);
+    expect(body.config.verify_chain).toBe(false);
   });
 
   test('creates an SSH check and the response redacts the secret', { tag: ['@P0'] }, async ({ page }, testInfo) => {
@@ -115,6 +115,7 @@ test.describe('Synthetics create — TCP / TLS / SSH', { tag: ['@synthetics', '@
     const { body } = await getCheck(page, response.body.id);
     expect(body.type).toBe('ssh');
     expect(body.config.username).toBe('e2e');
+    expect(body.config.auth.secret).toBe(SSH_SECRET);
   });
 
   test('server rejects a URL-shaped host target', { tag: ['@P1'] }, async ({ page }, testInfo) => {

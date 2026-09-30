@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics list — smoke, list operations, run-now, cross-cutting (plan §1, §3, §4.1, §10); checks are created disabled unless the scheduler is under test.
+// Synthetics list — smoke, list operations, run-now, cross-cutting; checks are created disabled unless the scheduler is under test.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -67,8 +67,6 @@ test.describe('Synthetics list', { tag: ['@synthetics', '@all'] }, () => {
     await context.close();
   });
 
-  // ------------------------------------------------------------------ §1 smoke
-
   test('sidebar entry opens the list page', { tag: ['@P0', '@smoke'] }, async () => {
     await pm.syntheticsListPage.openFromSidebar();
     await pm.syntheticsListPage.expectListVisible();
@@ -86,8 +84,6 @@ test.describe('Synthetics list', { tag: ['@synthetics', '@all'] }, () => {
     await pm.syntheticsListPage.search(`synth_e2e_nomatch_${Math.random().toString(36).slice(2, 8)}`);
     await pm.syntheticsListPage.expectEmptyState();
   });
-
-  // -------------------------------------------------------- §3 list operations
 
   test('search narrows the list to the matching check', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const a = await createCheck(page, 'http', testInfo);
@@ -186,14 +182,14 @@ test.describe('Synthetics list', { tag: ['@synthetics', '@all'] }, () => {
     expect((await listChecks(page)).some((c) => c.id === check.id)).toBe(false);
     await pm.syntheticsListPage.goto(ORG);
     await pm.syntheticsListPage.search(check.name);
-    await pm.syntheticsListPage.expectRowAbsent(check.id);
+    await pm.syntheticsListPage.expectEmptyState();
     await pm.syntheticsListPage.goto(ORG, { folder: folderId });
     await pm.syntheticsListPage.search(check.name);
     await pm.syntheticsListPage.expectRowVisible(check.id);
     expect((await listChecks(page, folderId)).some((c) => c.id === check.id)).toBe(true);
   });
 
-  test('bulk pause, enable and trigger act on the selection', { tag: ['@P2'] }, async ({ page }, testInfo) => {
+  test('bulk trigger, pause and enable act on the selection', { tag: ['@P2'] }, async ({ page }, testInfo) => {
     const prefix = `${workerPrefix(testInfo)}bulk2_${Math.random().toString(36).slice(2, 8)}_`;
     const start = startOneHourAhead();
     const a = await createCheck(page, 'http', testInfo, { name: `${prefix}a`, enabled: true, start });
@@ -202,26 +198,28 @@ test.describe('Synthetics list', { tag: ['@synthetics', '@all'] }, () => {
     await pm.syntheticsListPage.goto(ORG);
     await pm.syntheticsListPage.search(prefix);
     await pm.syntheticsListPage.expectRowCount(2);
+    // Trigger runs first: re-enabling resets next_run_at, so a later last_triggered_at would not prove the trigger.
+    expect((await getCheck(page, a.id)).body.last_triggered_at).toBe(0);
+    expect((await getCheck(page, b.id)).body.last_triggered_at).toBe(0);
     await pm.syntheticsListPage.selectRows([0, 1]);
+    await pm.syntheticsListPage.bulkTrigger();
+    await pm.syntheticsListPage.expectToast('Triggered 2 checks.');
+    await waitForCheck(page, a.id, (c) => Number(c.last_triggered_at) > 0, { timeoutMs: 30000 });
+    await waitForCheck(page, b.id, (c) => Number(c.last_triggered_at) > 0, { timeoutMs: 30000 });
 
+    // Every bulk action clears the selection, so re-select before the next one.
+    await pm.syntheticsListPage.selectRows([0, 1]);
     await pm.syntheticsListPage.bulkPause();
     await pm.syntheticsListPage.expectToast('Paused 2 checks.');
     await waitForCheck(page, a.id, (c) => c.enabled === false);
     await waitForCheck(page, b.id, (c) => c.enabled === false);
 
-    // Every bulk action clears the selection, so re-select before the next one.
     await pm.syntheticsListPage.selectRows([0, 1]);
     await pm.syntheticsListPage.bulkEnable();
     await pm.syntheticsListPage.expectToast('Enabled 2 checks.');
     await waitForCheck(page, a.id, (c) => c.enabled === true);
     await waitForCheck(page, b.id, (c) => c.enabled === true);
-
-    await pm.syntheticsListPage.selectRows([0, 1]);
-    await pm.syntheticsListPage.bulkTrigger();
-    await pm.syntheticsListPage.expectToast('Triggered 2 checks.');
   });
-
-  // --------------------------------------------------------------- §4.1 run now
 
   test('run now from the list reaches the scheduler', { tag: ['@P0'] }, async ({ page }, testInfo) => {
     const check = await createCheck(page, 'http', testInfo, { enabled: true, start: startOneHourAhead() });
@@ -233,8 +231,6 @@ test.describe('Synthetics list', { tag: ['@synthetics', '@all'] }, () => {
     // The 5 s scheduler tick claims the check and stamps last_triggered_at; nothing runs on CI.
     await waitForCheck(page, check.id, (c) => Number(c.last_triggered_at) > 0, { timeoutMs: 30000 });
   });
-
-  // --------------------------------------------------------- §10 cross-cutting
 
   test('deep links to a missing id fall back to the list with a toast', { tag: ['@P2'] }, async ({ page }) => {
     await pm.syntheticsCreatePage.gotoEdit(ORG, 'synth_e2e_missing');
