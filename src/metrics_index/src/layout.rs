@@ -26,7 +26,6 @@ use config::{
     },
 };
 
-pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
 /// [`metrics_index_enabled`] narrowed to one stream: the layout also
 /// needs a `__hash__` column of type `UInt64` (remote-write / OTLP metrics).
 pub fn metrics_index_stream(stream_type: StreamType, schema: &Schema) -> bool {

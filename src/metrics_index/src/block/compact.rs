@@ -26,40 +26,6 @@ use arrow::{
 
 use super::{header::Section, label_value};
 
-struct Input<'a> {
-    bytes: &'a [u8],
-    pos: usize,
-}
-
-impl<'a> Input<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes, pos: 0 }
-    }
-    fn take(&mut self, len: usize) -> Result<&'a [u8]> {
-        let end = self
-            .pos
-            .checked_add(len)
-            .context("compact offset overflow")?;
-        let result = self
-            .bytes
-            .get(self.pos..end)
-            .context("truncated compact data")?;
-        self.pos = end;
-        Ok(result)
-    }
-    fn u32(&mut self) -> Result<u32> {
-        Ok(u32::from_le_bytes(self.take(4)?.try_into()?))
-    }
-    fn id(&mut self, width: usize) -> Result<u32> {
-        let mut id = [0u8; 4];
-        id[..width].copy_from_slice(self.take(width)?);
-        Ok(u32::from_le_bytes(id))
-    }
-    fn remaining(&self) -> usize {
-        self.bytes.len() - self.pos
-    }
-}
-
 /// Compresses one column's raw bytes into a single zstd frame.
 pub(super) fn encode_frame(raw: &[u8]) -> Result<(Section, Vec<u8>)> {
     let frame = zstd::bulk::compress(raw, 1)?;
@@ -105,6 +71,23 @@ pub(super) fn decode_frame(
         "MIDX frame decompressed size mismatch"
     );
     Ok(raw)
+}
+
+/// Returns the next `len` bytes at `pos` and advances past them.
+pub(super) fn take<'a>(bytes: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8]> {
+    let data = bytes
+        .get(*pos..pos.saturating_add(len))
+        .context("truncated MIDX data")?;
+    *pos += len;
+    Ok(data)
+}
+
+pub(super) fn get_u32(bytes: &[u8], pos: &mut usize) -> Result<u32> {
+    Ok(u32::from_le_bytes(take(bytes, pos, 4)?.try_into()?))
+}
+
+pub(super) fn get_u64(bytes: &[u8], pos: &mut usize) -> Result<u64> {
+    Ok(u64::from_le_bytes(take(bytes, pos, 8)?.try_into()?))
 }
 
 pub(super) fn put_varint(out: &mut Vec<u8>, mut value: u64) {
@@ -175,10 +158,10 @@ pub(super) fn encode_label_column(col: &dyn Array) -> Result<Vec<u8>> {
 }
 
 pub(super) fn decode_label_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<ArrayRef> {
-    let mut input = Input::new(raw);
-    let count = input.u32()? as usize;
+    let mut pos = 0;
+    let count = get_u32(raw, &mut pos)? as usize;
     ensure!(
-        count <= rows && count <= input.remaining() / 4,
+        count <= rows && count <= (raw.len() - pos) / 4,
         "compact dictionary count"
     );
     let mut dictionary = Vec::new();
@@ -187,16 +170,16 @@ pub(super) fn decode_label_column(raw: &[u8], kind: &DataType, rows: usize) -> R
         .context("compact dictionary allocation failed")?;
     let mut dictionary_bytes = 0usize;
     for _ in 0..count {
-        let len = input.u32()? as usize;
+        let len = get_u32(raw, &mut pos)? as usize;
         dictionary_bytes = dictionary_bytes
             .checked_add(len)
             .context("compact dictionary bytes overflow")?;
-        dictionary.push(std::str::from_utf8(input.take(len)?)?);
+        dictionary.push(std::str::from_utf8(take(raw, &mut pos, len)?)?);
     }
     let id_width = id_width(count);
     let null = u32::MAX >> (32 - 8 * id_width);
     ensure!(
-        input.remaining() == rows.checked_mul(id_width).context("index size overflow")?,
+        raw.len() - pos == rows.checked_mul(id_width).context("index size overflow")?,
         "compact label indices length"
     );
     let mut ids = Vec::new();
@@ -206,7 +189,9 @@ pub(super) fn decode_label_column(raw: &[u8], kind: &DataType, rows: usize) -> R
     let mut view_payload = 0usize;
     let mut has_null = false;
     for _ in 0..rows {
-        let id = input.id(id_width)?;
+        let mut id = [0u8; 4];
+        id[..id_width].copy_from_slice(take(raw, &mut pos, id_width)?);
+        let id = u32::from_le_bytes(id);
         if id == null {
             has_null = true;
             ids.push(None);

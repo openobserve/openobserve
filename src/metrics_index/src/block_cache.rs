@@ -203,32 +203,21 @@ impl IndexCache {
         key: CacheKey,
         index: Arc<CachedIndex>,
         limit: usize,
-    ) -> Result<Arc<CachedIndex>> {
+    ) -> Arc<CachedIndex> {
         self.limit = limit;
         if limit == 0 {
-            return Ok(index);
+            return index;
         }
-        let index = if let Some(existing) = self
-            .peek(&key)
-            .filter(|existing| existing.binding == index.binding)
-        {
-            Arc::new(CachedIndex {
-                index: Arc::new(existing.index.merge_columns(&index.index)?),
-                binding: index.binding.clone(),
-            })
-        } else {
-            index
-        };
         let weight = CacheWeight::new(&key, &index);
         if weight.total > limit {
-            return Ok(index);
+            return index;
         }
         if let Some((_, old)) = self.entries.insert(key, (Arc::clone(&index), weight)) {
             self.bytes = self.bytes.saturating_sub(old.total);
         }
         self.bytes = self.bytes.saturating_add(weight.total);
         self.evict_until_fit(limit);
-        Ok(index)
+        index
     }
 
     fn evict_until_fit(&mut self, limit: usize) {
@@ -464,7 +453,7 @@ async fn load_through(
                             .as_ref()
                             .is_some_and(|prior| Arc::ptr_eq(prior, &entry))
                         {
-                            Ok(entry)
+                            entry
                         } else {
                             cache.lock().unwrap_or_else(|e| e.into_inner()).insert(
                                 key.clone(),
@@ -472,8 +461,8 @@ async fn load_through(
                                 limit,
                             )
                         };
-                        owner.complete(&admitted);
-                        return admitted?.index.project(labels);
+                        owner.complete(&Ok(Arc::clone(&admitted)));
+                        return admitted.index.project(labels);
                     }
                     Err(error) => {
                         cache

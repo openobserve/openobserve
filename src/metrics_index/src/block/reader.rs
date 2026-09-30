@@ -81,7 +81,7 @@ impl Default for BlockDecoder {
 
 /// Decodes the directory and requested labels from the bytes of `header.column_ranges(labels)`.
 pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Result<Index> {
-    let (projection, missing) = header.projection(labels)?;
+    let projection = header.projection(labels)?;
     ensure!(
         columns.len() == projection.len() + 1,
         "MIDX column count mismatch"
@@ -107,14 +107,10 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
     let labels = decode_labels(header, &columns[1..], &projection, &mut decoder)?;
     Ok(Index {
         base: Arc::new(IndexBase {
-            row_group_size: header.row_group_size,
-            parent: header.parent.clone(),
-            source_schema: Arc::clone(&header.source_schema),
             blocks,
             header: header.clone(),
         }),
         labels,
-        missing,
     })
 }
 
@@ -124,7 +120,7 @@ pub fn decode_additional_labels(
     names: &[String],
 ) -> Result<Index> {
     let header = &prior.base.header;
-    let (projection, missing) = header.projection(names)?;
+    let projection = header.projection(names)?;
     ensure!(
         columns.len() == projection.len(),
         "MIDX label count mismatch"
@@ -134,7 +130,6 @@ pub fn decode_additional_labels(
     Ok(Index {
         base: Arc::clone(&prior.base),
         labels,
-        missing,
     })
 }
 
