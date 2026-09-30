@@ -1368,7 +1368,6 @@
     "sessionReplayGapTooltip": "此部分无法加载",
     "sessionReplayRetry": "重试",
     "sessionReplayLiveBadge": "实时",
-    "sessionReplayLiveChip": "实时",
     "sessionReplayLateRows": "较早的活动在回放加载后才到达。请重新加载以包含它。",
     "sessionReplayReload": "重新加载",
     "seek": "定位",

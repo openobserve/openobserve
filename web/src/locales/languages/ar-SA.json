@@ -1368,7 +1368,6 @@
     "sessionReplayGapTooltip": "تعذّر تحميل هذا الجزء",
     "sessionReplayRetry": "إعادة المحاولة",
     "sessionReplayLiveBadge": "مباشر",
-    "sessionReplayLiveChip": "مباشر",
     "sessionReplayLateRows": "وصل نشاط أقدم بعد تحميل إعادة التشغيل. أعد التحميل لتضمينه.",
     "sessionReplayReload": "إعادة التحميل",
     "seek": "ابحث",
