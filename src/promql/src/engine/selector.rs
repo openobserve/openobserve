@@ -16,17 +16,10 @@
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
 //! `label_selector`, and `skip_labels`; writes `result_type`.
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use config::meta::{
-    promql::{NAME_LABEL, value::*},
-    search::ScanStats,
-};
-use datafusion::{
-    arrow::datatypes::Schema,
-    error::{DataFusionError, Result},
-    prelude::SessionContext,
-};
+use config::meta::promql::{NAME_LABEL, value::*};
+use datafusion::error::{DataFusionError, Result};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::ErrorCodes;
@@ -38,14 +31,14 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 
 use super::Engine;
 use crate::{
+    ScanContext,
     ast::rewrite::remove_filter_all,
     functions, micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     utils::{metric_name, offset_micros},
 };
 
-/// One context per selected schema with its scan stats and whether the matchers still apply.
-pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
+pub(super) type SelectorContexts = Vec<ScanContext>;
 
 /// What an instant selection emits at each step for the sample it picks there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,37 +94,21 @@ impl Engine {
         selector: &VectorSelector,
         time_range: (i64, i64),
         labels: &hashbrown::HashSet<String>,
-        prefer_blocks: bool,
+        streaming: bool,
     ) -> Result<SelectorContexts> {
-        let org_id = &self.ctx.query_ctx.org_id;
-        let name = selector.name.as_deref().unwrap();
-        let matchers = selector.matchers.clone();
         let mut filters = equal_matcher_filters(&selector.matchers);
-        if prefer_blocks {
-            self.ctx
-                .table_provider
-                .create_context_prefer_blocks(
-                    org_id,
-                    name,
-                    time_range,
-                    matchers,
-                    labels.clone(),
-                    &mut filters,
-                )
-                .await
-        } else {
-            self.ctx
-                .table_provider
-                .create_context(
-                    org_id,
-                    name,
-                    time_range,
-                    matchers,
-                    labels.clone(),
-                    &mut filters,
-                )
-                .await
-        }
+        self.ctx
+            .table_provider
+            .create_context(
+                &self.ctx.query_ctx.org_id,
+                selector.name.as_deref().unwrap(),
+                time_range,
+                selector.matchers.clone(),
+                labels.clone(),
+                &mut filters,
+                streaming,
+            )
+            .await
     }
 
     /// An instant selector, streamed when the layout allows it; `None` when nothing is selected.
@@ -417,7 +394,14 @@ impl Engine {
         let skip_labels = self.skip_labels;
         let mut tasks = Vec::with_capacity(ctxs.len());
         let mut abort_handles = Vec::with_capacity(ctxs.len());
-        for (ctx, schema, scan_stats, keep_filters) in ctxs {
+        for ScanContext {
+            ctx,
+            schema,
+            scan_stats,
+            keep_filters,
+            ..
+        } in ctxs
+        {
             let query_ctx = self.ctx.query_ctx.clone();
             let mut selector = selector.clone();
             if !keep_filters {
@@ -677,7 +661,11 @@ fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue>
 mod tests {
     use std::{sync::Arc, time::Duration};
 
-    use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
+    use config::meta::{
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL},
+        search::ScanStats,
+    };
+    use datafusion::{arrow::datatypes::Schema, prelude::SessionContext};
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{Offset, VectorSelector},
@@ -1062,7 +1050,8 @@ mod tests {
             _matchers: Matchers,
             _label_selector: hashbrown::HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            _streaming: bool,
+        ) -> Result<Vec<ScanContext>> {
             use datafusion::arrow::{
                 array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
                 datatypes::{DataType, Field},
@@ -1090,7 +1079,12 @@ mod tests {
             .unwrap();
             let ctx = SessionContext::new();
             ctx.register_batch(stream_name, batch).unwrap();
-            Ok(vec![(ctx, schema, ScanStats::default(), true)])
+            Ok(vec![ScanContext::table(
+                ctx,
+                schema,
+                ScanStats::default(),
+                true,
+            )])
         }
     }
 

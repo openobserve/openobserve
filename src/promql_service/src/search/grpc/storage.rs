@@ -18,7 +18,9 @@ use std::sync::Arc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{MetricsBlockScan, NAME_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label},
+        promql::{
+            HASH_LABEL, MetricsBlockScan, NAME_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label,
+        },
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -32,15 +34,14 @@ use infra::{
 };
 use itertools::Itertools;
 use metrics_index::MetricsFileLayout;
+use promql::{ScanContext, ScanSource};
 use promql_parser::label::Matchers;
 use search::{
-    datafusion::{exec::register_metrics_table_with_blocks, sort_order::FileSortOrder},
+    datafusion::{exec::register_metrics_table, sort_order::FileSortOrder},
     file_cache::{cache_files, calc_target_partitions, inspect_file_cache},
 };
 use search_service::match_source;
 use tracing::Instrument;
-
-use crate::search::grpc::Context;
 
 #[derive(Debug)]
 pub(super) struct BlockPreference<'a> {
@@ -57,7 +58,7 @@ pub(crate) async fn create_context(
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
     block_preference: BlockPreference<'_>,
-) -> Result<Option<Context>> {
+) -> Result<Option<ScanContext>> {
     let enter_span = tracing::span::Span::current();
 
     // check if we are allowed to search
@@ -135,9 +136,11 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
+    let hash_streams = hash_column_streams(&schema);
     let block_eligible = block_preference.enabled
         && get_config().compact.metrics_index_enabled
         && get_config().search.feature_metrics_streaming_agg_enabled
+        && hash_streams
         && files.iter().all(block_parent_eligible)
         && block_output_labels_supported(&schema, block_preference.output_labels)
         && block_matchers_supported(&schema, &matchers);
@@ -271,19 +274,22 @@ pub(crate) async fn create_context(
         FileSortOrder::None
     };
 
-    let block_scan = block_scan_candidate(stream_name, &files, sort_order, block_eligible);
-    let ctx = register_metrics_table_with_blocks(
-        &session,
-        schema.clone(),
-        stream_name,
-        files,
-        sort_order,
-        block_scan,
-    )
-    .await?;
+    let source = match block_scan_candidate(&files, sort_order, block_eligible) {
+        Some(scan) => ScanSource::Blocks(scan),
+        None if sort_order.is_sorted() && hash_streams => ScanSource::HashSorted,
+        None => ScanSource::Table,
+    };
+    let ctx =
+        register_metrics_table(&session, schema.clone(), stream_name, files, sort_order).await?;
 
     // keep_filters=false only when the pruner proved its selections exact
-    Ok(Some((ctx, schema, scan_stats, keep_filters)))
+    Ok(Some(ScanContext {
+        ctx,
+        schema,
+        scan_stats,
+        keep_filters,
+        source,
+    }))
 }
 
 fn block_parent_eligible(file: &FileKey) -> bool {
@@ -330,8 +336,14 @@ fn block_matchers_supported(schema: &arrow::datatypes::Schema, matchers: &Matche
         })
 }
 
+/// The series streams key on a `u64` hash; a stream without the column has nothing to key.
+fn hash_column_streams(schema: &arrow::datatypes::Schema) -> bool {
+    schema
+        .field_with_name(HASH_LABEL)
+        .is_ok_and(|field| field.data_type() == &arrow::datatypes::DataType::UInt64)
+}
+
 fn block_scan_candidate(
-    table_name: &str,
     files: &[FileKey],
     sort_order: FileSortOrder,
     enabled: bool,
@@ -342,7 +354,6 @@ fn block_scan_candidate(
         && files.iter().all(block_parent_eligible))
     .then(|| {
         Arc::new(MetricsBlockScan {
-            table_name: table_name.to_owned(),
             files: files.to_vec(),
         })
     })
@@ -466,8 +477,7 @@ mod tests {
     #[test]
     fn unfiltered_scan_uses_all_rows_without_source_selection() {
         let files = vec![file(100)];
-        let scan =
-            block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, true).unwrap();
+        let scan = block_scan_candidate(&files, FileSortOrder::HashTimestampAsc, true).unwrap();
         assert_eq!(scan.files.len(), 1);
         assert!(files[0].selection.is_none());
     }
@@ -475,15 +485,11 @@ mod tests {
     #[test]
     fn filtered_scan_is_chosen_before_row_selection() {
         let files = vec![file(100)];
-        assert!(block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, true).is_some());
-        assert!(
-            block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, false).is_none()
-        );
+        assert!(block_scan_candidate(&files, FileSortOrder::HashTimestampAsc, true).is_some());
+        assert!(block_scan_candidate(&files, FileSortOrder::HashTimestampAsc, false).is_none());
         let mut missing = files;
         missing[0].meta.mindex_size = 0;
-        assert!(
-            block_scan_candidate("m", &missing, FileSortOrder::HashTimestampAsc, true).is_none()
-        );
+        assert!(block_scan_candidate(&missing, FileSortOrder::HashTimestampAsc, true).is_none());
     }
 
     #[test]

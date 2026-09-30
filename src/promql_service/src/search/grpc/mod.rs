@@ -27,11 +27,11 @@ use config::{
     },
     utils::time::{now_micros, second_micros},
 };
-use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
+use datafusion::error::DataFusionError;
 use hashbrown::HashSet;
 use infra::errors::Result;
 use promql::{
-    DEFAULT_LOOKBACK, TableProvider,
+    DEFAULT_LOOKBACK, ScanContext, TableProvider,
     ast::{
         name_visitor,
         selector_window::{SelectorWindow, selector_window},
@@ -47,8 +47,6 @@ use tokio::sync::mpsc;
 
 mod storage;
 mod wal;
-
-type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
 
 /// What a range query's groups are planned from.
 struct GroupPlan {
@@ -73,7 +71,8 @@ impl TableProvider for StorageProvider {
         matchers: Matchers,
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<Vec<Context>> {
+        streaming: bool,
+    ) -> datafusion::error::Result<Vec<ScanContext>> {
         let mut ctxs = Vec::new();
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
@@ -84,52 +83,7 @@ impl TableProvider for StorageProvider {
             matchers.clone(),
             filters,
             storage::BlockPreference {
-                enabled: false,
-                output_labels: &label_selector,
-            },
-        )
-        .await?;
-        if let Some(ctx) = ctx {
-            ctxs.push(ctx);
-        }
-        if self.need_wal {
-            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
-            let wal_ctx_list = wal::create_context(
-                &trace_id,
-                org_id,
-                stream_name,
-                time_range,
-                matchers,
-                label_selector,
-            )
-            .await?;
-            for ctx in wal_ctx_list {
-                ctxs.push(ctx);
-            }
-        }
-        Ok(ctxs)
-    }
-
-    async fn create_context_prefer_blocks(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        time_range: (i64, i64),
-        matchers: Matchers,
-        label_selector: HashSet<String>,
-        filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<Vec<Context>> {
-        let mut ctxs = Vec::new();
-        let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
-        let ctx = storage::create_context(
-            &trace_id,
-            org_id,
-            stream_name,
-            time_range,
-            matchers.clone(),
-            filters,
-            storage::BlockPreference {
-                enabled: true,
+                enabled: streaming,
                 output_labels: &label_selector,
             },
         )
