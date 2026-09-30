@@ -40,6 +40,8 @@ export class MetricsExplorerPage {
         // grid modes it refreshes the card grid.
         this.refreshButton = '[data-test="metrics-explorer-refresh"]';
         this.shareButton = '[data-test="metrics-explorer-share-btn"]';
+        // Result-count label in the filter bar ("N" or "N of M").
+        this.countLabel = '[data-test="metrics-explorer-count"]';
 
         // ===== VISUALIZE PANE =====
         this.visualizeRoot = '[data-test="metrics-explorer-visualize"]';
@@ -174,6 +176,11 @@ export class MetricsExplorerPage {
 
     async expectVisualizeVisible() {
         await expect(this.page.locator(this.visualizeRoot)).toBeVisible({ timeout: 30000 });
+    }
+
+    /** The chart renderer stays mounted — a query re-run, not a stream reload. */
+    async expectChartRendererVisible() {
+        await expect(this.page.locator(this.chartRenderer).first()).toBeVisible({ timeout: 30000 });
     }
 
     async expectGridVisible() {
@@ -416,6 +423,20 @@ export class MetricsExplorerPage {
             .toBeGreaterThan(0);
     }
 
+    /**
+     * The grid never blanks across a refresh window. `expect.poll` can only
+     * assert a state is REACHED, not that it HOLDS, so sample the card count
+     * repeatedly and fail the moment it drops to zero.
+     */
+    async expectCardsRemainVisible(timeout = 10000) {
+        const deadline = Date.now() + timeout;
+        while (Date.now() < deadline) {
+            const count = await this.getCardCount();
+            expect(count, 'the grid must not blank during a manual refresh').toBeGreaterThan(0);
+            await this.page.waitForTimeout(100);
+        }
+    }
+
     /* ------------------------------------------------- a card, by metric name */
 
     cardRoot(metric) {
@@ -448,6 +469,61 @@ export class MetricsExplorerPage {
             timeout,
         });
         await expect(this.cardNoData(metric)).toBeHidden();
+    }
+
+    /* ---------------------------------------------------------------- refresh */
+
+    async clickRefresh() {
+        await this.page.locator(this.refreshButton).click();
+    }
+
+    /** OButton surfaces its loading prop as aria-busy (same as ShareButton). */
+    async isRefreshButtonLoading() {
+        const state = await this.page
+            .locator(this.refreshButton)
+            .getAttribute('aria-busy')
+            .catch(() => null);
+        return state === 'true' || state === '';
+    }
+
+    async isRefreshButtonEnabled() {
+        return await this.page
+            .locator(this.refreshButton)
+            .isEnabled({ timeout: 5000 })
+            .catch(() => false);
+    }
+
+    async isRefreshButtonDisabled() {
+        return !(await this.isRefreshButtonEnabled());
+    }
+
+    /** The refresh button is mid-reload: aria-busy AND disabled (double-click guard). */
+    async expectRefreshBusy(timeout = 10000) {
+        await expect
+            .poll(async () => await this.isRefreshButtonLoading(), {
+                timeout,
+                intervals: [50, 100, 200],
+            })
+            .toBe(true);
+        await expect(this.page.locator(this.refreshButton)).toBeDisabled({ timeout: 10000 });
+    }
+
+    /** The refresh button returned to idle: not busy and enabled again. */
+    async expectRefreshIdle(timeout = 30000) {
+        await expect
+            .poll(async () => await this.isRefreshButtonLoading(), {
+                timeout,
+                intervals: [200, 400, 800],
+            })
+            .toBe(false);
+        await expect(this.page.locator(this.refreshButton)).toBeEnabled({ timeout: 30000 });
+    }
+
+    /** The toolbar result-count label text — empty until the stream list resolves. */
+    async getResultCountText() {
+        return (
+            (await this.page.locator(this.countLabel).textContent().catch(() => '')) || ''
+        ).trim();
     }
 
     /* ----------------------------------------------------------------- share */
