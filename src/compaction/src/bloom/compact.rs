@@ -55,11 +55,14 @@ use tantivy_utils::puffin_directory::{
 
 use super::builder::build_blooms_from_index;
 
+/// `bloom_ver`s of the files a merge round retired, by the `file_list.date` of each file.
+pub(crate) type OrphanBlooms = hashbrown::HashMap<String, Vec<i64>>;
+
 /// Clean orphan `.bf`s for `orphan_blooms`, then build `.bf` coverage for the
 /// bucket's `bloom_ver = 0` files (queried internally via `query_for_bloom`).
 ///
 /// `date_key` is the `YYYY/MM/DD/HH` string used in `file_list.date`.
-/// `orphan_blooms` is the `bloom_ver` values of the files the merge round just
+/// `orphan_blooms` (see [`OrphanBlooms`]) come from the files the merge round just
 /// deleted — used only for cleanup. Files already carrying a non-zero
 /// `bloom_ver` are never re-stamped, so no live file migrates off a `bloom_ver`
 /// that a dumped row may still point to.
@@ -74,18 +77,20 @@ pub(crate) async fn build_for_stream(
     stream_name: &str,
     date_key: &str,
     is_incremental: bool,
-    orphan_blooms: Vec<i64>,
+    orphan_blooms: OrphanBlooms,
 ) -> Result<bool> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled {
         return Ok(false);
     }
 
-    // clean up orphan blooms
-    if let Err(e) =
-        cleanup_orphan_blooms(org_id, stream_type, stream_name, date_key, orphan_blooms).await
-    {
-        log::warn!("[BLOOM_BUILD] cleanup orphan blooms failed: {e}");
+    // a day-wide job retires files of other hours, whose `.bf`s live under those hours
+    for (date, bloom_vers) in orphan_blooms {
+        if let Err(e) =
+            cleanup_orphan_blooms(org_id, stream_type, stream_name, &date, bloom_vers).await
+        {
+            log::warn!("[BLOOM_BUILD] cleanup orphan blooms of {date} failed: {e}");
+        }
     }
 
     // don't build bloom for incremental round
