@@ -129,14 +129,6 @@ impl StorageScan<'_> {
             }
         };
 
-        // every indexed file was pruned away: nothing in storage can match the selector
-        if self.files.is_empty() {
-            log::info!(
-                "[trace_id {trace_id}] promql->search->storage: metrics-index pruning left no files, index took: {} ms",
-                self.scan_stats.idx_took
-            );
-            return Ok(None);
-        }
         log::info!(
             "[trace_id {trace_id}] promql->search->storage: after metrics-index path selection, files {}, scan_size {}, compressed_size {}, index took: {} ms",
             self.scan_stats.files,
@@ -152,6 +144,7 @@ impl StorageScan<'_> {
             ScanSource::HashSorted => self.sort_order,
             _ => FileSortOrder::None,
         };
+
         register_metrics_table(
             &ctx,
             &session,
