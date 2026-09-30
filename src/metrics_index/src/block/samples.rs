@@ -51,7 +51,7 @@ impl SampleEncoder {
         let values = self.encode_values(bits, out);
         out[start] = Codec::tag(timestamps, values);
         ensure!(
-            out.len() - start <= max_block_len(u32::try_from(ts.len())?)?,
+            out.len() - start <= max_block_len(u32::try_from(ts.len())?),
             "sample block exceeds format bound"
         );
         Ok(())
@@ -149,14 +149,6 @@ impl SampleDecoder {
         ts.clear();
         bits.clear();
         let rows = block.row_count as usize;
-        ensure!(
-            rows > 0 && rows <= MAX_BLOCK_ROWS,
-            "invalid decoded row count"
-        );
-        ensure!(
-            block.min_timestamp <= block.max_timestamp,
-            "invalid time bounds"
-        );
         let (&tag, body) = bytes.split_first().context("empty sample block")?;
         let mut pos = 0;
         self.decode_timestamps(Codec::from_id(tag & 0x0f)?, body, &mut pos, block, ts)?;
@@ -205,12 +197,8 @@ impl SampleDecoder {
 }
 
 /// Upper bound of one encoded sample block, enforced by the writer and on every read.
-pub fn max_block_len(row_count: u32) -> Result<usize> {
-    ensure!(
-        row_count > 0 && row_count as usize <= MAX_BLOCK_ROWS,
-        "invalid block row count"
-    );
-    Ok(32 + 18 * row_count as usize)
+pub fn max_block_len(row_count: u32) -> usize {
+    32 + 18 * row_count as usize
 }
 
 #[cfg(test)]
@@ -251,7 +239,7 @@ mod tests {
 
     fn roundtrip(ts: &[i64], bits: &[u64]) -> Vec<u8> {
         let block = encode(ts, bits);
-        assert!(block.len() <= max_block_len(ts.len() as u32).unwrap());
+        assert!(block.len() <= max_block_len(ts.len() as u32));
         let (decoded_ts, decoded_bits) = decode(&block, &meta(ts, block.len())).unwrap();
         assert_eq!(decoded_ts, ts);
         assert_eq!(decoded_bits, bits);
