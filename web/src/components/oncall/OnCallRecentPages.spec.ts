@@ -14,13 +14,28 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import OnCallRecentPages from "@/components/oncall/OnCallRecentPages.vue";
 import i18n from "@/locales";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 
 const MINUTE = 60_000_000;
+// Mutable per case, so the phone tests can switch while every other test stays desktop.
+const mockViewport = vi.hoisted(() => ({ mdUp: true, lgUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => mockViewport.mdUp && !mockViewport.lgUp),
+      isDesktop: computed(() => mockViewport.lgUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.lgUp),
+    }),
+  };
+});
+
 const OPENED = 1_700_000_000_000_000;
 
 const page = (over: Partial<OnCallResponse> = {}): OnCallResponse => ({
@@ -88,6 +103,23 @@ const rows = (wrapper: ReturnType<typeof render>) =>
   wrapper.findAll('[data-test^="oncall-recent-pages-row-"]');
 
 describe("OnCallRecentPages", () => {
+  afterEach(() => {
+    mockViewport.mdUp = true;
+    mockViewport.lgUp = true;
+  });
+
+  /// A phone table scrolls rather than flexing, and the default column width left the alert name a few characters.
+  it("gives the name column a real width on a phone only", () => {
+    const subject = (wrapper: ReturnType<typeof render>) =>
+      (wrapper.findComponent({ name: "OTable" }).props("columns") as any[]).find(
+        (column) => column.id === "subject",
+      );
+
+    expect(subject(render([page()])).size).toBeUndefined();
+    mockViewport.mdUp = false;
+    expect(subject(render([page()])).size).toBe(200);
+  });
+
   /// The list is a sample, and a sample that does not say so reads as the whole
   /// history of the team.
   it("says how many of the window's pages it is showing", () => {
