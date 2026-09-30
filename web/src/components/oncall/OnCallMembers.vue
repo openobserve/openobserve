@@ -18,11 +18,11 @@
         <div class="flex w-full flex-wrap items-center gap-2">
           <OSearchInput
             v-model="memberFilter"
-            class="w-full max-w-xs"
+            class="w-full max-w-xs max-lg:max-w-none"
             :placeholder="t('oncall.memberSearchPlaceholder')"
             data-test="oncall-members-search"
           />
-          <OSeparator vertical />
+          <OSeparator vertical class="max-lg:hidden" />
           <div class="min-w-0 flex-1">
             <OSelect
               v-if="!userLookupFailed"
@@ -58,7 +58,7 @@
 
           <span
             v-if="orgTotal"
-            class="text-text-secondary ms-auto shrink-0 text-xs"
+            class="text-text-secondary ms-auto shrink-0 text-xs max-md:hidden"
             data-test="oncall-members-coverage"
           >
             {{ t("oncall.membersOfOrg", { onTeam: onTeamCount, total: orgTotal }) }}
@@ -141,6 +141,7 @@
           variant="ghost"
           size="icon-sm"
           icon-left="event"
+          class="max-md:hidden"
           :aria-label="t('oncall.awayMark')"
           :data-test="`oncall-members-mark-away-${row.id}`"
           @click.stop="openAway(row.user_email)"
@@ -149,10 +150,42 @@
           variant="ghost"
           size="icon-sm"
           icon-left="close"
+          class="max-md:hidden"
           :aria-label="t('oncall.removeMember')"
           :data-test="`oncall-members-remove-${row.id}`"
           @click.stop="memberToRemove = row"
         />
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              :aria-label="t('oncall.moreActions')"
+              data-test="oncall-members-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            v-if="canConfigure"
+            icon-left="event"
+            class="md:hidden"
+            :data-test="`oncall-members-mark-away-${row.id}-menu`"
+            @select="openAway(row.user_email)"
+          >
+            <span>{{ t("oncall.awayMark") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="close"
+            variant="destructive"
+            class="md:hidden"
+            :data-test="`oncall-members-remove-${row.id}-menu`"
+            @select="memberToRemove = row"
+          >
+            <span>{{ t("oncall.removeMember") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </template>
 
       <template #empty>
@@ -295,6 +328,8 @@ import type {
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { formatInZone, rotationMembers } from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
