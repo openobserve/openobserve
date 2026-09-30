@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics create — HTTP (plan §2.1, §2.6, §2.7, §2.10); the protocol flow has no client-side validation, so 400s land in a toast.
+// Synthetics create — HTTP; the protocol flow has no client-side validation, so 400s land in a toast.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');

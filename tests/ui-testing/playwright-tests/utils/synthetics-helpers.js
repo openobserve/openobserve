@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics e2e helpers: API setup/teardown and result-stream seeding (plan: docs/test_generator/test-plans/synthetics-test-plan.md).
+// Synthetics e2e helpers: API setup/teardown and result-stream seeding.
 
 const fs = require('fs');
 const path = require('path');

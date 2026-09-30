@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics create — browser check via "Build manually", no recorder extension (plan §2.5, §2.9, §2.11–§2.14).
+// Synthetics create — browser check via "Build manually", no recorder extension.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -134,6 +134,7 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
     expect(body.cooldown_mins).toBe(10);
     expect(body.variables[0].name).toBe('BASE_URL');
     expect(body.auth.username).toBe('e2e-user');
+    expect(body.auth.password).toBe(BASIC_AUTH_PASSWORD);
   });
 
   test('variables panel validates names and undoes a removal', { tag: ['@P2'] }, async ({ page }, testInfo) => {

@@ -39,7 +39,6 @@ export class SyntheticsSettingsPage {
       importButton: '[data-test="synthetics-locations-import-btn"]',
       importJsonInput: '[data-test="synthetics-locations-import-json-input"]',
       importJsonButton: '[data-test="synthetics-locations-import-json-btn"]',
-      // Tokens
       createTokenButton: '[data-test="synthetics-tokens-create-btn"]',
       tokenNameField: '[data-test="synthetics-token-name-input-field"]',
       tokenNameError: '[data-test="synthetics-token-name-input-error"]',
@@ -54,8 +53,6 @@ export class SyntheticsSettingsPage {
   locationButton(id, action) { return `[data-test="synthetics-locations-${id}-${action}-btn"]`; }
   importError(i) { return `[data-test="synthetics-locations-import-error-${i}"]`; }
   tokenToggle(name) { return `[data-test="synthetics-token-${name}-toggle"]`; }
-
-  // ---------------------------------------------------------------- navigation
 
   async gotoLocations(orgId = '_meta') {
     await this.page.goto(`/web/settings/synthetics_locations?org_identifier=${orgId}`);
@@ -73,8 +70,6 @@ export class SyntheticsSettingsPage {
     await expect(this.page.locator(this.locators.createTokenButton)).toBeVisible({ timeout: 30000 });
     testLogger.navigation('Synthetics tokens');
   }
-
-  // --------------------------------------------------------- location actions
 
   async openAddForm() {
     await this.page.locator(this.locators.addButton).click();
@@ -118,8 +113,6 @@ export class SyntheticsSettingsPage {
 
   async runImport() { await this.page.locator(this.locators.importJsonButton).click(); }
 
-  // ----------------------------------------------------------- token actions
-
   async openCreateTokenDialog() {
     await this.page.locator(this.locators.createTokenButton).click();
     await this.page.locator(this.locators.tokenNameField).waitFor({ state: 'visible', timeout: 15000 });
@@ -134,7 +127,7 @@ export class SyntheticsSettingsPage {
     await this.page.locator(this.locators.tokenNameField).fill(name);
     await this.page.locator(this.locators.dialogPrimary).first().click();
     const response = await responsePromise;
-    return { status: response.status(), text: await response.text().catch(() => '') };
+    return { status: response.status(), text: await response.text() };
   }
 
   // Submits the create dialog without waiting for a request; used when the form itself rejects the name.
@@ -158,8 +151,6 @@ export class SyntheticsSettingsPage {
   async toggleToken(name) {
     await this.page.locator(this.tokenToggle(name)).click();
   }
-
-  // ---------------------------------------------------------------- assertions
 
   async expectLocationRow(id) {
     await expect(this.page.locator(this.locationButton(id, 'edit'))).toBeVisible({ timeout: 30000 });

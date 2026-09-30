@@ -27,14 +27,12 @@ export class SyntheticsCreatePage {
 
   _initializeLocators() {
     return {
-      // Details (protocol flow)
       nameField: '[data-test="synthetics-check-details-name-input-field"]',
       enabledSwitch: '[data-test="synthetics-check-details-enabled-switch-btn"]',
       targetField: '[data-test="synthetics-check-details-url-input-field"]',
       descriptionField: '[data-test="synthetics-check-details-description-textarea-field"]',
       tagField: '[data-test="synthetics-check-details-tag-input-field"]',
       addTagButton: '[data-test="synthetics-check-details-add-tag-btn"]',
-      // Type cards
       addAssertionButton: '[data-test="synthetics-check-http-add-assertion-btn"]',
       tcpPortField: '[data-test="synthetics-check-tcp-port-input-field"]',
       tlsPortField: '[data-test="synthetics-check-tls-port-input-field"]',
@@ -43,12 +41,10 @@ export class SyntheticsCreatePage {
       sshPortField: '[data-test="synthetics-check-ssh-port-input-field"]',
       sshUsernameField: '[data-test="synthetics-check-ssh-username-input-field"]',
       sshSecretField: '[data-test="synthetics-check-ssh-secret-input-field"]',
-      // Schedule
       frequencyItem: (value) => `[data-test="synthetics-check-schedule-frequency-${value}-item"]`,
       customIntervalField: '[data-test="synthetics-check-schedule-custom-interval-value-input-field"]',
       cronField: '[data-test="synthetics-check-schedule-cron-input-field"]',
       cronError: '[data-test="synthetics-check-schedule-cron-error"]',
-      // Configure sections
       basicAuthSwitch: '[data-test="synthetics-check-auth-network-basic-auth-switch-btn"]',
       basicAuthUsernameField: '[data-test="synthetics-check-auth-network-username-input-field"]',
       basicAuthPasswordField: '[data-test="synthetics-check-auth-network-password-input-field"]',
@@ -66,12 +62,10 @@ export class SyntheticsCreatePage {
       variablesRemoveDialog: '[data-test="synthetics-check-variables-panel-remove-dialog"]',
       variablesUndoButton: '[data-test="synthetics-check-variables-panel-undo-btn"]',
       privateLocationsEmpty: '[data-test="synthetics-check-locations-private-empty"]',
-      // Footer
       saveButton: '[data-test="synthetics-create-save-btn"]',
       cancelButton: '[data-test="synthetics-create-cancel-btn"]',
       unsavedDialog: '[data-test="synthetics-create-unsaved-dialog"]',
       dialogPrimary: '[data-test="o-dialog-primary-btn"]',
-      // Browser gate + journey
       gateUrlField: '[data-test="synthetics-create-url-input-field"]',
       gateUrlError: '[data-test="synthetics-create-url-input-error"]',
       gateNameField: '[data-test="synthetics-create-name-input-field"]',
@@ -98,8 +92,6 @@ export class SyntheticsCreatePage {
   deviceCell(browser, device) { return `[data-test="synthetics-check-browser-devices-cell-${browser}-${device}"]`; }
   variableRemoveButton(i) { return `[data-test="synthetics-check-variables-panel-remove-${i}-btn"]`; }
 
-  // ---------------------------------------------------------------- navigation
-
   async gotoCreate(orgId, type) {
     await this.page.goto(`/web/synthetics/add?org_identifier=${orgId}&type=${type}`);
     const firstField = type === 'browser' ? this.locators.gateUrlField : this.locators.nameField;
@@ -110,8 +102,6 @@ export class SyntheticsCreatePage {
   async gotoEdit(orgId, id) {
     await this.page.goto(`/web/synthetics/edit/${id}?org_identifier=${orgId}`);
   }
-
-  // ------------------------------------------------------ protocol form actions
 
   async fillName(name) { await this.page.locator(this.locators.nameField).fill(name); }
   async fillTarget(target) { await this.page.locator(this.locators.targetField).fill(target); }
@@ -246,7 +236,7 @@ export class SyntheticsCreatePage {
     );
     await this.page.locator(this.locators.saveButton).click();
     const response = await responsePromise;
-    const text = await response.text().catch(() => '');
+    const text = await response.text();
     return { status: response.status(), text, body: (() => { try { return JSON.parse(text); } catch { return null; } })() };
   }
 
@@ -259,8 +249,6 @@ export class SyntheticsCreatePage {
     await expect(dialog).toBeVisible({ timeout: 15000 });
     await dialog.locator(this.locators.dialogPrimary).click();
   }
-
-  // ---------------------------------------------------------- browser journey
 
   async fillGate(url, name) {
     await this.page.locator(this.locators.gateUrlField).fill(url);
@@ -308,8 +296,6 @@ export class SyntheticsCreatePage {
   async continueToConfigure() {
     await this.page.locator(this.locators.continueButton).click();
   }
-
-  // ---------------------------------------------------------------- assertions
 
   async expectSavedAndListed() {
     await this.expectToast('Check saved successfully.');
