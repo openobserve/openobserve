@@ -4430,4 +4430,13 @@ export class PipelinesPage {
         return await this.pipelineNodeOutputStreamNode.count();
     }
 
+    /**
+     * Saving the source node adds the mirroring destination asynchronously, so a
+     * plain count races the render -- it won on a fast machine and lost under CI load.
+     */
+    async expectOutputStreamNodePresent() {
+        await expect(this.pipelineNodeOutputStreamNode.first())
+            .toBeVisible({ timeout: 30000 });
+    }
+
 }
