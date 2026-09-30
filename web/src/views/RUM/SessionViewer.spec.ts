@@ -157,6 +157,7 @@ import store from "@/test/unit/helpers/store";
 import ShareButton from "@/components/common/ShareButton.vue";
 import searchService from "@/services/search";
 import { ACTIVE_WINDOW_MS } from "@/utils/rum/sessionReplayLive";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -1187,6 +1188,49 @@ describe("SessionViewer.vue — server-clock query windows (Risk 3)", () => {
     expect(Number.isFinite(query.end_time)).toBe(true);
     expect(query.end_time - query.start_time).toBe(30 * 86_400_000_000);
     expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — base64 SQL encoding", () => {
+  const plainPayload = () => ({ query: { sql: "" }, aggs: {} });
+  let wasEnabled: boolean;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    replaySchema.fields = { geo_info_country: true, geo_info_city: true };
+    wasEnabled = store.state.zoConfig.sql_base64_enabled;
+    store.state.zoConfig.sql_base64_enabled = true;
+    // Mirrors buildQueryPayload, which marks the payload base64 when the cluster flag is on.
+    (queryPayload.build ??= vi.fn()).mockImplementation(() => ({
+      ...plainPayload(),
+      encoding: "base64",
+    }));
+    const plain = rowsResponder(fixtureRows);
+    resetStreaming((sql, from) => plain(b64DecodeUnicode(sql) ?? "", from));
+  });
+
+  afterEach(() => {
+    store.state.zoConfig.sql_base64_enabled = wasEnabled;
+    queryPayload.build.mockImplementation(plainPayload);
+  });
+
+  it("sends the segment and event SQL base64-encoded", async () => {
+    const wrapper = await mountLoaded();
+
+    const segmentSqls = streaming.sqls.map((sql) => b64DecodeUnicode(sql) ?? "");
+    expect(segmentSqls.some((sql) => sql.includes("has_full_snapshot"))).toBe(true);
+    expect(segmentSqls.some((sql) => sql.includes("segment"))).toBe(true);
+    expect(streaming.sqls.every((sql) => !sql.includes("select"))).toBe(true);
+
+    const eventQueries = vi
+      .mocked(searchService.search)
+      .mock.calls.map((call: any[]) => call[0].query)
+      .filter((query: any) => query.encoding === "base64");
+    const eventSqls = eventQueries.map((query: any) => b64DecodeUnicode(query.query.sql) ?? "");
+    expect(eventSqls.some((sql) => sql.includes('"_rumdata"'))).toBe(true);
+    expect(eventSqls.some((sql) => sql.includes('"_rumlog"'))).toBe(true);
+    expect(eventQueries.every((query: any) => !query.query.sql.includes("select"))).toBe(true);
     wrapper.unmount();
   });
 });

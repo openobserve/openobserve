@@ -26,17 +26,17 @@ import ReplayLoadBand from "@/components/rum/ReplayLoadBand.vue";
 import ReplayPlaybackOverlay from "@/components/rum/ReplayPlaybackOverlay.vue";
 import ReplayStatusChip from "@/components/rum/ReplayStatusChip.vue";
 import {
-  buildMobileTimeline,
   wireframesAt,
   viewportAt,
   wireframeStyle,
-  type MobileSegment,
+  type MobileTimeline,
   type Wireframe,
 } from "@/composables/rum/useMobileSessionReplay";
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
   canResume,
   expectsMoreData,
+  formatReplayTime,
   shouldBuffer,
   skippedCount,
   timelineLength,
@@ -51,8 +51,8 @@ type Mode = "paused" | "playing" | "buffering" | "waiting" | "failed" | "ended";
 
 const props = withDefaults(
   defineProps<{
-    /** Parsed `_sessionreplay` segments (each the decoded wireframe segment JSON). */
-    segments: MobileSegment[];
+    /** Timestamp-ordered wireframe records, built once by the parent from the loaded segments. */
+    timeline: MobileTimeline;
     /** RUM events (action/view/error) with `relativeTime` — rendered as timeline markers. */
     events?: any[];
     /** True until the first window has loaded, so "not loaded yet" is not shown as "no replay". */
@@ -64,7 +64,6 @@ const props = withDefaults(
     runComplete?: boolean;
     loadPercent?: number;
     failedFromMs?: number | null;
-    truncated?: boolean;
     pendingSeekMs?: number | null;
     retryAttempt?: number;
     speed?: number;
@@ -81,7 +80,6 @@ const props = withDefaults(
     runComplete: false,
     loadPercent: 0,
     failedFromMs: null,
-    truncated: false,
     pendingSeekMs: null,
     retryAttempt: 0,
     speed: undefined,
@@ -115,7 +113,7 @@ const speedOptions = [
   { label: raw("8x"), value: 8 },
 ];
 
-const timeline = computed(() => buildMobileTimeline(props.segments ?? []));
+const timeline = computed(() => props.timeline);
 
 const playhead = ref(0); // ms offset from timeline.startTime
 const mode = ref<Mode>("paused");
@@ -186,11 +184,6 @@ const canvasStyle = computed(() => ({
   transform: `scale(${scale.value})`,
   "transform-origin": "top left",
 }));
-
-function fmt(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
 
 function imageSrc(w: Wireframe): string | undefined {
   return w.base64 ? `data:image/png;base64,${w.base64}` : undefined;
@@ -631,7 +624,7 @@ defineExpose({ seekTo, play, pause, togglePlay, playbackState });
               class="text-text-body ms-2 whitespace-nowrap tabular-nums"
               data-test="rum-mobile-replay-time"
             >
-              {{ fmt(displayMs) }} / {{ fmt(timelineMs) }}
+              {{ formatReplayTime(displayMs) }} / {{ formatReplayTime(timelineMs) }}
             </span>
             <ReplayStatusChip
               :load-state="loadState"

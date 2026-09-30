@@ -16,6 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import MobileSessionPlayer from "@/components/rum/MobileSessionPlayer.vue";
+import { buildMobileTimeline } from "@/composables/rum/useMobileSessionReplay";
 import i18n from "@/locales";
 
 const T = 1_700_000_000_000;
@@ -45,9 +46,17 @@ const segmentB = {
   ],
 };
 
+const tl = (segments: any[]) => buildMobileTimeline(segments);
+
 function mountPlayer(props: Record<string, any> = {}) {
   return mount(MobileSessionPlayer, {
-    props: { segments: [segmentA], sessionStartMs: T, loadState: "loading", speed: 1, ...props },
+    props: {
+      timeline: tl([segmentA]),
+      sessionStartMs: T,
+      loadState: "loading",
+      speed: 1,
+      ...props,
+    },
     global: {
       plugins: [i18n],
       stubs: {
@@ -89,11 +98,11 @@ describe("MobileSessionPlayer", () => {
     vi.advanceTimersByTime(2_000);
     await wrapper.vm.$nextTick();
     const before = wrapper.find('[data-test="rum-mobile-replay-time"]').text();
-    expect(before).toBe("0:01 / 0:05");
+    expect(before).toBe("00:01 / 00:05");
 
-    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    await wrapper.setProps({ timeline: tl([segmentA, segmentB]) });
 
-    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("0:01 / 0:20");
+    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("00:01 / 00:20");
     expect(playIcon(wrapper).attributes("data-name")).toBe("pause-circle-filled");
     wrapper.unmount();
   });
@@ -106,7 +115,7 @@ describe("MobileSessionPlayer", () => {
     expect(wrapper.vm.playbackState).toBe("buffering");
     expect(wrapper.find('[data-test="replay-overlay-buffering"]').exists()).toBe(true);
 
-    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    await wrapper.setProps({ timeline: tl([segmentA, segmentB]) });
     expect(wrapper.vm.playbackState).toBe("playing");
     wrapper.unmount();
   });
@@ -121,7 +130,7 @@ describe("MobileSessionPlayer", () => {
   });
 
   it("plays a seek the parent makes in the tick it clears the pending target", async () => {
-    const wrapper = mountPlayer({ segments: [segmentA, segmentB], pendingSeekMs: 12_000 });
+    const wrapper = mountPlayer({ timeline: tl([segmentA, segmentB]), pendingSeekMs: 12_000 });
     expect(wrapper.vm.playbackState).toBe("waiting");
 
     wrapper.vm.seekTo(12_000, true);
@@ -133,19 +142,25 @@ describe("MobileSessionPlayer", () => {
 
   it("uses the fixed session length from the parent for the total", () => {
     const wrapper = mountPlayer({ sessionEndMs: T + 600_000 });
-    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("0:00 / 10:00");
+    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("00:00 / 10:00");
+    wrapper.unmount();
+  });
+
+  it("shows hours in the readout once the session passes an hour", () => {
+    const wrapper = mountPlayer({ sessionEndMs: T + 3_725_000 });
+    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("00:00 / 01:02:05");
     wrapper.unmount();
   });
 
   it("lands seekTo on the right frame for a covered target", async () => {
-    const wrapper = mountPlayer({ segments: [segmentA, segmentB], loadState: "complete" });
+    const wrapper = mountPlayer({ timeline: tl([segmentA, segmentB]), loadState: "complete" });
     expect(wrapper.text()).toContain("first");
 
     wrapper.vm.seekTo(12_000, false);
     await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).toContain("second");
-    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("0:12 / 0:20");
+    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("00:12 / 00:20");
     wrapper.unmount();
   });
 
@@ -157,7 +172,7 @@ describe("MobileSessionPlayer", () => {
       "Loading up to 00:15",
     );
 
-    await wrapper.setProps({ segments: [segmentA, segmentB], pendingSeekMs: null });
+    await wrapper.setProps({ timeline: tl([segmentA, segmentB]), pendingSeekMs: null });
     wrapper.vm.seekTo(15_000, false);
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.playbackState).toBe("paused");
@@ -187,7 +202,7 @@ describe("MobileSessionPlayer", () => {
   });
 
   it("shows a failed load as an error with Retry, not as a missing replay", async () => {
-    const wrapper = mountPlayer({ segments: [], loadState: "error" });
+    const wrapper = mountPlayer({ timeline: tl([]), loadState: "error" });
     expect(wrapper.find('[data-test="rum-mobile-replay-empty"]').exists()).toBe(false);
     await wrapper.find('[data-test="replay-overlay-retry"]').trigger("click");
     expect(wrapper.emitted("retry")).toHaveLength(1);
@@ -203,9 +218,9 @@ describe("MobileSessionPlayer", () => {
     expect(wrapper.find('[data-test="replay-status-chip"]').text()).toBe("Live");
     expect(wrapper.emitted("seek-request")).toBeUndefined();
 
-    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    await wrapper.setProps({ timeline: tl([segmentA, segmentB]) });
     expect(wrapper.vm.playbackState).toBe("playing");
-    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("0:05 / 0:20");
+    expect(wrapper.find('[data-test="rum-mobile-replay-time"]').text()).toBe("00:05 / 00:20");
     expect(wrapper.emitted("seek-request")).toBeUndefined();
     wrapper.unmount();
   });
@@ -217,7 +232,7 @@ describe("MobileSessionPlayer", () => {
     await wrapper.vm.$nextTick();
     wrapper.vm.seekTo(2_000, false);
 
-    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    await wrapper.setProps({ timeline: tl([segmentA, segmentB]) });
     expect(wrapper.vm.playbackState).toBe("paused");
     wrapper.unmount();
   });
@@ -229,16 +244,16 @@ describe("MobileSessionPlayer", () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.playbackState).toBe("buffering");
 
-    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    await wrapper.setProps({ timeline: tl([segmentA, segmentB]) });
     expect(wrapper.vm.playbackState).toBe("playing");
     wrapper.unmount();
   });
 
   it("announces ready once the first records are there", async () => {
-    const wrapper = mountPlayer({ segments: [] });
+    const wrapper = mountPlayer({ timeline: tl([]) });
     expect(wrapper.emitted("ready")).toBeUndefined();
-    await wrapper.setProps({ segments: [segmentA] });
-    await wrapper.setProps({ segments: [segmentA, segmentB] });
+    await wrapper.setProps({ timeline: tl([segmentA]) });
+    await wrapper.setProps({ timeline: tl([segmentA, segmentB]) });
     expect(wrapper.emitted("ready")).toHaveLength(1);
     wrapper.unmount();
   });

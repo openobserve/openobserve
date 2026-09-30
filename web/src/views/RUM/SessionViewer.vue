@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:speed="replaySpeed"
               v-model:skip-inactivity="replaySkipInactivity"
               v-model:intent="replayIntent"
-              :segments="segments"
+              :timeline="mobileTimeline"
               :events="segmentEvents"
               :is-loading="segmentsLoading"
               class="min-h-0 flex-1"
@@ -207,6 +207,7 @@ import MobileSessionPlayer from "@/components/rum/MobileSessionPlayer.vue";
 import {
   buildMobileTimeline,
   isMobileReplaySource,
+  type MobileTimeline,
 } from "@/composables/rum/useMobileSessionReplay";
 import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
@@ -316,6 +317,12 @@ const WATCHDOG_MS = 2000;
 const EVENTS_PAGE_SIZE = 150;
 const RUM_EVENT_TYPES = ["action", "view", "error"];
 const MAX_EVENT_PAGES = 50;
+const EMPTY_TIMELINE: MobileTimeline = Object.freeze({
+  records: [],
+  startTime: 0,
+  endTime: 0,
+  duration: 0,
+});
 
 const defaultEvent = {
   id: "",
@@ -512,9 +519,11 @@ const failedFromMs = computed(() => {
   return failed.length ? manifest.value[failed[0]].start - sessionStartMs.value : null;
 });
 
-const mobileRecords = computed(() =>
-  isMobileReplay.value ? buildMobileTimeline(segments.value).records : [],
+const mobileTimeline = computed(() =>
+  isMobileReplay.value ? buildMobileTimeline(segments.value) : EMPTY_TIMELINE,
 );
+
+const mobileRecords = computed(() => mobileTimeline.value.records);
 
 const activePlayer = computed(() =>
   isMobileReplay.value ? mobilePlayerRef.value : videoPlayerRef.value,
@@ -533,7 +542,6 @@ const playerBindings = computed(() => ({
   loadState: loadState.value,
   loadPercent: loadPercent.value,
   failedFromMs: failedFromMs.value,
-  truncated: !!manifestSummary.value?.truncated,
   pendingSeekMs: pendingSeekMs.value,
   retryAttempt: retryAttempt.value,
 }));
@@ -698,6 +706,11 @@ const getSession = async () => {
   }
 };
 
+// buildQueryPayload encodes its own template SQL, so SQL assigned after it must be re-encoded in base64 mode.
+const setRequestSql = (req: any, sql: string) => {
+  req.query.sql = req.encoding === "base64" ? b64EncodeUnicode(sql) : sql;
+};
+
 const buildSegmentRequest = (sql: string, from: number, size: number, window: QueryWindow) => {
   const req = buildQueryPayload(
     {
@@ -714,8 +727,7 @@ const buildSegmentRequest = (sql: string, from: number, size: number, window: Qu
     } as any,
     t,
   );
-  // buildQueryPayload encodes its own template SQL, so SQL assigned after it must be re-encoded in base64 mode.
-  req.query.sql = req.encoding === "base64" ? b64EncodeUnicode(sql) : sql;
+  setRequestSql(req, sql);
   req.query.from = from;
   req.query.size = size;
   delete req.aggs;
@@ -1211,7 +1223,7 @@ const eventsRequest = (sql: string, window: QueryWindow, from: number) => {
     } as any,
     t,
   );
-  req.query.sql = sql;
+  setRequestSql(req, sql);
   req.query.from = from;
   req.query.size = EVENTS_PAGE_SIZE;
   delete req.aggs;

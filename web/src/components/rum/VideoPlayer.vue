@@ -245,7 +245,6 @@ const props = defineProps({
   runComplete: { type: Boolean, default: false },
   loadPercent: { type: Number, default: 0 },
   failedFromMs: { type: Number as PropType<number | null>, default: null },
-  truncated: { type: Boolean, default: false },
   pendingSeekMs: { type: Number as PropType<number | null>, default: null },
   singleSnapshot: { type: Boolean, default: false },
   retryAttempt: { type: Number, default: 0 },
