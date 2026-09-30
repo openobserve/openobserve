@@ -274,6 +274,11 @@ const useEnvRoutes = () => {
           name: "billing_group",
           component: BillingGroup,
         },
+        {
+          path: "paid_usage",
+          name: "paidUsage",
+          component: () => import("@/enterprise/components/billings/PaidUsage.vue"),
+        },
       ],
     },
   ];

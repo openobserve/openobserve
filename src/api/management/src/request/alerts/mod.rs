@@ -2320,11 +2320,15 @@ pub async fn delete_alert_bulk(
     let _user_id = user_email.user_id;
     let _folder_id = common::utils::http::get_folder(&query);
 
-    #[cfg(feature = "enterprise")]
+    // The delete loop unwraps each id, so a bad one is refused before anything is deleted.
     for id in &req.ids {
         if Ksuid::from_str(id).is_err() {
             return MetaHttpResponse::bad_request(format!("invalid alert id {id}"));
         };
+    }
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
         if !check_permissions(
             id,
             &org_id,
@@ -3958,8 +3962,12 @@ mod tests {
     use axum::{http::StatusCode, response::Response};
     use config::meta::alerts::{QueryCondition, QueryType};
     use openobserve_core::alerts::alert::AlertError;
+    use svix_ksuid::KsuidLike;
 
-    use super::resolve_generate_sql;
+    use super::{
+        BulkDeleteRequest, HashMap, Headers, Json, Ksuid, Path, Query, UserEmail,
+        delete_alert_bulk, resolve_generate_sql,
+    };
 
     /// Exporting `last_failed_at` hands an importer a backoff anchor for a model it never ran.
     #[cfg(feature = "enterprise")]
@@ -4305,6 +4313,30 @@ mod tests {
                 "rejected for the wrong reason"
             );
             assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        }
+    }
+
+    #[tokio::test]
+    async fn bulk_delete_refuses_an_invalid_id_instead_of_panicking() {
+        let valid = Ksuid::new(None, None).to_string();
+        for ids in [
+            vec!["not-a-ksuid".to_string()],
+            vec![valid, "not-a-ksuid".to_string()],
+        ] {
+            let resp = delete_alert_bulk(
+                Path("default".to_string()),
+                Query(HashMap::new()),
+                Headers(UserEmail {
+                    user_id: "user@example.com".to_string(),
+                }),
+                Json(BulkDeleteRequest { ids: ids.clone() }),
+            )
+            .await;
+            assert_eq!(
+                resp.status(),
+                StatusCode::BAD_REQUEST,
+                "{ids:?} must be refused with a 400"
+            );
         }
     }
 

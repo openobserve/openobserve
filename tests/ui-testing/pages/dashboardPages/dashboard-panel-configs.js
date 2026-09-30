@@ -580,6 +580,7 @@ export default class DashboardPanelConfigs {
       .first();
     await firstField.waitFor({ state: "visible", timeout: 5000 });
     await firstField.click();
+    await this.waitForAddFieldMenuClosed();
   }
 
   /**
@@ -595,6 +596,16 @@ export default class DashboardPanelConfigs {
     );
     await fieldOptions.first().waitFor({ state: "visible", timeout: 5000 });
     await fieldOptions.last().click();
+    await this.waitForAddFieldMenuClosed();
+  }
+
+  /** Wait for the "Add field" dropdown to unmount after a field is picked. */
+  async waitForAddFieldMenuClosed() {
+    // The menu hands focus back to its trigger on unmount, which dismisses any popover opened before then.
+    await this.page
+      .locator('[data-test^="dashboard-addpanel-config-add-field-"]')
+      .first()
+      .waitFor({ state: "detached", timeout: 5000 });
   }
 
   /** Select a unit from the Value Formatting OSelect for the currently configured column. */
@@ -606,10 +617,16 @@ export default class DashboardPanelConfigs {
     // nodes until scrolled to. Type into the built-in search box instead, which
     // narrows filteredOptions so the match renders immediately.
     const parentDataTest = await unitSelect.getAttribute("data-test");
-    await unitSelect.click();
-
+    const trigger = this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
     const searchInput = this.page.locator(`[data-test="${parentDataTest}-search"]`);
-    await searchInput.waitFor({ state: "visible", timeout: 5000 });
+
+    // A focus shift can dismiss the popover right after it opens, so re-open until the search box holds.
+    await expect(async () => {
+      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+        await trigger.click();
+      }
+      await searchInput.waitFor({ state: "visible", timeout: 2000 });
+    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
     await searchInput.fill(unitName);
 
     const unitOption = this.page.locator(
@@ -706,6 +723,9 @@ export default class DashboardPanelConfigs {
       .first();
     await btn.waitFor({ state: "visible", timeout: 5000 });
     await btn.click();
+    await expect(btn.locator('[role="checkbox"]')).toHaveAttribute("aria-checked", "true", {
+      timeout: 5000,
+    });
   }
 
   /**

@@ -42,15 +42,20 @@ test.describe("Splunk HEC Ingestion Window Warning testcases", () => {
     const orgId = getOrgIdentifier();
     await pm.splunkHecPage.navigateToSplunkHec(orgId);
 
-    const origin = await pm.splunkHecPage.getOrigin();
     const endpoint = await pm.splunkHecPage.getEndpointContent();
+    const health = await pm.splunkHecPage.getHealthContent();
+    const curl = await pm.splunkHecPage.getCurlContent();
 
-    expect(endpoint).toBe(`${origin}/services/collector`);
+    expect(endpoint).toMatch(/\/services\/collector$/);
     expect(endpoint).not.toContain(orgId);
     expect(endpoint).not.toContain('/api/');
     expect(endpoint).not.toContain('/web/');
 
-    testLogger.info('Endpoint URL verified as root-mounted');
+    // All three URL-bearing snippets resolve through the single collectorBase.
+    expect(health).toContain(endpoint);
+    expect(curl).toContain(endpoint);
+
+    testLogger.info('Endpoint URL verified as root-mounted and shared with curl/health snippets');
   });
 
   test("should navigate to the org-scoped Ingestion Tokens page from the tokens link", {
@@ -125,6 +130,46 @@ test.describe("Splunk HEC Ingestion Window Warning testcases", () => {
     expect(curlData).toHaveProperty('index');
 
     testLogger.info('Payload time is a live fractional epoch; curl example omits time');
+  });
+
+  test("should render the auth header snippet 'Authorization: Splunk <token>'", {
+    tag: ['@splunk-hec-ingestion-window', '@ingestion', '@all', '@P0']
+  }, async () => {
+    const orgId = getOrgIdentifier();
+    await pm.splunkHecPage.navigateToSplunkHec(orgId);
+
+    const authText = await pm.splunkHecPage.getAuthText();
+    expect(authText).toContain('Authorization: Splunk');
+    expect(authText).toContain('<token>');
+
+    testLogger.info('Auth header snippet verified with Splunk scheme and token placeholder');
+  });
+
+  test("should render an unauthenticated health probe at the collector health path", {
+    tag: ['@splunk-hec-ingestion-window', '@ingestion', '@all', '@P0']
+  }, async () => {
+    const orgId = getOrgIdentifier();
+    await pm.splunkHecPage.navigateToSplunkHec(orgId);
+
+    const health = await pm.splunkHecPage.getHealthContent();
+    expect(health).toContain('/services/collector/health');
+    expect(health).toMatch(/^curl -k /);
+    expect(health).not.toContain('Authorization');
+
+    testLogger.info('Health probe verified as an unauthenticated curl GET');
+  });
+
+  test("should carry the collector URL and Splunk auth scheme in the curl example", {
+    tag: ['@splunk-hec-ingestion-window', '@ingestion', '@all', '@P1']
+  }, async () => {
+    const orgId = getOrgIdentifier();
+    await pm.splunkHecPage.navigateToSplunkHec(orgId);
+
+    const curl = await pm.splunkHecPage.getCurlContent();
+    expect(curl).toContain('/services/collector');
+    expect(curl).toContain('Authorization: Splunk [SPLUNK_HEC_TOKEN]');
+
+    testLogger.info('Curl example verified with collector URL and Splunk auth header');
   });
 
   test.afterEach(async () => {

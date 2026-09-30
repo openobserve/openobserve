@@ -44,8 +44,14 @@ const props = defineProps<{
   checkId?: string;
   /** The check as last loaded or saved; promote acts on the stored copy. */
   saved?: BrowserCheck | null;
+  /** Referenced checks' steps by id; absent means none loaded, so a subtest counts no usage yet. */
+  childJourneys?: Map<string, { steps: BrowserStep[] }>;
 }>();
-const emit = defineEmits<{ "update:check": [value: BrowserCheck]; promoted: [name: string] }>();
+const emit = defineEmits<{
+  "update:check": [value: BrowserCheck];
+  promoted: [name: string];
+  close: [];
+}>();
 
 const { t } = useI18nTyped();
 
@@ -60,11 +66,20 @@ function stepUsesToken(step: BrowserStep, token: string): boolean {
   );
 }
 
+/** A subtest step's usage lives on the referenced check's steps, not the reference row. */
+function stepsToScan(): BrowserStep[] {
+  return props.check.journey.flatMap((step) =>
+    step.action === "subtest"
+      ? (props.childJourneys?.get(step.subtest?.id ?? "")?.steps ?? [])
+      : [step],
+  );
+}
+
 function usageCount(name: string): number {
   const trimmed = name.trim();
   if (!trimmed) return 0;
   const token = `{{${trimmed}}}`;
-  return props.check.journey.filter((step) => stepUsesToken(step, token)).length;
+  return stepsToScan().filter((step) => stepUsesToken(step, token)).length;
 }
 
 const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)));
@@ -347,6 +362,17 @@ function onPromoted(name: string) {
             data-test="synthetics-check-variables-panel-hint-icon"
           />
         </OTooltip>
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          icon-left="close"
+          class="ms-auto"
+          :aria-label="t('synthetics.variablesPanel.closePanel')"
+          data-test="synthetics-check-variables-panel-close-btn"
+          @click="emit('close')"
+        >
+          <OTooltip :content="t('synthetics.variablesPanel.closePanel')" side="bottom" />
+        </OButton>
       </div>
     </div>
 

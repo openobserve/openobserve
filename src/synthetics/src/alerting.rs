@@ -101,6 +101,12 @@ pub fn classify(
     if error_source == ERROR_SOURCE_QUEUE {
         return RunClass::NotMeasured;
     }
+    // A child still replicating to this region is lag of ours, like a queue drop.
+    if error_source == ERROR_SOURCE_CONFIG
+        && status_reason == Some(crate::job_api::REASON_CONFIG_REFERENCE_PENDING)
+    {
+        return RunClass::NotMeasured;
+    }
     match run_status {
         Some("passed") => RunClass::Healthy,
         Some("warning") => match status_reason {
@@ -148,6 +154,9 @@ pub const ERROR_SOURCE_ORPHAN: &str = "orphan";
 /// it: the three failure paths share one stream and one `status`, so a rule can
 /// only tell them apart by this value.
 pub const ERROR_SOURCE_DISPATCH: &str = "dispatch";
+
+/// `error_source` for a run whose journey could not be assembled (§5.11): unbilled, but alerts.
+pub const ERROR_SOURCE_CONFIG: &str = "config";
 
 /// What a completed run should send, if anything.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -443,6 +452,42 @@ mod tests {
             RunClass::Failing
         );
         assert_eq!(classify(Some("error"), 1, "probe", None), RunClass::Failing);
+    }
+
+    #[test]
+    fn a_config_error_is_failing_not_not_measured() {
+        // A config error is our fault but not lag: the check cannot run until fixed, so it pages.
+        assert_eq!(
+            classify(
+                Some("error"),
+                1,
+                ERROR_SOURCE_CONFIG,
+                Some("config_steps_exceeded")
+            ),
+            RunClass::Failing
+        );
+    }
+
+    #[test]
+    fn a_pending_replication_is_not_measured() {
+        assert_eq!(
+            classify(
+                Some("error"),
+                1,
+                ERROR_SOURCE_CONFIG,
+                Some(crate::job_api::REASON_CONFIG_REFERENCE_PENDING)
+            ),
+            RunClass::NotMeasured
+        );
+        assert_eq!(
+            classify(
+                Some("error"),
+                1,
+                ERROR_SOURCE_CONFIG,
+                Some(crate::job_api::REASON_CONFIG_REFERENCE_MISSING)
+            ),
+            RunClass::Failing
+        );
     }
 
     #[test]

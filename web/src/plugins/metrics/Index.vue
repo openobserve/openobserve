@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="selectedDate"
         ref="dateTimePickerRef"
         :disable="disable"
+        :hide-range-shift="isMobile"
         class="h-8"
         data-test="metrics-date-picker"
       />
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="refreshInterval"
         trigger
         :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+        :is-compact="isMobile"
         @trigger="runQuery"
         class="h-8"
         data-test="metrics-auto-refresh"
@@ -137,6 +139,7 @@ import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields
 import { useRoute, useRouter } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import ShareButton from "@/components/common/ShareButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   getMetricsConfig,
   encodeMetricsConfig,
@@ -178,6 +181,7 @@ export default defineComponent({
   },
   setup() {
     provide("dashboardPanelDataPageKey", "metrics");
+    const { isMobile } = useBreakpoint();
 
     // PanelEditor ref for accessing exposed methods/properties
     const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
@@ -615,6 +619,7 @@ export default defineComponent({
 
     return {
       t,
+      isMobile,
       updateDateTime,
       runQuery,
       dashboardPanelData,
