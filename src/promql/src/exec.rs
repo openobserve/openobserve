@@ -321,14 +321,8 @@ mod tests {
             _matchers: promql_parser::label::Matchers,
             _label_selector: hashbrown::HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> Result<
-            Vec<(
-                datafusion::prelude::SessionContext,
-                Arc<datafusion::arrow::datatypes::Schema>,
-                ScanStats,
-                bool,
-            )>,
-        > {
+            _streaming: bool,
+        ) -> Result<Vec<crate::ScanContext>> {
             use datafusion::arrow::{
                 array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
                 datatypes::{DataType, Field, Schema},
@@ -370,7 +364,12 @@ mod tests {
             .unwrap();
             let ctx = datafusion::prelude::SessionContext::new();
             ctx.register_batch(stream_name, batch).unwrap();
-            Ok(vec![(ctx, schema, ScanStats::default(), true)])
+            Ok(vec![crate::ScanContext::table(
+                ctx,
+                schema,
+                ScanStats::default(),
+                true,
+            )])
         }
     }
 
