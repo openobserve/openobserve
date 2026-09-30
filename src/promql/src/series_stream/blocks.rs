@@ -762,7 +762,7 @@ async fn load_entry(
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    Ok(metrics_index::fetch_parsed_index(
+    metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
         parent.metadata(),
@@ -770,7 +770,7 @@ async fn load_entry(
         labels,
         cached,
     )
-    .await?)
+    .await
 }
 
 pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {

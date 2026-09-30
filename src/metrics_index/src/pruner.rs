@@ -18,6 +18,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::{Context, Result, bail, ensure};
 use arrow::{
     array::{Array, BooleanArray},
     datatypes::Schema,
@@ -30,11 +31,8 @@ use config::{
     },
 };
 use datafusion::{
-    common::{DFSchema, DataFusionError, Result},
-    execution::context::ExecutionProps,
-    logical_expr::Expr,
-    physical_expr::create_physical_expr,
-    physical_plan::PhysicalExpr,
+    common::DFSchema, execution::context::ExecutionProps, logical_expr::Expr,
+    physical_expr::create_physical_expr, physical_plan::PhysicalExpr,
 };
 use futures::{StreamExt, stream};
 use promql_parser::label::{MatchOp, Matchers};
@@ -46,11 +44,10 @@ use crate::{
 };
 
 pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>> {
-    if !matchers.or_matchers.is_empty() {
-        return Err(DataFusionError::Execution(
-            "OR matchers require the source reader".into(),
-        ));
-    }
+    ensure!(
+        matchers.or_matchers.is_empty(),
+        "OR matchers require the source reader"
+    );
     for matcher in &matchers.matchers {
         if [NAME_LABEL, VALUE_LABEL, TIMESTAMP_COL_NAME].contains(&matcher.name.as_str()) {
             continue;
@@ -64,10 +61,7 @@ pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>>
             if index.source_schema.field_with_name(&matcher.name).is_err() {
                 return Ok(Vec::new());
             }
-            return Err(DataFusionError::Execution(format!(
-                "MIDX lacks identity label {}",
-                matcher.name
-            )));
+            bail!("MIDX lacks identity label {}", matcher.name);
         }
     }
     let Some(filter) = create_physical_filter(index.labels.schema().as_ref(), matchers)? else {
@@ -79,7 +73,7 @@ pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>>
     let mask = mask
         .as_any()
         .downcast_ref::<BooleanArray>()
-        .ok_or_else(|| DataFusionError::Execution("MIDX matcher was not boolean".into()))?;
+        .context("MIDX matcher was not boolean")?;
     Ok((0..mask.len())
         .filter(|&id| !mask.is_null(id) && mask.value(id))
         .collect())
@@ -176,14 +170,11 @@ pub async fn search(
                         &account,
                         &data_path,
                         &sidecar_path,
-                        config::FileFormat::from_extension(&data_path).ok_or_else(|| {
-                            DataFusionError::Execution("Unsupported metrics source format".into())
-                        })?,
+                        config::FileFormat::from_extension(&data_path)
+                            .context("Unsupported metrics source format")?,
                         crate::block::ParentMetadata {
-                            rows: u64::try_from(expected_rows)
-                                .map_err(|error| DataFusionError::External(error.into()))?,
-                            compressed_size: u64::try_from(compressed_size)
-                                .map_err(|error| DataFusionError::External(error.into()))?,
+                            rows: u64::try_from(expected_rows)?,
+                            compressed_size: u64::try_from(compressed_size)?,
                         },
                         mindex_size,
                         IndexLabels {
@@ -200,8 +191,7 @@ pub async fn search(
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
                             .map(|ranges| (Arc::new(ranges), complete, row_group_size))
                     })
-                    .await
-                    .map_err(|error| DataFusionError::External(Box::new(error)))?
+                    .await?
                 }
                 .await;
                 (data_path, result)
@@ -329,11 +319,10 @@ pub(super) fn create_physical_filter(
     let df_schema = DFSchema::try_from(sidecar_schema.clone())?;
     // plain expression planning: no session/registry needed for column
     // comparisons and regexp_like
-    create_physical_expr(
+    Ok(Some(create_physical_expr(
         &filter,
         &df_schema,
         &ExecutionProps::new(),
         &Default::default(),
-    )
-    .map(Some)
+    )?))
 }
