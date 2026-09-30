@@ -13097,11 +13097,15 @@ export class LogsPage {
         await search.waitFor({ state: 'visible', timeout: 20000 });
         await search.pressSequentially(streamName);
 
-        // The list filters on a debounce, so clicking before it settles explores the wrong row.
-        const exploreButtons = this.page.locator('[data-test="log-stream-explore-btn"]');
-        await expect.poll(async () => await exploreButtons.count(), { timeout: 20000 }).toBe(1);
+        // The filter matches substrings, so `e2e_automate` also lists `e2e_automate_w0`
+        // and friends. The row is picked by an exact name cell rather than by count.
+        const row = this.page
+            .locator('tr')
+            .filter({ has: this.page.getByText(streamName, { exact: true }) });
+        const exploreBtn = row.locator('[data-test="log-stream-explore-btn"]').first();
+        await exploreBtn.waitFor({ state: 'visible', timeout: 20000 });
 
-        await exploreButtons.first().click();
+        await exploreBtn.click();
         await this.page.waitForURL(/type=stream_explorer/, { timeout: 30000 });
     }
 

@@ -308,7 +308,6 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_12647_dest_/,            // pipeline-preview-bounds.spec.js (#12647) destination stream
         /^e2e7030[a-z0-9]+-(alpha|beta)_dest$/, // pipeline-export.spec.js (#7030) destination streams
         /^e2e_10602_/,                 // logs-v040-limit-and-stream-list.spec.js (#10602)
-        /^regression_8383_switch$/,    // logs-table-stream-switch.spec.js (#8383)
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
