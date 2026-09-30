@@ -8,10 +8,11 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use db::authz::set_ownership;
+use config::meta::folder::DEFAULT_FOLDER;
+use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::{auth::validator::list_objects_for_user, extractors::Headers};
 use openobserve_core::{
-    auth::{UserEmail, is_ofga_object_visible},
+    auth::{UserEmail, check_folder_write_permissions, is_ofga_object_visible},
     prompts::{self, MutationContext, PromptError, PromptSelector, PromptSource, ResolvePurpose},
 };
 use serde::Deserialize;
@@ -39,6 +40,9 @@ const FOLDER_WARNING: &str = "299 OpenObserve \"prompt folder assertion mismatch
 pub struct ListPromptsQuery {
     #[serde(default)]
     pub include_archived: bool,
+    /// `folder` is the name the permission check reads, so a caller scoped to one
+    /// folder must use it; `folderId` only filters.
+    #[serde(alias = "folder")]
     pub folder_id: Option<String>,
 }
 
@@ -114,6 +118,49 @@ async fn can_manage_protected_labels(org_id: &str, _user_id: &str) -> bool {
     }
 }
 
+const PROMPT_FOLDERS: &str = "prompt_folders";
+
+/// A prompt's OpenFGA identity: owned by the org, and a child of its folder so the
+/// folder's grants reach it.
+fn prompt_authz(entity_id: &str, folder_id: &str) -> Authz {
+    Authz {
+        obj_id: entity_id.to_string(),
+        parent_type: PROMPT_FOLDERS.to_string(),
+        parent: folder_id.to_string(),
+    }
+}
+
+fn folder_forbidden() -> Response {
+    machine_error(
+        StatusCode::FORBIDDEN,
+        "unauthorized_access",
+        "Unauthorized Access",
+    )
+}
+
+/// Whether the caller may list prompts in every folder, not just one.
+async fn can_list_all_folders(org_id: &str, _user_id: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            org_id,
+            org_id,
+            _user_id,
+            PROMPT_FOLDERS,
+            "LIST",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        true
+    }
+}
+
 /// `None` means every prompt is visible (admin, RBAC off, or list filtering off).
 async fn readable_prompts(org_id: &str, user_id: &str) -> Result<Option<Vec<String>>, Response> {
     list_objects_for_user(org_id, user_id, "GET", "prompt")
@@ -127,7 +174,7 @@ async fn readable_prompts(org_id: &str, user_id: &str) -> Result<Option<Vec<Stri
         })
 }
 
-/// `/resolve` addresses prompts by name, so the per-prompt GET is checked here.
+/// `/resolve` and `/match` reach prompts by name or content, so the per-prompt GET is checked here.
 async fn can_read_prompt(org_id: &str, _user_id: &str, _entity_id: &str) -> bool {
     #[cfg(feature = "enterprise")]
     {
@@ -251,7 +298,14 @@ pub async fn list_prompts(
         Ok(readable) => readable,
         Err(response) => return response,
     };
-    match prompts::list_prompts(&org_id, query.include_archived, query.folder_id.as_deref()).await {
+    // Without `folder` the route only authorized the default folder, so listing every
+    // folder needs the org-wide grant; otherwise the listing stays in that folder.
+    let folder_id = match query.folder_id {
+        Some(folder_id) => Some(folder_id),
+        None if can_list_all_folders(&org_id, &user.user_id).await => None,
+        None => Some(DEFAULT_FOLDER.to_string()),
+    };
+    match prompts::list_prompts(&org_id, query.include_archived, folder_id.as_deref()).await {
         Ok(list) => Json(ListPromptsResponseBody {
             list: list
                 .into_iter()
@@ -285,6 +339,14 @@ pub async fn create_prompt(
         Ok(request) => request,
         Err(error) => return prompt_error_response(error),
     };
+    // The route authorized `?folder=`, but the body names the folder the prompt lands in.
+    let folder_id = match request.folder_id.trim() {
+        "" => DEFAULT_FOLDER,
+        folder_id => folder_id,
+    };
+    if !check_folder_write_permissions(&org_id, &user.user_id, PROMPT_FOLDERS, folder_id).await {
+        return folder_forbidden();
+    }
     let via = request.source;
     match prompts::create_prompt(
         &org_id,
@@ -295,7 +357,15 @@ pub async fn create_prompt(
     .await
     {
         Ok(result) => {
-            set_ownership(&org_id, "prompts", Authz::new(&result.prompt.entity_id)).await;
+            // A replay returns the prompt as it is now, possibly since moved: leave its tuples.
+            if result.created && !result.replayed {
+                set_ownership(
+                    &org_id,
+                    "prompts",
+                    prompt_authz(&result.prompt.entity_id, &result.prompt.folder_id),
+                )
+                .await;
+            }
             Json(PromptMutationResponseBody::from(result)).into_response()
         }
         Err(error) => prompt_error_response(error),
@@ -312,10 +382,6 @@ pub async fn match_prompts(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<MatchPromptsRequestBody>,
 ) -> Response {
-    let readable = match readable_prompts(&org_id, &user.user_id).await {
-        Ok(readable) => readable,
-        Err(response) => return response,
-    };
     let (prompt_type, payload, config) = match body.into_core() {
         Ok(request) => request,
         Err(error) => return prompt_error_response(error),
@@ -330,7 +396,8 @@ pub async fn match_prompts(
     };
     let mut matches = Vec::with_capacity(versions.len());
     for version in versions {
-        if !is_ofga_object_visible(&org_id, "prompt", &version.entity_id, readable.as_deref()) {
+        // Content matches span folders the route never authorized.
+        if !can_read_prompt(&org_id, &user.user_id, &version.entity_id).await {
             continue;
         }
         let prompt = match prompts::get_prompt(&org_id, &version.entity_id).await {
@@ -554,6 +621,23 @@ pub async fn update_prompt(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<UpdatePromptRequestBody>,
 ) -> Response {
+    // The route authorized leaving the source folder; entering the destination is
+    // checked here, and the prompt's parent tuple follows it.
+    let mut moved_from = None;
+    if let Some(destination) = body.folder_id.as_deref().map(str::trim) {
+        let current = match prompts::get_prompt(&org_id, &entity_id).await {
+            Ok(prompt) => prompt.folder_id,
+            Err(error) => return prompt_error_response(error),
+        };
+        if current != destination {
+            if !check_folder_write_permissions(&org_id, &user.user_id, PROMPT_FOLDERS, destination)
+                .await
+            {
+                return folder_forbidden();
+            }
+            moved_from = Some(current);
+        }
+    }
     match prompts::update_head(
         &org_id,
         &entity_id,
@@ -562,7 +646,20 @@ pub async fn update_prompt(
     )
     .await
     {
-        Ok(prompt) => Json(PromptResponseBody::from(prompt)).into_response(),
+        Ok(prompt) => {
+            if let Some(source) = moved_from.filter(|source| source != &prompt.folder_id) {
+                // Naming the old parent is what removes it; otherwise the source
+                // folder's grants keep reaching a prompt that has left it.
+                remove_ownership(&org_id, "prompts", prompt_authz(&entity_id, &source)).await;
+                set_ownership(
+                    &org_id,
+                    "prompts",
+                    prompt_authz(&entity_id, &prompt.folder_id),
+                )
+                .await;
+            }
+            Json(PromptResponseBody::from(prompt)).into_response()
+        }
         Err(error) => prompt_error_response(error),
     }
 }
