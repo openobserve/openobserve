@@ -12,6 +12,10 @@
  *  - In Visualize, refresh short-circuits to `runQuery()` and never touches the
  *    stream list; the grid is never remounted.
  *
+ * Cache hits and short-circuits are asserted ON THE WIRE, not in the DOM: a mount
+ * served from cache renders identically to one that refetched, so the tests count
+ * `/streams?type=metrics` requests across the window under test.
+ *
  * NOT covered here (deliberately, per test-scope decision): the auto-refresh tick
  * and org-switch reloads — both wired but not DOM-observable with a stable
  * selector in OSS single-org CI. The loading-spinner overlay itself has no
@@ -20,7 +24,6 @@
  *
  * Feature: metrics-explorer-stream-cache
  * Area: Metrics → Metrics Explorer
- * Feature doc: docs/test_generator/features/metrics-explorer-stream-cache-feature.md
  *
  * Pre-requisites:
  *  - Global setup handles authentication + org_identifier
@@ -70,8 +73,11 @@ test.describe('Metrics Explorer Stream List Cache testcases', () => {
     const count = await pm.metricsExplorerPage.getCardCount();
     expect(count, 'the explorer should render at least one stream card').toBeGreaterThan(0);
 
-    const countText = await pm.metricsExplorerPage.getResultCountText();
-    expect(countText, 'the result count label should report a populated set').not.toBe('');
+    // The grid is virtualized, so the label counts every loaded card while the DOM
+    // holds only the rows in view — the label is the upper bound, never below it.
+    const shown = await pm.metricsExplorerPage.getResultCount();
+    expect(shown, 'the result count label should report a populated set').toBeGreaterThan(0);
+    expect(shown, 'the label must not undercount the rendered cards').toBeGreaterThanOrEqual(count);
 
     testLogger.info('Explorer grid painted cards on first visit');
   });
@@ -123,13 +129,22 @@ test.describe('Metrics Explorer Stream List Cache testcases', () => {
     await pm.metricsExplorerPage.enterVisualizeQuery(SEEDED_METRIC);
     await pm.metricsExplorerPage.waitForMetricsDataParam();
 
+    // The DOM cannot tell a short-circuit from a full reload — both leave the chart
+    // mounted. Only the wire can: exactly one query, zero stream-list refetches.
+    const streamCalls = pm.metricsExplorerPage.startStreamListCounter();
+    const queryFired = pm.metricsExplorerPage.waitForPromqlQuery();
+
     await pm.metricsExplorerPage.runVisualizeQuery();
+
+    await queryFired;
+    expect(
+      streamCalls.stop(),
+      'refresh in Visualize must re-run the chart only, never refetch the stream list'
+    ).toBe(0);
 
     // Still in Visualize — no fallback to the Explore/Workspace grid.
     await pm.metricsExplorerPage.expectModeActive('visualize');
     await pm.metricsExplorerPage.expectVisualizeVisible();
-
-    // The chart renderer stays mounted — a query re-run, not a stream-list reload.
     await pm.metricsExplorerPage.expectChartRendererVisible();
 
     testLogger.info('Visualize refresh re-ran the chart and never touched the stream grid');
@@ -141,50 +156,64 @@ test.describe('Metrics Explorer Stream List Cache testcases', () => {
     tag: ['@metrics-explorer-stream-cache', '@metrics', '@P1', '@refresh', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
-    testLogger.info('Testing the refresh button disables during a reload to block double-clicks');
+    testLogger.info('Testing two same-tick refresh clicks collapse into one stream reload');
 
     await pm.metricsExplorerPage.gotoExplorer();
     await pm.metricsExplorerPage.expectExplorerVisible();
     await pm.metricsExplorerPage.waitForCards();
 
-    await pm.metricsExplorerPage.clickRefresh();
+    const streamCalls = pm.metricsExplorerPage.startStreamListCounter();
+    // Gate on the response, not on aria-busy: the idle poll would otherwise be
+    // free to fire before Vue has painted the busy state and count nothing.
+    const reloadLanded = pm.metricsExplorerPage.waitForStreamListResponse();
 
-    // While a reload is in flight the button is disabled — a second click is
-    // impossible, so two stream reloads can never overlap.
-    await expect
-      .poll(async () => await pm.metricsExplorerPage.isRefreshButtonDisabled(), {
-        timeout: 10000,
-        intervals: [50, 100, 200],
-      })
-      .toBe(true);
+    // Two clicks in one tick. `onRefresh` sets `refreshing` synchronously before
+    // its first await, so the second click provably reaches the guard — waiting
+    // for the disabled state and clicking again would race the reload instead.
+    await pm.metricsExplorerPage.clickRefreshTwiceInSameTick();
 
-    // Once idle the button re-enables, and only one reload ran.
+    await reloadLanded;
     await pm.metricsExplorerPage.expectRefreshIdle();
 
-    testLogger.info('Refresh re-entry guard verified — no overlapping reloads possible');
+    expect(
+      streamCalls.stop(),
+      'the re-entry guard must collapse two clicks into a single stream reload'
+    ).toBe(1);
+
+    testLogger.info('Re-entry guard verified — two clicks produced exactly one stream reload');
   });
 
   // ═══ P2: FRESH REMOUNT ════════════════════════════════════════════════════
 
-  test("Rapid re-entry always renders the grid (fresh mount each visit)", {
+  test("In-app remount repaints the grid from cache (no stream refetch)", {
     tag: ['@metrics-explorer-stream-cache', '@metrics', '@P2', '@remount', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
-    testLogger.info('Testing a second visit remounts and repaints the grid from cache');
+    testLogger.info('Testing an in-app remount repaints the grid without refetching the stream list');
 
     await pm.metricsExplorerPage.gotoExplorer();
     await pm.metricsExplorerPage.expectExplorerVisible();
     await pm.metricsExplorerPage.waitForCards();
 
-    // keepAlive:false remounts the explorer on every visit, so this second
-    // gotoExplorer() is a fresh cache-first loadStreams() — it must repaint.
-    await pm.metricsExplorerPage.gotoExplorer();
+    // Round-trip through the SPA, not page.goto() — a reload would destroy the
+    // in-memory QueryClient and turn this into a plain cold load.
+    const streamCalls = pm.metricsExplorerPage.startStreamListCounter();
+
+    await pm.metricsExplorerPage.navigateAwayInApp();
+    await pm.metricsExplorerPage.navigateToExplorerInApp();
     await pm.metricsExplorerPage.expectExplorerVisible();
     await pm.metricsExplorerPage.waitForCards();
 
     const count = await pm.metricsExplorerPage.getCardCount();
     expect(count, 'a fresh mount must repaint the grid').toBeGreaterThan(0);
 
-    testLogger.info('Second mount repainted the grid — fresh cache-first load');
+    // The whole point of the cache: inside the 5-minute staleTime the remount
+    // repaints without going back to the server at all.
+    expect(
+      streamCalls.stop(),
+      'a remount inside staleTime must serve the stream list from cache'
+    ).toBe(0);
+
+    testLogger.info('In-app remount repainted the grid from cache — zero stream-list requests');
   });
 });

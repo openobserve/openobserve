@@ -61,6 +61,16 @@ export class MetricsExplorerPage {
         // ECharts mounts more than one canvas per instance (zrender adds layers).
         this.cardChartCanvas = 'canvas';
 
+        // ===== SIDEBAR NAV (in-app route changes, no full page reload) =====
+        this.metricsMenuItem = '[data-test="menu-link-\\/metrics-item"]';
+        this.logsMenuItem = '[data-test="menu-link-\\/logs-item"]';
+
+        // ===== ENDPOINTS (network assertions) =====
+        // stream.nameList() builds `/api/<org>/streams?type=<type>`; the metrics
+        // name list is the request the 5-minute TanStack cache is meant to skip.
+        this.streamListUrlPart = '/streams?type=metrics';
+        this.promqlQueryUrlPart = '/prometheus/api/v1/query_range';
+
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
         this.loadErrorState = '[data-test="metrics-explorer-load-error"]';
@@ -423,14 +433,11 @@ export class MetricsExplorerPage {
             .toBeGreaterThan(0);
     }
 
-    /**
-     * The grid never blanks across a refresh window. `expect.poll` can only
-     * assert a state is REACHED, not that it HOLDS, so sample the card count
-     * repeatedly and fail the moment it drops to zero.
-     */
+    /** Sampled, not polled: `expect.poll` proves a state is REACHED, not that it HOLDS. */
     async expectCardsRemainVisible(timeout = 10000) {
         const deadline = Date.now() + timeout;
-        while (Date.now() < deadline) {
+        // Bounded by the reload itself — sampling past it just asserts the idle state.
+        while (Date.now() < deadline && (await this.isRefreshButtonLoading())) {
             const count = await this.getCardCount();
             expect(count, 'the grid must not blank during a manual refresh').toBeGreaterThan(0);
             await this.page.waitForTimeout(100);
@@ -477,13 +484,13 @@ export class MetricsExplorerPage {
         await this.page.locator(this.refreshButton).click();
     }
 
-    /** OButton surfaces its loading prop as aria-busy (same as ShareButton). */
+    /** OButton binds `:aria-busy="loading || undefined"` — so "true", or absent. */
     async isRefreshButtonLoading() {
         const state = await this.page
             .locator(this.refreshButton)
-            .getAttribute('aria-busy')
+            .getAttribute('aria-busy', { timeout: 5000 })
             .catch(() => null);
-        return state === 'true' || state === '';
+        return state === 'true';
     }
 
     async isRefreshButtonEnabled() {
@@ -519,11 +526,96 @@ export class MetricsExplorerPage {
         await expect(this.page.locator(this.refreshButton)).toBeEnabled({ timeout: 30000 });
     }
 
-    /** The toolbar result-count label text — empty until the stream list resolves. */
+    /** The toolbar result-count label text — "N" when unfiltered, "N of M" when filtered. */
     async getResultCountText() {
         return (
-            (await this.page.locator(this.countLabel).textContent().catch(() => '')) || ''
+            (await this.page
+                .locator(this.countLabel)
+                .textContent({ timeout: 5000 })
+                .catch(() => '')) || ''
         ).trim();
+    }
+
+    /**
+     * The FIRST number in the label — the count of cards the grid is showing.
+     *
+     * Not comparable to getCardCount(): the grid is virtualized, so the DOM only
+     * ever holds the rows in view. This is the upper bound that count sits under.
+     */
+    async getResultCount() {
+        const text = await this.getResultCountText();
+        const shown = Number(text.split(' of ')[0].replace(/,/g, ''));
+        return Number.isFinite(shown) ? shown : -1;
+    }
+
+    /** Both clicks land in ONE tick, so the second is guaranteed to hit the re-entry guard. */
+    async clickRefreshTwiceInSameTick() {
+        await this.page.locator(this.refreshButton).evaluate((el) => {
+            el.click();
+            el.click();
+        });
+    }
+
+    /* ------------------------------------------------------------- network */
+
+    /**
+     * Tally matching requests from now until `stop()`.
+     *
+     * The cache contract is only observable on the wire — a served-from-cache
+     * mount looks identical in the DOM to a refetched one.
+     */
+    startRequestCounter(urlPart) {
+        const counter = { count: 0, urls: [] };
+        const handler = (request) => {
+            if (!request.url().includes(urlPart)) return;
+            counter.count += 1;
+            counter.urls.push(request.url());
+        };
+        this.page.on('request', handler);
+        counter.stop = () => {
+            this.page.off('request', handler);
+            return counter.count;
+        };
+        return counter;
+    }
+
+    startStreamListCounter() {
+        return this.startRequestCounter(this.streamListUrlPart);
+    }
+
+    /** Resolves on the next stream-list response — a reload landed, no UI-state race. */
+    waitForStreamListResponse(timeout = 30000) {
+        return this.page.waitForResponse(
+            (response) => response.url().includes(this.streamListUrlPart),
+            { timeout }
+        );
+    }
+
+    /** Resolves on the next PromQL range query — proof the chart actually re-ran. */
+    waitForPromqlQuery(timeout = 30000) {
+        return this.page.waitForResponse(
+            (response) => response.url().includes(this.promqlQueryUrlPart),
+            { timeout }
+        );
+    }
+
+    /* ------------------------------------------- in-app (SPA) navigation */
+
+    /**
+     * Leave the explorer WITHOUT a page reload.
+     *
+     * `page.goto()` tears down the whole SPA and with it the in-memory TanStack
+     * cache, so a reload can never exercise a cache hit. Routing through the
+     * sidebar unmounts the explorer (keepAlive:false) while the QueryClient lives.
+     */
+    async navigateAwayInApp() {
+        await this.page.locator(this.logsMenuItem).click();
+        await this.page.waitForURL(/\/web\/logs/, { timeout: 30000 });
+    }
+
+    async navigateToExplorerInApp() {
+        await this.page.locator(this.metricsMenuItem).click();
+        await this.page.waitForURL(/\/web\/metrics/, { timeout: 30000 });
     }
 
     /* ----------------------------------------------------------------- share */
