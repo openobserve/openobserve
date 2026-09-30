@@ -313,7 +313,7 @@
               {{ t("onlineEvals.scorer.detail.usedByIntro") }}
             </p>
             <OEmptyState
-              v-if="usedByCount === 0"
+              v-if="usedByCount === 0 && !experimentsLoading"
               size="inline"
               :title="t('onlineEvals.scorer.detail.usedByEmpty')"
               data-test="scorer-detail-used-by-empty"
@@ -480,13 +480,17 @@ const usedByJobs = computed<EvalJob[]>(() => {
 });
 
 const experiments = ref<LlmExperiment[]>([]);
+const experimentsLoading = ref(false);
 
 // Best-effort: the jobs list still renders when the experiments request fails.
 async function loadExperiments() {
+  experimentsLoading.value = true;
   try {
     experiments.value = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
   } catch {
     experiments.value = [];
+  } finally {
+    experimentsLoading.value = false;
   }
 }
 watch(orgId, () => void loadExperiments(), { immediate: true });
@@ -530,7 +534,7 @@ const tabs = computed(() => [
   {
     id: "usedBy" as TabId,
     label: t("onlineEvals.scorer.detail.tabs.usedBy"),
-    count: usedByCount.value,
+    count: experimentsLoading.value ? null : usedByCount.value,
   },
 ]);
 
@@ -722,7 +726,7 @@ const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(()
     },
     {
       label: t("onlineEvals.scorer.detail.kpis.usedBy"),
-      value: String(usedByCount.value),
+      value: experimentsLoading.value ? "—" : String(usedByCount.value),
       unit: "",
     },
   ];
