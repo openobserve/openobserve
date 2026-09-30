@@ -63,7 +63,7 @@ struct RecentIngestedTraceStream {
     stream_name: String,
 }
 
-/// `O2_SERVICE_GRAPH_SOURCE`; `None` is `auto`, which follows whether the org has a v1 stream.
+/// Parses a source spec from the env or `?source=`; `None` is auto, resolved by `use_v4_source`.
 pub fn parse_source(source: &str) -> Option<Source> {
     match source {
         "v1" => Some(Source::V1),
