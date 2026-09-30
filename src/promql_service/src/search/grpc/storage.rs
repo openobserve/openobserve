@@ -44,12 +44,190 @@ use search::{
     file_cache::{cache_files, calc_target_partitions, inspect_file_cache},
 };
 use search_service::match_source;
-use tracing::Instrument;
 
 #[derive(Debug)]
 pub(super) struct SourcePreference<'a> {
     pub streaming: bool,
     pub output_labels: &'a HashSet<String>,
+}
+
+/// A stream's files once the scan source is picked; each source prepares them its own way.
+struct StorageScan<'a> {
+    trace_id: &'a str,
+    org_id: &'a str,
+    stream_name: &'a str,
+    schema: Arc<arrow::datatypes::Schema>,
+    files: Vec<FileKey>,
+    scan_stats: ScanStats,
+    sort_order: FileSortOrder,
+}
+
+impl StorageScan<'_> {
+    /// Blocks read the sidecars by range: the parquet files are neither downloaded nor selected.
+    async fn blocks(mut self, scan: Arc<MetricsBlockScan>) -> Result<ScanContext> {
+        let trace_id = self.trace_id;
+        let cache_start = std::time::Instant::now();
+        let (_, hits, misses) =
+            inspect_file_cache(trace_id, &cache_inputs(&self.files), &mut self.scan_stats).await;
+        let target_partitions =
+            self.report_cache(file_data::CacheType::None, hits, misses, cache_start);
+        log::info!(
+            "[trace_id {trace_id}] promql->search->storage: MIDX block candidate across {} files; row selection deferred to block preflight",
+            self.files.len()
+        );
+        cache_metrics_index_files(trace_id, self.org_id, &self.files).await;
+
+        let ctx =
+            metrics_session_context(&self.session(target_partitions), self.sort_order).await?;
+        Ok(ScanContext {
+            ctx,
+            schema: self.schema,
+            scan_stats: self.scan_stats,
+            keep_filters: true,
+            source: ScanSource::Blocks(scan),
+        })
+    }
+
+    /// A table downloads its files, lets the metrics index select their rows, and registers them.
+    async fn table(
+        mut self,
+        matchers: &Matchers,
+        source: ScanSource,
+    ) -> Result<Option<ScanContext>> {
+        let trace_id = self.trace_id;
+        let cache_start = std::time::Instant::now();
+        let (cache_type, hits, misses) = cache_files(
+            trace_id,
+            &cache_inputs(&self.files),
+            &mut self.scan_stats,
+            "parquet",
+        )
+        .await;
+        let target_partitions = self.report_cache(cache_type, hits, misses, cache_start);
+        cache_metrics_index_files(trace_id, self.org_id, &self.files).await;
+
+        // keep_filters=false only when the pruner proved its selections exact
+        let keep_filters = match metrics_index::search(
+            trace_id,
+            &mut self.files,
+            self.schema.as_ref(),
+            matchers,
+            target_partitions,
+        )
+        .await
+        {
+            Ok(Some((took_ms, exact))) => {
+                self.scan_stats.idx_took = took_ms as i64;
+                !exact
+            }
+            Ok(None) => true,
+            Err(error) => {
+                log::warn!(
+                    "[trace_id {trace_id}] promql->search->storage: metrics-index row selection failed; continuing the source scan: {error}"
+                );
+                true
+            }
+        };
+
+        // every indexed file was pruned away: nothing in storage can match the selector
+        if self.files.is_empty() {
+            log::info!(
+                "[trace_id {trace_id}] promql->search->storage: metrics-index pruning left no files, index took: {} ms",
+                self.scan_stats.idx_took
+            );
+            return Ok(None);
+        }
+        log::info!(
+            "[trace_id {trace_id}] promql->search->storage: after metrics-index path selection, files {}, scan_size {}, compressed_size {}, index took: {} ms",
+            self.scan_stats.files,
+            self.scan_stats.original_size,
+            self.scan_stats.compressed_size,
+            self.scan_stats.idx_took
+        );
+
+        let session = self.session(target_partitions);
+        let ctx = metrics_session_context(&session, self.sort_order).await?;
+        // declaring the order on a materialized table would change its file grouping
+        let table_order = match source {
+            ScanSource::HashSorted => self.sort_order,
+            _ => FileSortOrder::None,
+        };
+        register_metrics_table(
+            &ctx,
+            &session,
+            self.schema.clone(),
+            self.stream_name,
+            self.files,
+            table_order,
+        )
+        .await?;
+        Ok(Some(ScanContext {
+            ctx,
+            schema: self.schema,
+            scan_stats: self.scan_stats,
+            keep_filters,
+            source,
+        }))
+    }
+
+    /// Reports the parquet cache and sizes the session's partitions by how much of it is cached.
+    fn report_cache(
+        &mut self,
+        cache_type: file_data::CacheType,
+        cache_hits: u64,
+        cache_misses: u64,
+        cache_start: std::time::Instant,
+    ) -> usize {
+        let (trace_id, org_id) = (self.trace_id, self.org_id);
+        let stream_type = StreamType::Metrics.to_string();
+        metrics::QUERY_DISK_CACHE_HIT_COUNT
+            .with_label_values(&[org_id, &stream_type, "parquet"])
+            .inc_by(cache_hits);
+        metrics::QUERY_DISK_CACHE_MISS_COUNT
+            .with_label_values(&[org_id, &stream_type, "parquet"])
+            .inc_by(cache_misses);
+
+        let scan_stats = &mut self.scan_stats;
+        scan_stats.querier_files = scan_stats.files;
+        let cached_ratio = (scan_stats.querier_memory_cached_files
+            + scan_stats.querier_disk_cached_files) as f64
+            / scan_stats.querier_files as f64;
+        let download_msg = if cache_type == file_data::CacheType::None {
+            "".to_string()
+        } else {
+            format!(" downloading others into {cache_type:?} in background,")
+        };
+        log::info!(
+            "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
+            scan_stats.querier_files,
+            scan_stats.querier_memory_cached_files,
+            scan_stats.querier_disk_cached_files,
+            (cached_ratio * 100.0) as usize,
+            cache_start.elapsed().as_millis()
+        );
+        if scan_stats.querier_files > 0 {
+            QUERY_PARQUET_CACHE_RATIO_NODE
+                .with_label_values(&[org_id, &stream_type])
+                .observe(cached_ratio);
+        }
+
+        let cfg = get_config();
+        let target_partitions =
+            calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
+        log::info!(
+            "[trace_id {trace_id}] promql->search->storage: session target_partitions: {target_partitions}"
+        );
+        target_partitions
+    }
+
+    fn session(&self, target_partitions: usize) -> SearchSession {
+        SearchSession {
+            id: self.trace_id.to_string(),
+            storage_type: StorageType::Memory,
+            work_group: None,
+            target_partitions,
+        }
+    }
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
@@ -62,8 +240,6 @@ pub(crate) async fn create_context(
     filters: &mut [(String, Vec<String>)],
     preference: SourcePreference<'_>,
 ) -> Result<Option<ScanContext>> {
-    let enter_span = tracing::span::Span::current();
-
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
         log::error!("stream [{stream_name}] is being deleted");
@@ -104,7 +280,7 @@ pub(crate) async fn create_context(
 
     // get file list
     let file_list_start = std::time::Instant::now();
-    let mut files = get_file_list(
+    let files = get_file_list(
         trace_id,
         org_id,
         stream_name,
@@ -118,7 +294,7 @@ pub(crate) async fn create_context(
     }
 
     // calculate scan size
-    let mut scan_stats = match infra::file_list::calculate_files_size(&files).await {
+    let scan_stats = match infra::file_list::calculate_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {
             log::error!("[trace_id {trace_id}] calculate files size error: {err}");
@@ -151,150 +327,19 @@ pub(crate) async fn create_context(
         sort_order,
         cfg.compact.metrics_index_enabled,
     );
-    let blocks = matches!(source, ScanSource::Blocks(_));
-
-    // load files to local cache
-    let cache_start = std::time::Instant::now();
-    let cache_inputs = files
-        .iter()
-        .map(|f| {
-            (
-                f.id,
-                &f.account,
-                &f.key,
-                f.meta.compressed_size,
-                f.meta.max_ts,
-            )
-        })
-        .collect_vec();
-    let (cache_type, cache_hits, cache_misses) = if blocks {
-        let (_, hits, misses) = inspect_file_cache(trace_id, &cache_inputs, &mut scan_stats)
-            .instrument(enter_span.clone())
-            .await;
-        (file_data::CacheType::None, hits, misses)
-    } else {
-        cache_files(trace_id, &cache_inputs, &mut scan_stats, "parquet")
-            .instrument(enter_span.clone())
-            .await
-    };
-
-    // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
-        .inc_by(cache_hits);
-    metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
-        .inc_by(cache_misses);
-
-    scan_stats.querier_files = scan_stats.files;
-    let cached_ratio = (scan_stats.querier_memory_cached_files
-        + scan_stats.querier_disk_cached_files) as f64
-        / scan_stats.querier_files as f64;
-
-    let download_msg = if cache_type == file_data::CacheType::None {
-        "".to_string()
-    } else {
-        format!(" downloading others into {cache_type:?} in background,")
-    };
-    log::info!(
-        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
-        scan_stats.querier_files,
-        scan_stats.querier_memory_cached_files,
-        scan_stats.querier_disk_cached_files,
-        (cached_ratio * 100.0) as usize,
-        cache_start.elapsed().as_millis()
-    );
-
-    if scan_stats.querier_files > 0 {
-        QUERY_PARQUET_CACHE_RATIO_NODE
-            .with_label_values(&[org_id, &StreamType::Metrics.to_string()])
-            .observe(cached_ratio);
-    }
-
-    let target_partitions =
-        calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
-
-    log::info!(
-        "[trace_id {trace_id}] promql->search->storage: session target_partitions: {target_partitions}"
-    );
-
-    let schema = Arc::new(schema.with_metadata(Default::default()));
-
-    if blocks {
-        log::info!(
-            "[trace_id {trace_id}] promql->search->storage: MIDX block candidate across {} files; row selection deferred to block preflight",
-            files.len()
-        );
-    }
-    cache_metrics_index_files(trace_id, org_id, &files).await;
-
-    let mut keep_filters = true;
-    if !blocks {
-        match metrics_index::search(
-            trace_id,
-            &mut files,
-            schema.as_ref(),
-            &matchers,
-            target_partitions,
-        )
-        .await
-        {
-            Ok(Some((took_ms, exact))) => {
-                scan_stats.idx_took = took_ms as i64;
-                keep_filters = !exact;
-            }
-            Ok(None) => {}
-            Err(error) => {
-                log::warn!(
-                    "[trace_id {trace_id}] promql->search->storage: metrics-index row selection failed; continuing the source scan: {error}"
-                );
-            }
-        };
-    }
-
-    // every indexed file was pruned away: nothing in storage can match the selector
-    if files.is_empty() {
-        log::info!(
-            "[trace_id {trace_id}] promql->search->storage: metrics-index pruning left no files, index took: {} ms",
-            scan_stats.idx_took
-        );
-        return Ok(None);
-    }
-
-    log::info!(
-        "[trace_id {trace_id}] promql->search->storage: after metrics-index path selection, files {}, scan_size {}, compressed_size {}, index took: {} ms",
-        scan_stats.files,
-        scan_stats.original_size,
-        scan_stats.compressed_size,
-        scan_stats.idx_took
-    );
-
-    let session = SearchSession {
-        id: trace_id.to_string(),
-        storage_type: StorageType::Memory,
-        work_group: None,
-        target_partitions,
-    };
-
-    let ctx = metrics_session_context(&session, sort_order).await?;
-    // declaring the order on a materialized table would change its file grouping
-    let table_order = match &source {
-        ScanSource::Blocks(_) => None,
-        ScanSource::HashSorted => Some(sort_order),
-        ScanSource::Table => Some(FileSortOrder::None),
-    };
-    if let Some(order) = table_order {
-        register_metrics_table(&ctx, &session, schema.clone(), stream_name, files, order).await?;
-    }
-
-    // keep_filters=false only when the pruner proved its selections exact
-    Ok(Some(ScanContext {
-        ctx,
-        schema,
+    let scan = StorageScan {
+        trace_id,
+        org_id,
+        stream_name,
+        schema: Arc::new(schema.with_metadata(Default::default())),
+        files,
         scan_stats,
-        keep_filters,
-        source,
-    }))
+        sort_order,
+    };
+    match source {
+        ScanSource::Blocks(blocks) => scan.blocks(blocks).await.map(Some),
+        source => scan.table(&matchers, source).await,
+    }
 }
 
 /// Picks the source the evaluator reads, before any file is cached or index-selected.
@@ -320,6 +365,21 @@ fn scan_source(
     } else {
         ScanSource::HashSorted
     }
+}
+
+fn cache_inputs(files: &[FileKey]) -> Vec<(i64, &String, &String, i64, i64)> {
+    files
+        .iter()
+        .map(|f| {
+            (
+                f.id,
+                &f.account,
+                &f.key,
+                f.meta.compressed_size,
+                f.meta.max_ts,
+            )
+        })
+        .collect_vec()
 }
 
 fn block_parent_eligible(file: &FileKey) -> bool {
