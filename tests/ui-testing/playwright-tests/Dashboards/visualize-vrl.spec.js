@@ -609,8 +609,8 @@ test.describe("VRL visualization support testcases", () => {
     const dynamicColumnsToggle = pm.dashboardPanelConfigs.dynamicColumnBtn;
     await dynamicColumnsToggle.waitFor({ state: "visible", timeout: 10000 });
 
-    const isChecked = await dynamicColumnsToggle.getAttribute("aria-checked");
-    expect(isChecked).toBe("true");
+    // Index.vue enables dynamic columns only after updateVisualization's field extraction resolves, which can trail the table render.
+    await expect(dynamicColumnsToggle).toHaveAttribute("aria-checked", "true", { timeout: 15000 });
 
     // Verify table has data rows
     const tableRows = pm.logsVisualise.getTableRows();

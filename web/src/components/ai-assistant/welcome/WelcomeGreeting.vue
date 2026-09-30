@@ -35,13 +35,13 @@ const logoSrc = computed(() =>
         <img
           :src="logoSrc"
           :alt="t('aiAssistant.welcome.taglineHighlight')"
-          class="welcome-hero__logo relative z-1 h-14 w-14"
+          class="welcome-hero__logo relative z-1 h-14 w-14 max-md:h-10 max-md:w-10"
         />
       </div>
 
       <div class="welcome-hero__heading-block flex items-center">
         <div
-          class="welcome-hero__title text-typography-body m-0 flex items-center gap-2 text-3xl leading-[1.15] font-bold tracking-[-0.01em]"
+          class="welcome-hero__title text-typography-body m-0 flex items-center gap-2 text-3xl leading-[1.15] font-bold tracking-[-0.01em] max-md:text-2xl"
         >
           {{ greeting }}
           <span
@@ -54,7 +54,7 @@ const logoSrc = computed(() =>
     </div>
 
     <div
-      class="welcome-hero__tagline text-typography-meta m-0 mt-1 max-w-[38rem] text-sm leading-[1.6]"
+      class="welcome-hero__tagline text-typography-meta m-0 mt-1 max-w-[38rem] text-sm leading-[1.6] max-md:mt-0 max-md:text-xs"
     >
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span
@@ -79,7 +79,7 @@ const logoSrc = computed(() =>
 
     <div
       v-if="email"
-      class="welcome-hero__meta text-2xs bg-border-default/30 mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full px-3 py-1.5"
+      class="welcome-hero__meta text-2xs bg-border-default/30 mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full px-3 py-1.5 max-md:hidden"
     >
       <span class="welcome-hero__meta-item inline-flex items-center gap-1">
         <span class="welcome-hero__meta-label text-typography-meta">{{

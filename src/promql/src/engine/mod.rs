@@ -327,14 +327,8 @@ pub(crate) mod tests {
             _machers: promql_parser::label::Matchers,
             _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> datafusion::error::Result<
-            Vec<(
-                datafusion::prelude::SessionContext,
-                std::sync::Arc<datafusion::arrow::datatypes::Schema>,
-                config::meta::search::ScanStats,
-                bool,
-            )>,
-        > {
+            _streaming: bool,
+        ) -> datafusion::error::Result<Vec<crate::ScanContext>> {
             Ok(vec![])
         }
     }
@@ -354,14 +348,8 @@ pub(crate) mod tests {
             matchers: promql_parser::label::Matchers,
             _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> datafusion::error::Result<
-            Vec<(
-                datafusion::prelude::SessionContext,
-                std::sync::Arc<datafusion::arrow::datatypes::Schema>,
-                config::meta::search::ScanStats,
-                bool,
-            )>,
-        > {
+            _streaming: bool,
+        ) -> datafusion::error::Result<Vec<crate::ScanContext>> {
             *self.captured.lock().unwrap() = Some(matchers);
             Ok(vec![])
         }

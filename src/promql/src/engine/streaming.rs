@@ -16,7 +16,7 @@
 use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
-use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use datafusion::error::Result;
 use futures::future::pending;
 use infra::errors::ErrorCodes;
 use promql_parser::{
@@ -29,6 +29,7 @@ use super::{
     selector::{SelectorContexts, SelectorOutput, named_selector, plain_selector},
 };
 use crate::{
+    ScanContext,
     aggregations::AggOp,
     functions, micros,
     series_stream::{
@@ -202,15 +203,19 @@ impl Engine {
         op: AggOp,
         range: Duration,
     ) -> Result<Option<Value>> {
-        self.stream_scan_guarded(scan, |ctx, schema| async move {
-            let Some(label_cols) =
-                LabelColumns::for_op(&op, modifier, schema, &scan.label_selector, func.name())
-            else {
+        self.stream_scan_guarded(scan, |ctx| async move {
+            let Some(label_cols) = LabelColumns::for_op(
+                &op,
+                modifier,
+                &ctx.schema,
+                &scan.label_selector,
+                func.name(),
+            ) else {
                 return Ok(None);
             };
             let Some(sources) = execute_partitioned(
-                ctx,
-                schema,
+                &ctx.ctx,
+                &ctx.source,
                 &scan.streaming_selector(),
                 label_cols,
                 micros(range),
@@ -234,16 +239,16 @@ impl Engine {
         func: Arc<dyn functions::RangeFunc>,
         range: Duration,
     ) -> Result<Option<(Vec<RangeValue>, usize)>> {
-        self.stream_scan_guarded(scan, |ctx, schema| async move {
+        self.stream_scan_guarded(scan, |ctx| async move {
             let label_cols = if self.skip_labels {
                 vec![]
             } else {
-                series_label_columns(schema, &scan.label_selector, func.name())
+                series_label_columns(&ctx.schema, &scan.label_selector, func.name())
             };
             let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
             match execute_partitioned(
-                ctx,
-                schema,
+                &ctx.ctx,
+                &ctx.source,
                 &scan.streaming_selector(),
                 LabelColumns::grouped(label_cols),
                 micros(range),
@@ -262,13 +267,13 @@ impl Engine {
     async fn stream_scan_guarded<'s, T, Fut>(
         &'s self,
         scan: &'s SelectorScan,
-        run: impl FnOnce(&'s SessionContext, &'s Schema) -> Fut,
+        run: impl FnOnce(&'s ScanContext) -> Fut,
     ) -> Result<Option<T>>
     where
         Fut: Future<Output = Result<Option<T>>>,
     {
         // a second context would split series and evaluate windows on partial data
-        let [(ctx, schema, scan_stats, _)] = scan.ctxs.as_slice() else {
+        let [ctx] = scan.ctxs.as_slice() else {
             return Ok(None);
         };
         let trace_id = &self.ctx.query_ctx.trace_id;
@@ -277,7 +282,7 @@ impl Engine {
             .table_provider
             .register_cancellation(trace_id)
             .await?;
-        let run = run(ctx, schema);
+        let run = run(ctx);
         tokio::pin!(run);
         // a cancel or an expired budget wins over a fold that happens to be ready and aborts it
         let result = tokio::select! {
@@ -308,7 +313,7 @@ impl Engine {
         let Some(result) = result? else {
             return Ok(None);
         };
-        self.ctx.scan_stats.write().await.add(scan_stats);
+        self.ctx.scan_stats.write().await.add(&ctx.scan_stats);
         Ok(Some(result))
     }
 
@@ -340,7 +345,12 @@ impl Engine {
             .create_selector_contexts(&selector, (start, end), &label_selector, prefer_blocks)
             .await?;
         let scan_matchers = match ctxs.as_slice() {
-            [(_, _, _, false)] => Matchers::empty(),
+            [
+                ScanContext {
+                    keep_filters: false,
+                    ..
+                },
+            ] => Matchers::empty(),
             _ => selector.matchers.clone(),
         };
         Ok(Some(SelectorScan {
@@ -360,7 +370,7 @@ mod tests {
     use config::{
         TIMESTAMP_COL_NAME,
         meta::{
-            promql::{HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL, VALUE_LABEL},
+            promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
             search::ScanStats,
         },
     };
@@ -376,16 +386,17 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::*;
-    use crate::{engine::tests::*, exec::PromqlContext, scalar_param::ScalarParam};
+    use crate::{ScanSource, engine::tests::*, exec::PromqlContext, scalar_param::ScalarParam};
 
     const SECOND: i64 = 1_000_000;
     const BASE: i64 = 1_000 * SECOND;
 
-    /// Serves one hash-sorted context and can hand out an already-fired cancel signal.
+    /// Serves one context, hash-sorted when `streams`, and can hand out a fired cancel signal.
     struct StreamingProvider {
         ctx: SessionContext,
+        streams: bool,
         calls: Arc<AtomicUsize>,
-        prefer_calls: Arc<AtomicUsize>,
+        streaming_calls: Arc<AtomicUsize>,
         canceled: bool,
         // a dropped sender reads as a cancel, so a live registration keeps it
         cancel: std::sync::Mutex<Option<oneshot::Sender<()>>>,
@@ -401,35 +412,23 @@ mod tests {
             _matchers: Matchers,
             _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            streaming: bool,
+        ) -> Result<Vec<ScanContext>> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            Ok(vec![(
-                self.ctx.clone(),
-                metrics_schema(),
-                ScanStats::default(),
-                true,
-            )])
-        }
-
-        async fn create_context_prefer_blocks(
-            &self,
-            org_id: &str,
-            stream_name: &str,
-            time_range: (i64, i64),
-            matchers: Matchers,
-            label_selector: HashSet<String>,
-            filters: &mut [(String, Vec<String>)],
-        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
-            self.prefer_calls.fetch_add(1, Ordering::SeqCst);
-            self.create_context(
-                org_id,
-                stream_name,
-                time_range,
-                matchers,
-                label_selector,
-                filters,
-            )
-            .await
+            if streaming {
+                self.streaming_calls.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(vec![ScanContext {
+                ctx: self.ctx.clone(),
+                schema: metrics_schema(),
+                scan_stats: ScanStats::default(),
+                keep_filters: true,
+                source: if self.streams && streaming {
+                    ScanSource::HashSorted
+                } else {
+                    ScanSource::Table
+                },
+            }])
         }
 
         async fn register_cancellation(
@@ -456,7 +455,7 @@ mod tests {
         ]))
     }
 
-    /// Two counters sampled every 20 s; the hash-sorted table exists only when `streams`.
+    /// Two counters sampled every 20 s; the table declares its hash order only when `streams`.
     fn provider(streams: bool, canceled: bool) -> StreamingProvider {
         provider_sampled_at(streams, canceled, 10, |step| BASE + step * 20 * SECOND)
     }
@@ -489,23 +488,22 @@ mod tests {
             ],
         )
         .unwrap();
-        let table = || MemTable::try_new(metrics_schema(), vec![vec![batch.clone()]]).unwrap();
-        let mut config = SessionConfig::new().with_target_partitions(3);
-        config.options_mut().optimizer.prefer_existing_sort = true;
-        let ctx = SessionContext::new_with_config(config);
-        ctx.register_table("m", Arc::new(table())).unwrap();
+        let mut table = MemTable::try_new(metrics_schema(), vec![vec![batch]]).unwrap();
         if streams {
-            let sorted = table().with_sort_order(vec![vec![
+            table = table.with_sort_order(vec![vec![
                 col(HASH_LABEL).sort(true, false),
                 col(TIMESTAMP_COL_NAME).sort(true, false),
             ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(sorted))
-                .unwrap();
         }
+        let mut config = SessionConfig::new().with_target_partitions(3);
+        config.options_mut().optimizer.prefer_existing_sort = true;
+        let ctx = SessionContext::new_with_config(config);
+        ctx.register_table("m", Arc::new(table)).unwrap();
         StreamingProvider {
             ctx,
+            streams,
             calls: Default::default(),
-            prefer_calls: Default::default(),
+            streaming_calls: Default::default(),
             canceled,
             cancel: Default::default(),
         }
@@ -659,14 +657,14 @@ mod tests {
             panic!("expected vector selector");
         };
         let provider = provider(true, false);
-        let prefer_calls = Arc::clone(&provider.prefer_calls);
+        let streaming_calls = Arc::clone(&provider.streaming_calls);
         let mut engine = engine_at(provider, 30, BASE + 60 * SECOND, 30 * SECOND, None);
         engine
             .selector_scan(&selector, Duration::from_secs(5), "VectorSelector")
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(prefer_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(streaming_calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

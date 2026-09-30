@@ -948,7 +948,7 @@ mod tests {
     use async_trait::async_trait;
     use config::{
         meta::{
-            promql::{HASH_SORTED_TABLE_SUFFIX, value::Label},
+            promql::value::Label,
             stream::{FileMeta, FileSelection},
         },
         metrics::promql::IndexBlocksCacheMetrics,
@@ -974,9 +974,12 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::*;
-    use crate::series_stream::{
-        SeriesSource,
-        plan::{StreamingSelector, execute_partitioned},
+    use crate::{
+        ScanSource,
+        series_stream::{
+            SeriesSource,
+            plan::{StreamingSelector, execute_partitioned},
+        },
     };
 
     type Row = (u64, i64, f64, Option<&'static str>);
@@ -1165,7 +1168,6 @@ mod tests {
         }
         fn scan(&self, files: impl IntoIterator<Item = FileKey>) -> MetricsBlockScan {
             MetricsBlockScan {
-                table_name: "m".into(),
                 files: files
                     .into_iter()
                     .map(|mut file| {
@@ -1514,11 +1516,8 @@ mod tests {
     async fn sparse_evaluation_uses_block_source() {
         let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-        let ctx = SessionContext::new_with_config(
-            SessionConfig::new()
-                .with_target_partitions(2)
-                .with_extension(Arc::new(fixture.scan([data.0]))),
-        );
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
+        let source = ScanSource::Blocks(Arc::new(fixture.scan([data.0])));
         let matchers = Matchers::empty();
         let selector = StreamingSelector {
             table_name: "m",
@@ -1528,7 +1527,7 @@ mod tests {
         let eval = EvalContext::new(130, 230, 100, "sparse-block".into());
         let sources = execute_partitioned(
             &ctx,
-            schema().as_ref(),
+            &source,
             &selector,
             LabelColumns::grouped(vec!["group".into()]),
             20,
@@ -1685,10 +1684,7 @@ mod tests {
         )
         .await;
         file.account = format!("{id}:default");
-        let scan = MetricsBlockScan {
-            table_name: "m".into(),
-            files: vec![file],
-        };
+        let scan = MetricsBlockScan { files: vec![file] };
         let prepared = prepare(
             &scan,
             &Matchers::empty(),
@@ -1977,9 +1973,11 @@ mod tests {
                 .optimizer
                 .enable_round_robin_repartition = false;
             config.options_mut().optimizer.prefer_existing_sort = true;
-            if blocks {
-                config.set_extension(Arc::clone(&scan));
-            }
+            let source = if blocks {
+                ScanSource::Blocks(Arc::clone(&scan))
+            } else {
+                ScanSource::HashSorted
+            };
             let ctx = SessionContext::new_with_config(config);
             let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
                 .unwrap()
@@ -1987,8 +1985,7 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
+            ctx.register_table("m", Arc::new(table)).unwrap();
             let matchers = Matchers::empty();
             let selector = StreamingSelector {
                 table_name: "m",
@@ -1997,7 +1994,7 @@ mod tests {
             };
             let sources = execute_partitioned(
                 &ctx,
-                schema().as_ref(),
+                &source,
                 &selector,
                 LabelColumns::grouped(vec![]),
                 20,
@@ -2065,9 +2062,11 @@ mod tests {
                 .optimizer
                 .enable_round_robin_repartition = false;
             config.options_mut().optimizer.prefer_existing_sort = true;
-            if blocks {
-                config.set_extension(Arc::clone(&scan));
-            }
+            let source = if blocks {
+                ScanSource::Blocks(Arc::clone(&scan))
+            } else {
+                ScanSource::HashSorted
+            };
             let ctx = SessionContext::new_with_config(config);
             let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
                 .unwrap()
@@ -2075,9 +2074,8 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
-            contexts.push(ctx);
+            ctx.register_table("m", Arc::new(table)).unwrap();
+            contexts.push((ctx, source));
         }
         for name in [
             "avg_over_time",
@@ -2098,7 +2096,7 @@ mod tests {
             "sum_over_time",
         ] {
             let mut outputs = Vec::new();
-            for ctx in &contexts {
+            for (ctx, source) in &contexts {
                 let matchers = Matchers::empty();
                 let selector = StreamingSelector {
                     table_name: "m",
@@ -2107,7 +2105,7 @@ mod tests {
                 };
                 let sources = execute_partitioned(
                     ctx,
-                    schema().as_ref(),
+                    source,
                     &selector,
                     LabelColumns::grouped(vec!["group".into()]),
                     20,
@@ -2225,12 +2223,8 @@ mod tests {
             (1, 30, 4.0, Some("x")),
         ]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-        let scan = Arc::new(fixture.scan([data.0]));
-        let ctx = SessionContext::new_with_config(
-            SessionConfig::new()
-                .with_target_partitions(28)
-                .with_extension(scan),
-        );
+        let source = ScanSource::Blocks(Arc::new(fixture.scan([data.0])));
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(28));
         let eval = EvalContext::new(120, 130, 5, "duplicate-range-functions".into());
         for name in ["count_over_time", "irate", "rate", "resets"] {
             let matchers = Matchers::empty();
@@ -2241,7 +2235,7 @@ mod tests {
             };
             let sources = execute_partitioned(
                 &ctx,
-                schema().as_ref(),
+                &source,
                 &selector,
                 LabelColumns::grouped(vec!["group".into()]),
                 20,
@@ -2271,20 +2265,15 @@ mod tests {
         let valid = file(&rows);
         let missing = file(&[(2, 30, 3.0, Some("y"))]);
         let fixture = Fixture::new(std::slice::from_ref(&valid), false).await;
-        let scan = fixture.scan([valid.0, missing.0]);
-        let ctx = SessionContext::new_with_config(
-            SessionConfig::new()
-                .with_target_partitions(2)
-                .with_extension(Arc::new(scan)),
-        );
+        let source = ScanSource::Blocks(Arc::new(fixture.scan([valid.0, missing.0])));
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
         let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
             .unwrap()
             .with_sort_order(vec![vec![
                 col("__hash__").sort(true, false),
                 col("_timestamp").sort(true, false),
             ]]);
-        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-            .unwrap();
+        ctx.register_table("m", Arc::new(table)).unwrap();
         let matchers = Matchers::empty();
         let selector = StreamingSelector {
             table_name: "m",
@@ -2293,7 +2282,7 @@ mod tests {
         };
         let error = execute_partitioned(
             &ctx,
-            schema().as_ref(),
+            &source,
             &selector,
             LabelColumns::grouped(vec!["group".into()]),
             20,
@@ -2338,19 +2327,20 @@ mod tests {
                     source.1 = legacy.clone();
                 }
                 let fixture = Fixture::new(&files, false).await;
-                let mut config = SessionConfig::new().with_target_partitions(2);
-                if enabled {
-                    config.set_extension(Arc::new(fixture.scan(files.iter().map(|v| v.0.clone()))));
-                }
-                let ctx = SessionContext::new_with_config(config);
+                let source = if enabled {
+                    ScanSource::Blocks(Arc::new(fixture.scan(files.iter().map(|v| v.0.clone()))))
+                } else {
+                    ScanSource::HashSorted
+                };
+                let ctx =
+                    SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
                 let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
                     .unwrap()
                     .with_sort_order(vec![vec![
                         col("__hash__").sort(true, false),
                         col("_timestamp").sort(true, false),
                     ]]);
-                ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                    .unwrap();
+                ctx.register_table("m", Arc::new(table)).unwrap();
                 let matchers = Matchers::empty();
                 let selector = StreamingSelector {
                     table_name: "m",
@@ -2359,7 +2349,7 @@ mod tests {
                 };
                 let result = execute_partitioned(
                     &ctx,
-                    schema().as_ref(),
+                    &source,
                     &selector,
                     LabelColumns::grouped(vec!["group".into()]),
                     20,

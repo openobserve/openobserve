@@ -37,6 +37,8 @@ const props = defineProps<{
   /** Override the target field label/placeholder (protocol checks take a host, not a URL). */
   targetLabel?: I18nText;
   targetPlaceholder?: I18nText;
+  /** Under the URL field; the host says whether the run opens the Starting URL at all. */
+  targetHint?: I18nText;
   /** Rows offered on `{{` in the target field; absent keeps it a plain input. */
   variableSuggestions?: VariableSuggestion[];
 }>();
@@ -159,6 +161,7 @@ function handleTagKeydown(event: KeyboardEvent) {
         :error="!!props.validationErrors?.url"
         :error-message="raw(props.validationErrors?.url)"
         :placeholder="targetPlaceholder ?? t('synthetics.checkDetails.startingUrlPlaceholder')"
+        :help-text="targetHint"
         :suggestions="variableSuggestions"
         data-test="synthetics-check-details-url-input"
       >

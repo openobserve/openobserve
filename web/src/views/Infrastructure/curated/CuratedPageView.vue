@@ -530,7 +530,7 @@ watch(
         <!-- The SAME indicator the dashboard panel bar carries — one staleness vocabulary app-wide. -->
         <span
           v-if="checkedAtMs !== null"
-          class="text-text-secondary flex items-center gap-1"
+          class="text-text-secondary flex items-center gap-1 max-md:hidden"
           data-test="curated-last-refreshed"
         >
           <OIcon name="schedule" size="xs" />
@@ -547,14 +547,16 @@ watch(
             </template>
           </OTooltip>
         </span>
+        <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
         <OButton
           variant="outline"
           size="sm-action"
           icon-left="refresh"
+          class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
           data-test="curated-refresh"
           @click="runRefresh(true)"
         >
-          {{ t("infra.curated.refresh") }}
+          <span class="max-md:sr-only">{{ t("infra.curated.refresh") }}</span>
         </OButton>
       </div>
     </template>

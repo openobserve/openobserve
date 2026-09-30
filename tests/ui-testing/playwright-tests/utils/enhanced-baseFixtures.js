@@ -141,7 +141,9 @@ async function verifyAuthentication(page) {
     // Home tile's `menu-link-/-item` no longer renders on the current rail
     // (only Slack/Help still use that pattern), so keying auth off it made
     // every suite fail setup even when login had succeeded.
-    await page.waitHelpers.waitForElementVisible('[data-test="navbar-main-nav"]', {
+    // Pages opened via context.newPage() (e.g. afterAll cleanup) never get the fixture-attached helpers.
+    const waitHelpers = page.waitHelpers ?? waitUtils.create(page);
+    await waitHelpers.waitForElementVisible('[data-test="navbar-main-nav"]', {
       timeout: 15000,
       description: 'main nav rail (auth verification)'
     });

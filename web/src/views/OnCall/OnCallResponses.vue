@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Whether the reader is themselves on call, beside the buttons rather
            than in the body: it qualifies the whole screen, not one section. -->
       <OnCallShiftBanner
-        v-if="myShift"
+        v-if="myShift && !isMobile"
         :user-email="viewerEmail"
         :rotation="myShift.rotation"
         :team-name="myShift.teamName"
@@ -71,6 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `compact` is the whole layout decision. With no pages the checklist is
          the screen and everything below it is hidden; with pages it is one bar
          naming the next undone step, over a list that stays fully usable. -->
+    <!-- A phone header has no room for the banner, so it leads the body instead. -->
+    <OnCallShiftBanner
+      v-if="myShift && isMobile"
+      class="mx-page-edge mt-2 shrink-0"
+      :user-email="viewerEmail"
+      :rotation="myShift.rotation"
+      :team-name="myShift.teamName"
+      :ends-at="myShift.endsAt"
+      :other-teams="myShift.otherTeams"
+    />
+
     <OnCallSetupChecklist
       v-if="showChecklist && !unavailable"
       :has-team="setup.hasTeam"
@@ -125,13 +136,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
       <template #toolbar>
-        <div class="flex w-full flex-wrap items-center gap-2">
+        <div class="flex w-full flex-wrap items-center gap-2 max-md:contents">
           <!-- One tab, one section — spread out rather than tucked behind a
                filter icon, the way Alerts' type tabs are: what the list is
                currently narrowed to should be visible at a glance, not a
                state hidden inside a dropdown. -->
           <OToggleGroup
             :model-value="activeFilter"
+            mobile-dropdown
             data-test="oncall-responses-filter-tabs"
             @update:model-value="(v) => selectFilterTab(v as 'all' | SectionKey)"
           >
@@ -163,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!teamsAvailable"
             :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
             width="sm"
+            class="max-md:w-36"
             data-test="oncall-responses-team-filter"
             @update:model-value="() => fetchResponses()"
           />
@@ -170,13 +183,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="priorityFilter"
             :options="priorityOptions"
             width="xs"
+            class="max-md:w-28"
             data-test="oncall-responses-priority-filter"
           />
           <!-- `basis-40` so the search keeps a usable width once the row
                wraps, instead of collapsing to its padding. -->
           <OSearchInput
             v-model="search"
-            class="min-w-40 flex-1 basis-40"
+            class="min-w-40 flex-1 basis-40 max-md:min-w-24 max-md:basis-24"
             clearable
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
@@ -200,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="causeOptions"
             :placeholder="t('oncall.causeFilterAny')"
             width="sm"
+            class="max-md:w-36"
             data-test="oncall-responses-cause-filter"
             @update:model-value="onCauseFilter"
           />
@@ -788,6 +803,7 @@ import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -865,6 +881,7 @@ import {
 } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();

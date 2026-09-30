@@ -69,7 +69,7 @@ mod tests {
     use config::{
         TIMESTAMP_COL_NAME,
         meta::promql::{
-            HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, VALUE_LABEL,
+            HASH_LABEL, VALUE_LABEL,
             value::{Label, RangeValue, Sample, TimeWindow, Value},
         },
     };
@@ -92,6 +92,7 @@ mod tests {
         plan::{LabelColumns, StreamingSelector, execute_partitioned},
     };
     use crate::{
+        ScanSource,
         aggregations::AggOp,
         functions::{self, RangeFunc},
         micros,
@@ -205,8 +206,7 @@ mod tests {
         let table = MemTable::try_new(arrow_schema(), sorted_partitions())
             .unwrap()
             .with_sort_order(vec![sort_order]);
-        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-            .unwrap();
+        ctx.register_table("m", Arc::new(table)).unwrap();
     }
 
     /// The same data as a materialized matrix for the reference evaluator.
@@ -246,7 +246,7 @@ mod tests {
         };
         execute_partitioned(
             ctx,
-            &arrow_schema(),
+            &ScanSource::HashSorted,
             &selector,
             label_cols,
             micros(range),
