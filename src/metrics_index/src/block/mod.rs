@@ -62,7 +62,9 @@ pub struct ParentMetadata {
     pub compressed_size: u64,
 }
 
+/// A block's directory entry, made only by a validated directory or the writer.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BlockMeta {
     pub hash: u64,
     pub row_start: u64,
