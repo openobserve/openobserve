@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 
 use super::entity::{org_domain_ownership::*, prelude::OrgDomainOwnership};
-use crate::{db::get_orm_client_rw, table::backfill_jobs::Column::Org};
+use crate::db::get_orm_client_rw;
 
 pub enum OwnershipState {
     Pending = 0,

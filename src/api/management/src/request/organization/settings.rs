@@ -160,7 +160,7 @@ pub async fn create(
     {
         field_found = true;
         for mapping in &mut mappings {
-            use o2_openfga::authorizer::groups::get_all_groups;
+            use o2_openfga::authorizer::roles::get_all_roles;
 
             if openobserve_core::organization::get_org(&mapping.org_id)
                 .await
@@ -179,32 +179,27 @@ pub async fn create(
                 ));
             }
 
-            if !matches!(
-                mapping.base_role.as_str(),
-                "admin" | "editor" | "viewer" | "allowed_user"
-            ) {
-                return MetaHttpResponse::bad_request(format!(
-                    "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
-                    mapping.base_role, mapping.org_id
-                ));
-            }
-            if let Some(group) = mapping.user_group.as_ref() {
-                let all_groups = match get_all_groups(&mapping.org_id, None).await {
+            if let Some(role) = mapping.role_name.as_ref() {
+                use openobserve_api_common::auth::jwt::format_role_name;
+
+                let all_roles = match get_all_roles(&mapping.org_id, None).await {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!(
-                            "error getting all groups for {} when updating domain org mappings : {e}",
+                            "error getting all roles for {} when updating domain org mappings : {e}",
                             mapping.org_id
                         );
                         return MetaHttpResponse::bad_request(format!(
-                            "error getting groups for org {} : {e}",
+                            "error getting role for org {} : {e}",
                             mapping.org_id
                         ));
                     }
                 };
-                if !all_groups.contains(&group) {
+                if !matches!(role.as_str(), "admin" | "editor" | "viewer" | "user")
+                    && !all_roles.contains(&format_role_name(&org_id, role))
+                {
                     return MetaHttpResponse::bad_request(format!(
-                        "custom group {group} not found in org {}",
+                        "custom role {role} not found in org {}",
                         mapping.org_id
                     ));
                 }

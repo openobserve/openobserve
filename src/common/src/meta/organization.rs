@@ -476,8 +476,7 @@ fn default_claim_parser_function() -> String {
 pub struct DomainOrgMapping {
     pub domain: String,
     pub org_id: String,
-    pub base_role: String,
-    pub user_group: Option<String>,
+    pub role_name: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -513,6 +512,10 @@ pub struct OrganizationSettingPayload {
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[serde(default)]
+    pub role_name_claim: Option<String>,
+    #[serde(default)]
+    pub create_missing_role: Option<bool>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -555,6 +558,12 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_org_mappings: Vec<DomainOrgMapping>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub role_name_claim: Option<String>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub create_missing_role: bool,
 }
 
 impl Default for OrganizationSetting {
@@ -590,6 +599,10 @@ impl Default for OrganizationSetting {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
+            #[cfg(feature = "cloud")]
+            role_name_claim: None,
+            #[cfg(feature = "cloud")]
+            create_missing_role: false,
         }
     }
 }
@@ -1460,6 +1473,8 @@ mod tests {
             claim_parser_function: None,
             cross_links: None,
             domain_org_mappings: None,
+            role_name_claim: None,
+            create_missing_role: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1538,6 +1553,10 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            role_name_claim: None,
+            #[cfg(feature = "cloud")]
+            create_missing_role: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1568,6 +1587,10 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            role_name_claim: None,
+            #[cfg(feature = "cloud")]
+            create_missing_role: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

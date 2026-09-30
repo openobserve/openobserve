@@ -486,7 +486,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260922_000002_create_user_password_history_table::Migration),
             Box::new(m20260922_000003_create_user_auth_state_table::Migration),
             Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
-            Box::new(m20260928_000001_create_org_domain_ownership_table::Migration)
+            Box::new(m20260928_000001_create_org_domain_ownership_table::Migration),
         ]
     }
 }

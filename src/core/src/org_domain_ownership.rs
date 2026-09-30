@@ -34,7 +34,7 @@ pub async fn init() {
     }
 }
 
-pub async fn get_cache_org_for_domain(domain: &str) -> Option<String> {
+pub async fn get_cached_org_for_domain(domain: &str) -> Option<String> {
     let lock = CACHE.read().await;
     let org = lock.get(domain);
     org.map(ToOwned::to_owned)
