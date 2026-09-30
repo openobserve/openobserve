@@ -319,14 +319,7 @@ pub(crate) async fn create_context(
     } else {
         FileSortOrder::None
     };
-    let source = scan_source(
-        &schema,
-        &files,
-        &matchers,
-        &preference,
-        sort_order,
-        cfg.compact.metrics_index_enabled,
-    );
+    let source = scan_source(&schema, &files, &matchers, &preference, sort_order);
     let scan = StorageScan {
         trace_id,
         org_id,
@@ -349,13 +342,11 @@ fn scan_source(
     matchers: &Matchers,
     preference: &SourcePreference<'_>,
     sort_order: FileSortOrder,
-    index_enabled: bool,
 ) -> ScanSource {
     if !preference.streaming || !sort_order.is_sorted() || !hash_column_streams(schema) {
         return ScanSource::Table;
     }
-    if index_enabled
-        && files.iter().all(block_parent_eligible)
+    if files.iter().all(block_parent_eligible)
         && block_output_labels_supported(schema, preference.output_labels)
         && block_matchers_supported(schema, matchers)
     {
@@ -552,7 +543,6 @@ mod tests {
         files: &[FileKey],
         streaming: bool,
         sort_order: FileSortOrder,
-        index_enabled: bool,
         hash: DataType,
     ) -> ScanSource {
         let schema = Schema::new(vec![
@@ -564,14 +554,7 @@ mod tests {
             streaming,
             output_labels: &output_labels,
         };
-        scan_source(
-            &schema,
-            files,
-            &Matchers::empty(),
-            &preference,
-            sort_order,
-            index_enabled,
-        )
+        scan_source(&schema, files, &Matchers::empty(), &preference, sort_order)
     }
 
     #[test]
@@ -581,7 +564,6 @@ mod tests {
             &files,
             true,
             FileSortOrder::HashTimestampAsc,
-            true,
             DataType::UInt64,
         ) else {
             panic!("indexed files with sidecars read blocks");
@@ -599,36 +581,17 @@ mod tests {
             ScanSource::HashSorted => "hash_sorted",
             ScanSource::Blocks(_) => "blocks",
         };
+        assert_eq!(is(source(&files, true, sorted, DataType::UInt64)), "blocks");
+        assert_eq!(is(source(&files, false, sorted, DataType::UInt64)), "table");
         assert_eq!(
-            is(source(&files, true, sorted, true, DataType::UInt64)),
-            "blocks"
-        );
-        assert_eq!(
-            is(source(&files, false, sorted, true, DataType::UInt64)),
+            is(source(&files, true, FileSortOrder::None, DataType::UInt64)),
             "table"
         );
-        assert_eq!(
-            is(source(
-                &files,
-                true,
-                FileSortOrder::None,
-                true,
-                DataType::UInt64
-            )),
-            "table"
-        );
-        assert_eq!(
-            is(source(&files, true, sorted, true, DataType::Utf8)),
-            "table"
-        );
-        assert_eq!(
-            is(source(&files, true, sorted, false, DataType::UInt64)),
-            "hash_sorted"
-        );
+        assert_eq!(is(source(&files, true, sorted, DataType::Utf8)), "table");
         let mut missing = files;
         missing[0].meta.mindex_size = 0;
         assert_eq!(
-            is(source(&missing, true, sorted, true, DataType::UInt64)),
+            is(source(&missing, true, sorted, DataType::UInt64)),
             "hash_sorted"
         );
     }
