@@ -18,15 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <Login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
     <div class="relative-position flex px-3 pt-2">
-      <img
-        class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
-        loading="lazy"
-        :src="
-          isDark
-            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-            : getImageURL('images/common/openobserve_latest_light_2.svg')
-        "
-      />
+      <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer nofollow">
+        <img
+          class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
+          loading="lazy"
+          :src="
+            isDark
+              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+              : getImageURL('images/common/openobserve_latest_light_2.svg')
+          "
+        />
+      </a>
     </div>
     <InvitationList
       v-if="showInvitations"
