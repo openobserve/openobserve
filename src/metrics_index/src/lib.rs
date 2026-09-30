@@ -199,7 +199,7 @@ mod tests {
         }
         let schema = Arc::new(Schema::new(fields));
         let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
-        let mut writer = crate::block::BlockWriter::new_pending(
+        let mut writer = crate::block::BlockWriter::new(
             Vec::new(),
             schema.clone(),
             crate::block::MAX_BLOCK_ROWS,

@@ -404,7 +404,7 @@ mod tests {
         let schema = builder.schema().clone();
         let metadata = builder.metadata().as_ref().clone();
         let mut writer =
-            super::BlockWriter::new_pending(Vec::new(), schema.clone(), super::MAX_BLOCK_ROWS)?;
+            super::BlockWriter::new(Vec::new(), schema.clone(), super::MAX_BLOCK_ROWS)?;
         for batch in builder.with_batch_size(super::MAX_BLOCK_ROWS).build()? {
             let batch = batch?;
             let batch = RecordBatch::try_new(schema.clone(), batch.columns().to_vec())?;
@@ -468,14 +468,7 @@ mod tests {
     }
 
     fn test_writer(max_rows: usize) -> BlockWriter<Vec<u8>> {
-        BlockWriter::new(
-            Vec::new(),
-            schema(),
-            vec!["label_a".into(), "label_b".into()],
-            parent(),
-            max_rows,
-        )
-        .unwrap()
+        BlockWriter::new(Vec::new(), schema(), max_rows).unwrap()
     }
 
     fn header_data(blob: &[u8]) -> (super::header::HeaderData, usize) {
@@ -544,7 +537,7 @@ mod tests {
         for range in [0..1, 1..5, 5..7] {
             writer.write(&batch(&rows[range])).unwrap();
         }
-        writer.finish().unwrap()
+        writer.finish_for_vortex(parent(), schema()).unwrap()
     }
 
     fn index(blob: &[u8], labels: &[&str]) -> Result<Index> {
@@ -567,7 +560,7 @@ mod tests {
         assert_eq!(index.label_value(0, "missing").unwrap(), None);
         let mut writer = test_writer(2);
         writer.write(&batch(&rows())).unwrap();
-        assert_eq!(writer.finish().unwrap(), blob);
+        assert_eq!(writer.finish_for_vortex(parent(), schema()).unwrap(), blob);
         assert_eq!(index.label_value(0, "label_a").unwrap(), None);
         assert_eq!(index.label_value(0, "label_b").unwrap(), Some(""));
         assert_eq!(index.label_value(2, "label_a").unwrap(), Some(""));
@@ -695,14 +688,14 @@ mod tests {
         input[1].3 = Some("");
         let mut writer = test_writer(2);
         assert!(writer.write(&batch(&input)).is_err());
-        assert!(writer.finish().is_err());
+        assert!(writer.finish_for_vortex(parent(), schema()).is_err());
         let mut input = rows();
         input[2].1 = 9;
         let mut writer = test_writer(2);
         assert!(writer.write(&batch(&input)).is_err());
         let mut writer = test_writer(2);
         writer.write(&batch(&rows()[..3])).unwrap();
-        assert!(writer.finish().is_err());
+        assert!(writer.finish_for_vortex(parent(), schema()).is_err());
         let other = Arc::new(
             schema()
                 .as_ref()
@@ -747,7 +740,7 @@ mod tests {
             (0..input.num_rows()).map(|i| if i % 2 == 0 { "a" } else { "b" }),
         )));
         let input = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
-        let mut writer = BlockWriter::new_pending(Vec::new(), Arc::clone(&schema), 2).unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), Arc::clone(&schema), 2).unwrap();
         writer.write(&input).unwrap();
         let blob = writer.finish_for_vortex(parent(), schema).unwrap();
         let decoded = index(&blob, &["label_a", "label_b"]).unwrap();
@@ -765,7 +758,7 @@ mod tests {
         let input = RecordBatch::try_new(schema(), columns).unwrap();
         let mut writer = test_writer(2);
         writer.write(&input).unwrap();
-        let blob = writer.finish().unwrap();
+        let blob = writer.finish_for_vortex(parent(), schema()).unwrap();
         let metadata_bytes = blob.len() - trailer_of(&blob).blocks_end(blob.len() as u64) as usize;
         let index = index(&blob, &["label_b"]).unwrap();
         assert!(metadata_bytes < 100_000);
@@ -806,7 +799,7 @@ mod tests {
         let input = batch(&rows());
         let mut writer = test_writer(1);
         writer.write(&input).unwrap();
-        let blob = writer.finish().unwrap();
+        let blob = writer.finish_for_vortex(parent(), schema()).unwrap();
         let index = index(&blob, &[]).unwrap();
         assert!(index.blocks.iter().all(|block| block.row_count == 1));
         assert_eq!(
@@ -829,7 +822,7 @@ mod tests {
         let input = RecordBatch::try_new(schema(), columns).unwrap();
         let mut writer = test_writer(2);
         writer.write(&input).unwrap();
-        let blob = writer.finish().unwrap();
+        let blob = writer.finish_for_vortex(parent(), schema()).unwrap();
         let decoded = index(&blob, &["label_b"]).unwrap();
         assert_eq!(
             decoded.label_value(0, "label_b").unwrap(),
@@ -847,12 +840,11 @@ mod tests {
         }
         let wide = Arc::new(Schema::new(fields));
         assert_eq!(identity_label_columns(wide.as_ref()).unwrap(), labels);
-        let mut writer =
-            BlockWriter::new(Vec::new(), Arc::clone(&wide), labels, parent(), 2).unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), Arc::clone(&wide), 2).unwrap();
         writer
-            .write(&RecordBatch::try_new(wide, columns).unwrap())
+            .write(&RecordBatch::try_new(Arc::clone(&wide), columns).unwrap())
             .unwrap();
-        let blob = writer.finish().unwrap();
+        let blob = writer.finish_for_vortex(parent(), wide).unwrap();
         let last = format!("additional_{}", WARN_LABEL_COLUMNS - 1);
         let decoded = index(&blob, &[last.as_str()]).unwrap();
         let block = decoded.blocks.len() - 1;
@@ -894,16 +886,11 @@ mod tests {
         let mut identity = parent();
         identity.rows = rows.len() as u64;
         for max_rows in [1, 4, 9] {
-            let mut writer = BlockWriter::new(
-                Vec::new(),
-                schema(),
-                vec!["label_a".into(), "label_b".into()],
-                identity.clone(),
-                max_rows,
-            )
-            .unwrap();
+            let mut writer = BlockWriter::new(Vec::new(), schema(), max_rows).unwrap();
             writer.write(&batch(&rows)).unwrap();
-            let blob = writer.finish().unwrap();
+            let blob = writer
+                .finish_for_vortex(identity.clone(), schema())
+                .unwrap();
             let index = decode_file(&blob, &identity, &[]).unwrap();
             assert_eq!(
                 decoded_rows(&blob, &index),
@@ -940,16 +927,9 @@ mod tests {
             rows: rows.len() as u64,
             compressed_size: 123,
         };
-        let mut writer = BlockWriter::new(
-            Vec::new(),
-            schema(),
-            vec!["label_a".into(), "label_b".into()],
-            parent.clone(),
-            MAX_BLOCK_ROWS,
-        )
-        .unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), schema(), MAX_BLOCK_ROWS).unwrap();
         writer.write(&batch(&rows)).unwrap();
-        let blob = writer.finish().unwrap();
+        let blob = writer.finish_for_vortex(parent.clone(), schema()).unwrap();
         let index = decode_file(&blob, &parent, &[]).unwrap();
         assert_eq!(
             index.blocks.row_counts().collect::<Vec<_>>(),
@@ -1064,7 +1044,7 @@ mod tests {
         assert!(is_supported_schema(&large));
         let input =
             RecordBatch::try_new(Arc::clone(&large), batch(&rows()).columns().to_vec()).unwrap();
-        let mut writer = BlockWriter::new_pending(Vec::new(), Arc::clone(&large), 2).unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), Arc::clone(&large), 2).unwrap();
         writer.write(&input).unwrap();
         let blob = writer.finish_for_vortex(parent(), large).unwrap();
         assert!(trailer_of(&blob).header_len > 2 * 1024 * 1024);
@@ -1128,12 +1108,10 @@ mod tests {
             ..parent()
         };
         let pending = || {
-            let mut writer =
-                BlockWriter::new_pending(Vec::new(), input.schema(), MAX_BLOCK_ROWS).unwrap();
+            let mut writer = BlockWriter::new(Vec::new(), input.schema(), MAX_BLOCK_ROWS).unwrap();
             writer.write(&input).unwrap();
             writer
         };
-        assert!(pending().finish().is_err());
         let mut wrong = parent.clone();
         wrong.rows += 1;
         assert!(
@@ -1286,16 +1264,9 @@ mod tests {
                 fail_after,
                 fail_flush,
             };
-            let mut writer = BlockWriter::new(
-                output,
-                schema(),
-                vec!["label_a".into(), "label_b".into()],
-                parent(),
-                2,
-            )
-            .unwrap();
+            let mut writer = BlockWriter::new(output, schema(), 2).unwrap();
             writer.write(&batch(&rows())).unwrap();
-            let result = writer.finish();
+            let result = writer.finish_for_vortex(parent(), schema());
             let observed = state.lock().unwrap();
             if fail_after == usize::MAX && fail_flush == usize::MAX {
                 assert!(result.is_ok());
@@ -1313,7 +1284,7 @@ mod tests {
     #[test]
     fn vortex_finalizer_preserves_schema_without_row_groups() {
         let input = batch(&rows());
-        let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), input.schema(), 2).unwrap();
         writer.write(&input).unwrap();
         let encoded = writer.finish_for_vortex(parent(), input.schema()).unwrap();
         let decoded = index(&encoded, &["label_a", "label_b"]).unwrap();
@@ -1372,7 +1343,7 @@ mod tests {
     fn vortex_finalizer_rejects_invalid_source_metadata() {
         let input = batch(&rows());
         let pending = || {
-            let mut writer = BlockWriter::new_pending(Vec::new(), input.schema(), 2).unwrap();
+            let mut writer = BlockWriter::new(Vec::new(), input.schema(), 2).unwrap();
             writer.write(&input).unwrap();
             writer
         };

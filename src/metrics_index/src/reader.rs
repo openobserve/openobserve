@@ -477,8 +477,7 @@ mod tests {
             },
             false,
         );
-        let mut writer =
-            crate::block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
+        let mut writer = crate::block::BlockWriter::new(Vec::new(), schema.clone(), 2).unwrap();
         writer.write(&batch).unwrap();
         let bytes = match format {
             config::FileFormat::Parquet => {

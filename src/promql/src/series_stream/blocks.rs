@@ -1261,7 +1261,7 @@ mod tests {
         .unwrap()
     }
     fn file(rows: &[Row]) -> (FileKey, Vec<u8>) {
-        file_batch(batch(rows), vec!["group".into()])
+        file_batch(batch(rows))
     }
 
     #[tokio::test]
@@ -1302,7 +1302,7 @@ mod tests {
         );
     }
 
-    fn file_batch(batch: RecordBatch, label_columns: Vec<String>) -> (FileKey, Vec<u8>) {
+    fn file_batch(batch: RecordBatch) -> (FileKey, Vec<u8>) {
         let records = batch.num_rows();
         let timestamps = batch
             .column_by_name("_timestamp")
@@ -1321,16 +1321,11 @@ mod tests {
             rows: records as u64,
             compressed_size: 123,
         };
-        let mut writer = BlockWriter::new(
-            Vec::new(),
-            batch.schema(),
-            label_columns,
-            parent.metadata(),
-            2,
-        )
-        .unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), batch.schema(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer.finish().unwrap();
+        let bytes = writer
+            .finish_for_vortex(parent.metadata(), batch.schema())
+            .unwrap();
         let mut file = FileKey::new(
             0,
             String::new(),
@@ -1890,10 +1885,7 @@ mod tests {
         fields.push(Arc::new(Field::new("env", DataType::Utf8, true)));
         let mut arrays = source.columns().to_vec();
         arrays.push(Arc::new(StringArray::from(vec!["prod", "prod"])));
-        let new = file_batch(
-            RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap(),
-            vec!["group".into(), "env".into()],
-        );
+        let new = file_batch(RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap());
         let fixture = Fixture::new(&[old.clone(), new.clone()], false).await;
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "env", "prod")]);
         let prepared = prepare(
@@ -2394,7 +2386,7 @@ mod tests {
             original.columns()[..3].to_vec(),
         )
         .unwrap();
-        let absent = file_batch(absent, vec![]);
+        let absent = file_batch(absent);
         let null = file(&[(1, 30, 3.0, None), (1, 40, 4.0, None)]);
         let empty = file(&[(1, 30, 3.0, Some("")), (1, 40, 4.0, Some(""))]);
         let fixture = Fixture::new(&[absent.clone(), null.clone(), empty.clone()], false).await;

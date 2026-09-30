@@ -663,7 +663,7 @@ mod tests {
         let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
         let schema = builder.schema().clone();
         let metadata = builder.metadata().as_ref().clone();
-        let mut writer = metrics_index::block::BlockWriter::new_pending(
+        let mut writer = metrics_index::block::BlockWriter::new(
             Vec::new(),
             schema.clone(),
             metrics_index::block::MAX_BLOCK_ROWS,

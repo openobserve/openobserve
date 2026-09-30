@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, io::Write, sync::Arc};
+use std::{io::Write, sync::Arc};
 
 use anyhow::{Context, Result, anyhow, ensure};
 use arrow::{
@@ -38,8 +38,6 @@ use super::{
 pub struct BlockWriter<W: Write> {
     output: W,
     schema: SchemaRef,
-    parent: Option<ParentMetadata>,
-    row_group_size: Option<u32>,
     label_indices: Vec<usize>,
     hash_index: usize,
     time_index: usize,
@@ -60,20 +58,44 @@ pub struct BlockWriter<W: Write> {
 }
 
 impl<W: Write> BlockWriter<W> {
-    pub fn new(
-        output: W,
-        schema: SchemaRef,
-        label_columns: Vec<String>,
-        parent: ParentMetadata,
-        max_block_rows: usize,
-    ) -> Result<Self> {
-        Self::new_inner(output, schema, label_columns, Some(parent), max_block_rows)
-    }
-
-    /// Parent metadata is required before metadata or a footer can be emitted.
-    pub fn new_pending(output: W, schema: SchemaRef, max_block_rows: usize) -> Result<Self> {
+    /// Indexes the identity labels of `schema`; the parent is bound when the writer finishes.
+    pub fn new(output: W, schema: SchemaRef, max_block_rows: usize) -> Result<Self> {
+        ensure!(
+            max_block_rows > 0 && max_block_rows <= MAX_BLOCK_ROWS,
+            "invalid max block rows"
+        );
         let labels = identity_label_columns(&schema)?;
-        Self::new_inner(output, schema, labels, None, max_block_rows)
+        if labels.len() > WARN_LABEL_COLUMNS {
+            log::warn!(
+                "metrics schema has {} identity labels, more than {WARN_LABEL_COLUMNS}; building its MIDX may use a lot of memory",
+                labels.len()
+            );
+        }
+        let label_indices = labels
+            .iter()
+            .map(|label| schema.index_of(label))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            hash_index: schema.index_of("__hash__")?,
+            time_index: schema.index_of("_timestamp")?,
+            value_index: schema.index_of("value")?,
+            output,
+            schema,
+            label_indices,
+            max_block_rows,
+            previous: None,
+            current_hash: None,
+            current_labels: Vec::new(),
+            timestamps: Vec::with_capacity(max_block_rows),
+            values: Vec::with_capacity(max_block_rows),
+            encoder: SampleEncoder::default(),
+            block_bytes: Vec::new(),
+            rows: 0,
+            offset: 0,
+            blocks: Vec::new(),
+            labels: Vec::new(),
+            failed: false,
+        })
     }
 
     pub fn finish_for_parquet(
@@ -89,12 +111,12 @@ impl<W: Write> BlockWriter<W> {
             verified_row_group_size(&metadata)?.context("unsupported Parquet row-group layout")?;
         let stored =
             ArrowReaderMetadata::try_new(Arc::new(metadata), ArrowReaderOptions::default())?;
-        self.finish_for_source(parent, Arc::clone(stored.schema()), Some(row_group_size))
+        self.finish(parent, Arc::clone(stored.schema()), Some(row_group_size))
     }
 
     /// The caller must verify the completed Vortex file before finalizing its index.
     pub fn finish_for_vortex(self, parent: ParentMetadata, schema: SchemaRef) -> Result<W> {
-        self.finish_for_source(parent, schema, None)
+        self.finish(parent, schema, None)
     }
 
     pub fn write(&mut self, batch: &RecordBatch) -> Result<()> {
@@ -106,20 +128,31 @@ impl<W: Write> BlockWriter<W> {
         result
     }
 
-    pub fn finish(mut self) -> Result<W> {
+    /// The container adapter must verify the completed file before supplying its source facts.
+    fn finish(
+        mut self,
+        parent: ParentMetadata,
+        stored_schema: SchemaRef,
+        row_group_size: Option<u32>,
+    ) -> Result<W> {
         ensure!(!self.failed, "writer is poisoned");
-        let parent = self
-            .parent
-            .clone()
-            .context("parent metadata is not bound")?;
+        ensure!(
+            parent.rows > 0 && parent.compressed_size > 0,
+            "empty parent unsupported"
+        );
         ensure!(self.rows == parent.rows, "source/parent row count mismatch");
+        ensure!(row_group_size != Some(0), "invalid parent row group size");
+        ensure!(
+            schema_matches(&self.schema, &stored_schema),
+            "stored source schema changed"
+        );
         self.flush_block()?;
         self.current_labels.clear();
         ensure!(!self.blocks.is_empty(), "MIDX without sample blocks");
         let mut header = HeaderData {
             parent,
-            row_group_size: self.row_group_size,
-            source_schema: self.schema.as_ref().clone(),
+            row_group_size,
+            source_schema: stored_schema.as_ref().clone(),
             blocks: u64::try_from(self.blocks.len())?,
             labels: Vec::with_capacity(self.label_indices.len()),
             directory: Vec::with_capacity(DIRECTORY_FIELDS),
@@ -161,117 +194,6 @@ impl<W: Write> BlockWriter<W> {
         self.output.write_all(&trailer[24..])?;
         self.output.flush()?;
         Ok(self.output)
-    }
-
-    /// The container adapter must verify the completed file before supplying its source facts.
-    fn finish_for_source(
-        mut self,
-        parent: ParentMetadata,
-        stored_schema: SchemaRef,
-        row_group_size: Option<u32>,
-    ) -> Result<W> {
-        validate_parent(&parent)?;
-        ensure!(
-            self.parent.as_ref().is_none_or(|known| known == &parent),
-            "parent metadata changed"
-        );
-        ensure!(self.rows == parent.rows, "source/parent row count mismatch");
-        ensure!(row_group_size != Some(0), "invalid parent row group size");
-        ensure!(
-            schema_matches(&self.schema, &stored_schema),
-            "stored source schema changed"
-        );
-        self.schema = stored_schema;
-        self.row_group_size = row_group_size;
-        self.parent = Some(parent);
-        self.finish()
-    }
-
-    fn new_inner(
-        output: W,
-        schema: SchemaRef,
-        label_columns: Vec<String>,
-        parent: Option<ParentMetadata>,
-        max_block_rows: usize,
-    ) -> Result<Self> {
-        if let Some(parent) = &parent {
-            validate_parent(parent)?;
-        }
-        ensure!(
-            max_block_rows > 0 && max_block_rows <= MAX_BLOCK_ROWS,
-            "invalid max block rows"
-        );
-        if label_columns.len() > WARN_LABEL_COLUMNS {
-            log::warn!(
-                "metrics schema has {} identity labels, more than {WARN_LABEL_COLUMNS}; building its MIDX may use a lot of memory",
-                label_columns.len()
-            );
-        }
-        let source_labels = identity_label_columns(&schema)?;
-        ensure!(
-            source_labels.len() == label_columns.len()
-                && source_labels
-                    .iter()
-                    .all(|label| label_columns.contains(label)),
-            "incomplete source identity labels"
-        );
-        let mut seen = HashSet::new();
-        let mut label_indices = Vec::new();
-        for label in &label_columns {
-            ensure!(seen.insert(label.clone()), "duplicate label column");
-            ensure!(
-                !["__hash__", "_timestamp", "value"].contains(&label.as_str()),
-                "sample column cannot be an identity label"
-            );
-            let index = schema.index_of(label)?;
-            ensure!(
-                is_label_type(schema.field(index).data_type()),
-                "unsupported label type"
-            );
-            ensure!(
-                !label.starts_with("__oo_midx_"),
-                "reserved metadata label name"
-            );
-            label_indices.push(index);
-        }
-        let hash_index = schema.index_of("__hash__")?;
-        let time_index = schema.index_of("_timestamp")?;
-        let value_index = schema.index_of("value")?;
-        ensure!(
-            schema.field(hash_index).data_type() == &DataType::UInt64,
-            "hash type"
-        );
-        ensure!(
-            schema.field(time_index).data_type() == &DataType::Int64,
-            "timestamp type"
-        );
-        ensure!(
-            schema.field(value_index).data_type() == &DataType::Float64,
-            "value type"
-        );
-        Ok(Self {
-            output,
-            schema,
-            parent,
-            row_group_size: None,
-            label_indices,
-            hash_index,
-            time_index,
-            value_index,
-            max_block_rows,
-            previous: None,
-            current_hash: None,
-            current_labels: Vec::new(),
-            timestamps: Vec::with_capacity(max_block_rows),
-            values: Vec::with_capacity(max_block_rows),
-            encoder: SampleEncoder::default(),
-            block_bytes: Vec::new(),
-            rows: 0,
-            offset: 0,
-            blocks: Vec::new(),
-            labels: Vec::new(),
-            failed: false,
-        })
     }
 
     fn write_inner(&mut self, batch: &RecordBatch) -> Result<()> {
@@ -323,12 +245,6 @@ impl<W: Write> BlockWriter<W> {
                     );
                 }
             }
-            ensure!(
-                self.parent
-                    .as_ref()
-                    .is_none_or(|parent| self.rows < parent.rows),
-                "source exceeds parent row count"
-            );
             self.timestamps.push(timestamp);
             self.values.push(values.value(row).to_bits());
             self.rows = self.rows.checked_add(1).context("row count overflow")?;
@@ -409,14 +325,6 @@ impl<W: Write> BlockWriter<W> {
         }
         Ok(columns)
     }
-}
-
-fn validate_parent(parent: &ParentMetadata) -> Result<()> {
-    ensure!(
-        parent.rows > 0 && parent.compressed_size > 0,
-        "empty parent unsupported"
-    );
-    Ok(())
 }
 
 fn verified_row_group_size(metadata: &ParquetMetaData) -> Result<Option<u32>> {
