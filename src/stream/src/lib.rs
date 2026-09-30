@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{future::Future, io::Error};
+use std::{future::Future, io::Error, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
 use axum::{http, response::Response as HttpResponse};
@@ -48,7 +48,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, SchemaCache,
         get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
         unwrap_stream_settings,
     },
@@ -347,6 +347,20 @@ pub async fn save_stream_settings(
         }
     };
     let settings = saved.settings;
+
+    // Otherwise reads on this node serve the old settings until the schema watcher catches up.
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    infra::schema::put_stream_settings(key.clone(), Arc::new(settings.clone())).await;
+    {
+        let mut w = STREAM_SCHEMAS_LATEST.write().await;
+        if let Some(cached) = w.get(&key) {
+            let mut schema = cached.schema().as_ref().clone();
+            schema
+                .metadata
+                .insert("settings".to_string(), json::to_string(&settings).unwrap());
+            w.insert(key, SchemaCache::new(schema));
+        }
+    }
 
     sync_associated_metadata_stream_retention(org_id, stream_name, stream_type, &settings).await;
 
@@ -1144,8 +1158,12 @@ mod tests {
     use std::collections::HashMap;
 
     use arrow_schema::{DataType, Field};
+    use config::meta::stream::UpdateSettingsWrapper;
 
     use super::*;
+
+    // unique org so the process-wide schema caches can host these tests in parallel
+    const SETTINGS_TEST_ORG: &str = "settings_cache_test_org";
 
     #[test]
     fn test_associated_metadata_streams() {
@@ -1706,5 +1724,107 @@ mod tests {
         .await
         .expect_err("start after end is rejected by the later validation");
         assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    async fn create_settings_test_stream(name: &str, fields: &[&str]) {
+        let _ = infra::db::create_table().await;
+        let stream = StreamCreate {
+            fields: fields
+                .iter()
+                .map(|f| StreamField {
+                    name: f.to_string(),
+                    r#type: "Utf8".to_string(),
+                })
+                .collect(),
+            settings: StreamSettings {
+                enable_distinct_fields: false,
+                ..Default::default()
+            },
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn evict_settings_test_stream(name: &str) {
+        let key = format!("{SETTINGS_TEST_ORG}/{}/{name}", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+        infra::schema::remove_stream_settings(&key).await;
+    }
+
+    async fn update_settings_test_stream(name: &str, update: UpdateStreamSettings) {
+        let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Logs, update)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn settings_test_stream(name: &str) -> StreamSettings {
+        get_stream(SETTINGS_TEST_ORG, name, StreamType::Logs)
+            .await
+            .unwrap()
+            .settings
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_is_read_back_without_waiting_for_the_watcher() {
+        // the test DB outlives the run, so each run needs fresh stream names
+        let name = &format!("read_back_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        // cold caches, as after a restart; no schema watcher runs in unit tests
+        evict_settings_test_stream(name).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                enable_distinct_fields: Some(true),
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        let settings = settings_test_stream(name).await;
+        assert!(settings.enable_distinct_fields);
+        assert_eq!(settings.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_right_after_create_finds_the_stream() {
+        let name = &format!("right_after_create_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(settings_test_stream(name).await.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_back_to_back_settings_updates_keep_both_changes() {
+        let name = &format!("back_to_back_{}", now_micros());
+        create_settings_test_stream(name, &["fa", "fb"]).await;
+        evict_settings_test_stream(name).await;
+        for field in ["fa", "fb"] {
+            update_settings_test_stream(
+                name,
+                UpdateStreamSettings {
+                    index_fields: UpdateSettingsWrapper {
+                        add: vec![field.to_string()],
+                        remove: vec![],
+                    },
+                    ..Default::default()
+                },
+            )
+            .await;
+        }
+        // read what was persisted, not what this node cached
+        evict_settings_test_stream(name).await;
+        let index_fields = settings_test_stream(name).await.index_fields;
+        assert!(index_fields.contains(&"fa".to_string()), "{index_fields:?}");
+        assert!(index_fields.contains(&"fb".to_string()), "{index_fields:?}");
     }
 }
