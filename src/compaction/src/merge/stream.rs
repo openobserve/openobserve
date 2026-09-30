@@ -19,7 +19,10 @@ use config::{
     cluster, get_config,
     meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     metrics,
-    utils::time::hour_micros,
+    utils::{
+        parquet::parse_file_key_columns,
+        time::{day_micros, hour_micros},
+    },
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{cache::file_data, file_list as infra_file_list};
@@ -33,10 +36,14 @@ use tokio::{
 };
 
 use super::{
-    job::{job_range_end, job_time_level},
-    plan::{BatchLimits, plan_batches},
+    dynamic::{DayPlan, day_prefix, plan_day},
+    job::{JobScope, job_range_end, job_scope},
+    plan::{BatchLimits, PlannedBatch, plan_batches},
 };
-use crate::worker::{MergeBatch, MergeSender};
+use crate::{
+    bloom::compact::OrphanBlooms,
+    worker::{MergeBatch, MergeSender},
+};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -82,9 +89,17 @@ pub async fn merge_by_stream(
     let is_incremental = !crate::is_past_hour(offset);
 
     // check offset
-    let partition_time_level = job_time_level(stream_type, offset, !is_incremental, |max_ts| {
-        has_downsampling_rule(stream_name, max_ts)
-    });
+    let dynamic_day = offset % day_micros(1) == 0
+        && crate::is_past_day(offset)
+        && infra::schema::get_dynamic_merge(org_id, stream_name, stream_type).await;
+    let scope = job_scope(
+        stream_type,
+        offset,
+        !is_incremental,
+        dynamic_day,
+        |max_ts| has_downsampling_rule(stream_name, max_ts),
+    );
+    let partition_time_level = scope.time_level();
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
         (
@@ -110,7 +125,7 @@ pub async fn merge_by_stream(
     );
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
-    let max_original_size = if mode.merges_whole_batch() {
+    let max_original_size = if mode.merges_whole_batch() || scope == JobScope::DynamicDay {
         i64::MAX
     } else {
         infra_file_list::merge_max_original_size()
@@ -142,37 +157,31 @@ pub async fn merge_by_stream(
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
-        let file_name = file.key.clone();
-        let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
-        let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(file.to_owned());
+        let prefix = &file.key[..file.key.rfind('/').unwrap()];
+        // the dynamic merge job sees a partition's hours as one group, written to DD/00
+        let prefix = if scope == JobScope::DynamicDay {
+            day_prefix(prefix)
+        } else {
+            prefix.to_string()
+        };
+        partition_files_with_size
+            .entry(prefix)
+            .or_default()
+            .push(file);
     }
 
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
-    for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
+    for (prefix, files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
         let mode = mode.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
+        let task: JoinHandle<anyhow::Result<OrphanBlooms>> = tokio::task::spawn(async move {
             let cfg = get_config();
-            // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
-            match job_strategy {
-                MergeStrategy::FileSize => {
-                    files_with_size.sort_by_key(|k| k.meta.original_size);
-                }
-                MergeStrategy::FileTime => {
-                    files_with_size.sort_by_key(|k| k.meta.min_ts);
-                }
-                MergeStrategy::TimeRange => {
-                    files_with_size = sort_by_time_range(files_with_size);
-                }
-            }
-
             let limits = BatchLimits {
                 strategy: &job_strategy,
                 max_file_size: cfg.compact.max_file_size,
@@ -180,33 +189,30 @@ pub async fn merge_by_stream(
                 is_incremental,
                 merge_max_original_size: infra_file_list::merge_max_original_size(),
             };
-            let batch_groups: Vec<MergeBatch> = plan_batches(
-                files_with_size,
-                &mode,
-                &limits,
-                &format!("{org_id}/{stream_type}/{stream_name}"),
-            )
-            .into_iter()
-            .enumerate()
-            .map(|(batch_id, (files, mode))| MergeBatch {
-                batch_id,
-                org_id: org_id.clone(),
-                stream_type,
-                stream_name: stream_name.clone(),
-                prefix: prefix.clone(),
-                files,
-                mode,
-            })
-            .collect();
+            let stream = format!("{org_id}/{stream_type}/{stream_name}");
+            let planned = plan_partition(scope, files_with_size, &mode, &limits, &stream, &prefix);
+            let batch_groups: Vec<MergeBatch> = planned
+                .into_iter()
+                .enumerate()
+                .map(|(batch_id, (files, mode))| MergeBatch {
+                    batch_id,
+                    org_id: org_id.clone(),
+                    stream_type,
+                    stream_name: stream_name.clone(),
+                    prefix: prefix.clone(),
+                    files,
+                    mode,
+                })
+                .collect();
             if batch_groups.is_empty() {
-                return Ok(vec![]); // no files need to merge
+                return Ok(OrphanBlooms::default()); // no files need to merge
             }
 
             // send to worker
             let batch_group_len = batch_groups.len();
             let (inner_tx, mut inner_rx) = mpsc::channel(batch_group_len);
-            for batch in batch_groups.iter() {
-                if let Err(e) = worker_tx.send((inner_tx.clone(), batch.clone())).await {
+            for batch in batch_groups {
+                if let Err(e) = worker_tx.send((inner_tx.clone(), batch)).await {
                     log::error!("[COMPACTOR] send batch to worker failed: {e}");
                     return Err(anyhow::Error::msg("send batch to worker failed"));
                 }
@@ -218,8 +224,8 @@ pub async fn merge_by_stream(
             }
 
             let mut last_error = None;
-            let mut check_guard = HashSet::with_capacity(batch_groups.len());
-            let mut orphan_blooms = Vec::new();
+            let mut check_guard = HashSet::with_capacity(batch_group_len);
+            let mut orphan_blooms = OrphanBlooms::default();
             for ret in worker_results {
                 let (batch_id, new_files, retire_files) = match ret {
                     Ok(v) => v,
@@ -258,9 +264,13 @@ pub async fn merge_by_stream(
                 }
 
                 // collect orphan blooms after writing file list successfully
-                for file in &retire_files {
-                    if file.meta.bloom_ver > 0 {
-                        orphan_blooms.push(file.meta.bloom_ver);
+                for file in retire_files.iter().filter(|f| f.meta.bloom_ver > 0) {
+                    // a `.bf` lives under the hour of the file it covers, not under the job's
+                    if let Ok((_, date, _)) = parse_file_key_columns(&file.key) {
+                        orphan_blooms
+                            .entry(date)
+                            .or_default()
+                            .push(file.meta.bloom_ver);
                     }
                 }
             }
@@ -274,9 +284,11 @@ pub async fn merge_by_stream(
     }
 
     // collect bloom files which need to be clean
-    let mut orphan_blooms = Vec::new();
+    let mut orphan_blooms = OrphanBlooms::default();
     for task in tasks {
-        orphan_blooms.extend(task.await??);
+        for (date, bloom_vers) in task.await?? {
+            orphan_blooms.entry(date).or_default().extend(bloom_vers);
+        }
     }
 
     // Build bloom filters for the current hour. Failures are non-fatal: files
@@ -420,6 +432,48 @@ fn retirement_events(new_files: Vec<FileKey>, retire_files: &[FileKey]) -> Vec<F
     }));
     events.sort_by(|a, b| a.key.cmp(&b.key));
     events
+}
+
+/// Batches of one partition: the day plan for the dynamic merge job, else the hourly plan.
+fn plan_partition(
+    scope: JobScope,
+    files: Vec<FileKey>,
+    mode: &MergeMode,
+    limits: &BatchLimits<'_>,
+    stream: &str,
+    prefix: &str,
+) -> Vec<PlannedBatch> {
+    let hourly = |files| {
+        plan_batches(
+            sort_by_strategy(files, limits.strategy),
+            mode,
+            limits,
+            stream,
+        )
+    };
+    if scope != JobScope::DynamicDay {
+        return hourly(files);
+    }
+    let day_files = files.len();
+    match plan_day(files, mode, limits) {
+        DayPlan::Merge(batches) => {
+            log::info!(
+                "[COMPACTOR] merge_by_stream [{stream}] dynamic merge of {day_files} files into {prefix}"
+            );
+            batches
+        }
+        DayPlan::Hour00(files) => hourly(files),
+    }
+}
+
+/// The order the hourly planner groups files in.
+fn sort_by_strategy(mut files: Vec<FileKey>, strategy: &MergeStrategy) -> Vec<FileKey> {
+    match strategy {
+        MergeStrategy::FileSize => files.sort_by_key(|k| k.meta.original_size),
+        MergeStrategy::FileTime => files.sort_by_key(|k| k.meta.min_ts),
+        MergeStrategy::TimeRange => files = sort_by_time_range(files),
+    }
+    files
 }
 
 /// sort by time range without overlapping

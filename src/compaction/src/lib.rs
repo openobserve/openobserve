@@ -22,12 +22,12 @@ use config::{
         cluster::{CompactionJobType, Role},
         stream::{PartitionTimeLevel, StreamType},
     },
-    utils::time::{hour_micros, now_micros, second_micros},
+    utils::time::{day_micros, hour_micros, now_micros, second_micros},
 };
 use infra::{
     cluster::get_node_from_consistent_hash,
     file_list as infra_file_list,
-    schema::{get_partition_time_level, get_settings},
+    schema::{get_partition_time_level, get_settings, get_stream_setting_dynamic_merge},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
@@ -314,7 +314,10 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             need_done_ids.push(job.id); // the data will be deleted by retention, just skip
             continue;
         }
-        if partition_time_level == PartitionTimeLevel::Daily {
+        // every job of a dynamic stream's closed day reads the files the day's job merges
+        let dynamic_day = is_past_day(job.offsets)
+            && get_stream_setting_dynamic_merge(stream_type, &Some(stream_settings.clone()));
+        if partition_time_level == PartitionTimeLevel::Daily || dynamic_day {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -444,6 +447,12 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+/// A day is closed once its last hour is past: no hour of it can receive files any more.
+pub(crate) fn is_past_day(offset: i64) -> bool {
+    let day = day_micros(1);
+    is_past_hour(offset - offset % day + day - 1)
 }
 
 pub(crate) fn is_past_hour(offset: i64) -> bool {
