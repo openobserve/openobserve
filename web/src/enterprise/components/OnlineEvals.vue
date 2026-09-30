@@ -734,6 +734,7 @@ async function loadQualityAgents(force = false) {
     ) {
       qualityAgentKey.value = ALL_AGENTS_VALUE;
     }
+    if (urlAgentName && !urlAgent) syncQualityAgentUrl();
   } catch (err) {
     console.warn("Failed to load GenAI agents", err);
     qualityAgents.value = [];
