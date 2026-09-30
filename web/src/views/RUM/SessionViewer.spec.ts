@@ -1156,7 +1156,7 @@ describe("SessionViewer.vue — server-clock query windows (Risk 3)", () => {
       expect(window).toEqual({ startTime: minTs - 1_000_000, endTime: maxTs + 1_000_000 });
     }
     expect(windowsBy(150)[0]).toEqual({
-      startTime: minTs - 1_000_000,
+      startTime: minTs - 60_000_000,
       endTime: maxTs + 60_000_000,
     });
     wrapper.unmount();
@@ -2106,6 +2106,58 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(vm.upperTs).toBe(arrival);
     wrapper.unmount();
+  });
+
+  // The mocked payload drops the timestamps, so carry them the way buildQueryPayload does to read each event query's window.
+  const eventWindows = (stream: string) =>
+    vi
+      .mocked(searchService.search)
+      .mock.calls.map((call: any[]) => call[0]?.query?.query ?? {})
+      .filter((query: any) => String(query.sql).includes(stream))
+      .map((query: any) => ({ startTime: query.start_time, endTime: query.end_time }));
+
+  async function withWindowedPayload(check: (wrapper: VueWrapper) => Promise<void> | void) {
+    queryPayload.build.mockImplementation((opts: any) => ({
+      query: { sql: "", start_time: opts.timestamps.startTime, end_time: opts.timestamps.endTime },
+      aggs: {},
+    }));
+    let wrapper: VueWrapper | undefined;
+    try {
+      wrapper = await mountLive();
+      await check(wrapper);
+    } finally {
+      wrapper?.unmount();
+      queryPayload.build.mockImplementation(() => ({ query: { sql: "" }, aggs: {} }));
+    }
+  }
+
+  it("opens the event queries a minute either side of the replay rows, the manifest a second before", async () => {
+    await withWindowedPayload(() => {
+      for (const stream of ['"_rumdata"', '"_rumlog"']) {
+        expect(eventWindows(stream)[0], stream).toEqual({
+          startTime: L * 1000 - 60_000_000,
+          endTime: maxTs + 60_000_000,
+        });
+      }
+      expect(segmentWindows()[0]).toEqual({
+        startTime: L * 1000 - 1_000_000,
+        endTime: maxTs + 1_000_000,
+      });
+    });
+  });
+
+  it("starts an event poll with no cursor yet a minute before min_ts", async () => {
+    await withWindowedPayload(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+      for (const stream of ['"_rumdata"', '"_rumlog"']) {
+        const windows = eventWindows(stream);
+        expect(windows.length, stream).toBeGreaterThan(1);
+        expect(windows.at(-1), stream).toEqual({
+          startTime: L * 1000 - 60_000_000,
+          endTime: (NOW + 30_000) * 1000 + 60_000_000,
+        });
+      }
+    });
   });
 
   it("appends only new segment ids, loads them, and extends the session end", async () => {

@@ -310,7 +310,7 @@ const SEGMENT_PAGE_SIZE = 1000;
 const MAX_SEGMENT_PAGES = 50;
 const DAY_US = 86_400_000_000;
 const SECOND_US = 1_000_000;
-// Events arrive in 30 s flushes plus the SDK's retry backoff, so their window runs a minute past the last replay row.
+// Events flush in independent 30 s batches plus retry backoff, so their window runs a minute either side of the replay rows.
 const EVENTS_TAIL_US = 60_000_000;
 const DEFAULT_LOOKUP_US = 30 * DAY_US;
 const WATCHDOG_MS = 2000;
@@ -613,9 +613,9 @@ const routeRangeUs = () => {
 };
 
 // Rows are stamped with server receive time, so later queries use the arrival bounds getSession found, not the device clock.
-const serverWindowUs = (tailUs: number) => {
+const serverWindowUs = (headUs: number, tailUs: number) => {
   const minTs = Number(sessionState.data.selectedSession?.min_ts);
-  if (minTs > 0 && upperTs > 0) return { start: minTs - SECOND_US, end: upperTs + tailUs };
+  if (minTs > 0 && upperTs > 0) return { start: minTs - headUs, end: upperTs + tailUs };
   return routeRangeUs();
 };
 
@@ -801,7 +801,7 @@ const runSegmentQuery = (
 // A manifest truncated by the per-request size cap corrupts the snapshot-anchor search, so page past it.
 const fetchAllPages = async (
   sql: string,
-  window: QueryWindow = serverWindowUs(SECOND_US),
+  window: QueryWindow = serverWindowUs(SECOND_US, SECOND_US),
 ): Promise<{ hits: any[]; complete: boolean }> => {
   const hits: any[] = [];
   for (let page = 0; page < MAX_SEGMENT_PAGES; page++) {
@@ -1173,16 +1173,16 @@ const runLivePoll = async () => {
 };
 
 // Polls look a minute behind the bound so a row that arrived late is still found; the dedup drops what was already seen.
-const liveWindowUs = (cursorUs: number): QueryWindow => {
+const liveWindowUs = (cursorUs: number, headUs: number): QueryWindow => {
   const nowUs = Date.now() * 1000;
-  const from = cursorUs > 0 ? cursorUs - LIVE_OVERLAP_US : serverWindowUs(0).start;
+  const from = cursorUs > 0 ? cursorUs - LIVE_OVERLAP_US : serverWindowUs(headUs, 0).start;
   return { start: from, end: Math.max(nowUs, upperTs) + LIVE_OVERLAP_US };
 };
 
 // Selected by arrival time only, so a late row with an earlier start is seen; it raises the notice and is never inserted.
 const pollManifest = async () => {
   if (!manifest.value.length || manifestSummary.value?.truncated) return;
-  const { hits } = await fetchAllPages(manifestSql(), liveWindowUs(upperTs));
+  const { hits } = await fetchAllPages(manifestSql(), liveWindowUs(upperTs, SECOND_US));
   if (cancelled || !isLive.value) return;
   upperTs = raiseUpperTs(upperTs, hits, timestampField());
   // The open dropped rows before the first full snapshot, so a poll that returns them again must drop them too.
@@ -1199,9 +1199,9 @@ const pollManifest = async () => {
 };
 
 const pollEvents = async () => {
-  const hits = await fetchEventPages(rumEventsSql(), liveWindowUs(lastEventsTs));
+  const hits = await fetchEventPages(rumEventsSql(), liveWindowUs(lastEventsTs, EVENTS_TAIL_US));
   if (cancelled) return;
-  const logs = await fetchEventPages(errorLogsSql(), liveWindowUs(lastLogsTs));
+  const logs = await fetchEventPages(errorLogsSql(), liveWindowUs(lastLogsTs, EVENTS_TAIL_US));
   if (cancelled) return;
   const changed = addRumEvents(hits);
   if (addErrorLogs(logs) || changed) publishEvents();
@@ -1310,7 +1310,7 @@ const publishEvents = () => {
 // Paged in full, because the live cursor is the largest arrival time seen and a cut-off first page would skip the rest.
 const getSessionEvents = () => {
   isLoading.value.push(true);
-  fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US))
+  fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
     .then((hits: any[]) => {
       // Test the SOURCE field, not the rendered value: user_email is filled with
       // t("common.unknownUser") when absent, so comparing it to the English
@@ -1330,7 +1330,7 @@ const getSessionEvents = () => {
 
 const getSessionErrorLogs = () => {
   isLoading.value.push(true);
-  fetchEventPages(errorLogsSql(), serverWindowUs(EVENTS_TAIL_US))
+  fetchEventPages(errorLogsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
     .then((hits: any[]) => {
       addErrorLogs(hits);
       publishEvents();
