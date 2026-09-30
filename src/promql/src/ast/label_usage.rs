@@ -16,6 +16,7 @@
 //! Static analysis of a PromQL expression that decides which series labels
 //! need to be loaded.
 
+use hashbrown::HashSet;
 use promql_parser::parser::{
     AggregateExpr, BinaryExpr, Call, Expr as PromExpr, LabelModifier, ParenExpr, UnaryExpr, token,
 };
@@ -36,7 +37,7 @@ const LABEL_DROPPING_AGGS: [u8; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 33] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 44] = [
     "rate",
     "irate",
     "increase",
@@ -70,6 +71,17 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 33] = [
     "clamp",
     "clamp_max",
     "clamp_min",
+    "timestamp",
+    "sort",
+    "sort_desc",
+    "day_of_month",
+    "day_of_week",
+    "day_of_year",
+    "days_in_month",
+    "hour",
+    "minute",
+    "month",
+    "year",
 ];
 
 /// Returns true when the query's root aggregation discards all labels and the
@@ -93,9 +105,13 @@ pub fn labels_dropped_at_root(expr: &PromExpr) -> bool {
     }
 }
 
-/// Returns true when loading only the grouping labels cannot merge series before they are grouped.
-pub fn grouping_labels_suffice(expr: &PromExpr) -> bool {
-    selectors_grouped(expr, false)
+/// The label columns that keep series apart until they are grouped; empty means every label.
+pub fn grouping_labels(expr: &PromExpr) -> HashSet<String> {
+    let mut labels = HashSet::new();
+    if !selectors_grouped(expr, false, &mut labels) {
+        labels.clear();
+    }
+    labels
 }
 
 fn subtree_labels_unused(expr: &PromExpr) -> bool {
@@ -115,14 +131,14 @@ fn subtree_labels_unused(expr: &PromExpr) -> bool {
     }
 }
 
-fn selectors_grouped(expr: &PromExpr, grouped: bool) -> bool {
+fn selectors_grouped(expr: &PromExpr, grouped: bool, labels: &mut HashSet<String>) -> bool {
     match expr {
         PromExpr::VectorSelector(_) | PromExpr::MatrixSelector(_) => grouped,
         PromExpr::NumberLiteral(_) | PromExpr::StringLiteral(_) => true,
         PromExpr::Paren(ParenExpr { expr }) | PromExpr::Unary(UnaryExpr { expr }) => {
-            selectors_grouped(expr, grouped)
+            selectors_grouped(expr, grouped, labels)
         }
-        PromExpr::Subquery(subquery) => selectors_grouped(&subquery.expr, grouped),
+        PromExpr::Subquery(subquery) => selectors_grouped(&subquery.expr, grouped, labels),
         PromExpr::Aggregate(AggregateExpr {
             op,
             expr,
@@ -132,18 +148,23 @@ fn selectors_grouped(expr: &PromExpr, grouped: bool) -> bool {
             // topk/bottomk and `without` keep labels that were never loaded
             let collapses = !matches!(op.id(), token::T_TOPK | token::T_BOTTOMK)
                 && !matches!(modifier, Some(LabelModifier::Exclude(_)));
-            selectors_grouped(expr, collapses)
+            if collapses && let Some(LabelModifier::Include(by)) = modifier {
+                labels.extend(by.labels.iter().cloned());
+            }
+            selectors_grouped(expr, collapses, labels)
                 && param
                     .as_deref()
-                    .is_none_or(|param| selectors_grouped(param, false))
+                    .is_none_or(|param| selectors_grouped(param, false, labels))
         }
         PromExpr::Call(Call { func, args }) => {
             let grouped = grouped && LABEL_AGNOSTIC_FUNCS.contains(&func.name);
-            args.args.iter().all(|arg| selectors_grouped(arg, grouped))
+            args.args
+                .iter()
+                .all(|arg| selectors_grouped(arg, grouped, labels))
         }
         // matching and the duplicate-labelset checks need every label of both operands
         PromExpr::Binary(BinaryExpr { lhs, rhs, .. }) => {
-            selectors_grouped(lhs, false) && selectors_grouped(rhs, false)
+            selectors_grouped(lhs, false, labels) && selectors_grouped(rhs, false, labels)
         }
         PromExpr::Extension(_) => false,
     }
@@ -187,46 +208,68 @@ mod tests {
     }
 
     #[test]
-    fn test_grouping_labels_suffice() {
-        let cases = [
-            ("sum by (job) (m)", true),
-            ("sum by (job) (rate(m[5m]))", true),
-            ("sum by (job) (abs(-m))", true),
-            ("sum by (job) (m) / 2", true),
+    fn test_grouping_labels() {
+        let cases: [(&str, &[&str]); 30] = [
+            ("sum by (job) (m)", &["job"]),
+            ("sum by (job) (rate(m[5m]))", &["job"]),
+            ("sum by (job) (abs(-m))", &["job"]),
+            ("max by (job) (timestamp(m))", &["job"]),
+            ("count by (job) (hour(m))", &["job"]),
+            ("sum by (job) (m) / 2", &["job"]),
             (
                 "sum by (job) (rate(a[5m])) / on (job) sum by (job) (rate(b[5m]))",
-                true,
+                &["job"],
             ),
-            ("sum by (job) (max by (job, instance) (m) / 2)", true),
-            ("histogram_quantile(0.9, sum by (le) (rate(m[5m])))", true),
-            ("count(m) + sum by (job) (n)", true),
-            ("topk by (job) (1, sum by (job, instance) (m))", true),
+            (
+                "sum by (job) (a) / on (job, instance) sum by (job) (b)",
+                &["job"],
+            ),
+            (
+                "sum by (job) (max by (job, instance) (m) / 2)",
+                &["instance", "job"],
+            ),
+            (
+                "histogram_quantile(0.9, sum by (le) (rate(m[5m])))",
+                &["le"],
+            ),
+            ("count(m) + sum by (job) (n)", &["job"]),
+            (
+                "topk by (region) (1, sum by (job, instance) (m))",
+                &["instance", "job"],
+            ),
             (
                 "label_replace(sum by (job) (m), \"j\", \"$1\", \"job\", \"(.*)\")",
-                true,
+                &["job"],
             ),
+            ("sum(m)", &[]),
             // #14976: an operator inside the aggregation sees series before they are grouped
-            ("sum by (job) (m / 2)", false),
-            ("sum by (job) (m * 60)", false),
-            ("max by (job) (m - 1)", false),
-            ("sum by (job) (m + m)", false),
-            ("sum by (job) (rate(a[5m]) / rate(b[5m]))", false),
+            ("sum by (job) (m / 2)", &[]),
+            ("sum by (job) (m * 60)", &[]),
+            ("max by (job) (m - 1)", &[]),
+            ("sum by (job) (m + m)", &[]),
+            ("sum by (job) (rate(a[5m]) / rate(b[5m]))", &[]),
+            ("sum by (job) (a * on (pod) group_left (job) b)", &[]),
             // a selector outside every grouping aggregation keeps all its labels
-            ("sum by (job) (m) + n", false),
-            ("m / on (job) group_left n", false),
-            ("topk by (job) (1, m)", false),
-            ("sum without (instance) (m)", false),
-            ("sum by (job) (sum without (instance) (m))", false),
+            ("sum by (job) (m) + n", &[]),
+            ("m / on (job) group_left n", &[]),
+            ("topk by (job) (1, m)", &[]),
+            ("sum without (instance) (m)", &[]),
+            ("sum by (job) (sum without (instance) (m))", &[]),
+            ("quantile by (job) (scalar(q), m)", &[]),
             // #11321: label_replace reads and creates labels outside the grouping
             (
                 "count by (new) (label_replace(m, \"new\", \"$1\", \"old\", \"(.*)\"))",
-                false,
+                &[],
             ),
-            ("sum by (job) (histogram_quantile(0.9, rate(m[5m])))", false),
+            ("sum by (job) (histogram_quantile(0.9, rate(m[5m])))", &[]),
+            ("m", &[]),
+            ("rate(m[5m])", &[]),
         ];
         for (query, expected) in cases {
             let expr = promql_parser::parser::parse(query).unwrap();
-            assert_eq!(grouping_labels_suffice(&expr), expected, "query: {query}");
+            let mut labels: Vec<_> = grouping_labels(&expr).into_iter().collect();
+            labels.sort();
+            assert_eq!(labels, expected, "query: {query}");
         }
     }
 }
