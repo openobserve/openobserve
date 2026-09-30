@@ -185,11 +185,19 @@ export const useHistogram = () => {
         const breakdownField: string | null =
           searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
-        // hasBreakdown is true only when the backend both returned a
-        // breakdown field AND the aggs actually contain zo_sql_breakdown values.
+        // hasBreakdown requires EVERY accumulated row to carry a breakdown
+        // value, not just some. The backend can return inconsistently-shaped
+        // rows for the same query — some partitions tagged with
+        // zo_sql_breakdown, others not (seen live, likely a caching
+        // inconsistency) — and entering the stacked path on a partial match
+        // surfaces a spurious "(unspecified)" legend entry that Visualize's
+        // rendering never shows for the same data. Requiring every() falls
+        // back to the flat single-series path instead, matching Visualize,
+        // whenever the backend can't consistently supply the breakdown.
         const hasBreakdown =
           !!breakdownField &&
-          searchObj.data.queryResults.aggs.some((item: any) => item.zo_sql_breakdown !== undefined);
+          searchObj.data.queryResults.aggs.length > 0 &&
+          searchObj.data.queryResults.aggs.every((item: any) => item.zo_sql_breakdown !== undefined);
 
         if (hasBreakdown) {
           // --- Stacked breakdown path ---
@@ -216,7 +224,10 @@ export const useHistogram = () => {
             breakdownMap.set(key, JSON.parse(JSON.stringify(item)));
           });
 
-          // Merge current page aggs into the map
+          // Merge current page aggs into the map. hasBreakdown (above)
+          // already guarantees every row here has a defined zo_sql_breakdown
+          // — a mixed/partial shape falls through to the flat path instead
+          // of reaching this block at all.
           searchObj.data.queryResults.aggs.forEach((item: any) => {
             if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
               timestampSet.add(item.zo_sql_key);

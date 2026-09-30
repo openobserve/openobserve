@@ -219,6 +219,25 @@ export const useSearchResponseHandler = () => {
     searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
+  // The histogram stream (payload.type === "histogram") accumulates its
+  // buckets and descriptive fields onto the same searchObj.data.queryResults
+  // object the main search stream (payload.type === "search") writes to. A
+  // second, independent (non-paginated) main-search run overlapping the
+  // first search's still-streaming histogram — e.g. the live-mode debounce
+  // double-fire — hits the wholesale queryResults reassignment below and,
+  // without this, silently drops everything the histogram had accumulated.
+  // Proven by histogramStreamCapture.spec.ts, which replays a real captured
+  // stream through this exact interference and asserts the loss.
+  const preserveHistogramFields = () => ({
+    aggs: searchObj.data?.queryResults?.aggs,
+    order_by: searchObj.data?.queryResults?.order_by,
+    histogram_interval: searchObj.data?.queryResults?.histogram_interval,
+    visualization_histogram_interval:
+      searchObj.data?.queryResults?.visualization_histogram_interval,
+    histogram_breakdown_field: searchObj.data?.queryResults?.histogram_breakdown_field,
+    converted_histogram_query: searchObj.data?.queryResults?.converted_histogram_query,
+  });
+
   const handleStreamingMetadata = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
@@ -250,6 +269,7 @@ export const useSearchResponseHandler = () => {
             (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
           hits: searchObj.data?.queryResults?.hits || [],
           streaming_aggs: response.content?.streaming_aggs,
+          ...preserveHistogramFields(),
         };
       } else if (isPagination) {
         searchObj.data.queryResults.from = response.content.results.from;
@@ -257,7 +277,10 @@ export const useSearchResponseHandler = () => {
         searchObj.data.queryResults.took = response.content.results.took;
         searchObj.data.queryResults.total = response.content.results.total;
       } else {
-        searchObj.data.queryResults = response.content.results;
+        searchObj.data.queryResults = {
+          ...response.content.results,
+          ...preserveHistogramFields(),
+        };
       }
     }
 
