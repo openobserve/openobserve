@@ -76,9 +76,7 @@ pub(crate) async fn create_context(
         Ok(schema) => schema,
         Err(err) => {
             log::error!("[trace_id {trace_id}] get schema error: {err}");
-            return Err(datafusion::error::DataFusionError::Execution(
-                err.to_string(),
-            ));
+            return Err(DataFusionError::Execution(err.to_string()));
         }
     };
     if schema.fields().is_empty() {
@@ -120,11 +118,11 @@ pub(crate) async fn create_context(
     }
 
     // calculate scan size
-    let mut scan_stats = match infra::file_list::calculate_files_size(&files.to_vec()).await {
+    let mut scan_stats = match infra::file_list::calculate_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {
             log::error!("[trace_id {trace_id}] calculate files size error: {err}");
-            return Err(datafusion::error::DataFusionError::Execution(
+            return Err(DataFusionError::Execution(
                 "calculate files size error".to_string(),
             ));
         }
@@ -137,16 +135,26 @@ pub(crate) async fn create_context(
         file_list_start.elapsed().as_millis()
     );
 
+    let cfg = get_config();
+    let sort_order = if cfg.search.feature_metrics_streaming_agg_enabled
+        && MetricsFileLayout::all_hash_ordered(&files)
+    {
+        FileSortOrder::HashTimestampAsc
+    } else {
+        FileSortOrder::None
+    };
+    let source = scan_source(
+        &schema,
+        &files,
+        &matchers,
+        &preference,
+        sort_order,
+        cfg.compact.metrics_index_enabled,
+    );
+    let blocks = matches!(source, ScanSource::Blocks(_));
+
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let hash_streams = hash_column_streams(&schema);
-    let block_eligible = preference.streaming
-        && get_config().compact.metrics_index_enabled
-        && get_config().search.feature_metrics_streaming_agg_enabled
-        && hash_streams
-        && files.iter().all(block_parent_eligible)
-        && block_output_labels_supported(&schema, preference.output_labels)
-        && block_matchers_supported(&schema, &matchers);
     let cache_inputs = files
         .iter()
         .map(|f| {
@@ -159,7 +167,7 @@ pub(crate) async fn create_context(
             )
         })
         .collect_vec();
-    let (cache_type, cache_hits, cache_misses) = if block_eligible {
+    let (cache_type, cache_hits, cache_misses) = if blocks {
         let (_, hits, misses) = inspect_file_cache(trace_id, &cache_inputs, &mut scan_stats)
             .instrument(enter_span.clone())
             .await;
@@ -203,7 +211,6 @@ pub(crate) async fn create_context(
             .observe(cached_ratio);
     }
 
-    let cfg = get_config();
     let target_partitions =
         calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
 
@@ -211,9 +218,9 @@ pub(crate) async fn create_context(
         "[trace_id {trace_id}] promql->search->storage: session target_partitions: {target_partitions}"
     );
 
-    let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
+    let schema = Arc::new(schema.with_metadata(Default::default()));
 
-    if block_eligible {
+    if blocks {
         log::info!(
             "[trace_id {trace_id}] promql->search->storage: MIDX block candidate across {} files; row selection deferred to block preflight",
             files.len()
@@ -222,7 +229,7 @@ pub(crate) async fn create_context(
     cache_metrics_index_files(trace_id, org_id, &files).await;
 
     let mut keep_filters = true;
-    if !block_eligible {
+    if !blocks {
         match metrics_index::search(
             trace_id,
             &mut files,
@@ -269,21 +276,6 @@ pub(crate) async fn create_context(
         target_partitions,
     };
 
-    let sort_order = if cfg.search.feature_metrics_streaming_agg_enabled
-        && MetricsFileLayout::all_hash_ordered(&files)
-    {
-        FileSortOrder::HashTimestampAsc
-    } else {
-        FileSortOrder::None
-    };
-
-    let source = match block_scan_candidate(&files, sort_order, block_eligible) {
-        Some(scan) => ScanSource::Blocks(scan),
-        None if preference.streaming && sort_order.is_sorted() && hash_streams => {
-            ScanSource::HashSorted
-        }
-        None => ScanSource::Table,
-    };
     let ctx = metrics_session_context(&session, sort_order).await?;
     // declaring the order on a materialized table would change its file grouping
     let table_order = match &source {
@@ -303,6 +295,31 @@ pub(crate) async fn create_context(
         keep_filters,
         source,
     }))
+}
+
+/// Picks the source the evaluator reads, before any file is cached or index-selected.
+fn scan_source(
+    schema: &arrow::datatypes::Schema,
+    files: &[FileKey],
+    matchers: &Matchers,
+    preference: &SourcePreference<'_>,
+    sort_order: FileSortOrder,
+    index_enabled: bool,
+) -> ScanSource {
+    if !preference.streaming || !sort_order.is_sorted() || !hash_column_streams(schema) {
+        return ScanSource::Table;
+    }
+    if index_enabled
+        && files.iter().all(block_parent_eligible)
+        && block_output_labels_supported(schema, preference.output_labels)
+        && block_matchers_supported(schema, matchers)
+    {
+        ScanSource::Blocks(Arc::new(MetricsBlockScan {
+            files: files.to_vec(),
+        }))
+    } else {
+        ScanSource::HashSorted
+    }
 }
 
 fn block_parent_eligible(file: &FileKey) -> bool {
@@ -354,22 +371,6 @@ fn hash_column_streams(schema: &arrow::datatypes::Schema) -> bool {
     schema
         .field_with_name(HASH_LABEL)
         .is_ok_and(|field| field.data_type() == &arrow::datatypes::DataType::UInt64)
-}
-
-fn block_scan_candidate(
-    files: &[FileKey],
-    sort_order: FileSortOrder,
-    enabled: bool,
-) -> Option<Arc<MetricsBlockScan>> {
-    (enabled
-        && sort_order == FileSortOrder::HashTimestampAsc
-        && !files.is_empty()
-        && files.iter().all(block_parent_eligible))
-    .then(|| {
-        Arc::new(MetricsBlockScan {
-            files: files.to_vec(),
-        })
-    })
 }
 
 /// Prefetch the `.midx` sidecars like the Tantivy path prefetches `.ttv` files:
@@ -487,22 +488,89 @@ mod tests {
         )
     }
 
+    fn source(
+        files: &[FileKey],
+        streaming: bool,
+        sort_order: FileSortOrder,
+        index_enabled: bool,
+        hash: DataType,
+    ) -> ScanSource {
+        let schema = Schema::new(vec![
+            Field::new(HASH_LABEL, hash, false),
+            Field::new("path", DataType::Utf8, true),
+        ]);
+        let output_labels = HashSet::new();
+        let preference = SourcePreference {
+            streaming,
+            output_labels: &output_labels,
+        };
+        scan_source(
+            &schema,
+            files,
+            &Matchers::empty(),
+            &preference,
+            sort_order,
+            index_enabled,
+        )
+    }
+
     #[test]
     fn unfiltered_scan_uses_all_rows_without_source_selection() {
         let files = vec![file(100)];
-        let scan = block_scan_candidate(&files, FileSortOrder::HashTimestampAsc, true).unwrap();
+        let ScanSource::Blocks(scan) = source(
+            &files,
+            true,
+            FileSortOrder::HashTimestampAsc,
+            true,
+            DataType::UInt64,
+        ) else {
+            panic!("indexed files with sidecars read blocks");
+        };
         assert_eq!(scan.files.len(), 1);
         assert!(files[0].selection.is_none());
     }
 
     #[test]
-    fn filtered_scan_is_chosen_before_row_selection() {
+    fn scan_source_needs_every_block_condition() {
         let files = vec![file(100)];
-        assert!(block_scan_candidate(&files, FileSortOrder::HashTimestampAsc, true).is_some());
-        assert!(block_scan_candidate(&files, FileSortOrder::HashTimestampAsc, false).is_none());
+        let sorted = FileSortOrder::HashTimestampAsc;
+        let is = |source: ScanSource| match source {
+            ScanSource::Table => "table",
+            ScanSource::HashSorted => "hash_sorted",
+            ScanSource::Blocks(_) => "blocks",
+        };
+        assert_eq!(
+            is(source(&files, true, sorted, true, DataType::UInt64)),
+            "blocks"
+        );
+        assert_eq!(
+            is(source(&files, false, sorted, true, DataType::UInt64)),
+            "table"
+        );
+        assert_eq!(
+            is(source(
+                &files,
+                true,
+                FileSortOrder::None,
+                true,
+                DataType::UInt64
+            )),
+            "table"
+        );
+        assert_eq!(
+            is(source(&files, true, sorted, true, DataType::Utf8)),
+            "table"
+        );
+        assert_eq!(
+            is(source(&files, true, sorted, false, DataType::UInt64)),
+            "hash_sorted"
+        );
         let mut missing = files;
         missing[0].meta.mindex_size = 0;
-        assert!(block_scan_candidate(&missing, FileSortOrder::HashTimestampAsc, true).is_none());
+        assert_eq!(
+            is(source(&missing, true, sorted, true, DataType::UInt64)),
+            "hash_sorted"
+        );
     }
 
     #[test]
