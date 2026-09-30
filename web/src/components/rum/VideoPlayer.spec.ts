@@ -1262,17 +1262,17 @@ describe("VideoPlayer", () => {
       local.unmount();
     });
 
-    it("reads Live while live and never Fully loaded", async () => {
+    it("shows no chip while live and never Fully loaded", async () => {
       vi.useFakeTimers();
       try {
         const { local } = await mountPlayer({ loadPercent: 45.6 });
         await local.setProps({ loadState: "live", loadPercent: 100 });
         const chip = () => local.find('[data-test="replay-status-chip"]');
-        expect(chip().text()).toBe("Live");
+        expect(chip().exists()).toBe(false);
 
         vi.advanceTimersByTime(5000);
         await local.vm.$nextTick();
-        expect(chip().text()).toBe("Live");
+        expect(chip().exists()).toBe(false);
 
         await local.setProps({ loadState: "complete" });
         expect(chip().exists()).toBe(false);

@@ -25,10 +25,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <template v-if="isLive && loadState !== 'error'" #title-trail>
-      <OBadge variant="success" size="sm" dot data-test="session-viewer-live-badge">{{
-        t("rum.sessionReplayLiveBadge")
-      }}</OBadge>
+    <template #title>
+      <span class="inline-flex max-w-full min-w-0 items-center gap-2">
+        <span class="truncate">{{
+          sessionDetails.id ? raw(sessionDetails.id) : t("rum.sessionReplay")
+        }}</span>
+        <OBadge
+          v-if="isLive && loadState !== 'error'"
+          variant="success"
+          size="sm"
+          dot
+          class="shrink-0"
+          data-test="session-viewer-live-badge"
+          >{{ t("rum.sessionReplayLiveBadge") }}</OBadge
+        >
+      </span>
     </template>
     <template v-if="!sessionNotFound" #subtitle>
       <div

@@ -18,8 +18,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import ReplayStatusChip from "./ReplayStatusChip.vue";
 
-const PULSE = "motion-safe:animate-pulse";
-
 function mountChip(loadState: string) {
   return mount(ReplayStatusChip, {
     props: { loadState: loadState as any },
@@ -31,36 +29,32 @@ function dotClasses(wrapper: VueWrapper) {
   return wrapper.find('[data-test="replay-status-chip"] > span').classes();
 }
 
-describe("ReplayStatusChip dot", () => {
+describe("ReplayStatusChip", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
     wrapper.unmount();
   });
 
-  it("shows a pulsing success dot while the session is live", () => {
-    wrapper = mountChip("live");
+  it("shows nothing while the session is live, even once fully loaded", async () => {
+    wrapper = mountChip("loading");
+    await wrapper.setProps({ loadState: "live" });
 
-    const classes = dotClasses(wrapper);
-    expect(classes).toContain("bg-badge-success-solid-bg");
-    expect(classes).toContain(PULSE);
-    expect(classes).not.toContain("bg-badge-error-solid-bg");
+    expect(wrapper.find('[data-test="replay-status-chip"]').exists()).toBe(false);
   });
 
-  it("shows a static primary dot while loading", () => {
+  it("shows a primary dot while loading", () => {
     wrapper = mountChip("loading");
 
     const classes = dotClasses(wrapper);
     expect(classes).toContain("bg-button-primary");
-    expect(classes).not.toContain(PULSE);
   });
 
-  it("shows a static teal dot once a load completes", async () => {
+  it("shows a teal dot once a load completes", async () => {
     wrapper = mountChip("loading");
     await wrapper.setProps({ loadState: "complete" });
 
     const classes = dotClasses(wrapper);
     expect(classes).toContain("bg-badge-teal-solid-bg");
-    expect(classes).not.toContain(PULSE);
   });
 });

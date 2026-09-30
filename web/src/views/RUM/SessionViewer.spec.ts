@@ -2047,7 +2047,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     const vm = live.vm as any;
     expect(vm.isLive).toBe(true);
     expect(vm.loadState).toBe("live");
-    expect(live.find('[data-test="session-viewer-live-badge"]').text()).toBe("LIVE");
+    expect(live.find('[data-test="session-viewer-live-badge"]').text()).toBe("Live");
     const liveBadge = live
       .findAllComponents(OBadge)
       .find((badge) => badge.attributes("data-test") === "session-viewer-live-badge");
@@ -2423,7 +2423,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     wrapper.unmount();
   });
 
-  it("drops the LIVE badge when there is no manifest to follow or the load failed", async () => {
+  it("drops the Live badge when there is no manifest to follow or the load failed", async () => {
     server.rows = [];
     const empty = await mountLive();
     expect((empty.vm as any).loadState).toBe("empty");

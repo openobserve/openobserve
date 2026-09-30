@@ -59,8 +59,6 @@ const label = computed(() => {
   if (props.loadState === "loading") {
     return t("rum.sessionReplayLoadingPercent", { percent: Math.floor(props.loadPercent) });
   }
-  // Live never reads "Fully loaded": more of the session is still being recorded.
-  if (props.loadState === "live") return t("rum.sessionReplayLiveChip");
   if (props.loadState === "complete" && showFullyLoaded.value) {
     return t("rum.sessionReplayFullyLoaded");
   }
@@ -68,7 +66,6 @@ const label = computed(() => {
 });
 
 const dotClass = computed(() => {
-  if (props.loadState === "live") return "bg-badge-success-solid-bg motion-safe:animate-pulse";
   return props.loadState === "complete" ? "bg-badge-teal-solid-bg" : "bg-button-primary";
 });
 
