@@ -265,50 +265,63 @@ describe("ImportFunction", () => {
     });
   });
 
+  // Nothing is held back by this screen. It validates the shape of the document
+  // and sends every item, the way the pipeline and template import screens do; a
+  // name the org already holds is the server's answer, not a local guess. The
+  // old pre-check needed a prompt raised on one press and acted on by the next,
+  // and that second press silently kept the existing function.
   describe("name already exists", () => {
     const conflicting = { name: "parse_nginx", function: ".b = 2", params: "row", transType: 0 };
+    const serverRejectsClash = () =>
+      mockCreate.mockRejectedValueOnce({
+        response: { data: { message: "Function already exist" } },
+      });
 
-    it("surfaces the conflict on the first press and writes nothing", async () => {
+    it("sends the item and reports what the server said", async () => {
+      serverRejectsClash();
       const wrapper = mountScreen();
       await flushPromises();
 
       await importJson(wrapper, conflicting);
 
-      expect(mockCreate).not.toHaveBeenCalled();
-      expect(mockUpdate).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain('"parse_nginx" already exists');
-      expect(wrapper.find('[data-test="function-import-error-0-0"]').exists()).toBe(true);
-    });
-
-    it("keeps the existing function when the choice is left at its default", async () => {
-      const wrapper = mountScreen();
-      await flushPromises();
-
-      await importJson(wrapper, conflicting);
-      await pressImport(wrapper);
-
-      expect(mockCreate).not.toHaveBeenCalled();
-      expect(mockUpdate).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain("the existing function was kept");
-    });
-
-    it("says nothing was imported when every item is skipped", async () => {
-      const wrapper = mountScreen();
-      await flushPromises();
-
-      await importJson(wrapper, conflicting);
-      await pressImport(wrapper);
-
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "info",
-          message: expect.stringContaining("Nothing imported"),
-        }),
-      );
+      // Sent, not withheld: no press of this screen quietly declines to try.
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(wrapper.text()).toContain("already exist");
       expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
+    it("offers the name box and the replace checkbox on the rejection", async () => {
+      serverRejectsClash();
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+
+      // The controls are async components jsdom never mounts, so what is
+      // asserted is the field the pane renders the name box and checkbox from.
+      expect(wrapper.vm.functionErrors.at(-1).map((e: any) => e.field)).toEqual(["name_exists"]);
+    });
+
+    it("imports under a new name when the clash is renamed away", async () => {
+      serverRejectsClash();
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      wrapper.vm.updateFunctionName("parse_nginx_v2", 0);
+      await nextTick();
+      await pressImport(wrapper);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockCreate.mock.calls[1][1]).toMatchObject({
+        name: "parse_nginx_v2",
+        function: ".b = 2",
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
     it("overrides through PUT once the user asks to replace the existing one", async () => {
+      serverRejectsClash();
       const wrapper = mountScreen();
       await flushPromises();
 
@@ -322,10 +335,10 @@ describe("ImportFunction", () => {
         name: "parse_nginx",
         function: ".b = 2",
       });
-      expect(mockCreate).not.toHaveBeenCalled();
     });
 
     it("names the pipelines an override would change", async () => {
+      serverRejectsClash();
       const wrapper = mountScreen();
       await flushPromises();
 
@@ -338,9 +351,10 @@ describe("ImportFunction", () => {
       expect(wrapper.text()).toContain("nginx_ingest");
     });
 
-    // The choice belonged to the file that raised it. Kept across a new file —
-    // and keyed by position — it silently overrode whatever sat at that index.
+    // The choice belonged to the file that raised it. Kept across a new file it
+    // would replace whatever arrived under that name next.
     it("drops the choices made for one file when another is loaded", async () => {
+      serverRejectsClash();
       const wrapper = mountScreen();
       await flushPromises();
 
@@ -348,39 +362,15 @@ describe("ImportFunction", () => {
       await wrapper.vm.onOverrideChoice("parse_nginx", 0, true);
       await flushPromises();
 
-      // A different file, a different existing function, same position.
-      await importJson(wrapper, { name: "parse_json", function: ".c = 3" });
+      await loadDocument(wrapper, { name: "parse_json", function: ".c = 3" });
 
-      expect(mockUpdate).not.toHaveBeenCalled();
-      expect(mockCreate).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain('"parse_json" already exists');
       expect(wrapper.vm.overrideExisting).toEqual({});
     });
 
-    // Skipping and overriding were the only two ways out of a clash, so the
-    // obvious third — bring it in under a free name — meant hand-editing the JSON.
-    it("imports under a new name when the clash is renamed away", async () => {
-      const wrapper = mountScreen();
-      await flushPromises();
-
-      await importJson(wrapper, conflicting);
-      expect(wrapper.text()).toContain('"parse_nginx" already exists');
-
-      wrapper.vm.updateFunctionName("parse_nginx_v2", 0);
-      await nextTick();
-      await pressImport(wrapper);
-
-      expect(mockCreate).toHaveBeenCalledTimes(1);
-      expect(mockCreate.mock.calls[0][1]).toMatchObject({
-        name: "parse_nginx_v2",
-        function: ".b = 2",
-      });
-      expect(mockUpdate).not.toHaveBeenCalled();
-    });
-
-    // The rename box wrote whatever was typed and only complained on the next
-    // press, so a name that could never work took a round trip to find out.
+    // The name box says what it can about what is typed. What the ORG holds is
+    // not among it — that answer only exists on the server.
     it("judges what is typed into the name box as it is typed", async () => {
+      serverRejectsClash();
       const wrapper = mountScreen();
       await flushPromises();
 
@@ -389,10 +379,6 @@ describe("ImportFunction", () => {
       wrapper.vm.updateFunctionName("not a name", 0);
       await nextTick();
       expect(wrapper.vm.nameInputError[0]).toContain("letters, numbers and underscores");
-
-      wrapper.vm.updateFunctionName("parse_json", 0);
-      await nextTick();
-      expect(wrapper.vm.nameInputError[0]).toContain("already taken");
 
       wrapper.vm.updateFunctionName("", 0);
       await nextTick();
@@ -403,8 +389,6 @@ describe("ImportFunction", () => {
       expect(wrapper.vm.nameInputError[0]).toBeNull();
     });
 
-    // Two items may not both claim one name, and the box has to say so before
-    // the press turns it into a server 400 that reads like an unrelated clash.
     it("catches a rename that collides with another item in the same file", async () => {
       const wrapper = mountScreen();
       await flushPromises();
@@ -419,89 +403,17 @@ describe("ImportFunction", () => {
       expect(wrapper.vm.nameInputError[1]).toContain("Another function in this file");
     });
 
-    // Replacing the existing one is a decision about that name, so the box has
-    // nothing left to object to.
-    it("drops the name box's objection once the user chooses to replace", async () => {
-      const wrapper = mountScreen();
-      await flushPromises();
-
-      await importJson(wrapper, conflicting);
-      wrapper.vm.updateFunctionName("parse_nginx", 0);
-      await nextTick();
-      expect(wrapper.vm.nameInputError[0]).toContain("already taken");
-
-      await wrapper.vm.onOverrideChoice("parse_nginx", 0, true);
-      await flushPromises();
-      expect(wrapper.vm.nameInputError[0]).toBeNull();
-    });
-
-    // The clash was reported once per screen, so a name typed into the rename
-    // box was skipped with no prompt at all.
-    it("prompts for a clash the rename box introduces", async () => {
-      const wrapper = mountScreen();
-      await flushPromises();
-
-      await importJson(wrapper, { function: ".a = 1" });
-      expect(wrapper.text()).toContain("name is required");
-
-      wrapper.vm.updateFunctionName("parse_nginx", 0);
-      await nextTick();
-      await flushPromises();
-      await pressImport(wrapper);
-
-      expect(mockCreate).not.toHaveBeenCalled();
-      expect(mockUpdate).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain('"parse_nginx" already exists');
-    });
-
-    // Pressing Import again is the obvious next move on "already exists", and it
-    // used to be the press that cleared the name box and the replace checkbox,
-    // leaving the raw JSON as the only way to rename.
-    it("keeps the clash controls on screen after it skips", async () => {
-      const wrapper = mountScreen();
-      await flushPromises();
-
-      await importJson(wrapper, conflicting);
-      expect(wrapper.text()).toContain('"parse_nginx" already exists');
-
-      await pressImport(wrapper);
-
-      expect(wrapper.text()).toContain("skipped, the existing function was kept");
-      expect(wrapper.text()).toContain('"parse_nginx" already exists');
-      expect(wrapper.find('[data-test="function-import-override-checkbox-0"]').exists()).toBe(true);
-    });
-
-    // ...and the rename is still one edit away rather than a reload of the file.
-    it("still takes a rename after the skip", async () => {
-      const wrapper = mountScreen();
-      await flushPromises();
-
-      await importJson(wrapper, conflicting);
-      await pressImport(wrapper);
-
-      wrapper.vm.updateFunctionName("parse_nginx_v2", 0);
-      await nextTick();
-      await pressImport(wrapper);
-
-      expect(mockCreate).toHaveBeenCalledTimes(1);
-      expect(mockCreate.mock.calls[0][1]).toMatchObject({ name: "parse_nginx_v2" });
-    });
-
-    // The picker has to stay reachable while a second item is still being
-    // fixed, even though its own clash no longer holds the import back.
-    it("keeps the picker on screen while another item is still invalid", async () => {
+    // A document that is not shaped right is not sent at all — that part is the
+    // screen's to judge, and it is the only thing that stops a press.
+    it("sends nothing while any item is malformed", async () => {
       const wrapper = mountScreen();
       await flushPromises();
 
       await importJson(wrapper, [conflicting, { name: "fn_b", function: "  " }]);
-      expect(wrapper.text()).toContain('"parse_nginx" already exists');
-
-      await pressImport(wrapper);
 
       expect(mockCreate).not.toHaveBeenCalled();
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("function body is required");
-      expect(wrapper.text()).toContain('"parse_nginx" already exists');
     });
   });
 
@@ -624,9 +536,11 @@ describe("ImportFunction", () => {
       expect(wrapper.text()).toContain("read as VRL");
       // The controls themselves are async components that jsdom never mounts, so
       // what is asserted is the pair of fields the pane renders them from.
+      // Language first: it is the smaller control and it decides how the body
+      // below it is read.
       expect(wrapper.vm.functionErrors.at(-1).map((e: any) => e.field)).toEqual([
-        "function_body",
         "trans_type",
+        "function_body",
       ]);
     });
 
@@ -687,7 +601,8 @@ describe("ImportFunction", () => {
   });
 
   // Under RBAC the list is filtered, so a name can be taken without the screen
-  // ever seeing it; the 400 is the only signal.
+  // ever being able to see it. Since nothing is pre-checked, that case is not
+  // special: the server answers, and the same controls appear.
   it("turns a server-reported clash into the same conflict prompt", async () => {
     mockCreate.mockRejectedValueOnce({ response: { data: { message: "Function already exist" } } });
     const wrapper = mountScreen();
@@ -696,8 +611,7 @@ describe("ImportFunction", () => {
     const invisible = { name: "hidden_fn", function: ".a = 1", params: "row", transType: 0 };
     await importJson(wrapper, invisible);
 
-    expect(wrapper.text()).toContain('"hidden_fn" already exists');
-    expect(wrapper.text()).not.toContain("failed");
+    expect(wrapper.text()).toContain("already exist");
     expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
 
     // Override then writes through PUT, even though the list never showed it.
@@ -707,29 +621,6 @@ describe("ImportFunction", () => {
 
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(mockUpdate.mock.calls[0][1]).toMatchObject({ name: "hidden_fn" });
-  });
-
-  // After a partial run the second press used to report the functions the first
-  // press created as "skipped, the existing function was kept".
-  it("says what this run already wrote, and does not write it twice", async () => {
-    mockCreate
-      .mockResolvedValueOnce({ data: { code: 200 } })
-      .mockRejectedValueOnce({ response: { data: { message: "Function already exist" } } });
-    const wrapper = mountScreen();
-    await flushPromises();
-
-    await importJson(wrapper, [
-      { name: "fn_a", function: ".a = 1" },
-      { name: "hidden_fn", function: ".b = 2" },
-    ]);
-    expect(mockCreate).toHaveBeenCalledTimes(2);
-
-    await pressImport(wrapper);
-
-    expect(mockCreate).toHaveBeenCalledTimes(2);
-    expect(wrapper.find('[data-test="function-import-result-0"]').text()).toContain(
-      "already imported by this run",
-    );
   });
 
   // A run rarely goes in on one press: something fails, the user fixes it in the
@@ -776,14 +667,13 @@ describe("ImportFunction", () => {
         { name: "b_fn", function: ".b = 2" },
       ]);
 
-      // a_fn is neither re-sent nor held up for a clash it caused itself.
-      expect(wrapper.text()).not.toContain('"a_fn" already exists');
-      expect(wrapper.find('[data-test="function-import-result-0"]').text()).toContain(
-        "already imported by this run",
-      );
+      // a_fn goes back as an update of this run's own work, not as a clash it
+      // caused itself — and never as something set aside.
+      expect(wrapper.text()).not.toContain("already exist");
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdate.mock.calls[0][1]).toMatchObject({ name: "a_fn" });
       expect(mockCreate).toHaveBeenCalledTimes(3);
       expect(mockCreate.mock.calls[2][1]).toMatchObject({ name: "b_fn", function: ".b = 2" });
-      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     // The other half of owning what it wrote: an edit to that function is this
@@ -800,8 +690,8 @@ describe("ImportFunction", () => {
 
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockUpdate.mock.calls[0][1]).toMatchObject({ name: "a_fn", function: ".a = 2" });
-      expect(wrapper.text()).toContain("re-imported with your change");
-      expect(wrapper.text()).not.toContain('"a_fn" already exists');
+      expect(wrapper.text()).toContain("overridden");
+      expect(wrapper.text()).not.toContain("already exist");
     });
   });
 

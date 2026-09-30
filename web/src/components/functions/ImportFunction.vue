@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineAsyncComponent, defineComponent, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useMutation } from "@tanstack/vue-query";
 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
@@ -240,10 +240,10 @@ import BaseImport from "../common/BaseImport.vue";
 import { functionNameRegex } from "./AddFunction.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import jsTransformService from "@/services/jstransform";
-import { functionsQuery, saveFunctionMutation } from "@/services/jstransform.queries";
+import { saveFunctionMutation } from "@/services/jstransform.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 
-type ImportStatus = "created" | "overridden" | "skipped" | "failed";
+type ImportStatus = "created" | "overridden" | "failed";
 
 // Every validation names the field it is about, so the output pane can put the
 // control that fixes it next to the message instead of asking the user to go
@@ -253,8 +253,6 @@ type FieldError = {
   message: I18nText;
   itemIndex: number;
   name: string;
-  /** False = shown for context but does not hold the import back. */
-  blocking: boolean;
 };
 
 // A plain I18nText is a branded string, so `typeof e === "object"` is what
@@ -304,20 +302,11 @@ export default defineComponent({
     const overrideExisting = ref<Record<string, boolean>>({});
     const dependentPipelines = ref<Record<string, string[]>>({});
 
-    // Names whose clash has been put on screen with a picker. A conflict is
-    // surfaced once and written on the next press, so the user never has an
-    // existing function replaced by a click they did not make. Per name rather
-    // than one flag for the screen: a rename, or a second file, brings names
-    // that have never been confirmed and must be prompted for in their own right.
-    const conflictsSurfaced = ref<Set<string>>(new Set());
-
     // What this run has written: name -> the payload that was sent. NOT reset
-    // with the rest, because it describes the server rather than the editor —
-    // a function created by the first press exists whatever the user does to
-    // the document next. Fixing one item's VRL and pressing again must not
-    // re-prompt for the item that already went in, nor write it twice; it is
-    // re-sent only if its own definition changed, which is an update of this
-    // run's own work and needs no permission. Only the org owns it.
+    // with the rest, because it describes the server rather than the editor — a
+    // function created by the first press exists whatever the user does to the
+    // document next. Fixing one item and pressing again is the normal retry, and
+    // it must not have the server reject everything the first press created.
     const writtenByThisRun = ref<Map<string, string>>(new Map());
 
     // The same entitlement the Add Function form applies. Offering JavaScript
@@ -335,10 +324,6 @@ export default defineComponent({
       if (isJsAllowed.value) options.push({ label: raw("JavaScript"), value: "1" });
       return options;
     });
-
-    const existingFunctions = useQuery(() =>
-      Object.assign(functionsQuery(orgId.value), { enabled: !!orgId.value }),
-    );
 
     // Set at each call site, so one declared mutation covers both create and override.
     const isOverride = ref(false);
@@ -362,24 +347,12 @@ export default defineComponent({
 
     const triggerImport = () => baseImportRef.value?.handleImport();
 
-    const resultClass = (status: ImportStatus) => {
-      if (status === "failed") return "text-status-negative";
-      if (status === "skipped") return "text-text-secondary";
-      return "text-status-positive";
-    };
+    const resultClass = (status: ImportStatus) =>
+      status === "failed" ? "text-status-negative" : "text-status-positive";
 
-    // Under RBAC the list is filtered to what the user may read, so a name can
-    // exist without appearing here; the server's 400 is what reveals it.
-    const serverReportedExisting = ref<Set<string>>(new Set());
-
-    const nameExists = (name: string) =>
-      (existingFunctions.data.value ?? []).some((fn: any) => fn.name === name) ||
-      serverReportedExisting.value.has(name);
-
-    // Both caches describe one org's functions and mean nothing in the next.
+    // Describes one org's functions and means nothing in the next.
     watch(orgId, () => {
       writtenByThisRun.value = new Map();
-      serverReportedExisting.value = new Set();
     });
 
     // ── Document identity ──────────────────────────────────────────────────
@@ -399,7 +372,6 @@ export default defineComponent({
       nameInputError.value = {};
       overrideExisting.value = {};
       dependentPipelines.value = {};
-      conflictsSurfaced.value = new Set();
     };
 
     // Compared on CONTENT, not on the text: BaseImport reformats what it holds
@@ -455,11 +427,8 @@ export default defineComponent({
       if (items.some((other, i) => i !== index && other?.name === name)) {
         return t("function.import.nameInputDuplicate");
       }
-      // Written by this run, so sending it again updates our own work.
-      if (writtenByThisRun.value.has(name)) return null;
-      if (nameExists(name) && !overrideExisting.value[name]) {
-        return t("function.import.nameInputExists");
-      }
+      // Whether the org already holds this name is not asked here: that is the
+      // server's answer, and it arrives as a rejection carrying this same box.
       return null;
     };
 
@@ -532,7 +501,6 @@ export default defineComponent({
       message,
       itemIndex,
       name,
-      blocking: true,
     });
 
     const validate = (item: any, index: number, itemIndex: number, seen: Set<string>) => {
@@ -548,21 +516,20 @@ export default defineComponent({
         // catches " parse_nginx ", whose spaces would hide a real clash.
         errors.push(nameError(t("function.import.nameInvalid", { index, name }), itemIndex, name));
       } else if (seen.has(name)) {
-        // Left undetected, the second copy lands as a server 400 that reads as a
-        // clash — and overriding it would replace what this same import created.
+        // Two items in one file cannot both claim a name. This one is about the
+        // document, not the org, so it is the import screen's to catch.
         errors.push(
           nameError(t("function.import.duplicateName", { index, name }), itemIndex, name),
         );
-      } else if (!writtenByThisRun.value.has(name) && nameExists(name)) {
-        errors.push({
-          field: "name_exists",
-          message: t("function.import.nameExists", { index, name }),
-          itemIndex,
-          name,
-          blocking: !conflictsSurfaced.value.has(name),
-        });
       }
       if (name) seen.add(name);
+
+      // Whether the ORG already has this name is deliberately not checked here.
+      // Every other import screen validates the shape of the document and lets
+      // the server judge the rest, so a clash arrives as a rejection carrying the
+      // box that renames it. Pre-empting it needed a prompt that was raised on
+      // one press and acted on by the next, which is what produced a press that
+      // silently kept the existing function.
 
       if (!item?.function || typeof item.function !== "string" || !item.function.trim()) {
         errors.push({
@@ -570,7 +537,6 @@ export default defineComponent({
           message: t("function.import.bodyRequired", { index }),
           itemIndex,
           name,
-          blocking: true,
         });
       }
 
@@ -581,7 +547,6 @@ export default defineComponent({
           message: t("function.import.transTypeInvalid", { index }),
           itemIndex,
           name,
-          blocking: true,
         });
       }
 
@@ -591,7 +556,6 @@ export default defineComponent({
           message: t("function.import.paramsInvalid", { index }),
           itemIndex,
           name,
-          blocking: true,
         });
       }
 
@@ -603,42 +567,31 @@ export default defineComponent({
       message: t("function.import.nameExists", { index, name: item.name }),
       itemIndex,
       name: item.name,
-      blocking: false,
     });
 
     // The server judged the definition — a VRL or JavaScript compile error, or
     // anything else it would not take. The result line carries its reasoning; the
-    // controls carry the fix. Both are offered, because the commonest cause is a
-    // JavaScript body with no `transType`, which defaults to VRL and is then read
-    // by the VRL compiler: the body looks fine and the language is what is wrong.
+    // controls carry the fix.
+    //
+    // Language comes FIRST, above the editor. It is the smaller control, and it
+    // decides how the body is read: the commonest rejection here is a JavaScript
+    // body with no `transType`, which defaults to VRL and is then handed to the
+    // VRL compiler. The body is not wrong in that case, so asking about it first
+    // — under a tall editor — sends the user to correct code that already works.
     const rejectionErrors = (item: any, index: number, itemIndex: number): ImportError[] => [
       {
-        field: "function_body",
-        message: t("function.import.rejectedBody", { index, name: item.name }),
+        field: "trans_type",
+        message: t("function.import.rejectedLanguage", { index, name: item.name }),
         itemIndex,
         name: item.name,
-        blocking: false,
       },
       {
-        field: "trans_type",
-        message: t("function.import.rejectedLanguage"),
+        field: "function_body",
+        message: t("function.import.rejectedBody"),
         itemIndex,
         name: item.name,
-        blocking: false,
       },
     ];
-
-    // Remembering what the user has now been shown, so the next press acts on the
-    // picker rather than reporting the same clash again.
-    const rememberSurfacedConflicts = (groups: ImportError[][]) => {
-      for (const group of groups) {
-        for (const error of group) {
-          if (typeof error === "object" && error.field === "name_exists") {
-            conflictsSurfaced.value.add(error.name);
-          }
-        }
-      }
-    };
 
     // Built once: it is both what is sent and what is remembered, so "did this
     // item change since we wrote it?" compares like with like.
@@ -649,35 +602,29 @@ export default defineComponent({
       transType: parseInt(String(item.transType ?? 0)),
     });
 
-    const writeFunction = async (item: any, index: number) => {
+    const writeFunction = async (item: any, index: number, itemIndex: number) => {
       const name: string = item.name;
       const payload = payloadFor(item);
-      // Ours already: it exists because this run created it, so a changed
-      // definition goes back as an update and needs no conflict prompt.
+      // Ours already: it exists because an earlier press of this run created it,
+      // so re-sending is an update of this run's own work. Without this a second
+      // press — the normal way to retry after fixing one item — would have the
+      // server reject everything the first press created.
       const ours = writtenByThisRun.value.has(name);
-      const override = ours || (nameExists(name) && overrideExisting.value[name] === true);
+      const override = ours || overrideExisting.value[name] === true;
       isOverride.value = override;
 
       try {
         await saveFunction.mutateAsync(payload);
         writtenByThisRun.value.set(name, JSON.stringify(payload));
         importResults.value.push({
-          message: ours
-            ? t("function.import.reimported", { index, name })
-            : override
-              ? t("function.import.overridden", { index, name })
-              : t("function.import.createSuccess", { index, name }),
+          message: override
+            ? t("function.import.overridden", { index, name })
+            : t("function.import.createSuccess", { index, name }),
           status: override ? "overridden" : "created",
         });
-        return override ? "overridden" : "created";
+        return null;
       } catch (error: any) {
         const reason = error?.response?.data?.message ?? error?.message ?? "";
-        // The name was taken after all, so the user gets the same choice a
-        // visible clash would have offered rather than a dead failure line.
-        if (/already exist/i.test(String(reason))) {
-          serverReportedExisting.value.add(name);
-          return "conflict";
-        }
         importResults.value.push({
           message: t("function.import.createFailed", {
             index,
@@ -686,7 +633,11 @@ export default defineComponent({
           }),
           status: "failed",
         });
-        return "failed";
+        // A taken name is the one rejection with a specific fix, so it gets the
+        // box that renames it rather than the generic pair.
+        return /already exist/i.test(String(reason))
+          ? [conflictError(item, index, itemIndex)]
+          : rejectionErrors(item, index, itemIndex);
       }
     };
 
@@ -728,84 +679,28 @@ export default defineComponent({
       const errorGroups = items
         .map((item, i) => validate(item, i + 1, i, seen))
         .filter((group) => group.length > 0);
-      const isBlocking = (error: ImportError) => typeof error !== "object" || error.blocking;
-      if (errorGroups.some((group) => group.some(isBlocking))) {
+      // The document has to be shaped right before any of it is sent; what the
+      // org already holds is the server's to judge.
+      if (errorGroups.length > 0) {
         functionErrors.value = errorGroups;
-        rememberSurfacedConflicts(errorGroups);
         isImporting.value = false;
         if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
         return;
       }
 
       let written = 0;
-      let failed = 0;
-      let skipped = 0;
-      const lateConflicts: ImportError[][] = [];
-      // Clashes this press chose to skip, and items the server refused. Both end
-      // up back on screen: pressing Import again is the user's next move, and it
-      // must not be the press that takes their controls away.
-      const stillOpen: ImportError[][] = [];
+      // What the server refused, each with the control that answers it. Nothing
+      // is held back by this screen, so every item here was actually attempted.
+      const rejected: ImportError[][] = [];
       for (const [itemIndex, item] of items.entries()) {
-        const index = itemIndex + 1;
-        const name: string = item.name;
-        // Written by an earlier press, so it exists now because of this import
-        // — not because the user is keeping an older one. Unchanged since, so
-        // there is nothing to send; a changed definition falls through and is
-        // updated below without a prompt.
-        if (writtenByThisRun.value.get(name) === JSON.stringify(payloadFor(item))) {
-          importResults.value.push({
-            message: t("function.import.alreadyImported", { index, name }),
-            status: "skipped",
-          });
-          skipped++;
-          continue;
-        }
-        if (
-          !writtenByThisRun.value.has(name) &&
-          nameExists(name) &&
-          !overrideExisting.value[name]
-        ) {
-          importResults.value.push({
-            message: t("function.import.skipped", { index, name }),
-            status: "skipped",
-          });
-          // The clash is unresolved, not settled: the name box and the replace
-          // checkbox stay beside the skip line so a rename is still one edit
-          // away rather than a reload of the file.
-          stillOpen.push([conflictError(item, index, itemIndex)]);
-          skipped++;
-          continue;
-        }
-        const outcome = await writeFunction(item, index);
-        if (outcome === "conflict") {
-          lateConflicts.push([conflictError(item, index, itemIndex)]);
-        } else if (outcome === "failed") {
-          failed++;
-          stillOpen.push(rejectionErrors(item, index, itemIndex));
-        } else {
-          written++;
-        }
+        const errors = await writeFunction(item, itemIndex + 1, itemIndex);
+        if (errors) rejected.push(errors);
+        else written++;
       }
 
-      if (lateConflicts.length > 0) {
-        functionErrors.value = [...functionErrors.value, ...lateConflicts];
-        rememberSurfacedConflicts(lateConflicts);
-      }
-
-      // Not run through rememberSurfacedConflicts: these clashes were already
-      // surfaced by the press that skipped them, and a rejection is not a clash.
-      if (stillOpen.length > 0) {
-        functionErrors.value = [...functionErrors.value, ...stillOpen];
-      }
-
-      // Nothing was written, so the run stays on screen with its skipped lines
-      // rather than reporting an import that did not happen.
-      if (failed === 0 && lateConflicts.length === 0 && written === 0 && skipped > 0) {
-        toast({
-          message: t("function.import.allSkipped", { count: skipped }, skipped),
-          variant: "info",
-        });
-      } else if (failed === 0 && lateConflicts.length === 0) {
+      if (rejected.length > 0) {
+        functionErrors.value = rejected;
+      } else {
         toast({
           message: t("function.import.importSuccess", { count: written }, written),
           variant: "success",
