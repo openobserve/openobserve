@@ -13016,4 +13016,141 @@ export class LogsPage {
         return values;
     }
 
+    /**
+     * Poll the search API until a seeded window is fully searchable.
+     *
+     * Ingest acknowledges before every row is indexed, so a page loaded straight
+     * after seeding queries an arbitrary prefix. Settling over the API first costs
+     * one request per poll, where settling through the UI re-runs the whole render.
+     */
+    async waitForSearchableRowCount(stream, expected, startTimeMicros, endTimeMicros, timeout = 90000) {
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.ZO_BASE_URL}/api/${orgId}/_search?type=logs&use_cache=false`;
+        let last = null;
+        await expect.poll(async () => {
+            const resp = await this.page.request.post(url, {
+                headers: getAuthHeaders(),
+                data: {
+                    query: {
+                        sql: `SELECT COUNT(*) AS cnt FROM "${stream}"`,
+                        start_time: startTimeMicros,
+                        end_time: endTimeMicros,
+                        size: 1,
+                    },
+                },
+            });
+            if (!resp.ok()) return -1;
+            const body = await resp.json().catch(() => ({}));
+            // Coerced: a 64-bit count can serialise as a string, which no strict compare matches.
+            last = Number(body?.hits?.[0]?.cnt ?? 0);
+            return last;
+        }, { timeout, intervals: [1000, 2000, 3000] }).toBe(expected);
+        return last;
+    }
+
+    getWrapContentButton() {
+        return this.page.locator('[data-test="logs-search-result-wrap-table-content-btn"]');
+    }
+
+    /** Wrap is a persisted preference, so localStorage is the state -- not the button's styling.
+     *  The key is absent until the user first toggles, which reads as off. */
+    async isWrapContentOn() {
+        return await this.page.evaluate(() => {
+            try {
+                return localStorage.getItem('wrapContent') === 'true';
+            } catch (e) {
+                return false;
+            }
+        });
+    }
+
+    async setWrapContentOff() {
+        await this.getWrapContentButton().waitFor({ state: 'visible', timeout: 15000 });
+        if (await this.isWrapContentOn()) {
+            await this.getWrapContentButton().click();
+        }
+        await expect
+            .poll(async () => await this.isWrapContentOn(), { timeout: 10000 })
+            .toBe(false);
+    }
+
+    async expectWrapContentOn(expected) {
+        await expect
+            .poll(async () => await this.isWrapContentOn(), { timeout: 15000 })
+            .toBe(expected);
+    }
+
+    async expectHistogramChartVisible() {
+        await expect(
+            this.page.locator('[data-test="logs-search-result-bar-chart"]')
+        ).toBeVisible({ timeout: 30000 });
+    }
+
+    /**
+     * Land on the stream explorer. The explore button on the streams page produces
+     * exactly this URL, and going straight to it avoids picking a row out of a list
+     * whose filter matches substrings -- `e2e_automate` also lists `e2e_automate_w0`
+     * and friends, and which of those a click lands on differs per environment.
+     */
+    async exploreStreamFromStreamsPage(streamName) {
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.ZO_BASE_URL}/web/logs`
+            + `?stream_type=logs&stream=${streamName}&period=15m&refresh=0`
+            + `&type=stream_explorer&org_identifier=${orgId}&show_histogram=true`;
+        await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await this.page.waitForURL(/type=stream_explorer/, { timeout: 30000 });
+    }
+
+    getStreamPickerTrigger() {
+        return this.page.locator(this.indexDropDownTrigger);
+    }
+
+    getStreamPickerPopover() {
+        return this.page.locator(this.indexDropDownPopover);
+    }
+
+    getStreamPickerOption(streamName) {
+        return this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`
+        );
+    }
+
+    /** Open the picker, type a filter, and click the option that survives it. */
+    async pickStreamByTypedFilter(filterText, streamName) {
+        await this.getStreamPickerTrigger().click();
+        await this.getStreamPickerPopover().waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.locator(this.indexDropDownSearch).fill(filterText);
+        const option = this.getStreamPickerOption(streamName);
+        await option.waitFor({ state: 'visible', timeout: 15000 });
+        await option.click();
+    }
+
+    async expectStreamPickerClosed() {
+        await expect(this.getStreamPickerPopover()).toBeHidden({ timeout: 15000 });
+    }
+
+    /** The trigger renders the selected name alone -- a typed filter must not survive in it. */
+    async expectSelectedStreamLabel(streamName) {
+        const trigger = this.getStreamPickerTrigger();
+        await expect(trigger).toHaveAttribute('data-test-selected-label', streamName, { timeout: 15000 });
+        await expect(trigger).toHaveText(streamName, { timeout: 15000 });
+    }
+
+    async openStreamPicker() {
+        await this.getStreamPickerTrigger().click();
+        await this.getStreamPickerPopover().waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** Every offered stream must render its name; a blank row is the #10598 symptom. */
+    async getStreamOptionLabels() {
+        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
+        await options.first().waitFor({ state: 'visible', timeout: 15000 });
+        return await options.evaluateAll((nodes) =>
+            nodes.map((n) => ({
+                value: n.getAttribute('data-test-value'),
+                text: (n.textContent || '').trim(),
+            }))
+        );
+    }
+
 }
