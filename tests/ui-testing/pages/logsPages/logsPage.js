@@ -13035,13 +13035,14 @@ export class LogsPage {
                         sql: `SELECT COUNT(*) AS cnt FROM "${stream}"`,
                         start_time: startTimeMicros,
                         end_time: endTimeMicros,
-                        size: -1,
+                        size: 1,
                     },
                 },
             });
             if (!resp.ok()) return -1;
-            const hits = (await resp.json().catch(() => ({}))).hits || [];
-            last = hits.length ? hits[0].cnt : 0;
+            const body = await resp.json().catch(() => ({}));
+            // Coerced: a 64-bit count can serialise as a string, which no strict compare matches.
+            last = Number(body?.hits?.[0]?.cnt ?? 0);
             return last;
         }, { timeout, intervals: [1000, 2000, 3000] }).toBe(expected);
         return last;

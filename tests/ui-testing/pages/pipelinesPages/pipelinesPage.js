@@ -485,10 +485,11 @@ export class PipelinesPage {
         // APIs sharing one DataTransfer, so `setData` and the drop's clientX/Y both
         // reach useDnD.ts:onDrop.
         //
-        // The elements are handed to the page directly rather than resolved from
-        // Playwright bounding boxes via elementFromPoint: boundingBox() is in page
-        // space and elementFromPoint takes viewport space, so any scroll made the drop
-        // land on the wrong element and silently do nothing.
+        // The elements are handed to the page directly rather than resolved from a
+        // Playwright bounding box via elementFromPoint: those coordinates are captured
+        // before the drag and go stale if anything scrolls or reflows, so the drop
+        // landed on whatever now sits at that point and silently did nothing. Reading
+        // the rects inside the evaluate closes that gap.
         const nodeForm = this.page.locator(
             '[data-test="add-stream-input-stream-routing-section"]:visible, ' +
             '[data-test="add-stream-query-routing-section"]:visible, ' +
