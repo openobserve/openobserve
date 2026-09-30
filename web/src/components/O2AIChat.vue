@@ -290,6 +290,7 @@
           @cancel="handleToolCancel"
           @always-confirm="handleToolAlwaysConfirm"
         />
+        <O2AIPaidUsageConsent v-if="showPaidUsageConsent" />
 
         <!-- Hidden file input for image upload -->
         <input
@@ -302,7 +303,7 @@
         />
 
         <O2AIChatInput
-          v-if="!pendingConfirmation"
+          v-if="!pendingConfirmation && !showPaidUsageConsent"
           v-model="inputMessage"
           v-model:auto-navigation="isAutoNavigationEnabled"
           :pending-images="pendingImages"
@@ -342,6 +343,8 @@ import { ChatMessage } from "@/ts/interfaces/chat";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { ReferenceChip } from "@/components/RichTextInput.vue";
 import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
+import O2AIPaidUsageConsent from "@/components/ai-assistant/chat/O2AIPaidUsageConsent.vue";
+import { useChatConsentSurface } from "@/composables/usePaidOverageConsent";
 import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
 import O2AIChatHistoryMenu from "@/components/ai-assistant/chat/O2AIChatHistoryMenu.vue";
 import O2AIChatInput from "@/components/ai-assistant/chat/O2AIChatInput.vue";
@@ -395,6 +398,7 @@ export default defineComponent({
     BetaBadge,
     ConfirmDialog,
     O2AIConfirmDialog,
+    O2AIPaidUsageConsent,
     O2AIHomeWelcome,
     O2AIChatHistoryMenu,
     O2AIChatInput,
@@ -445,6 +449,7 @@ export default defineComponent({
     const chatMessages = ref<ChatMessage[]>([]);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<any>(null);
+    const { showInChat: showPaidUsageConsent } = useChatConsentSurface(() => props.isOpen);
     const currentTextSegment = ref("");
     const currentChatId = ref<number | null>(null);
     const store = useStore();
@@ -1193,6 +1198,7 @@ export default defineComponent({
 
     return {
       raw,
+      showPaidUsageConsent,
       inputMessage,
       chatMessages,
       isLoading,

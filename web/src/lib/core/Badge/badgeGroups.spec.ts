@@ -285,6 +285,20 @@ describe("badgeGroups", () => {
   });
 });
 
+describe("aiMode", () => {
+  it("renders consent-required as a warning instead of free usage", () => {
+    const result = resolveBadge("aiMode", "consent_required");
+    expect(result.variant).toBe("warning-soft");
+    expect(result.labelKey).toBe("paidUsage.modeConsentRequired");
+  });
+
+  it("does not label an unknown backend mode as free usage", () => {
+    const result = resolveBadge("aiMode", "future_mode");
+    expect(result.variant).toBe("default-soft");
+    expect(result.labelKey).toBe("paidUsage.modeUnknown");
+  });
+});
+
 // "waiting" is the status every anomaly config carries until its first model
 // trains. Without a registry entry it fell through to genericEntry, whose label
 // is humanize() — English in every locale, and unstyled.

@@ -548,7 +548,10 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
     {
         return (StatusCode::BAD_REQUEST, format!("URL blocked: {e}")).into_response();
     }
-    let client = match common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
+    // Session replay loads the recorded page's fonts and images through here. Without a
+    // User-Agent, CDN firewalls such as the AWS managed `NoUserAgent_HEADER` rule answer 403.
+    let builder = reqwest::Client::builder().user_agent("OpenObserve");
+    let client = match common::utils::ssrf_guard::build_safe_client(builder) {
         Ok(c) => c,
         Err(e) => {
             return (
@@ -1909,6 +1912,11 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/quota/{pool}/usage_limit",
                 put(organization::org::set_quota_usage_limit),
+            )
+            .route(
+                "/{org_id}/quota/{feature}/paid_overage",
+                get(organization::org::get_paid_overage_status)
+                    .put(organization::org::set_paid_overage_status),
             )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",

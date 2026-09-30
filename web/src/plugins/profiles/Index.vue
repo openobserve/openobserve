@@ -16,10 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="bg-card-glass-bg flex h-full min-h-0 flex-col">
+    <!-- Below lg the bar wraps (selects two-up on phones), so the date picker and Run query stay on screen. -->
     <div
-      class="border-border-default flex shrink-0 flex-nowrap items-center gap-1.5 border-b p-1.5"
+      class="border-border-default flex shrink-0 flex-nowrap items-center gap-1.5 border-b p-1.5 max-lg:flex-wrap"
     >
-      <div class="max-w-36 min-w-0 flex-1">
+      <div
+        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+      >
         <OSelect
           v-model="selectedStream"
           :label="t('profiles.stream')"
@@ -30,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-stream-select"
         />
       </div>
-      <div class="max-w-36 min-w-0 flex-1">
+      <div
+        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+      >
         <OSelect
           v-model="selectedService"
           :label="t('profiles.service')"
@@ -40,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-service-select"
         />
       </div>
-      <div class="max-w-44 min-w-0 flex-1">
+      <div
+        class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+      >
         <OSelect
           v-model="selectedProfileType"
           :label="t('profiles.profileType')"
@@ -50,7 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-type-select"
         />
       </div>
-      <div class="max-w-36 min-w-0 flex-1">
+      <div
+        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+      >
         <OSelect
           v-model="draftTagKey"
           :label="t('profiles.tagKey')"
@@ -62,7 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-tag-key-select"
         />
       </div>
-      <div class="max-w-36 min-w-0 flex-1">
+      <div
+        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+      >
         <OSelect
           v-model="draftTagValue"
           :label="t('profiles.tagValue')"

@@ -143,7 +143,14 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> j
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };
     match result {
-        Ok(res) => res.try_into().unwrap(),
+        // A program returning non-UTF-8 bytes, as the decode_* family can, has no JSON form.
+        Ok(res) => match res.try_into() {
+            Ok(val) => val,
+            Err(err) => {
+                log::error!("vrl_transform result conversion error: {err}");
+                json::Value::Null
+            }
+        },
         Err(err) => {
             log::error!("vrl_transform execute error: {err}");
             json::Value::Null
@@ -272,5 +279,52 @@ mod tests {
         let result = df.collect().await.unwrap();
         let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
         assert_eq!(count, 4);
+    }
+
+    // Mirrors save_function: a VRL body is stored verbatim only when it already ends in '.'.
+    fn as_stored(body: &str) -> String {
+        if body.ends_with('.') {
+            body.to_string()
+        } else {
+            format!("{body} \n .")
+        }
+    }
+
+    // Mirrors get_udf_vrl: each argument is bound, then the stored body is appended.
+    fn as_udf_program(stored: &str, param: &str, value: &str) -> String {
+        format!(" .{param} = \"{value}\" \n \n {stored}")
+    }
+
+    fn run_udf(body: &str, value: &str) -> json::Value {
+        let source = as_udf_program(&as_stored(body), "row", value);
+        let compiled = compile_vrl_function(&source, "udf_panic_test").unwrap();
+        let mut runtime = Runtime::new(vrl::prelude::state::RuntimeState::default());
+        apply_vrl_fn(&mut runtime, compiled.program)
+    }
+
+    #[test]
+    fn a_bare_byte_string_result_reports_instead_of_panicking() {
+        // A body already ending in '.' keeps its own final expression, so decoded bytes reach
+        // the conversion; "//8=" decodes to 0xFF 0xFF, which has no JSON string form.
+        let body = "decode_base64!(.row)\n# returns the raw decoded bytes.";
+        assert_eq!(
+            run_udf(body, "//8="),
+            json::Value::Null,
+            "the UDF must degrade, not abort the query thread"
+        );
+    }
+
+    #[test]
+    fn the_same_bytes_inside_an_object_still_convert() {
+        // Object and Array serialise losslessly through a lossy Serialize impl, so only a bare
+        // byte string is fallible; this pins that the fix does not change the object case.
+        let body = "decode_base64!(.row)";
+        assert!(run_udf(body, "//8=").is_object());
+    }
+
+    #[test]
+    fn a_convertible_result_is_returned_unchanged() {
+        let body = "upcase!(.row)\n# uppercased.";
+        assert_eq!(run_udf(body, "ok"), json::Value::String("OK".into()));
     }
 }
