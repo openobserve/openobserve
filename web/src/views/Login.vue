@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <Login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
     <div class="relative-position flex px-3 pt-2">
-      <a href="https://openobserve.ai/" target="_blank" rel="nofollow">
+      <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
         <img
           class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
           loading="lazy"
