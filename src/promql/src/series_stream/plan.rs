@@ -23,8 +23,8 @@ use config::{
     meta::{
         plan::generate_plan_string,
         promql::{
-            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, MetricsBlockScan,
-            NAME_LABEL, VALUE_LABEL, value::EvalContext,
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, MetricsBlockScan, NAME_LABEL, VALUE_LABEL,
+            value::EvalContext,
         },
     },
 };
@@ -168,8 +168,7 @@ async fn execute_hash_sorted(
     lookback: i64,
     eval_ctx: &EvalContext,
 ) -> Result<Option<Vec<SourceFuture>>> {
-    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
-    let Ok(df) = ctx.table(sorted_table.as_str()).await else {
+    let Ok(df) = ctx.table(selector.table_name).await else {
         return Ok(None);
     };
     let df = apply_time_window(
@@ -856,10 +855,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_streaming_falls_back_without_sorted_table() {
+    async fn test_streaming_falls_back_without_a_table() {
         let ctx = session_ctx();
-        let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
-        ctx.register_table("m", Arc::new(table)).unwrap();
 
         let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
         assert!(result.is_none());
@@ -868,11 +865,10 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_falls_back_when_ordering_is_not_declared() {
         let ctx = session_ctx();
-        // same data registered under the sorted name but without the ordering
+        // the same data registered without the ordering
         // declaration: the plan needs a real sort, so the gate must reject it
         let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
-        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-            .unwrap();
+        ctx.register_table("m", Arc::new(table)).unwrap();
 
         let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
         assert!(result.is_none());
