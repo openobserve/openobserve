@@ -139,19 +139,13 @@ impl StorageScan<'_> {
 
         let session = self.session(target_partitions);
         let ctx = metrics_session_context(&session, self.sort_order).await?;
-        // declaring the order on a materialized table would change its file grouping
-        let table_order = match source {
-            ScanSource::HashSorted => self.sort_order,
-            _ => FileSortOrder::None,
-        };
-
         register_metrics_table(
             &ctx,
             &session,
             self.schema.clone(),
             self.stream_name,
             self.files,
-            table_order,
+            self.sort_order,
         )
         .await?;
         Ok(Some(ScanContext {
@@ -304,15 +298,12 @@ pub(crate) async fn create_context(
         file_list_start.elapsed().as_millis()
     );
 
-    let cfg = get_config();
-    let sort_order = if cfg.search.feature_metrics_streaming_agg_enabled
-        && MetricsFileLayout::all_hash_ordered(&files)
-    {
-        FileSortOrder::HashTimestampAsc
-    } else {
-        FileSortOrder::None
+    let source = scan_source(&schema, &files, &matchers, &preference);
+    // a materialized table reads its files unordered: declaring the order would regroup them
+    let sort_order = match source {
+        ScanSource::Table => FileSortOrder::None,
+        _ => FileSortOrder::HashTimestampAsc,
     };
-    let source = scan_source(&schema, &files, &matchers, &preference, sort_order);
     let scan = StorageScan {
         trace_id,
         org_id,
@@ -334,9 +325,11 @@ fn scan_source(
     files: &[FileKey],
     matchers: &Matchers,
     preference: &SourcePreference<'_>,
-    sort_order: FileSortOrder,
 ) -> ScanSource {
-    if !preference.streaming || !sort_order.is_sorted() || !hash_column_streams(schema) {
+    if !preference.streaming
+        || !MetricsFileLayout::all_hash_ordered(files)
+        || !hash_column_streams(schema)
+    {
         return ScanSource::Table;
     }
     if files.iter().all(block_parent_eligible)
@@ -532,12 +525,7 @@ mod tests {
         )
     }
 
-    fn source(
-        files: &[FileKey],
-        streaming: bool,
-        sort_order: FileSortOrder,
-        hash: DataType,
-    ) -> ScanSource {
+    fn source(files: &[FileKey], streaming: bool, hash: DataType) -> ScanSource {
         let schema = Schema::new(vec![
             Field::new(HASH_LABEL, hash, false),
             Field::new("path", DataType::Utf8, true),
@@ -547,18 +535,13 @@ mod tests {
             streaming,
             output_labels: &output_labels,
         };
-        scan_source(&schema, files, &Matchers::empty(), &preference, sort_order)
+        scan_source(&schema, files, &Matchers::empty(), &preference)
     }
 
     #[test]
     fn unfiltered_scan_uses_all_rows_without_source_selection() {
         let files = vec![file(100)];
-        let ScanSource::Blocks(scan) = source(
-            &files,
-            true,
-            FileSortOrder::HashTimestampAsc,
-            DataType::UInt64,
-        ) else {
+        let ScanSource::Blocks(scan) = source(&files, true, DataType::UInt64) else {
             panic!("indexed files with sidecars read blocks");
         };
         assert_eq!(scan.files.len(), 1);
@@ -568,25 +551,23 @@ mod tests {
     #[test]
     fn scan_source_needs_every_block_condition() {
         let files = vec![file(100)];
-        let sorted = FileSortOrder::HashTimestampAsc;
         let is = |source: ScanSource| match source {
             ScanSource::Table => "table",
             ScanSource::HashSorted => "hash_sorted",
             ScanSource::Blocks(_) => "blocks",
         };
-        assert_eq!(is(source(&files, true, sorted, DataType::UInt64)), "blocks");
-        assert_eq!(is(source(&files, false, sorted, DataType::UInt64)), "table");
-        assert_eq!(
-            is(source(&files, true, FileSortOrder::None, DataType::UInt64)),
-            "table"
-        );
-        assert_eq!(is(source(&files, true, sorted, DataType::Utf8)), "table");
+        assert_eq!(is(source(&files, true, DataType::UInt64)), "blocks");
+        assert_eq!(is(source(&files, false, DataType::UInt64)), "table");
+        assert_eq!(is(source(&files, true, DataType::Utf8)), "table");
+        let mut legacy = files.clone();
+        legacy.push(FileKey {
+            key: "files/org/metrics/m/2026/09/23/00/id.parquet".into(),
+            ..file(100)
+        });
+        assert_eq!(is(source(&legacy, true, DataType::UInt64)), "table");
         let mut missing = files;
         missing[0].meta.mindex_size = 0;
-        assert_eq!(
-            is(source(&missing, true, sorted, DataType::UInt64)),
-            "hash_sorted"
-        );
+        assert_eq!(is(source(&missing, true, DataType::UInt64)), "hash_sorted");
     }
 
     #[test]
