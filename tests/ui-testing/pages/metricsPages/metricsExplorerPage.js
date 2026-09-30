@@ -436,12 +436,12 @@ export class MetricsExplorerPage {
     /** Sampled, not polled: `expect.poll` proves a state is REACHED, not that it HOLDS. */
     async expectCardsRemainVisible(timeout = 10000) {
         const deadline = Date.now() + timeout;
-        // Bounded by the reload itself — sampling past it just asserts the idle state.
-        while (Date.now() < deadline && (await this.isRefreshButtonLoading())) {
+        // do-while: a cache-fast reload may already be idle, and the invariant must still be asserted once.
+        do {
             const count = await this.getCardCount();
             expect(count, 'the grid must not blank during a manual refresh').toBeGreaterThan(0);
             await this.page.waitForTimeout(100);
-        }
+        } while (Date.now() < deadline && (await this.isRefreshButtonLoading()));
     }
 
     /* ------------------------------------------------- a card, by metric name */
@@ -491,17 +491,6 @@ export class MetricsExplorerPage {
             .getAttribute('aria-busy', { timeout: 5000 })
             .catch(() => null);
         return state === 'true';
-    }
-
-    async isRefreshButtonEnabled() {
-        return await this.page
-            .locator(this.refreshButton)
-            .isEnabled({ timeout: 5000 })
-            .catch(() => false);
-    }
-
-    async isRefreshButtonDisabled() {
-        return !(await this.isRefreshButtonEnabled());
     }
 
     /** The refresh button is mid-reload: aria-busy AND disabled (double-click guard). */
