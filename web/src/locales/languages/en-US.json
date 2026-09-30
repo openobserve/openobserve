@@ -3674,6 +3674,7 @@
       "transTypeInvalid": "Function - {index}: type must be 0 for VRL or 1 for JavaScript",
       "paramsInvalid": "Function - {index}: params must be a string",
       "transTypeLabel": "Language",
+      "transTypePlaceholder": "Choose a language",
       "paramsLabel": "Parameters",
       "paramsHint": "Comma-separated argument names. Defaults to \u201crow\u201d.",
       "overrideExisting": "Replace the existing function instead",

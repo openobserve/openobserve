@@ -550,6 +550,30 @@ describe("ImportFunction", () => {
       expect(mockCreate.mock.calls[0][1]).toMatchObject({ transType: 0 });
     });
 
+    // Found by hand: the picker normalised an unusable transType to VRL, so it
+    // opened already displaying the answer. Choosing VRL then emitted no change,
+    // wrote nothing, and the same error came back on every press — a dead end.
+    it("leaves the language unselected when the value is not a language", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "fn_a", function: ".a = 1", transType: "vrl" });
+
+      expect(wrapper.vm.currentTransType(0)).toBe("");
+    });
+
+    // Absent is different from unusable: nothing is wrong with it, and VRL is
+    // what the payload will send, so the picker may show it.
+    it("shows VRL when the item declares no language at all", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "fn_a", function: "" });
+
+      expect(wrapper.vm.currentTransType(0)).toBe("0");
+      expect(wrapper.vm.bodyLanguage(0)).toBe("vrl");
+    });
+
     // OSS builds cannot run JavaScript, so offering it would only trade this
     // validation error for a server-side one.
     it("offers VRL only on OSS", async () => {

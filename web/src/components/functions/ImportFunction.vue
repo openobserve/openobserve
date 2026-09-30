@@ -180,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :options="transTypeOptions"
                         :label="t('function.import.transTypeLabel')"
+                        :placeholder="t('function.import.transTypePlaceholder')"
                         @update:model-value="
                           (val: any) => updateTransType(String(val), errorMessage.itemIndex)
                         "
@@ -489,8 +490,18 @@ export default defineComponent({
     const currentBody = (index: number) =>
       String(baseImportRef.value?.jsonArrayOfObj?.[index]?.function ?? "");
 
-    const currentTransType = (index: number) =>
-      String(baseImportRef.value?.jsonArrayOfObj?.[index]?.transType ?? "0") === "1" ? "1" : "0";
+    // Absent means VRL — that is what the payload sends, so the picker may say so.
+    // A value that is neither 0 nor 1 is not a language at all, and the picker
+    // shows nothing selected: normalising it to VRL would render a picker already
+    // displaying the answer, whose selection emits no change and writes nothing,
+    // leaving the document holding the value that was just rejected and the same
+    // error on every press.
+    const currentTransType = (index: number) => {
+      const declared = baseImportRef.value?.jsonArrayOfObj?.[index]?.transType;
+      if (declared === undefined || declared === null) return "0";
+      const text = String(declared);
+      return text === "0" || text === "1" ? text : "";
+    };
 
     // The editor speaks the language the item declares, so a JavaScript function
     // is not written against VRL tokenizing.
