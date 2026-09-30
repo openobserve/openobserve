@@ -57,11 +57,11 @@ export class RolesPage {
         this.railScopeAll = page.locator('[data-test="edit-role-module-rail-scope-all"]');
         this.railScopeGranted = page.locator('[data-test="edit-role-module-rail-scope-granted"]');
         this.railTabs = page.locator('[data-test="edit-role-module-rail-tabs"]');
-        // The rail is rendered twice (desktop + responsive copy), so every rail slug
-        // matches two elements. Pin the visible one rather than relaxing strict mode.
-        this.railSummaryItem = page
-            .locator('[data-test="edit-role-module-rail-item-summary"]:visible')
-            .first();
+        // "Role Overview" — the landing pane, not a permission module. It carries its
+        // own slug (`-overview`, ModuleRail.vue), NOT `-item-summary`: that one belongs
+        // to the real `summary` permission module, and clicking it opens that module's
+        // pane instead of the overview.
+        this.railSummaryItem = page.locator('[data-test="edit-role-module-rail-overview"]');
         this.railNoMatch = page.locator('[data-test="edit-role-module-rail-no-match"]');
 
         // ---------- module pane ----------
@@ -126,25 +126,18 @@ export class RolesPage {
         return this.page.locator('[data-test^="edit-role-module-rail-item-"]:visible');
     }
 
-    /** Distinct module keys in the rail, immune to the duplicate desktop/mobile render. */
     /**
      * Distinct module keys in the rail.
      *
-     * `summary` is filtered because the rail's "Role Overview" nav item and the real
-     * `summary` permission module BOTH render as `edit-role-module-rail-item-summary`
-     * — two elements, one slug — and without the filter Role Overview counts as a
-     * module. The cost is that a published module is dropped too, so THIS LIST IS ONE
-     * SHORT of what the rail actually offers. Do not compare its length against a
-     * resource total: that reads as a missing module when nothing is missing, which
-     * is exactly how o2-enterprise#2717 came to be filed and closed as invalid.
-     * Test membership, or give Role Overview its own slug and drop the filter.
+     * Every `-item-` slug is a real permission module, `summary` included. "Role
+     * Overview" is not one of them — it renders as `edit-role-module-rail-overview`
+     * and so never reaches this list.
      */
     async railModuleKeys() {
         const slugs = await this.page
             .locator('[data-test^="edit-role-module-rail-item-"]')
             .evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
-        return [...new Set(slugs.map((s) => s.replace('edit-role-module-rail-item-', '')))]
-            .filter((k) => k !== 'summary');
+        return [...new Set(slugs.map((s) => s.replace('edit-role-module-rail-item-', '')))];
     }
 
     scopeRow(key) {

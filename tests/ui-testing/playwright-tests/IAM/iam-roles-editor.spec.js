@@ -267,25 +267,24 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         expect(falseZero, `counter showed a real zero before loading finished: ${[...seen]}`).toBe(false);
     });
 
-    // SKIPPED — the assertion is wrong, and there is NO product defect here.
+    // SKIPPED — never seen green, and there is NO known product defect here.
     //
-    // It compares railModuleKeys().length against the number of visible top-level
-    // resources and sees 48 vs 49. Verified on pentest that the rail is complete: the
-    // `summary` module renders and is grantable. The rail holds 50 elements over 49
-    // distinct slugs, because "Role Overview" reuses the `summary` module's slug, and
-    // the helper filters that slug to stop Role Overview counting as a module — taking
-    // the real module with it. I filed this as o2-enterprise#2717 before checking the
-    // element behind the slug; it is closed as invalid.
+    // It last read 48 rail modules against 49 visible top-level resources, because
+    // railModuleKeys() dropped the real `summary` module: the helper filtered that slug
+    // believing "Role Overview" shared it. It does not — Role Overview is
+    // `edit-role-module-rail-overview` — so the filter is gone and the count should now
+    // line up. That was verified on pentest too: the rail is complete and `summary` is
+    // grantable. o2-enterprise#2717 was filed off the old reading and closed as invalid.
     //
-    // To re-enable: assert that every key from GET /resources appears in the rail,
-    // rather than comparing totals. Membership survives the collision; a count cannot.
+    // To re-enable: run it, and if it is still off by one, assert that every key from
+    // GET /resources appears in the rail instead of comparing totals — membership names
+    // the missing module, a count only says the numbers differ.
     test.fixme('U-15 · a role with grants across every module renders the whole rail', async ({ page }) => {
         const resources = (await req(page, 'GET', '/resources')).body || [];
         const expected = resources.filter((r) => r.visible && !r.parent && r.key !== 'org').length;
         // The rail is built from GET /resources, so it must show every visible
         // top-level module — a client-side group map that silently drops one is the
-        // PR's own stated risk (unknown resources fall into "Other"). Compare distinct
-        // module keys: the rail is rendered twice (desktop + responsive copy).
+        // PR's own stated risk (unknown resources fall into "Other").
         await expect
             .poll(async () => (await pm.rolesPage.railModuleKeys()).length, { timeout: 20000 })
             .toBe(expected);
