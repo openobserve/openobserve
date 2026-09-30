@@ -418,3 +418,28 @@ describe("LLMInsightsDashboard — date-picker disabled contract (compareDateDis
     expect((wrapper.vm as any).compareDateDisabled).toBe(true);
   });
 });
+
+describe("LLMInsightsDashboard — agent variant restore", () => {
+  it("restores the persisted env+version, not the first same-named variant", async () => {
+    localStorage.setItem("llmInsights_agentFilter", "checkout-agent");
+    localStorage.setItem("llmInsights_envFilter", "prod");
+    localStorage.setItem("llmInsights_versionFilter", "1.4.0");
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    expect((wrapper.vm as any).selectedVersion).toBe("1.4.0");
+    expect(localStorage.getItem("llmInsights_versionFilter")).toBe("1.4.0");
+  });
+
+  it("falls back to the first variant by name when the persisted version is gone", async () => {
+    localStorage.setItem("llmInsights_agentFilter", "checkout-agent");
+    localStorage.setItem("llmInsights_envFilter", "prod");
+    localStorage.setItem("llmInsights_versionFilter", "9.9.9");
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    expect((wrapper.vm as any).selectedVersion).toBe("1.5.0");
+  });
+});
