@@ -73,6 +73,8 @@ struct EvaluatorSpanReflection {
     attributes_target_stream_type: String,
     attributes_target_agent_name: String,
     attributes_target_agent_id: String,
+    attributes_target_agent_env: String,
+    attributes_target_agent_version: String,
     attributes_scorer_id: String,
     attributes_scorer_version: String,
     attributes_scorer_type: String,
@@ -129,6 +131,8 @@ impl EvaluatorSpanReflection {
             attributes_target_stream_type: String::new(),
             attributes_target_agent_name: String::new(),
             attributes_target_agent_id: String::new(),
+            attributes_target_agent_env: String::new(),
+            attributes_target_agent_version: String::new(),
             attributes_scorer_id: String::new(),
             attributes_scorer_version: String::new(),
             attributes_scorer_type: String::new(),
@@ -262,6 +266,8 @@ mod tests {
         assert!(obj.contains_key("attributes_target_stream_type"));
         assert!(obj.contains_key("attributes_target_agent_name"));
         assert!(obj.contains_key("attributes_target_agent_id"));
+        assert!(obj.contains_key("attributes_target_agent_env"));
+        assert!(obj.contains_key("attributes_target_agent_version"));
         assert!(obj.contains_key("attributes_scorer_id"));
         assert!(obj.contains_key("attributes_scorer_version"));
         assert!(obj.contains_key("attributes_scorer_type"));

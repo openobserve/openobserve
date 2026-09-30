@@ -1628,6 +1628,8 @@ async fn process_llm_evaluation_node(
                         target_stream_type: ctx.source_stream_type.clone(),
                         target_agent_name: ctx.agent_name.clone(),
                         target_agent_id: ctx.agent_id.clone(),
+                        target_agent_env: ctx.agent_env.clone(),
+                        target_agent_version: ctx.agent_version.clone(),
                         scorer_id: None,
                         scorer_version: None,
                         scorer_type: None,
