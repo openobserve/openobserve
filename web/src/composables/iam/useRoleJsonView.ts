@@ -124,6 +124,10 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
           resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
+        } else if (resource === "prompt") {
+          resourceDetails = resourceMapper.value["pfolder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
         } else if (entity === "_all_" + getOrgId()) {
           resourceDetails.permission[permission.permission as "AllowAll"].value =
             selectedPermissionsHash.value.has(
@@ -178,6 +182,10 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
           ) as Entity;
         } else if (resource === "workflows") {
           resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
+        } else if (resource === "prompt") {
+          resourceDetails = resourceMapper.value["pfolder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
         } else if (resource === "report") {

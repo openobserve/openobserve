@@ -322,7 +322,11 @@ pub async fn list_prompts(
 
 #[utoipa::path(
     post, path = "/{org_id}/prompts", context_path = "/api", tag = "Prompts",
-    params(("org_id" = String, Path)), request_body = inline(CreatePromptRequestBody),
+    params(
+        ("org_id" = String, Path),
+        ("folder" = Option<String>, Query, description = "Folder the permission check authorizes; must name the folder in the body. Defaults to the default folder."),
+    ),
+    request_body = inline(CreatePromptRequestBody),
     responses((status = 200, body = inline(PromptMutationResponseBody)))
 )]
 pub async fn create_prompt(
@@ -374,7 +378,11 @@ pub async fn create_prompt(
 
 #[utoipa::path(
     post, path = "/{org_id}/prompts/match", context_path = "/api", tag = "Prompts",
-    params(("org_id" = String, Path)), request_body = inline(MatchPromptsRequestBody),
+    params(
+        ("org_id" = String, Path),
+        ("folder" = Option<String>, Query, description = "Folder the permission check authorizes. Defaults to the default folder."),
+    ),
+    request_body = inline(MatchPromptsRequestBody),
     responses((status = 200, body = inline(MatchPromptsResponseBody)))
 )]
 pub async fn match_prompts(
@@ -382,6 +390,10 @@ pub async fn match_prompts(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<MatchPromptsRequestBody>,
 ) -> Response {
+    let readable = match readable_prompts(&org_id, &user.user_id).await {
+        Ok(readable) => readable,
+        Err(response) => return response,
+    };
     let (prompt_type, payload, config) = match body.into_core() {
         Ok(request) => request,
         Err(error) => return prompt_error_response(error),
@@ -396,8 +408,15 @@ pub async fn match_prompts(
     };
     let mut matches = Vec::with_capacity(versions.len());
     for version in versions {
-        // Content matches span folders the route never authorized.
-        if !can_read_prompt(&org_id, &user.user_id, &version.entity_id).await {
+        // Content matches span folders the route never authorized. One listing answers
+        // for all of them; without it (list filtering off) each prompt is checked.
+        let visible = match readable.as_deref() {
+            Some(readable) => {
+                is_ofga_object_visible(&org_id, "prompt", &version.entity_id, Some(readable))
+            }
+            None => can_read_prompt(&org_id, &user.user_id, &version.entity_id).await,
+        };
+        if !visible {
             continue;
         }
         let prompt = match prompts::get_prompt(&org_id, &version.entity_id).await {
