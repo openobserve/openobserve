@@ -27,3 +27,28 @@ pub(crate) fn decode(body: &[u8], pos: &mut usize, rows: usize, bits: &mut Vec<u
     bits.resize(rows, get_u64(body, pos)?);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{super::assert_truncations_fail, *};
+
+    #[test]
+    fn constant_bit_patterns_round_trip() {
+        for value in [
+            (-0f64).to_bits(),
+            0.1f64.to_bits(),
+            f64::INFINITY.to_bits(),
+            f64::NAN.to_bits(),
+            0x7ff8_0000_0000_0042,
+            0x7ff0_0000_0000_0002,
+            1,
+        ] {
+            let mut body = Vec::new();
+            encode(value, &mut body);
+            let (mut pos, mut bits) = (0, Vec::new());
+            decode(&body, &mut pos, 3, &mut bits).unwrap();
+            assert_eq!((bits, pos), (vec![value; 3], 8));
+            assert_truncations_fail(&body, |bytes| decode(bytes, &mut 0, 3, &mut Vec::new()));
+        }
+    }
+}

@@ -78,3 +78,71 @@ fn for_each_run(quotients: &[u64], mut f: impl FnMut(u64, u64)) {
 fn varint_len(value: u64) -> usize {
     (64 - (value | 1).leading_zeros() as usize).div_ceil(7)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        super::{assert_truncations_fail, scaled_steps},
+        *,
+    };
+
+    const BASE: i64 = 1_790_000_000_000_000;
+    const STEP: i64 = 15_000_000;
+
+    fn roundtrip(ts: &[i64]) {
+        let mut quotients = Vec::new();
+        let divisor = scaled_steps(ts, &mut quotients);
+        let mut body = Vec::new();
+        encode(divisor, &quotients, &mut body);
+        assert_eq!(encoded_len(divisor, &quotients), body.len());
+        let (mut pos, mut out) = (0, Vec::new());
+        let last = decode(&body, &mut pos, ts.len(), ts[0], &mut out).unwrap();
+        assert_eq!(
+            (out.as_slice(), last, pos),
+            (ts, ts[ts.len() - 1], body.len())
+        );
+        assert_truncations_fail(&body, |bytes| {
+            decode(bytes, &mut 0, ts.len(), ts[0], &mut Vec::new()).map(|_| ())
+        });
+    }
+
+    #[test]
+    fn runs_of_steps_round_trip() {
+        roundtrip(&[0, 10, 30]);
+        roundtrip(&[i64::MIN, 0, 0, i64::MAX]);
+        roundtrip(
+            &(0..240)
+                .map(|i| BASE + (i + i / 120) * STEP)
+                .collect::<Vec<_>>(),
+        );
+        roundtrip(
+            &(0..2000)
+                .map(|i| BASE + (i + i / 500) * STEP)
+                .collect::<Vec<_>>(),
+        );
+        roundtrip(
+            &(0..100)
+                .map(|i| BASE + i * STEP + (i % 2) * 1000)
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn bad_runs_and_divisors_fail() {
+        for (body, rows) in [
+            (vec![1, 1, 0, 1, 2], 3),
+            (vec![1, 1, 3], 3),
+            (vec![1, 1, 1], 3),
+            (vec![0, 1, 2], 3),
+            ([&[1][..], &[0xff; 9], &[1, 1]].concat(), 2),
+        ] {
+            assert!(
+                decode(&body, &mut 0, rows, 0, &mut Vec::new()).is_err(),
+                "{body:?}"
+            );
+        }
+        let (mut pos, mut out) = (0, Vec::new());
+        assert_eq!(decode(&[1, 1, 2], &mut pos, 3, 5, &mut out).unwrap(), 7);
+        assert_eq!(out, [5, 6, 7]);
+    }
+}

@@ -187,7 +187,114 @@ fn to_decimal(b: u64, exponent: usize) -> Option<i64> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        super::{assert_truncations_fail, random},
+        *,
+    };
+
+    const STALE_NAN: u64 = 0x7ff0_0000_0000_0002;
+
+    fn floats(values: &[f64]) -> Vec<u64> {
+        values.iter().map(|v| v.to_bits()).collect()
+    }
+
+    fn roundtrip(bits: &[u64]) -> Vec<u8> {
+        let mut body = Vec::new();
+        assert!(Encoder::default().encode(bits, &mut body));
+        let (mut pos, mut out) = (0, Vec::new());
+        Decoder::default()
+            .decode(&body, &mut pos, bits.len(), &mut Vec::new(), &mut out)
+            .unwrap();
+        assert_eq!((out.as_slice(), pos), (bits, body.len()));
+        assert_truncations_fail(&body, |bytes| {
+            Decoder::default().decode(bytes, &mut 0, bits.len(), &mut Vec::new(), &mut Vec::new())
+        });
+        body
+    }
+
+    #[test]
+    fn decimals_round_trip_with_their_exponent() {
+        assert_eq!(&roundtrip(&floats(&[0.1, 0.2, 0.35]))[..2], &[2, 0]);
+        assert_eq!(roundtrip(&floats(&[1.0, 2.0, 3.0]))[0], 0);
+        let tiny: Vec<u64> = (1..=10).map(|i| (i as f64 / 1e18).to_bits()).collect();
+        assert_eq!(roundtrip(&tiny)[0], 18);
+        let gauge: Vec<u64> = random(5)
+            .take(300)
+            .map(|r| ((r % 100_000) as f64 / 100.0).to_bits())
+            .collect();
+        assert_eq!(roundtrip(&gauge)[0], 2);
+    }
+
+    #[test]
+    fn exceptions_keep_their_bits_at_every_position() {
+        let n = 40;
+        let base: Vec<f64> = (0..n)
+            .map(|i| (2000 + i * 37 % 991) as f64 / 100.0)
+            .collect();
+        let cases: [&[(usize, u64)]; 5] = [
+            &[(0, STALE_NAN)],
+            &[(20, (-0f64).to_bits())],
+            &[(n - 1, f64::NAN.to_bits())],
+            &[
+                (5, f64::INFINITY.to_bits()),
+                (6, STALE_NAN),
+                (7, (-0f64).to_bits()),
+            ],
+            &[
+                (0, STALE_NAN),
+                (1, f64::NEG_INFINITY.to_bits()),
+                (n - 1, STALE_NAN),
+            ],
+        ];
+        for exceptions in cases {
+            let mut bits = floats(&base);
+            for (i, b) in exceptions {
+                bits[*i] = *b;
+            }
+            let body = roundtrip(&bits);
+            assert_eq!(usize::from(body[1]), exceptions.len());
+        }
+    }
+
+    #[test]
+    fn rare_large_exponents_become_exceptions() {
+        let mut values: Vec<f64> = (0..100).map(|i| (i + 1) as f64 / 10.0).collect();
+        values[40] = 0.123_456_789_012_345;
+        values[70] = 1.987_654_321_098_765;
+        assert_eq!(&roundtrip(&floats(&values))[..2], &[1, 2]);
+    }
+
+    #[test]
+    fn unconvertible_blocks_are_not_encoded() {
+        let mut out = vec![9];
+        let noise: Vec<u64> = random(6).take(64).collect();
+        assert!(!Encoder::default().encode(&noise, &mut out));
+        assert!(!Encoder::default().encode(&[f64::NAN.to_bits(); 8], &mut out));
+        assert_eq!(out, [9]);
+    }
+
+    #[test]
+    fn corrupt_bodies_fail() {
+        let decode = |body: &[u8], rows| {
+            Decoder::default().decode(body, &mut 0, rows, &mut Vec::new(), &mut Vec::new())
+        };
+        assert!(decode(&[1, 0, 2, 2, 2], 2).is_ok());
+        let zeros = [0u8; 8];
+        for (body, rows) in [
+            (vec![19, 0, 2, 2, 2], 2),
+            (
+                [&[1, 2, 0][..], &zeros, &[0], &zeros, &[2, 2, 2]].concat(),
+                2,
+            ),
+            (
+                [&[1, 2, 1][..], &zeros, &[0], &zeros, &[2, 2, 4, 0]].concat(),
+                3,
+            ),
+            ([&[1, 1, 3][..], &zeros, &[2, 2, 4, 0]].concat(), 3),
+        ] {
+            assert!(decode(&body, rows).is_err(), "{body:?}");
+        }
+    }
 
     #[test]
     fn negative_zero_is_never_a_decimal() {

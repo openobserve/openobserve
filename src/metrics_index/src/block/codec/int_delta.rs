@@ -57,3 +57,57 @@ pub(crate) fn decode_with(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        super::{assert_truncations_fail, random},
+        *,
+    };
+
+    const LIMIT: i64 = 1 << 53;
+
+    fn roundtrip(ints: &[i64]) {
+        let mut body = Vec::new();
+        encode(ints, &mut body);
+        let (mut pos, mut seq, mut bits) = (0, Vec::new(), Vec::new());
+        decode(&body, &mut pos, ints.len(), &mut seq, &mut bits).unwrap();
+        let expected: Vec<u64> = ints.iter().map(|v| (*v as f64).to_bits()).collect();
+        assert_eq!((bits, pos), (expected, body.len()));
+        assert_truncations_fail(&body, |bytes| {
+            decode(bytes, &mut 0, ints.len(), &mut Vec::new(), &mut Vec::new())
+        });
+    }
+
+    #[test]
+    fn integer_sequences_round_trip() {
+        roundtrip(&[5]);
+        roundtrip(&[3, -3]);
+        roundtrip(&(0..200).map(|i| i * i * 7919).collect::<Vec<_>>());
+        roundtrip(
+            &(0..65)
+                .map(|i| if i % 2 == 0 { LIMIT } else { -LIMIT })
+                .collect::<Vec<_>>(),
+        );
+        roundtrip(&(0..300).map(|i| i64::from(i % 50 == 0)).collect::<Vec<_>>());
+        roundtrip(
+            &random(1)
+                .take(300)
+                .map(|r| (r % 2001) as i64 - 1000)
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn decode_with_maps_each_integer() {
+        let ints = [10, 20, 35];
+        let mut body = Vec::new();
+        encode(&ints, &mut body);
+        let mut bits = Vec::new();
+        decode_with(&body, &mut 0, 3, &mut Vec::new(), &mut bits, |v| {
+            v as u64 * 2
+        })
+        .unwrap();
+        assert_eq!(bits, [20, 40, 70]);
+    }
+}

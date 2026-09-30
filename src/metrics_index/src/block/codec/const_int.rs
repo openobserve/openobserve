@@ -29,3 +29,20 @@ pub(crate) fn decode(body: &[u8], pos: &mut usize, rows: usize, bits: &mut Vec<u
     bits.resize(rows, value.to_bits());
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{super::assert_truncations_fail, *};
+
+    #[test]
+    fn constant_integers_round_trip() {
+        for value in [0, 1, -1, 7, -123_456_789, 1 << 53, -(1 << 53)] {
+            let mut body = Vec::new();
+            encode(value, &mut body);
+            let (mut pos, mut bits) = (0, Vec::new());
+            decode(&body, &mut pos, 5, &mut bits).unwrap();
+            assert_eq!((bits, pos), (vec![(value as f64).to_bits(); 5], body.len()));
+            assert_truncations_fail(&body, |bytes| decode(bytes, &mut 0, 5, &mut Vec::new()));
+        }
+    }
+}

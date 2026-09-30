@@ -41,3 +41,41 @@ pub(crate) fn decode(rows: usize, min: i64, max: i64, ts: &mut Vec<i64>) -> Resu
     ts.extend((0..rows as u64).map(|i| min.wrapping_add((each * i) as i64)));
     Ok(max)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn roundtrip(ts: &[i64]) {
+        assert!(fits(ts));
+        let mut out = Vec::new();
+        let last = decode(ts.len(), ts[0], ts[ts.len() - 1], &mut out).unwrap();
+        assert_eq!((out.as_slice(), last), (ts, ts[ts.len() - 1]));
+    }
+
+    #[test]
+    fn evenly_spaced_timestamps_round_trip() {
+        roundtrip(&[42]);
+        roundtrip(&[-5, 1_000]);
+        roundtrip(&[i64::MIN, i64::MAX]);
+        roundtrip(&[7, 7, 7, 7]);
+        roundtrip(
+            &(0..8192)
+                .map(|i| 1_790_000_000_000_000 + i * 15_000_000)
+                .collect::<Vec<_>>(),
+        );
+        let span = u64::MAX / 3;
+        roundtrip(
+            &(0..4u64)
+                .map(|i| (i64::MIN as u64).wrapping_add(i * span) as i64)
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn uneven_steps_do_not_fit_and_inexact_spans_fail() {
+        assert!(!fits(&[0, 15, 45]));
+        assert!(!fits(&[0, 0, 1]));
+        assert!(decode(3, 0, 5, &mut Vec::new()).is_err());
+    }
+}

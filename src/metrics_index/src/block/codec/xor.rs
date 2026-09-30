@@ -70,3 +70,60 @@ pub(crate) fn decode(body: &[u8], pos: &mut usize, rows: usize, bits: &mut Vec<u
     *pos += reader.consumed_bytes();
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        super::{assert_truncations_fail, random},
+        *,
+    };
+
+    fn roundtrip(bits: &[u64]) {
+        let mut body = Vec::new();
+        encode(bits, &mut body);
+        let (mut pos, mut out) = (0, Vec::new());
+        decode(&body, &mut pos, bits.len(), &mut out).unwrap();
+        assert_eq!((out.as_slice(), pos), (bits, body.len()));
+        assert_truncations_fail(&body, |bytes| {
+            decode(bytes, &mut 0, bits.len(), &mut Vec::new())
+        });
+    }
+
+    #[test]
+    fn bit_patterns_round_trip() {
+        roundtrip(&[0x7ff0_0000_0000_0002]);
+        roundtrip(&[1.5f64.to_bits(); 100]);
+        roundtrip(
+            &(0..64)
+                .map(|i| [1.0f64, 1.5][i % 2].to_bits())
+                .collect::<Vec<_>>(),
+        );
+        roundtrip(&[
+            0,
+            (-0f64).to_bits(),
+            f64::NAN.to_bits(),
+            0x7ff8_0000_0000_0042,
+            f64::INFINITY.to_bits(),
+            f64::NEG_INFINITY.to_bits(),
+            u64::MAX,
+            1,
+        ]);
+        roundtrip(&random(3).take(300).collect::<Vec<_>>());
+        roundtrip(
+            &random(4)
+                .take(500)
+                .map(|r| (4_000_000_000_000.0 + (r % 4096) as f64).to_bits())
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn invalid_windows_fail() {
+        let reuse = [&[0u8; 8][..], &[0b01, 0, 0, 0, 0, 0, 0, 0, 0]].concat();
+        let error = decode(&reuse, &mut 0, 2, &mut Vec::new()).unwrap_err();
+        assert!(error.to_string().contains("reused before"));
+        let wide = [&[0u8; 8][..], &[0xff, 0x1f, 0, 0, 0, 0, 0, 0, 0, 0]].concat();
+        let error = decode(&wide, &mut 0, 2, &mut Vec::new()).unwrap_err();
+        assert!(error.to_string().contains("invalid XOR window"));
+    }
+}

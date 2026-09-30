@@ -113,6 +113,29 @@ fn next_timestamp(previous: i64, step: u64) -> Result<i64> {
     Ok(next)
 }
 
+/// Deterministic pseudo-random sequence for codec tests.
+#[cfg(test)]
+fn random(seed: u64) -> impl Iterator<Item = u64> {
+    std::iter::successors(Some(seed), |x| {
+        Some(
+            x.wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407),
+        )
+    })
+    .map(|x| (x ^ (x >> 29)).wrapping_mul(0xbf58_476d_1ce4_e5b9) ^ (x >> 32))
+}
+
+/// Asserts that `decode` fails on every strict prefix of `body`.
+#[cfg(test)]
+fn assert_truncations_fail(body: &[u8], decode: impl Fn(&[u8]) -> Result<()>) {
+    for len in 0..body.len() {
+        assert!(
+            decode(&body[..len]).is_err(),
+            "prefix of {len} bytes decoded"
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
