@@ -152,6 +152,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { createRecordConverter } from "@/utils/rum/sessionReplayChangeFormat";
+import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
 const props = defineProps({
   events: {
     type: Array,
@@ -337,6 +338,7 @@ const setupSession = async () => {
   // convert here. A single converter instance threads node-id / string-table state across
   // all records in order (it resets itself on each full snapshot, mirroring the SDK).
   const recordConverter = createRecordConverter();
+  let pageHref: string | undefined;
 
   props.segments.forEach((segment: any) => {
     const convertedRecords: any[] = [];
@@ -358,8 +360,13 @@ const setupSession = async () => {
         };
         segCopy = seg;
       }
+      if (segCopy.type === 4) pageHref = segCopy.data?.href;
+      if (segCopy.type === 3 && segCopy.data?.source === 0) {
+        segCopy.data.adds?.forEach((add: any) => resolveRelativeLinks(add.node, pageHref));
+      }
       try {
         if (segCopy.type === 2 && segCopy.data.node.type === 0) {
+          resolveRelativeLinks(segCopy.data.node, pageHref);
           segCopy.data.node.childNodes.forEach((child: any) => {
             if (child.type === 2 && child.tagName === "html") {
               child.childNodes.forEach((_child: any) => {

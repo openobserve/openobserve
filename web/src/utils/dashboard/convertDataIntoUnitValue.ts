@@ -160,6 +160,13 @@ export const getUnitValue = (
       while (unitIndex > 0 && absValue < units[unit][unitIndex].divisor) {
         unitIndex--;
       }
+      // zero has nothing to scale, so it stays in the panel's own unit (divisor 1)
+      if (absValue === 0) {
+        const ownUnit = units[unit].findIndex((entry: { divisor: number }) => entry.divisor === 1);
+        if (ownUnit !== -1) {
+          unitIndex = ownUnit;
+        }
+      }
 
       // calculate the final value: sign * absValue / divisor
       const finalValue = ((sign * absValue) / units[unit][unitIndex].divisor).toFixed(decimals);

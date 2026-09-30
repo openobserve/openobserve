@@ -755,4 +755,19 @@ export default defineComponent({
     overflow: hidden !important;
   }
 }
+
+/* Layered to outrank the global print reset in base-elements.css, which sets every .h-full to height:auto and every scroll area to overflow:visible. */
+@layer base {
+  @media print {
+    /* Keep the table panel at its grid-cell height; grown ancestors push the footer past the cell's clip. */
+    :global(.grid-stack-item-content:has([data-test="dashboard-table-renderer-wrapper"]) .h-full) {
+      height: 100% !important;
+    }
+
+    /* Rows cannot scroll on paper; clip them above the footer instead of painting over it. */
+    .table-wrapper :deep([data-test="o2-table-scroll-container"]) {
+      overflow: clip !important;
+    }
+  }
+}
 </style>
