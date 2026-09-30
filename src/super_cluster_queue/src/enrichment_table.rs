@@ -36,6 +36,7 @@ pub(crate) async fn process_file_list_delete(msg: Message) -> Result<()> {
         StreamType::EnrichmentTables,
         stream_name,
         (time_range.start, time_range.end),
+        false,
     )
     .await
     .map_err(|e| {
