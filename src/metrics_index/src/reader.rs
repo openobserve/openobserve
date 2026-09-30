@@ -15,35 +15,14 @@
 
 use std::{ops::Range, sync::Arc};
 
-use anyhow::{Context, Result, bail, ensure};
-use arrow::{
-    array::{Array, BooleanArray, RecordBatch, UInt32Array},
-    datatypes::SchemaRef,
-};
+use anyhow::{Context, Result, ensure};
 use bytes::Bytes;
-use datafusion::physical_plan::PhysicalExpr;
 
-use crate::{
-    block_cache::{CachedIndex, Sidecar, SidecarBinding, covers, load_index},
-    layout::METRICS_INDEX_ROW_COUNT,
-};
+use crate::block_cache::{CachedIndex, Sidecar, SidecarBinding, covers};
 
 /// Label and directory regions up to this total are fetched in one read instead of per column.
 /// 1 MiB is object_store's coalescing gap: below it, one more request costs more than the bytes.
 const SMALL_METADATA_BYTES: u64 = 1024 * 1024;
-
-pub(super) struct MetricsIndexData {
-    pub(super) schema: SchemaRef,
-    pub(super) batches: Vec<RecordBatch>,
-    pub(super) parent_records: usize,
-    /// Vortex does not use Parquet row groups.
-    pub(super) row_group_size: Option<u32>,
-}
-
-pub(super) struct IndexLabels {
-    pub requested: Arc<Vec<String>>,
-    pub flat: Arc<Vec<String>>,
-}
 
 /// Trailing bytes of a MIDX file already fetched while reading its header.
 struct Tail {
@@ -61,82 +40,6 @@ impl Tail {
         );
         Ok(self.bytes.slice(start..end))
     }
-}
-
-pub(super) async fn load_metrics_index_file(
-    sidecar: &Sidecar,
-    format: config::FileFormat,
-    labels: IndexLabels,
-) -> Result<MetricsIndexData> {
-    let index = load_index(sidecar, &labels.requested).await?;
-    tokio::task::spawn_blocking(move || metrics_block_index_data(&index, format, &labels.flat))
-        .await?
-}
-
-/// Evaluate `filter` over the run rows and collect the selected physical row
-/// ranges. Runs tile the data file, so each run's start is the prefix sum of
-/// the preceding counts.
-pub(super) fn evaluate_metrics_index(
-    data: &MetricsIndexData,
-    filter: Option<&dyn PhysicalExpr>,
-    expected_rows: usize,
-) -> Result<Vec<Range<usize>>> {
-    let parent_records = data.parent_records;
-    ensure!(
-        parent_records == expected_rows,
-        "metrics-index was written for {parent_records} rows, but the parent file contains {expected_rows} records"
-    );
-    let count_index = data.schema.index_of(METRICS_INDEX_ROW_COUNT)?;
-    let mut ranges: Vec<Range<usize>> = Vec::new();
-    let mut next_row: usize = 0;
-
-    for batch in &data.batches {
-        let mask = match filter {
-            Some(filter) => {
-                let mask = filter.evaluate(batch)?.into_array(batch.num_rows())?;
-                mask.as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .context("metrics-index filter did not produce a boolean array")?
-                    .clone()
-            }
-            None => BooleanArray::from(vec![true; batch.num_rows()]),
-        };
-        let mask = &mask;
-        let counts = batch
-            .column(count_index)
-            .as_any()
-            .downcast_ref::<UInt32Array>()
-            .context("metrics-index row count is not UInt32")?;
-
-        for row in 0..batch.num_rows() {
-            let count = counts.value(row) as usize;
-            ensure!(count != 0, "metrics-index contains an empty row range");
-            let start = next_row;
-            let end = start
-                .checked_add(count)
-                .context("metrics-index row range overflow")?;
-            ensure!(
-                end <= expected_rows,
-                "metrics-index row range ends at {end}, beyond the parent file's {expected_rows} records"
-            );
-            next_row = end;
-            if mask.is_null(row) || !mask.value(row) {
-                continue;
-            }
-            if let Some(previous) = ranges.last_mut()
-                && start == previous.end
-            {
-                previous.end = end;
-            } else {
-                ranges.push(start..end);
-            }
-        }
-    }
-    ensure!(
-        next_row == expected_rows,
-        "metrics-index covers {next_row} rows, but the parent file contains {expected_rows} records"
-    );
-    Ok(ranges)
 }
 
 /// Reads the sidecar columns `cached` lacks for `labels` and decodes them into a new entry.
@@ -204,7 +107,7 @@ pub(crate) async fn fetch_parsed_index(
             crate::block::decode_index(&header, &columns, &requested)?
         };
         Ok(Arc::new(CachedIndex {
-            index: Arc::new(index.for_cache()),
+            index: Arc::new(index),
             binding,
         }))
     })
@@ -296,57 +199,10 @@ async fn read_columns(
     Ok(columns)
 }
 
-fn metrics_block_index_data(
-    index: &crate::block::Index,
-    format: config::FileFormat,
-    flat_labels: &[String],
-) -> Result<MetricsIndexData> {
-    let row_group_size = match format {
-        config::FileFormat::Parquet => Some(
-            index
-                .row_group_size
-                .context("Parquet block index lacks parent row group size")?,
-        ),
-        config::FileFormat::Vortex if index.row_group_size.is_none() => None,
-        _ => bail!("Invalid block parent format/row-group binding"),
-    };
-    let mut fields = vec![arrow::datatypes::Field::new(
-        METRICS_INDEX_ROW_COUNT,
-        arrow::datatypes::DataType::UInt32,
-        false,
-    )];
-    let mut columns: Vec<arrow::array::ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
-        index.blocks.row_counts(),
-    ))];
-    for (i, field) in index.labels.schema().fields().iter().enumerate() {
-        if index.source_schema.field_with_name(field.name()).is_ok() {
-            if flat_labels.contains(field.name()) {
-                let source_field = index.source_schema.field_with_name(field.name())?;
-                fields.push(source_field.clone());
-                columns.push(arrow::compute::cast(
-                    index.labels.column(i),
-                    source_field.data_type(),
-                )?);
-            } else {
-                fields.push(field.as_ref().clone());
-                columns.push(Arc::clone(index.labels.column(i)));
-            }
-        }
-    }
-    let schema = Arc::new(arrow::datatypes::Schema::new(fields));
-    let batch = RecordBatch::try_new(Arc::clone(&schema), columns)?;
-    Ok(MetricsIndexData {
-        schema,
-        batches: vec![batch],
-        parent_records: usize::try_from(index.parent.rows)?,
-        row_group_size,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{Float64Array, Int64Array, StringArray, UInt64Array},
+        array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
         datatypes::{DataType, Field, Schema},
     };
     use config::meta::stream::{FileKey, FileMeta, FileSelection};
@@ -491,46 +347,10 @@ mod tests {
         store(&file, Some(bytes)).await;
         let mut sidecar = Sidecar::of(&file).unwrap();
         sidecar.size += 1;
-        let data = load_metrics_index_file(
-            &sidecar,
-            config::FileFormat::Parquet,
-            IndexLabels {
-                requested: Arc::new(vec!["path".to_string()]),
-                flat: Arc::new(Vec::new()),
-            },
-        )
-        .await
-        .unwrap();
-        assert_eq!(data.parent_records, 6);
-    }
-
-    #[tokio::test]
-    async fn equality_keeps_dictionary_and_regex_flattens_label() {
-        let (_, file, bytes) = fixture(config::FileFormat::Vortex).await;
-        store(&file, Some(bytes)).await;
-        for flat in [false, true] {
-            let data = load_metrics_index_file(
-                &Sidecar::of(&file).unwrap(),
-                config::FileFormat::Vortex,
-                IndexLabels {
-                    requested: Arc::new(vec!["path".to_string()]),
-                    flat: Arc::new(if flat {
-                        vec!["path".to_string()]
-                    } else {
-                        vec![]
-                    }),
-                },
-            )
+        let index = crate::block_cache::load_index(&sidecar, &["path".to_string()])
             .await
             .unwrap();
-            assert_eq!(
-                matches!(
-                    data.schema.field_with_name("path").unwrap().data_type(),
-                    DataType::Dictionary(_, _)
-                ),
-                !flat
-            );
-        }
+        assert_eq!(index.header.parent.rows, 6);
     }
 
     #[tokio::test]

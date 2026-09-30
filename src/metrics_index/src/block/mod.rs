@@ -27,10 +27,10 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Result, anyhow, ensure};
+use anyhow::{Result, bail, ensure};
 use arrow::{
-    array::{Array, DictionaryArray, LargeStringArray, RecordBatch, StringArray, StringViewArray},
-    datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
+    array::{Array, AsArray, RecordBatch},
+    datatypes::{DataType, Schema, UInt8Type, UInt16Type, UInt32Type},
 };
 pub use config::meta::promql::index::{MIDX_MAGIC, MIDX_TRAILER_LEN, MIDX_VERSION, MidxTrailer};
 pub use directory::{BlockDirectory, BlockIter};
@@ -99,9 +99,6 @@ pub struct DecodedBlockRef<'a> {
 
 #[derive(Debug)]
 pub struct IndexBase {
-    pub row_group_size: Option<u32>,
-    pub parent: ParentMetadata,
-    pub source_schema: SchemaRef,
     pub blocks: BlockDirectory,
     pub header: Header,
 }
@@ -110,7 +107,6 @@ pub struct IndexBase {
 pub struct Index {
     pub base: Arc<IndexBase>,
     pub labels: RecordBatch,
-    missing: Vec<String>,
 }
 
 impl Deref for Index {
@@ -127,24 +123,23 @@ impl Index {
     }
 
     pub fn estimated_heap_size(&self) -> usize {
+        let source_schema = &self.header.source_schema;
         let schema_bytes =
-            serde_json::to_vec(self.source_schema.as_ref()).map_or(0, |bytes| bytes.len());
+            serde_json::to_vec(source_schema.as_ref()).map_or(0, |bytes| bytes.len());
         std::mem::size_of::<Self>()
             .saturating_add(std::mem::size_of::<IndexBase>())
             .saturating_add(self.estimated_directory_size())
             .saturating_add(self.labels.get_array_memory_size())
-            .saturating_add(self.missing.capacity() * std::mem::size_of::<String>())
-            .saturating_add(self.missing.iter().map(String::capacity).sum::<usize>())
             .saturating_add(schema_bytes.saturating_mul(2))
             .saturating_add(
-                (self.source_schema.fields().len() + self.labels.num_columns()).saturating_mul(512),
+                (source_schema.fields().len() + self.labels.num_columns()).saturating_mul(512),
             )
     }
 
     pub fn missing_labels(&self, names: &[String]) -> Result<Vec<String>> {
         let mut missing = Vec::new();
         for name in names {
-            let Ok(field) = self.source_schema.field_with_name(name) else {
+            let Ok(field) = self.header.source_schema.field_with_name(name) else {
                 continue;
             };
             ensure!(
@@ -180,11 +175,6 @@ impl Index {
         }
         Ok(Self {
             base: Arc::clone(&self.base),
-            missing: names
-                .iter()
-                .filter(|name| self.source_schema.field_with_name(name).is_err())
-                .cloned()
-                .collect(),
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
@@ -196,10 +186,10 @@ impl Index {
     pub fn merge_columns(&self, other: &Self) -> Result<Self> {
         debug_assert!(
             Arc::ptr_eq(&self.base, &other.base)
-                || (self.base.header.blocks_end == other.base.header.blocks_end
-                    && self.parent == other.parent
-                    && self.source_schema == other.source_schema
-                    && self.row_group_size == other.row_group_size),
+                || (self.header.blocks_end == other.header.blocks_end
+                    && self.header.parent == other.header.parent
+                    && self.header.source_schema == other.header.source_schema
+                    && self.header.row_group_size == other.header.row_group_size),
             "cannot mix metadata bindings"
         );
         let mut fields = self.labels.schema().fields().to_vec();
@@ -218,7 +208,6 @@ impl Index {
         }
         Ok(Self {
             base: Arc::clone(&self.base),
-            missing: Vec::new(),
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
@@ -227,16 +216,11 @@ impl Index {
         })
     }
 
-    pub fn for_cache(mut self) -> Self {
-        self.missing.clear();
-        self
-    }
-
     #[inline]
     pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
         let Some(column) = self.labels.column_by_name(name) else {
             ensure!(
-                self.missing.iter().any(|missing| missing == name),
+                self.header.source_schema.field_with_name(name).is_err(),
                 "label was not projected: {name}"
             );
             return Ok(None);
@@ -302,31 +286,25 @@ fn label_value(array: &dyn Array, row: usize) -> Result<Option<&str>> {
     if array.is_null(row) {
         return Ok(None);
     }
-    if let Some(a) = array.as_any().downcast_ref::<StringArray>() {
+    if let Some(a) = array.as_string_opt::<i32>() {
         return Ok(Some(a.value(row)));
     }
-    if let Some(a) = array.as_any().downcast_ref::<LargeStringArray>() {
+    if let Some(a) = array.as_string_opt::<i64>() {
         return Ok(Some(a.value(row)));
     }
-    if let Some(a) = array.as_any().downcast_ref::<StringViewArray>() {
+    if let Some(a) = array.as_string_view_opt() {
         return Ok(Some(a.value(row)));
     }
-    if let Some(array) = array.as_any().downcast_ref::<DictionaryArray<UInt8Type>>() {
-        return label_value(
-            array.values().as_ref(),
-            usize::from(array.keys().value(row)),
-        );
-    }
-    if let Some(array) = array.as_any().downcast_ref::<DictionaryArray<UInt16Type>>() {
-        return label_value(
-            array.values().as_ref(),
-            usize::from(array.keys().value(row)),
-        );
-    }
-    if let Some(array) = array.as_any().downcast_ref::<DictionaryArray<UInt32Type>>() {
-        return label_value(array.values().as_ref(), array.keys().value(row) as usize);
-    }
-    Err(anyhow!("unsupported identity label array"))
+    let (values, key) = if let Some(a) = array.as_dictionary_opt::<UInt8Type>() {
+        (a.values(), usize::from(a.keys().value(row)))
+    } else if let Some(a) = array.as_dictionary_opt::<UInt16Type>() {
+        (a.values(), usize::from(a.keys().value(row)))
+    } else if let Some(a) = array.as_dictionary_opt::<UInt32Type>() {
+        (a.values(), a.keys().value(row) as usize)
+    } else {
+        bail!("unsupported identity label array");
+    };
+    label_value(values.as_ref(), key)
 }
 
 fn semantic_metadata(schema: &Schema) -> HashMap<String, String> {
@@ -350,7 +328,7 @@ mod tests {
 
     use arrow::{
         array::{Float64Array, Int64Array, RecordBatch, StringArray, StringViewArray, UInt64Array},
-        datatypes::{DataType, Field, Schema},
+        datatypes::{DataType, Field, Schema, SchemaRef},
     };
     use bytes::Bytes;
 
@@ -566,7 +544,9 @@ mod tests {
         assert_eq!(index.label_value(0, "label_b").unwrap(), Some(""));
         assert_eq!(index.label_value(2, "label_a").unwrap(), Some(""));
         assert_eq!(index.label_value(2, "label_b").unwrap(), None);
-        assert!(index.label_value(0, "not_projected").is_err());
+        assert_eq!(index.label_value(0, "not_in_source").unwrap(), None);
+        let partial = super::tests::index(&blob, &["label_b"]).unwrap();
+        assert!(partial.label_value(0, "label_a").is_err());
     }
 
     #[test]
@@ -1056,8 +1036,8 @@ mod tests {
             &container[container.len() - 12..container.len() - 8],
             &MIDX_VERSION.to_le_bytes()
         );
-        assert_eq!(parsed.row_group_size, Some(3));
-        assert_eq!(parsed.source_schema, input.schema());
+        assert_eq!(parsed.header.row_group_size, Some(3));
+        assert_eq!(parsed.header.source_schema, input.schema());
         let actual = decoded_rows(&container, &parsed)
             .into_iter()
             .map(|(_, t, v)| (t, v))
@@ -1075,12 +1055,10 @@ mod tests {
         let sql = arrow::compute::concat_batches(&input.schema(), &sql_batches).unwrap();
         assert_eq!(sql.num_rows(), input.num_rows());
         for (row, expected) in actual.iter().enumerate() {
-            let times = sql.column(1).as_any().downcast_ref::<Int64Array>().unwrap();
+            let times = sql.column(1).as_primitive::<arrow::datatypes::Int64Type>();
             let values = sql
                 .column(2)
-                .as_any()
-                .downcast_ref::<Float64Array>()
-                .unwrap();
+                .as_primitive::<arrow::datatypes::Float64Type>();
             assert_eq!((times.value(row), values.value(row).to_bits()), *expected);
         }
     }
@@ -1277,9 +1255,9 @@ mod tests {
         writer.write(&input).unwrap();
         let encoded = writer.finish_for_vortex(parent(), input.schema()).unwrap();
         let decoded = index(&encoded, &["label_a", "label_b"]).unwrap();
-        assert_eq!(decoded.parent, parent());
-        assert_eq!(decoded.row_group_size, None);
-        assert_eq!(decoded.source_schema, input.schema());
+        assert_eq!(decoded.header.parent, parent());
+        assert_eq!(decoded.header.row_group_size, None);
+        assert_eq!(decoded.header.source_schema, input.schema());
         assert_eq!(
             decoded_rows(&encoded, &decoded),
             rows().iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
@@ -1316,8 +1294,8 @@ mod tests {
         };
         let blob = std::fs::read(moved_index).unwrap();
         let parsed = decode_file(&blob, &expected, &["label_a".into()]).unwrap();
-        assert_eq!(parsed.parent, expected);
-        assert_eq!(parsed.source_schema, input.schema());
+        assert_eq!(parsed.header.parent, expected);
+        assert_eq!(parsed.header.source_schema, input.schema());
         assert_eq!(
             parsed
                 .blocks

@@ -18,10 +18,9 @@ use std::{io::Write, sync::Arc};
 use anyhow::{Context, Result, anyhow, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
-        StringViewArray, UInt64Array,
+        Array, ArrayRef, AsArray, LargeStringArray, RecordBatch, StringArray, StringViewArray,
     },
-    datatypes::{DataType, SchemaRef},
+    datatypes::{DataType, Float64Type, Int64Type, SchemaRef, UInt64Type},
 };
 use parquet::{
     arrow::arrow_reader::{ArrowReaderMetadata, ArrowReaderOptions},
@@ -201,21 +200,9 @@ impl<W: Write> BlockWriter<W> {
             schema_matches(self.schema.as_ref(), batch.schema().as_ref()),
             "source schema changed"
         );
-        let hashes = batch
-            .column(self.hash_index)
-            .as_any()
-            .downcast_ref::<UInt64Array>()
-            .context("hash array type")?;
-        let times = batch
-            .column(self.time_index)
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .context("timestamp array type")?;
-        let values = batch
-            .column(self.value_index)
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .context("value array type")?;
+        let hashes = batch.column(self.hash_index).as_primitive::<UInt64Type>();
+        let times = batch.column(self.time_index).as_primitive::<Int64Type>();
+        let values = batch.column(self.value_index).as_primitive::<Float64Type>();
         ensure!(
             hashes.null_count() == 0 && times.null_count() == 0 && values.null_count() == 0,
             "nullable samples unsupported"

@@ -17,7 +17,7 @@
 
 use anyhow::Result;
 
-use super::pack::get_u64;
+use crate::block::compact::get_u64;
 
 pub(crate) fn encode(bits: u64, out: &mut Vec<u8>) {
     out.extend_from_slice(&bits.to_le_bytes());

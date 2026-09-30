@@ -2447,21 +2447,15 @@ mod tests {
         c.account = "c".into();
         cache.trim(weight.total * 2);
         assert!(cache.get(&a).is_none());
-        cache
-            .insert(a.clone(), Arc::clone(&entry), weight.total * 2)
-            .unwrap();
+        cache.insert(a.clone(), Arc::clone(&entry), weight.total * 2);
         let first = cache_snapshot(&registry);
         assert_eq!(first["used_bytes"], weight.total as f64);
-        cache
-            .insert(b.clone(), Arc::clone(&entry), weight.total * 2)
-            .unwrap();
+        cache.insert(b.clone(), Arc::clone(&entry), weight.total * 2);
         assert!(cache.get(&a).is_some());
-        cache
-            .insert(c.clone(), Arc::clone(&entry), weight.total * 2)
-            .unwrap();
+        cache.insert(c.clone(), Arc::clone(&entry), weight.total * 2);
         assert!(cache.get(&b).is_none());
         assert!(cache.get(&a).is_some());
-        cache.insert(a.clone(), entry, weight.total * 2).unwrap();
+        cache.insert(a.clone(), entry, weight.total * 2);
         assert_eq!(
             cache_snapshot(&registry)["used_bytes"],
             (weight.total * 2) as f64
@@ -2484,15 +2478,13 @@ mod tests {
         let (key, entry, weight) = cache_entry();
         cache.trim(0);
         assert!(cache.get(&key).is_none());
-        cache.insert(key.clone(), Arc::clone(&entry), 0).unwrap();
+        cache.insert(key.clone(), Arc::clone(&entry), 0);
         cache.trim(weight.total - 1);
         assert!(cache.get(&key).is_none());
-        cache
-            .insert(key.clone(), Arc::clone(&entry), weight.total - 1)
-            .unwrap();
+        cache.insert(key.clone(), Arc::clone(&entry), weight.total - 1);
         let values = cache_snapshot(&registry);
         assert!(values.values().all(|value| *value == 0.0));
-        cache.insert(key, entry, weight.total).unwrap();
+        cache.insert(key, entry, weight.total);
         cache.trim(0);
         let reset = cache_snapshot(&registry);
         assert_eq!(reset["used_bytes"], 0.0);
@@ -2520,9 +2512,7 @@ mod tests {
                     for iteration in 0..100 {
                         let mut cache = cache.lock().unwrap();
                         cache.trim(weight.total * 3);
-                        cache
-                            .insert(key.clone(), Arc::clone(&entry), weight.total * 3)
-                            .unwrap();
+                        cache.insert(key.clone(), Arc::clone(&entry), weight.total * 3);
                         assert!(cache.get(&key).is_some());
                         if iteration % 5 == 0 {
                             cache.remove(&key);
@@ -2546,7 +2536,7 @@ mod tests {
         let (mut cache, registry) = observed_cache();
         let (key, entry, weight) = cache_entry();
         let weak = Arc::downgrade(&entry.index);
-        cache.insert(key.clone(), entry, weight.total).unwrap();
+        cache.insert(key.clone(), entry, weight.total);
         let cache = Arc::new(Mutex::new(cache));
         let worker_cache = Arc::clone(&cache);
         let (started, entered) = tokio::sync::oneshot::channel();
@@ -2594,9 +2584,7 @@ mod tests {
             .unwrap(),
         });
         let mut cache = IndexCache::default();
-        cache
-            .insert(key.clone(), Arc::clone(&index), usize::MAX)
-            .unwrap();
+        cache.insert(key.clone(), Arc::clone(&index), usize::MAX);
         assert!(cache.bytes >= expected_heap + std::mem::size_of::<CachedIndex>());
         assert!(cache.get(&key).is_some());
         let mut other = key.clone();
@@ -2605,7 +2593,7 @@ mod tests {
         cache.trim(cache.bytes - 1);
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
-        cache.insert(key.clone(), index, usize::MAX).unwrap();
+        cache.insert(key.clone(), index, usize::MAX);
         cache.trim(0);
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
