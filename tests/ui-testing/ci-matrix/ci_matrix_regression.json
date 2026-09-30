@@ -56,7 +56,8 @@
     "run_files": [
       "dashboard-regression.spec.js",
       "dashboard-cache-browser-refresh.spec.js",
-      "dashboard-save-validation-message-11283.spec.js"
+      "dashboard-save-validation-message-11283.spec.js",
+      "dashboard-14479-variable-name-prefix.spec.js"
     ],
     "disabled": []
   },
