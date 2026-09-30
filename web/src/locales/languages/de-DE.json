@@ -3659,7 +3659,40 @@
     "dataSource": "Quelle der Daten",
     "uploadFile": "Datei hochladen",
     "fromUrl": "Von URL",
-    "addFunction": "Funktion hinzufügen"
+    "addFunction": "Funktion hinzufügen",
+    "import": {
+      "title": "Funktion importieren",
+      "outputMessages": "Ausgabemeldungen",
+      "errorValidations": "Fehlervalidierungen",
+      "results": "Importergebnisse",
+      "nameLabel": "Funktionsname",
+      "nameRequired": "Funktion - {index}: Name ist erforderlich",
+      "nameExists": "Funktion - {index}: \"{name}\" ist bereits vorhanden",
+      "nameInvalid": "Funktion - {index}: \"{name}\" ist kein gültiger Funktionsname. Verwenden Sie Buchstaben, Zahlen und Unterstriche, beginnend mit einem Buchstaben oder Unterstrich.",
+      "duplicateName": "Funktion - {index}: \"{name}\" kommt in dieser Datei mehrfach vor",
+      "bodyRequired": "Funktion - {index}: Funktionskörper ist erforderlich",
+      "transTypeInvalid": "Funktion - {index}: Typ muss 0 für VRL oder 1 für JavaScript sein",
+      "paramsInvalid": "Funktion - {index}: params muss eine Zeichenkette sein",
+      "transTypeLabel": "Sprache",
+      "transTypePlaceholder": "Sprache auswählen",
+      "paramsLabel": "Parameter",
+      "paramsHint": "Kommagetrennte Argumentnamen. Standardmäßig „row“.",
+      "overrideExisting": "Stattdessen die vorhandene Funktion ersetzen",
+      "nameInputRequired": "Geben Sie einen Funktionsnamen ein",
+      "nameInputInvalid": "Verwenden Sie Buchstaben, Zahlen und Unterstriche, beginnend mit einem Buchstaben oder Unterstrich",
+      "nameInputDuplicate": "Eine andere Funktion in dieser Datei verwendet diesen Namen bereits",
+      "nameInputExists": "Dieser Name ist in dieser Organisation bereits vergeben",
+      "overrideAffects": "Überschreiben ändert auch diese Rohrleitungen: {pipelines}",
+      "createSuccess": "Funktion - {index}: \"{name}\" importiert",
+      "overridden": "Funktion - {index}: \"{name}\" überschrieben",
+      "createFailed": "Funktion - {index}: \"{name}\" fehlgeschlagen - {reason}",
+      "rejectedBody": "Korrigieren Sie die Definition und importieren Sie sie erneut.",
+      "rejectedLanguage": "Funktion - {index}: \"{name}\" wurde abgelehnt. Wenn es sich um eine JavaScript-Funktion handelt, legen Sie die Sprache fest - eine Definition ohne Sprache wird als VRL gelesen.",
+      "jsonStringEmpty": "JSON-Zeichenkette ist leer",
+      "invalidJsonFormat": "Ungültiges JSON-Format",
+      "importSuccess": "{count} Funktion importiert | {count} Funktionen importiert",
+      "nothingToImport": "Keine Funktionen zum Importieren gefunden. Prüfen Sie, ob die Datei gültiges JSON ist."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Dimensionen werden analysiert...",
@@ -6854,7 +6887,6 @@
       "ok": "OK",
       "error": "Fehler",
       "pending": "Ausstehend",
-      "skipped": "Übersprungen",
       "unknown": "Unbekannt",
       "flapping": "Flattern",
       "flipsSuffix": "Wechsel",
@@ -15870,7 +15902,8 @@
       "oncallAck": "Bestätigen",
       "oncallEscalate": "Eskalieren",
       "oncallSnooze": "Schlummern",
-      "oncallResolve": "Lösen"
+      "oncallResolve": "Lösen",
+      "functionsImport": "Funktion importieren"
     }
   },
   "components": {
@@ -16482,7 +16515,10 @@
       "enrichmentReloadStarted": "Neuladen der Anreicherungstabelle gestartet. Verarbeitung im Hintergrund...",
       "enrichmentJobStarted": "Auftrag für Anreicherungstabelle gestartet. Verarbeitung im Hintergrund...",
       "enrichmentCreationFailed": "Erstellung der Anreicherungstabelle fehlgeschlagen",
-      "functionDeletionAssociatedPipelines": "Löschen der Funktion fehlgeschlagen, da sie mit Pipelines verknüpft ist. Klicken Sie auf die Schaltfläche \"Ansehen\", um die zugehörigen Pipelines anzuzeigen."
+      "functionDeletionAssociatedPipelines": "Löschen der Funktion fehlgeschlagen, da sie mit Pipelines verknüpft ist. Klicken Sie auf die Schaltfläche \"Ansehen\", um die zugehörigen Pipelines anzuzeigen.",
+      "successfullyExportedFunctions": "{count} Funktion erfolgreich exportiert | {count} Funktionen erfolgreich exportiert",
+      "errorExportingFunctions": "Fehler beim Exportieren der Funktionen. Bitte versuchen Sie es erneut.",
+      "functionsMissingFromExport": "{names} ist nicht mehr in der Liste und wurde vom Export ausgelassen | {names} sind nicht mehr in der Liste und wurden vom Export ausgelassen"
     },
     "recommended": {
       "failedToImportDashboard": "Fehler beim Importieren des Dashboards: {error}",

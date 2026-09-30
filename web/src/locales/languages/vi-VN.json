@@ -3659,7 +3659,40 @@
     "dataSource": "Nguồn dữ liệu",
     "uploadFile": "Tải lên tệp",
     "fromUrl": "Từ URL",
-    "addFunction": "Thêm Hàm"
+    "addFunction": "Thêm Hàm",
+    "import": {
+      "title": "Nhập hàm",
+      "outputMessages": "Thông báo đầu ra",
+      "errorValidations": "Lỗi xác thực",
+      "results": "Kết quả nhập",
+      "nameLabel": "Tên hàm",
+      "nameRequired": "Hàm - {index}: tên là bắt buộc",
+      "nameExists": "Hàm - {index}: \"{name}\" đã tồn tại",
+      "nameInvalid": "Hàm - {index}: \"{name}\" không phải là tên hàm hợp lệ. Dùng chữ cái, chữ số và dấu gạch dưới, bắt đầu bằng chữ cái hoặc dấu gạch dưới.",
+      "duplicateName": "Hàm - {index}: \"{name}\" xuất hiện nhiều hơn một lần trong tệp này",
+      "bodyRequired": "Hàm - {index}: thân hàm là bắt buộc",
+      "transTypeInvalid": "Hàm - {index}: loại phải là 0 cho VRL hoặc 1 cho JavaScript",
+      "paramsInvalid": "Hàm - {index}: params phải là một chuỗi",
+      "transTypeLabel": "Ngôn ngữ",
+      "transTypePlaceholder": "Chọn ngôn ngữ",
+      "paramsLabel": "Tham số",
+      "paramsHint": "Tên đối số phân tách bằng dấu phẩy. Mặc định là “row”.",
+      "overrideExisting": "Thay thế hàm hiện có",
+      "nameInputRequired": "Nhập tên hàm",
+      "nameInputInvalid": "Dùng chữ cái, chữ số và dấu gạch dưới, bắt đầu bằng chữ cái hoặc dấu gạch dưới",
+      "nameInputDuplicate": "Một hàm khác trong tệp này đã dùng tên này",
+      "nameInputExists": "Tên này đã được dùng trong tổ chức này",
+      "overrideAffects": "Ghi đè cũng thay đổi các pipeline sau: {pipelines}",
+      "createSuccess": "Hàm - {index}: \"{name}\" đã được nhập",
+      "overridden": "Hàm - {index}: \"{name}\" đã bị ghi đè",
+      "createFailed": "Hàm - {index}: \"{name}\" thất bại - {reason}",
+      "rejectedBody": "Sửa lại định nghĩa và nhập lại.",
+      "rejectedLanguage": "Hàm - {index}: \"{name}\" đã bị từ chối. Nếu đó là hàm JavaScript, hãy đặt ngôn ngữ — định nghĩa không có ngôn ngữ sẽ được đọc là VRL.",
+      "jsonStringEmpty": "Chuỗi JSON trống",
+      "invalidJsonFormat": "Định dạng JSON không hợp lệ",
+      "importSuccess": "Đã nhập {count} hàm | Đã nhập {count} hàm",
+      "nothingToImport": "Không tìm thấy hàm nào để nhập. Kiểm tra xem tệp có phải là JSON hợp lệ không."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Đang phân tích các thứ nguyên...",
@@ -6854,7 +6887,6 @@
       "ok": "OK",
       "error": "Lỗi",
       "pending": "Đang chờ",
-      "skipped": "Đã bỏ qua",
       "unknown": "Không xác định",
       "flapping": "Chập chờn",
       "flipsSuffix": "lần lật",
@@ -15870,7 +15902,8 @@
       "oncallAck": "Xác nhận",
       "oncallEscalate": "Leo thang",
       "oncallSnooze": "Tạm hoãn",
-      "oncallResolve": "Giải quyết"
+      "oncallResolve": "Giải quyết",
+      "functionsImport": "Nhập hàm"
     }
   },
   "components": {
@@ -16482,7 +16515,10 @@
       "enrichmentReloadStarted": "Đã bắt đầu tải lại bảng bổ sung. Đang xử lý trong nền...",
       "enrichmentJobStarted": "Đã bắt đầu tác vụ bảng bổ sung. Đang xử lý trong nền...",
       "enrichmentCreationFailed": "Không thể tạo bảng bổ sung",
-      "functionDeletionAssociatedPipelines": "Không thể xóa hàm vì nó được liên kết với các đường ống. Nhấp vào nút xem để xem các đường ống liên quan."
+      "functionDeletionAssociatedPipelines": "Không thể xóa hàm vì nó được liên kết với các đường ống. Nhấp vào nút xem để xem các đường ống liên quan.",
+      "successfullyExportedFunctions": "Đã xuất thành công {count} hàm | Đã xuất thành công {count} hàm",
+      "errorExportingFunctions": "Lỗi khi xuất hàm. Vui lòng thử lại.",
+      "functionsMissingFromExport": "{names} không còn trong danh sách và đã bị loại khỏi bản xuất | {names} không còn trong danh sách và đã bị loại khỏi bản xuất"
     },
     "recommended": {
       "failedToImportDashboard": "Không thể nhập bảng điều khiển: {error}",

@@ -3659,7 +3659,40 @@
     "dataSource": "[データソース]",
     "uploadFile": "[ファイルをアップロード]",
     "fromUrl": "URL から",
-    "addFunction": "機能追加"
+    "addFunction": "機能追加",
+    "import": {
+      "title": "関数のインポート",
+      "outputMessages": "出力メッセージ",
+      "errorValidations": "検証エラー",
+      "results": "インポート結果",
+      "nameLabel": "関数名",
+      "nameRequired": "関数 - {index}: 名前は必須です",
+      "nameExists": "関数 - {index}: \"{name}\" は既に存在します",
+      "nameInvalid": "関数 - {index}: \"{name}\" は有効な関数名ではありません。文字、数字、アンダースコアを使用し、先頭は文字またはアンダースコアにしてください。",
+      "duplicateName": "関数 - {index}: \"{name}\" がこのファイル内に複数回出現します",
+      "bodyRequired": "関数 - {index}: 関数の本体は必須です",
+      "transTypeInvalid": "関数 - {index}: type は VRL なら 0、JavaScript なら 1 である必要があります",
+      "paramsInvalid": "関数 - {index}: params は文字列である必要があります",
+      "transTypeLabel": "言語",
+      "transTypePlaceholder": "言語を選択",
+      "paramsLabel": "パラメータ",
+      "paramsHint": "カンマ区切りの引数名。デフォルトは「row」です。",
+      "overrideExisting": "代わりに既存の関数を置き換える",
+      "nameInputRequired": "関数名を入力",
+      "nameInputInvalid": "文字、数字、アンダースコアを使用し、先頭は文字またはアンダースコアにしてください",
+      "nameInputDuplicate": "このファイル内の別の関数が既にこの名前を使用しています",
+      "nameInputExists": "この名前は既にこの組織で使用されています",
+      "overrideAffects": "上書きすると以下のパイプラインも変更されます: {pipelines}",
+      "createSuccess": "関数 - {index}: \"{name}\" をインポートしました",
+      "overridden": "関数 - {index}: \"{name}\" を上書きしました",
+      "createFailed": "関数 - {index}: \"{name}\" が失敗しました - {reason}",
+      "rejectedBody": "定義を修正して再度インポートしてください。",
+      "rejectedLanguage": "関数 - {index}: \"{name}\" は拒否されました。JavaScript 関数の場合は言語を設定してください。言語が指定されていない定義は VRL として読み込まれます。",
+      "jsonStringEmpty": "JSON 文字列が空です",
+      "invalidJsonFormat": "無効な JSON 形式",
+      "importSuccess": "{count} 件の関数をインポートしました | {count} 件の関数をインポートしました",
+      "nothingToImport": "インポートできる関数が見つかりません。ファイルが有効な JSON であることを確認してください。"
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "ディメンションを解析中...",
@@ -6854,7 +6887,6 @@
       "ok": "OK",
       "error": "エラー",
       "pending": "保留中",
-      "skipped": "スキップ",
       "unknown": "不明",
       "flapping": "フラッピング",
       "flipsSuffix": "フリップ",
@@ -15870,7 +15902,8 @@
       "oncallAck": "確認",
       "oncallEscalate": "エスカレート",
       "oncallSnooze": "スヌーズ",
-      "oncallResolve": "解決"
+      "oncallResolve": "解決",
+      "functionsImport": "関数をインポート"
     }
   },
   "components": {
@@ -16482,7 +16515,10 @@
       "enrichmentReloadStarted": "エンリッチメントテーブルのリロードを開始しました。バックグラウンドで処理しています...",
       "enrichmentJobStarted": "エンリッチメントテーブルのジョブを開始しました。バックグラウンドで処理しています...",
       "enrichmentCreationFailed": "エンリッチメントテーブルの作成に失敗しました",
-      "functionDeletionAssociatedPipelines": "関数はパイプラインに関連付けられているため、削除に失敗しました。関連するパイプラインを確認するには、表示ボタンをクリックしてください。"
+      "functionDeletionAssociatedPipelines": "関数はパイプラインに関連付けられているため、削除に失敗しました。関連するパイプラインを確認するには、表示ボタンをクリックしてください。",
+      "successfullyExportedFunctions": "{count} 件の関数をエクスポートしました | {count} 件の関数をエクスポートしました",
+      "errorExportingFunctions": "関数のエクスポート中にエラーが発生しました。もう一度お試しください。",
+      "functionsMissingFromExport": "{names} はリストに存在しないため、エクスポートから除外されました | {names} はリストに存在しないため、エクスポートから除外されました"
     },
     "recommended": {
       "failedToImportDashboard": "ダッシュボードのインポートに失敗しました: {error}",

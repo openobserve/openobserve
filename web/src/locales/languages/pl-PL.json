@@ -3659,7 +3659,40 @@
     "dataSource": "Źródło danych",
     "uploadFile": "Prześlij plik",
     "fromUrl": "Z URL",
-    "addFunction": "Dodaj funkcję"
+    "addFunction": "Dodaj funkcję",
+    "import": {
+      "title": "Importuj funkcję",
+      "outputMessages": "Komunikaty wyjściowe",
+      "errorValidations": "Błędy walidacji",
+      "results": "Wyniki importu",
+      "nameLabel": "Nazwa funkcji",
+      "nameRequired": "Funkcja - {index}: nazwa jest wymagana",
+      "nameExists": "Funkcja - {index}: „{name}” już istnieje",
+      "nameInvalid": "Funkcja - {index}: „{name}” nie jest prawidłową nazwą funkcji. Użyj liter, cyfr i podkreśleń, zaczynając od litery lub podkreślenia.",
+      "duplicateName": "Funkcja - {index}: „{name}” występuje w tym pliku więcej niż raz",
+      "bodyRequired": "Funkcja - {index}: treść funkcji jest wymagana",
+      "transTypeInvalid": "Funkcja - {index}: typ musi mieć wartość 0 dla VRL lub 1 dla JavaScript",
+      "paramsInvalid": "Funkcja - {index}: parametry muszą być ciągiem znaków",
+      "transTypeLabel": "Język",
+      "transTypePlaceholder": "Wybierz język",
+      "paramsLabel": "Parametry",
+      "paramsHint": "Nazwy argumentów rozdzielone przecinkami. Domyślnie „row”.",
+      "overrideExisting": "Zamiast tego zastąp istniejącą funkcję",
+      "nameInputRequired": "Wprowadź nazwę funkcji",
+      "nameInputInvalid": "Użyj liter, cyfr i podkreśleń, zaczynając od litery lub podkreślenia",
+      "nameInputDuplicate": "Inna funkcja w tym pliku już używa tej nazwy",
+      "nameInputExists": "Ta nazwa jest już zajęta w tej organizacji",
+      "overrideAffects": "Zastąpienie zmieni także te potoki: {pipelines}",
+      "createSuccess": "Funkcja - {index}: zaimportowano „{name}”",
+      "overridden": "Funkcja - {index}: zastąpiono „{name}”",
+      "createFailed": "Funkcja - {index}: „{name}” nie powiodło się - {reason}",
+      "rejectedBody": "Popraw definicję i zaimportuj ponownie.",
+      "rejectedLanguage": "Funkcja - {index}: „{name}” została odrzucona. Jeśli to funkcja JavaScript, ustaw język — definicja bez języka jest odczytywana jako VRL.",
+      "jsonStringEmpty": "Ciąg JSON jest pusty",
+      "invalidJsonFormat": "Nieprawidłowy format JSON",
+      "importSuccess": "Zaimportowano {count} funkcję | Zaimportowano {count} funkcji",
+      "nothingToImport": "Nie znaleziono funkcji do zaimportowania. Sprawdź, czy plik jest prawidłowym JSON-em."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Analizowanie wymiarów...",
@@ -6854,7 +6887,6 @@
       "ok": "OK",
       "error": "Błąd",
       "pending": "Oczekujące",
-      "skipped": "Pominięty",
       "unknown": "Nieznany",
       "flapping": "Migotanie",
       "flipsSuffix": "Przełączenia",
@@ -15870,7 +15902,8 @@
       "oncallAck": "Potwierdź",
       "oncallEscalate": "Eskaluj",
       "oncallSnooze": "Odłóż",
-      "oncallResolve": "Rozwiąż"
+      "oncallResolve": "Rozwiąż",
+      "functionsImport": "Importuj funkcję"
     }
   },
   "components": {
@@ -16482,7 +16515,10 @@
       "enrichmentReloadStarted": "Rozpoczęto przeładowanie tabeli wzbogacania. Przetwarzanie w tle...",
       "enrichmentJobStarted": "Rozpoczęto zadanie tabeli wzbogacania. Przetwarzanie w tle...",
       "enrichmentCreationFailed": "Tworzenie tabeli wzbogacania nie powiodło się",
-      "functionDeletionAssociatedPipelines": "Usunięcie funkcji nie powiodło się, ponieważ jest ona powiązana z potokami. Kliknij przycisk Zobacz, aby wyświetlić powiązane potoki."
+      "functionDeletionAssociatedPipelines": "Usunięcie funkcji nie powiodło się, ponieważ jest ona powiązana z potokami. Kliknij przycisk Zobacz, aby wyświetlić powiązane potoki.",
+      "successfullyExportedFunctions": "Pomyślnie wyeksportowano {count} funkcję | Pomyślnie wyeksportowano {count} funkcji",
+      "errorExportingFunctions": "Błąd podczas eksportowania funkcji. Spróbuj ponownie.",
+      "functionsMissingFromExport": "{names} nie znajduje się już na liście i zostało pominięte w eksporcie | {names} nie znajdują się już na liście i zostały pominięte w eksporcie"
     },
     "recommended": {
       "failedToImportDashboard": "Nie udało się zaimportować pulpitu: {error}",

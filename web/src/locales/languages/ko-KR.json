@@ -3659,7 +3659,40 @@
     "dataSource": "데이터 소스",
     "uploadFile": "파일 업로드",
     "fromUrl": "URL에서",
-    "addFunction": "함수 추가"
+    "addFunction": "함수 추가",
+    "import": {
+      "title": "함수 가져오기",
+      "outputMessages": "출력 메시지",
+      "errorValidations": "오류 검증",
+      "results": "가져오기 결과",
+      "nameLabel": "함수 이름",
+      "nameRequired": "함수 - {index}: 이름은 필수입니다",
+      "nameExists": "함수 - {index}: \"{name}\"이(가) 이미 존재합니다",
+      "nameInvalid": "함수 - {index}: \"{name}\"은(는) 유효한 함수 이름이 아닙니다. 문자, 숫자, 밑줄을 사용하고 문자 또는 밑줄로 시작하세요.",
+      "duplicateName": "함수 - {index}: \"{name}\"이(가) 이 파일에 두 번 이상 나타납니다",
+      "bodyRequired": "함수 - {index}: 함수 본문은 필수입니다",
+      "transTypeInvalid": "함수 - {index}: 유형은 VRL이면 0, JavaScript면 1이어야 합니다",
+      "paramsInvalid": "함수 - {index}: params는 문자열이어야 합니다",
+      "transTypeLabel": "언어",
+      "transTypePlaceholder": "언어 선택",
+      "paramsLabel": "매개변수",
+      "paramsHint": "쉼표로 구분된 인수 이름입니다. 기본값은 “row”입니다.",
+      "overrideExisting": "기존 함수를 대신 교체",
+      "nameInputRequired": "함수 이름을 입력하세요",
+      "nameInputInvalid": "문자, 숫자, 밑줄을 사용하고 문자 또는 밑줄로 시작하세요",
+      "nameInputDuplicate": "이 파일의 다른 함수가 이미 이 이름을 사용하고 있습니다",
+      "nameInputExists": "이 이름은 이미 이 조직에서 사용 중입니다",
+      "overrideAffects": "재정의하면 다음 파이프라인도 변경됩니다: {pipelines}",
+      "createSuccess": "함수 - {index}: \"{name}\"을(를) 가져왔습니다",
+      "overridden": "함수 - {index}: \"{name}\"을(를) 재정의했습니다",
+      "createFailed": "함수 - {index}: \"{name}\" 실패 - {reason}",
+      "rejectedBody": "정의를 수정한 후 다시 가져오세요.",
+      "rejectedLanguage": "함수 - {index}: \"{name}\"이(가) 거부되었습니다. JavaScript 함수라면 언어를 설정하세요. 언어가 없는 정의는 VRL로 해석됩니다.",
+      "jsonStringEmpty": "JSON 문자열이 비어 있습니다",
+      "invalidJsonFormat": "잘못된 JSON 형식",
+      "importSuccess": "함수 {count}개 가져옴 | 함수 {count}개 가져옴",
+      "nothingToImport": "가져올 함수를 찾을 수 없습니다. 파일이 유효한 JSON인지 확인하세요."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "치수 분석 중...",
@@ -6854,7 +6887,6 @@
       "ok": "정상",
       "error": "오류",
       "pending": "대기 중",
-      "skipped": "건너뜀",
       "unknown": "알 수 없음",
       "flapping": "변동",
       "flipsSuffix": "전환",
@@ -15870,7 +15902,8 @@
       "oncallAck": "확인",
       "oncallEscalate": "에스컬레이션",
       "oncallSnooze": "스누즈",
-      "oncallResolve": "해결"
+      "oncallResolve": "해결",
+      "functionsImport": "함수 가져오기"
     }
   },
   "components": {
@@ -16482,7 +16515,10 @@
       "enrichmentReloadStarted": "보강 테이블 새로고침이 시작되었습니다. 백그라운드에서 처리 중...",
       "enrichmentJobStarted": "보강 테이블 작업이 시작되었습니다. 백그라운드에서 처리 중...",
       "enrichmentCreationFailed": "보강 테이블 생성에 실패했습니다.",
-      "functionDeletionAssociatedPipelines": "함수 삭제가 실패했습니다. 파이프라인과 연결되어 있기 때문입니다. 연결된 파이프라인을 보려면 보기 버튼을 클릭하세요."
+      "functionDeletionAssociatedPipelines": "함수 삭제가 실패했습니다. 파이프라인과 연결되어 있기 때문입니다. 연결된 파이프라인을 보려면 보기 버튼을 클릭하세요.",
+      "successfullyExportedFunctions": "함수 {count}개를 내보냈습니다 | 함수 {count}개를 내보냈습니다",
+      "errorExportingFunctions": "함수 내보내기 중 오류가 발생했습니다. 다시 시도하세요.",
+      "functionsMissingFromExport": "{names}이(가) 더 이상 목록에 없어 내보내기에서 제외되었습니다 | {names}이(가) 더 이상 목록에 없어 내보내기에서 제외되었습니다"
     },
     "recommended": {
       "failedToImportDashboard": "대시보드 가져오기에 실패했습니다: {error}",

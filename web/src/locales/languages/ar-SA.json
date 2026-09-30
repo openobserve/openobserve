@@ -3659,7 +3659,40 @@
     "dataSource": "مصدر البيانات",
     "uploadFile": "رفع الملف",
     "fromUrl": "من الرابط",
-    "addFunction": "دالة الإضافة"
+    "addFunction": "دالة الإضافة",
+    "import": {
+      "title": "استيراد دالة",
+      "outputMessages": "رسائل المخرجات",
+      "errorValidations": "أخطاء التحقق",
+      "results": "نتائج الاستيراد",
+      "nameLabel": "اسم الدالة",
+      "nameRequired": "الدالة - {index}: الاسم مطلوب",
+      "nameExists": "الدالة - {index}: \"{name}\" موجود بالفعل",
+      "nameInvalid": "الدالة - {index}: \"{name}\" ليس اسم دالة صالحًا. استخدم الأحرف والأرقام والشرطات السفلية، بدءًا بحرف أو شرطة سفلية.",
+      "duplicateName": "الدالة - {index}: \"{name}\" يظهر أكثر من مرة في هذا الملف",
+      "bodyRequired": "الدالة - {index}: جسم الدالة مطلوب",
+      "transTypeInvalid": "الدالة - {index}: يجب أن يكون النوع 0 لـ VRL أو 1 لـ JavaScript",
+      "paramsInvalid": "الدالة - {index}: يجب أن تكون المعاملات سلسلة نصية",
+      "transTypeLabel": "اللغة",
+      "transTypePlaceholder": "اختر لغة",
+      "paramsLabel": "المعاملات",
+      "paramsHint": "أسماء الوسائط مفصولة بفواصل. القيمة الافتراضية هي “row”.",
+      "overrideExisting": "استبدال الدالة الموجودة بدلاً من ذلك",
+      "nameInputRequired": "أدخل اسم دالة",
+      "nameInputInvalid": "استخدم الأحرف والأرقام والشرطات السفلية، بدءًا بحرف أو شرطة سفلية",
+      "nameInputDuplicate": "هناك دالة أخرى في هذا الملف تستخدم هذا الاسم بالفعل",
+      "nameInputExists": "هذا الاسم مستخدم بالفعل في هذه المؤسسة",
+      "overrideAffects": "سيؤدي الاستبدال أيضًا إلى تغيير مسارات المعالجة هذه: {pipelines}",
+      "createSuccess": "الدالة - {index}: تم استيراد \"{name}\"",
+      "overridden": "الدالة - {index}: تم استبدال \"{name}\"",
+      "createFailed": "الدالة - {index}: فشلت \"{name}\" - {reason}",
+      "rejectedBody": "صحّح التعريف واستورد مرة أخرى.",
+      "rejectedLanguage": "الدالة - {index}: تم رفض \"{name}\". إذا كانت دالة JavaScript، فحدد اللغة — يُقرأ التعريف بدون لغة على أنه VRL.",
+      "jsonStringEmpty": "سلسلة JSON فارغة",
+      "invalidJsonFormat": "تنسيق JSON غير صالح",
+      "importSuccess": "تم استيراد {count} دالة | تم استيراد {count} دوال",
+      "nothingToImport": "لم يتم العثور على دوال لاستيرادها. تحقق من أن الملف بتنسيق JSON صالح."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "تحليل الأبعاد...",
@@ -6854,7 +6887,6 @@
       "ok": "حسنا",
       "error": "خطأ",
       "pending": "قيد الانتظار",
-      "skipped": "تم تخطيها",
       "unknown": "غير معروف",
       "flapping": "الرفرفة",
       "flipsSuffix": "القفزات",
@@ -15870,7 +15902,8 @@
       "oncallAck": "إقرار",
       "oncallEscalate": "تصعيد",
       "oncallSnooze": "تأجيل",
-      "oncallResolve": "حل"
+      "oncallResolve": "حل",
+      "functionsImport": "استيراد دالة"
     }
   },
   "components": {
@@ -16482,7 +16515,10 @@
       "enrichmentReloadStarted": "تم بدء إعادة تحميل جدول الإثراء. المعالجة في الخلفية...",
       "enrichmentJobStarted": "تم بدء مهمة جدول الإثراء. المعالجة في الخلفية...",
       "enrichmentCreationFailed": "فشل إنشاء جدول الإثراء",
-      "functionDeletionAssociatedPipelines": "فشل حذف الدالة لأنها مرتبطة بمسارات معالجة. انقر على زر العرض للحصول على مسارات المعالجة المرتبطة."
+      "functionDeletionAssociatedPipelines": "فشل حذف الدالة لأنها مرتبطة بمسارات معالجة. انقر على زر العرض للحصول على مسارات المعالجة المرتبطة.",
+      "successfullyExportedFunctions": "تم تصدير {count} دالة بنجاح | تم تصدير {count} دوال بنجاح",
+      "errorExportingFunctions": "خطأ في تصدير الدوال. يرجى المحاولة مرة أخرى.",
+      "functionsMissingFromExport": "{names} لم يعد في القائمة وتم استبعاده من التصدير | {names} لم تعد في القائمة وتم استبعادها من التصدير"
     },
     "recommended": {
       "failedToImportDashboard": "فشل استيراد لوحة التحكم: {error}",

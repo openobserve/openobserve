@@ -3659,7 +3659,40 @@
     "dataSource": "資料來源",
     "uploadFile": "上傳檔案",
     "fromUrl": "從 URL",
-    "addFunction": "新增函式"
+    "addFunction": "新增函式",
+    "import": {
+      "title": "匯入函式",
+      "outputMessages": "輸出訊息",
+      "errorValidations": "錯誤驗證",
+      "results": "匯入結果",
+      "nameLabel": "函式名稱",
+      "nameRequired": "函式 - {index}：名稱為必填",
+      "nameExists": "函式 - {index}：「{name}」已存在",
+      "nameInvalid": "函式 - {index}：「{name}」不是有效的函式名稱。請使用字母、數字與底線，並以字母或底線開頭。",
+      "duplicateName": "函式 - {index}：「{name}」在此檔案中出現超過一次",
+      "bodyRequired": "函式 - {index}：函式主體為必填",
+      "transTypeInvalid": "函式 - {index}：類型必須為 0（VRL）或 1（JavaScript）",
+      "paramsInvalid": "函式 - {index}：params 必須是字串",
+      "transTypeLabel": "語言",
+      "transTypePlaceholder": "選擇語言",
+      "paramsLabel": "參數",
+      "paramsHint": "以逗號分隔的引數名稱。預設為「row」。",
+      "overrideExisting": "改為取代現有函式",
+      "nameInputRequired": "輸入函式名稱",
+      "nameInputInvalid": "請使用字母、數字與底線，並以字母或底線開頭",
+      "nameInputDuplicate": "此檔案中已有另一個函式使用此名稱",
+      "nameInputExists": "此名稱已在此組織中使用",
+      "overrideAffects": "覆寫也會變更這些管線：{pipelines}",
+      "createSuccess": "函式 - {index}：「{name}」已匯入",
+      "overridden": "函式 - {index}：「{name}」已覆寫",
+      "createFailed": "函式 - {index}：「{name}」失敗 - {reason}",
+      "rejectedBody": "請修正定義後重新匯入。",
+      "rejectedLanguage": "函式 - {index}：「{name}」已遭拒絕。若為 JavaScript 函式，請設定語言 — 未設定語言的定義會以 VRL 讀取。",
+      "jsonStringEmpty": "JSON 字串為空",
+      "invalidJsonFormat": "JSON 格式無效",
+      "importSuccess": "已匯入 {count} 個函式 | 已匯入 {count} 個函式",
+      "nothingToImport": "找不到可匯入的函式。請確認檔案為有效的 JSON。"
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "正在分析維度...",
@@ -6849,7 +6882,6 @@
       "ok": "正常",
       "error": "錯誤",
       "pending": "待觸發",
-      "skipped": "已跳過",
       "unknown": "未知",
       "flapping": "抖動",
       "flipsSuffix": "翻轉次數",
@@ -15865,7 +15897,8 @@
       "oncallAck": "確認",
       "oncallEscalate": "升級",
       "oncallSnooze": "延後",
-      "oncallResolve": "解決"
+      "oncallResolve": "解決",
+      "functionsImport": "匯入函式"
     }
   },
   "components": {
@@ -16477,7 +16510,10 @@
       "enrichmentReloadStarted": "擴充表重新載入已開始。正在背景處理中...",
       "enrichmentJobStarted": "擴充表作業已開始。正在背景處理中...",
       "enrichmentCreationFailed": "建立擴充表失敗",
-      "functionDeletionAssociatedPipelines": "函式刪除失敗，因為它與管線相關聯。請按一下檢視按鈕以取得相關聯的管線。"
+      "functionDeletionAssociatedPipelines": "函式刪除失敗，因為它與管線相關聯。請按一下檢視按鈕以取得相關聯的管線。",
+      "successfullyExportedFunctions": "成功匯出 {count} 個函式 | 成功匯出 {count} 個函式",
+      "errorExportingFunctions": "匯出函式時發生錯誤。請再試一次。",
+      "functionsMissingFromExport": "{names} 已不在清單中，因此未納入匯出 | {names} 已不在清單中，因此未納入匯出"
     },
     "recommended": {
       "failedToImportDashboard": "匯入儀表板失敗：{error}",

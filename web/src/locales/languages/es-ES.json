@@ -3659,7 +3659,40 @@
     "dataSource": "Fuente de datos",
     "uploadFile": "Cargar archivo",
     "fromUrl": "Desde URL",
-    "addFunction": "Añadir función"
+    "addFunction": "Añadir función",
+    "import": {
+      "title": "Importar función",
+      "outputMessages": "Mensajes de salida",
+      "errorValidations": "Validaciones de errores",
+      "results": "Resultados de importación",
+      "nameLabel": "Nombre de la función",
+      "nameRequired": "Función - {index}: el nombre es obligatorio",
+      "nameExists": "Función - {index}: \"{name}\" ya existe",
+      "nameInvalid": "Función - {index}: \"{name}\" no es un nombre de función válido. Use letras, números y guiones bajos, comenzando con una letra o un guion bajo.",
+      "duplicateName": "Función - {index}: \"{name}\" aparece más de una vez en este archivo",
+      "bodyRequired": "Función - {index}: el cuerpo de la función es obligatorio",
+      "transTypeInvalid": "Función - {index}: el tipo debe ser 0 para VRL o 1 para JavaScript",
+      "paramsInvalid": "Función - {index}: params debe ser una cadena",
+      "transTypeLabel": "Idioma",
+      "transTypePlaceholder": "Elige un idioma",
+      "paramsLabel": "Parámetros",
+      "paramsHint": "Nombres de argumentos separados por comas. Por defecto, “row”.",
+      "overrideExisting": "Reemplazar la función existente en su lugar",
+      "nameInputRequired": "Introduce un nombre de función",
+      "nameInputInvalid": "Use letras, números y guiones bajos, comenzando con una letra o un guion bajo",
+      "nameInputDuplicate": "Otra función de este archivo ya usa este nombre",
+      "nameInputExists": "Este nombre ya está en uso en esta organización",
+      "overrideAffects": "La anulación también modifica estas tuberías: {pipelines}",
+      "createSuccess": "Función - {index}: \"{name}\" importada",
+      "overridden": "Función - {index}: \"{name}\" anulada",
+      "createFailed": "Función - {index}: \"{name}\" falló - {reason}",
+      "rejectedBody": "Corrige la definición e importa de nuevo.",
+      "rejectedLanguage": "Función - {index}: \"{name}\" fue rechazada. Si es una función de JavaScript, establece el idioma — una definición sin idioma se interpreta como VRL.",
+      "jsonStringEmpty": "La cadena JSON está vacía",
+      "invalidJsonFormat": "Formato JSON no válido",
+      "importSuccess": "Se importó {count} función | Se importaron {count} funciones",
+      "nothingToImport": "No se encontraron funciones para importar. Comprueba que el archivo sea JSON válido."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Analizando las dimensiones...",
@@ -6854,7 +6887,6 @@
       "ok": "Ok",
       "error": "Error",
       "pending": "Pendiente",
-      "skipped": "Omitidas",
       "unknown": "Desconocido",
       "flapping": "Aleteo",
       "flipsSuffix": "cambios",
@@ -15870,7 +15902,8 @@
       "oncallAck": "Reconocer",
       "oncallEscalate": "Escalar",
       "oncallSnooze": "Posponer",
-      "oncallResolve": "Resolver"
+      "oncallResolve": "Resolver",
+      "functionsImport": "Importar función"
     }
   },
   "components": {
@@ -16482,7 +16515,10 @@
       "enrichmentReloadStarted": "Recarga de tabla de enriquecimiento iniciada. Procesando en segundo plano...",
       "enrichmentJobStarted": "Trabajo de tabla de enriquecimiento iniciado. Procesando en segundo plano...",
       "enrichmentCreationFailed": "Falló la creación de la tabla de enriquecimiento",
-      "functionDeletionAssociatedPipelines": "La eliminación de la función falló porque está asociada con pipelines. Haga clic en el botón Ver para ver los pipelines asociados."
+      "functionDeletionAssociatedPipelines": "La eliminación de la función falló porque está asociada con pipelines. Haga clic en el botón Ver para ver los pipelines asociados.",
+      "successfullyExportedFunctions": "Se exportó {count} función correctamente | Se exportaron {count} funciones correctamente",
+      "errorExportingFunctions": "Error al exportar las funciones. Inténtalo de nuevo.",
+      "functionsMissingFromExport": "{names} ya no está en la lista y quedó fuera de la exportación | {names} ya no están en la lista y quedaron fuera de la exportación"
     },
     "recommended": {
       "failedToImportDashboard": "Error al importar el Dashboard: {error}",
