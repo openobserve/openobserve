@@ -366,7 +366,7 @@ impl SeriesStream for BlockSeriesStream {
             let head = (Arc::clone(&first.file.index), first.head().unwrap());
             self.samples.clear();
             if self.decoder.is_none() {
-                self.decoder = Some(BlockDecoder::new().map_err(external)?);
+                self.decoder = Some(BlockDecoder::default());
             }
             let decoder = self.decoder.as_mut().expect("decoder initialized");
             let mut file_id = first_file;

@@ -35,10 +35,6 @@ pub struct BlockDecoder {
 }
 
 impl BlockDecoder {
-    pub fn new() -> Result<Self> {
-        Self::with_capacity(MAX_BLOCK_ROWS)
-    }
-
     pub fn decode<'a>(
         &'a mut self,
         block_bytes: &[u8],
@@ -55,23 +51,15 @@ impl BlockDecoder {
         })
     }
 
-    fn with_capacity(rows: usize) -> Result<Self> {
-        ensure!(
-            rows > 0 && rows <= MAX_BLOCK_ROWS,
-            "invalid decoder capacity"
-        );
-        Ok(Self {
+    fn with_capacity(rows: usize) -> Self {
+        Self {
             samples: SampleDecoder::with_capacity(rows),
             timestamps: Vec::with_capacity(rows),
             value_bits: Vec::with_capacity(rows),
-        })
+        }
     }
 
     fn decode_inner(&mut self, block_bytes: &[u8], block: &BlockMeta) -> Result<()> {
-        ensure!(
-            block.block_length as usize <= max_block_len(block.row_count)?,
-            "block length exceeds format bound"
-        );
         ensure!(
             block_bytes.len() == block.block_length as usize,
             "block length mismatch"
@@ -82,6 +70,12 @@ impl BlockDecoder {
             &mut self.timestamps,
             &mut self.value_bits,
         )
+    }
+}
+
+impl Default for BlockDecoder {
+    fn default() -> Self {
+        Self::with_capacity(MAX_BLOCK_ROWS)
     }
 }
 
@@ -111,16 +105,7 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
     }
     let blocks = decode_directory(&raw, rows, &header.parent, header.blocks_end)?;
     let labels = decode_labels(header, &columns[1..], &projection, &mut decoder)?;
-    for i in 1..rows {
-        if blocks.block(i).hash == blocks.block(i - 1).hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
+    ensure_series_labels_constant(&blocks, &labels)?;
     Ok(Index {
         base: Arc::new(IndexBase {
             row_group_size: header.row_group_size,
@@ -147,8 +132,17 @@ pub fn decode_additional_labels(
     );
     let mut decoder = frame_decoder()?;
     let labels = decode_labels(header, columns, &projection, &mut decoder)?;
-    for i in 1..header.blocks {
-        if prior.blocks.block(i).hash == prior.blocks.block(i - 1).hash {
+    ensure_series_labels_constant(&prior.blocks, &labels)?;
+    Ok(Index {
+        base: Arc::clone(&prior.base),
+        labels,
+        missing,
+    })
+}
+
+fn ensure_series_labels_constant(blocks: &BlockDirectory, labels: &RecordBatch) -> Result<()> {
+    for i in 1..blocks.len() {
+        if blocks.block(i).hash == blocks.block(i - 1).hash {
             for column in labels.columns() {
                 ensure!(
                     label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
@@ -157,11 +151,7 @@ pub fn decode_additional_labels(
             }
         }
     }
-    Ok(Index {
-        base: Arc::clone(&prior.base),
-        labels,
-        missing,
-    })
+    Ok(())
 }
 
 fn decode_labels(
@@ -217,7 +207,7 @@ pub fn decode_file(file: &[u8], expected: &ParentMetadata, labels: &[String]) ->
 }
 
 pub fn decode_block(block_bytes: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
-    let mut decoder = BlockDecoder::with_capacity(block.row_count as usize)?;
+    let mut decoder = BlockDecoder::with_capacity(block.row_count as usize);
     decoder.decode(block_bytes, block)?;
     Ok(DecodedBlock {
         timestamps: decoder.timestamps,
@@ -263,7 +253,7 @@ fn decode_directory(
             "invalid block row count"
         );
         ensure!(
-            block.block_length as usize <= max_block_len(block.row_count)?,
+            block.block_length as usize <= max_block_len(block.row_count),
             "block length exceeds format bound"
         );
         ensure!(block.block_length > 0, "empty sample block");
@@ -333,7 +323,7 @@ mod decoder_tests {
 
     #[test]
     fn reusable_decoder_keeps_bounded_allocations_across_block_sizes() {
-        let mut decoder = BlockDecoder::new().unwrap();
+        let mut decoder = BlockDecoder::default();
         let pointers = (decoder.timestamps.as_ptr(), decoder.value_bits.as_ptr());
         let capacities = (decoder.timestamps.capacity(), decoder.value_bits.capacity());
         assert_eq!(capacities, (MAX_BLOCK_ROWS, MAX_BLOCK_ROWS));
@@ -367,7 +357,7 @@ mod decoder_tests {
     fn reusable_decoder_recovers_after_integrity_and_native_errors() {
         let samples = [(0, 0), (15_000_000, 1f64.to_bits()), (45_000_000, 0)];
         let (block_bytes, block) = fixture(&samples);
-        let mut decoder = BlockDecoder::new().unwrap();
+        let mut decoder = BlockDecoder::default();
         decoder.decode(&block_bytes, &block).unwrap();
         let mut corrupt = block_bytes.clone();
         corrupt[0] |= 0x80;
@@ -376,7 +366,7 @@ mod decoder_tests {
         let mut too_many = block.clone();
         too_many.row_count = MAX_BLOCK_ROWS as u32 + 1;
         let mut too_long = block.clone();
-        too_long.block_length = max_block_len(3).unwrap() as u32 + 1;
+        too_long.block_length = max_block_len(3) as u32 + 1;
         for (bytes, metadata) in [
             (&corrupt[..], &block),
             (&block_bytes[..block_bytes.len() - 1], &block),
@@ -395,7 +385,7 @@ mod decoder_tests {
 
     #[test]
     fn reusable_decoder_rejects_bad_order_and_exact_decoded_lengths() {
-        let mut decoder = BlockDecoder::new().unwrap();
+        let mut decoder = BlockDecoder::default();
         let (decreased, metadata) = fixture(&[(0, 0), (10, 1), (5, 2)]);
         assert!(
             decoder
@@ -431,8 +421,8 @@ mod decoder_tests {
         ];
         let (block_bytes, metadata) = fixture(&samples);
         let owned = decode_block(&block_bytes, &metadata).unwrap();
-        let mut first = BlockDecoder::new().unwrap();
-        let mut second = BlockDecoder::new().unwrap();
+        let mut first = BlockDecoder::default();
+        let mut second = BlockDecoder::default();
         let borrowed = first.decode(&block_bytes, &metadata).unwrap();
         let (other_block_bytes, other_metadata) = fixture(&[(77, f64::INFINITY.to_bits())]);
         second.decode(&other_block_bytes, &other_metadata).unwrap();

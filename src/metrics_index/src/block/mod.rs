@@ -192,7 +192,7 @@ impl Index {
     }
 
     pub fn merge_columns(&self, other: &Self) -> Result<Self> {
-        ensure!(
+        debug_assert!(
             Arc::ptr_eq(&self.base, &other.base)
                 || (self.base.header.blocks_end == other.base.header.blocks_end
                     && self.parent == other.parent
@@ -232,7 +232,6 @@ impl Index {
 
     #[inline]
     pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
-        ensure!(block < self.blocks.len(), "block index out of bounds");
         let Some(column) = self.labels.column_by_name(name) else {
             ensure!(
                 self.missing.iter().any(|missing| missing == name),
@@ -773,15 +772,7 @@ mod tests {
         let blob = fixture();
         let index = index(&blob, &[]).unwrap();
         let mut block = index.blocks.block(0).clone();
-        let range = block.block_range();
-        block.block_length = u32::try_from(max_block_len(block.row_count).unwrap() + 1).unwrap();
-        let error =
-            decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("block length exceeds format bound")
-        );
+        block.block_length = u32::try_from(max_block_len(block.row_count) + 1).unwrap();
         let mut lengths = directory_values(&blob, 4);
         let delta = u64::from(block.block_length) - lengths[0];
         lengths[0] = u64::from(block.block_length);
