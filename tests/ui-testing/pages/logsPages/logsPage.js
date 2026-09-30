@@ -3,7 +3,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../commonActions.js';
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -5033,7 +5033,7 @@ export class LogsPage {
     }
 
     async clickMenuLinkLogsItem() {
-        await this.clickMenuLinkByType('logs');
+        await clickNavUntilRoute(this.page, this.logsMenuItem, '/logs');
         // Sidebar nav is an in-SPA route change; gate on the Search toggle re-mounting before
         // callers read persisted state. Unlike visualizeToggle, this item has no v-if guard
         // (zoConfig.timechart_enabled, enterprise, viewport width), so it's present in every
@@ -7542,8 +7542,16 @@ export class LogsPage {
      * Click the share link button on the logs search bar
      */
     async clickShareLinkButton() {
-        await this.page.locator(this.shareLinkButton).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.shareLinkButton).click();
+        const btn = this.page.locator(this.shareLinkButton);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        // ShareButton stays disabled until the authenticated /api/<org>/config supplies web_url; the public /config lacks it.
+        const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
+        if (!enabled) {
+            testLogger.warn('Share link button still disabled after 30s (org config not loaded); reloading once', { url: this.page.url() });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
+            await expect(btn, 'share link button never enabled: org config (web_url) did not load').toBeEnabled({ timeout: 30000 });
+        }
+        await btn.click();
         testLogger.info('Clicked share link button');
     }
 
@@ -9129,7 +9137,7 @@ export class LogsPage {
             });
         }, this.queryEditor, { timeout: 10000 });
         // Set value via the monaco model so undo history is preserved and Vue v-model fires
-        await this.page.evaluate(({ selector, value }) => {
+        const applyValue = () => this.page.evaluate(({ selector, value }) => {
             const host = document.querySelector(selector);
             const editors = window.monaco?.editor?.getEditors?.() ?? [];
             const target = editors.find(ed => {
@@ -9151,11 +9159,84 @@ export class LogsPage {
             }
             target.setSelection(model.getFullModelRange());
         }, { selector: this.queryEditor, value: query });
+        // A pending editor remount (e.g. SQL-mode switch) or state->editor sync can discard the edit, so re-apply until it holds past the 500ms change debounce.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await applyValue();
+            const applied = await expect.poll(() => this.getQueryEditorText(), { timeout: 3000 }).toBe(query).then(() => true).catch(() => false);
+            if (applied && await this._queryEditorValueHolds(query, 700)) break;
+            testLogger.warn(`Query editor value did not stick (attempt ${attempt}/3); re-applying`);
+        }
         // Verify via getValue() that the model now reflects the value (handles empty string too)
         await expect.poll(async () => {
             return await this.getQueryEditorText();
         }, { timeout: 5000 }).toBe(query);
         testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
+    }
+
+    /**
+     * Wait until the app's search state holds `query`, re-firing the editor change if the commit was dropped.
+     * @param {string} query
+     */
+    async waitForSearchQueryCommitted(query, timeout = 20000) {
+        const expected = query.trim();
+        await expect.poll(async () => {
+            const state = await this._mutateSearchObj((searchObj) => ({
+                query: (searchObj.data.query || '').trim(),
+                loading: !!searchObj.loadingStream,
+            }));
+            if (!state) return 'search state unreachable';
+            if (state.query === expected) return 'committed';
+            // SearchBar.updateQueryValue drops editor emissions while loadingStream is set, so the edit never reaches searchObj.
+            if (!state.loading) {
+                testLogger.warn('Query edit never reached searchObj (dropped during loadingStream); re-firing editor change', { state: state.query.slice(0, 60) });
+                await this.page.evaluate(({ selector, value }) => {
+                    const host = document.querySelector(selector);
+                    const ed = (window.monaco?.editor?.getEditors?.() ?? []).find(e => host?.contains(e.getDomNode?.()));
+                    if (!ed) return;
+                    ed.getModel().setValue(`${value} `);
+                    ed.getModel().setValue(value);
+                }, { selector: this.queryEditor, value: query });
+            }
+            return `pending (loadingStream=${state.loading}, state="${state.query.slice(0, 60)}")`;
+        }, { timeout, intervals: [300, 700, 1000] }).toBe('committed');
+    }
+
+    /**
+     * Wait until the app's search state holds the VRL function, re-firing the VRL editor change if the commit was lost.
+     * @param {string} vrl
+     */
+    async waitForVrlFunctionCommitted(vrl, timeout = 20000) {
+        const norm = (s) => (s || '').replace(/\s+/g, '');
+        const expected = norm(vrl);
+        await expect.poll(async () => {
+            const state = await this._mutateSearchObj((searchObj) => ({
+                fn: searchObj.data.tempFunctionContent || '',
+                type: searchObj.data.transformType,
+            }));
+            if (!state) return 'search state unreachable';
+            if (norm(state.fn) === expected && state.type === 'function') return 'committed';
+            // Visualize only forces table + dynamic columns when tempFunctionContent is already set as it opens.
+            if (norm(state.fn) !== expected) {
+                testLogger.warn('VRL edit never reached tempFunctionContent; re-firing editor change', { fn: state.fn.slice(0, 40) });
+                await this.page.evaluate(({ selector, value }) => {
+                    const host = document.querySelector(selector);
+                    const ed = (window.monaco?.editor?.getEditors?.() ?? []).find(e => host?.contains(e.getDomNode?.()));
+                    if (!ed) return;
+                    ed.getModel().setValue(`${value} `);
+                    ed.getModel().setValue(value);
+                }, { selector: '[data-test="logs-vrl-function-editor"]', value: vrl });
+            }
+            return `pending (transformType=${state.type}, fn="${state.fn.slice(0, 40)}")`;
+        }, { timeout, intervals: [300, 700, 1000] }).toBe('committed');
+    }
+
+    async _queryEditorValueHolds(expected, holdMs) {
+        const deadline = Date.now() + holdMs;
+        while (Date.now() < deadline) {
+            if ((await this.getQueryEditorText()) !== expected) return false;
+            await this.page.waitForTimeout(100);
+        }
+        return (await this.getQueryEditorText()) === expected;
     }
 
     /**
@@ -9868,7 +9949,7 @@ export class LogsPage {
      * Click the Build tab toggle to switch to Build mode
      */
     async clickBuildToggle() {
-        await this.page.locator(this.buildToggle).click();
+        await selectLogsViewMode(this.page, 'build');
         testLogger.info('Clicked Build tab toggle');
     }
 
@@ -10001,7 +10082,7 @@ export class LogsPage {
      * Click the Logs tab toggle to switch back to Logs mode
      */
     async clickLogsToggle() {
-        await this.page.locator(this.logsToggle).click();
+        await selectLogsViewMode(this.page, 'logs');
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked Logs tab toggle');
     }
@@ -10010,7 +10091,7 @@ export class LogsPage {
      * Click the Visualize tab toggle
      */
     async clickVisualizeToggle() {
-        await this.page.locator(this.visualizeToggle).click();
+        await selectLogsViewMode(this.page, 'visualize');
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked Visualize tab toggle');
     }
@@ -10021,7 +10102,8 @@ export class LogsPage {
      * Click the Dashboard sidebar menu item to navigate away from Logs.
      */
     async clickMenuLinkDashboardItem() {
-        await this.page.locator(this.dashboardMenuItem).click();
+        // Confirming the route commit matters: an unconfirmed click lets the next nav click race it and be dropped.
+        await clickNavUntilRoute(this.page, this.dashboardMenuItem, '/dashboards');
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Clicked Dashboard sidebar menu item');
     }
