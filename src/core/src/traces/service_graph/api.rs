@@ -32,8 +32,7 @@ pub struct ServiceGraphQuery {
     pub agent_id: Option<String>,
     pub agent_name: Option<String>,
     pub agent_env: Option<String>,
-    /// `v1` or `v4` pins the engine for side-by-side checks; anything else follows the cutover
-    /// state.
+    /// `v1` or `v4` pins the engine for side-by-side checks; ignored once v1 is stopped.
     pub source: Option<String>,
 }
 
@@ -52,7 +51,7 @@ pub struct ServiceGraphQuery {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
-        ("source" = Option<String>, Query, description = "Force the engine: v1 (edge stream) or v4 (metrics); default follows the cutover state"),
+        ("source" = Option<String>, Query, description = "Force the engine: v1 (edge stream) or v4 (metrics); default follows O2_SERVICE_GRAPH_SOURCE, and v4 is forced once O2_SERVICE_GRAPH_V1_STOP is on"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -78,11 +77,7 @@ pub async fn get_current_topology(
             (now - window_micros, now)
         };
 
-    let use_v4 = match query.source.as_deref() {
-        Some("v1") => false,
-        Some("v4") => true,
-        _ => super::use_v4_source(&org_id).await,
-    };
+    let use_v4 = super::use_v4_source(&org_id, query.source.as_deref()).await;
     if use_v4 {
         return match topology_v4(&org_id, &query, start_time, end_time).await {
             Ok(data) => MetaHttpResponse::json(data),
