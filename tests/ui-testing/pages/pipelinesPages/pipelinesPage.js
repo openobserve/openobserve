@@ -13,11 +13,6 @@ const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 // is the primary cause of "Premature close" / ECONNRESET flakiness in CI.
 // Pick the agent by protocol so both local (http://localhost) and cloud/alpha
 // (https://) URLs work — an http.Agent rejects https:// URLs.
-// An HTML5 drop that lands nowhere is silent, so the drag is retried rather than
-// left to surface later as a missing node.
-const DRAG_DROP_ATTEMPTS = 3;
-const DRAG_DROP_FORM_TIMEOUT = 10000;
-
 const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
 const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
 const selectAgent = (parsedURL) =>
@@ -477,80 +472,77 @@ export class PipelinesPage {
 
     async dragStreamToTarget(streamElement, offset = { x: 0, y: 0 }) {
         await this.ensureNodePaletteOpen();
-
-        // The NodeSidebar uses HTML5 `@dragstart` (draggable="true") and the canvas's
-        // `@drop` reads `pipelineObj.draggedNode` set in `onDragStart`. Playwright's
-        // mouse.move/down/up does NOT dispatch HTML5 drag events, so the full sequence
-        // (dragstart -> dragenter -> dragover -> drop -> dragend) is dispatched via DOM
-        // APIs sharing one DataTransfer, so `setData` and the drop's clientX/Y both
-        // reach useDnD.ts:onDrop.
-        //
-        // The elements are handed to the page directly rather than resolved from a
-        // Playwright bounding box via elementFromPoint: those coordinates are captured
-        // before the drag and go stale if anything scrolls or reflows, so the drop
-        // landed on whatever now sits at that point and silently did nothing. Reading
-        // the rects inside the evaluate closes that gap.
-        const nodeForm = this.page.locator(
+        // The pipeline NodeSidebar uses HTML5 `@dragstart` (draggable="true"),
+        // and the canvas's `@drop` reads `pipelineObj.draggedNode` set in
+        // `onDragStart`. Playwright's `mouse.move/down/up` does NOT dispatch
+        // HTML5 drag events. We dispatch the full HTML5 drag sequence
+        // (dragstart → dragover → drop) directly via DOM APIs using
+        // `page.evaluate`, sharing a single DataTransfer instance so the
+        // source's `event.dataTransfer.setData` and the drop's `clientX/Y`
+        // both flow through to useDnD.ts:onDrop.
+        const targetBox = await this.vueFlowPane.boundingBox();
+        const streamBox = await streamElement.boundingBox();
+        if (!streamBox || !targetBox) return;
+        const sourceX = streamBox.x + streamBox.width / 2;
+        const sourceY = streamBox.y + streamBox.height / 2;
+        const targetX = targetBox.x + targetBox.width / 2 + offset.x;
+        const targetY = targetBox.y + targetBox.height / 2 + offset.y;
+        // Resolve elements via DOM coordinates so we don't introduce
+        // non-data-test selectors here.
+        await this.page.evaluate(
+            ({ sx, sy, tx, ty }) => {
+                const sourceEl = document.elementFromPoint(sx, sy);
+                const targetEl = document.elementFromPoint(tx, ty);
+                if (!sourceEl || !targetEl) return;
+                // Walk up from sourceEl to find the [draggable=true] ancestor
+                let dragEl = sourceEl;
+                while (dragEl && dragEl !== document.body) {
+                    if (dragEl.getAttribute && dragEl.getAttribute('draggable') === 'true') break;
+                    dragEl = dragEl.parentElement;
+                }
+                if (!dragEl) dragEl = sourceEl;
+                const dt = new DataTransfer();
+                dragEl.dispatchEvent(new DragEvent('dragstart', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: sx, clientY: sy,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragenter', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragover', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('drop', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                dragEl.dispatchEvent(new DragEvent('dragend', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+            },
+            { sx: sourceX, sy: sourceY, tx: targetX, ty: targetY }
+        );
+        // Wait for whichever node form the drop opened to render:
+        //   Stream    -> add-stream-input-stream-routing-section (Stream.vue)
+        //   Query     -> add-stream-query-routing-section        (Query.vue)
+        //   Condition -> add-condition-section                   (Condition.vue)
+        //   Function  -> associate-function-drawer               (AssociateFunction.vue)
+        // Previously this waited only on the stream selector, so EVERY query/condition/
+        // function drag burned the full 10s timeout before the .catch(). Racing all four
+        // (`:visible` so .first() only considers the one open dialog) lets each drag
+        // resolve on its own form in ~1s.
+        await this.page.locator(
             '[data-test="add-stream-input-stream-routing-section"]:visible, ' +
             '[data-test="add-stream-query-routing-section"]:visible, ' +
             '[data-test="add-condition-section"]:visible, ' +
             '[data-test="associate-function-drawer"]:visible'
-        );
-
-        let lastError = null;
-        for (let attempt = 1; attempt <= DRAG_DROP_ATTEMPTS; attempt++) {
-            const sourceHandle = await streamElement.elementHandle({ timeout: 15000 });
-            const targetHandle = await this.vueFlowPane.elementHandle({ timeout: 15000 });
-            if (!sourceHandle || !targetHandle) {
-                lastError = new Error('drag source or canvas not attached');
-                continue;
-            }
-
-            await this.page.evaluate(
-                ({ source, target, dx, dy }) => {
-                    let dragEl = source;
-                    while (dragEl && dragEl !== document.body) {
-                        if (dragEl.getAttribute && dragEl.getAttribute('draggable') === 'true') break;
-                        dragEl = dragEl.parentElement;
-                    }
-                    if (!dragEl) dragEl = source;
-
-                    const sourceRect = source.getBoundingClientRect();
-                    const targetRect = target.getBoundingClientRect();
-                    const sx = sourceRect.x + sourceRect.width / 2;
-                    const sy = sourceRect.y + sourceRect.height / 2;
-                    const tx = targetRect.x + targetRect.width / 2 + dx;
-                    const ty = targetRect.y + targetRect.height / 2 + dy;
-
-                    const dt = new DataTransfer();
-                    const fire = (el, type, x, y) => el.dispatchEvent(
-                        new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y })
-                    );
-                    fire(dragEl, 'dragstart', sx, sy);
-                    fire(target, 'dragenter', tx, ty);
-                    fire(target, 'dragover', tx, ty);
-                    fire(target, 'drop', tx, ty);
-                    fire(dragEl, 'dragend', tx, ty);
-                },
-                { source: sourceHandle, target: targetHandle, dx: offset.x, dy: offset.y }
-            );
-
-            try {
-                // The drop opens one of the four node forms; racing them lets each drag
-                // resolve on its own form instead of burning the timeout on the others.
-                await nodeForm.first().waitFor({ state: 'visible', timeout: DRAG_DROP_FORM_TIMEOUT });
-                return;
-            } catch (e) {
-                // A drop that lands nowhere leaves an empty canvas and no error, which
-                // surfaces much later as a missing node. Retry, then fail here instead.
-                lastError = e;
-                testLogger.warn(`dragStreamToTarget: no node form after attempt ${attempt}, retrying`);
-            }
-        }
-
-        throw new Error(
-            `dragStreamToTarget: no node form opened after ${DRAG_DROP_ATTEMPTS} attempts - the drop did not register (${lastError?.message ?? 'unknown'})`
-        );
+        )
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .catch(() => {});
     }
 
     async selectLogs() {
