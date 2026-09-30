@@ -93,7 +93,6 @@ impl MidxTrailer {
 /// Immutable files selected for one PromQL block scan.
 #[derive(Debug, Clone)]
 pub struct MetricsBlockScan {
-    pub table_name: String,
     pub files: Vec<FileKey>,
 }
 

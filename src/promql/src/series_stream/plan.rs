@@ -46,6 +46,7 @@ use tokio::task::JoinSet;
 
 use super::{SeriesSource, blocks, hash_sorted::HashSortedSeriesStream};
 use crate::{
+    ScanSource,
     aggregations::AggOp,
     functions::KEEP_METRIC_NAME_FUNC,
     utils::{apply_matchers, apply_time_window},
@@ -106,49 +107,67 @@ struct PlannedPartition {
 
 pub(crate) async fn execute_partitioned(
     ctx: &SessionContext,
-    schema: &Schema,
+    source: &ScanSource,
     selector: &StreamingSelector<'_>,
     label_cols: LabelColumns,
     lookback: i64,
     eval_ctx: &EvalContext,
 ) -> Result<Option<Vec<SourceFuture>>> {
-    if schema
-        .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
-    {
-        return Ok(None);
-    }
     let label_cols = Arc::new(label_cols);
     let partitions = ctx.state().config().target_partitions();
-    if let Some(scan) = ctx.state().config().get_extension::<MetricsBlockScan>()
-        && scan.table_name == selector.table_name
-        && blocks::query_window(eval_ctx, selector.offset, lookback).is_some()
-    {
-        let intervals = hash_partitions(partitions).collect::<Vec<_>>();
-        let prepared = blocks::prepare(
-            &scan,
-            selector.matchers,
-            Arc::clone(&label_cols),
-            &intervals,
-            selector.offset,
-            lookback,
-            eval_ctx,
-        )
-        .await
-        .map_err(|error| DataFusionError::External(error.into()))?;
-        return Ok(Some(
-            prepared
-                .into_iter()
-                .map(|partition| {
-                    Box::pin(async move {
-                        Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
-                            partition,
-                        )))
-                    }) as SourceFuture
-                })
-                .collect(),
-        ));
+    match source {
+        ScanSource::Blocks(scan) => {
+            execute_blocks(scan, selector, label_cols, partitions, lookback, eval_ctx)
+                .await
+                .map(Some)
+        }
+        ScanSource::HashSorted => {
+            execute_hash_sorted(ctx, selector, label_cols, partitions, lookback, eval_ctx).await
+        }
+        ScanSource::Table => Ok(None),
     }
+}
+
+async fn execute_blocks(
+    scan: &MetricsBlockScan,
+    selector: &StreamingSelector<'_>,
+    label_cols: Arc<LabelColumns>,
+    partitions: usize,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Vec<SourceFuture>> {
+    let intervals = hash_partitions(partitions).collect::<Vec<_>>();
+    let prepared = blocks::prepare(
+        scan,
+        selector.matchers,
+        label_cols,
+        &intervals,
+        selector.offset,
+        lookback,
+        eval_ctx,
+    )
+    .await
+    .map_err(|error| DataFusionError::External(error.into()))?;
+    Ok(prepared
+        .into_iter()
+        .map(|partition| {
+            Box::pin(async move {
+                Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
+                    partition,
+                )))
+            }) as SourceFuture
+        })
+        .collect())
+}
+
+async fn execute_hash_sorted(
+    ctx: &SessionContext,
+    selector: &StreamingSelector<'_>,
+    label_cols: Arc<LabelColumns>,
+    partitions: usize,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Option<Vec<SourceFuture>>> {
     let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
     let Ok(df) = ctx.table(sorted_table.as_str()).await else {
         return Ok(None);

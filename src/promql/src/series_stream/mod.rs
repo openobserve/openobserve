@@ -92,6 +92,7 @@ mod tests {
         plan::{LabelColumns, StreamingSelector, execute_partitioned},
     };
     use crate::{
+        ScanSource,
         aggregations::AggOp,
         functions::{self, RangeFunc},
         micros,
@@ -246,7 +247,7 @@ mod tests {
         };
         execute_partitioned(
             ctx,
-            &arrow_schema(),
+            &ScanSource::HashSorted,
             &selector,
             label_cols,
             micros(range),
