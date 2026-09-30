@@ -370,7 +370,7 @@ mod tests {
     use config::{
         TIMESTAMP_COL_NAME,
         meta::{
-            promql::{HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL, VALUE_LABEL},
+            promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
             search::ScanStats,
         },
     };
@@ -423,7 +423,7 @@ mod tests {
                 schema: metrics_schema(),
                 scan_stats: ScanStats::default(),
                 keep_filters: true,
-                source: if self.streams {
+                source: if self.streams && streaming {
                     ScanSource::HashSorted
                 } else {
                     ScanSource::Table
@@ -455,7 +455,7 @@ mod tests {
         ]))
     }
 
-    /// Two counters sampled every 20 s; the hash-sorted table exists only when `streams`.
+    /// Two counters sampled every 20 s; the table declares its hash order only when `streams`.
     fn provider(streams: bool, canceled: bool) -> StreamingProvider {
         provider_sampled_at(streams, canceled, 10, |step| BASE + step * 20 * SECOND)
     }
@@ -488,19 +488,17 @@ mod tests {
             ],
         )
         .unwrap();
-        let table = || MemTable::try_new(metrics_schema(), vec![vec![batch.clone()]]).unwrap();
-        let mut config = SessionConfig::new().with_target_partitions(3);
-        config.options_mut().optimizer.prefer_existing_sort = true;
-        let ctx = SessionContext::new_with_config(config);
-        ctx.register_table("m", Arc::new(table())).unwrap();
+        let mut table = MemTable::try_new(metrics_schema(), vec![vec![batch]]).unwrap();
         if streams {
-            let sorted = table().with_sort_order(vec![vec![
+            table = table.with_sort_order(vec![vec![
                 col(HASH_LABEL).sort(true, false),
                 col(TIMESTAMP_COL_NAME).sort(true, false),
             ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(sorted))
-                .unwrap();
         }
+        let mut config = SessionConfig::new().with_target_partitions(3);
+        config.options_mut().optimizer.prefer_existing_sort = true;
+        let ctx = SessionContext::new_with_config(config);
+        ctx.register_table("m", Arc::new(table)).unwrap();
         StreamingProvider {
             ctx,
             streams,

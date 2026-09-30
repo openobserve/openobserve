@@ -125,7 +125,7 @@ impl ScanContext {
 pub enum ScanSource {
     /// The plain table, loaded whole by the materializing path.
     Table,
-    /// The `HASH_SORTED_TABLE_SUFFIX` table, streamed series by series in hash order.
+    /// The table with its `(__hash__, _timestamp)` order declared, streamed series by series.
     HashSorted,
     /// The MIDX blocks of these files, streamed series by series.
     Blocks(Arc<MetricsBlockScan>),

@@ -217,8 +217,30 @@ describe("Dashboard Data Conversion Utils", () => {
 
       expect(getUnitValue(0, "seconds")).toEqual({
         value: "0.00",
-        unit: "ns",
+        unit: "s",
       });
+    });
+
+    it("should keep zero in the panel's own unit", () => {
+      // zero used to fall to the smallest unit in the table, so a KB axis started at 0.00B
+      const panelUnits: [string, string][] = [
+        ["kilobytes", "KB"],
+        ["megabytes", "MB"],
+        ["milliseconds", "ms"],
+        ["microseconds", "μs"],
+      ];
+      for (const [unit, expected] of panelUnits) {
+        expect(getUnitValue(0, unit)).toEqual({ value: "0.00", unit: expected });
+      }
+      expect(getUnitValue(-0, "kilobytes")).toEqual({ value: "0.00", unit: "KB" });
+      expect(getUnitValue("0", "megabytes")).toEqual({ value: "0.00", unit: "MB" });
+      expect(getUnitValue(null, "kilobytes")).toEqual({ value: "0.00", unit: "KB" });
+    });
+
+    it("should still scale non-zero time values below 1 down", () => {
+      // only zero stays in the panel's unit
+      expect(getUnitValue(0.5, "seconds")).toEqual({ value: "500.00", unit: "ms" });
+      expect(getUnitValue(0.5, "microseconds")).toEqual({ value: "500.00", unit: "ns" });
     });
 
     it("should handle negative values", () => {
