@@ -13086,26 +13086,18 @@ export class LogsPage {
         ).toBeVisible({ timeout: 30000 });
     }
 
-    /** The streams page "explore" action lands on logs with type=stream_explorer. */
+    /**
+     * Land on the stream explorer. The explore button on the streams page produces
+     * exactly this URL, and going straight to it avoids picking a row out of a list
+     * whose filter matches substrings -- `e2e_automate` also lists `e2e_automate_w0`
+     * and friends, and which of those a click lands on differs per environment.
+     */
     async exploreStreamFromStreamsPage(streamName) {
         const orgId = getOrgIdentifier();
-        await this.page.goto(
-            `${process.env.ZO_BASE_URL}/web/streams?org_identifier=${orgId}`,
-            { waitUntil: 'domcontentloaded', timeout: 30000 }
-        );
-        const search = this.page.locator(this.searchStreamInput);
-        await search.waitFor({ state: 'visible', timeout: 20000 });
-        await search.pressSequentially(streamName);
-
-        // The filter matches substrings, so `e2e_automate` also lists `e2e_automate_w0`
-        // and friends. The row is picked by an exact name cell rather than by count.
-        const row = this.page
-            .locator('tr')
-            .filter({ has: this.page.getByText(streamName, { exact: true }) });
-        const exploreBtn = row.locator('[data-test="log-stream-explore-btn"]').first();
-        await exploreBtn.waitFor({ state: 'visible', timeout: 20000 });
-
-        await exploreBtn.click();
+        const url = `${process.env.ZO_BASE_URL}/web/logs`
+            + `?stream_type=logs&stream=${streamName}&period=15m&refresh=0`
+            + `&type=stream_explorer&org_identifier=${orgId}&show_histogram=true`;
+        await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await this.page.waitForURL(/type=stream_explorer/, { timeout: 30000 });
     }
 
