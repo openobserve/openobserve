@@ -24,7 +24,7 @@ use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope};
 use crate::incremental::OPEN_HOUR_MERGE_FILES;
 
 /// One planned merge: the files and the mode they merge in.
-type PlannedBatch = (Vec<FileKey>, MergeMode);
+pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
 
 /// The size rules one merge round batches files under.
 pub(super) struct BatchLimits<'a> {
@@ -75,13 +75,56 @@ pub(super) fn plan_batches(
 
 /// Legacy metrics files never join a hash-ordered batch: sorting them would
 /// be a full sort of the hour. Returns `(files for the mode, legacy files)`.
-fn split_legacy_metrics(files: Vec<FileKey>, mode: &MergeMode) -> (Vec<FileKey>, Vec<FileKey>) {
+pub(super) fn split_legacy_metrics(
+    files: Vec<FileKey>,
+    mode: &MergeMode,
+) -> (Vec<FileKey>, Vec<FileKey>) {
     if mode.metrics_file_layout().is_none() {
         return (files, Vec::new());
     }
     files
         .into_iter()
         .partition(|f| MetricsFileLayout::is_hash_ordered(&f.key))
+}
+
+/// Size-bounded merge groups in the planner's file order.
+pub(super) fn size_bounded_groups(
+    files: &[FileKey],
+    limits: &BatchLimits<'_>,
+) -> Vec<Vec<FileKey>> {
+    let max_file_size = limits.max_file_size as i64;
+    let max_group_files = limits.max_group_files;
+    let mut groups = Vec::new();
+    let mut new_file_list: Vec<FileKey> = Vec::new();
+    let mut new_file_size = 0;
+    for file in files {
+        if new_file_size + file.meta.original_size > max_file_size
+            || (max_group_files > 0 && new_file_list.len() >= max_group_files)
+        {
+            if new_file_list.len() <= 1 {
+                if *limits.strategy == MergeStrategy::FileSize {
+                    break;
+                }
+                new_file_list.clear();
+                new_file_size = file.meta.original_size;
+                new_file_list.push(file.clone());
+                continue; // replace previous file with current file
+            }
+            groups.push(std::mem::take(&mut new_file_list));
+            new_file_size = 0;
+        }
+        new_file_size += file.meta.original_size;
+        new_file_list.push(file.clone());
+    }
+    // The trailing batch is always below max_file_size (the loop flushes a group
+    // only when adding the next file would exceed it). In incremental mode we do
+    // NOT seal this remainder: more files will arrive in the still-open hour, and
+    // sealing now would force re-merging it later (write amplification). Carry it
+    // to the next round; the scheduled hour-end pass seals whatever is left.
+    if new_file_list.len() > 1 && !limits.is_incremental {
+        groups.push(new_file_list);
+    }
+    groups
 }
 
 /// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
@@ -125,43 +168,6 @@ fn pending_ingester_files(files: Vec<FileKey>) -> Option<Vec<FileKey>> {
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
         .collect();
     (pending.len() >= OPEN_HOUR_MERGE_FILES).then_some(pending)
-}
-
-/// Size-bounded merge groups in the planner's file order.
-fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<FileKey>> {
-    let max_file_size = limits.max_file_size as i64;
-    let max_group_files = limits.max_group_files;
-    let mut groups = Vec::new();
-    let mut new_file_list: Vec<FileKey> = Vec::new();
-    let mut new_file_size = 0;
-    for file in files {
-        if new_file_size + file.meta.original_size > max_file_size
-            || (max_group_files > 0 && new_file_list.len() >= max_group_files)
-        {
-            if new_file_list.len() <= 1 {
-                if *limits.strategy == MergeStrategy::FileSize {
-                    break;
-                }
-                new_file_list.clear();
-                new_file_size = file.meta.original_size;
-                new_file_list.push(file.clone());
-                continue; // replace previous file with current file
-            }
-            groups.push(std::mem::take(&mut new_file_list));
-            new_file_size = 0;
-        }
-        new_file_size += file.meta.original_size;
-        new_file_list.push(file.clone());
-    }
-    // The trailing batch is always below max_file_size (the loop flushes a group
-    // only when adding the next file would exceed it). In incremental mode we do
-    // NOT seal this remainder: more files will arrive in the still-open hour, and
-    // sealing now would force re-merging it later (write amplification). Carry it
-    // to the next round; the scheduled hour-end pass seals whatever is left.
-    if new_file_list.len() > 1 && !limits.is_incremental {
-        groups.push(new_file_list);
-    }
-    groups
 }
 
 #[cfg(test)]

@@ -23,8 +23,28 @@ use config::{
 use infra::{
     cluster::get_node_by_uuid,
     dist_lock, file_list as infra_file_list,
-    schema::{get_partition_time_level, unwrap_stream_created_at},
+    schema::{get_dynamic_merge, get_partition_time_level, unwrap_stream_created_at},
 };
+
+/// What the merge job at `offset` covers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum JobScope {
+    /// The stream's own partition: an hour, or the day for daily-partitioned types.
+    Partition(PartitionTimeLevel),
+    /// The whole day, downsampled; the output stays in the hour directories.
+    DownsampledDay,
+    /// The whole day under the dynamic merge policy; merged output goes to `DD/00`.
+    DynamicDay,
+}
+
+impl JobScope {
+    pub(super) fn time_level(self) -> PartitionTimeLevel {
+        match self {
+            Self::Partition(level) => level,
+            Self::DownsampledDay | Self::DynamicDay => PartitionTimeLevel::Daily,
+        }
+    }
+}
 
 /// Last microsecond of the range a merge job at `offset` covers: the hour of
 /// `offset`, or the whole day for daily-partitioned streams. No file of the
@@ -38,21 +58,29 @@ pub(super) fn job_range_end(offset: i64, partition_time_level: PartitionTimeLeve
     }
 }
 
-/// A settled 00:00 metrics job covers its whole day once `has_rule(day end)` finds a rule.
-pub(super) fn job_time_level(
+/// Only a 00:00 job widens to its day: downsampled if `has_rule(day end)`, else by `dynamic_day`.
+pub(super) fn job_scope(
     stream_type: StreamType,
     offset: i64,
     finalize: bool,
+    dynamic_day: bool,
     has_rule: impl Fn(i64) -> bool,
-) -> PartitionTimeLevel {
+) -> JobScope {
+    let partition = JobScope::Partition(get_partition_time_level(stream_type));
+    if offset % day_micros(1) != 0 {
+        return partition;
+    }
     if finalize
         && stream_type == StreamType::Metrics
-        && offset % day_micros(1) == 0
         && has_rule(job_range_end(offset, PartitionTimeLevel::Daily))
     {
-        return PartitionTimeLevel::Daily;
+        return JobScope::DownsampledDay;
     }
-    get_partition_time_level(stream_type)
+    if dynamic_day {
+        JobScope::DynamicDay
+    } else {
+        partition
+    }
 }
 
 /// Generate merging job by stream
@@ -117,6 +145,15 @@ pub async fn generate_job_by_stream(
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
             "[COMPACTOR] add file_list_jobs failed: {e}"
+        ));
+    }
+    // here, not in the merge: a merge of an hour without files returns before it could re-arm
+    if let Some(day_offset) = dynamic_merge_offset(offset)
+        && get_dynamic_merge(org_id, stream_name, stream_type).await
+        && let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, day_offset).await
+    {
+        return Err(anyhow::anyhow!(
+            "[COMPACTOR] add file_list_jobs for dynamic merge failed: {e}"
         ));
     }
 
@@ -290,7 +327,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     if offset == 0 {
         return Ok(()); // no data
     }
-    // only a 00:00 job covers the whole day, see job_time_level
+    // only a 00:00 job covers the whole day, see job_scope
     let offset = offset - offset % day_micros(1);
 
     let cfg = get_config();
@@ -349,6 +386,11 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     Ok(())
 }
 
+/// The 00:00 job to re-arm along with the job for `offset`: at hour 00 the day before is closed.
+fn dynamic_merge_offset(offset: i64) -> Option<i64> {
+    (offset % day_micros(1) == 0).then(|| offset - day_micros(1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -376,28 +418,57 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_job_time_level_whole_day_only_for_downsampling() {
-        let day = Utc
-            .with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
+    fn day_start() -> i64 {
+        Utc.with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
             .unwrap()
-            .timestamp_micros();
+            .timestamp_micros()
+    }
+
+    #[test]
+    fn test_job_scope_downsampled_day_only_for_a_matching_rule() {
+        let day = day_start();
         let day_end = day + day_micros(1) - 1;
         let metrics = StreamType::Metrics;
+        let hourly = JobScope::Partition(PartitionTimeLevel::Hourly);
 
         // the rule is asked about the end of the day, not of hour 00
-        let level = job_time_level(metrics, day, true, |max_ts| max_ts == day_end);
-        assert_eq!(level, PartitionTimeLevel::Daily);
+        let scope = job_scope(metrics, day, true, false, |max_ts| max_ts == day_end);
+        assert_eq!(scope, JobScope::DownsampledDay);
+        assert_eq!(scope.time_level(), PartitionTimeLevel::Daily);
 
         // no rule for the day end: the plain hour-00 merge stays hourly
-        let level = job_time_level(metrics, day, true, |_| false);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
+        assert_eq!(job_scope(metrics, day, true, false, |_| false), hourly);
         // other hours, open hours and other stream types never widen
-        let level = job_time_level(metrics, day + hour_micros(5), true, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = job_time_level(metrics, day, false, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
-        let level = job_time_level(StreamType::Logs, day, true, |_| true);
-        assert_eq!(level, PartitionTimeLevel::Hourly);
+        let hour5 = day + hour_micros(5);
+        assert_eq!(job_scope(metrics, hour5, true, false, |_| true), hourly);
+        assert_eq!(job_scope(metrics, day, false, false, |_| true), hourly);
+        assert_eq!(
+            job_scope(StreamType::Logs, day, true, false, |_| true),
+            hourly
+        );
+    }
+
+    /// The 00:00 job is the dynamic merge job only for an enabled stream's closed day.
+    #[test]
+    fn test_job_scope_dynamic_day() {
+        let day = day_start();
+        let hourly = JobScope::Partition(PartitionTimeLevel::Hourly);
+        let logs = StreamType::Logs;
+        assert_eq!(
+            job_scope(logs, day, true, true, |_| false),
+            JobScope::DynamicDay
+        );
+        // not enabled, or the day is still open
+        assert_eq!(job_scope(logs, day, true, false, |_| false), hourly);
+        // a downsampling rule takes the day first
+        let scope = job_scope(StreamType::Metrics, day, true, true, |_| true);
+        assert_eq!(scope, JobScope::DownsampledDay);
+    }
+
+    #[test]
+    fn test_dynamic_merge_offset_rearms_the_day_before_at_hour_00() {
+        let day = day_start();
+        assert_eq!(dynamic_merge_offset(day), Some(day - day_micros(1)));
+        assert_eq!(dynamic_merge_offset(day + hour_micros(1)), None);
     }
 }
