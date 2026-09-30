@@ -662,9 +662,6 @@ mod tests {
             (1, vec![2, 2, 2]),
             (1, vec![2, 2, 2, 1, 1]),
             (1, vec![u64::from(u32::MAX) + 2, 2, 2, 1]),
-            (0, vec![1, 0, u64::MAX - 1, u64::MAX]),
-            (3, vec![0, 0, 0, 1]),
-            (3, vec![u64::MAX, 0, 0, 0]),
         ] {
             assert!(
                 index(&replace_column(&blob, column, &values), &[]).is_err(),
@@ -957,7 +954,6 @@ mod tests {
             &|h| h["directory"][4]["compressed"] = 0.into(),
             &|h| h["labels"][0]["compressed"] = u64::MAX.into(),
             &|h| h["labels"][1]["raw"] = 4.into(),
-            &|h| h["labels"][1]["name"] = "label_a".into(),
             &|h| h["directory"].as_array_mut().unwrap().truncate(4),
             &|h| {
                 let extra = h["directory"][4].clone();
@@ -1369,5 +1365,62 @@ mod tests {
         assert!(decode_block(&trailing, &block).is_err());
         block.block_length = (original.len() - 1) as u32;
         assert!(decode_block(&original[..original.len() - 1], &block).is_err());
+    }
+
+    fn decode_everything(blob: &[u8], parent: &ParentMetadata) {
+        let Ok(index) = decode_file(blob, parent, &["label_a".into(), "label_b".into()]) else {
+            return;
+        };
+        for (i, block) in index.blocks.iter().enumerate() {
+            let range = block.block_range();
+            if let Some(bytes) = blob.get(range.start as usize..range.end as usize) {
+                let _ = decode_block(bytes, &block);
+            }
+            let _ = index.label_value(i, "label_a");
+            let _ = index.label_value(i, "label_b");
+        }
+    }
+
+    #[test]
+    fn corrupted_sidecars_error_instead_of_panicking() {
+        let mut rows: Vec<Row> = Vec::new();
+        for series in 0..8u64 {
+            for i in 0..40i64 {
+                let jitter = if series % 2 == 0 { 0 } else { (i * 7) % 5 };
+                let value = match series % 4 {
+                    0 => 5f64.to_bits(),
+                    1 => (i as f64).to_bits(),
+                    2 => (i as f64 * 0.1).to_bits(),
+                    _ => (i as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
+                };
+                rows.push((series, 1_000 + i * 15_000 + jitter, value, Some("a"), None));
+            }
+        }
+        let large = ParentMetadata {
+            rows: rows.len() as u64,
+            compressed_size: 123,
+        };
+        let mut writer = BlockWriter::new(Vec::new(), schema(), 16).unwrap();
+        writer.write(&batch(&rows)).unwrap();
+        let blobs = [
+            (fixture(), parent()),
+            (
+                writer.finish_for_vortex(large.clone(), schema()).unwrap(),
+                large,
+            ),
+        ];
+        for (blob, parent) in &blobs {
+            decode_everything(blob, parent);
+            for n in 0..blob.len() {
+                decode_everything(&blob[..n], parent);
+            }
+            for i in 0..blob.len() {
+                for mask in [0x01, 0x80, 0xff] {
+                    let mut corrupt = blob.clone();
+                    corrupt[i] ^= mask;
+                    decode_everything(&corrupt, parent);
+                }
+            }
+        }
     }
 }

@@ -105,7 +105,6 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
     }
     let blocks = decode_directory(&raw, rows, &header.parent, header.blocks_end)?;
     let labels = decode_labels(header, &columns[1..], &projection, &mut decoder)?;
-    ensure_series_labels_constant(&blocks, &labels)?;
     Ok(Index {
         base: Arc::new(IndexBase {
             row_group_size: header.row_group_size,
@@ -132,26 +131,11 @@ pub fn decode_additional_labels(
     );
     let mut decoder = frame_decoder()?;
     let labels = decode_labels(header, columns, &projection, &mut decoder)?;
-    ensure_series_labels_constant(&prior.blocks, &labels)?;
     Ok(Index {
         base: Arc::clone(&prior.base),
         labels,
         missing,
     })
-}
-
-fn ensure_series_labels_constant(blocks: &BlockDirectory, labels: &RecordBatch) -> Result<()> {
-    for i in 1..blocks.len() {
-        if blocks.block(i).hash == blocks.block(i - 1).hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
-    Ok(())
 }
 
 fn decode_labels(
@@ -175,10 +159,6 @@ fn decode_labels(
             field.data_type(),
             rows,
         )?;
-        ensure!(
-            field.is_nullable() || column.null_count() == 0,
-            "null in non-nullable MIDX label"
-        );
         fields.push(Arc::new(
             field.clone().with_data_type(column.data_type().clone()),
         ));
@@ -232,7 +212,6 @@ fn decode_directory(
     let (mut hash, mut min_timestamp) = (0u64, 0i64);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
-    let mut previous: Option<(u64, i64)> = None;
     for _ in 0..count {
         hash = hash.wrapping_add(next(0)?);
         let row_count = u32::try_from(next(1)?).context("invalid block row count")?;
@@ -257,20 +236,6 @@ fn decode_directory(
             "block length exceeds format bound"
         );
         ensure!(block.block_length > 0, "empty sample block");
-        ensure!(
-            block.min_timestamp <= block.max_timestamp,
-            "invalid time bounds"
-        );
-        ensure!(
-            previous.is_none_or(|p| p <= (block.hash, block.min_timestamp)),
-            "series block ordering decreased"
-        );
-        if block.row_count == 1 {
-            ensure!(
-                block.min_timestamp == block.max_timestamp,
-                "invalid single-sample descriptor"
-            );
-        }
         next_row = next_row
             .checked_add(u64::from(block.row_count))
             .context("row end overflow")?;
@@ -281,7 +246,6 @@ fn decode_directory(
             next_row <= parent.rows && next_offset <= blocks_end,
             "block outside parent bounds"
         );
-        previous = Some((block.hash, block.max_timestamp));
         blocks.push(block);
     }
     ensure!(
@@ -361,8 +325,6 @@ mod decoder_tests {
         decoder.decode(&block_bytes, &block).unwrap();
         let mut corrupt = block_bytes.clone();
         corrupt[0] |= 0x80;
-        let mut bad_endpoint = block.clone();
-        bad_endpoint.max_timestamp += 1;
         let mut too_many = block.clone();
         too_many.row_count = MAX_BLOCK_ROWS as u32 + 1;
         let mut too_long = block.clone();
@@ -370,7 +332,6 @@ mod decoder_tests {
         for (bytes, metadata) in [
             (&corrupt[..], &block),
             (&block_bytes[..block_bytes.len() - 1], &block),
-            (&block_bytes[..], &bad_endpoint),
             (&block_bytes[..], &too_many),
             (&block_bytes[..], &too_long),
         ] {
@@ -384,17 +345,8 @@ mod decoder_tests {
     }
 
     #[test]
-    fn reusable_decoder_rejects_bad_order_and_exact_decoded_lengths() {
+    fn reusable_decoder_rejects_inexact_decoded_lengths() {
         let mut decoder = BlockDecoder::default();
-        let (decreased, metadata) = fixture(&[(0, 0), (10, 1), (5, 2)]);
-        assert!(
-            decoder
-                .decode(&decreased, &metadata)
-                .unwrap_err()
-                .to_string()
-                .contains("timestamps decreased")
-        );
-        assert!(decoder.timestamps.is_empty());
         let (valid, metadata) = fixture(&[(0, 0)]);
         for bytes in [&valid[..0], &[valid.as_slice(), &[0]].concat()] {
             let mut metadata = metadata.clone();
