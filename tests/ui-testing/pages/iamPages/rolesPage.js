@@ -13,6 +13,10 @@ import { expect } from '@playwright/test';
 // the UI labels them List / Get / Create / Update / Delete / All.
 export const ACTIONS = ['AllowAll', 'AllowList', 'AllowGet', 'AllowPost', 'AllowPut', 'AllowDelete'];
 
+// One rail row per permission module. "Role Overview" is NOT one of these — it has its
+// own slug, `edit-role-module-rail-overview` (ModuleRail.vue).
+const RAIL_ITEM = 'edit-role-module-rail-item-';
+
 export class RolesPage {
     constructor(page) {
         this.page = page;
@@ -107,9 +111,7 @@ export class RolesPage {
     }
 
     railItem(moduleKey) {
-        return this.page
-            .locator(`[data-test="edit-role-module-rail-item-${moduleKey}"]:visible`)
-            .first();
+        return this.page.locator(`[data-test="${RAIL_ITEM}${moduleKey}"]:visible`).first();
     }
     railGroup(groupId) {
         return this.page.locator(`[data-test="edit-role-module-rail-group-${groupId}"]`);
@@ -123,7 +125,7 @@ export class RolesPage {
         return this.page.locator(`[data-test="edit-role-module-rail-unsaved-${moduleKey}"]`);
     }
     railItems() {
-        return this.page.locator('[data-test^="edit-role-module-rail-item-"]:visible');
+        return this.page.locator(`[data-test^="${RAIL_ITEM}"]:visible`);
     }
 
     /**
@@ -135,9 +137,9 @@ export class RolesPage {
      */
     async railModuleKeys() {
         const slugs = await this.page
-            .locator('[data-test^="edit-role-module-rail-item-"]')
+            .locator(`[data-test^="${RAIL_ITEM}"]`)
             .evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
-        return [...new Set(slugs.map((s) => s.replace('edit-role-module-rail-item-', '')))];
+        return [...new Set(slugs.map((s) => s.replace(RAIL_ITEM, '')))];
     }
 
     scopeRow(key) {
@@ -274,9 +276,11 @@ export class RolesPage {
         await expect(this.pane).toBeVisible({ timeout: 15000 });
     }
 
-    async openSummary() {
+    /** `timeout` is the budget for the summary to paint — U-12 tightens it to assert
+     *  the editor is still responsive after a heavy module, not merely alive. */
+    async openSummary({ timeout = 15000 } = {}) {
         await this.railSummaryItem.click();
-        await expect(this.summary).toBeVisible({ timeout: 15000 });
+        await expect(this.summary).toBeVisible({ timeout });
     }
 
     // ================= grants =================

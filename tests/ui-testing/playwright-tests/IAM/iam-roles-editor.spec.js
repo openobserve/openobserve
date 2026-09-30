@@ -202,8 +202,7 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         expect(elapsed, 'module pane took too long to render its first page').toBeLessThan(20000);
 
         // The pane must stay interactive afterwards — a frozen page still "renders".
-        await pm.rolesPage.railSummaryItem.click();
-        await expect(pm.rolesPage.summary).toBeVisible({ timeout: 10000 });
+        await pm.rolesPage.openSummary({ timeout: 10000 });
     });
 
     // ---------------- summary ----------------
