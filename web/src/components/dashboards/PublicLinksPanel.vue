@@ -88,17 +88,6 @@
       class="flex flex-col gap-4"
       data-test="dashboards-public-links-panel-form"
     >
-      <OButton
-        v-if="links.length"
-        variant="ghost"
-        size="sm"
-        icon-left="arrow-back"
-        class="self-start"
-        data-test="dashboards-public-links-panel-back-btn"
-        @click="closeForm"
-      >
-        {{ t("dashboard.publicLinks.backToLinks") }}
-      </OButton>
       <div class="text-text-secondary text-sm">
         {{ editing ? t("dashboard.publicLinks.editNote") : t("dashboard.publicLinks.intro") }}
       </div>
