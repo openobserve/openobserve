@@ -948,7 +948,7 @@ mod tests {
     use async_trait::async_trait;
     use config::{
         meta::{
-            promql::{HASH_SORTED_TABLE_SUFFIX, value::Label},
+            promql::value::Label,
             stream::{FileMeta, FileSelection},
         },
         metrics::promql::IndexBlocksCacheMetrics,
@@ -1985,8 +1985,7 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
+            ctx.register_table("m", Arc::new(table)).unwrap();
             let matchers = Matchers::empty();
             let selector = StreamingSelector {
                 table_name: "m",
@@ -2075,8 +2074,7 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
+            ctx.register_table("m", Arc::new(table)).unwrap();
             contexts.push((ctx, source));
         }
         for name in [
@@ -2275,8 +2273,7 @@ mod tests {
                 col("__hash__").sort(true, false),
                 col("_timestamp").sort(true, false),
             ]]);
-        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-            .unwrap();
+        ctx.register_table("m", Arc::new(table)).unwrap();
         let matchers = Matchers::empty();
         let selector = StreamingSelector {
             table_name: "m",
@@ -2343,8 +2340,7 @@ mod tests {
                         col("__hash__").sort(true, false),
                         col("_timestamp").sort(true, false),
                     ]]);
-                ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                    .unwrap();
+                ctx.register_table("m", Arc::new(table)).unwrap();
                 let matchers = Matchers::empty();
                 let selector = StreamingSelector {
                     table_name: "m",
