@@ -242,9 +242,6 @@ const baseStubs = {
     props: ["open", "install", "locationName", "locationId", "token", "org", "o2Url", "scriptUrl"],
     emits: ["update:open"],
   },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
-  },
 };
 
 function mountPage() {
@@ -293,11 +290,6 @@ describe("SyntheticMonitoring", () => {
     it("should render the MonitorTable", () => {
       wrapper = mountPage();
       expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
-    });
-
-    it("should render the Beta badge in the page title", () => {
-      wrapper = mountPage();
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 
