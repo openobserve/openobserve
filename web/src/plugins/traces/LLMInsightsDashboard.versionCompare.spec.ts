@@ -418,3 +418,70 @@ describe("LLMInsightsDashboard — date-picker disabled contract (compareDateDis
     expect((wrapper.vm as any).compareDateDisabled).toBe(true);
   });
 });
+
+describe("LLMInsightsDashboard — agent variant restore", () => {
+  it("restores the persisted env+version, not the first same-named variant", async () => {
+    localStorage.setItem("llmInsights_agentFilter", "checkout-agent");
+    localStorage.setItem("llmInsights_envFilter", "prod");
+    localStorage.setItem("llmInsights_versionFilter", "1.4.0");
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    expect((wrapper.vm as any).selectedVersion).toBe("1.4.0");
+    expect(localStorage.getItem("llmInsights_versionFilter")).toBe("1.4.0");
+  });
+
+  it("falls back to the first variant by name when the persisted version is gone", async () => {
+    localStorage.setItem("llmInsights_agentFilter", "checkout-agent");
+    localStorage.setItem("llmInsights_envFilter", "prod");
+    localStorage.setItem("llmInsights_versionFilter", "9.9.9");
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    expect((wrapper.vm as any).selectedVersion).toBe("1.5.0");
+  });
+});
+
+describe("LLMInsightsDashboard — filter mode toggle", () => {
+  it("reloads KPIs when the scope bar toggles Agent → Stream", async () => {
+    mockAvailableStreams.value = ["default"];
+    mockStreamsLoaded.value = true;
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    const bar = wrapper.findComponent({ name: "AiScopeBar" });
+    bar.vm.$emit("update:filterMode", "stream");
+    bar.vm.$emit("filter-mode-change", "stream");
+    await flushPromises();
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "default",
+      expect.any(Number),
+      expect.any(Number),
+      null,
+    );
+  });
+});
+
+describe("LLMInsightsDashboard — per-variant KPI cache", () => {
+  it("refetches KPIs when switching to another version of the same agent", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    expect((wrapper.vm as any).selectedVersion).toBe("1.5.0");
+    mockFetchAll.mockClear();
+    (wrapper.vm as any).selectedVersion = "1.4.0";
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "default",
+      expect.any(Number),
+      expect.any(Number),
+      expect.objectContaining({ version: "1.4.0" }),
+    );
+  });
+});
