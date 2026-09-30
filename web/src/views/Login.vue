@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
           loading="lazy"
+          :alt="t('login.openObserveLogoAlt')"
           :src="
             isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
