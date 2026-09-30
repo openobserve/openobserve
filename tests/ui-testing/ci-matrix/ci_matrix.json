@@ -376,7 +376,8 @@
       "metrics-table-column-order.spec.js",
       "metrics-promql-builder.spec.js",
       "metrics-share-deep-link.spec.js",
-      "metrics-explorer-share-visualize.spec.js"
+      "metrics-explorer-share-visualize.spec.js",
+      "metrics-explorer-stream-cache.spec.js"
     ],
     "disabled": [],
     "paths": [
