@@ -454,6 +454,39 @@ describe("ImportFunction", () => {
       expect(wrapper.text()).toContain('"parse_nginx" already exists');
     });
 
+    // Pressing Import again is the obvious next move on "already exists", and it
+    // used to be the press that cleared the name box and the replace checkbox,
+    // leaving the raw JSON as the only way to rename.
+    it("keeps the clash controls on screen after it skips", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      expect(wrapper.text()).toContain('"parse_nginx" already exists');
+
+      await pressImport(wrapper);
+
+      expect(wrapper.text()).toContain("skipped, the existing function was kept");
+      expect(wrapper.text()).toContain('"parse_nginx" already exists');
+      expect(wrapper.find('[data-test="function-import-override-checkbox-0"]').exists()).toBe(true);
+    });
+
+    // ...and the rename is still one edit away rather than a reload of the file.
+    it("still takes a rename after the skip", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, conflicting);
+      await pressImport(wrapper);
+
+      wrapper.vm.updateFunctionName("parse_nginx_v2", 0);
+      await nextTick();
+      await pressImport(wrapper);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({ name: "parse_nginx_v2" });
+    });
+
     // The picker has to stay reachable while a second item is still being
     // fixed, even though its own clash no longer holds the import back.
     it("keeps the picker on screen while another item is still invalid", async () => {
@@ -548,6 +581,64 @@ describe("ImportFunction", () => {
 
       expect(mockCreate).toHaveBeenCalledTimes(1);
       expect(mockCreate.mock.calls[0][1]).toMatchObject({ params: "row" });
+    });
+
+    // A definition the server refuses used to print its compiler error and stop
+    // there. The commonest cause is a JavaScript body with no transType, read by
+    // the VRL compiler — the body looks fine and the language is what is wrong.
+    it("offers the body and the language after the server refuses an item", async () => {
+      mockCreate.mockRejectedValueOnce({
+        response: { data: { message: "error[E203]: syntax error" } },
+      });
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "testffff", function: "throw new Error('x')" });
+
+      expect(wrapper.text()).toContain("error[E203]");
+      expect(wrapper.text()).toContain("was rejected");
+      expect(wrapper.text()).toContain("read as VRL");
+      // The controls themselves are async components that jsdom never mounts, so
+      // what is asserted is the pair of fields the pane renders them from.
+      expect(wrapper.vm.functionErrors.at(-1).map((e: any) => e.field)).toEqual([
+        "function_body",
+        "trans_type",
+      ]);
+    });
+
+    it("re-sends the item once the language is corrected", async () => {
+      mockCreate.mockRejectedValueOnce({
+        response: { data: { message: "error[E203]: syntax error" } },
+      });
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "testffff", function: "throw new Error('x')" });
+
+      wrapper.vm.updateTransType("1", 0);
+      await nextTick();
+      await pressImport(wrapper);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockCreate.mock.calls[1][1]).toMatchObject({ name: "testffff", transType: 1 });
+    });
+
+    // The control is a correction, so it opens on what is already there. Offering
+    // a blank editor over a rejected definition would ask the user to retype it.
+    it("opens the body editor on the definition that was refused", async () => {
+      mockCreate.mockRejectedValueOnce({
+        response: { data: { message: "error[E203]: syntax error" } },
+      });
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, { name: "testffff", function: "throw new Error('x')" });
+
+      expect(wrapper.vm.currentBody(0)).toBe("throw new Error('x')");
+      // No transType in the file, so it reads as VRL — which is what the payload
+      // sent, and why the VRL compiler is what rejected it.
+      expect(wrapper.vm.currentTransType(0)).toBe("0");
+      expect(wrapper.vm.bodyLanguage(0)).toBe("vrl");
     });
 
     // Whatever is typed on the right has to be what leaves on the next press,

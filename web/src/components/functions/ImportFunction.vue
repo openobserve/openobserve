@@ -157,7 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :editor-id="`function-import-body-editor-${errorMessage.itemIndex}`"
                           :data-test="`function-import-body-input-${errorMessage.itemIndex}`"
                           class="h-full"
-                          :query="userSelectedBody[errorMessage.itemIndex] ?? ''"
+                          :query="
+                            userSelectedBody[errorMessage.itemIndex] ??
+                            currentBody(errorMessage.itemIndex)
+                          "
                           :language="bodyLanguage(errorMessage.itemIndex)"
                           :debounce-time="300"
                           :show-auto-complete="false"
@@ -171,7 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div v-else-if="errorMessage.field === 'trans_type'" class="w-75 py-2">
                       <OSelect
                         :data-test="`function-import-trans-type-input-${errorMessage.itemIndex}`"
-                        :model-value="userSelectedTransType[errorMessage.itemIndex] ?? '0'"
+                        :model-value="
+                          userSelectedTransType[errorMessage.itemIndex] ??
+                          currentTransType(errorMessage.itemIndex)
+                        "
                         :options="transTypeOptions"
                         :label="t('function.import.transTypeLabel')"
                         @update:model-value="
@@ -477,13 +483,21 @@ export default defineComponent({
       writeField(index, "params", params);
     };
 
+    // What the item holds now, so a control offered over a rejected definition
+    // opens on that definition rather than on a blank. An absent or unusable
+    // `transType` reads as VRL, which is what the payload will send.
+    const currentBody = (index: number) =>
+      String(baseImportRef.value?.jsonArrayOfObj?.[index]?.function ?? "");
+
+    const currentTransType = (index: number) =>
+      String(baseImportRef.value?.jsonArrayOfObj?.[index]?.transType ?? "0") === "1" ? "1" : "0";
+
     // The editor speaks the language the item declares, so a JavaScript function
-    // whose body is missing is not written against VRL tokenizing.
-    const bodyLanguage = (index: number) => {
-      const item = baseImportRef.value?.jsonArrayOfObj?.[index];
-      const transType = String(userSelectedTransType.value[index] ?? item?.transType ?? "0");
-      return transType === "1" ? "javascript" : "vrl";
-    };
+    // is not written against VRL tokenizing.
+    const bodyLanguage = (index: number) =>
+      (userSelectedTransType.value[index] ?? currentTransType(index)) === "1"
+        ? "javascript"
+        : "vrl";
 
     const onOverrideChoice = async (name: string, itemIndex: number, checked: boolean) => {
       if (!name) return;
@@ -580,6 +594,28 @@ export default defineComponent({
       name: item.name,
       blocking: false,
     });
+
+    // The server judged the definition — a VRL or JavaScript compile error, or
+    // anything else it would not take. The result line carries its reasoning; the
+    // controls carry the fix. Both are offered, because the commonest cause is a
+    // JavaScript body with no `transType`, which defaults to VRL and is then read
+    // by the VRL compiler: the body looks fine and the language is what is wrong.
+    const rejectionErrors = (item: any, index: number, itemIndex: number): ImportError[] => [
+      {
+        field: "function_body",
+        message: t("function.import.rejectedBody", { index, name: item.name }),
+        itemIndex,
+        name: item.name,
+        blocking: false,
+      },
+      {
+        field: "trans_type",
+        message: t("function.import.rejectedLanguage"),
+        itemIndex,
+        name: item.name,
+        blocking: false,
+      },
+    ];
 
     // Remembering what the user has now been shown, so the next press acts on the
     // picker rather than reporting the same clash again.
@@ -694,6 +730,10 @@ export default defineComponent({
       let failed = 0;
       let skipped = 0;
       const lateConflicts: ImportError[][] = [];
+      // Clashes this press chose to skip, and items the server refused. Both end
+      // up back on screen: pressing Import again is the user's next move, and it
+      // must not be the press that takes their controls away.
+      const stillOpen: ImportError[][] = [];
       for (const [itemIndex, item] of items.entries()) {
         const index = itemIndex + 1;
         const name: string = item.name;
@@ -718,6 +758,10 @@ export default defineComponent({
             message: t("function.import.skipped", { index, name }),
             status: "skipped",
           });
+          // The clash is unresolved, not settled: the name box and the replace
+          // checkbox stay beside the skip line so a rename is still one edit
+          // away rather than a reload of the file.
+          stillOpen.push([conflictError(item, index, itemIndex)]);
           skipped++;
           continue;
         }
@@ -726,6 +770,7 @@ export default defineComponent({
           lateConflicts.push([conflictError(item, index, itemIndex)]);
         } else if (outcome === "failed") {
           failed++;
+          stillOpen.push(rejectionErrors(item, index, itemIndex));
         } else {
           written++;
         }
@@ -734,6 +779,12 @@ export default defineComponent({
       if (lateConflicts.length > 0) {
         functionErrors.value = [...functionErrors.value, ...lateConflicts];
         rememberSurfacedConflicts(lateConflicts);
+      }
+
+      // Not run through rememberSurfacedConflicts: these clashes were already
+      // surfaced by the press that skipped them, and a rejection is not a clash.
+      if (stillOpen.length > 0) {
+        functionErrors.value = [...functionErrors.value, ...stillOpen];
       }
 
       // Nothing was written, so the run stays on screen with its skipped lines
@@ -773,6 +824,8 @@ export default defineComponent({
       triggerImport,
       resultClass,
       bodyLanguage,
+      currentBody,
+      currentTransType,
       updateFunctionName,
       updateFunctionBody,
       updateTransType,
