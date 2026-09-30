@@ -307,7 +307,6 @@
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
-import { formatInTimeZone } from "date-fns-tz";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useOrgId } from "@/composables/query";
@@ -331,6 +330,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import type { PublicLink } from "@/services/public_dashboards_admin";
 import {
@@ -348,12 +348,17 @@ import {
   toPublicLinkConfig,
   type PublicLinkForm,
 } from "./PublicLinkForm.schema";
+import {
+  publicLinkExpiry,
+  publicLinkUrl as publicUrl,
+  shortRange,
+  type ExpiryNote,
+} from "./publicLinkDisplay";
 
 type VariableValues = { values?: Array<{ name: string; value: unknown }> };
 type PanelView = "list" | "form" | "created";
 
-interface PresetOption {
-  label: I18nText;
+interface PresetOption extends SelectOption {
   value: number;
 }
 
@@ -508,12 +513,6 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-function shortRange(secs: number): string {
-  if (secs % 86400 === 0) return `${secs / 86400}d`;
-  if (secs % 3600 === 0) return `${secs / 3600}h`;
-  return `${secs / 60}m`;
-}
-
 function presetLabel(secs: number): I18nText {
   return t("dashboard.publicDashboard.past", { range: raw(shortRange(secs)) });
 }
@@ -522,17 +521,8 @@ function rangesText(link: PublicLink): I18nText {
   return raw(link.time_range.allowed_presets_secs.map(shortRange).join(" · "));
 }
 
-// Whole calendar days in the author's timezone, so "today" flips at their midnight.
-function expiryNote(link: PublicLink): { text: I18nText; soon: boolean } | null {
-  if (!link.expires_at || link.status === "expired") return null;
-  const end = formatInTimeZone(link.expires_at / 1000, timezone.value, "yyyy-MM-dd");
-  const days = Math.round((Date.parse(end) - Date.parse(today.value)) / 86_400_000);
-  if (days <= 0) return { text: t("dashboard.publicLinks.expiresToday"), soon: true };
-  return { text: t("dashboard.publicLinks.expiresInDays", { n: days }, days), soon: false };
-}
-
-function publicUrl(link: PublicLink): string {
-  return `${window.location.origin}/web/public/dashboards/${link.slug}`;
+function expiryNote(link: PublicLink): ExpiryNote | null {
+  return publicLinkExpiry(link, timezone.value, t);
 }
 
 function serverMessage(e: unknown): I18nText {
@@ -616,8 +606,9 @@ async function confirmRevoke() {
 }
 
 function copyLink(link: PublicLink) {
-  copyToClipboard(publicUrl(link));
-  showPositiveNotification(t("dashboard.publicDashboard.linkCopied"));
+  copyToClipboard(publicUrl(link), t, {
+    successMessage: t("dashboard.publicDashboard.linkCopied"),
+  });
 }
 
 function openPublicPage(link: PublicLink) {

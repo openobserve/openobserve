@@ -3759,6 +3759,24 @@ async fn handle_public_dashboard_triggers(
         return Ok(());
     }
 
+    // Skipped, not dropped, so the link comes back if the org is restored.
+    if db::org_status::is_blocked(&pd.org_id) {
+        new_trigger.next_run_at = next_public_dashboard_run(
+            trigger.next_run_at,
+            i64::from(pd.rebuild_secs),
+            now_micros(),
+        );
+        db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
+        return Ok(());
+    }
+
+    if crate::public_dashboards::publisher_left(&pd).await {
+        log::info!(
+            "[SCHEDULER trace_id {trace_id}] pausing public dashboard {pd_id}: publisher left the org"
+        );
+        return crate::public_dashboards::pause_for_departed_publisher(pd).await;
+    }
+
     if let Err(e) = crate::public_dashboards::rebuild_one(&pd).await {
         log::error!(
             "[SCHEDULER trace_id {trace_id}] public dashboard rebuild failed: {pd_id}: {e}"

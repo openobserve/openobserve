@@ -18,13 +18,19 @@
 //! it does indexed point-reads against the meta store only. All query execution
 //! lives in the background rebuilder.
 
+use std::{
+    sync::{LazyLock, RwLock},
+    time::Duration,
+};
+
 use axum::{
     Json,
-    extract::{Path, Query},
-    http::StatusCode,
+    extract::{Extension, Path, Query},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use config::{
+    axum::middlewares::RealIp,
     meta::{
         dashboards::Dashboard,
         public_dashboards::{PublicVariable, SanitizedDashboard, TimeRangePolicy},
@@ -36,6 +42,13 @@ use infra::{
     table::{dashboards, entity::public_dashboards::Model, public_dashboards as table},
 };
 use serde::Deserialize;
+
+use crate::request::public_rate_limit::{Counters, client_ip, over_budget};
+
+const READ_WINDOW: Duration = Duration::from_secs(60);
+
+/// Per-IP read counters for both public dashboard routes.
+static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
 
 #[derive(Deserialize)]
 pub struct DataParams {
@@ -64,20 +77,40 @@ async fn resolve(slug: &str) -> Servable {
     if pd.visibility != 1 {
         return Servable::NotFound;
     }
+    if db::org_status::is_blocked(&pd.org_id) {
+        return Servable::Unavailable;
+    }
     if pd.expires_at.is_some_and(|exp| exp <= now_micros()) {
         return Servable::Expired;
     }
     if !pd.enabled {
         return Servable::Unavailable;
     }
-    // TODO(R14): the public plane carries no `blocked_orgs_middleware`, so a
-    // suspended/blocked org must be rejected here → Servable::Unavailable.
     Servable::Ok(Box::new(pd))
 }
 
 /// GET /api/public_dashboards/{slug} — the sanitized config the viewer renders.
-pub async fn config(Path(slug): Path<String>) -> Response {
-    let pd = match resolve(&slug).await {
+pub async fn config(ip: Option<Extension<RealIp>>, Path(slug): Path<String>) -> Response {
+    if rate_limited(ip.map(|e| e.0)) {
+        return with_headers(too_many_requests());
+    }
+    with_headers(serve_config(&slug).await)
+}
+
+/// GET /api/public_dashboards/{slug}/data?preset= — point-read one snapshot.
+pub async fn data(
+    ip: Option<Extension<RealIp>>,
+    Path(slug): Path<String>,
+    Query(params): Query<DataParams>,
+) -> Response {
+    if rate_limited(ip.map(|e| e.0)) {
+        return with_headers(too_many_requests());
+    }
+    with_headers(serve_data(&slug, params.preset).await)
+}
+
+async fn serve_config(slug: &str) -> Response {
+    let pd = match resolve(slug).await {
         Servable::Ok(pd) => pd,
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
@@ -105,16 +138,15 @@ pub async fn config(Path(slug): Path<String>) -> Response {
     .into_response()
 }
 
-/// GET /api/public_dashboards/{slug}/data?preset= — point-read one snapshot.
-pub async fn data(Path(slug): Path<String>, Query(params): Query<DataParams>) -> Response {
-    let pd = match resolve(&slug).await {
+async fn serve_data(slug: &str, preset: i64) -> Response {
+    let pd = match resolve(slug).await {
         Servable::Ok(pd) => pd,
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
     };
     let conn = get_orm_client_ro().await;
-    match table::get_snapshot(conn, &pd.id, params.preset).await {
+    match table::get_snapshot(conn, &pd.id, preset).await {
         Ok(Some(snap)) => match serde_json::from_str::<serde_json::Value>(&snap.data) {
             Ok(v) => Json(v).into_response(),
             Err(_) => (StatusCode::ACCEPTED, "preparing").into_response(),
@@ -147,6 +179,34 @@ fn public_variables(dash: &Dashboard, frozen: Option<&str>) -> Vec<PublicVariabl
                 .unwrap_or(serde_json::Value::Null),
         })
         .collect()
+}
+
+/// True if this IP is over its per-minute budget; 0 rpm disables the limiter.
+fn rate_limited(ip: Option<RealIp>) -> bool {
+    let rpm = u32::try_from(config::get_config().public_dashboards.rpm).unwrap_or(u32::MAX);
+    rpm != 0 && over_budget(&READ_RPM, client_ip(ip), READ_WINDOW, rpm)
+}
+
+/// The slug is a bearer secret, so no response is indexed or leaks it through `Referer`.
+fn with_headers(mut resp: Response) -> Response {
+    let headers = resp.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        "x-robots-tag",
+        HeaderValue::from_static("noindex, nofollow"),
+    );
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
+    resp
+}
+
+fn too_many_requests() -> Response {
+    (StatusCode::TOO_MANY_REQUESTS, "Too many requests").into_response()
 }
 
 fn expired() -> Response {
@@ -205,6 +265,8 @@ fn strip_secrets(v: &mut serde_json::Value) {
                 "promql_labels",
                 "promqlOperations",
                 "promql_operations",
+                "customChartContent",
+                "custom_chart_content",
             ] {
                 map.remove(key);
             }
@@ -262,6 +324,9 @@ mod tests {
             "{s}"
         );
         assert!(!s.contains("vrl_a") && !s.contains("vrl_b"), "{s}");
+        let mut chart = serde_json::json!({ "panels": [{ "customChartContent": "alert(1)" }] });
+        strip_secrets(&mut chart);
+        assert!(!chart.to_string().contains("alert(1)"));
         // Non-secret render structure is preserved.
         assert!(s.contains("keep me"), "{s}");
         assert!(s.contains("\"id\":\"p1\""), "{s}");
@@ -273,5 +338,14 @@ mod tests {
         let mut v = serde_json::json!("plain");
         strip_secrets(&mut v);
         assert_eq!(v, serde_json::json!("plain"));
+    }
+
+    #[test]
+    fn every_public_response_carries_the_privacy_headers() {
+        let resp = with_headers(StatusCode::NOT_FOUND.into_response());
+        let h = resp.headers();
+        assert_eq!(h[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+        assert_eq!(h["x-robots-tag"], "noindex, nofollow");
+        assert_eq!(h[header::REFERRER_POLICY], "no-referrer");
     }
 }

@@ -491,6 +491,12 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-public-links": {
+    illustration: "connect",
+    variant: "neutral",
+    titleKey: "emptyState.noPublicLinks.title",
+    descriptionKey: "emptyState.noPublicLinks.description",
+  },
   "no-oncall-teams": {
     illustration: "users",
     variant: "create",
@@ -1011,6 +1017,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-service-accounts": "emptyState.nouns.serviceAccounts",
   "no-invitations": "emptyState.nouns.invitations",
   "no-dashboards-in-folder": "emptyState.nouns.dashboards",
+  "no-public-links": "emptyState.nouns.publicLinks",
   "no-groups": "emptyState.nouns.groups",
   "no-roles": "emptyState.nouns.roles",
   "no-anomaly-configs": "emptyState.nouns.anomalyConfigs",

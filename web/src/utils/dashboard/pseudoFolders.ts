@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { orgKey } from "@/composables/query/keys";
+// Real folder ids are generated identifiers, so the dunder names cannot collide.
+export const FAVORITES_FOLDER_ID = "__favorites__";
+export const PUBLIC_LINKS_FOLDER_ID = "__public_links__";
 
-export const publicLinkKeys = {
-  all: (org: string) => orgKey(org, "public_links"),
-  org: (org: string) => orgKey(org, "public_links", "org"),
-  byDashboard: (org: string, dashboardId: string) =>
-    orgKey(org, "public_links", "dashboard", dashboardId),
-};
+/** True for a Dashboards rail view that is not a real folder and must never reach a folder API. */
+export const isPseudoFolder = (id: string | null | undefined): boolean =>
+  id === FAVORITES_FOLDER_ID || id === PUBLIC_LINKS_FOLDER_ID;

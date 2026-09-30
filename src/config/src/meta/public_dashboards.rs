@@ -22,12 +22,12 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Draft configures the share without exposing it; Public serves it.
+/// Draft configures the share without exposing it; Public serves it and is the default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Visibility {
-    #[default]
     Draft,
+    #[default]
     Public,
 }
 

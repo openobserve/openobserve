@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <FolderList
             type="dashboards"
             show-favorites
+            :show-public-links="publicLinksEnabled"
             @update:activeFolderId="updateActiveFolderId"
           />
         </div>
@@ -121,7 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg h-full">
+          <PublicLinksTable v-if="showPublicLinks" class="w-full" />
           <OTable
+            v-else
             class="h-full w-full"
             ref="oTableRef"
             :data="dashboards"
@@ -460,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="addDashboardRef"
         @close="showAddDashboardDialog = false"
         @updated="updateDashboardList"
-        :activeFolderId="activeFolderId ?? undefined"
+        :activeFolderId="realFolderId"
       />
     </ODialog>
 
@@ -593,6 +596,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { PUBLIC_LINKS_FOLDER_ID, isPseudoFolder } from "@/utils/dashboard/pseudoFolders";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -604,6 +608,10 @@ const AddDashboard = defineAsyncComponent(() => {
 
 const AddDashboardFromGitHub = defineAsyncComponent(() => {
   return import("@/components/dashboards/AddDashboardFromGitHub.vue");
+});
+
+const PublicLinksTable = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PublicLinksTable.vue");
 });
 
 interface DashboardRow {
@@ -662,6 +670,7 @@ export default defineComponent({
     FolderList,
     OToggleGroup,
     OToggleGroupItem,
+    PublicLinksTable,
   },
   setup() {
     const store = useStore();
@@ -728,6 +737,16 @@ export default defineComponent({
     // The favorites view is a rail location, not a toolbar filter: it is
     // active exactly when the Favorites pseudo-folder is selected.
     const showFavoritesOnly = computed(() => activeFolderId.value === FAVORITES_FOLDER_ID);
+    const publicLinksEnabled = computed(
+      () => store.state.zoConfig?.public_dashboards_enabled === true,
+    );
+    const showPublicLinks = computed(
+      () => publicLinksEnabled.value && activeFolderId.value === PUBLIC_LINKS_FOLDER_ID,
+    );
+    // Where a create, import or row fallback lands; a rail view is never a real folder.
+    const realFolderId = computed(() =>
+      isPseudoFolder(activeFolderId.value) ? "default" : activeFolderId.value || "default",
+    );
     const toggleFavorite = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       const userId = store.state.userInfo?.email;
@@ -735,8 +754,7 @@ export default defineComponent({
       // results, the favorites view); in the normal folder view it is
       // undefined, so fall back to the active folder (default). Never store
       // the Favorites pseudo-folder as a real folder id.
-      const folderId =
-        row.folder_id || (showFavoritesOnly.value ? "default" : activeFolderId.value) || "default";
+      const folderId = row.folder_id || realFolderId.value;
       toggleFavoriteSetting(
         org,
         userId,
@@ -808,7 +826,8 @@ export default defineComponent({
     // Listen for AI assistant dashboard mutations to auto-refresh the list
     const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
-      const folderId = event.folderId || activeFolderId.value;
+      const folderId =
+        event.folderId || (isPseudoFolder(activeFolderId.value) ? null : activeFolderId.value);
       if (folderId) {
         // The AI agent just changed this folder, so refetch rather than serving
         // the cached list.
@@ -933,6 +952,8 @@ export default defineComponent({
       activeFolderId.value = null;
       if (route.query.folder === FAVORITES_FOLDER_ID) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
+      } else if (route.query.folder === PUBLIC_LINKS_FOLDER_ID && !publicLinksEnabled.value) {
+        activeFolderId.value = "default";
       } else if (typeof route.query.folder === "string" && route.query.folder) {
         activeFolderId.value = route.query.folder;
       } else if (favorites.value.length > 0) {
@@ -954,19 +975,19 @@ export default defineComponent({
         if (switching) currentPage.value = 1;
         const { page: _page, ...carriedQuery } = route.query;
         const baseQuery = switching ? carriedQuery : route.query;
-        // The Favorites pseudo-folder has no backend list. Rows render
-        // immediately from the stored favorites; fetch the involved folders'
-        // lists in the background purely to enrich them (owner/created/fresh
-        // titles) — cached folders resolve instantly.
-        if (activeFolderId.value === FAVORITES_FOLDER_ID) {
+        // A rail view has no backend folder, so it must never reach the folder fetch below.
+        if (isPseudoFolder(activeFolderId.value)) {
           loading.value = false;
-          const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
-          Promise.all(
-            favFolders.map((fid) => getAllDashboardsByFolderId(store, fid).catch(() => null)),
-          ).then(() => {
-            // A folder switched away from mid-flight must not stamp over the one now active.
-            if (activeFolderId.value === FAVORITES_FOLDER_ID) stampFolders(favFolders);
-          });
+          // Favorites rows render from the stored list; the folder fetches only enrich them.
+          if (activeFolderId.value === FAVORITES_FOLDER_ID) {
+            const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
+            Promise.all(
+              favFolders.map((fid) => getAllDashboardsByFolderId(store, fid).catch(() => null)),
+            ).then(() => {
+              // A folder switched away from mid-flight must not stamp over the one now active.
+              if (activeFolderId.value === FAVORITES_FOLDER_ID) stampFolders(favFolders);
+            });
+          }
           searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
@@ -1131,7 +1152,7 @@ export default defineComponent({
         path: "/dashboards/import",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolderId.value || "default",
+          folder: realFolderId.value,
         },
       });
     };
@@ -1295,7 +1316,7 @@ export default defineComponent({
           await pruneFavorites(stale);
           stampFolders(favFolders);
         } else {
-          const folderId = activeFolderId.value ?? "default";
+          const folderId = realFolderId.value;
           const response = await getAllDashboards(store, folderId, force);
           // folderId is always truthy here, so getAllDashboards never returns
           // undefined; `?? []` only satisfies the type (fallback unreachable).
@@ -1665,10 +1686,7 @@ export default defineComponent({
         );
         const idsByFolder = new Map<string, string[]>();
         for (const id of idsToDelete) {
-          const folderId =
-            rowFolders.get(id) ||
-            (showFavoritesOnly.value ? "default" : activeFolderId.value) ||
-            "default";
+          const folderId = rowFolders.get(id) || realFolderId.value;
           const bucket = idsByFolder.get(folderId);
           if (bucket) bucket.push(id);
           else idsByFolder.set(folderId, [id]);
@@ -1884,6 +1902,9 @@ export default defineComponent({
       isFavorite,
       toggleFavorite,
       showFavoritesOnly,
+      publicLinksEnabled,
+      showPublicLinks,
+      realFolderId,
     };
   },
   methods: {

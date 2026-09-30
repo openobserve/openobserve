@@ -103,7 +103,6 @@ import Person from "~icons/material-symbols/person-outline";
 import PersonAdd from "~icons/material-symbols/person-add-outline";
 import PlayArrow from "~icons/material-symbols/play-arrow-outline";
 import Preview from "~icons/material-symbols/preview-outline";
-import Public from "~icons/material-symbols/public";
 import QueryStats from "~icons/material-symbols/query-stats";
 import Refresh from "~icons/material-symbols/refresh";
 import Replay from "~icons/material-symbols/replay";
@@ -454,7 +453,6 @@ export const iconRegistry = {
   "person-add": PersonAdd,
   "play-arrow": PlayArrow,
   preview: Preview,
-  public: Public,
   "query-stats": QueryStats,
   refresh: Refresh,
   replay: Replay,

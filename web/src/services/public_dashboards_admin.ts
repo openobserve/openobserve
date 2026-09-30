@@ -52,6 +52,7 @@ export interface PublicLink {
   rebuild_state: number;
   expires_at: number | null;
   published_by: string;
+  updated_by: string | null;
   created_at: number;
   updated_at: number;
 }

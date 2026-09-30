@@ -34,6 +34,7 @@ pub struct Model {
     pub enabled: bool,
     pub expires_at: Option<i64>,
     pub created_by: String,
+    pub updated_by: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
     pub last_accessed_at: Option<i64>,

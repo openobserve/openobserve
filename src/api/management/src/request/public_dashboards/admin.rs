@@ -203,9 +203,6 @@ pub async fn update(
     if let Some(r) = feature_gate() {
         return r;
     }
-    if let Err(msg) = openobserve_core::public_dashboards::validate_config(&body) {
-        return MetaHttpResponse::bad_request(msg);
-    }
     if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false).await {
         return r;
     }
@@ -213,7 +210,10 @@ pub async fn update(
         Ok(link) => link,
         Err(r) => return r,
     };
-    match openobserve_core::public_dashboards::update_link(link, body).await {
+    if let Err(msg) = openobserve_core::public_dashboards::validate_edit(&body, &link) {
+        return MetaHttpResponse::bad_request(msg);
+    }
+    match openobserve_core::public_dashboards::update_link(link, body, &user.user_id).await {
         Ok(link) => view_response("update", &org_id, link).await,
         Err(e) => map_err("update", e),
     }
@@ -234,7 +234,7 @@ pub async fn pause(
         Ok(link) => link,
         Err(r) => return r,
     };
-    match openobserve_core::public_dashboards::pause_link(link).await {
+    match openobserve_core::public_dashboards::pause_link(link, &user.user_id).await {
         Ok(link) => view_response("pause", &org_id, link).await,
         Err(e) => map_err("pause", e),
     }
@@ -255,7 +255,7 @@ pub async fn resume(
         Ok(link) => link,
         Err(r) => return r,
     };
-    match openobserve_core::public_dashboards::resume_link(link).await {
+    match openobserve_core::public_dashboards::resume_link(link, &user.user_id).await {
         Ok(link) => view_response("resume", &org_id, link).await,
         Err(e) if e.to_string().contains("expired") => MetaHttpResponse::bad_request(e),
         Err(e) => map_err("resume", e),

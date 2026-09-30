@@ -92,7 +92,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 93: create oncall_response_reports.
 // 94: create synthetics_refs.
 // 95: create public_dashboards tables and add their name column.
-pub const DB_SCHEMA_VERSION: u64 = 95;
+// 96: add updated_by to public_dashboards.
+pub const DB_SCHEMA_VERSION: u64 = 96;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1095,7 +1096,7 @@ pub struct PublicDashboards {
     #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_MIN_REBUILD_SECS",
         default = 30,
-        help = "Minimum seconds between snapshot rebuilds; the author-chosen cadence is clamped up to this floor."
+        help = "Minimum seconds between snapshot rebuilds; a link asking for a shorter cadence is rejected."
     )]
     pub min_rebuild_secs: u64,
     #[env_config(

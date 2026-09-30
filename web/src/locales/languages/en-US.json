@@ -90,6 +90,10 @@
       "templates": "Browse templates",
       "templatesDesc": "Start from a community dashboard"
     },
+    "noPublicLinks": {
+      "title": "No public links yet",
+      "description": "Open a dashboard and use the globe button to publish it."
+    },
     "noDashboardsInFolder": {
       "title": "No dashboards in this folder",
       "description": "This folder is empty. Add a dashboard here or move one from another folder.",
@@ -416,6 +420,7 @@
     "nouns": {
       "logs": "logs",
       "patterns": "patterns",
+      "publicLinks": "public links",
       "dashboards": "dashboards",
       "pipelines": "pipelines",
       "workflows": "workflows",
@@ -6060,7 +6065,18 @@
       "expiresToday": "Expires today",
       "expiresInDays": "Expires in {n} day | Expires in {n} days",
       "presetsRequired": "Pick at least one time range",
-      "defaultNotAvailable": "The default must be one of the available time ranges"
+      "defaultNotAvailable": "The default must be one of the available time ranges",
+      "openDashboard": "Open dashboard",
+      "dashboardInFolder": "{dashboard} in {folder}",
+      "dashboardMissing": "Dashboard no longer exists",
+      "fixedRange": "Fixed: {range}",
+      "expires": "Expires",
+      "never": "Never",
+      "publishedBy": "Published by",
+      "search": "Search public links",
+      "summaryAll": "All",
+      "revokeTitle": "Revoke \"{name}\"?",
+      "revokeMessage": "Anyone using this link loses access immediately. This can't be undone; publishing again creates a new link."
     }
   },
   "panel": {

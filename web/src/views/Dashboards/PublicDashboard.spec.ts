@@ -130,6 +130,39 @@ describe("PublicDashboard viewer", () => {
     expect(service.getData).not.toHaveBeenCalled();
   });
 
+  it("keeps polling while preparing and renders once the first snapshot exists", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig)
+      .mockResolvedValueOnce({
+        data: { ...CONFIG, available_presets: [], time_range: { editable: true } },
+        status: 200,
+      } as never)
+      .mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    expect(w.text()).toContain("Preparing");
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(service.getData).toHaveBeenCalledWith(expect.any(String), 3600);
+    expect(grid(w).exists()).toBe(true);
+  });
+
+  it("keeps the page out of search indexes and Referer headers while open", () => {
+    vi.mocked(service.getConfig).mockReturnValue(new Promise(() => {}));
+    const count = (name: string, content: string) =>
+      document.head.querySelectorAll(`meta[name="${name}"][content="${content}"]`).length;
+    const before = count("robots", "noindex, nofollow");
+    const w = buildWrapper();
+    expect(count("robots", "noindex, nofollow")).toBe(before + 1);
+    expect(count("referrer", "no-referrer")).toBeGreaterThan(0);
+    w.unmount();
+    expect(count("robots", "noindex, nofollow")).toBe(before);
+  });
+
   it("shows not-found on a 404", async () => {
     (service.getConfig as any).mockRejectedValue({ response: { status: 404 } });
     const w = buildWrapper();

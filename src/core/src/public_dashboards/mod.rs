@@ -44,6 +44,20 @@ use regex::Regex;
 
 const REBUILD_STATE_OK: i32 = 1;
 const REBUILD_STATE_ERROR: i32 = 2;
+const MAX_PRESETS: usize = 10;
+const MIN_PRESET_SECS: i64 = 60;
+const MAX_PRESET_SECS: i64 = 90 * 86_400;
+const MAX_FROZEN_VARIABLES_BYTES: usize = 64 * 1024;
+
+/// Search-response fields the renderer reads; SQL, VRL errors and trace ids stay private.
+const PUBLIC_META_FIELDS: [&str; 6] = [
+    "histogram_interval",
+    "total",
+    "is_partial",
+    "order_by",
+    "new_start_time",
+    "new_end_time",
+];
 
 /// Rebuild every preset snapshot for one public dashboard. Reads the LIVE
 /// dashboard config (edits auto-sync), executes each panel query as the
@@ -122,6 +136,19 @@ async fn build_panels(
         return out;
     };
     for panel in v8.tabs.iter().flat_map(|tab| &tab.panels) {
+        // A custom chart runs the author's JavaScript in the viewer's origin, so it is never
+        // public.
+        if panel.typ == "custom_chart" {
+            let snapshot = panel_snapshot(
+                &panel.query_type,
+                start,
+                end,
+                Vec::new(),
+                Some("unsupported".to_string()),
+            );
+            out.insert(panel.id.clone(), snapshot);
+            continue;
+        }
         let is_promql = panel.query_type == "promql";
         let mut results = Vec::with_capacity(panel.queries.len());
         let mut failure = None;
@@ -289,20 +316,26 @@ async fn run_sql(
     .await
     {
         Ok(resp) => {
-            // Mirror the live loader's shapes: `data[i]` is the hits array and
-            // `resultMetaData[i]` is a per-partition array of the response minus hits.
-            let mut meta = serde_json::to_value(&resp).unwrap_or_default();
-            let hits = meta
+            let mut full = serde_json::to_value(&resp).unwrap_or_default();
+            let hits = full
                 .as_object_mut()
                 .and_then(|obj| obj.remove("hits"))
                 .unwrap_or_else(|| serde_json::Value::Array(vec![]));
-            Ok((hits, serde_json::Value::Array(vec![meta])))
+            Ok((hits, serde_json::Value::Array(vec![public_meta(&full)])))
         }
         Err(e) => {
             log::warn!("public dashboard rebuild query failed: {e}");
             Err("query_error".to_string())
         }
     }
+}
+
+fn public_meta(full: &serde_json::Value) -> serde_json::Value {
+    let kept = PUBLIC_META_FIELDS
+        .iter()
+        .filter_map(|&k| full.get(k).map(|v| (k.to_string(), v.clone())))
+        .collect();
+    serde_json::Value::Object(kept)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -575,6 +608,7 @@ pub async fn create(
         enabled: true,
         expires_at: cfg.expires_at,
         created_by: publisher.to_string(),
+        updated_by: None,
         created_at: now,
         updated_at: now,
         last_accessed_at: None,
@@ -618,6 +652,7 @@ pub struct PublicLinkView {
     pub rebuild_state: i32,
     pub expires_at: Option<i64>,
     pub published_by: String,
+    pub updated_by: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -668,6 +703,7 @@ pub async fn views(
                 rebuild_state: link.rebuild_state,
                 expires_at: link.expires_at,
                 published_by: link.published_by,
+                updated_by: link.updated_by,
                 created_at: link.created_at,
                 updated_at: link.updated_at,
                 id: link.id,
@@ -693,7 +729,9 @@ pub async fn get_link(
 pub async fn update_link(
     mut link: PublicDashboard,
     cfg: PublicDashboardConfig,
+    user_id: &str,
 ) -> Result<PublicDashboard, anyhow::Error> {
+    link.updated_by = Some(user_id.to_string());
     link.name = cfg.name.trim().to_string();
     link.time_range_editable = cfg.time_range.editable;
     link.default_range_secs = cfg.time_range.default_range_secs;
@@ -714,8 +752,36 @@ pub async fn update_link(
 }
 
 /// Stop serving and rebuilding; the slug, settings and snapshots are kept.
-pub async fn pause_link(mut link: PublicDashboard) -> Result<PublicDashboard, anyhow::Error> {
+pub async fn pause_link(
+    link: PublicDashboard,
+    user_id: &str,
+) -> Result<PublicDashboard, anyhow::Error> {
+    set_paused(link, Some(user_id.to_string())).await
+}
+
+/// Whether the publisher has left the link's org; a failed lookup isn't treated as leaving.
+pub async fn publisher_left(link: &PublicDashboard) -> bool {
+    if db::user::is_root_user(&link.published_by) {
+        return false;
+    }
+    matches!(
+        infra::table::org_users::is_member(&link.org_id, &link.published_by).await,
+        Ok(false)
+    )
+}
+
+/// Pause a link whose publisher left the org; the queries ran with that person's access.
+pub async fn pause_for_departed_publisher(link: PublicDashboard) -> Result<(), anyhow::Error> {
+    let updated_by = link.updated_by.clone();
+    set_paused(link, updated_by).await.map(|_| ())
+}
+
+async fn set_paused(
+    mut link: PublicDashboard,
+    updated_by: Option<String>,
+) -> Result<PublicDashboard, anyhow::Error> {
     link.enabled = false;
+    link.updated_by = updated_by;
     link.updated_at = now_micros();
     pd_table::update(&link).await?;
     let _ = db::scheduler::delete(
@@ -728,13 +794,17 @@ pub async fn pause_link(mut link: PublicDashboard) -> Result<PublicDashboard, an
 }
 
 /// Serve and rebuild again at the same address, with a fresh build straight away.
-pub async fn resume_link(mut link: PublicDashboard) -> Result<PublicDashboard, anyhow::Error> {
+pub async fn resume_link(
+    mut link: PublicDashboard,
+    user_id: &str,
+) -> Result<PublicDashboard, anyhow::Error> {
     if link.expires_at.is_some_and(|exp| exp <= now_micros()) {
         return Err(anyhow::anyhow!(
             "this link has expired; extend its expiry date to bring it back"
         ));
     }
     link.enabled = true;
+    link.updated_by = Some(user_id.to_string());
     link.updated_at = now_micros();
     pd_table::update(&link).await?;
     restart_rebuilds(&link).await?;
@@ -748,6 +818,22 @@ pub async fn delete(org: &str, id: &str) -> Result<bool, anyhow::Error> {
         let _ = db::scheduler::delete(org, db::scheduler::TriggerModule::PublicDashboard, id).await;
     }
     Ok(existed)
+}
+
+/// Revoke every link on a dashboard; called when the dashboard is deleted.
+pub async fn revoke_all_for_dashboard(org: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
+    for link in pd_table::list_by_dashboard(org, dashboard_id).await? {
+        delete(org, &link.id).await?;
+    }
+    Ok(())
+}
+
+/// Revoke every link in an org; called by org cleanup.
+pub async fn revoke_all_for_org(org: &str) -> Result<(), anyhow::Error> {
+    for link in pd_table::list(org).await? {
+        delete(org, &link.id).await?;
+    }
+    Ok(())
 }
 
 /// Replace the link's trigger with one due now and build synchronously, so edits and
@@ -783,16 +869,46 @@ async fn register_trigger(org: &str, id: &str, next_run_at: i64) -> Result<(), a
         .map_err(|e| anyhow::anyhow!("failed to register rebuild trigger: {e}"))
 }
 
-/// Reject a publish request the server would otherwise have to rewrite, so the
-/// author learns the real cadence instead of it being silently raised.
+/// Reject a create request the server would otherwise have to rewrite or store unbounded.
 pub fn validate_config(cfg: &PublicDashboardConfig) -> Result<(), String> {
+    check_expiry(cfg.expires_at, now_micros())?;
+    validate_limits(cfg)
+}
+
+/// An edit that keeps an expired link's date is allowed, so only a changed expiry must be in the
+/// future.
+pub fn validate_edit(cfg: &PublicDashboardConfig, link: &PublicDashboard) -> Result<(), String> {
+    if cfg.expires_at != link.expires_at {
+        check_expiry(cfg.expires_at, now_micros())?;
+    }
+    validate_limits(cfg)
+}
+
+fn validate_limits(cfg: &PublicDashboardConfig) -> Result<(), String> {
     check_rebuild_secs(
         cfg.rebuild_secs,
         config::get_config().public_dashboards.min_rebuild_secs,
     )?;
-    check_expiry(cfg.expires_at, now_micros())?;
     if cfg.name.trim().chars().count() > 256 {
         return Err("name must be at most 256 characters".to_string());
+    }
+    check_presets(&cfg.time_range)?;
+    let vars_len = serde_json::to_string(&cfg.frozen_variables).map_or(0, |s| s.len());
+    if vars_len > MAX_FROZEN_VARIABLES_BYTES {
+        return Err("frozen variables must be at most 64 KB".to_string());
+    }
+    Ok(())
+}
+
+fn check_presets(tr: &TimeRangePolicy) -> Result<(), String> {
+    if tr.allowed_presets_secs.len() > MAX_PRESETS {
+        return Err(format!("at most {MAX_PRESETS} time ranges are allowed"));
+    }
+    let in_range = |secs: &i64| (MIN_PRESET_SECS..=MAX_PRESET_SECS).contains(secs);
+    let all_in_range = tr.allowed_presets_secs.iter().all(in_range)
+        && tr.default_range_secs.as_ref().is_none_or(in_range);
+    if !all_in_range {
+        return Err("time ranges must be between 1 minute and 90 days".to_string());
     }
     Ok(())
 }
@@ -1068,5 +1184,33 @@ mod tests {
                 reason: "unauthorized".into()
             }
         );
+    }
+
+    #[test]
+    fn public_meta_keeps_only_renderer_fields() {
+        let full = json!({
+            "histogram_interval": 60,
+            "total": 3,
+            "converted_histogram_query": "SELECT secret FROM s",
+            "function_error": ["vrl leak"],
+            "trace_id": "abc",
+        });
+        assert_eq!(
+            public_meta(&full),
+            json!({ "histogram_interval": 60, "total": 3 })
+        );
+    }
+
+    #[test]
+    fn presets_are_capped_in_count_and_length() {
+        let tr = |presets: Vec<i64>, default: Option<i64>| TimeRangePolicy {
+            editable: true,
+            default_range_secs: default,
+            allowed_presets_secs: presets,
+        };
+        assert!(check_presets(&tr(vec![60, 90 * 86_400], Some(3600))).is_ok());
+        assert!(check_presets(&tr((1..=11).map(|i| i * 60).collect(), None)).is_err());
+        assert!(check_presets(&tr(vec![30], None)).is_err());
+        assert!(check_presets(&tr(vec![3600], Some(91 * 86_400))).is_err());
     }
 }

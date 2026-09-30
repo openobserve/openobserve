@@ -366,10 +366,11 @@ const footerNote = computed<I18nText>(() =>
 
 // Re-read on the author's "Refresh every" cadence — the same interval the snapshot rebuilds on.
 const refresh = async () => {
-  if (state.value !== "ready") return;
+  if (state.value !== "ready" && state.value !== "preparing") return;
   try {
     const res = await publicDashboardsService.getConfig(slug);
     applyConfig(res.data ?? {});
+    if (selectedPreset.value === null) selectedPreset.value = pickDefaultPreset();
     await loadData();
   } catch (e: unknown) {
     mapError(e);
@@ -378,10 +379,13 @@ const refresh = async () => {
 
 // Grace past the rebuild's due time so the read lands after the new snapshot is written.
 const REBUILD_GRACE_MS = 2000;
+// The first snapshot lands within seconds of publishing, so waiting a whole cadence would strand the page.
+const PREPARING_POLL_MS = 5000;
 
 // Aim the next read just after the next rebuild is due; a stale or missing snapshot falls back to the plain cadence.
 const nextRefreshDelay = (): number => {
   const cadenceMs = refreshSecs.value * 1000;
+  if (state.value === "preparing") return Math.min(cadenceMs, PREPARING_POLL_MS);
   if (!builtAt.value) return cadenceMs;
   const due = builtAt.value / 1000 + cadenceMs + REBUILD_GRACE_MS - Date.now();
   return due > 0 && due <= cadenceMs + REBUILD_GRACE_MS ? due : cadenceMs;
@@ -404,12 +408,27 @@ const refreshNow = async () => {
   scheduleRefresh();
 };
 
+// The slug is a bearer secret: keep the page out of search indexes and outgoing Referer headers.
+const PRIVACY_META: Array<[string, string]> = [
+  ["robots", "noindex, nofollow"],
+  ["referrer", "no-referrer"],
+];
+const addedMeta: HTMLMetaElement[] = [];
+
 onMounted(async () => {
+  for (const [name, content] of PRIVACY_META) {
+    const meta = document.createElement("meta");
+    meta.name = name;
+    meta.content = content;
+    document.head.appendChild(meta);
+    addedMeta.push(meta);
+  }
   await load();
   scheduleRefresh();
 });
 
 onBeforeUnmount(() => {
   if (refreshTimer) clearTimeout(refreshTimer);
+  addedMeta.forEach((meta) => meta.remove());
 });
 </script>

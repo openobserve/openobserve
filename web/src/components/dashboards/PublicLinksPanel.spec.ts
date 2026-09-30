@@ -88,6 +88,7 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
   rebuild_state: 1,
   expires_at: null,
   published_by: "a@b.c",
+  updated_by: null,
   created_at: 1,
   updated_at: 1,
   ...over,

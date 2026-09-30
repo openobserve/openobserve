@@ -498,6 +498,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     timed_annotations::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/timed_annotations: {e}"))?;
+    crate::public_dashboards::revoke_all_for_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/public_dashboards: {e}"))?;
     // dashboards must be deleted before folders (FK constraint)
     dashboards::delete_by_org(org_id)
         .await
