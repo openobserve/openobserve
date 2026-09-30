@@ -15,15 +15,13 @@
 
 use std::{ops::Range, sync::Arc};
 
+use anyhow::{Context, Result, bail, ensure};
 use arrow::{
     array::{Array, BooleanArray, RecordBatch, UInt32Array},
     datatypes::SchemaRef,
 };
 use bytes::Bytes;
-use datafusion::{
-    common::{DataFusionError, Result},
-    physical_plan::PhysicalExpr,
-};
+use datafusion::physical_plan::PhysicalExpr;
 
 use crate::{
     block_cache::{
@@ -57,15 +55,12 @@ struct Tail {
 
 impl Tail {
     fn slice(&self, range: Range<u64>) -> Result<Bytes> {
-        let start = usize::try_from(range.start - self.start)
-            .map_err(|error| DataFusionError::External(error.into()))?;
-        let end = usize::try_from(range.end - self.start)
-            .map_err(|error| DataFusionError::External(error.into()))?;
-        if start > end || end > self.bytes.len() {
-            return Err(DataFusionError::Execution(
-                "MIDX column outside tail".into(),
-            ));
-        }
+        let start = usize::try_from(range.start - self.start)?;
+        let end = usize::try_from(range.end - self.start)?;
+        ensure!(
+            start <= end && end <= self.bytes.len(),
+            "MIDX column outside tail"
+        );
         Ok(self.bytes.slice(start..end))
     }
 }
@@ -96,8 +91,7 @@ pub(super) async fn load_metrics_index_file(
     let entry = if cached
         .as_ref()
         .map(|entry| entry.index.missing_labels(&labels.requested))
-        .transpose()
-        .map_err(|error| DataFusionError::External(error.into()))?
+        .transpose()?
         .is_some_and(|missing| missing.is_empty())
     {
         cached.unwrap()
@@ -108,16 +102,11 @@ pub(super) async fn load_metrics_index_file(
         INDEX_CACHE
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .insert(key, loaded, limit)
-            .map_err(|error| DataFusionError::External(error.into()))?
+            .insert(key, loaded, limit)?
     };
-    let index = entry
-        .index
-        .project(&labels.requested)
-        .map_err(|error| DataFusionError::External(error.into()))?;
+    let index = entry.index.project(&labels.requested)?;
     tokio::task::spawn_blocking(move || metrics_block_index_data(&index, format, &labels.flat))
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?
+        .await?
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -129,11 +118,10 @@ pub(super) fn evaluate_metrics_index(
     expected_rows: usize,
 ) -> Result<Vec<Range<usize>>> {
     let parent_records = data.parent_records;
-    if parent_records != expected_rows {
-        return Err(DataFusionError::Execution(format!(
-            "metrics-index was written for {parent_records} rows, but the parent file contains {expected_rows} records"
-        )));
-    }
+    ensure!(
+        parent_records == expected_rows,
+        "metrics-index was written for {parent_records} rows, but the parent file contains {expected_rows} records"
+    );
     let count_index = data.schema.index_of(METRICS_INDEX_ROW_COUNT)?;
     let mut ranges: Vec<Range<usize>> = Vec::new();
     let mut next_row: usize = 0;
@@ -144,11 +132,7 @@ pub(super) fn evaluate_metrics_index(
                 let mask = filter.evaluate(batch)?.into_array(batch.num_rows())?;
                 mask.as_any()
                     .downcast_ref::<BooleanArray>()
-                    .ok_or_else(|| {
-                        DataFusionError::Execution(
-                            "metrics-index filter did not produce a boolean array".to_string(),
-                        )
-                    })?
+                    .context("metrics-index filter did not produce a boolean array")?
                     .clone()
             }
             None => BooleanArray::from(vec![true; batch.num_rows()]),
@@ -158,26 +142,19 @@ pub(super) fn evaluate_metrics_index(
             .column(count_index)
             .as_any()
             .downcast_ref::<UInt32Array>()
-            .ok_or_else(|| {
-                DataFusionError::Execution("metrics-index row count is not UInt32".to_string())
-            })?;
+            .context("metrics-index row count is not UInt32")?;
 
         for row in 0..batch.num_rows() {
             let count = counts.value(row) as usize;
-            if count == 0 {
-                return Err(DataFusionError::Execution(
-                    "metrics-index contains an empty row range".to_string(),
-                ));
-            }
+            ensure!(count != 0, "metrics-index contains an empty row range");
             let start = next_row;
-            let end = start.checked_add(count).ok_or_else(|| {
-                DataFusionError::Execution("metrics-index row range overflow".to_string())
-            })?;
-            if end > expected_rows {
-                return Err(DataFusionError::Execution(format!(
-                    "metrics-index row range ends at {end}, beyond the parent file's {expected_rows} records"
-                )));
-            }
+            let end = start
+                .checked_add(count)
+                .context("metrics-index row range overflow")?;
+            ensure!(
+                end <= expected_rows,
+                "metrics-index row range ends at {end}, beyond the parent file's {expected_rows} records"
+            );
             next_row = end;
             if mask.is_null(row) || !mask.value(row) {
                 continue;
@@ -191,11 +168,10 @@ pub(super) fn evaluate_metrics_index(
             }
         }
     }
-    if next_row != expected_rows {
-        return Err(DataFusionError::Execution(format!(
-            "metrics-index covers {next_row} rows, but the parent file contains {expected_rows} records"
-        )));
-    }
+    ensure!(
+        next_row == expected_rows,
+        "metrics-index covers {next_row} rows, but the parent file contains {expected_rows} records"
+    );
     Ok(ranges)
 }
 
@@ -210,8 +186,7 @@ pub async fn fetch_parsed_index(
     if cached
         .as_ref()
         .map(|entry| entry.index.missing_labels(labels))
-        .transpose()
-        .map_err(|error| DataFusionError::External(error.into()))?
+        .transpose()?
         .is_some_and(|missing| missing.is_empty())
     {
         return Ok(cached.unwrap());
@@ -237,27 +212,20 @@ pub async fn fetch_parsed_index(
     let trailer = tail
         .bytes
         .get(tail.bytes.len() - crate::block::MIDX_TRAILER_LEN..)
-        .ok_or_else(|| DataFusionError::Execution("short MIDX trailer".into()))?;
-    let binding = SidecarBinding::parse(size, trailer)
-        .map_err(|error| DataFusionError::External(error.into()))?;
-    if let Some(existing) = &cached
-        && existing.binding != binding
-    {
-        return Err(DataFusionError::Execution(
-            "MIDX sidecar differs from cached trailer/size".into(),
-        ));
+        .context("short MIDX trailer")?;
+    let binding = SidecarBinding::parse(size, trailer)?;
+    if let Some(existing) = &cached {
+        ensure!(
+            existing.binding == binding,
+            "MIDX sidecar differs from cached trailer/size"
+        );
     }
     let requested = if let Some(existing) = &cached {
-        existing
-            .index
-            .missing_labels(labels)
-            .map_err(|error| DataFusionError::External(error.into()))?
+        existing.index.missing_labels(labels)?
     } else {
         labels.to_vec()
     };
-    let mut ranges = header
-        .column_ranges(&requested)
-        .map_err(|error| DataFusionError::External(error.into()))?;
+    let mut ranges = header.column_ranges(&requested)?;
     if cached.is_some() {
         ranges.remove(0);
     }
@@ -265,39 +233,31 @@ pub async fn fetch_parsed_index(
     tokio::task::spawn_blocking(move || -> Result<_> {
         let index = if let Some(existing) = cached {
             let additional =
-                crate::block::decode_additional_labels(&existing.index, &columns, &requested)
-                    .map_err(|error| DataFusionError::External(error.into()))?;
-            existing
-                .index
-                .merge_columns(&additional)
-                .map_err(|error| DataFusionError::External(error.into()))?
+                crate::block::decode_additional_labels(&existing.index, &columns, &requested)?;
+            existing.index.merge_columns(&additional)?
         } else {
-            crate::block::decode_index(&header, &columns, &requested)
-                .map_err(|error| DataFusionError::External(error.into()))?
+            crate::block::decode_index(&header, &columns, &requested)?
         };
         Ok(Arc::new(CachedIndex {
             index: Arc::new(index.for_cache()),
             binding,
         }))
     })
-    .await
-    .map_err(|error| DataFusionError::External(Box::new(error)))?
+    .await?
 }
 
 async fn head_size(account: &str, path: &str) -> Result<u64> {
     Ok(infra::cache::storage::head(account, &path.into())
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?
+        .await?
         .size)
 }
 
 async fn get_range(account: &str, path: &str, range: Range<u64>) -> Result<Bytes> {
-    let bytes = infra::cache::storage::get_range(account, &path.into(), range.clone())
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?;
-    if bytes.len() as u64 != range.end - range.start {
-        return Err(DataFusionError::Execution("Truncated MIDX range".into()));
-    }
+    let bytes = infra::cache::storage::get_range(account, &path.into(), range.clone()).await?;
+    ensure!(
+        bytes.len() as u64 == range.end - range.start,
+        "Truncated MIDX range"
+    );
     Ok(bytes)
 }
 
@@ -312,10 +272,9 @@ async fn read_header(
     size: u64,
     parent: &crate::block::ParentMetadata,
 ) -> Result<(crate::block::Header, Tail)> {
-    let external = |error: anyhow::Error| DataFusionError::External(error.into());
     let mut start = size.saturating_sub(crate::block::HEADER_PROBE_BYTES);
     let mut bytes = get_range(account, path, start..size).await?;
-    let trailer = crate::block::Header::trailer(&bytes, size).map_err(external)?;
+    let trailer = crate::block::Header::trailer(&bytes, size)?;
     let needed = if trailer.label_len + trailer.directory_len <= SMALL_METADATA_BYTES {
         trailer.blocks_end(size)
     } else if trailer.header_start(size) < start {
@@ -328,7 +287,7 @@ async fn read_header(
         start = needed;
         bytes = concat(&prefix, &bytes);
     }
-    let header = crate::block::Header::parse(&bytes, size, parent).map_err(external)?;
+    let header = crate::block::Header::parse(&bytes, size, parent)?;
     Ok((header, Tail { start, bytes }))
 }
 
@@ -347,9 +306,7 @@ async fn read_columns(
     let mut fetched = if remote.is_empty() {
         Vec::new()
     } else {
-        infra::cache::storage::get_ranges(account, &path.into(), &remote)
-            .await
-            .map_err(|error| DataFusionError::External(Box::new(error)))?
+        infra::cache::storage::get_ranges(account, &path.into(), &remote).await?
     }
     .into_iter()
     .zip(remote);
@@ -360,12 +317,11 @@ async fn read_columns(
             columns.push(local);
             continue;
         }
-        let (prefix, expected) = fetched
-            .next()
-            .ok_or_else(|| DataFusionError::Execution("Missing MIDX column range".into()))?;
-        if prefix.len() as u64 != expected.end - expected.start {
-            return Err(DataFusionError::Execution("Truncated MIDX column".into()));
-        }
+        let (prefix, expected) = fetched.next().context("Missing MIDX column range")?;
+        ensure!(
+            prefix.len() as u64 == expected.end - expected.start,
+            "Truncated MIDX column"
+        );
         columns.push(if local.is_empty() {
             prefix
         } else {
@@ -381,15 +337,13 @@ fn metrics_block_index_data(
     flat_labels: &[String],
 ) -> Result<MetricsIndexData> {
     let row_group_size = match format {
-        config::FileFormat::Parquet => Some(index.row_group_size.ok_or_else(|| {
-            DataFusionError::Execution("Parquet block index lacks parent row group size".into())
-        })?),
+        config::FileFormat::Parquet => Some(
+            index
+                .row_group_size
+                .context("Parquet block index lacks parent row group size")?,
+        ),
         config::FileFormat::Vortex if index.row_group_size.is_none() => None,
-        _ => {
-            return Err(DataFusionError::Execution(
-                "Invalid block parent format/row-group binding".into(),
-            ));
-        }
+        _ => bail!("Invalid block parent format/row-group binding"),
     };
     let mut fields = vec![arrow::datatypes::Field::new(
         METRICS_INDEX_ROW_COUNT,
@@ -419,8 +373,7 @@ fn metrics_block_index_data(
     Ok(MetricsIndexData {
         schema,
         batches: vec![batch],
-        parent_records: usize::try_from(index.parent.rows)
-            .map_err(|e| DataFusionError::External(e.into()))?,
+        parent_records: usize::try_from(index.parent.rows)?,
         row_group_size,
     })
 }
