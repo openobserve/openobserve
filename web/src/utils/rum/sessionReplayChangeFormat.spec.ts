@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import {
   createRecordConverter,
   convertRecords,
+  dropChangesBeforeFirstSnapshot,
   hasChangeFormatRecords,
 } from "./sessionReplayChangeFormat";
 
@@ -140,6 +141,29 @@ describe("sessionReplayChangeFormat", () => {
       const [out] = createRecordConverter().convert(record);
       expect(out.data.node.adoptedStyleSheets).toEqual([{ cssRules: [".a{}", ".b{}"] }]);
     });
+
+    it("drops insertions whose resolved parent is a text node instead of throwing", () => {
+      const record = fullSnapshot([
+        [
+          ADD_NODE,
+          [null, "#document"], // id0
+          [1, "BODY"], // id1 -> appended to the document
+          [1, "#text", "hi"], // id2 -> appended to BODY, has no childNodes
+          [1, "SPAN"], // id3 -> appendChild into the text node
+          [0, "B"], // id4 -> after id3, so parent is the text node
+          [-1, "I"], // id5 -> before id4, so parent is the text node
+        ],
+      ]);
+
+      const [out] = createRecordConverter().convert(record);
+
+      const body = out.data.node.childNodes[0];
+      expect(body.tagName).toBe("body");
+      expect(body.childNodes.map((n: any) => n.id)).toEqual([2]);
+      const text = body.childNodes[0];
+      expect(text.type).toBe(3);
+      expect(text.childNodes).toBeUndefined();
+    });
   });
 
   describe("incremental Change (type 12) conversion", () => {
@@ -207,6 +231,29 @@ describe("sessionReplayChangeFormat", () => {
         data: [[ATTRIBUTE, [1, ["hidden"]]]],
       });
       expect(out[0].data.attributes).toEqual([{ id: 1, attributes: { hidden: null } }]);
+    });
+
+    it("adds into and removes from a text-node parent without throwing", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"], [1, "#text", "hi"]]]),
+      );
+
+      const added = converter.convert({
+        type: 12,
+        timestamp: 5000,
+        data: [[ADD_NODE, [1, "SPAN"]]], // id3 -> appendChild into the text node id2
+      });
+      expect(added[0].data.adds).toEqual([
+        { parentId: 2, nextId: null, node: expect.objectContaining({ id: 3, tagName: "span" }) },
+      ]);
+
+      const removed = converter.convert({
+        type: 12,
+        timestamp: 6000,
+        data: [[REMOVE_NODE, 3]],
+      });
+      expect(removed[0].data.removes).toEqual([{ id: 3, parentId: 2 }]);
     });
   });
 
@@ -344,6 +391,24 @@ describe("sessionReplayChangeFormat", () => {
       expect(hasChangeFormatRecords([{ type: 2, data: { node: {} } }, { type: 3 }])).toBe(false);
     });
 
+    it("dropChangesBeforeFirstSnapshot drops only the Change records before the snapshot", () => {
+      const meta = { type: 4, timestamp: 1, data: {} };
+      const earlyChange = { type: 12, timestamp: 2, data: [] };
+      const snapshot = fullSnapshot([[ADD_NODE, [null, "#document"]]]);
+      const laterChange = { type: 12, timestamp: 4, data: [] };
+
+      expect(dropChangesBeforeFirstSnapshot([meta, earlyChange, snapshot, laterChange])).toEqual([
+        meta,
+        snapshot,
+        laterChange,
+      ]);
+    });
+
+    it("dropChangesBeforeFirstSnapshot leaves a list with no Change-format snapshot alone", () => {
+      const records = [{ type: 4 }, { type: 12, data: [] }];
+      expect(dropChangesBeforeFirstSnapshot(records)).toEqual(records);
+    });
+
     it("convertRecords threads state and resets on each full snapshot", () => {
       const records = [
         fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]),
@@ -356,6 +421,90 @@ describe("sessionReplayChangeFormat", () => {
       expect(out[0].data.node.childNodes[0].id).toBe(1);
       expect(out[1].data.attributes[0].id).toBe(1);
       expect(out[2].data.node.childNodes[0].id).toBe(1);
+    });
+  });
+  describe("emitted records are copies", () => {
+    const snapshot = () =>
+      fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"], [1, "DIV", ["class", "a"]]]]);
+
+    function ids(node: any, out: number[] = []): number[] {
+      out.push(node.id);
+      for (const child of node.childNodes ?? []) ids(child, out);
+      return out;
+    }
+
+    it("leaves the emitted snapshot unchanged by later changes", () => {
+      const converter = createRecordConverter();
+      const [snap] = converter.convert(snapshot());
+      const before = JSON.stringify(snap);
+
+      converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [
+          [ADD_NODE, [1, "SPAN"]],
+          [ATTRIBUTE, [2, ["class", "b"]]],
+          [REMOVE_NODE, 2],
+        ],
+      });
+
+      expect(JSON.stringify(snap)).toBe(before);
+    });
+
+    it("rebuilds at 0 without the ids later adds introduced, so a seek to 0 shows no duplicates", () => {
+      const converter = createRecordConverter();
+      const [snap] = converter.convert(snapshot());
+      const [mutation] = converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [[ADD_NODE, [1, "SPAN"]]],
+      });
+
+      const snapshotIds = ids(snap.data.node);
+      expect(new Set(snapshotIds).size).toBe(snapshotIds.length);
+      expect(snapshotIds).not.toContain(mutation.data.adds[0].node.id);
+    });
+
+    it("keeps the earlier attribute state for a backward goto inside the run", () => {
+      const converter = createRecordConverter();
+      const [snap] = converter.convert(snapshot());
+      const [add] = converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [[ADD_NODE, [1, "SPAN", ["title", "first"]]]],
+      });
+      converter.convert({
+        type: 12,
+        timestamp: 3000,
+        data: [[ATTRIBUTE, [3, ["title", "second"]], [2, ["class", "z"]]]],
+      });
+
+      expect(snap.data.node.childNodes[0].childNodes[0].attributes.class).toBe("a");
+      expect(add.data.adds[0].node.attributes.title).toBe("first");
+    });
+  });
+
+  describe("markStale", () => {
+    it("drops Change records until the next Change-format full snapshot", () => {
+      const converter = createRecordConverter();
+      converter.convert(fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]));
+      converter.markStale();
+
+      const change = { type: 12, timestamp: 2000, data: [[TEXT, [1, "x"]]] };
+      expect(converter.convert(change)).toEqual([]);
+
+      const [snap] = converter.convert(
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]),
+      );
+      expect(snap.type).toBe(2);
+      expect(converter.convert(change)).toHaveLength(1);
+    });
+
+    it("passes classic records through while stale", () => {
+      const converter = createRecordConverter();
+      converter.markStale();
+      const meta = { type: 4, timestamp: 1, data: { width: 1, height: 1 } };
+      expect(converter.convert(meta)).toEqual([meta]);
     });
   });
 });
