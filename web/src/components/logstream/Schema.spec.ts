@@ -2357,6 +2357,35 @@ describe("Schema Component Tests", () => {
         }),
       );
     });
+
+    it("should not send dynamic_merge while the switch is untouched", async () => {
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+      expect(wrapper.vm.showDynamicMergeToggle).toBe(true);
+      expect(wrapper.vm.dynamicMergeIsDefault).toBe(true);
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      const settings = mockUpdateSettings.mock.calls[0][3];
+      expect(settings).not.toHaveProperty("dynamic_merge");
+    });
+
+    it("should send dynamic_merge once the switch is changed", async () => {
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+      wrapper.vm.dynamicMerge = true;
+      wrapper.vm.onDynamicMergeChange();
+      expect(wrapper.vm.dynamicMergeIsDefault).toBe(false);
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings.mock.calls[0][3]).toEqual(
+        expect.objectContaining({ dynamic_merge: true }),
+      );
+    });
   });
 
   // ==========================================
