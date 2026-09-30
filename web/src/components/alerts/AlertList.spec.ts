@@ -1414,6 +1414,18 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(wrapper.vm.showForm).toBe(false);
   });
 
+  it("duplicateAlert pre-fills stream type and name from the source row", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(wrapper.vm.toBeClonestreamType).toBe(row.stream_type);
+    expect(wrapper.vm.toBeClonestreamName).toBe(row.stream_name);
+  });
+
   it("clone dialog emits click:primary -> invokes submitForm", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);

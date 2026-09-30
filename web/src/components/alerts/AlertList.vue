@@ -2506,9 +2506,19 @@ export default defineComponent({
       toBeCloneAlertName.value = row.name;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonedIsComposite.value = row.alert_type === "Composite";
-      toBeClonestreamName.value = "";
-      toBeClonestreamType.value = "";
+      // Pre-fill from the original alert's row — composite rows carry no
+      // single stream (stream_name is the "--" placeholder), so leave those blank.
+      toBeClonestreamType.value = toBeClonedIsComposite.value ? "" : row.stream_type || "";
+      toBeClonestreamName.value =
+        toBeClonedIsComposite.value || !row.stream_name || row.stream_name === "--"
+          ? ""
+          : row.stream_name;
       showForm.value = true;
+      // Load the stream-name options for the pre-filled stream type so the
+      // dialog's dropdown reflects it instead of showing an empty list.
+      if (toBeClonestreamType.value) {
+        await updateStreams(false);
+      }
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
       if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
         toBeClonedAlert.value = await getAlertById(row.alert_id);
