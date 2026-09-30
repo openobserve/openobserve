@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template v-if="isLive && loadState !== 'error'" #title-trail>
-      <OBadge variant="error" size="sm" dot data-test="session-viewer-live-badge">{{
+      <OBadge variant="success" size="sm" dot data-test="session-viewer-live-badge">{{
         t("rum.sessionReplayLiveBadge")
       }}</OBadge>
     </template>

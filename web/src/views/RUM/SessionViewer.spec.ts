@@ -155,6 +155,7 @@ const playerStubs = vi.hoisted(() => ({
 import SessionViewer from "./SessionViewer.vue";
 import store from "@/test/unit/helpers/store";
 import ShareButton from "@/components/common/ShareButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import searchService from "@/services/search";
 import { ACTIVE_WINDOW_MS } from "@/utils/rum/sessionReplayLive";
 import { b64DecodeUnicode } from "@/utils/zincutils";
@@ -2047,6 +2048,10 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     expect(vm.isLive).toBe(true);
     expect(vm.loadState).toBe("live");
     expect(live.find('[data-test="session-viewer-live-badge"]').text()).toBe("LIVE");
+    const liveBadge = live
+      .findAllComponents(OBadge)
+      .find((badge) => badge.attributes("data-test") === "session-viewer-live-badge");
+    expect(liveBadge?.props("variant")).toBe("success");
     live.unmount();
 
     const ended = await mountLive(NOW - ACTIVE_WINDOW_MS - 1);

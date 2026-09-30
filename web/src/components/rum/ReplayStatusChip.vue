@@ -68,7 +68,7 @@ const label = computed(() => {
 });
 
 const dotClass = computed(() => {
-  if (props.loadState === "live") return "bg-badge-error-solid-bg";
+  if (props.loadState === "live") return "bg-badge-success-solid-bg motion-safe:animate-pulse";
   return props.loadState === "complete" ? "bg-badge-teal-solid-bg" : "bg-button-primary";
 });
 
