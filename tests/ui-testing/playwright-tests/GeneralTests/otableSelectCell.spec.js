@@ -6,7 +6,8 @@ const PageManager = require('../../pages/page-manager.js');
 const uniqueSaName = () => `sa${Date.now()}x${Math.floor(Math.random() * 10000)}`;
 
 test.describe("OTable Select Cell Click Selection testcases", () => {
-    test.describe.configure({ mode: 'parallel' });
+    // Serial: tests share the org's service-account list; parallel create/delete churn flips the header select-all/indeterminate state mid-assertion.
+    test.describe.configure({ mode: 'serial' });
     let pm;
     let email;
     let secondEmail;

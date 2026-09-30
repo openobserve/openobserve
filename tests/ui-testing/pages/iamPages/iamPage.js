@@ -471,8 +471,7 @@ export class IamPage {
         expect(checkedCount).toBe(selectableRowCount);
     }
 
-    // System row is never selectable: its checkbox stays unchecked and disabled,
-    // and clicking its select-cell padding is a no-op (isRowSelectable === false).
+    // isRowSelectable === false, so the select-cell click is a no-op and the checkbox stays disabled.
     async expectSystemRowCheckboxDisabled() {
         await expect(this.systemRowCheckbox).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
         await expect(this.systemRowCheckbox).toBeDisabled();
