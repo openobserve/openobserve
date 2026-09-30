@@ -17,6 +17,7 @@ mod compact;
 mod directory;
 mod header;
 mod reader;
+mod samples;
 mod writer;
 
 use std::{
@@ -34,6 +35,7 @@ pub use config::meta::promql::index::{MIDX_MAGIC, MIDX_TRAILER_LEN, MIDX_VERSION
 pub use directory::{BlockDirectory, BlockIter};
 pub use header::Header;
 pub use reader::{BlockDecoder, decode_additional_labels, decode_block, decode_file, decode_index};
+pub use samples::max_block_len;
 use serde::{Deserialize, Serialize};
 pub use writer::BlockWriter;
 
@@ -42,16 +44,7 @@ pub const HEADER_PROBE_BYTES: u64 = 64 * 1024;
 pub const MAX_BLOCK_ROWS: usize = 8192;
 /// Label count above which building a MIDX warns: the writer holds every label of every block.
 pub const WARN_LABEL_COLUMNS: usize = 128;
-const DIRECTORY_FIELDS: usize = 7;
-const DIRECTORY_TYPES: [DataType; DIRECTORY_FIELDS] = [
-    DataType::UInt64,
-    DataType::UInt64,
-    DataType::UInt32,
-    DataType::Int64,
-    DataType::Int64,
-    DataType::UInt64,
-    DataType::UInt32,
-];
+const DIRECTORY_FIELDS: usize = 5;
 const NON_IDENTITY: &[&str] = &[
     "exemplars",
     "is_monotonic",
@@ -338,18 +331,6 @@ impl Index {
             })
             .collect()
     }
-}
-
-/// Bounds scratch space before allocating or decoding one sample block.
-pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
-    ensure!(
-        row_count > 0 && row_count as usize <= MAX_BLOCK_ROWS,
-        "invalid block row count"
-    );
-    let raw = usize::try_from(row_count)?
-        .checked_mul(16)
-        .ok_or_else(|| anyhow!("block size overflow"))?;
-    Ok(zstd::zstd_safe::compress_bound(raw))
 }
 
 pub fn identity_label_columns(schema: &Schema) -> Result<Vec<String>> {
