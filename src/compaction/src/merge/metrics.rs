@@ -39,6 +39,12 @@ pub(super) enum MetricsIndexMergeScope {
     WholeHour,
 }
 
+/// Files `files` would make at `max_file_size` each.
+pub(super) fn ideal_file_count(files: &[FileKey], max_file_size: usize) -> usize {
+    let total_original_size: i64 = files.iter().map(|f| f.meta.original_size.max(0)).sum();
+    (total_original_size as usize).div_ceil(max_file_size.max(1))
+}
+
 pub(super) fn metrics_index_merge_scope(
     files: &[FileKey],
     max_file_size: usize,
@@ -47,9 +53,7 @@ pub(super) fn metrics_index_merge_scope(
         .iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::Indexed))
         .count();
-    let total_original_size: i64 = files.iter().map(|f| f.meta.original_size.max(0)).sum();
-    let ideal_file_count = (total_original_size as usize).div_ceil(max_file_size.max(1));
-    if indexed_files > ideal_file_count + METRICS_INDEX_REWRITE_SLACK {
+    if indexed_files > ideal_file_count(files, max_file_size) + METRICS_INDEX_REWRITE_SLACK {
         MetricsIndexMergeScope::WholeHour
     } else if indexed_files == files.len() {
         MetricsIndexMergeScope::Skip
