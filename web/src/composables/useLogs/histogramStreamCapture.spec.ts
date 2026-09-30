@@ -26,7 +26,6 @@
  * searchObj.data.histogram.xData/yData reflect the real accumulated aggs.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { writeFileSync } from "fs";
 import { useSearchResponseHandler } from "./useSearchResponseHandler";
 
 // ---------------------------------------------------------------------------
@@ -648,25 +647,6 @@ describe("histogram stream capture replay (real merge logic)", () => {
     const { xData, yData } = mockState.searchObj.data.histogram;
     expect(xData.length).toBe(yData.length);
     expect(xData.length).toBeGreaterThan(0);
-
-    // Print the actual histogram data object driving the chart: every
-    // [timestamp, count] pair, in x-axis order, plus the raw accumulated
-    // aggs count — so the real shape/values can be inspected directly.
-    // (vitest.config.ts suppresses console output during test runs, so this
-    // is written to a file instead of console.log.)
-    writeFileSync(
-      "/private/tmp/claude-501/-Users-bhargavpatel-Documents-zinclabs-openobserve/db9e7b11-f2d7-4035-98fa-f97ab3b30759/scratchpad/histogram-data-object.json",
-      JSON.stringify(
-        {
-          bucketCount: xData.length,
-          totalAggs: aggs.length,
-          nonZeroBuckets: yData.filter((y: number) => y > 0).length,
-          buckets: xData.map((ts: number, i: number) => [new Date(ts).toISOString(), yData[i]]),
-        },
-        null,
-        2,
-      ),
-    );
 
     const newestTs = new Date(NEWEST_KEY + "Z").getTime();
     const oldestTs = new Date(OLDEST_KEY + "Z").getTime();

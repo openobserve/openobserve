@@ -414,6 +414,25 @@ describe("useHistogram Composable", () => {
       expect(mockState.searchObj.data.queryResults.total).toBe(179);
     });
 
+    it("falls through to the flat path for a lone zo_sql_breakdown: null row, without dropping its count", () => {
+      // null !== undefined, so a hasBreakdown check written as `!== undefined`
+      // alone would wrongly stay true here and then silently skip this row
+      // in the stacked merge (which also excludes null) — the same
+      // data-loss class this fix closes for undefined-only rows.
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
+        { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 99 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const hist = mockState.searchObj.data.histogram;
+
+      expect(hist.breakdownField).toBeNull();
+      expect(hist.breakdownSeries).toBeNull();
+      expect(hist.yData).toEqual([102]); // 3 + 99 — nothing dropped
+      expect(mockState.searchObj.data.queryResults.total).toBe(102);
+    });
+
     it("sums multiple aggs rows for the same (timestamp, category)", () => {
       setAggs([
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },

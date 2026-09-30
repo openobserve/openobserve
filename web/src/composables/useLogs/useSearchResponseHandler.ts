@@ -219,15 +219,7 @@ export const useSearchResponseHandler = () => {
     searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
-  // The histogram stream (payload.type === "histogram") accumulates its
-  // buckets and descriptive fields onto the same searchObj.data.queryResults
-  // object the main search stream (payload.type === "search") writes to. A
-  // second, independent (non-paginated) main-search run overlapping the
-  // first search's still-streaming histogram — e.g. the live-mode debounce
-  // double-fire — hits the wholesale queryResults reassignment below and,
-  // without this, silently drops everything the histogram had accumulated.
-  // Proven by histogramStreamCapture.spec.ts, which replays a real captured
-  // stream through this exact interference and asserts the loss.
+  // Carries histogram-owned fields through the wholesale queryResults reassignment below, which otherwise drops them when a concurrent search run overlaps the still-streaming histogram (see histogramStreamCapture.spec.ts).
   const preserveHistogramFields = () => ({
     aggs: searchObj.data?.queryResults?.aggs,
     order_by: searchObj.data?.queryResults?.order_by,
