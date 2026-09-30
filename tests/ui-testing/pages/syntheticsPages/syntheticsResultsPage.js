@@ -43,7 +43,7 @@ export class SyntheticsResultsPage {
       drawer: '[data-test="synthetics-run-detail-drawer"]',
       protocolDetail: '[data-test="synthetics-protocol-run-detail"]',
       protocolAssertionsBadge: '[data-test="synthetics-protocol-run-assertions-badge"]',
-      // Run detail (full page or drawer)
+      // Shared by the full-page and drawer run detail.
       statusBadge: '[data-test="synthetics-run-detail-status-badge"]',
       infoSkeleton: '[data-test="synthetics-run-detail-info-skeleton"]',
       detailStepsTab: '[data-test="synthetics-run-detail-tab-steps"]',
@@ -67,8 +67,6 @@ export class SyntheticsResultsPage {
   stepErrorCard(rowId) { return `[data-test="synthetics-run-detail-step-error-card-${rowId}"]`; }
   relativePeriod(suffix) { return `[data-test="date-time-relative-${suffix}-btn"]`; }
 
-  // ---------------------------------------------------------------- navigation
-
   // `name` mirrors the list link's `?name=` query, which is what the header and toasts display.
   async gotoResults(orgId, checkId, { name = null } = {}) {
     const params = new URLSearchParams({ org_identifier: orgId });
@@ -90,8 +88,6 @@ export class SyntheticsResultsPage {
     await expect(this.page.locator(this.locators.infoSkeleton)).toHaveCount(0, { timeout: 60000 });
     testLogger.navigation('Synthetics run detail', { checkId, runId, executionId });
   }
-
-  // ------------------------------------------------------------------- actions
 
   async triggerRun() { await this.page.locator(this.locators.triggerRunButton).click(); }
 
@@ -127,8 +123,6 @@ export class SyntheticsResultsPage {
   async openAttempt(value) {
     await selectOSelectOption(this.page, this.locators.attemptDropdown, value);
   }
-
-  // ---------------------------------------------------------------- assertions
 
   // Anchored so "of 3" cannot pass on "of 30".
   async expectRunTotal(total) {

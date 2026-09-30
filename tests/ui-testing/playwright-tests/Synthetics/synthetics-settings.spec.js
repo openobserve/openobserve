@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Synthetics settings — public locations (meta org) and agent tokens (plan §7, §8); ids are `{provider}-{region}`, so the region carries the worker prefix.
+// Synthetics settings — public locations (meta org) and agent tokens; ids are `{provider}-{region}`, so the region carries the worker prefix.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -79,8 +79,6 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
   async function findLocation(page, id) {
     return (await listLocations(page)).find((l) => l.id === id) ?? null;
   }
-
-  // ------------------------------------------------------------- §7 locations
 
   test('adds a public location from Settings', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const region = uniqueName('loc', testInfo);
@@ -166,8 +164,6 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
     await s.gotoSettings(ORG);
     await s.expectLocationsTabCount(0);
   });
-
-  // ---------------------------------------------------------------- §8 tokens
 
   test('creates then disables a token', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const name = uniqueName('tok', testInfo);
