@@ -185,23 +185,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <template #bottom>
-              <div class="flex w-full items-center justify-between py-2">
-                <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
-                  {{ resultTotal }} {{ t("function.header") }}
-                </div>
-                <OButton
-                  v-if="selectedFunctions.length > 0"
-                  data-test="function-list-delete-functions-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                  icon-left="delete"
-                >
-                  {{ t("common.delete") }}
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="function-list-delete-functions-btn"
+                variant="outline-destructive"
+                size="sm"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+                icon-left="delete"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -475,7 +469,6 @@ export default defineComponent({
     // Bound to the refresh button: always reaches the server.
     const refreshJSTransforms = () => functions.refetch();
 
-    const resultTotal = ref<number>(0);
     const pageSize = ref(20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
 
@@ -674,15 +667,6 @@ export default defineComponent({
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -817,7 +801,6 @@ export default defineComponent({
       lastUpdatedAt,
       refreshJSTransforms,
       forbidden,
-      resultTotal,
       refreshList,
       pageSize,
       pageSizeOptions,
