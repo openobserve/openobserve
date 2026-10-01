@@ -798,8 +798,7 @@ mod tests {
         destination_error_response(err).status()
     }
 
-    /// Runs the test at `path` in a child process with `envs`, because the SSRF allowlist is read
-    /// once per process.
+    /// Runs the test at `path` in a child process, as the SSRF allowlist is read once per process.
     fn isolated<F: Future<Output = ()>>(
         path: &str,
         envs: &[(&str, &str)],

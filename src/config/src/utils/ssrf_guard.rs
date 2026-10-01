@@ -536,8 +536,7 @@ pub fn find_ssrf_refusal<'a>(
     None
 }
 
-/// Whether only the operator allowlist admitted the peer `resp` came from, so its body must not
-/// reach the caller.
+/// Whether only the operator allowlist admits `resp`'s peer, so its body must stay hidden.
 pub fn admitted_only_by_allowlist(resp: &reqwest::Response) -> bool {
     let cfg = crate::get_config();
     admitted_only_by(
@@ -1268,7 +1267,7 @@ mod tests {
                 "https://hooks.example.com/x",
                 Some("10.9.9.9".parse().unwrap())
             ),
-            "a peer the allowlist does not admit either is an egress proxy, as for the strict client"
+            "a peer neither policy admits is an egress proxy, as for the strict client"
         );
     }
 
