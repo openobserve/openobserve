@@ -366,6 +366,10 @@ impl SsrfAllowlist {
         Self { cidrs, hosts }
     }
 
+    fn is_empty(&self) -> bool {
+        self.cidrs.is_empty() && self.hosts.is_empty()
+    }
+
     fn allows_host(&self, host: &str) -> bool {
         self.hosts.iter().any(|h| h.eq_ignore_ascii_case(host))
     }
@@ -532,6 +536,19 @@ pub fn find_ssrf_refusal<'a>(
     None
 }
 
+/// Whether only the operator allowlist admitted the peer `resp` came from, so its body must not
+/// reach the caller.
+pub fn admitted_only_by_allowlist(resp: &reqwest::Response) -> bool {
+    let cfg = crate::get_config();
+    admitted_only_by(
+        resp.url().as_str(),
+        resp.remote_addr().map(|addr| addr.ip()),
+        cfg.common.ssrf_allow_loopback,
+        cfg.common.skip_ssrf_checks,
+        &ALLOWLIST,
+    )
+}
+
 fn build_scoped_client(
     builder: reqwest::ClientBuilder,
     scope: Scope,
@@ -567,6 +584,38 @@ fn build_guarded_client(
         }))
         .dns_resolver(Arc::new(resolver))
         .build()
+}
+
+/// Strict policy refuses `url` at `peer` while the destination policy admits it.
+fn admitted_only_by(
+    url: &str,
+    peer: Option<IpAddr>,
+    allow_loopback: bool,
+    skip_ssrf: bool,
+    configured: &SsrfAllowlist,
+) -> bool {
+    if skip_ssrf || configured.is_empty() {
+        return false;
+    }
+    // Without the connected address the strict policy cannot be confirmed.
+    let Some(peer) = peer else {
+        return true;
+    };
+    let host = url::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_string))
+        .unwrap_or_default();
+    let admits = |allowlist: &SsrfAllowlist| {
+        SsrfGuard::validate_url_inner(url, allow_loopback, false, allowlist).is_ok()
+            && SsrfGuard::check_ip_inner(
+                &peer,
+                allow_loopback,
+                allowlist.allows_host(&host),
+                allowlist,
+            )
+            .is_ok()
+    };
+    !admits(&NO_ALLOWLIST) && admits(configured)
 }
 
 /// Hosts of the env proxies reqwest uses, read the way hyper-util's `Matcher::from_env` reads them.
@@ -1140,6 +1189,87 @@ mod tests {
         assert!(proxy_hosts_from(env(&[("HTTP_PROXY", "")])).is_empty());
         let cgi = env(&[("REQUEST_METHOD", "GET"), ("HTTP_PROXY", "http://p.svc:1")]);
         assert!(proxy_hosts_from(cgi).is_empty());
+    }
+
+    async fn body_server() -> u16 {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nsecret")
+                    .await;
+            }
+        });
+        port
+    }
+
+    #[tokio::test]
+    async fn test_a_peer_only_the_allowlist_admits_is_judged_at_the_connected_address() {
+        let port = body_server().await;
+        let builder = || reqwest::Client::builder().timeout(std::time::Duration::from_secs(5));
+        let by_cidr: &'static SsrfAllowlist =
+            Box::leak(Box::new(SsrfAllowlist::parse("127.0.0.1/32", "")));
+        let client = build_scoped_client(builder(), Scope::Destination, by_cidr).unwrap();
+        let resp = client
+            .get(format!("http://127.0.0.1:{port}/"))
+            .send()
+            .await
+            .unwrap();
+        let peer = resp.remote_addr().map(|addr| addr.ip());
+        assert_eq!(peer, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        let url = resp.url().as_str().to_string();
+        assert!(admitted_only_by(&url, peer, false, false, by_cidr));
+        assert!(!admitted_only_by(&url, peer, true, false, by_cidr));
+        assert!(!admitted_only_by(&url, peer, false, true, by_cidr));
+        assert!(!admitted_only_by(&url, peer, false, false, &none()));
+        assert!(
+            !admitted_only_by_allowlist(&resp),
+            "no allowlist is configured here"
+        );
+
+        let by_host: &'static SsrfAllowlist =
+            Box::leak(Box::new(SsrfAllowlist::parse("", "localhost")));
+        let client = build_scoped_client(builder(), Scope::Destination, by_host).unwrap();
+        let resp = client
+            .get(format!("http://localhost:{port}/"))
+            .send()
+            .await
+            .unwrap();
+        let peer = resp.remote_addr().map(|addr| addr.ip());
+        assert!(admitted_only_by(
+            resp.url().as_str(),
+            peer,
+            false,
+            false,
+            by_host
+        ));
+    }
+
+    #[test]
+    fn test_only_a_strictly_admitted_peer_may_show_its_body() {
+        let allow = SsrfAllowlist::parse("10.1.2.0/24", "svc.internal");
+        let public: IpAddr = "93.184.216.34".parse().unwrap();
+        let private: IpAddr = "10.1.2.3".parse().unwrap();
+        let only = |url: &str, peer| admitted_only_by(url, peer, false, false, &allow);
+        assert!(!only("https://hooks.example.com/x", Some(public)));
+        assert!(only("http://10.1.2.3/x", Some(private)));
+        assert!(
+            only("https://hooks.example.com/x", Some(private)),
+            "a name that rebinds to an allowlisted address is judged by that address"
+        );
+        assert!(only("http://svc.internal/x", Some(public)));
+        assert!(only("https://hooks.example.com/x", None));
+        assert!(
+            !only(
+                "https://hooks.example.com/x",
+                Some("10.9.9.9".parse().unwrap())
+            ),
+            "a peer the allowlist does not admit either is an egress proxy, as for the strict client"
+        );
     }
 
     fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {

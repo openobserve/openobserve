@@ -225,9 +225,12 @@ async fn request(
 
     let resp = req.send().await?;
     let status = resp.status();
+    let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
     let text = resp.text().await.unwrap_or_default();
     if status.is_success() {
         Ok(text)
+    } else if hide_body {
+        Err(anyhow::anyhow!("status {status}"))
     } else {
         Err(anyhow::anyhow!("status {status}: {text}"))
     }

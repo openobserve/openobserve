@@ -3011,8 +3011,12 @@ fn destination_http_client(
     .map_err(|e| e.to_string())
 }
 
+/// Empty for a peer only the operator allowlist admits, since node outputs and errors reach users.
 #[cfg(any(feature = "enterprise", test))]
 async fn read_body_capped(mut res: reqwest::Response, limit: usize) -> String {
+    if config::utils::ssrf_guard::admitted_only_by_allowlist(&res) {
+        return String::new();
+    }
     let mut buf = Vec::new();
     while buf.len() < limit {
         match res.chunk().await {
@@ -5346,6 +5350,50 @@ mod tests {
             },
         };
         assert!(error.contains("not allowed"), "{error}");
+    }
+
+    async fn capped_body_from(base: &str) -> String {
+        let endpoint = config::meta::destinations::Endpoint {
+            url: format!("{base}/ok"),
+            ..Default::default()
+        };
+        let client = destination_http_client(&endpoint, std::time::Duration::from_secs(5)).unwrap();
+        let res = client.post(&endpoint.url).send().await.unwrap();
+        assert!(res.status().is_success());
+        read_body_capped(res, 4096).await
+    }
+
+    #[test]
+    fn test_read_body_capped_hides_a_peer_only_the_allowlist_admits() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::test_read_body_capped_hides_a_peer_only_the_allowlist_admits"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let base = crate::ssrf_test_support::secret_server().await;
+                assert_eq!(capped_body_from(&base).await, "");
+            },
+        );
+    }
+
+    #[test]
+    fn test_read_body_capped_echoes_a_peer_the_strict_policy_admits() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::test_read_body_capped_echoes_a_peer_the_strict_policy_admits"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_SSRF_ALLOW_LOOPBACK", "true"),
+            ],
+            || async {
+                let base = crate::ssrf_test_support::secret_server().await;
+                assert_eq!(capped_body_from(&base).await, "secret");
+            },
+        );
     }
 
     #[tokio::test]
