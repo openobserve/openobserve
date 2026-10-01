@@ -31,6 +31,9 @@ mod progress;
 pub use config::MigrationConfig;
 pub use migrator::{run_file_list, run_meta};
 
+const DEFAULT_EXT_AUTH_SALT: &str = "openobserve";
+const MIN_EXT_AUTH_SALT_LEN: usize = 16;
+
 pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     // warm both pools before the migration starts hitting them
     get_orm_client_ro().await;
@@ -61,6 +64,10 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
             "failed to get db schema version after {MAX_RETRIES} attempts: {e}; refusing to assume a fresh install and run the db upgrade against an unhealthy database"
         ));
     }
+    check_ext_auth_salt(
+        db_schema_version,
+        &::config::get_config().auth.ext_auth_salt,
+    )?;
     if db_schema_version == DB_SCHEMA_VERSION {
         // if version matches, we do not need to run update commands
         log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
@@ -105,4 +112,44 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     log::info!("DB upgrade completed to version {}", DB_SCHEMA_VERSION);
 
     Ok(())
+}
+
+/// Existing installs only warn: rotating the salt breaks logins already derived from it.
+fn check_ext_auth_salt(db_schema_version: u64, salt: &str) -> anyhow::Result<()> {
+    if salt != DEFAULT_EXT_AUTH_SALT && salt.len() >= MIN_EXT_AUTH_SALT_LEN {
+        return Ok(());
+    }
+    if db_schema_version == 0 {
+        return Err(anyhow::anyhow!(
+            "ZO_EXT_AUTH_SALT must be set to a random secret of at least {MIN_EXT_AUTH_SALT_LEN} characters on a new install (for example `openssl rand -hex 32`), and kept the same on every node and restart"
+        ));
+    }
+    log::warn!(
+        "ZO_EXT_AUTH_SALT is the public default or shorter than {MIN_EXT_AUTH_SALT_LEN} characters; presigned and ext-token logins can be forged from a leaked database"
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_new_install_refuses_a_missing_default_or_short_ext_auth_salt() {
+        for salt in ["", DEFAULT_EXT_AUTH_SALT, "short-secret"] {
+            let err = check_ext_auth_salt(0, salt).unwrap_err().to_string();
+            assert!(err.contains("ZO_EXT_AUTH_SALT"), "{salt}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_new_install_accepts_a_random_ext_auth_salt() {
+        assert!(check_ext_auth_salt(0, "3f9c2a7e5b1d8c4f6a0e2b9d7c5a3f1e").is_ok());
+    }
+
+    #[test]
+    fn an_existing_install_keeps_starting_with_the_default_ext_auth_salt() {
+        assert!(check_ext_auth_salt(DB_SCHEMA_VERSION, DEFAULT_EXT_AUTH_SALT).is_ok());
+        assert!(check_ext_auth_salt(1, "").is_ok());
+    }
 }
