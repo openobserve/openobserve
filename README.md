@@ -81,7 +81,7 @@ Get started in minutes without managing infrastructure. The free tier includes u
 ### 🐳 Docker
 
 ```bash
-export ZO_EXT_AUTH_SALT="$(openssl rand -hex 32)"  # save it: the same value must be used on every restart
+export ZO_EXT_AUTH_SALT="$(openssl rand -hex 24)"  # save it: the same value must be used on every restart
 docker run -d \
       --name openobserve \
       -v $PWD/data:/data \

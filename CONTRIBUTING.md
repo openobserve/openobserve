@@ -89,7 +89,7 @@ Create a `.env` file in the root `openobserve` directory (if not already present
 ```env
 ZO_WEB_URL="http://localhost:8081"
 ZO_CORS_ALLOWED_ORIGINS="http://localhost:3000, http://localhost:5173, http://localhost:8081"
-ZO_EXT_AUTH_SALT="<output of openssl rand -hex 32, kept the same across restarts>"
+ZO_EXT_AUTH_SALT="<output of openssl rand -hex 24, kept the same across restarts>"
 ```
 
 Start the backend server:
@@ -100,7 +100,7 @@ ZO_ROOT_USER_EMAIL="root@example.com" ZO_ROOT_USER_PASSWORD="Complexpass#123" ca
 
 This will start the openobserve API server on port 5080
 
-environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when openobserve is started. A new install refuses to start until ZO_EXT_AUTH_SALT is set to a random secret of at least 16 characters; keep the same value across restarts and nodes.
+environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when openobserve is started. A new install refuses to start until ZO_EXT_AUTH_SALT is set to a random secret of 16 to 48 characters (for example `openssl rand -hex 24`); keep the same value across restarts and nodes.
 
 ### UI
 
