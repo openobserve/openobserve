@@ -3659,7 +3659,40 @@
     "dataSource": "Veri Kaynağı",
     "uploadFile": "Dosya Yükle",
     "fromUrl": "URL'den",
-    "addFunction": "Fonksiyon Ekle"
+    "addFunction": "Fonksiyon Ekle",
+    "import": {
+      "title": "Fonksiyon İçe Aktar",
+      "outputMessages": "Çıktı Mesajları",
+      "errorValidations": "Hata Doğrulamaları",
+      "results": "İçe Aktarma Sonuçları",
+      "nameLabel": "Fonksiyon Adı",
+      "nameRequired": "Fonksiyon - {index}: ad gerekli",
+      "nameExists": "Fonksiyon - {index}: \"{name}\" zaten mevcut",
+      "nameInvalid": "Fonksiyon - {index}: \"{name}\" geçerli bir fonksiyon adı değil. Harf, sayı ve alt çizgi kullanın; harf veya alt çizgi ile başlayın.",
+      "duplicateName": "Fonksiyon - {index}: \"{name}\" bu dosyada birden fazla kez geçiyor",
+      "bodyRequired": "Fonksiyon - {index}: fonksiyon gövdesi gerekli",
+      "transTypeInvalid": "Fonksiyon - {index}: tür, VRL için 0 veya JavaScript için 1 olmalıdır",
+      "paramsInvalid": "Fonksiyon - {index}: params bir dize olmalıdır",
+      "transTypeLabel": "Dil",
+      "transTypePlaceholder": "Bir dil seçin",
+      "paramsLabel": "Parametreler",
+      "paramsHint": "Virgülle ayrılmış argüman adları. Varsayılan olarak “row”.",
+      "overrideExisting": "Bunun yerine mevcut fonksiyonu değiştir",
+      "nameInputRequired": "Bir fonksiyon adı girin",
+      "nameInputInvalid": "Harf, sayı ve alt çizgi kullanın; harf veya alt çizgi ile başlayın",
+      "nameInputDuplicate": "Bu dosyadaki başka bir fonksiyon zaten bu adı kullanıyor",
+      "nameInputExists": "Bu ad bu organizasyonda zaten alınmış",
+      "overrideAffects": "Geçersiz kılma şu boru hatlarını da değiştirir: {pipelines}",
+      "createSuccess": "Fonksiyon - {index}: \"{name}\" içe aktarıldı",
+      "overridden": "Fonksiyon - {index}: \"{name}\" geçersiz kılındı",
+      "createFailed": "Fonksiyon - {index}: \"{name}\" başarısız oldu - {reason}",
+      "rejectedBody": "Tanımı düzeltin ve yeniden içe aktarın.",
+      "rejectedLanguage": "Fonksiyon - {index}: \"{name}\" reddedildi. JavaScript fonksiyonuysa dili ayarlayın — dili olmayan bir tanım VRL olarak okunur.",
+      "jsonStringEmpty": "JSON dizesi boş",
+      "invalidJsonFormat": "Geçersiz JSON biçimi",
+      "importSuccess": "{count} fonksiyon içe aktarıldı | {count} fonksiyon içe aktarıldı",
+      "nothingToImport": "İçe aktarılacak fonksiyon bulunamadı. Dosyanın geçerli JSON olduğunu kontrol edin."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Boyutları analiz ediyor...",
@@ -15870,7 +15903,8 @@
       "oncallAck": "Onayla",
       "oncallEscalate": "Yükselt",
       "oncallSnooze": "Ertele",
-      "oncallResolve": "Çöz"
+      "oncallResolve": "Çöz",
+      "functionsImport": "Fonksiyonu içe aktar"
     }
   },
   "components": {
@@ -16482,7 +16516,10 @@
       "enrichmentReloadStarted": "Zenginleştirme tablosu yeniden yükleme başlatıldı. Arka planda işleniyor...",
       "enrichmentJobStarted": "Zenginleştirme tablosu işi başlatıldı. Arka planda işleniyor...",
       "enrichmentCreationFailed": "Zenginleştirme Tablosu oluşturma başarısız oldu",
-      "functionDeletionAssociatedPipelines": "Fonksiyon silme başarısız oldu çünkü pipeline'larla ilişkili. İlişkili pipeline'ları görmek için görüntüle düğmesine tıklayın."
+      "functionDeletionAssociatedPipelines": "Fonksiyon silme başarısız oldu çünkü pipeline'larla ilişkili. İlişkili pipeline'ları görmek için görüntüle düğmesine tıklayın.",
+      "successfullyExportedFunctions": "{count} fonksiyon başarıyla dışa aktarıldı | {count} fonksiyon başarıyla dışa aktarıldı",
+      "errorExportingFunctions": "Fonksiyonlar dışa aktarılırken hata oluştu. Lütfen tekrar deneyin.",
+      "functionsMissingFromExport": "{names} artık listede değil ve dışa aktarmaya dahil edilmedi | {names} artık listede değil ve dışa aktarmaya dahil edilmedi"
     },
     "recommended": {
       "failedToImportDashboard": "Pano içe aktarılamadı: {error}",

@@ -23,13 +23,35 @@ import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-const { mockJsTransformList, mockJsTransformDelete, mockBulkDelete, mockGetAssociatedPipelines } =
-  vi.hoisted(() => ({
-    mockJsTransformList: vi.fn(),
-    mockJsTransformDelete: vi.fn(),
-    mockBulkDelete: vi.fn(),
-    mockGetAssociatedPipelines: vi.fn(),
-  }));
+const {
+  mockJsTransformList,
+  mockJsTransformDelete,
+  mockBulkDelete,
+  mockGetAssociatedPipelines,
+  mockToastFn,
+  mockDownloadFile,
+} = vi.hoisted(() => ({
+  mockJsTransformList: vi.fn(),
+  mockJsTransformDelete: vi.fn(),
+  mockBulkDelete: vi.fn(),
+  mockGetAssociatedPipelines: vi.fn(),
+  mockToastFn: vi.fn(() => () => {}),
+  mockDownloadFile: vi.fn(() => true),
+}));
+
+// Export writes the file straight from the list, so the download is what these
+// tests read instead of a dialog's state.
+vi.mock("@/utils/dom", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return { ...actual, downloadFile: (...args: any[]) => mockDownloadFile(...args) };
+});
+
+// Only `toast` is spied on; everything else in the module stays real, since the
+// components under this tree reach for the rest of it.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return { ...actual, toast: (...args: any[]) => mockToastFn(...args) };
+});
 
 // A plain module mock. The query declarations live in `jstransform.queries.ts`
 // and reach the transport through a normal import, so this replacement is what
@@ -1080,6 +1102,144 @@ describe("FunctionList", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.isUpdated).toBe(true);
+    });
+  });
+
+  // The list query already carries every field the file needs, so export reads
+  // from it rather than fetching each definition again.
+  describe("Export", () => {
+    const mountList = async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    // The file itself is the product, so these read the download rather than a
+    // dialog's state: there is no dialog, and a preview modal for a one-format
+    // export would only stand between the user and the file.
+    const downloadedPayload = () => JSON.parse(mockDownloadFile.mock.calls.at(-1)![1] as string);
+    const downloadedName = () => mockDownloadFile.mock.calls.at(-1)![0] as string;
+
+    it("writes the row's definition straight to a file named after it", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      await vm.exportFunction({ name: "js_func" });
+      await flushPromises();
+
+      expect(downloadedName()).toBe("js_func.json");
+      // A single function is written as an object, not a one-element array —
+      // that is what a hand-written one-function file looks like, and the import
+      // screen takes either.
+      //
+      // `streams` is deliberately absent: the deprecated stream association
+      // names streams that mean nothing in the org this file is imported into.
+      // `numArgs` is absent too: the server derives it from `params`, so
+      // carrying it would put a field in the file that import reads from nowhere.
+      expect(downloadedPayload()).toEqual({
+        name: "js_func",
+        function: "return event;",
+        params: "",
+        transType: 1,
+      });
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("exports every selected row into one dated file", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      vm.selectedFunctionIds = ["func1", "js_func"];
+      await nextTick();
+      await vm.exportSelectedFunctions();
+      await flushPromises();
+
+      expect(downloadedPayload().map((fn: any) => fn.name)).toEqual(["func1", "js_func"]);
+      expect(downloadedName()).toMatch(/^functions-\d{4}-\d{2}-\d{2}\.json$/);
+      // Keeping the ticks after the file is written would leave the next press
+      // exporting rows the user believes they are done with.
+      expect(vm.selectedFunctionIds).toEqual([]);
+    });
+
+    // The row is on screen, so a miss means the cache has moved on rather than
+    // that the function is gone. One re-read before giving up.
+    it("re-reads the list once when a row is missing from the cache", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+      const callsBefore = mockJsTransformList.mock.calls.length;
+
+      mockJsTransformList.mockResolvedValueOnce({
+        data: { list: [...mockFunctionData.data.list, { name: "late_fn", function: ".a = 1" }] },
+      });
+      await vm.exportFunction({ name: "late_fn" });
+      await flushPromises();
+
+      expect(mockJsTransformList.mock.calls.length).toBe(callsBefore + 1);
+      expect(downloadedPayload()).toMatchObject({ name: "late_fn" });
+    });
+
+    // The selection outlives the rows: selectedFunctions is filtered against the
+    // loaded list, so a function deleted elsewhere used to fall out of the file
+    // with nothing said. Export asks for the ids the user actually ticked.
+    it("names the rows it could not find instead of quietly shortening the file", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      vm.selectedFunctionIds = ["func1", "gone_fn"];
+      await nextTick();
+      await vm.exportSelectedFunctions();
+      await flushPromises();
+
+      // One survivor, so the file is the object form rather than a
+      // one-element array.
+      expect(downloadedPayload()).toMatchObject({ name: "func1" });
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "info",
+          message: expect.stringContaining("gone_fn"),
+        }),
+      );
+    });
+
+    it("shows the bulk button busy while the list is being re-read", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      expect(vm.exportLoading).toBe(false);
+      vm.selectedFunctionIds = ["func1"];
+      await nextTick();
+      const done = vm.exportSelectedFunctions();
+      expect(vm.exportLoading).toBe(true);
+      await done;
+      await flushPromises();
+      expect(vm.exportLoading).toBe(false);
+    });
+
+    it("reports a row the re-read cannot find instead of writing an empty file", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+
+      await vm.exportFunction({ name: "gone_fn" });
+      await flushPromises();
+
+      expect(mockDownloadFile).not.toHaveBeenCalled();
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    // A refused download is not an export. Saying it succeeded would leave the
+    // user looking for a file the browser never wrote.
+    it("reports an error when the browser refuses the download", async () => {
+      const wrapper = await mountList();
+      const vm = wrapper.vm as any;
+      mockDownloadFile.mockReturnValueOnce(false);
+
+      await vm.exportFunction({ name: "func1" });
+      await flushPromises();
+
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
   });
 });
