@@ -52,6 +52,9 @@ pub struct Pipeline {
     pub paused_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<PipelineErrorInfo>,
+    /// Set while this enabled realtime pipeline fails to compile, so ingestion bypasses it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_error: Option<String>,
 }
 
 impl Pipeline {
@@ -72,6 +75,7 @@ impl Pipeline {
             edges: meta_pipeline.edges,
             paused_at,
             last_error,
+            load_error: None,
         }
     }
 }
@@ -93,6 +97,7 @@ impl PipelineList {
         pipelines: Vec<meta_pipeline>,
         triggers: Vec<Trigger>,
         errors: HashMap<String, PipelineErrorInfo>,
+        mut load_errors: HashMap<String, String>,
     ) -> Self {
         let triggers_map = triggers
             .into_iter()
@@ -106,7 +111,10 @@ impl PipelineList {
                     .and_then(|trigger| trigger.end_time)
             });
             let last_error = errors.get(&pipeline.id).cloned();
-            list.push(Pipeline::from(pipeline, paused_at, last_error));
+            let load_error = load_errors.remove(&pipeline.id);
+            let mut pipeline = Pipeline::from(pipeline, paused_at, last_error);
+            pipeline.load_error = load_error;
+            list.push(pipeline);
         }
 
         PipelineList { list }
@@ -207,7 +215,7 @@ mod tests {
         let triggers = vec![];
         let errors = HashMap::new();
 
-        let pipeline_list = PipelineList::from(pipelines, triggers, errors);
+        let pipeline_list = PipelineList::from(pipelines, triggers, errors, HashMap::new());
 
         assert_eq!(pipeline_list.list.len(), 0);
     }
@@ -252,13 +260,41 @@ mod tests {
             },
         );
 
-        let pipeline_list = PipelineList::from(pipelines, triggers, errors);
+        let pipeline_list = PipelineList::from(pipelines, triggers, errors, HashMap::new());
 
         assert_eq!(pipeline_list.list.len(), 2);
         assert_eq!(pipeline_list.list[0].id, "id1");
         assert_eq!(pipeline_list.list[1].id, "id2");
         assert!(pipeline_list.list[0].last_error.is_some());
         assert!(pipeline_list.list[1].last_error.is_none());
+    }
+
+    #[test]
+    fn a_pipeline_that_failed_to_load_carries_its_load_error_in_the_list() {
+        let broken = meta_pipeline {
+            id: "broken".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org1".to_string(),
+            name: "broken".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::default()),
+            nodes: vec![],
+            edges: vec![],
+            kind: PipelineKind::User,
+        };
+        let healthy = meta_pipeline {
+            id: "healthy".to_string(),
+            name: "healthy".to_string(),
+            ..broken.clone()
+        };
+        let load_errors = HashMap::from([("broken".to_string(), "denied fn".to_string())]);
+
+        let list = PipelineList::from(vec![broken, healthy], vec![], HashMap::new(), load_errors);
+
+        let json = serde_json::to_value(&list).unwrap();
+        assert_eq!(json["list"][0]["load_error"], "denied fn");
+        assert!(json["list"][1].get("load_error").is_none());
     }
 
     #[test]
@@ -317,6 +353,7 @@ mod tests {
             edges: vec![],
             paused_at: Some(12345),
             last_error: None,
+            load_error: None,
         };
 
         let json = serde_json::to_string(&pipeline).unwrap();
@@ -339,6 +376,7 @@ mod tests {
             edges: vec![],
             paused_at: None,
             last_error: None,
+            load_error: None,
         };
         let json = serde_json::to_value(&pipeline).unwrap();
         assert!(!json.as_object().unwrap().contains_key("last_error"));
@@ -362,6 +400,7 @@ mod tests {
                 error_summary: Some("err".to_string()),
                 node_errors: None,
             }),
+            load_error: None,
         };
         let json = serde_json::to_value(&pipeline).unwrap();
         assert!(json.as_object().unwrap().contains_key("last_error"));

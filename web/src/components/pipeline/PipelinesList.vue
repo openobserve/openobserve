@@ -128,17 +128,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                healthy majority. -->
           <template #cell-state="{ row }">
             <span class="inline-flex min-w-0 items-center gap-1.5">
-              <OTag
-                :variant="stateVariant(row)"
-                size="sm"
-                :data-test="`pipeline-list-${row.name}-state`"
+              <OTooltip
+                :content="loadErrorTooltip(row)"
+                :disabled="!row.load_error"
+                hoverable
+                side="bottom"
               >
-                <template #icon>
-                  <OIcon :name="stateIconName(row)" size="xs" />
-                </template>
-                {{ stateLabel(row) }}
-              </OTag>
-              <span v-if="pipelineState(row) === 'errored'" class="text-text-secondary text-xs">
+                <OTag
+                  :variant="stateVariant(row)"
+                  size="sm"
+                  :data-test="`pipeline-list-${row.name}-state`"
+                >
+                  <template #icon>
+                    <OIcon :name="stateIconName(row)" size="xs" />
+                  </template>
+                  {{ stateLabel(row) }}
+                </OTag>
+              </OTooltip>
+              <span
+                v-if="pipelineState(row) === 'errored' && row.last_error"
+                class="text-text-secondary text-xs"
+              >
                 <OTimeCell
                   :value="row.last_error?.last_error_timestamp"
                   unit="us"
@@ -717,11 +727,11 @@ const currentRouteName = computed(() => {
 const otableColumns = computed(() => columns.value);
 
 // ── Pipeline operational state (single source of truth) ─────────────────────
-// errored → last run reported an error (needs attention, whether or not it runs)
+// errored → failed to load, or last run reported an error (needs attention)
 // active  → enabled and running
 // paused  → disabled
 const pipelineState = (row: any): "errored" | "active" | "paused" => {
-  if (row?.last_error) return "errored";
+  if (row?.load_error || row?.last_error) return "errored";
   return row?.enabled ? "active" : "paused";
 };
 
@@ -734,6 +744,7 @@ const stateIconName = (row: any): IconName => {
   return s === "errored" ? "error-outline" : s === "paused" ? "pause" : "check-circle";
 };
 const stateLabel = (row: any): string => {
+  if (row?.load_error) return t("pipeline_list.stateLoadFailed");
   const s = pipelineState(row);
   return s === "errored"
     ? t("pipeline_list.stateErrored")
@@ -741,6 +752,9 @@ const stateLabel = (row: any): string => {
       ? t("pipeline_list.statePaused")
       : t("pipeline_list.stateActive");
 };
+
+const loadErrorTooltip = (row: any) =>
+  row?.load_error ? t("pipeline_list.loadErrorTooltip", { error: row.load_error }) : undefined;
 
 // Full-row wash for the EXCEPTIONS only — errored gets a light red, paused a
 // muted grey, healthy rows stay clean (their state reads from the green rail).

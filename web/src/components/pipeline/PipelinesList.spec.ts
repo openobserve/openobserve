@@ -20,6 +20,7 @@ import i18n from "@/locales";
 import { nextTick, reactive } from "vue";
 import pipelineService from "@/services/pipelines";
 import { createStore } from "vuex";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Mock services
 vi.mock("@/services/pipelines", async (importOriginal) => {
@@ -378,6 +379,42 @@ describe("PipelinesList", () => {
       wrapper.vm.closeErrorDialog();
 
       expect(wrapper.vm.errorDialog.show).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Load failure state", () => {
+    const brokenPipeline = {
+      ...mockRealtimePipeline,
+      load_error: "call to undefined function get_hostname",
+    };
+
+    it("marks a pipeline the server failed to load as errored and names the failure", () => {
+      expect(wrapper.vm.pipelineState(brokenPipeline)).toBe("errored");
+      expect(wrapper.vm.stateLabel(brokenPipeline)).toBe(
+        i18n.global.t("pipeline_list.stateLoadFailed"),
+      );
+      expect(wrapper.vm.loadErrorTooltip(brokenPipeline)).toContain(brokenPipeline.load_error);
+    });
+
+    it("gives a loaded pipeline no load-failure tooltip", () => {
+      expect(wrapper.vm.loadErrorTooltip(mockRealtimePipeline)).toBeUndefined();
+      expect(wrapper.vm.stateLabel(mockRealtimePipeline)).toBe(
+        i18n.global.t("pipeline_list.stateActive"),
+      );
+    });
+
+    it("counts a pipeline that failed to load in the errored tile", async () => {
+      wrapper.unmount();
+      queryClient.clear();
+      (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
+        data: { list: [brokenPipeline, mockScheduledPipeline] },
+      });
+      wrapper = createWrapper();
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.stateCounts.errored).toBe(1);
     });
   });
 
