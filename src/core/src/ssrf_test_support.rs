@@ -17,8 +17,7 @@
 
 use std::{future::Future, process::Command};
 
-/// Runs the test at `path` (from `module_path!`) in a child process with `envs`; the child runs
-/// `task`.
+/// Runs the test at `path` (a `module_path!` path) in a child process that runs `task`.
 pub(crate) fn isolated<F: Future<Output = ()>>(
     path: &str,
     envs: &[(&str, &str)],
