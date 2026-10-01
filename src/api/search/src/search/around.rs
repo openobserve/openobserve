@@ -333,16 +333,19 @@ mod tests {
 
     #[test]
     fn test_resolve_around_stream_uses_sql_param_table() {
-        let query = sql_query("SELECT * FROM \"victim\"");
-        assert_eq!(resolve_around_stream("allowed", None, &query), "victim");
+        let query = sql_query("SELECT * FROM \"foreign_stream\"");
+        assert_eq!(
+            resolve_around_stream("allowed", None, &query),
+            "foreign_stream"
+        );
     }
 
     #[test]
     fn test_resolve_around_stream_uses_explicit_sql_table() {
         let query = sql_query("SELECT * FROM \"other\"");
         assert_eq!(
-            resolve_around_stream("allowed", Some("SELECT * FROM victim"), &query),
-            "victim"
+            resolve_around_stream("allowed", Some("SELECT * FROM foreign_stream"), &query),
+            "foreign_stream"
         );
     }
 
@@ -360,10 +363,10 @@ mod tests {
     fn test_around_base_sql_reads_only_the_resolved_stream() {
         let name = resolve_around_stream(
             "allowed",
-            Some("SELECT * FROM \"allowed\"\" , \"\"victim\""),
+            Some("SELECT * FROM \"allowed\"\" , \"\"foreign_stream\""),
             &HashMap::new(),
         );
-        assert_eq!(name, "allowed\" , \"victim");
+        assert_eq!(name, "allowed\" , \"foreign_stream");
         assert_eq!(
             resolve_stream_names(&around_base_sql(&name)).unwrap(),
             vec![name]

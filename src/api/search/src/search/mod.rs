@@ -1954,8 +1954,9 @@ mod tests {
     #[test]
     fn test_resolve_typed_stream_names_honours_the_schema_prefix() {
         assert_eq!(
-            resolve_typed_stream_names("SELECT * FROM metrics.victim", StreamType::Logs).unwrap(),
-            vec![("victim".to_string(), StreamType::Metrics)]
+            resolve_typed_stream_names("SELECT * FROM metrics.foreign_stream", StreamType::Logs)
+                .unwrap(),
+            vec![("foreign_stream".to_string(), StreamType::Metrics)]
         );
         assert_eq!(
             resolve_typed_stream_names(

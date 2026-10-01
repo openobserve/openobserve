@@ -497,7 +497,7 @@ pub(crate) mod tests {
             let mut request = basic_request("auth-seeded", "real@example.com", "Realpass#123");
             request
                 .metadata_mut()
-                .insert("user_id", "victim@example.com".parse().unwrap());
+                .insert("user_id", "other-user@example.com".parse().unwrap());
             let request = check(request).unwrap();
             assert_eq!(user_ids(&request), ["real@example.com"]);
         }

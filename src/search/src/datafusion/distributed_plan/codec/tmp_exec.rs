@@ -197,16 +197,12 @@ mod tests {
         let mut writer = FileWriter::try_new(&mut buffer, &schema).unwrap();
         writer.write(&batch).unwrap();
         writer.finish().unwrap();
-        let secret = "files/t9_other_org/secret.arrow";
+        let secret = "files/org_b/secret.arrow";
         infra::storage::put("", secret, buffer.into_inner().into())
             .await
             .unwrap();
 
-        for path in [
-            secret,
-            "join/../files/t9_other_org/secret.arrow",
-            "/join/x.arrow",
-        ] {
+        for path in [secret, "join/../files/org_b/secret.arrow", "/join/x.arrow"] {
             let plan: Arc<dyn ExecutionPlan> = Arc::new(TmpExec::new(
                 "trace".to_string(),
                 config::get_cluster_name(),

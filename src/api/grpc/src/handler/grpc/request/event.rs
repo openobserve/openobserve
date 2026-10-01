@@ -310,7 +310,7 @@ mod tests {
         for addr in ["http://10.9.0.1:5081", "http://10.9.0.2:5081"] {
             assert_eq!(resolve_peer(addr).await.as_deref(), Some(addr));
         }
-        for addr in ["http://10.9.0.3:5081", "http://attacker.example:5081", ""] {
+        for addr in ["http://10.9.0.3:5081", "http://unlisted.example:5081", ""] {
             assert_eq!(resolve_peer(addr).await, None, "{addr}");
         }
     }

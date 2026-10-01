@@ -467,7 +467,7 @@ mod tests {
         };
         let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(strings)]).unwrap();
         let data = serialize_record_batches(schema.clone(), vec![Arc::new(batch)]).unwrap();
-        let key = "aggregations/t9_org/logs/invalid_ipc/0_1.arrow";
+        let key = "aggregations/org_a/logs/invalid_ipc/0_1.arrow";
         let path = disk::get_file_path(key).unwrap();
         std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
         std::fs::write(&path, data).unwrap();

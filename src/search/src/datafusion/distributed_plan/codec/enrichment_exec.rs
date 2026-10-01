@@ -124,7 +124,7 @@ mod tests {
 
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let outside = tempfile::tempdir().unwrap();
-        let table_dir = outside.path().join("stolen");
+        let table_dir = outside.path().join("outside_table");
         std::fs::create_dir_all(&table_dir)?;
         let batch =
             RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![7]))])?;
@@ -136,12 +136,18 @@ mod tests {
         writer.write(&batch)?;
         writer.close()?;
         // the OS only resolves `..` through directories that exist, as they do on a live node
-        std::fs::create_dir_all(get_table_dir("t9_org"))?;
+        std::fs::create_dir_all(get_table_dir("org_a"))?;
         let up = "../".repeat(64);
         let outside_rel = outside.path().to_str().unwrap().trim_start_matches('/');
         let cases = [
-            ("t9_org".to_string(), format!("{up}{outside_rel}/stolen")),
-            (format!("t9_org/{up}{outside_rel}"), "stolen".to_string()),
+            (
+                "org_a".to_string(),
+                format!("{up}{outside_rel}/outside_table"),
+            ),
+            (
+                format!("org_a/{up}{outside_rel}"),
+                "outside_table".to_string(),
+            ),
         ];
 
         for (org_id, stream_name) in cases {

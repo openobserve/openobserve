@@ -1575,25 +1575,25 @@ mod tests {
             std::process::id()
         );
         std::fs::write(&secret, b"TOP SECRET").unwrap();
-        let evil = format!("../escape_target_{}.txt", std::process::id());
-        assert!(file_data.get(&evil, None).await.is_none());
-        assert!(file_data.get_size(&evil).await.is_none());
+        let escaping = format!("../escape_target_{}.txt", std::process::id());
+        assert!(file_data.get(&escaping, None).await.is_none());
+        assert!(file_data.get_size(&escaping).await.is_none());
         assert!(file_data.get("/etc/hosts", None).await.is_none());
         let _ = std::fs::remove_file(&secret);
     }
 
     #[test]
     fn get_file_path_rejects_keys_escaping_cache_root() {
-        for evil in [
+        for escaping in [
             "../../etc/passwd",
             "files/../../../etc/passwd",
             "aggregations/../../../../etc/passwd",
             "/etc/passwd",
         ] {
-            let resolved = get_file_path(evil);
+            let resolved = get_file_path(escaping);
             assert!(
                 resolved.is_none(),
-                "{evil} resolved outside the cache root: {resolved:?}"
+                "{escaping} resolved outside the cache root: {resolved:?}"
             );
         }
         let legit = "aggregations/default/logs/t/hash/1000_2000.arrow";
@@ -1614,7 +1614,7 @@ mod tests {
     async fn set_rejects_key_escaping_cache_root() {
         let tmp = tempfile::tempdir().unwrap();
         let mut file_data = temp_root_file_data(&tmp);
-        let (_, tmp_file) = write_tmp_file("x", Bytes::from("evil")).await.unwrap();
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("data")).await.unwrap();
 
         let ret = file_data.set("files/../../x", &tmp_file, 4).await;
 
@@ -1632,7 +1632,7 @@ mod tests {
         let outside = tmp.path().join("outside");
         std::fs::create_dir_all(&outside).unwrap();
         std::os::unix::fs::symlink(&outside, tmp.path().join("cache").join("files")).unwrap();
-        let (_, tmp_file) = write_tmp_file("x", Bytes::from("evil")).await.unwrap();
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("data")).await.unwrap();
 
         let ret = file_data
             .set("files/default/logs/x.parquet", &tmp_file, 4)
@@ -1650,7 +1650,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_size_rejects_key_escaping_cache_root() {
-        let key = "files/../../t9_set_size_escape.parquet";
+        let key = "files/../../set_size_escape.parquet";
 
         let ret = set_size(key, 1).await;
 
