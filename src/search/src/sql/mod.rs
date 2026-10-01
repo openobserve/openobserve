@@ -93,7 +93,15 @@ impl Sql {
             .search_event_type
             .as_ref()
             .and_then(|s| SearchEventType::try_from(s.as_str()).ok());
-        Self::new(query, &req.org_id, req.stream_type, search_event_type).await
+        Self::resolve(
+            query,
+            &req.org_id,
+            req.stream_type,
+            search_event_type,
+            false,
+            req.chat_history_reader,
+        )
+        .await
     }
 
     pub async fn new(
@@ -112,6 +120,25 @@ impl Sql {
         search_event_type: Option<SearchEventType>,
         extract_patterns: bool,
     ) -> Result<Sql, Error> {
+        Self::resolve(
+            query,
+            org_id,
+            stream_type,
+            search_event_type,
+            extract_patterns,
+            false,
+        )
+        .await
+    }
+
+    async fn resolve(
+        query: &SearchQuery,
+        org_id: &str,
+        stream_type: StreamType,
+        search_event_type: Option<SearchEventType>,
+        extract_patterns: bool,
+        marked_chat_history_reader: bool,
+    ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
         let offset = query.from as i64;
@@ -121,6 +148,21 @@ impl Sql {
         // 1. get table name
         let stream_names = resolve_stream_names_with_type(&sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
+        // Every data query is resolved here, whoever issues it (UI, dashboards,
+        // alerts, reports, scheduled pipelines). The AI chat-events stream holds
+        // every user's conversations; only the Chat API reader may query it, and
+        // to anyone else it does not exist.
+        let chat_history_reader = marked_chat_history_reader
+            || config::meta::self_reporting::ai_chat::is_chat_history_reader();
+        if !chat_history_reader
+            && let Some(protected) = stream_names.iter().find(|s| {
+                config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.stream_name())
+            })
+        {
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                protected.stream_name(),
+            )));
+        }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
             let stream_name = stream.stream_name();
