@@ -332,7 +332,10 @@ const orgId = computed(() =>
   String(store.state.selectedOrganization?.identifier ?? route.query.org_identifier ?? ""),
 );
 const promptQuery = useQuery(() => ({
-  ...llmPromptsQuery(orgId.value),
+  ...llmPromptsQuery(
+    orgId.value,
+    folderScope.value === "current" ? activeFolderId.value : undefined,
+  ),
   enabled: Boolean(orgId.value),
 }));
 const settingsQuery = useQuery(() => ({

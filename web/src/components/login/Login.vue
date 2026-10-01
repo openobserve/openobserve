@@ -49,31 +49,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 9.375rem; max-height: 1.9375rem"
           />
         </span>
-        <img
+        <a
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-          "
-          :src="
-            isDark
-              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-              : getImageURL('images/common/openobserve_latest_light_2.svg')
-          "
-        />
+          href="https://openobserve.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            class="appLogo h-auto"
+            :style="
+              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+            "
+            :src="
+              isDark
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
+            :alt="t('login.openObserveLogoAlt')"
+          />
+        </a>
       </div>
       <div class="mb-4 flex justify-center" v-else>
-        <img
-          class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-          "
-          :src="
-            isDark
-              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-              : getImageURL('images/common/openobserve_latest_light_2.svg')
-          "
-        />
+        <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
+          <img
+            class="appLogo h-auto"
+            :style="
+              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+            "
+            :alt="t('login.openObserveLogoAlt')"
+            :src="
+              isDark
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
+          />
+        </a>
       </div>
 
       <div v-if="autoRedirectDexLogin">
