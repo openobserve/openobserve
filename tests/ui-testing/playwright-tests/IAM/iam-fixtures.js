@@ -22,6 +22,34 @@ const req = async (page, method, path, data) => {
     return { status: resp.status(), body: await resp.json().catch(() => ({})) };
 };
 
+/**
+ * A request made AS the user signed in to `page` — NOT as root.
+ *
+ * `req()` above attaches getAuthHeaders(), which on self-hosted is Basic auth for
+ * ZO_ROOT_USER_EMAIL (set in CI). Root bypasses every permission check, so an
+ * enforcement assertion sent that way proves nothing about the role under test.
+ * The A-0x tests get away with it only because the browser context's session cookie
+ * currently wins over that header — an undocumented precedence this suite must not
+ * depend on. If it ever flipped, every "user X is denied" test would quietly start
+ * passing as root: green, and worthless.
+ *
+ * So send NO Authorization header at all. Identity then comes solely from the
+ * session cookie `page.request` inherits from loginAs(), which is the same thing the
+ * ENT api-tests do (rbac/utils.py logs in via POST auth/login and carries the
+ * session). Use this for every "can this user do X" assertion.
+ */
+const reqAs = async (page, method, path, data) => {
+    const resp = await page.request.fetch(`${api()}/${org()}${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        ...(data ? { data } : {}),
+    });
+    return { status: resp.status(), body: await resp.json().catch(() => ({})) };
+};
+
+/** Did this request succeed? Anything >= 400 counts as denied. */
+const allowed = (res) => res.status < 400;
+
 const listRoles = async (page) => (await req(page, 'GET', '/roles')).body || [];
 const listGroups = async (page) => (await req(page, 'GET', '/groups')).body || [];
 const getGroup = async (page, name) => (await req(page, 'GET', `/groups/${name}`)).body || {};
@@ -131,7 +159,7 @@ const rbacEnabled = async (page) => {
 
 module.exports = {
     loginAs, MEMBER_PASSWORD, createMember, sweepUsers, rbacEnabled,
-    PREFIX, uniq, org, api, req,
+    PREFIX, uniq, org, api, req, reqAs, allowed,
     listRoles, listGroups, getGroup, listUsers, getPerms,
     createRole, setRolePerms, setGroup, createGroupApi, sweepRoles,
 };
