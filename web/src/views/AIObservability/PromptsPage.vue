@@ -44,7 +44,6 @@
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-prompt-list"
-        :footer-title="t('aiObservability.nav.prompts')"
         class="h-full w-full"
         data-test="prompt-table"
         @row-click="(row) => openDetail(row)"

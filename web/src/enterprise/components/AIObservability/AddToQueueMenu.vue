@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else
         :variant="variant"
-        size="sm-toolbar"
+        :size="size"
         icon-left="add"
         :loading="busy"
         :data-test="dataTest"
@@ -131,7 +131,7 @@ import type { DropdownSide } from "@/lib/overlay/Dropdown/ODropdown.types";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
+import type { ButtonSize, ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type { DiscoveryScope } from "@/services/llm-discovery.service";
 import type { LlmQueue } from "@/services/llm-queues.service";
 
@@ -146,6 +146,8 @@ const props = withDefaults(
     loading?: boolean;
     busy?: boolean;
     variant?: ButtonVariant;
+    /** Size of the labelled trigger; a table footer passes "sm" to match its other bulk actions. */
+    size?: ButtonSize;
     /** Compact trigger: an icon + caret button group; `label` becomes its tooltip. */
     compact?: boolean;
     /** Which way the menu opens — "top" only where the trigger sits at the page foot. */
@@ -160,6 +162,7 @@ const props = withDefaults(
     loading: false,
     busy: false,
     variant: "outline",
+    size: "sm-toolbar",
     compact: false,
     side: "bottom",
     splitAction: false,
