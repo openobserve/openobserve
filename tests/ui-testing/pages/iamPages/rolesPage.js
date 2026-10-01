@@ -88,6 +88,22 @@ export class RolesPage {
         this.summaryEmpty = page.locator('[data-test="edit-role-summary-empty"]');
         this.summaryLoading = page.locator('[data-test="edit-role-summary-loading"]');
 
+        // ---------- pane pagination (OTable's own controls, not the pane's) ----------
+        this.panePageSize = page.locator('[data-test="o2-table-page-size-select"]');
+        this.paneNextPage = page.locator('[data-test="o2-table-next-page-btn"]');
+        this.panePrevPage = page.locator('[data-test="o2-table-prev-page-btn"]');
+        this.panePaginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
+        this.panePagination = page.locator('[data-test^="o2-table-pagination-"]').first();
+
+        // ---------- tabs ----------
+        this.tabs = page.locator('[data-test="edit-role-tabs"]');
+
+        // ---------- leaving with unsaved changes ----------
+        // ConfirmDialog renders inside ODialog, so the buttons carry the dialog's slugs.
+        this.leaveConfirm = page.locator('[data-test="confirm-dialog"]');
+        this.leaveConfirmOk = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.leaveConfirmCancel = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+
         // ---------- unsaved drawer ----------
         this.drawer = page.locator('[data-test="edit-role-unsaved-drawer"]');
 
@@ -193,6 +209,20 @@ export class RolesPage {
     }
     summaryModules() {
         return this.page.locator('[data-test^="edit-role-summary-module-"]');
+    }
+
+    /** The "N Inside" badge on a folder or stream-type row that holds item grants. */
+    paneInside(nodeName) {
+        return this.page.locator(`[data-test="edit-role-module-pane-inside-${nodeName}"]`);
+    }
+
+    /** A tab header. AppTabs slugs them `tab-<value>`: permissions | users | serviceAccounts. */
+    tab(value) {
+        return this.page.locator(`[data-test="tab-${value}"]`);
+    }
+    /** The per-tab unsaved dot. Only that tab's own changes raise it. */
+    tabDirtyDot(value) {
+        return this.page.locator(`[data-test="tab-${value}-dirty-dot"]`);
     }
 
     drawerChange(changeId) {
@@ -319,6 +349,32 @@ export class RolesPage {
     }
     grantEntity(name, action) {
         return this.setCheckbox(this.entityCheckbox(name, action), true);
+    }
+
+    async switchTab(value) {
+        await this.tab(value).click();
+        await expect(this.tab(value)).toHaveAttribute('data-state', 'active', { timeout: 10000 })
+            .catch(() => {});
+    }
+
+    /** Opens a folder or stream-type row, descending one level in the pane. */
+    async openNode(nodeName) {
+        await this.openEntity(nodeName).click();
+        await expect(this.paneBack).toBeVisible({ timeout: 15000 });
+    }
+
+    /** Current rows-per-page, read from OTable's select rather than assumed. */
+    async pageSize() {
+        const txt = (await this.panePageSize.innerText().catch(() => '')) || '';
+        const n = txt.match(/\d+/);
+        return n ? Number(n[0]) : null;
+    }
+
+    async setPageSize(size) {
+        await this.panePageSize.click();
+        // OSelect renders its options in a portal, so match on the visible option text.
+        await this.page.getByRole('option', { name: String(size), exact: true }).click();
+        await expect.poll(async () => await this.pageSize(), { timeout: 10000 }).toBe(size);
     }
 
     // ================= save =================

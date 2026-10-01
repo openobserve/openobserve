@@ -22,6 +22,7 @@ const testLogger = require('../utils/test-logger.js');
 const {
     PREFIX, req, reqAs, allowed, listRoles, listUsers, createRole, setRolePerms,
     sweepRoles, sweepUsers, loginAs, MEMBER_PASSWORD, uniq, org,
+    createDashboardFolder, createDashboardIn, sweepDashboardFolders,
 } = require('./iam-fixtures.js');
 
 const obj = (resource) => `${resource}:_all_${org()}`;
@@ -35,6 +36,19 @@ const U_STREAM = `${PREFIX}_e_stream@example.com`;   // one stream, by name
 const U_TYPE = `${PREFIX}_e_type@example.com`;       // a whole module
 const U_PAIR = `${PREFIX}_e_pair@example.com`;       // two grants, one removed later
 const U_BASE = `${PREFIX}_e_base@example.com`;       // nothing, ever — the baseline
+
+const U_FOLDER = `${PREFIX}_e_folder@example.com`;   // a whole dashboard folder
+const U_ITEM = `${PREFIX}_e_item@example.com`;       // one dashboard inside a folder
+
+const R_FOLDER = `${PREFIX}_e_role_folder`;
+const R_ITEM = `${PREFIX}_e_role_item`;
+
+// One folder holding two dashboards, plus a dashboard in a second folder. Both
+// halves are needed: the neighbour proves a grant does not widen within a folder,
+// the other folder proves it does not widen across folders.
+const F_MAIN = `${PREFIX}_e_folder_main`;
+const F_AWAY = `${PREFIX}_e_folder_away`;
+let fMain, fAway, dGranted, dNeighbour, dAway;
 
 const R_STREAM = `${PREFIX}_e_role_stream`;
 const R_TYPE = `${PREFIX}_e_role_type`;
@@ -96,14 +110,26 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
             // Base role `user` carries nothing, so the custom role is the whole of
             // each account's access. `admin` would make every assertion pass for the
             // wrong reason.
-            for (const email of [U_STREAM, U_TYPE, U_PAIR, U_BASE]) {
+            fMain = await createDashboardFolder(page, F_MAIN);
+            fAway = await createDashboardFolder(page, F_AWAY);
+            dGranted = await createDashboardIn(page, fMain, `${PREFIX}_e_dash_granted`);
+            dNeighbour = await createDashboardIn(page, fMain, `${PREFIX}_e_dash_neighbour`);
+            dAway = await createDashboardIn(page, fAway, `${PREFIX}_e_dash_away`);
+            if (!dGranted || !dNeighbour || !dAway) {
+                throw new Error('dashboard seeding returned no id — the create response shape changed');
+            }
+
+            for (const email of [U_STREAM, U_TYPE, U_PAIR, U_BASE, U_FOLDER, U_ITEM]) {
                 await req(page, 'POST', '/users', {
                     email, password: MEMBER_PASSWORD,
                     first_name: 'IAM', last_name: 'Enforce', role: 'user',
                 });
             }
 
-            for (const [role, user] of [[R_STREAM, U_STREAM], [R_TYPE, U_TYPE], [R_PAIR, U_PAIR]]) {
+            for (const [role, user] of [
+                [R_STREAM, U_STREAM], [R_TYPE, U_TYPE], [R_PAIR, U_PAIR],
+                [R_FOLDER, U_FOLDER], [R_ITEM, U_ITEM],
+            ]) {
                 await createRole(page, role);
                 await req(page, 'PUT', `/roles/${role}`, {
                     add: [], remove: [], add_users: [user], remove_users: [],
@@ -127,6 +153,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
             for (const stream of [S_GRANTED, S_OTHER]) {
                 await req(page, 'DELETE', `/streams/${stream}?type=logs`).catch(() => {});
             }
+            await sweepDashboardFolders(page);
             const roles = await sweepRoles(page);
             const users = await sweepUsers(page);
             testLogger.info(`teardown removed ${roles.length} roles, ${users.length} users`);
@@ -239,6 +266,73 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
                 .toBe(false);
             // The point of the test: removing one grant must not disturb the other.
             expect(allowed(await readGranted(after)), 'removing one grant revoked the other too').toBe(true);
+        } finally {
+            await root.close();
+        }
+    });
+
+    // ---------------- flow 2 ----------------
+
+    test('E-02 · List on a folder lists it, All on the folder also opens what is inside', {
+        tag: ['@iam', '@iamRolesEnforcement', '@P0', '@all']
+    }, async ({ browser }) => {
+        const readFolder = (page) => reqAs(page, 'GET', `/dashboards?folder=${fMain}`);
+        const openInside = (page) => reqAs(page, 'GET', `/dashboards/${dGranted}?folder=${fMain}`);
+        const openAway = (page) => reqAs(page, 'GET', `/dashboards/${dAway}?folder=${fAway}`);
+
+        const root = await browser.newPage();
+        try {
+            // List on the folder: see the folder's contents listed, but not open one.
+            const listGrant = [{ object: `dfolder:${fMain}`, permission: 'AllowList' }];
+            await setRolePerms(root, R_FOLDER, listGrant);
+
+            const listOnly = await signIn(browser, U_FOLDER);
+            await expect.poll(async () => allowed(await readFolder(listOnly)), { timeout: 20000 }).toBe(true);
+            expect(allowed(await openInside(listOnly)),
+                'List on a folder was enough to OPEN a dashboard inside it').toBe(false);
+            expect(allowed(await openAway(listOnly)),
+                'a grant on one folder reached a dashboard in another').toBe(false);
+
+            // All on the same folder: both the listing and the contents.
+            await setRolePerms(root, R_FOLDER, [{ object: `dfolder:${fMain}`, permission: 'AllowAll' }], listGrant);
+
+            const all = await signIn(browser, U_FOLDER);
+            await expect.poll(async () => allowed(await openInside(all)), { timeout: 30000 }).toBe(true);
+            expect(allowed(await readFolder(all)), 'All on a folder lost the listing it had with List').toBe(true);
+            // The boundary that matters most: All is still folder-scoped.
+            expect(allowed(await openAway(all)),
+                'All on one folder reached a dashboard in another folder').toBe(false);
+        } finally {
+            await root.close();
+        }
+    });
+
+    // ---------------- flow 3 ----------------
+
+    test('E-03 · a grant on one dashboard opens only that dashboard', {
+        tag: ['@iam', '@iamRolesEnforcement', '@P0', '@all']
+    }, async ({ browser }) => {
+        const root = await browser.newPage();
+        try {
+            // The two-id object shape: the item is addressed through its folder.
+            await setRolePerms(root, R_ITEM, [
+                { object: `dashboard:${fMain}/${dGranted}`, permission: 'AllowGet' },
+            ]);
+
+            const page = await signIn(browser, U_ITEM);
+            await expect
+                .poll(async () => allowed(await reqAs(page, 'GET', `/dashboards/${dGranted}?folder=${fMain}`)),
+                    { timeout: 20000 })
+                .toBe(true);
+
+            expect(
+                allowed(await reqAs(page, 'GET', `/dashboards/${dNeighbour}?folder=${fMain}`)),
+                'a grant on one dashboard leaked to its neighbour in the same folder',
+            ).toBe(false);
+            expect(
+                allowed(await reqAs(page, 'GET', `/dashboards?folder=${fMain}`)),
+                'a single-dashboard grant allowed listing the whole folder',
+            ).toBe(false);
         } finally {
             await root.close();
         }

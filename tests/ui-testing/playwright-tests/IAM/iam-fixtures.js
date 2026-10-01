@@ -142,6 +142,53 @@ const sweepUsers = async (page) => {
     return removed;
 };
 
+// ---------- dashboard folders, for the folder-scoped grant shapes ----------
+//
+// Folders are the only grant shape whose object carries two ids
+// (`<type>:<folderId>/<itemId>`), so List-vs-All on a folder and a grant on one
+// item inside it cannot be tested with flat resources.
+
+/** Returns the generated folderId — grants are keyed on it, never on the name. */
+const createDashboardFolder = async (page, name) => {
+    const { status, body } = await req(page, 'POST', '/v2/folders/dashboards', {
+        name, description: 'iam automation',
+    });
+    if (status >= 400) throw new Error(`create dashboard folder ${name}: ${status}`);
+    return body.folderId;
+};
+
+/** Returns the generated dashboardId. */
+const createDashboardIn = async (page, folderId, title) => {
+    const resp = await page.request.post(
+        `${api()}/${org()}/dashboards?folder=${folderId}`,
+        { headers: getAuthHeaders(), data: { title, description: 'iam automation', panels: [] } },
+    );
+    const body = await resp.json().catch(() => ({}));
+    if (resp.status() >= 400) throw new Error(`create dashboard ${title}: ${resp.status()}`);
+    // The id lives at different depths across versions; take whichever is present.
+    return body.v1?.dashboardId ?? body.dashboardId ?? body.v2?.dashboardId ?? body.id;
+};
+
+const listDashboardFolders = async (page) =>
+    (await req(page, 'GET', '/v2/folders/dashboards')).body?.list ?? [];
+
+const sweepDashboardFolders = async (page) => {
+    const removed = [];
+    for (const f of await listDashboardFolders(page)) {
+        if (typeof f?.name === 'string' && f.name.startsWith(PREFIX)) {
+            // Dashboards inside must go first, or the folder delete is refused.
+            const dashes = (await req(page, 'GET', `/dashboards?folder=${f.folderId}`)).body?.dashboards ?? [];
+            for (const d of dashes) {
+                const id = d.v1?.dashboardId ?? d.dashboardId ?? d.id;
+                if (id) await req(page, 'DELETE', `/dashboards/${id}?folder=${f.folderId}`).catch(() => {});
+            }
+            await req(page, 'DELETE', `/v2/folders/dashboards/${f.folderId}`).catch(() => {});
+            removed.push(f.name);
+        }
+    }
+    return removed;
+};
+
 /**
  * Is RBAC on for this build? Asked of the API, deliberately — NOT by waiting for a
  * tab to appear.
@@ -162,4 +209,5 @@ module.exports = {
     PREFIX, uniq, org, api, req, reqAs, allowed,
     listRoles, listGroups, getGroup, listUsers, getPerms,
     createRole, setRolePerms, setGroup, createGroupApi, sweepRoles,
+    createDashboardFolder, createDashboardIn, listDashboardFolders, sweepDashboardFolders,
 };
