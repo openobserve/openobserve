@@ -13142,7 +13142,6 @@
         "usedByIntro": "このスコアラーを参照しているジョブと実験。",
         "usedByEmpty": "このスコアラーを参照しているジョブまたは実験はまだありません。",
         "usedByExperiment": "実験",
-        "versionsIntro": "バージョンは、スコアラー設定の変更不可能なスナップショットです。有効なバージョンは、現在ジョブが実行しているものです。",
         "lastUpdated": "最終更新",
         "metadataSection": "メタデータ",
         "createdLabel": "作成日",

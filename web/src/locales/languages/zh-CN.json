@@ -13142,7 +13142,6 @@
         "usedByIntro": "引用此评分器的作业和实验。",
         "usedByEmpty": "尚无作业或实验引用此评分器。",
         "usedByExperiment": "实验",
-        "versionsIntro": "版本是评分器配置的不可变快照。活动版本是任务当前运行的版本。",
         "lastUpdated": "最后更新",
         "metadataSection": "元数据",
         "createdLabel": "创建于",

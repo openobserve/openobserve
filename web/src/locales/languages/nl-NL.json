@@ -13142,7 +13142,6 @@
         "usedByIntro": "Taken en experimenten die naar deze scorer verwijzen.",
         "usedByEmpty": "Er zijn nog geen taken of experimenten die naar deze scorer verwijzen.",
         "usedByExperiment": "Experiment",
-        "versionsIntro": "Versies zijn onveranderlijke momentopnamen van de scorerconfiguratie. De actieve versie is wat taken vandaag uitvoeren.",
         "lastUpdated": "Laatst bijgewerkt",
         "metadataSection": "Metadata",
         "createdLabel": "Aangemaakt",

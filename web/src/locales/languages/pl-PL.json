@@ -13142,7 +13142,6 @@
         "usedByIntro": "Zadania i eksperymenty, które odwołują się do tego scorera.",
         "usedByEmpty": "Żadne zadania ani eksperymenty nie odwołują się jeszcze do tego scorera.",
         "usedByExperiment": "Eksperyment",
-        "versionsIntro": "Wersje są niezmiennymi migawkami konfiguracji skorera. Aktywna wersja to ta, którą zadania uruchamiają dzisiaj.",
         "lastUpdated": "Ostatnia aktualizacja",
         "metadataSection": "Metadane",
         "createdLabel": "Utworzono",

@@ -13142,7 +13142,6 @@
         "usedByIntro": "Tarefas e experimentos que fazem referência a este avaliador.",
         "usedByEmpty": "Ainda não há tarefas ou experimentos que referenciem este avaliador.",
         "usedByExperiment": "Experimento",
-        "versionsIntro": "As versões são snapshots imutáveis da configuração do avaliador. A versão ativa é a que os trabalhos executam hoje.",
         "lastUpdated": "Última atualização",
         "metadataSection": "Metadados",
         "createdLabel": "Criado",

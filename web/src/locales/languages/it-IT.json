@@ -13142,7 +13142,6 @@
         "usedByIntro": "Job ed esperimenti che fanno riferimento a questo scorer.",
         "usedByEmpty": "Nessun job o esperimento fa ancora riferimento a questo scorer.",
         "usedByExperiment": "Esperimento",
-        "versionsIntro": "Le versioni sono istantanee immutabili della configurazione dello scorer. La versione attiva è quella che i processi eseguono oggi.",
         "lastUpdated": "Ultimo aggiornamento",
         "metadataSection": "Metadati",
         "createdLabel": "Creato",

@@ -13142,7 +13142,6 @@
         "usedByIntro": "Tâches et expériences qui référencent ce scorer.",
         "usedByEmpty": "Aucune tâche ni expérience ne référence encore ce scorer.",
         "usedByExperiment": "Expérience",
-        "versionsIntro": "Les versions sont des instantanés immuables de la configuration de l'évaluateur. La version active est celle que les tâches exécutent actuellement.",
         "lastUpdated": "Dernière mise à jour",
         "metadataSection": "Métadonnées",
         "createdLabel": "Créé",

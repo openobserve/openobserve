@@ -13142,7 +13142,6 @@
         "usedByIntro": "Trabajos y experimentos que hacen referencia a este evaluador.",
         "usedByEmpty": "Ningún trabajo ni experimento hace referencia a este evaluador todavía.",
         "usedByExperiment": "Experimento",
-        "versionsIntro": "Las versiones son instantáneas inmutables de la configuración del evaluador. La versión activa es la que ejecutan los trabajos hoy.",
         "lastUpdated": "Última actualización",
         "metadataSection": "Metadatos",
         "createdLabel": "Creado",

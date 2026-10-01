@@ -13142,7 +13142,6 @@
         "usedByIntro": "Jobs und Experimente, die auf diesen Scorer verweisen.",
         "usedByEmpty": "Bisher verweisen keine Jobs oder Experimente auf diesen Scorer.",
         "usedByExperiment": "Experiment",
-        "versionsIntro": "Versionen sind unveränderliche Snapshots der Scorer-Konfiguration. Die aktive Version ist die, die Aufträge heute ausführen.",
         "lastUpdated": "Zuletzt aktualisiert",
         "metadataSection": "Metadaten",
         "createdLabel": "Erstellt",
