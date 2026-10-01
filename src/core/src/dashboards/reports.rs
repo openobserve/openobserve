@@ -55,7 +55,10 @@ use lettre::{
 };
 use reqwest::Client;
 
-use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz, short_url};
+use crate::{
+    alerts::alert::TZ_OFFSET_RANGE_MINUTES, auth::is_ofga_unsupported, common::meta::authz::Authz,
+    short_url,
+};
 
 /// Errors that can occur when interacting with reports.
 #[derive(Debug, thiserror::Error)]
@@ -104,6 +107,12 @@ pub enum ReportError {
 
     #[error(transparent)]
     ParseCronError(#[from] cron::error::Error),
+
+    #[error("Report tz_offset must be strictly between -1440 and 1440 minutes")]
+    TzOffsetOutOfRange,
+
+    #[error("Report cron schedule '{cron}' has no future occurrence")]
+    CronHasNoFutureOccurrence { cron: String },
 
     #[error(transparent)]
     DbError(anyhow::Error),
@@ -160,17 +169,7 @@ pub async fn save(
         return Err(ReportError::NameContainsForwardSlash);
     }
 
-    if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let now = chrono::Utc::now().second();
-        report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
-        // Check if the cron expression is valid
-        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
-            return Err(ReportError::ParseCronError(e));
-        }
-    } else if report.frequency.interval == 0 {
-        report.frequency.interval = 1;
-    }
+    validate_schedule(&mut report)?;
 
     match db::dashboards::reports::get(conn, org_id, folder_id, &report.name).await {
         Ok(old_report) => {
@@ -1039,6 +1038,27 @@ fn bind_to_path_org(report: &mut Report, org_id: &str) -> Result<(), ReportError
     Ok(())
 }
 
+/// Normalises a report's schedule and rejects one the scheduler could not evaluate.
+fn validate_schedule(report: &mut Report) -> Result<(), ReportError> {
+    if !TZ_OFFSET_RANGE_MINUTES.contains(&report.tz_offset) {
+        return Err(ReportError::TzOffsetOutOfRange);
+    }
+    if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let now = chrono::Utc::now().second();
+        report.frequency.cron =
+            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
+        let schedule = Schedule::from_str(&report.frequency.cron)?;
+        if schedule.upcoming(chrono::Utc).next().is_none() {
+            return Err(ReportError::CronHasNoFutureOccurrence {
+                cron: report.frequency.cron.clone(),
+            });
+        }
+    } else if report.frequency.interval == 0 {
+        report.frequency.interval = 1;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1178,6 +1198,49 @@ mod tests {
     fn test_report_error_db_error() {
         let err = ReportError::DbError(anyhow::anyhow!("connection refused"));
         assert!(err.to_string().contains("connection refused"));
+    }
+
+    fn scheduled(tz_offset: i32, cron: &str) -> Report {
+        let mut report = Report {
+            tz_offset,
+            ..Default::default()
+        };
+        report.frequency.frequency_type = ReportFrequencyType::Cron;
+        report.frequency.cron = cron.to_string();
+        report
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_full_day_tz_offset() {
+        for tz_offset in [1440, -1440, i32::MAX, i32::MIN] {
+            let err = validate_schedule(&mut scheduled(tz_offset, "0 0 * * * *"));
+            assert!(
+                matches!(err, Err(ReportError::TzOffsetOutOfRange)),
+                "{tz_offset}: {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_cron_with_no_future_occurrence() {
+        let err = validate_schedule(&mut scheduled(0, "0 0 0 1 1 * 2020"));
+        assert!(
+            matches!(err, Err(ReportError::CronHasNoFutureOccurrence { .. })),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn validate_schedule_accepts_values_at_their_bounds() {
+        for tz_offset in [-1439, 0, 1439] {
+            let mut report = scheduled(tz_offset, "0 0 * * * *");
+            assert!(validate_schedule(&mut report).is_ok(), "{tz_offset}");
+        }
+        let mut report = Report::default();
+        report.frequency.frequency_type = ReportFrequencyType::Hours;
+        report.frequency.interval = 0;
+        assert!(validate_schedule(&mut report).is_ok());
+        assert_eq!(report.frequency.interval, 1);
     }
 
     #[test]

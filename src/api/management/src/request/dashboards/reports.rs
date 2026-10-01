@@ -1072,6 +1072,24 @@ mod tests {
         assert_eq!(status(ReportError::NoDestinations), StatusCode::BAD_REQUEST);
     }
 
+    #[test]
+    fn test_tz_offset_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(ReportError::TzOffsetOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_cron_has_no_future_occurrence_is_bad_request() {
+        assert_eq!(
+            status(ReportError::CronHasNoFutureOccurrence {
+                cron: "0 0 0 1 1 * 2020".to_string()
+            }),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
     // 404 Not Found
     #[test]
     fn test_report_not_found_is_not_found() {
