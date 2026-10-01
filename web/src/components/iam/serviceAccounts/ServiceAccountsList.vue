@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('serviceAccounts.header')"
           sorting="client"
           selection="multiple"
           :selected-ids="selectedAccountEmails"
@@ -243,13 +242,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </template>
 
-          <template #bottom>
-            <span class="text-xs font-normal max-md:hidden"
-              >{{ serviceAccountsState.service_accounts_users.length }}
-              {{ t("serviceAccounts.header") }}</span
-            >
+          <template #selection-actions>
             <OButton
-              v-if="selectedAccounts.length > 0"
               data-test="service-accounts-list-delete-accounts-btn"
               variant="outline-destructive"
               size="sm"
@@ -609,7 +603,6 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const { track } = useReo();
-    const resultTotal = ref<number>(0);
     const confirmDelete = ref<boolean>(false);
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
@@ -904,7 +897,6 @@ export default defineComponent({
     };
 
     const applyServiceAccounts = (accounts: any[]) => {
-      resultTotal.value = accounts.length;
       currentUserRole.value = "";
       serviceAccountsState.service_accounts_users = accounts.map((data: any) => {
         return {
@@ -1087,7 +1079,6 @@ export default defineComponent({
               ...serviceAccountsState.service_accounts_users,
               user,
             ];
-            resultTotal.value = serviceAccountsState.service_accounts_users.length;
           }
         } else {
           setTimeout(() => {

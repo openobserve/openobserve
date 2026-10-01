@@ -57,7 +57,6 @@ const o2Stubs = {
       "filterMode",
       "defaultColumns",
       "showGlobalFilter",
-      "footerTitle",
       "dense",
     ],
   },

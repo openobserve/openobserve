@@ -322,20 +322,6 @@ describe("EnrichmentTableList", () => {
       expect(vm.visibleRows.length).toBe(1);
       expect(vm.visibleRows[0].name).toBe("url_table");
     });
-
-    it("resultTotal updates when visibleRows changes", async () => {
-      const wrapper = mountComponent();
-      await flushPromises();
-
-      setupTables(wrapper);
-      const vm = wrapper.vm as any;
-      vm.selectedFilter = "uploaded";
-
-      // Allow computed + watcher to flush
-      await flushPromises();
-
-      expect(vm.resultTotal).toBe(1);
-    });
   });
 
   // ── text search ────────────────────────────────────────────────────────────

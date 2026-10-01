@@ -5546,12 +5546,6 @@ export default defineComponent({
   border-top: none;
 }
 
-/* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
-.saved-view-table
-  :deep([data-test="o2-table-pagination-bottom"] [data-test="o2-table-pagination-actions"]) {
-  display: none;
-}
-
 /* Query editor placeholder text styling is global (styles/tailwind.css) —
    shared with traces, RUM sessions, RUM error tracking, and alerts. */
 </style>

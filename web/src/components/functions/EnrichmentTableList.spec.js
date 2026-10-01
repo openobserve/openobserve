@@ -644,14 +644,12 @@ describe("EnrichmentTableList Component", () => {
     it("handles organization change in pipeline view", async () => {
       // Setup initial state
       wrapper.vm.jsTransforms = [{ name: "old-table" }];
-      wrapper.vm.resultTotal = 10;
       mockRouter.currentRoute.value.name = "pipeline";
 
       // Trigger watcher
       await wrapper.vm.$options.watch.selectedOrg.call(wrapper.vm, "new-org", "old-org");
       await flushPromises();
 
-      expect(wrapper.vm.resultTotal).toBe(0);
       expect(wrapper.vm.jsTransforms).toEqual([]);
       expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false, false, true);
     });

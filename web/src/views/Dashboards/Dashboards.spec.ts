@@ -236,7 +236,7 @@ const buildGlobalConfig = (
     OTable: {
       name: "OTable",
       template:
-        '<div data-test-stub="o-table"><slot name="toolbar" /><slot name="toolbar-trailing" /><slot name="empty" /><slot name="bottom" /></div>',
+        '<div data-test-stub="o-table"><slot name="toolbar" /><slot name="toolbar-trailing" /><slot name="empty" /><slot name="selection-actions" /></div>',
     },
     OEmptyState: true,
     OInput: true,
@@ -561,7 +561,7 @@ describe("Dashboards.vue", () => {
       expect(Array.isArray(wrapper.vm.dashboards)).toBe(true);
     });
 
-    it("should compute resultTotal correctly", async () => {
+    it("should list every dashboard of the active folder", async () => {
       // Create a store with dashboard data
       const testStore = createMockStore();
       testStore.state.organizationData.allDashboardList = {
@@ -597,7 +597,30 @@ describe("Dashboards.vue", () => {
       await nextTick();
       await nextTick();
 
-      expect(wrapper.vm.resultTotal).toBe(3);
+      expect(wrapper.vm.dashboards).toHaveLength(3);
+    });
+  });
+
+  describe("Table footer", () => {
+    it("hands the bulk actions to the table's selection footer", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      // Read from the component tree: this suite mocks document.createElement, so there is no DOM to query.
+      const actions = wrapper
+        .findComponent({ name: "OTable" })
+        .findAllComponents({ name: "OButton" })
+        .map((button: any) => button.vm.$attrs["data-test"]);
+      expect(actions).toEqual(
+        expect.arrayContaining([
+          "dashboard-list-move-across-folders-btn",
+          "dashboard-list-export-dashboards-btn",
+          "dashboard-list-delete-dashboards-btn",
+        ]),
+      );
     });
   });
 
@@ -653,7 +676,6 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showFavoritesOnly).toBe(true);
       expect(wrapper.vm.dashboards).toHaveLength(1);
       expect(wrapper.vm.dashboards[0].id).toBe("dash2");
-      expect(wrapper.vm.resultTotal).toBe(1);
 
       wrapper.vm.updateActiveFolderId("default");
       await nextTick();

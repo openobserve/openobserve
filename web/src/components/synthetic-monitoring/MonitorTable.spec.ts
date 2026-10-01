@@ -51,7 +51,7 @@ const OTableStub = {
           <slot name="cell-actions" :row="row" />
         </div>
       </template>
-      <slot name="bottom" />
+      <slot v-if="selectedIds.length > 0" name="selection-actions" />
     </div>
   `,
   props: {
@@ -61,7 +61,6 @@ const OTableStub = {
     selectedIds: { type: Array, default: () => [] },
     rowKey: { type: String, default: "id" },
     dataTest: { type: String, default: "" },
-    footerTitle: { type: String, default: "" },
     emptyMessage: { type: String, default: "" },
   },
 };
@@ -172,7 +171,6 @@ function getOTableProps(wrapper: VueWrapper) {
     data: stub.props("data") as any[],
     loading: stub.props("loading") as boolean,
     selectedIds: stub.props("selectedIds") as string[],
-    footerTitle: stub.props("footerTitle") as string,
   };
 }
 
@@ -277,18 +275,6 @@ describe("MonitorTable", () => {
       const { columns } = getOTableProps(wrapper);
       const ids = columns.map((c) => c.id);
       expect(ids).not.toContain("folder_name");
-    });
-
-    it("should pass default footerTitle when not provided", () => {
-      wrapper = mountMonitorTable();
-      const { footerTitle } = getOTableProps(wrapper);
-      expect(footerTitle).toBe("Checks");
-    });
-
-    it("should pass custom footerTitle when provided", () => {
-      wrapper = mountMonitorTable({ footerTitle: "Monitors" });
-      const { footerTitle } = getOTableProps(wrapper);
-      expect(footerTitle).toBe("Monitors");
     });
   });
 
@@ -533,33 +519,6 @@ describe("MonitorTable", () => {
       expect(enableBtn.attributes("disabled")).toBeDefined();
       const triggerBtn = wrapper.find('[data-test="monitor-table-trigger-selected-btn"]');
       expect(triggerBtn.attributes("disabled")).toBeDefined();
-    });
-  });
-
-  // ── Footer text ───────────────────────────────────────────────────────
-
-  describe("footer", () => {
-    it("should show selection count when rows are selected", () => {
-      wrapper = mountMonitorTable({
-        selectedIds: ["mon-http-1", "mon-tcp-1"],
-      });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("2 of 4 selected");
-    });
-
-    it("should show total count when no rows are selected", () => {
-      wrapper = mountMonitorTable({ selectedIds: [] });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("4 Checks");
-    });
-
-    it("should show custom footerTitle in total count", () => {
-      wrapper = mountMonitorTable({
-        selectedIds: [],
-        footerTitle: "HTTP Monitors",
-      });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("4 HTTP Monitors");
     });
   });
 

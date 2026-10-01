@@ -114,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :total-count-exact="!hasMore"
       :page-size="rowsPerPage"
       :page-size-options="rowsPerPageOptions"
-      :footer-title="t('traces.sessionsList.sessions')"
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="ai-sessions-list"

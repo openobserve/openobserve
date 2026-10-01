@@ -305,7 +305,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="rowsPerPage"
             :page-size-options="rowsPerPageOptions"
-            :footer-title="t('traces.servicesCatalog.footerTitle')"
             table-id="services-catalog"
             data-test="services-catalog-table"
             @row-click="(row) => handleRowClick(row)"

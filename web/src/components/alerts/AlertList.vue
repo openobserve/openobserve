@@ -734,65 +734,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
 
-              <template #bottom>
-                <div class="flex h-12 w-full items-center justify-between gap-1">
-                  <div class="flex min-w-25 items-center text-xs font-normal">
-                    <template v-if="selectedAlerts.length > 0"
-                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
-                      {{ t("alerts.selectedLabel") }}</template
-                    >
-                    <span v-else class="max-md:hidden"
-                      >{{ resultTotal }} {{ t("alerts.header") }}</span
-                    >
-                  </div>
-
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-move-across-folders-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="drive-file-move"
-                    @click="moveMultipleAlerts"
-                    >{{ t("common.move") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-export-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="download"
-                    @click="multipleExportAlert"
-                    >{{ t("common.export") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-pause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="pause"
-                    @click="bulkToggleAlerts('pause')"
-                    >{{ t("alerts.pause") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-unpause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="play-arrow"
-                    @click="bulkToggleAlerts('resume')"
-                    >{{ t("alerts.resume") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-delete-alerts-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    icon-left="delete"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                    >{{ t("common.delete") }}</OButton
-                  >
-                </div>
+              <template #selection-actions>
+                <OButton
+                  data-test="alert-list-move-across-folders-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="drive-file-move"
+                  @click="moveMultipleAlerts"
+                  >{{ t("common.move") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-export-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="download"
+                  @click="multipleExportAlert"
+                  >{{ t("common.export") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-pause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="pause"
+                  @click="bulkToggleAlerts('pause')"
+                  >{{ t("alerts.pause") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-unpause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="play-arrow"
+                  @click="bulkToggleAlerts('resume')"
+                  >{{ t("alerts.resume") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-delete-alerts-btn"
+                  variant="outline-destructive"
+                  size="sm"
+                  icon-left="delete"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                  >{{ t("common.delete") }}</OButton
+                >
               </template>
             </OTable>
           </div>
@@ -2479,10 +2462,6 @@ export default defineComponent({
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
-    const resultTotal = computed(function () {
-      return displayedAlerts.value?.length;
-    });
-
     // No timezone suffix in this table, unlike the other lists.
     const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
@@ -3747,7 +3726,6 @@ export default defineComponent({
       selectedDelete,
       updateStreams,
       updateStreamName,
-      resultTotal,
       refreshList,
       pageSize,
       pageSizeOptions,

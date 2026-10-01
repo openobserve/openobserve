@@ -13,7 +13,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
@@ -89,7 +89,6 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   globalFilterPlaceholder: undefined,
   filterMode: "client",
   defaultColumns: true,
-  footerTitle: raw(""),
   totalCountExact: true,
   showHeader: true,
   fillHeight: true,
@@ -1712,55 +1711,10 @@ defineExpose({
         />
       </div>
 
-      <!-- ── Bottom Pagination (with optional bulk actions slot) ──
-           Skipped when `customPaginationBar` is set: the caller's #bottom slot
-           owns the whole pagination bar (rendered standalone below). -->
-      <OTablePagination
-        v-if="pagination.isEnabled.value && !props.customPaginationBar"
-        position="bottom"
-        :current-page="pagination.currentPage.value"
-        :total-pages="pagination.totalPages.value"
-        :total-count="pagination.totalCount.value"
-        :total-count-exact="props.totalCountExact"
-        :page-size="pagination.pageSize.value"
-        :page-size-options="pagination.pageSizeOptions.value"
-        :showing-from="pagination.showingFrom.value"
-        :showing-to="pagination.showingTo.value"
-        :is-first-page="pagination.isFirstPage.value"
-        :is-last-page="pagination.isLastPage.value"
-        :title="props.footerTitle"
-        :loading="heldLoading"
-        @update:page-size="pagination.setPageSize"
-        @first-page="pagination.firstPage"
-        @prev-page="pagination.prevPage"
-        @next-page="pagination.nextPage"
-        @last-page="pagination.lastPage"
-      >
-        <!-- OTablePagination authoritatively swaps the slot for a skeleton when
-           its `loading` prop is true, so we can always pass the slot. -->
-        <template v-if="slots.bottom" #actions>
-          <slot
-            name="bottom"
-            :current-page="pagination.currentPage.value"
-            :page-size="pagination.pageSize.value"
-            :total-pages="pagination.totalPages.value"
-            :total-rows="pagination.totalCount.value"
-            :is-first-page="pagination.isFirstPage.value"
-            :is-last-page="pagination.isLastPage.value"
-            :set-page-size="pagination.setPageSize"
-            :first-page="pagination.firstPage"
-            :prev-page="pagination.prevPage"
-            :next-page="pagination.nextPage"
-            :last-page="pagination.lastPage"
-          />
-        </template>
-      </OTablePagination>
-
-      <!-- Standalone #bottom slot, so a caller's footer is never dropped when
-           pagination is disabled. -->
-      <div v-else-if="slots.bottom" data-test="o2-table-bottom">
+      <!-- A caller-drawn pager replaces the built-in bar and is kept with pagination off, where it may still carry a row count. -->
+      <div v-if="slots['pagination-bar']" data-test="o2-table-pagination-bar">
         <slot
-          name="bottom"
+          name="pagination-bar"
           :current-page="pagination.currentPage.value"
           :page-size="pagination.pageSize.value"
           :total-pages="pagination.totalPages.value"
@@ -1774,6 +1728,35 @@ defineExpose({
           :last-page="pagination.lastPage"
         />
       </div>
+
+      <OTablePagination
+        v-else-if="pagination.isEnabled.value"
+        position="bottom"
+        :current-page="pagination.currentPage.value"
+        :total-pages="pagination.totalPages.value"
+        :total-count="pagination.totalCount.value"
+        :total-count-exact="props.totalCountExact"
+        :page-size="pagination.pageSize.value"
+        :page-size-options="pagination.pageSizeOptions.value"
+        :showing-from="pagination.showingFrom.value"
+        :showing-to="pagination.showingTo.value"
+        :is-first-page="pagination.isFirstPage.value"
+        :is-last-page="pagination.isLastPage.value"
+        :loading="heldLoading"
+        :selected-count="selection.selectedCount.value"
+        @update:page-size="pagination.setPageSize"
+        @first-page="pagination.firstPage"
+        @prev-page="pagination.prevPage"
+        @next-page="pagination.nextPage"
+        @last-page="pagination.lastPage"
+      >
+        <template v-if="slots['selection-actions']" #selection-actions>
+          <slot name="selection-actions" />
+        </template>
+        <template v-if="slots['footer-note']" #footer-note>
+          <slot name="footer-note" />
+        </template>
+      </OTablePagination>
     </div>
     <!-- /bordered wrapper -->
   </div>

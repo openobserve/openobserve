@@ -256,17 +256,6 @@ describe("FunctionList", () => {
       expect(vm.jsTransforms).toHaveLength(3);
     });
 
-    it("should set resultTotal after loading", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      expect(vm.resultTotal).toBe(3);
-    });
-
     it("should handle load error for non-403 status", async () => {
       mockJsTransformList.mockRejectedValue({ response: { status: 500 } });
 
@@ -825,21 +814,6 @@ describe("FunctionList", () => {
       const vm = wrapper.vm as any;
       vm.filterQuery = "zzz_no_match_xyz";
       expect(vm.hasVisibleRows).toBe(false);
-    });
-
-    it("should update resultTotal when visibleRows changes", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      expect(vm.resultTotal).toBe(3);
-
-      vm.filterQuery = "func1";
-      await flushPromises();
-      expect(vm.resultTotal).toBe(1);
     });
   });
 

@@ -336,25 +336,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OEmptyState>
             </div>
           </template>
-          <template #bottom="scope">
-            <div class="flex w-full items-center justify-between py-2">
-              <div class="flex w-full items-center text-xs font-normal">
-                <span class="max-md:hidden">
-                  {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
-                </span>
-                <OButton
-                  v-if="selectedIds.length > 0"
-                  icon-left="delete"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  class="ms-4"
-                  :disabled="isDeleting"
-                  @click="confirmBatchDeleteAction"
-                >
-                  {{ isDeleting ? t("common.deleting") : t("common.delete") }}
-                </OButton>
-              </div>
-            </div>
+          <template #selection-actions>
+            <OButton
+              icon-left="delete"
+              variant="outline-destructive"
+              size="sm"
+              :disabled="isDeleting"
+              @click="confirmBatchDeleteAction"
+            >
+              {{ isDeleting ? t("common.deleting") : t("common.delete") }}
+            </OButton>
           </template>
         </OTable>
       </div>
@@ -504,7 +495,6 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const confirmBatchDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
-    const resultTotal = ref<number>(0);
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
@@ -717,7 +707,6 @@ export default defineComponent({
     // Rows only — the one-time side effects below run on the fresh result, so
     // a cached paint never re-opens the schema dialog or re-warms the next page.
     const applyStreams = (res: any) => {
-      resultTotal.value = res.list.length;
       totalCount.value = res.total;
       logStream.value = [];
 
@@ -1045,7 +1034,6 @@ export default defineComponent({
 
       const removedCount = before - logStream.value.length;
       totalCount.value = Math.max(0, totalCount.value - removedCount);
-      resultTotal.value = logStream.value.length;
 
       selectedIds.value = [];
 
@@ -1367,7 +1355,6 @@ export default defineComponent({
       streamRowStyle,
       summaryStats,
       summaryLoading,
-      resultTotal,
       listSchema,
       deleteStream,
       deleteBatchStream,

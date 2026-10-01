@@ -145,7 +145,6 @@ const baseStubs = {
       "toggleLoadingMap",
       "triggerLoadingMap",
       "bulkActionLoading",
-      "footerTitle",
       "emptyMessage",
       "hasFilters",
     ],

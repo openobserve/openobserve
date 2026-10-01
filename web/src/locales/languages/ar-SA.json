@@ -2188,7 +2188,6 @@
     "syntheticsTokensDesc": "رموز o2syn_ على مستوى المؤسسة التي يستخدمها وكلاء الاصطناع الخاصون لسحب المهام",
     "serviceAccountsName": "اسم حساب الخدمة",
     "basicUsers": "المستخدمون",
-    "organizationMembers": "أعضاء المؤسسة",
     "invitations": "الدعوات",
     "quota": "الحصص",
     "externalUserWarningTitle": "تحذير المستخدم الخارجي",
@@ -2471,7 +2470,6 @@
       "memberUpdatedSuccessfully": "تم تحديث عضو المنظمة بنجاح."
     },
     "user": {
-      "organizationMembers": "أعضاء المؤسسة",
       "delete": "حذف",
       "failedToLoadCustomRoles": "فشل في تحميل الأدوار المخصصة.",
       "pleaseWaitLoadingUsers": "يرجى الانتظار أثناء تحميل المستخدمين...",
@@ -2677,7 +2675,6 @@
     "fetchingFunctions": "وظائف الجلب...",
     "associateFunction": "وظيفة الشريك",
     "noFunctionsFound": "لم يتم العثور على دوال",
-    "streamsUnit": "{count} البث | {count} التدفق",
     "deleteAssociatedAlertsPipelinesBatch": "حذف جميع مسارات المعالجة والتنبيهات المرتبطة بالتدفقات المحددة",
     "allFieldsCount": "جميع الحقول ({count})",
     "performanceFieldsDialog": {
@@ -2790,7 +2787,6 @@
       "showList": "إظهار قائمة التشغيلات"
     },
     "history": {
-      "button": "السلاسل",
       "title": "تاريخ سير العمل",
       "started": "بدأ",
       "ended": "انتهى",
@@ -3349,7 +3345,6 @@
     "actionCannotBeUndone": "لا يمكن التراجع عن هذا الإجراء أو إلغاؤه بمجرد إنشاء الوظيفة.",
     "areYouSureProceed": "هل أنت متأكد أنك تريد المتابعة؟",
     "clearFilters": "المرشحات الشفافة",
-    "backfillJobLabel": "{count} وظيفة ملء | {count} وظائف ملء الخلفية",
     "chunksUnit": "القطع",
     "never": "أبدا",
     "jobTooltipLabel": "العمل",
@@ -3368,7 +3363,6 @@
     "functionName": "اسم الوظيفة",
     "remoteDestination": "وجهة بعيدة",
     "failedToLoadPipeline": "فشل تحميل مسار المعالجة",
-    "header": "مسارات المعالجة",
     "subtitle": "تحويل وثراء ومسار البيانات أثناء الطيران",
     "deleteNode": "حذف",
     "addPipeline": "خط أنابيب جديد",
@@ -5480,7 +5474,6 @@
       "dynamicVariables": "المتغيرات الديناميكية"
     },
     "dashboards": {
-      "selected": "{count} تم اختياره",
       "failedToLoadFolder": "فشل في تحميل لوحات المعلومات للمجلد المحدد.",
       "pleaseWait": "يرجى الانتظار...",
       "copySuffix": "{title} - نسخة",
@@ -6836,7 +6829,6 @@
     "reloadAlertsTooltip": "تنبيهات إعادة التحميل",
     "triggerDetection": "اكتشاف الزناد",
     "retrain": "إعادة التدريب",
-    "selectedLabel": "مختار",
     "resume": "السيرة الذاتية",
     "deleteAlertTitle": "حذف تنبيه",
     "deleteAlertMessage": "هل أنت متأكد أنك تريد حذف هذا التنبيه؟",
@@ -7460,7 +7452,6 @@
       "noCondition": "لا يوجد حالة",
       "noHistoryAvailable": "لا يوجد سجل تقييم متوفر لهذا التنبيه",
       "tryExpandingTimeRange": "حاول توسيع نطاق الزمن",
-      "results": "النتائج",
       "ifCondition": "إذا {condition}"
     },
     "historyTable": {
@@ -7932,8 +7923,6 @@
     "prebuiltDestination": "وجهة {type} جاهزة",
     "errorValidations": "التحقق من الأخطاء",
     "outputMessagesLabel": "رسائل الإخراج",
-    "incidentSingular": "الحادث",
-    "incidentPlural": "الحوادث",
     "confirmDeleteTemplates": "هل أنت متأكد أنك تريد حذف {count} القالب؟ | هل أنت متأكد أنك تريد حذف {count} القالب؟",
     "lastOutcome": "النتيجة الأخيرة",
     "priority": "الأولوية",
@@ -8288,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "قالب التصدير",
-    "selected": "مختار",
     "deleteTemplateTitle": "حذف القالب",
     "deleteTemplateMessage": "هل أنت متأكد أنك تريد حذف القالب؟",
     "deleteTemplatesTitle": "حذف القوالب",
@@ -8542,7 +8530,6 @@
     "deleteDestinationTitle": "حذف الوجهة",
     "deleteDestinationMessage": "هل أنت متأكد أنك تريد حذف الوجهة؟",
     "deleteDestinationsTitle": "حذف الوجهات",
-    "selected": "مختار",
     "organizationLabel": "المؤسسة",
     "defaultPlaceholder": "مثلا، الافتراضي",
     "streamNameLabel": "اسم التدفق",
@@ -9350,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "مفاتيح التشفير للحقول الحساسة",
-      "selected": "{count} تم اختياره",
       "delete": "حذف",
       "deleteCipherKeyTitle": "حذف مفتاح التشفير",
       "deleteCipherKeyMessage": "هل أنت متأكد أنك تريد حذف مفتاح الشيفرة؟",
@@ -9945,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "البث",
-      "sessions": "الجلسات",
       "failedToLoad": "فشل تحميل الجلسات",
       "retry": "إعادة المحاولة",
       "tokenTooltip": "الإدخال: {input} · المخرج: {output} · الإجمالي: {total}",
@@ -10057,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "لم يتم اكتشاف أي تدفقات",
       "tabLabel": "كتالوج الخدمة",
-      "footerTitle": "الخدمات",
       "filterPlaceholder": "فلتر حسب اسم الخدمة...",
       "columns": {
         "serviceName": "الخدمة",
@@ -10626,7 +10610,6 @@
     "create_regex_pattern_field": "حذف / إسقاط باستخدام Regex",
     "import": "الاستيراد",
     "import_title": "نمط الاستيراد",
-    "bottom_header": "أنماط {count} | {count} الأنماط",
     "filter_by_tag": "التصفية حسب الوسم",
     "refresh": "تحديث",
     "loading_patterns": "أنماط التحميل...",
@@ -10682,7 +10665,6 @@
     "get_history": "احصل على التاريخ",
     "executed_at": "تم إعدامه في",
     "sql_query": "SQL استعلام",
-    "results": "النتائج",
     "delayMessage": "قد يتأخر تاريخ البحث بواسطة"
   },
   "correlation": {
@@ -10825,7 +10807,6 @@
     "function_definition": "تعريف الدالة",
     "more_details": "مزيد من التفاصيل",
     "query_function": "الاستعلام / الوظيفة",
-    "results": "النتائج",
     "max_limit": "الحد الأقصى",
     "cancel_job_title": "إلغاء البحث المجدول",
     "cancel_job_message": "هل أنت متأكد أنك تريد إلغاء هذا البحث المجدول؟",
@@ -10932,9 +10913,6 @@
     "testBtn": "اختبار",
     "importBtn": "الاستيراد",
     "newModel": "النموذج الجديد",
-    "modelsCount": "{count} موديلات",
-    "exportSelected": "التصدير ({count})",
-    "deleteSelected": "حذف ({count})",
     "importTitle": "تسعير نموذج الاستيراد",
     "errorValidations": "التحقق من الأخطاء",
     "outputMessages": "رسائل الإخراج",
@@ -11452,11 +11430,6 @@
         "trace": "آثار",
         "session": "الجلسات"
       },
-      "scopeNoun": {
-        "span": "الامتدادات",
-        "trace": "آثار",
-        "session": "الجلسات"
-      },
       "inQueueFilter": {
         "label": "في قائمة الانتظار",
         "notEnqueued": "في الطابور: غير مدعوم للانتظار",
@@ -11502,16 +11475,12 @@
         "sectionTitle": "إضافة إلى قائمة الانتظار",
         "manageQueues": "إدارة الطوابير"
       },
-      "bulkAdd": "أضف {count} إلى قائمة الانتظار",
-      "selectedCount": "{selected} من {total} المختارين",
-      "footerTitle": "{scope} غير صحي",
       "addSuccess": "بالإضافة إلى {queue} — الصف يبقى في ديسكفري، وحالته موجودة في الطابور.",
       "addError": "فشل في إضافة عناصر إلى قائمة الانتظار",
       "openQueue": "الطابور المفتوح",
       "queuesError": "فشل في تحميل قوائم الانتظار"
     },
     "queues": {
-      "listTitle": "طوابير",
       "searchPlaceholder": "طوابير البحث...",
       "newButton": "الطابور الجديد",
       "loadError": "فشل في تحميل قوائم الانتظار",
@@ -11570,7 +11539,6 @@
         "targetDataset": "مجموعة البيانات المستهدفة",
         "noTargetDataset": "لا توجد مجموعة بيانات مستهدفة",
         "searchPlaceholder": "عناصر البحث...",
-        "footerTitle": "العناصر",
         "allItems": "الجميع",
         "inTrace": "في تريس {traceId}",
         "reviewAgain": "مراجعة مرة أخرى",
@@ -11995,7 +11963,6 @@
       "clearBaseline": "مسح خط الأساس"
     },
     "datasets": {
-      "listTitle": "مجموعات البيانات",
       "searchPlaceholder": "مجموعات بيانات البحث...",
       "newButton": "مجموعة بيانات جديدة",
       "loadError": "فشل في تحميل مجموعات البيانات",
@@ -12039,7 +12006,6 @@
         "fallbackTitle": "مجموعة البيانات",
         "meta": "{count} الأصناف · تحديث {updated}",
         "loadError": "فشل في تحميل مجموعة البيانات",
-        "footerTitle": "العناصر",
         "tabs": {
           "items": "العناصر",
           "experiments": "التجارب"
@@ -12176,8 +12142,6 @@
       "summaryAgents": "الوكلاء المتأثرون",
       "failuresTitle": "تصنيف الفشل",
       "failuresHint": "الأخطاء مجمعة حسب النوع، لكل وكيل",
-      "footerLoops": "الحلقات",
-      "footerFailures": "فئات الفشل",
       "noLoops": "لم يتم اكتشاف سلوك تكراري في هذا النطاق",
       "noFailures": "لا توجد أعطال في العوامل في هذا النطاق",
       "noLoopsForAgent": "لا يوجد سلوك تكرار لكل {agent} في هذا النطاق — مثل تبديل الوكيل أو توسيع نطاق الزمن",
@@ -12244,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "المهام عن بعد",
       "searchPlaceholder": "مهام البحث",
       "newButton": "مهمة جديدة",
       "loadError": "تعذر تحميل المهام البعيدة",
@@ -12892,7 +12855,6 @@
         "title": "درجات التقييم",
         "hint": "الدرجات والمنطق تأتي من _llm_scores. اختر سلسلة لفتح مسار المقيم لمزيد من التحقيق.",
         "filterLabel": "درجات تقييم المرشحات",
-        "footerTitle": "درجات التقييم",
         "noThresholdHint": "حدد عتبة صحية في هذا التكوين لتصنيف وتسليط الضوء على الدرجات غير الصحية.",
         "noReasoning": "لم يتم تسجيل أي سبب",
         "unknownAgent": "وكيل غير معروف",
@@ -12917,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "نظرة عامة على إعدادات النقاط",
         "searchPlaceholder": "إعدادات الفلتر...",
         "relativeTime": {
           "daysAgo": "منذ {day}d",
@@ -13045,7 +13006,6 @@
         "updatedLabel": "تحديث"
       },
       "createTitle": "تكوين الموسيقى الجديدة",
-      "listTitle": "إعدادات النقاط",
       "searchPlaceholder": "إعدادات البحث",
       "newButton": "تكوين جديد للموسيقى الموسيقية",
       "columns": {
@@ -13122,9 +13082,6 @@
         "errors": {
           "title": "أخطاء التحقق"
         }
-      },
-      "export": {
-        "bulkButton": "التصدير"
       }
     },
     "scorer": {
@@ -13178,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "المسجلون",
       "searchPlaceholder": "مسجل النقاط في البحث",
       "newButton": "مسجل جديد",
       "usedByJob": "{count} وظيفة | {count} الوظائف",
@@ -13219,9 +13175,6 @@
           "nameConflict": "السجل {index}: الاسم \"{name}\" موجود بالفعل في هذه المنظمة",
           "duplicateName": "{index} الهداف: يستخدم الاسم \"{name}\" أكثر من مرة في هذا الاستيراد"
         }
-      },
-      "export": {
-        "bulkButton": "التصدير"
       },
       "backTo": "العودة إلى الهدافين",
       "badgeRemote": "البعيد",
@@ -13411,11 +13364,9 @@
           "recentEmpty": "لم تفشل أي جولات في النافذة المحددة."
         }
       },
-      "listTitle": "وظائف التقييم",
       "searchPlaceholder": "البحث عن الوظائف",
       "newButton": "وظيفة جديدة",
       "scorerCount": "{count} مسجلة | {count} مسجلة",
-      "deleteBulkButton": "حذف",
       "deleteBulkTitle": "حذف وظائف التقييم",
       "deleteBulkConfirm": "هل أنت متأكد أنك تريد حذف {count} التقييمات؟ لا يمكن التراجع عن هذا الإجراء.",
       "deletedBulk": "{count} وظائف التقييم التي تم حذفها",
@@ -14395,10 +14346,6 @@
       "passed": "تم النجاح",
       "warning": "تحذير"
     },
-    "footer": {
-      "browserTests": "اختبارات المتصفح",
-      "checks": "الشيكات"
-    },
     "journey": {
       "extract": {
         "action": "استخراج إلى اختبار فرعي",
@@ -14781,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "إضافة الموقع",
-      "bottomHeader": "المواقع",
       "bulkDeleteConfirmMessage": "هل أنت متأكد أنك تريد حذف {count} المواقع؟",
       "bulkDeleteConfirmTitle": "حذف المواقع",
       "bulkDeleteFailed": "فشل في حذف المواقع",
@@ -14842,7 +14788,6 @@
       "regionPlaceholder": "مثلا: الولايات المتحدة-الشرقية-1",
       "regionRequired": "المنطقة مطلوبة",
       "searchPlaceholder": "ابحث في المواقع...",
-      "selectedCount": "{selected} المواقع {total} المختارة",
       "title": "المواقع",
       "publicTitle": "المواقع العامة",
       "privateTitle": "المواقع الخاصة",
@@ -15096,8 +15041,7 @@
       "detailOrigin": "الأصل",
       "detailFirstParty": "الطرف الأول",
       "detailThirdParty": "طرف ثالث",
-      "detailStackTrace": "تتبع المكدس",
-      "footerEvents": "الفعاليات"
+      "detailStackTrace": "تتبع المكدس"
     },
     "runDetail": {
       "evidenceSection": "الأدلة",
@@ -15297,7 +15241,6 @@
       "bulkTriggerSuccess": "تم تفعيل {count} الاختبار. | تم تفعيل {count} فحوصات.",
       "bulkTriggerToast": "تفعيل {count} فحص... | تفعيل فحوصات {count}...",
       "check": "تم التحقق",
-      "checksFooterTitle": "الشيكات",
       "checksCount": "{count} شيكات",
       "delete": "حذف",
       "duplicate": "تكرار",
@@ -15325,7 +15268,6 @@
       "pausing": "توقفت...",
       "response": "الاستجابة",
       "scheduledAt": "المجدول في",
-      "selectedCount": "{selected} من {total} المختارين",
       "status": "الحالة",
       "statusDegraded": "⚠ متدهورة",
       "statusDown": "✗ إلى الأسفل",
@@ -15508,7 +15450,6 @@
     "editTitle": "تعديل صفحة الحالة",
     "back": "صفحات الحالة",
     "loadFailed": "فشل تحميل صفحة الحالة",
-    "footerTitle": "صفحات الحالة",
     "searchPlaceholder": "البحث في صفحات الحالة",
     "copyUrl": "نسخ الرابط",
     "publicUrl": "الرابط العام",
@@ -16019,7 +15960,9 @@
         "resetColumnWidths": "إعادة ضبط عرض الأعمدة"
       },
       "removeColumnAria": "إزالة العمود",
-      "formatColumnAria": "عمود التنسيق"
+      "formatColumnAria": "عمود التنسيق",
+      "selectedOfTotal": "تم تحديد {selected} من {total}",
+      "selectedCount": "تم تحديد {selected}"
     },
     "predefinedThemes": {
       "title": "الموضوع",
@@ -16974,7 +16917,6 @@
     },
     "move": "تحرك",
     "moveTitle": "نقل {count} SLO(s) إلى مجلد آخر",
-    "moveSelected": "تم اختيار {count} الحركة",
     "exportTitle": "تصدير SLO | تصدير {count} SLOs",
     "exportSubtitle": "راجع التعريف، ثم قم بتحميله ك JSON أو Terraform لمزود OpenObserve.",
     "exportFailed": "لم أتمكن من قراءة تعريف SLO. يرجى المحاولة مرة أخرى.",
@@ -17739,7 +17681,6 @@
       "otherRow": "جميع الاستعلامات الأخرى",
       "truncatedText": "كان هذا البيان طويلًا جدًا لتخزينه بالكامل، لذلك تم عرضه مختصرًا.",
       "stmtClass": {
-        "query": "الاستعلامات",
         "queryHint": "فقط SQL حقيقية — SELECT، INSERT، UPDATE و DELETE.",
         "all": "الاستعلامات + عبء الاتصال",
         "allHint": "يحسب أيضًا الأعمال الإدارية التي يرسلها برنامج التشغيل بين الاستعلامات: BEGIN و COMMIT، SET، والفحوصات التي تحافظ على اتصال المجموعة حيًا.",
@@ -18340,7 +18281,6 @@
       "disclosureShort": "كل صف هو استدعاء حقيقي واحد مكتمل",
       "disclosureDetail": "يقاس بالتطبيق الذي أجرى المكالمة، ومن التتبع الذي ترسله. فقط المكالمات التي انتهت هنا — استعلام لا يزال يعمل، أو استعلام توقف ولم يعد، ولم ينتج أي قياس.",
       "counts": {
-        "complete": "عرض جميع استدعاءات قواعد البيانات {count} في هذه النافذة، الأبطأ أولا.",
         "truncated": "{count} أبطأ نداءات في هذه النافذة — أجريت أكثر مما هو موضح هنا.",
         "filtered": "يعرض {count} من {total} الاتصالات."
       },
@@ -18684,7 +18624,6 @@
         "unknown": "الولاية غير مبلغة عنها"
       },
       "counts": {
-        "complete": "عرض جلسات {count}.",
         "capped": "تم أخذ عينات من جلسات أكثر مما نستطيع قراءته دفعة واحدة. هذه هي {count} التي لدينا.",
         "filtered": "عرض {count} من {total} الجلسات."
       },
@@ -18801,8 +18740,7 @@
         "lastVacuum": "الفراغ الأخير",
         "lastAutovacuum": "آخر مكنسة آلية",
         "lastAnalyze": "التحليل الأخير"
-      },
-      "countLine": "{count} الجداول"
+      }
     },
     "recommendations": {
       "title": "التوصيات",
@@ -19147,7 +19085,6 @@
     "acknowledge": "إقرار",
     "acknowledgeHint": "تحمَّل المسؤولية. هذا يوقف التصعيد.",
     "actions": "إجراءات",
-    "selectedCount": "تم تحديد {count}",
     "bulkAckDone": "تم الإقرار على {count} من النداءات",
     "bulkAckPartial": "تعذّر الإقرار على {count} من النداءات",
     "resolveCause": "ما السبب؟",

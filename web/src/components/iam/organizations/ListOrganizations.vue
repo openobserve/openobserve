@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('organization.header')"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
