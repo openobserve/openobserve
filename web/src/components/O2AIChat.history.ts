@@ -32,7 +32,11 @@ export interface StoredTurn {
   error?: string | null;
 }
 
-function toAttachment(image: { filename: string; mime: string; url: string }): ImageAttachment | null {
+function toAttachment(image: {
+  filename: string;
+  mime: string;
+  url: string;
+}): ImageAttachment | null {
   const comma = image.url?.indexOf(",") ?? -1;
   if (comma < 0 || (image.mime !== "image/png" && image.mime !== "image/jpeg")) return null;
   const data = image.url.slice(comma + 1);

@@ -33,7 +33,13 @@ describe("messagesFromTurns", () => {
       [
         turn("list streams", [
           { type: "message_delta", content: "Checking." },
-          { type: "tool_call", tool: "StreamList", message: "Listing streams", call_id: "c1", context: {} },
+          {
+            type: "tool_call",
+            tool: "StreamList",
+            message: "Listing streams",
+            call_id: "c1",
+            context: {},
+          },
           {
             type: "tool_result",
             tool: "StreamList",
