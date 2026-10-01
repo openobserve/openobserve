@@ -102,9 +102,10 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
     Ok(())
 }
 
-// the instance id (default internal gRPC token) and validator auth are secrets, also in the key
+// license admins need the instance id to request a license; key secrets stay root-only
 fn viewer_license_fields(
     is_root: bool,
+    is_license_admin: bool,
     redact_key: bool,
     key: Option<String>,
     mut license: Option<License>,
@@ -118,7 +119,7 @@ fn viewer_license_fields(
     } else {
         key
     };
-    let installation_id = if is_root {
+    let installation_id = if is_root || is_license_admin {
         config::get_instance_id()
     } else {
         String::new()
@@ -136,8 +137,14 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         None => (None, None),
     };
 
+    let is_root = db::user::is_root_user(&email.user_id);
+    let is_license_admin = is_root
+        || check_license_permission(&email.user_id, "PUT")
+            .await
+            .is_ok();
     let (key, license, installation_id) = viewer_license_fields(
-        db::user::is_root_user(&email.user_id),
+        is_root,
+        is_license_admin,
         o2_cfg.common.redact_license_key,
         key,
         license,
@@ -231,11 +238,11 @@ mod tests {
         (key, json::from_value(payload).unwrap())
     }
 
-    fn response_json(is_root: bool) -> String {
+    fn response_json(is_root: bool, is_license_admin: bool) -> String {
         config::cache_instance_id(INSTANCE_ID);
         let (key, license) = stored_license();
         let (key, license, installation_id) =
-            viewer_license_fields(is_root, false, Some(key), Some(license));
+            viewer_license_fields(is_root, is_license_admin, false, Some(key), Some(license));
         json::to_string(&LicenseResponse {
             key,
             license,
@@ -261,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_installation_id_is_visible_to_root_only() {
-        let viewer = response_json(false);
+        let viewer = response_json(false, false);
         let viewer_key = decoded_key_segments(&viewer);
         for secret in [INSTANCE_ID, VALIDATOR_AUTH] {
             assert!(!viewer.contains(secret), "{viewer}");
@@ -269,7 +276,7 @@ mod tests {
         }
         assert!(viewer.contains("lic-1"));
 
-        let root = response_json(true);
+        let root = response_json(true, true);
         let (key, _) = stored_license();
         assert!(root.contains(&key));
         assert!(decoded_key_segments(&root).contains(INSTANCE_ID));
@@ -277,5 +284,20 @@ mod tests {
         assert_eq!(root["installation_id"], INSTANCE_ID);
         assert_eq!(root["license"]["installation_id"], INSTANCE_ID);
         assert_eq!(root["license"]["validator_auth"], VALIDATOR_AUTH);
+    }
+
+    #[test]
+    fn test_license_admins_get_the_installation_id_but_not_the_key_secrets() {
+        let admin = response_json(false, true);
+        let admin_json: json::Value = json::from_str(&admin).unwrap();
+        assert_eq!(admin_json["installation_id"], INSTANCE_ID);
+        assert_eq!(admin_json["license"]["installation_id"], "");
+        assert!(!admin.contains(VALIDATOR_AUTH), "{admin}");
+        let admin_key = decoded_key_segments(&admin);
+        for secret in [INSTANCE_ID, VALIDATOR_AUTH] {
+            assert!(!admin_key.contains(secret));
+        }
+        let (key, _) = stored_license();
+        assert!(!admin.contains(&key));
     }
 }
