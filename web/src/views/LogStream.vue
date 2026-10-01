@@ -443,7 +443,7 @@ import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import segment from "../services/segment_analytics";
+import analytics from "../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
@@ -825,7 +825,7 @@ export default defineComponent({
           });
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -1001,7 +1001,7 @@ export default defineComponent({
       schemaData.value.stream_type = props.row.stream_type;
       showIndexSchemaDialog.value = true;
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Actions",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

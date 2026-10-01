@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import pipelines from "@/services/pipelines";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -416,6 +419,30 @@ describe("pipelines service", () => {
       mockHttpInstance.get.mockRejectedValue(error);
 
       await expect(pipelines.getPipelineStreams("org123")).rejects.toThrow("Server error");
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks pipeline_created once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(
+        pipelines.createPipeline({ org_identifier: "org123", data: { name: "p" } }),
+      ).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("pipeline_created");
+    });
+
+    it("does not track pipeline_created when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(
+        pipelines.createPipeline({ org_identifier: "org123", data: { name: "p" } }),
+      ).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

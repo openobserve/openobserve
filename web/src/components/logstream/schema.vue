@@ -807,7 +807,7 @@ import {
 } from "@/services/stream.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import {
   formatSizeFromMB,
   getImageURL,
@@ -1693,7 +1693,7 @@ export default defineComponent({
             },
           );
 
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
             user_id: store.state.userInfo.email,

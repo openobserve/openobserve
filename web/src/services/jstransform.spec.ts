@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import jstransform from "@/services/jstransform";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -739,6 +742,26 @@ describe("jstransform service", () => {
       await expect(
         jstransform.test("org123", { function: ".bad = syntax(", events: [] }),
       ).rejects.toThrow("Function execution error");
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks function_created once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(jstransform.create("org123", { name: "fn" })).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("function_created");
+    });
+
+    it("does not track function_created when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(jstransform.create("org123", { name: "fn" })).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

@@ -342,7 +342,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -427,7 +427,7 @@ export default defineComponent({
       }
 
       if (config.isCloud == "true") {
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Search Data",
           user_org: this.store.state.selectedOrganization.identifier,
           user_id: this.store.state.userInfo.email,
@@ -463,7 +463,7 @@ export default defineComponent({
         }
 
         if (config.isCloud == "true") {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Get More Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
@@ -491,7 +491,7 @@ export default defineComponent({
         }
 
         if (config.isCloud == "true") {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Get More Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
@@ -521,7 +521,7 @@ export default defineComponent({
         this.refreshHistogramChart();
 
         if (config.isCloud == "true") {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Get Less Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,

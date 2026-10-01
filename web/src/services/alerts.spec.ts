@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import alerts from "@/services/alerts";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock the http service
 vi.mock("@/services/http", () => ({
@@ -669,6 +672,70 @@ describe("alerts service", () => {
       mockHttpInstance.delete.mockRejectedValue(error);
 
       await expect(alerts.delete("org123", "logs", "test", "logs")).rejects.toThrow("Forbidden");
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks alert_created once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(alerts.create("org123", "logs", "logs", { name: "a" })).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+    });
+
+    it("does not track alert_created when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(alerts.create("org123", "logs", "logs", { name: "a" })).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("tracks alert_created from create_by_alert_id once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(alerts.create_by_alert_id("org123", { name: "a" }, "f1")).resolves.toBe(
+        response,
+      );
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+    });
+
+    it("does not track alert_created from create_by_alert_id when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(alerts.create_by_alert_id("org123", { name: "a" }, "f1")).rejects.toThrow(
+        "boom",
+      );
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("tracks alert_created from clone_by_id once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(alerts.clone_by_id("org123", "a1", { name: "copy" }, "f1")).resolves.toBe(
+        response,
+      );
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+    });
+
+    it("does not track alert_created from clone_by_id when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(alerts.clone_by_id("org123", "a1", { name: "copy" }, "f1")).rejects.toThrow(
+        "boom",
+      );
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

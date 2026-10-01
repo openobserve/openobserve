@@ -54,7 +54,7 @@ vi.mock("@/services/iam", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
@@ -68,7 +68,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import organizationsService from "@/services/organizations";
 import usersService from "@/services/users";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 
 function mountComp(props: Record<string, any> = {}) {
   return mount(MemberInvitation, {
@@ -255,7 +255,7 @@ describe("MemberInvitation", () => {
       expect(getForm(wrapper).vm.form.state.values.role).toBe("admin");
     });
 
-    it("tracks the invitation via segment analytics", async () => {
+    it("tracks the invitation via product analytics", async () => {
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { message: "Invited", data: { invalid_members: null } },
       } as any);
@@ -263,7 +263,7 @@ describe("MemberInvitation", () => {
       setEmail(wrapper, "new@example.com");
       await submitForm(wrapper);
 
-      expect(segment.track).toHaveBeenCalledWith(
+      expect(analytics.track).toHaveBeenCalledWith(
         "Button Click",
         expect.objectContaining({ button: "Invite User", page: "Users" }),
       );

@@ -25,6 +25,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import type { RichCardContent } from "./types";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import analytics from "@/services/product_analytics";
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: vi.fn() }),
@@ -36,6 +38,7 @@ vi.mock("@/services/stream", () => ({
   default: { nameList: (...a: any[]) => nameListMock(...a) },
 }));
 vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const store = createStore({
   state: {
@@ -423,5 +426,23 @@ describe("SetupCardRenderer — step-note jump links", () => {
     // ...and the payload survives only as inert escaped text, never an href.
     expect(html).not.toContain('href="javascript:');
     expect(wrapper.find(".step-note").text()).toContain("javascript:alert(1)");
+  });
+});
+
+describe("SetupCardRenderer — product analytics", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("tracks snippet_copied with the current route when a step is copied", () => {
+    wrapper = mountCard();
+
+    wrapper.findComponent(OCodeBlock).vm.$emit("copy");
+
+    expect(analytics.track).toHaveBeenCalledWith("snippet_copied", {
+      route: router.currentRoute.value.name,
+    });
   });
 });

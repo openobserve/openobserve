@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   CompositeAlertValidationRequest,
   CompositeAlertValidationResponse,
@@ -64,7 +65,12 @@ const alerts = {
     return http().get(url);
   },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
-    return http().post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data);
+    return http()
+      .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   update: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http().put(
@@ -115,7 +121,12 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   update_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
@@ -283,7 +294,12 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   // POST /api/v2/{org}/alerts/{id}/export — returns config with runtime fields stripped
   export_by_id: (org_identifier: string, alert_id: string) => {

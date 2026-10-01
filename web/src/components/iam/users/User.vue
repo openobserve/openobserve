@@ -343,7 +343,7 @@ import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
 import AddUser from "@/components/iam/users/AddUser.vue";
 import organizationsService from "@/services/organizations";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
 import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1098,7 +1098,7 @@ export default defineComponent({
         // The row already stores the canonical role VALUE, so AddUser's role
         // select matches an option directly (see updateUser).
         selectedUser.value = { ...props.row };
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
@@ -1328,7 +1328,7 @@ export default defineComponent({
           await getOrgMembers(true);
           updateUserActions();
 
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Revoke Invite",
             user_org: store.state.selectedOrganization.identifier,
             user_id: store.state.userInfo.email,
@@ -1440,7 +1440,7 @@ export default defineComponent({
           console.log(error);
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

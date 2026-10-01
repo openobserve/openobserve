@@ -583,6 +583,7 @@ describe("Login", () => {
 
     await wrapper.vm.onSignIn();
     expect(rum.openobserveRum.setUser).toHaveBeenCalledWith({
+      id: "testuser",
       name: "testuser ",
       email: "testuser",
     });

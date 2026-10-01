@@ -1,4 +1,5 @@
 import http from "./http";
+import analytics from "./product_analytics";
 
 const pipelines = {
   getPipelines: (org_identifier: string) => {
@@ -41,7 +42,12 @@ const pipelines = {
 
   createPipeline: ({ data, org_identifier }: { data: object; org_identifier: string }) => {
     const url = `/api/${org_identifier}/pipelines`;
-    return http({}).post(url, data);
+    return http({})
+      .post(url, data)
+      .then((res) => {
+        analytics.track("pipeline_created");
+        return res;
+      });
   },
 
   updatePipeline: ({ org_identifier, data }: { org_identifier: string; data: any }) => {

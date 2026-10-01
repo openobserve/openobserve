@@ -485,7 +485,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
@@ -876,7 +876,7 @@ export default defineComponent({
       }
       addLookupTable();
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -939,7 +939,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Delete Enrichment Table",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

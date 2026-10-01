@@ -394,7 +394,7 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { debounce } from "lodash-es";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -603,7 +603,7 @@ export default defineComponent({
     // Gives the user 2.5s to finish typing start/end time before firing.
     const triggerAbsoluteQueryDebounced = debounce((value: object) => {
       if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,
@@ -701,7 +701,7 @@ export default defineComponent({
       }
 
       if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,

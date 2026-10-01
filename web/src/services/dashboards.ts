@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const dashboards = {
   list: (
@@ -43,9 +44,14 @@ const dashboards = {
     return http().get(`/api/${organization}/dashboards`, { params });
   },
   create: (organization: string, data: any, folderId?: string) => {
-    return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
-      headers: { "Content-Type": "application/json; charset=UTF-8" },
-    });
+    return http()
+      .post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+      })
+      .then((res) => {
+        analytics.track("dashboard_created");
+        return res;
+      });
   },
   delete: (organization: string, dashboardID: string, folderId?: string) => {
     return http().delete(

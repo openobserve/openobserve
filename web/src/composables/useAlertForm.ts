@@ -37,7 +37,7 @@ import {
 } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 
 import useStreams from "@/composables/useStreams";
@@ -2321,7 +2321,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         button: "Update Alert",
         page: "Alerts",
       });
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Alert",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -2359,7 +2359,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         button: "Create Alert",
         page: "Alerts",
       });
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Save Alert",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

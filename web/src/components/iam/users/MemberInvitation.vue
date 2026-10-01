@@ -57,7 +57,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import organizationsService from "@/services/organizations";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import usersService from "@/services/users";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -135,7 +135,7 @@ export default defineComponent({
         });
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Invite User",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

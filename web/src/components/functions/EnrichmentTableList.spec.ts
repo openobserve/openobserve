@@ -64,7 +64,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((v) => v + " MB"),

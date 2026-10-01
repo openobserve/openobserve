@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 import { TestFunctionPayload } from "@/ts/interfaces/function";
 
 const jstransform = {
@@ -30,7 +31,12 @@ const jstransform = {
     );
   },
   create: (org_identifier: string, data: any) => {
-    return http().post(`/api/${org_identifier}/functions`, data);
+    return http()
+      .post(`/api/${org_identifier}/functions`, data)
+      .then((res) => {
+        analytics.track("function_created");
+        return res;
+      });
   },
   getAssociatedPipelines: (org_identifier: string, name: string) => {
     return http().get(`/api/${org_identifier}/functions/${name}`);

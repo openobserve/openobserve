@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const anomaly_detection = {
   list: (org_identifier: string) => {
@@ -37,7 +38,12 @@ const anomaly_detection = {
     if (folder_id) {
       url += `?folder=${encodeURIComponent(folder_id)}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
 
   // PUT /api/v2/{org}/alerts/{id} — delegates to anomaly config update when alert_type is "anomaly_detection"

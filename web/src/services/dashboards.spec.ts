@@ -28,6 +28,9 @@ vi.mock("./http", () => ({
 }));
 
 import http from "./http";
+import analytics from "./product_analytics";
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("Dashboards Service", () => {
   let mockHttp: any;
@@ -699,6 +702,26 @@ describe("Dashboards Service", () => {
           { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks dashboard_created once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttp.post.mockResolvedValue(response);
+
+      await expect(dashboards.create("test-org", {})).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("does not track dashboard_created when the request rejects", async () => {
+      mockHttp.post.mockRejectedValue(new Error("boom"));
+
+      await expect(dashboards.create("test-org", {})).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

@@ -1980,7 +1980,7 @@ import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import searchService from "@/services/search";
 
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
@@ -3162,7 +3162,7 @@ export default defineComponent({
       }
 
       if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,

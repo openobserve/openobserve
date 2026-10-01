@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import EnrichmentTableList from "./EnrichmentTableList.vue";
 import streamService from "@/services/stream";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 
 // Mock zincutils
@@ -22,8 +22,8 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 
-// Mock segment analytics
-vi.mock("@/services/segment_analytics", () => ({
+// Mock product analytics
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -283,11 +283,11 @@ describe("EnrichmentTableList Component", () => {
       expect(mockDelete).toHaveBeenCalled();
     });
 
-    it("tracks delete action in segment analytics", async () => {
+    it("tracks delete action in product analytics", async () => {
       await wrapper.vm.deleteLookupTable();
       await flushPromises();
 
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Delete Enrichment Table",
         user_org: "test-org",
         user_id: "test@example.com",

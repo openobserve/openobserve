@@ -343,7 +343,7 @@ import {
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
@@ -1064,6 +1064,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           }
           delete tracesRequestState[searchTraceId];
           if (!isPagination) {
+            analytics.track("traces_search_completed");
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
@@ -1869,7 +1870,7 @@ const searchData = () => {
   runQueryFn();
 
   if (config.isCloud == "true") {
-    segment.track("Button Click", {
+    analytics.track("Button Click", {
       button: "Search Data",
       user_org: store.state.selectedOrganization.identifier,
       user_id: store.state.userInfo.email,
@@ -1888,7 +1889,7 @@ const getMoreData = () => {
     getQueryData(true);
 
     if (config.isCloud == "true") {
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Get More Data",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

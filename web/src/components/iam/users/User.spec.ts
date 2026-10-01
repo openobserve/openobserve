@@ -23,7 +23,7 @@ import router from "@/test/unit/helpers/router";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
@@ -55,7 +55,7 @@ vi.mock("@/services/iam", async (importOriginal) => {
   const { automockService } = await import("@/test/unit/helpers/mockService");
   return automockService(await importOriginal());
 });
-vi.mock("@/services/segment_analytics");
+vi.mock("@/services/product_analytics");
 
 // Mock aws-exports config
 vi.mock("@/aws-exports", () => ({
@@ -198,7 +198,7 @@ const mountUser = () =>
 const mockUsersService = vi.mocked(usersService);
 const mockOrganizationsService = vi.mocked(organizationsService);
 const mockGetRoles = vi.mocked(getRoles);
-const mockSegment = vi.mocked(segment);
+const mockAnalytics = vi.mocked(analytics);
 
 beforeAll(() => {
   process.env.TZ = "UTC";
@@ -784,7 +784,7 @@ describe("User Component", () => {
       wrapper.vm.addUser(userProps, true);
       expect(wrapper.vm.isUpdated).toBe(true);
       expect(wrapper.vm.selectedUser).toEqual(userProps.row);
-      expect(mockSegment.track).toHaveBeenCalled();
+      expect(mockAnalytics.track).toHaveBeenCalled();
     });
   });
 
@@ -1088,7 +1088,7 @@ describe("User Component", () => {
         },
         store.state.selectedOrganization.identifier,
       );
-      expect(mockSegment.track).toHaveBeenCalled();
+      expect(mockAnalytics.track).toHaveBeenCalled();
     });
 
     it("should handle update role error", async () => {
