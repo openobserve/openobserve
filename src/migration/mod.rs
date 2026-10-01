@@ -116,8 +116,7 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Existing installs only warn on a weak but usable salt: rotating it breaks logins derived from
-/// it.
+/// Existing installs only warn on a weak usable salt: rotating it breaks logins derived from it.
 fn check_ext_auth_salt(fresh_install: bool, salt: &str) -> anyhow::Result<()> {
     if salt.len() > MAX_EXT_AUTH_SALT_LEN {
         return Err(anyhow::anyhow!(
