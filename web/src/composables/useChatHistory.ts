@@ -103,7 +103,10 @@ export interface ServerChatDetail extends ServerChatSummary {
  */
 export interface ChatHistoryServer {
   enabled: () => boolean;
-  list: (orgId: string, limit: number) => Promise<{ chats: ServerChatSummary[]; next_cursor?: string }>;
+  list: (
+    orgId: string,
+    limit: number,
+  ) => Promise<{ chats: ServerChatSummary[]; next_cursor?: string }>;
   get: (orgId: string, sessionId: string, knownSeq?: number) => Promise<ServerChatDetail>;
   rename: (orgId: string, sessionId: string, title: string) => Promise<unknown>;
   remove: (orgId: string, sessionId: string) => Promise<unknown>;
@@ -500,9 +503,7 @@ export function useChatHistory(
       // Browser-only: a chat from before persistence, or one not yet listed.
       merged.push(record);
     }
-    return merged.sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    );
+    return merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   };
 
   const loadChat = async (chatId: number): Promise<ChatHistoryEntry | null> => {
