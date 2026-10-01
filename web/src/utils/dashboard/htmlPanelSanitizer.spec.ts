@@ -32,15 +32,17 @@ const render = (html: string, prefix = "#o2-html-panel-p1") => {
 
 describe("htmlPanelSanitizer", () => {
   describe("escapeStyleText", () => {
-    it("escapes every < so serialized CSS cannot end its style element", () => {
-      const out = escapeStyleText('a { content: "</style><img src=x onerror=alert(1)>"; }');
+    it("escapes every </ so serialized CSS cannot end its style element", () => {
+      const out = escapeStyleText('a { content: "</style><img src=x onerror=alert(1)></STYLE>"; }');
 
-      expect(out).not.toContain("<");
-      expect(out).toBe('a { content: "\\3c /style>\\3c img src=x onerror=alert(1)>"; }');
+      expect(out).not.toContain("</");
+      expect(out).toBe('a { content: "\\3c /style><img src=x onerror=alert(1)>\\3c /STYLE>"; }');
     });
 
-    it("leaves CSS without < untouched", () => {
-      const css = "#p .a { color: red; }\n@media (min-width: 10rem) { #p .b { color: blue; } }";
+    it("keeps < in CSS range media and container queries", () => {
+      const css =
+        "@media (width < 37.5rem) { #p .a { color: red; } }\n" +
+        "@container (25rem <= width) { #p .b { color: blue; } }";
 
       expect(escapeStyleText(css)).toBe(css);
     });
@@ -79,16 +81,36 @@ describe("htmlPanelSanitizer", () => {
       expect(out.querySelector("p")?.textContent).toBe("ok");
     });
 
-    it("escapes a decoded < in a rewritten attribute selector", () => {
+    it("escapes a decoded </ in a rewritten attribute selector", () => {
       const out = render(
         '<style>a[title="\\3c/style\\3e\\3cimg src=x onerror=alert(1)\\3e"]{color:red}</style>',
       );
 
-      expect(out.querySelector("style")?.textContent).not.toContain("<");
+      expect(out.querySelector("style")?.textContent).not.toContain("</");
       expect(out.innerHTML).not.toMatch(/<\/style>[\s\S]*<img/i);
       const reparsed = document.createElement("div");
       reparsed.innerHTML = out.innerHTML;
       expect(reparsed.querySelector("img")).toBeNull();
+    });
+
+    it("never lets a decoded CSS content string close the style element", () => {
+      const out = render(
+        '<style>a{content:"\\3c/style\\3e\\3cimg src=x onerror=alert(1)\\3e"}</style><p>hi</p>',
+      );
+      const reparsed = document.createElement("div");
+      reparsed.innerHTML = out.innerHTML;
+
+      expect(out.querySelector("style")?.textContent).not.toContain("</");
+      expect(reparsed.querySelector("img")).toBeNull();
+      expect(reparsed.querySelector("p")?.textContent).toBe("hi");
+    });
+
+    it("keeps a range media query in panel CSS", () => {
+      const out = render(
+        "<style>@media (width < 37.5rem) { .r { color: red; } }</style><p class='r'>r</p>",
+      );
+
+      expect(out.querySelector("style")?.textContent).toContain("(width < 37.5rem)");
     });
 
     it("registers its iframe hook once, on a private DOMPurify instance", () => {

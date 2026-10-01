@@ -35,8 +35,8 @@ export const isAllowedIframeSrc = (src: string, pageOrigin: string): boolean => 
   }
 };
 
-/** Escape `<` so CSS text can never end its `<style>` element if the markup is serialized again. */
-export const escapeStyleText = (cssText: string): string => cssText.replace(/</g, "\\3c ");
+/** Escape `</`, the only sequence that can end a `<style>` element, so a bare `<` in range media queries keeps working. */
+export const escapeStyleText = (cssText: string): string => cssText.replace(/<\//g, "\\3c /");
 
 /** Sanitize panel HTML and scope its CSS under `prefix`; mount the fragment directly, never through innerHTML. */
 export const sanitizeHtmlPanel = (html: string, prefix: string): DocumentFragment => {
