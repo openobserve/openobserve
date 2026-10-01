@@ -39,14 +39,28 @@ static ALLOWLIST: LazyLock<SsrfAllowlist> = LazyLock::new(|| {
         &cfg.common.ssrf_allowed_hosts,
     )
 });
+static NO_ALLOWLIST: SsrfAllowlist = SsrfAllowlist {
+    cidrs: Vec::new(),
+    hosts: Vec::new(),
+};
 
 pub struct SsrfGuard;
 
 impl SsrfGuard {
+    /// Strict policy for clients that hand the response back to the caller; ignores the allowlist.
     pub fn validate_url_with_config(url: &str) -> Result<(), String> {
+        Self::validate_scoped(url, Scope::Strict, &ALLOWLIST)
+    }
+
+    /// Policy for send-only destinations, which honours `ZO_SSRF_ALLOWED_CIDRS` / `_HOSTS`.
+    pub fn validate_destination_url_with_config(url: &str) -> Result<(), String> {
+        Self::validate_scoped(url, Scope::Destination, &ALLOWLIST)
+    }
+
+    fn validate_scoped(url: &str, scope: Scope, configured: &SsrfAllowlist) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
         let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        Self::validate_url_inner(url, allow_loopback, skip_ssrf, &ALLOWLIST)
+        Self::validate_url_inner(url, allow_loopback, skip_ssrf, scope.allowlist(configured))
     }
 
     fn validate_url_inner(
@@ -135,14 +149,14 @@ impl SsrfGuard {
         Self::is_private_ip_inner(ip, false)
     }
 
-    /// Validate one IP against the SSRF policy, with no hostname allowlist entry to lift it.
+    /// Validate one IP against the strict SSRF policy.
     pub fn check_ip_with_config(ip: &IpAddr) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
         let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
         if skip_ssrf {
             return Ok(());
         }
-        Self::check_ip_inner(ip, allow_loopback, false, &ALLOWLIST)
+        Self::check_ip_inner(ip, allow_loopback, false, &NO_ALLOWLIST)
     }
 
     /// `host_allowed` lifts the private-address check except for link-local and metadata IPs.
@@ -170,13 +184,25 @@ impl SsrfGuard {
         Ok(())
     }
 
-    /// Async validator: runs the string checks, then resolves the hostname via
-    /// DNS and validates every returned IP. Closes the hostname-points-at-private
-    /// bypass that the sync validator can't see.
+    /// Async strict validator: the string checks, then every address the hostname resolves to.
     pub async fn validate_url_with_config_async(url: &str) -> Result<(), String> {
+        Self::validate_scoped_async(url, Scope::Strict, &ALLOWLIST).await
+    }
+
+    /// Async validator for send-only destinations; honours the allowlist.
+    pub async fn validate_destination_url_with_config_async(url: &str) -> Result<(), String> {
+        Self::validate_scoped_async(url, Scope::Destination, &ALLOWLIST).await
+    }
+
+    async fn validate_scoped_async(
+        url: &str,
+        scope: Scope,
+        configured: &SsrfAllowlist,
+    ) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
         let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        Self::validate_url_async_inner(url, allow_loopback, skip_ssrf, &ALLOWLIST).await
+        Self::validate_url_async_inner(url, allow_loopback, skip_ssrf, scope.allowlist(configured))
+            .await
     }
 
     async fn validate_url_async_inner(
@@ -281,6 +307,23 @@ impl SsrfGuard {
     }
 }
 
+/// Which callers the operator allowlist applies to.
+#[derive(Debug, Clone, Copy)]
+enum Scope {
+    /// The response reaches the caller, so an allowlisted internal service would be readable.
+    Strict,
+    Destination,
+}
+
+impl Scope {
+    fn allowlist(self, configured: &SsrfAllowlist) -> &SsrfAllowlist {
+        match self {
+            Scope::Strict => &NO_ALLOWLIST,
+            Scope::Destination => configured,
+        }
+    }
+}
+
 /// Operator exceptions to the SSRF checks, parsed once from the two allowlist env vars.
 #[derive(Debug, Default)]
 struct SsrfAllowlist {
@@ -378,8 +421,18 @@ impl Cidr {
 }
 
 /// Rejects resolved addresses at connect time, where the sync redirect callback cannot resolve DNS.
-#[derive(Debug, Default, Clone)]
-pub struct SsrfDnsResolver;
+#[derive(Debug, Clone)]
+pub struct SsrfDnsResolver {
+    allowlist: &'static SsrfAllowlist,
+}
+
+impl Default for SsrfDnsResolver {
+    fn default() -> Self {
+        Self {
+            allowlist: &NO_ALLOWLIST,
+        }
+    }
+}
 
 impl SsrfDnsResolver {
     async fn resolve_checked(
@@ -406,8 +459,9 @@ impl SsrfDnsResolver {
 
 impl Resolve for SsrfDnsResolver {
     fn resolve(&self, name: Name) -> Resolving {
+        let allowlist = self.allowlist;
         Box::pin(async move {
-            let addrs = Self::resolve_checked(name.as_str(), &ALLOWLIST).await?;
+            let addrs = Self::resolve_checked(name.as_str(), allowlist).await?;
             let iter: Addrs = Box::new(addrs.into_iter());
             Ok(iter)
         })
@@ -415,7 +469,8 @@ impl Resolve for SsrfDnsResolver {
 }
 
 /// Build a reqwest client that is hardened against SSRF on redirect chains
-/// and on DNS resolution. Use this anywhere the URL is derived from user input.
+/// and on DNS resolution. Use this anywhere the URL is derived from user input
+/// and the response is read back; it ignores the operator allowlist.
 ///
 /// Two layers of defense:
 /// 1. Custom redirect policy (max 5 hops), revalidates each redirect target.
@@ -423,23 +478,45 @@ impl Resolve for SsrfDnsResolver {
 ///
 /// Honors `ZO_SSRF_ALLOW_LOOPBACK` consistently across both layers.
 pub fn build_safe_client(builder: reqwest::ClientBuilder) -> reqwest::Result<reqwest::Client> {
-    builder
-        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            if attempt.previous().len() >= 5 {
-                return attempt.error("too many redirects");
-            }
-            match SsrfGuard::validate_url_with_config(attempt.url().as_str()) {
-                Ok(()) => attempt.follow(),
-                Err(e) => attempt.error(e),
-            }
-        }))
-        .dns_resolver(Arc::new(SsrfDnsResolver))
-        .build()
+    build_scoped_client(builder, Scope::Strict, &ALLOWLIST)
+}
+
+/// [`build_safe_client`] for send-only destinations, which also admits the operator allowlist.
+pub fn build_safe_destination_client(
+    builder: reqwest::ClientBuilder,
+) -> reqwest::Result<reqwest::Client> {
+    build_scoped_client(builder, Scope::Destination, &ALLOWLIST)
 }
 
 /// Parses the allowlist now so invalid entries are reported at startup, not on first request.
 pub fn init_allowlist() {
     LazyLock::force(&ALLOWLIST);
+}
+
+fn build_scoped_client(
+    builder: reqwest::ClientBuilder,
+    scope: Scope,
+    configured: &'static SsrfAllowlist,
+) -> reqwest::Result<reqwest::Client> {
+    let allowlist = scope.allowlist(configured);
+    builder
+        .redirect(reqwest::redirect::Policy::custom(move |attempt| {
+            if attempt.previous().len() >= 5 {
+                return attempt.error("too many redirects");
+            }
+            let cfg = crate::get_config();
+            match SsrfGuard::validate_url_inner(
+                attempt.url().as_str(),
+                cfg.common.ssrf_allow_loopback,
+                cfg.common.skip_ssrf_checks,
+                allowlist,
+            ) {
+                Ok(()) => attempt.follow(),
+                Err(e) => attempt.error(e),
+            }
+        }))
+        .dns_resolver(Arc::new(SsrfDnsResolver { allowlist }))
+        .build()
 }
 
 fn split_list(list: &str) -> impl Iterator<Item = &str> {
@@ -836,6 +913,59 @@ mod tests {
             chain.contains("169.254.169.254") && chain.contains("not allowed"),
             "{chain}"
         );
+    }
+
+    #[tokio::test]
+    async fn test_strict_validators_ignore_the_allowlist() {
+        let allow = SsrfAllowlist::parse("10.1.2.0/24", "");
+        let url = "http://10.1.2.3/";
+        assert!(SsrfGuard::validate_scoped(url, Scope::Strict, &allow).is_err());
+        assert!(SsrfGuard::validate_scoped(url, Scope::Destination, &allow).is_ok());
+        let res = SsrfGuard::validate_scoped_async(url, Scope::Strict, &allow).await;
+        assert!(res.is_err(), "{res:?}");
+        let res = SsrfGuard::validate_scoped_async(url, Scope::Destination, &allow).await;
+        assert!(res.is_ok(), "{res:?}");
+    }
+
+    #[tokio::test]
+    async fn test_strict_client_refuses_an_allowed_cidr_the_destination_client_admits() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+                    .await;
+            }
+        });
+        let allow: &'static SsrfAllowlist =
+            Box::leak(Box::new(SsrfAllowlist::parse("127.0.0.1/32,::1/128", "")));
+        let url = format!("http://localhost:{port}/");
+        let builder = || reqwest::Client::builder().timeout(std::time::Duration::from_secs(5));
+        let strict = build_scoped_client(builder(), Scope::Strict, allow).unwrap();
+        let err = strict
+            .get(&url)
+            .send()
+            .await
+            .expect_err("the strict client must ignore the allowlist");
+        assert!(error_chain(&err).contains("not allowed"), "{err:?}");
+        let destination = build_scoped_client(builder(), Scope::Destination, allow).unwrap();
+        let res = destination.get(&url).send().await;
+        assert!(res.is_ok(), "{:?}", res.map_err(|e| error_chain(&e)));
+    }
+
+    fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {
+        let mut chain = String::new();
+        let mut source = Some(err);
+        while let Some(e) = source {
+            chain.push_str(&e.to_string());
+            chain.push_str(": ");
+            source = e.source();
+        }
+        chain
     }
 
     #[test]

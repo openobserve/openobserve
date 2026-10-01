@@ -3450,10 +3450,13 @@ pub async fn send_anomaly_alert(
     let payload = anomaly_alert_payload(&ctx, &message, &link);
 
     // SSRF protection: validate the URL (incl. DNS) before sending and build the
-    // client through `build_safe_client` so redirects + connect-time resolution
+    // client through `build_safe_destination_client` so redirects + connect-time resolution
     // are re-validated.
     if let Err(e) =
-        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url).await
+        common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+            &endpoint.url,
+        )
+        .await
     {
         return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
     }
@@ -3462,7 +3465,7 @@ pub async fn send_anomaly_alert(
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
 
     let mut req = client.post(&endpoint.url);
 
