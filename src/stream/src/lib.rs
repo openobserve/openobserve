@@ -28,8 +28,7 @@ use config::{
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
-        self_reporting::usage::AUDIT_STREAM,
-        self_reporting::ai_chat::is_protected_ai_chat_stream,
+        self_reporting::{ai_chat::is_protected_ai_chat_stream, usage::AUDIT_STREAM},
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
