@@ -1707,10 +1707,10 @@ mod tests {
                 .is_valid
         );
 
-        // Anyone can derive this: the salt defaults to a public constant.
-        let forged = password_ext_credential("", &req_time, 300, salt);
+        // An empty password_ext needs no secret to hash, so it must not back a login.
+        let unbacked = password_ext_credential("", &req_time, 300, salt);
         assert!(
-            validate_user_from_db(Ok(user("")), &forged, Some(&req_time), 300, salt)
+            validate_user_from_db(Ok(user("")), &unbacked, Some(&req_time), 300, salt)
                 .await
                 .is_err(),
             "an empty password_ext must not back a presigned login"
@@ -2254,9 +2254,9 @@ mod tests {
                 expires_in: 300,
             };
             let salt = get_config().auth.ext_auth_salt.clone();
-            let forged = password_ext_credential("", "1700000000", 300, &salt);
+            let unbacked = password_ext_credential("", "1700000000", 300, &salt);
             assert!(
-                !validate_credentials_ext(email, &forged, "default/streams", auth_token, "GET")
+                !validate_credentials_ext(email, &unbacked, "default/streams", auth_token, "GET")
                     .await
                     .unwrap()
                     .is_valid,

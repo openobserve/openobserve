@@ -1083,20 +1083,21 @@ for (var i = 0; i < filtered.length; i++) {
         let (_, error) = apply_js_fn(&hook, json!({}), "org_a", &stream);
         assert!(error.is_none(), "{error:?}");
 
-        let victim = compile_js_function("row.mapped = [1, 2].map(x => x * 2);", "org_b").unwrap();
-        let (victim_out, error) =
-            apply_js_fn(&victim, json!({"secret": "s3cr3t"}), "org_b", &stream);
+        let other_org_fn =
+            compile_js_function("row.mapped = [1, 2].map(x => x * 2);", "org_b").unwrap();
+        let (other_org_out, error) =
+            apply_js_fn(&other_org_fn, json!({"secret": "s3cr3t"}), "org_b", &stream);
         assert!(error.is_none(), "{error:?}");
 
         let reader = compile_js_function(
-            "row.stolen = JSON.captured ? JSON.captured.join('|') : null;",
+            "row.captured = JSON.captured ? JSON.captured.join('|') : null;",
             "org_a",
         )
         .unwrap();
         let (reader_out, error) = apply_js_fn(&reader, json!({}), "org_a", &stream);
         assert!(error.is_none(), "{error:?}");
         assert_eq!(
-            (&victim_out["mapped"], &reader_out["stolen"]),
+            (&other_org_out["mapped"], &reader_out["captured"]),
             (&json!([2, 4]), &json!(null))
         );
     }

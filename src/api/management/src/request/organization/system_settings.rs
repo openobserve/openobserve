@@ -453,24 +453,27 @@ mod tests {
 
     #[tokio::test]
     async fn user_settings_of_another_user_are_forbidden() {
-        let org = "settings-idor-org";
-        let (viewer, victim) = ("viewer@settings-idor.test", "victim@settings-idor.test");
+        let org = "settings-other-user-org";
+        let (viewer, other) = (
+            "viewer@settings-other-user.test",
+            "other@settings-other-user.test",
+        );
         join(org, viewer, UserRole::Viewer);
-        seed_user_setting(org, victim, "favorite_dashboards").await;
+        seed_user_setting(org, other, "favorite_dashboards").await;
 
         let read = get_setting(
             Path((org.to_string(), "favorite_dashboards".to_string())),
             caller(viewer),
-            user_query(victim),
+            user_query(other),
         )
         .await;
         assert_eq!(read.status(), StatusCode::FORBIDDEN);
 
-        let list = list_settings(Path(org.to_string()), caller(viewer), user_query(victim)).await;
+        let list = list_settings(Path(org.to_string()), caller(viewer), user_query(other)).await;
         assert_eq!(list.status(), StatusCode::FORBIDDEN);
 
         let write = set_user_setting(
-            Path((org.to_string(), victim.to_string())),
+            Path((org.to_string(), other.to_string())),
             caller(viewer),
             Json(SystemSettingPayload {
                 setting_key: "favorite_dashboards".to_string(),
@@ -485,7 +488,7 @@ mod tests {
         let delete = delete_user_setting(
             Path((
                 org.to_string(),
-                victim.to_string(),
+                other.to_string(),
                 "favorite_dashboards".to_string(),
             )),
             caller(viewer),

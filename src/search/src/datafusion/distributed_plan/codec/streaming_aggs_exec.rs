@@ -368,7 +368,7 @@ mod tests {
         // the OS only resolves `..` through directories that exist, as they do on a live node
         let cache_root = infra::cache::file_data::disk::get_dir().await;
         std::fs::create_dir_all(format!("{cache_root}aggregations"))?;
-        let evil = format!(
+        let escaping = format!(
             "aggregations/{}{}",
             "../".repeat(64),
             planted.to_str().unwrap().trim_start_matches('/')
@@ -396,7 +396,7 @@ mod tests {
             "traversal".to_string(),
             0,
             1000,
-            vec![Arc::new(evil)],
+            vec![Arc::new(escaping)],
             Arc::new(EmptyExec::new(Arc::clone(&schema))),
             1,
             true,
