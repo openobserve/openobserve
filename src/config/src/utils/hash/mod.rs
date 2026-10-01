@@ -51,7 +51,7 @@ pub fn get_passcode_hash(pass: &str, salt: &str) -> String {
     try_get_passcode_hash(pass, salt).expect("salt length outside what argon2 accepts")
 }
 
-/// `None` when argon2 cannot use `salt`: shorter than 3 bytes (e.g. empty) or longer than 48.
+/// `None` when argon2 cannot use `salt`: shorter than 8 bytes (e.g. empty) or longer than 48.
 pub fn try_get_passcode_hash(pass: &str, salt: &str) -> Option<String> {
     let t_cost = 4;
     let m_cost = 2048;
