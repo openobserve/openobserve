@@ -102,7 +102,8 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
         .await
     {
         log::error!(
-            "[Destination] error triggering super cluster event to add destination to cache: {e}"
+            "[Destination] error triggering super cluster event to add destination to cache: org_id: {}, error: {e}",
+            saved.org_id
         );
     }
 
@@ -130,7 +131,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
         .await
     {
         log::error!(
-            "[Destination] error triggering super cluster event to remove destination from cache: {e}"
+            "[Destination] error triggering super cluster event to remove destination from cache: org_id: {org_id}, error: {e}"
         );
     }
 
@@ -194,11 +195,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_value: Destination = match table::destinations::get(org_id, name).await {
                     Ok(Some(dest)) => dest,
                     Ok(None) => {
-                        log::error!("Destination not found in db");
+                        log::error!("Destination not found in db, org_id: {org_id}");
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting from db: {e}");
+                        log::error!("Error getting from db: org_id: {org_id}, error: {e}");
                         continue;
                     }
                 };

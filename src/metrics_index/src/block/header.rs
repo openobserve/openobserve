@@ -18,8 +18,8 @@
 use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
-use arrow::datatypes::{DataType, Schema, SchemaRef};
-use config::meta::promql::midx::MidxTrailer;
+use arrow::datatypes::{Schema, SchemaRef};
+use config::meta::promql::index::MidxTrailer;
 use serde::{Deserialize, Serialize};
 
 use super::*;
@@ -138,10 +138,7 @@ impl Header {
             data.directory.len() == DIRECTORY_FIELDS,
             "invalid directory column count"
         );
-        let min_label_raw = blocks
-            .checked_mul(4)
-            .and_then(|n| n.checked_add(4))
-            .context("label size overflow")?;
+        let min_label_raw = blocks.checked_add(4).context("label size overflow")?;
         let blocks_end = trailer.blocks_end(file_size);
         let mut next = blocks_end;
         let mut labels = Vec::with_capacity(data.labels.len());
@@ -160,18 +157,14 @@ impl Header {
             next == trailer.directory_start(file_size),
             "MIDX label region length mismatch"
         );
+        let max_directory_raw = blocks.checked_mul(10).context("directory size overflow")?;
         let mut directory = Vec::with_capacity(DIRECTORY_FIELDS);
-        for (section, kind) in data.directory.into_iter().zip(DIRECTORY_TYPES) {
-            let width = match kind {
-                DataType::Boolean => 1,
-                DataType::UInt32 => 4,
-                _ => 8,
-            };
-            let raw = blocks
-                .checked_mul(width)
-                .context("directory size overflow")?;
+        for section in data.directory {
             let column = Column::next(&mut next, section)?;
-            ensure!(column.raw == raw, "directory column row count mismatch");
+            ensure!(
+                (blocks..=max_directory_raw).contains(&column.raw),
+                "directory column size does not match its row count"
+            );
             directory.push(column);
         }
         ensure!(

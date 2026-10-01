@@ -26,6 +26,7 @@
  */
 
 import type { I18nKey } from "@/types/i18n";
+import { START_LOAD_STEP_ID } from "@/constants/synthetics";
 
 // ── Stream + field config (the single source of truth) ────────────────────
 
@@ -194,6 +195,8 @@ export interface SyntheticRunDetail extends SyntheticRun {
   failedStep: string | null;
   recordedSteps: RecordedStep[];
   lastAttemptSteps: StepExecution[];
+  /** Row 0 — a sibling of the steps, never one of them, so every `steps.length` reader is unchanged. */
+  startLoad: StartLoad | null;
   retryHistory: RetryAttempt[];
   /** Spec P5.4 — present exactly when the final attempt failed. */
   failureDetail: FailureDetail | null;
@@ -304,12 +307,16 @@ export interface StepExecution {
   settle_ms?: number;
 }
 
+/** The start load as the probe reports it: a step execution plus the URL it actually opened. */
+export type StartLoad = StepExecution & { url: string };
+
 export interface RetryAttempt {
   attempt: number;
   status: string;
   durationMs: number;
   failedStep: string | null;
   steps: StepExecution[];
+  startLoad: StartLoad | null;
   /** Why THIS attempt failed. Null on an attempt that passed. */
   failureDetail: FailureDetail | null;
   /** This attempt's own artifacts, uploaded under an attempt-scoped key. */
@@ -807,6 +814,7 @@ export interface RunLocationResult {
   executionId: string;
   traceKey: string | null;
   steps: StepResult[];
+  startLoad: (StepResult & { url: string }) | null;
   recordedSteps: RecordedStep[];
   retryHistory: RetryAttempt[];
 }
@@ -984,14 +992,24 @@ function parseAssertions(raw: unknown): ProtocolAssertionResult[] {
   }));
 }
 
-function parseSteps(raw: unknown): StepResult[] {
-  return parseJsonArray(raw).map((s: any) => ({
+function parseStep(s: any): StepResult {
+  return {
     stepId: str(s.step_id ?? s.id),
     status: s.status === "ok" || s.status === "passed" ? "ok" : "fail",
     durationMs: num(s.duration_ms),
     error: str(s.error),
     screenshotKey: s.screenshot_key ? str(s.screenshot_key) : null,
-  }));
+  };
+}
+
+function parseSteps(raw: unknown): StepResult[] {
+  return parseJsonArray(raw).map(parseStep);
+}
+
+function parseStartLoadResult(raw: unknown): (StepResult & { url: string }) | null {
+  const s = parseJson(raw);
+  if (!s || typeof s !== "object") return null;
+  return { ...parseStep(s), url: str((s as any).url) };
 }
 
 export function buildLastRunSql(monitorId: string, environment?: string): string {
@@ -1088,9 +1106,8 @@ const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
  * `evidence_by_step`. Those are JSON blob columns; on a 5000-row aggregation
  * one of them was ~20 MB of duplicated payload.
  *
- * Blob columns belong to the single-row detail query only
- * (`buildRunDetailSql` / `buildProtocolRunDetailSql` use `SELECT *`
- * deliberately — one row).
+ * Blob columns belong to the single-row detail query only: `buildRunDetailSql` names columns
+ * explicitly (see `RUN_DETAIL_COLUMNS`); `buildProtocolRunDetailSql` uses `SELECT *`.
  *
  * `buildRunsWithStepsSql` is the one intentional exception: it needs
  * `last_attempt_steps` and `retry_history` to tally per-step stats. It still
@@ -1484,7 +1501,8 @@ export function foldStepStream(
 
   for (const hit of aggregateHits) {
     const stepId = str(hit.step_id);
-    if (!stepId) continue;
+    // The stream groups by step_id, so row 0 arrives like a step; it is never a numbered one.
+    if (!stepId || stepId === START_LOAD_STEP_ID) continue;
     const executions = num(hit.executions);
     const failures = num(hit.failures);
     const flaky = num(hit.flaky);
@@ -1691,6 +1709,7 @@ const RUN_DETAIL_COLUMNS: { field: string; alias: string; fallback: string }[] =
   { field: "retry_step_ids", alias: "retry_step_ids", fallback: "''" },
   { field: "last_attempt_steps", alias: "last_attempt_steps", fallback: "''" },
   { field: "recorded_steps", alias: "recorded_steps", fallback: "''" },
+  { field: "start_load", alias: "start_load", fallback: "''" },
 ];
 
 /** run/execution WHERE clauses restricted to fields that exist in the schema.
@@ -1826,6 +1845,24 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
   };
 }
 
+function normaliseStepStatus(status: unknown): StepExecution["status"] {
+  if (status === "ok" || status === "passed") return "ok";
+  return status === "skipped" ? "skipped" : "fail";
+}
+
+/** `start_load` arrives nested on an attempt or as a JSON string on the record; both map here. */
+function mapStartLoad(raw: unknown): StartLoad | null {
+  const s = parseJson(raw);
+  if (!s || typeof s !== "object") return null;
+  const st = s as any;
+  return {
+    ...st,
+    step_id: str(st.step_id) || START_LOAD_STEP_ID,
+    status: normaliseStepStatus(st.status),
+    url: str(st.url),
+  };
+}
+
 /**
  * `status` is READ, not derived.
  *
@@ -1856,12 +1893,7 @@ function mapRetryHistory(raw: unknown): RetryAttempt[] {
     // a broken one.
     const steps: StepExecution[] = parseJsonArray(a?.steps).map((st: any) => ({
       ...st,
-      status:
-        st?.status === "ok" || st?.status === "passed"
-          ? ("ok" as const)
-          : st?.status === "skipped"
-            ? ("skipped" as const)
-            : ("fail" as const),
+      status: normaliseStepStatus(st?.status),
     }));
     const summed = steps.reduce((sum, st) => sum + (st.duration_ms ?? 0), 0);
     const refs: Array<{ step_id?: unknown; key?: unknown }> = Array.isArray(
@@ -1878,6 +1910,7 @@ function mapRetryHistory(raw: unknown): RetryAttempt[] {
         steps.find((st: any) => st.status === "failed" || st.status === "fail")?.step_id ??
         null,
       steps,
+      startLoad: mapStartLoad(a?.start_load),
       failureDetail: mapFailureDetail(a?.failure_detail),
       screenshotKeys: new Map(refs.map((r) => [str(r.step_id), str(r.key)])),
       traceKey: a?.artifacts?.trace_ref ? str(a.artifacts.trace_ref) : null,
@@ -1910,6 +1943,7 @@ export function buildAttemptViews(detail: SyntheticRunDetail): AttemptView[] {
         durationMs: detail.durationMs,
         failedStep: detail.failedStep,
         steps: detail.lastAttemptSteps,
+        startLoad: detail.startLoad,
         failureDetail: detail.failureDetail,
         screenshotKeys: new Map(),
         traceKey: detail.traceKey,
@@ -1926,6 +1960,7 @@ export function buildAttemptViews(detail: SyntheticRunDetail): AttemptView[] {
     return {
       ...a,
       steps: detail.lastAttemptSteps.length ? detail.lastAttemptSteps : a.steps,
+      startLoad: detail.startLoad ?? a.startLoad,
       failureDetail: detail.failureDetail ?? a.failureDetail,
       traceKey: detail.traceKey ?? a.traceKey,
       evidenceKey: detail.evidenceKey ?? a.evidenceKey,
@@ -2068,6 +2103,7 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
   const rawRecordedSteps = parseJson(rawHit.recorded_steps);
   const rawSteps = parseJson(rawHit.last_attempt_steps);
   const rawStepsArr = Array.isArray(rawSteps) ? (rawSteps as any[]) : [];
+  const failureDetail = mapFailureDetail(flattenedFailureDetail(rawHit), rawHit.trace_key);
 
   return {
     ...base,
@@ -2081,10 +2117,11 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
     // `parseJsonArray` on the fallback too — `retry_history` arrives as a JSON
     // string, so `Array.isArray` made this branch dead for every real record.
     attempts: num(rawHit.attempts) || parseJsonArray(rawHit.retry_history).length,
+    // A failing Step wins; `_start` is named only by `failure_detail`, since the start load is in no steps array.
     failedStep: rawHit.failed_step
       ? str(rawHit.failed_step)
       : (rawStepsArr.find((s: any) => s.status === "fail" || s.status === "failed")?.step_id ??
-        null),
+        (failureDetail?.stepId === START_LOAD_STEP_ID ? START_LOAD_STEP_ID : null)),
     recordedSteps: Array.isArray(rawRecordedSteps) ? (rawRecordedSteps as RecordedStep[]) : [],
     // `skipped` is a real outcome, not a failure. An `optional` step exists
     // precisely because it may not be there — a cookie banner, a one-time
@@ -2093,19 +2130,15 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
     // for. The type has always allowed all three; only this mapper did not.
     lastAttemptSteps: rawStepsArr.map((s: any) => ({
       ...s,
-      status:
-        s.status === "ok" || s.status === "passed"
-          ? ("ok" as const)
-          : s.status === "skipped"
-            ? ("skipped" as const)
-            : ("fail" as const),
+      status: normaliseStepStatus(s.status),
     })),
+    startLoad: mapStartLoad(rawHit.start_load),
     // The probe writes retry_history on every failed run; the mapper discarded
     // it before any component could read it. A step that failed once and passed
     // on the next attempt is transient by definition, and this is the only place
     // that fact survives.
     retryHistory: mapRetryHistory(rawHit.retry_history),
-    failureDetail: mapFailureDetail(flattenedFailureDetail(rawHit), rawHit.trace_key),
+    failureDetail,
     evidenceByStep: mapEvidence(rawHit.evidence_by_step),
     evidenceKey: rawHit.evidence_key ? str(rawHit.evidence_key) : null,
     evidenceTruncated: !!rawHit.evidence_truncated,
@@ -2167,6 +2200,7 @@ export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocati
     executionId: str(rawHit.execution_id),
     traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
     steps: parseSteps(rawHit.last_attempt_steps),
+    startLoad: parseStartLoadResult(rawHit.start_load),
     recordedSteps: parseJsonArray(rawHit.recorded_steps).map((s: any) => ({
       id: str(s.id),
       name: str(s.name),

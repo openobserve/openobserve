@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="sqlmode ? 'sql-mode' : 'normal-mode'"
       >
         <OIcon name="help" size="sm" />
-        {{ t("search.syntaxGuideLabel") }}
+        <!-- Icon-only on phones so the editor header keeps its actions on one row. -->
+        <span class="max-md:sr-only">{{ t("search.syntaxGuideLabel") }}</span>
       </OButton>
     </template>
     <div>

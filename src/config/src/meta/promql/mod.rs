@@ -69,8 +69,10 @@ where
 }
 
 pub mod grpc;
-pub mod midx;
+pub mod index;
 pub mod value;
+
+pub use index::MetricsBlockScan;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
@@ -80,8 +82,6 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
-/// Suffix of the extra table that declares the `(__hash__, _timestamp)` file order.
-pub const HASH_SORTED_TABLE_SUFFIX: &str = "__hash_sorted";
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///

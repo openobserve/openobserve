@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <span class="text-text-secondary text-2xs flex min-w-0 items-center gap-1" :data-test="dataTest">
     <OIcon name="account-tree" size="xs" class="shrink-0" aria-hidden="true" />
-    <span class="min-w-0 truncate" :data-test="`${dataTest}-text`">{{ text }}</span>
+    <span v-if="!compact" class="min-w-0 truncate" :data-test="`${dataTest}-text`">{{ text }}</span>
     <OTooltip :content="hint" />
   </span>
 </template>
@@ -37,9 +37,11 @@ const props = withDefaults(
   defineProps<{
     /** This view's own wording, when it says more than the default key. */
     label?: I18nText;
+    /** Icon only, for a toolbar with no room left for text. */
+    compact?: boolean;
     dataTest?: string;
   }>(),
-  { label: undefined, dataTest: "dbm-app-source-legend" },
+  { label: undefined, compact: false, dataTest: "dbm-app-source-legend" },
 );
 
 const { t } = useI18nTyped();

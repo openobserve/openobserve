@@ -110,6 +110,11 @@ impl ReadFilter {
         self.trace_stream.is_none() && self.agent_env.is_none()
     }
 
+    /// Values PromQL cannot quote are the caller's input error, not a read failure.
+    pub fn validate(&self) -> Result<(), String> {
+        self.edge_matcher().map(|_| ())
+    }
+
     fn edge_matcher(&self) -> Result<String, String> {
         let mut parts = Vec::with_capacity(2);
         if let Some(s) = self.trace_stream.as_deref() {
@@ -685,6 +690,20 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_read_filter_validate_refuses_control_chars() {
+        let ok = ReadFilter {
+            trace_stream: Some("default".to_string()),
+            agent_env: Some("prod\"x".to_string()),
+        };
+        assert!(ok.validate().is_ok());
+        let bad = ReadFilter {
+            trace_stream: Some("z\u{96}".to_string()),
+            agent_env: None,
+        };
+        assert!(bad.validate().is_err());
+    }
+
     const M: &str = "trace_stream=\"default\"";
     const ENV: &str = "agent_env=\"prod\"";
     const BOTH: &str = "trace_stream=\"default\",agent_env=\"prod\"";
@@ -755,9 +774,9 @@ mod tests {
             _matchers: promql_parser::label::Matchers,
             _label_selector: hashbrown::HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>
-        {
-            Ok(vec![(
+            _streaming: bool,
+        ) -> datafusion::error::Result<Vec<promql::ScanContext>> {
+            Ok(vec![promql::ScanContext::table(
                 self.ctx.clone(),
                 self.schema.clone(),
                 ScanStats::default(),

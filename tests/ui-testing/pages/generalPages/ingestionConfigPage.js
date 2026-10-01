@@ -44,6 +44,14 @@ export class IngestionConfigPage {
 
         // Count of integration route tabs in Recommended view (scoped to its container)
         this.recommendedRouteTabs = page.locator('[data-test="data-sources-recommended-tabs"] [data-test^="ingestion-recommended-tab-"]');
+
+        // Org passcode access-control selectors (feature: ingestion-passcode-forbidden).
+        // Normal surfaces render when the 200 path applies; the *-forbidden banners
+        // render only when GET /{org}/passcode returns 403 (enterprise-only UI state).
+        this.dataSourceSetupCard = page.locator('[data-test="data-source-setup-card"]');
+        this.dataSourceSetupCardForbidden = page.locator('[data-test="data-source-setup-card-passcode-forbidden"]');
+        this.copyContentForbidden = page.locator('[data-test="copy-content-passcode-forbidden"]');
+        this.rumContentText = page.locator('[data-test="rum-content-text"]');
     }
 
     // ==================== Navigation ====================
@@ -62,6 +70,11 @@ export class IngestionConfigPage {
 
     async navigateToIntegration(integrationPath, orgId) {
         await this.page.goto(`${process.env.ZO_BASE_URL}/web${integrationPath}?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+    }
+
+    async navigateToIngestion(orgId) {
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/ingestion?org_identifier=${orgId}`);
         await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     }
 
@@ -91,6 +104,28 @@ export class IngestionConfigPage {
 
     async verifyContentVisible() {
         await expect(this.contentText).toBeVisible();
+    }
+
+    // ==================== Org Passcode Access-Control Assertions ====================
+
+    async expectDataSourceSetupCardForbiddenVisible(timeout = 15000) {
+        await expect(this.dataSourceSetupCardForbidden).toBeVisible({ timeout });
+    }
+
+    async expectDataSourceSetupCardHidden() {
+        await expect(this.dataSourceSetupCard).toBeHidden();
+    }
+
+    async expectCopyContentForbiddenHidden() {
+        await expect(this.copyContentForbidden).toBeHidden();
+    }
+
+    async expectRumContentTextVisible(timeout = 15000) {
+        await expect(this.rumContentText).toBeVisible({ timeout });
+    }
+
+    async getRumContentText() {
+        return await this.rumContentText.textContent();
     }
 
     async verifyNotificationVisible(expectedText = null, timeout = 5000) {
