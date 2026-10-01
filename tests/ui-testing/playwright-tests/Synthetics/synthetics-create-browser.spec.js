@@ -21,16 +21,16 @@ const PageManager = require('../../pages/page-manager.js');
 const {
   assertSyntheticsEnabled,
   ensureSyntheticsLocation,
-  workerPrefix,
   uniqueName,
+  dummySecret,
   getCheck,
   findCheckByName,
-  deleteChecksByPrefix,
+  cleanupWorkerEntities,
 } = require('../utils/synthetics-helpers.js');
 
 const ORG = process.env['ORGNAME'];
 const START_URL = 'https://example.com';
-const BASIC_AUTH_PASSWORD = 'synth-e2e-basic-pass';
+const BASIC_AUTH_PASSWORD = dummySecret();
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -53,10 +53,7 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    await deleteChecksByPrefix(page, workerPrefix(testInfo));
-    await context.close();
+    await cleanupWorkerEntities(browser, testInfo);
   });
 
   // Gate → empty journey → navigate step + page_title assertion → Configure.
@@ -77,12 +74,15 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
 
   test('creates a browser check via Build manually', { tag: ['@P0'] }, async ({ page }, testInfo) => {
     const name = uniqueName('browser', testInfo);
+    testLogger.info('Building a two-step journey for a new browser check', { name });
     await buildTwoStepJourney(name);
+    testLogger.info('Selecting a location and saving the check disabled');
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);
     await pm.syntheticsCreatePage.save();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Verifying the saved check through the list and the API');
     const created = await findCheckByName(page, name);
     expect(created).toBeTruthy();
     await pm.syntheticsListPage.search(name);
@@ -95,18 +95,23 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
   });
 
   test('gate rejects an invalid start URL and disables Build', { tag: ['@P1'] }, async () => {
+    testLogger.info('Opening the browser create gate');
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'browser');
     await pm.syntheticsCreatePage.fillGate('ftp://x');
+    testLogger.info('Verifying the gate rejects the start URL');
     await pm.syntheticsCreatePage.expectGateUrlRejected();
   });
 
   test('a click step without a locator blocks Continue', { tag: ['@P1'] }, async ({ page }, testInfo) => {
+    testLogger.info('Opening the journey builder via Build manually');
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'browser');
     await pm.syntheticsCreatePage.fillGate(START_URL, uniqueName('nolocator', testInfo));
     await pm.syntheticsCreatePage.buildManually();
     await pm.syntheticsCreatePage.addNavigateStep(START_URL);
+    testLogger.info('Adding a step with no locator');
     // A new step defaults to `click` with an empty locator.
     await pm.syntheticsCreatePage.addStep();
+    testLogger.info('Verifying Continue is blocked by the locator error');
     await pm.syntheticsCreatePage.continueToConfigure();
     await pm.syntheticsCreatePage.expectStepLocatorError();
     await pm.syntheticsCreatePage.expectOnJourneyStep();
@@ -114,7 +119,9 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
 
   test('auth, retries, alerts and variables persist', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const name = uniqueName('configure', testInfo);
+    testLogger.info('Building a journey for a new browser check', { name });
     await buildTwoStepJourney(name);
+    testLogger.info('Setting auth, retries, alerts and a variable');
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);
     await pm.syntheticsCreatePage.setBasicAuth('e2e-user', BASIC_AUTH_PASSWORD);
@@ -122,9 +129,11 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
     await pm.syntheticsCreatePage.setRetries(1, 30);
     await pm.syntheticsCreatePage.setAlerts(3, 10);
     await pm.syntheticsCreatePage.addVariable('BASE_URL', START_URL);
+    testLogger.info('Saving the check and capturing the response');
     const response = await pm.syntheticsCreatePage.saveCapturingResponse();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Verifying the configure fields persisted through the API');
     expect([200, 201]).toContain(response.status);
     expect(response.text).not.toContain(BASIC_AUTH_PASSWORD);
     const { body } = await getCheck(page, response.body.id);
@@ -138,21 +147,25 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
   });
 
   test('variables panel validates names and undoes a removal', { tag: ['@P2'] }, async ({ page }, testInfo) => {
+    testLogger.info('Building a journey to reach the variables panel');
     await buildTwoStepJourney(uniqueName('variables', testInfo));
     const c = pm.syntheticsCreatePage;
 
+    testLogger.info('Verifying an invalid variable name is rejected');
     await c.openAddVariable();
     await c.typeVariableName('1abc');
     await c.expectVariableNameError('Names start with a letter or underscore');
     await c.addVariable('A', '1');
     await c.expectVariableCount(1);
 
+    testLogger.info('Verifying a duplicate variable name is rejected');
     await c.openAddVariable();
     await c.typeVariableName('A');
     await c.expectVariableNameError('A variable with this name already exists.');
     await c.addVariable('B', '2');
     await c.expectVariableCount(2);
 
+    testLogger.info('Removing a variable and undoing the removal');
     await c.removeVariable(1);
     await c.expectVariableCount(1);
     await c.undoVariableRemoval();
@@ -161,8 +174,10 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
 
   test('tags, description and device matrix round-trip', { tag: ['@P2'] }, async ({ page }, testInfo) => {
     const name = uniqueName('details', testInfo);
+    testLogger.info('Building a journey for a new browser check', { name });
     await buildTwoStepJourney(name);
     const c = pm.syntheticsCreatePage;
+    testLogger.info('Setting tags, description and a second device');
     await c.selectLocation(locationId);
     await c.setEnabled(false);
     await c.addTag('alpha');
@@ -175,6 +190,7 @@ test.describe('Synthetics create — browser (build manually)', { tag: ['@synthe
     await c.save();
     await c.expectSavedAndListed();
 
+    testLogger.info('Verifying tags, description and devices through the API');
     const created = await findCheckByName(page, name);
     expect(created).toBeTruthy();
     const { body } = await getCheck(page, created.id);

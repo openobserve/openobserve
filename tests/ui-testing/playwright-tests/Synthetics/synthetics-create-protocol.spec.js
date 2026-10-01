@@ -21,15 +21,15 @@ const PageManager = require('../../pages/page-manager.js');
 const {
   assertSyntheticsEnabled,
   ensureSyntheticsLocation,
-  workerPrefix,
   uniqueName,
+  dummySecret,
   getCheck,
   findCheckByName,
-  deleteChecksByPrefix,
+  cleanupWorkerEntities,
 } = require('../utils/synthetics-helpers.js');
 
 const ORG = process.env['ORGNAME'];
-const SSH_SECRET = 'synth-e2e-secret';
+const SSH_SECRET = dummySecret();
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -52,23 +52,23 @@ test.describe('Synthetics create — TCP / TLS / SSH', { tag: ['@synthetics', '@
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    await deleteChecksByPrefix(page, workerPrefix(testInfo));
-    await context.close();
+    await cleanupWorkerEntities(browser, testInfo);
   });
 
   test('creates a TCP check', { tag: ['@P0'] }, async ({ page }, testInfo) => {
     const name = uniqueName('tcp', testInfo);
+    testLogger.info('Opening the TCP create form', { name });
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'tcp');
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('example.com');
     await pm.syntheticsCreatePage.fillTcp(443);
+    testLogger.info('Selecting a location and saving the check disabled');
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);
     await pm.syntheticsCreatePage.save();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Verifying the TCP check through the list and the API');
     const created = await findCheckByName(page, name);
     expect(created).toBeTruthy();
     await pm.syntheticsListPage.search(name);
@@ -80,16 +80,19 @@ test.describe('Synthetics create — TCP / TLS / SSH', { tag: ['@synthetics', '@
 
   test('creates a TLS check', { tag: ['@P0'] }, async ({ page }, testInfo) => {
     const name = uniqueName('tls', testInfo);
+    testLogger.info('Opening the TLS create form', { name });
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'tls');
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('example.com');
     await pm.syntheticsCreatePage.fillTls({ port: 443, minDays: 7 });
     await pm.syntheticsCreatePage.setTlsVerifyChain(false);
+    testLogger.info('Selecting a location and saving the check disabled');
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);
     await pm.syntheticsCreatePage.save();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Verifying the TLS config through the API');
     const created = await findCheckByName(page, name);
     expect(created).toBeTruthy();
     const { body } = await getCheck(page, created.id);
@@ -100,15 +103,18 @@ test.describe('Synthetics create — TCP / TLS / SSH', { tag: ['@synthetics', '@
 
   test('creates an SSH check and the response redacts the secret', { tag: ['@P0'] }, async ({ page }, testInfo) => {
     const name = uniqueName('ssh', testInfo);
+    testLogger.info('Opening the SSH create form', { name });
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'ssh');
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('example.com');
     await pm.syntheticsCreatePage.fillSsh({ port: 22, username: 'e2e', secret: SSH_SECRET });
+    testLogger.info('Selecting a location and saving the check disabled');
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);
     const response = await pm.syntheticsCreatePage.saveCapturingResponse();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Verifying the save response redacts the secret');
     expect([200, 201]).toContain(response.status);
     // GET returns the secret in plaintext by design; only the write response is redacted.
     expect(response.text).not.toContain(SSH_SECRET);
@@ -120,13 +126,16 @@ test.describe('Synthetics create — TCP / TLS / SSH', { tag: ['@synthetics', '@
 
   test('server rejects a URL-shaped host target', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const name = uniqueName('badhost', testInfo);
+    testLogger.info('Filling a TCP check with a URL-shaped target', { name });
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'tcp');
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('https://example.com');
     await pm.syntheticsCreatePage.fillTcp(443);
     await pm.syntheticsCreatePage.selectLocation(locationId);
+    testLogger.info('Saving and capturing the response');
     const response = await pm.syntheticsCreatePage.saveCapturingResponse();
 
+    testLogger.info('Verifying the server rejects the target');
     expect(response.status).toBe(400);
     await pm.syntheticsCreatePage.expectToast('target: expected host or host:port');
     expect(await findCheckByName(page, name)).toBeNull();

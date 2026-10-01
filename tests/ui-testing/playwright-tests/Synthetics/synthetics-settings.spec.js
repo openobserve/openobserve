@@ -21,15 +21,13 @@ const PageManager = require('../../pages/page-manager.js');
 const {
   assertSyntheticsEnabled,
   ensureSyntheticsLocation,
-  workerPrefix,
   uniqueName,
   listLocations,
   createLocation,
-  deleteLocation,
   listTokens,
-  disableTokensByPrefix,
   request,
   apiBase,
+  cleanupWorkerEntities,
 } = require('../utils/synthetics-helpers.js');
 
 const ORG = process.env['ORGNAME'];
@@ -57,14 +55,7 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    const prefix = `${PROVIDER}-${workerPrefix(testInfo)}`;
-    for (const loc of await listLocations(page).catch(() => [])) {
-      if (typeof loc?.id === 'string' && loc.id.startsWith(prefix)) await deleteLocation(page, loc.id);
-    }
-    await disableTokensByPrefix(page, workerPrefix(testInfo));
-    await context.close();
+    await cleanupWorkerEntities(browser, testInfo);
   });
 
   async function seedLocation(page, testInfo, overrides = {}) {
@@ -83,35 +74,44 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
   test('adds a public location from Settings', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const region = uniqueName('loc', testInfo);
     const id = `${PROVIDER}-${region}`;
+    testLogger.info('Opening the locations settings in the meta org');
     const s = pm.syntheticsSettingsPage;
     await s.gotoLocations(META_ORG);
+    testLogger.info('Adding a public location', { locationId: id });
     await s.openAddForm();
     await s.fillLocationForm({ label: `E2E ${region}`, provider: 'custom', customProvider: PROVIDER, region });
     await s.submitLocationForm();
+    testLogger.info('Verifying the location is listed');
     await s.expectToast('Location created successfully');
     await s.expectLocationRow(id);
     expect(await findLocation(page, id)).toBeTruthy();
   });
 
   test('edits a location label', { tag: ['@P1'] }, async ({ page }, testInfo) => {
+    testLogger.info('Seeding a public location via the API');
     const loc = await seedLocation(page, testInfo);
     const s = pm.syntheticsSettingsPage;
+    testLogger.info('Editing the location label', { locationId: loc.id });
     await s.gotoLocations(META_ORG);
     await s.openEditForm(loc.id);
     await s.fillLocationForm({ label: `${loc.label} edited` });
     await s.submitLocationForm();
+    testLogger.info('Verifying the new label');
     await s.expectToast('Location updated successfully');
     expect((await findLocation(page, loc.id)).label).toBe(`${loc.label} edited`);
   });
 
   test('disables then enables a location', { tag: ['@P1'] }, async ({ page }, testInfo) => {
+    testLogger.info('Seeding a public location via the API');
     const loc = await seedLocation(page, testInfo);
     const s = pm.syntheticsSettingsPage;
+    testLogger.info('Disabling the location', { locationId: loc.id });
     await s.gotoLocations(META_ORG);
     await s.toggleLocation(loc.id, 'disable');
     await s.expectToast('Location disabled');
     await s.expectLocationToggle(loc.id, 'enable');
     expect((await findLocation(page, loc.id)).enabled).toBe(false);
+    testLogger.info('Enabling the location', { locationId: loc.id });
     await s.toggleLocation(loc.id, 'enable');
     await s.expectToast('Location enabled');
     await s.expectLocationToggle(loc.id, 'disable');
@@ -119,38 +119,48 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
   });
 
   test('deletes a location with confirmation', { tag: ['@P1'] }, async ({ page }, testInfo) => {
+    testLogger.info('Seeding a public location via the API');
     const loc = await seedLocation(page, testInfo);
     const s = pm.syntheticsSettingsPage;
+    testLogger.info('Deleting the location', { locationId: loc.id });
     await s.gotoLocations(META_ORG);
     await s.deleteLocation(loc.id);
+    testLogger.info('Verifying the location is deleted');
     await s.expectToast('Location deleted successfully');
     await s.expectLocationRowAbsent(loc.id);
     expect(await findLocation(page, loc.id)).toBeNull();
   });
 
   test('a disabled location is not offered in Configure', { tag: ['@P1'] }, async ({ page }, testInfo) => {
+    testLogger.info('Seeding a disabled location via the API');
     const loc = await seedLocation(page, testInfo, { enabled: false });
+    testLogger.info('Verifying Configure does not offer the location', { locationId: loc.id });
     const c = pm.syntheticsCreatePage;
     await c.gotoCreate(ORG, 'http');
     await c.expectLocationOffered(loc.id, false, { loadedId: sharedLocationId });
 
+    testLogger.info('Enabling the location from Settings');
     await pm.syntheticsSettingsPage.gotoLocations(META_ORG);
     await pm.syntheticsSettingsPage.toggleLocation(loc.id, 'enable');
     await pm.syntheticsSettingsPage.expectToast('Location enabled');
+    testLogger.info('Verifying Configure offers the location');
     await c.gotoCreate(ORG, 'http');
     await c.expectLocationOffered(loc.id, true);
   });
 
   test('import validates each item', { tag: ['@P2'] }, async ({ page }, testInfo) => {
     const region = uniqueName('loc', testInfo);
+    testLogger.info('Opening the locations settings in the meta org');
     const s = pm.syntheticsSettingsPage;
     await s.gotoLocations(META_ORG);
+    testLogger.info('Pasting import JSON with one invalid item');
     await s.pasteImportJson(JSON.stringify([
       { provider: PROVIDER, region, label: `E2E ${region}` },
       { provider: PROVIDER, label: 'missing region' },
     ]));
     // Client-side validation lists only the invalid items, so the second item is error 0.
     await s.expectImportError(0, 'Region is required for item 2');
+    testLogger.info('Running the import');
     // The import view unmounts itself shortly after success, so the outcome is read from the toast and the API.
     await s.runImport();
     await s.expectToast('1 locations imported successfully');
@@ -158,24 +168,29 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
   });
 
   test('locations tab is hidden outside the meta org', { tag: ['@P2'] }, async () => {
+    testLogger.info('Verifying the locations tab in the meta org');
     const s = pm.syntheticsSettingsPage;
     await s.gotoSettings(META_ORG);
     await s.expectLocationsTabCount(1);
+    testLogger.info('Verifying the locations tab is hidden in the user org');
     await s.gotoSettings(ORG);
     await s.expectLocationsTabCount(0);
   });
 
   test('creates then disables a token', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const name = uniqueName('tok', testInfo);
+    testLogger.info('Creating a token from Settings', { tokenName: name });
     const s = pm.syntheticsSettingsPage;
     await s.gotoTokens(ORG);
     const created = await s.createToken(name);
     expect(created.status).toBe(200);
     await s.expectToast('Token created');
+    testLogger.info('Verifying the token is listed and enabled');
     await s.closeRevealDialog();
     await s.expectTokenRow(name);
     expect((await listTokens(page)).find((t) => t.name === name)?.enabled).toBe(true);
 
+    testLogger.info('Disabling the token');
     await s.toggleToken(name);
     await s.expectToast('Token disabled');
     expect((await listTokens(page)).find((t) => t.name === name)?.enabled).toBe(false);
@@ -183,10 +198,12 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
 
   // The form schema rejects the name before any request is made; the server rule is covered directly.
   test('the reserved token name "default" is rejected', { tag: ['@P2'] }, async ({ page }) => {
+    testLogger.info('Submitting the reserved token name in the form');
     const s = pm.syntheticsSettingsPage;
     await s.gotoTokens(ORG);
     await s.submitTokenName('default');
     await s.expectTokenNameError('reserved');
+    testLogger.info('Verifying the server rejects the reserved name');
     const server = await request(page, 'post', `${apiBase()}/agent-tokens`, { name: 'default' });
     expect(server.status).toBe(400);
     expect(String(server.body?.message ?? '')).toContain('reserved');

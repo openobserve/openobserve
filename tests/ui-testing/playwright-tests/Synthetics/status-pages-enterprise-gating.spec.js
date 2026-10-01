@@ -4,6 +4,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { GATED_ITEMS } = require('../../pages/generalPages/statusPagesPage.js');
+const { uniqueName } = require('../utils/synthetics-helpers.js');
 
 test.describe.configure({ mode: 'serial' });
 
@@ -22,7 +23,8 @@ async function seedStatusPage(page, orgId) {
   const response = await page.request.post(`${baseUrl}/api/${orgId}/status_pages`, {
     headers,
     data: {
-      name: `Enterprise Gating Test Page ${Date.now()}`,
+      // The synth_e2e_ prefix lets cleanup.spec.js sweep pages that a crashed run left behind.
+      name: uniqueName('status_page', test.info()),
       description: 'seeded by status-pages-enterprise-gating.spec.js',
     },
   });

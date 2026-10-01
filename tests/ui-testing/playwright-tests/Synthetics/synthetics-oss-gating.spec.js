@@ -49,21 +49,27 @@ test.describe('Synthetics — OSS gating', { tag: ['@synthetics', '@all', '@oss'
   });
 
   test('private locations tab is hidden and the section falls back to checks', { tag: ['@P1'] }, async () => {
+    testLogger.info('Verifying the config reports private locations disabled');
     expect(config.synthetics_private_locations_enabled).toBe(false);
     const l = pm.syntheticsListPage;
+    testLogger.info('Opening the private locations section');
     await l.goto(ORG, { section: 'private' });
     await l.expectPrivateSectionAbsent();
   });
 
   test('creating a private location returns 400', { tag: ['@P1'] }, async ({ page }) => {
+    testLogger.info('Creating a private location via the API');
     const { status, body } = await createLocation(page, { kind: 'private', region: 'x', label: 'x' });
+    testLogger.info('Verifying the server rejects the private location');
     expect(status).toBe(400);
     expect(String(body?.message ?? '')).toContain('private locations require enterprise');
   });
 
   test('Configure offers no private section', { tag: ['@P2'] }, async () => {
     const c = pm.syntheticsCreatePage;
+    testLogger.info('Opening the HTTP create form');
     await c.gotoCreate(ORG, 'http');
+    testLogger.info('Verifying no private location section is offered');
     await c.expectLocationOffered(locationId, true);
     await c.expectNoPrivateLocationSection();
   });
