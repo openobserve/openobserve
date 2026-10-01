@@ -42,10 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-setup-banner"
   >
     <span class="flex min-w-0 items-center gap-x-3">
-      <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
+      <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase max-md:hidden">
         {{ t("oncall.setupFinish") }}
       </span>
-      <span class="text-text-body min-w-0 truncate text-sm" data-test="oncall-setup-next">
+      <span
+        class="text-text-body min-w-0 truncate text-sm max-lg:line-clamp-2 max-lg:whitespace-normal"
+        data-test="oncall-setup-next"
+      >
         {{ t("oncall.setupNextStep", { step: nextStep.title }) }}
       </span>
     </span>

@@ -148,23 +148,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="xs"
+            class="max-md:hidden"
             :data-test="`oncall-unrouted-claim-${row.id}`"
             @click.stop="emit('claim', row)"
           >
-            {{
-              teamName
-                ? t("oncall.unroutedClaimFor", { team: raw(teamName) })
-                : t("oncall.unroutedWriteRule")
-            }}
+            {{ claimLabel }}
           </OButton>
           <OButton
             variant="ghost"
             size="icon-sm"
             icon-left="close"
+            class="max-md:hidden"
             :aria-label="t('oncall.unroutedDismiss')"
             :data-test="`oncall-unrouted-dismiss-${row.id}`"
             @click.stop="emit('dismiss', row)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :aria-label="t('oncall.moreActions')"
+                data-test="oncall-unrouted-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="alt-route"
+              class="md:hidden"
+              :data-test="`oncall-unrouted-claim-${row.id}-menu`"
+              @select="emit('claim', row)"
+            >
+              <span>{{ claimLabel }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="close"
+              class="md:hidden"
+              :data-test="`oncall-unrouted-dismiss-${row.id}-menu`"
+              @select="emit('dismiss', row)"
+            >
+              <span>{{ t("oncall.unroutedDismiss") }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </span>
       </template>
 
@@ -203,6 +230,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -250,6 +279,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+const claimLabel = computed<I18nText>(() =>
+  props.teamName
+    ? t("oncall.unroutedClaimFor", { team: raw(props.teamName) })
+    : t("oncall.unroutedWriteRule"),
+);
 
 const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
   {

@@ -170,20 +170,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the rows this page happened to have walked hid a team's older
                pages entirely past the fetch cap. -->
           <OSelect
+            v-if="!isMobile"
             v-model="teamFilter"
             :options="teamOptions"
             :disabled="!teamsAvailable"
             :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
             width="sm"
-            class="max-md:w-36"
             data-test="oncall-responses-team-filter"
             @update:model-value="() => fetchResponses()"
           />
           <OSelect
+            v-if="!isMobile"
             v-model="priorityFilter"
             :options="priorityOptions"
             width="xs"
-            class="max-md:w-28"
             data-test="oncall-responses-priority-filter"
           />
           <!-- `basis-40` so the search keeps a usable width once the row
@@ -198,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- On by default. A rule firing every minute is one problem, not
                ninety-five, and the ungrouped view is for reading history. -->
           <OCheckbox
+            v-if="!isMobile"
             v-model="grouped"
             :label="t('oncall.groupByAlert')"
             data-test="oncall-responses-group-toggle"
@@ -209,15 +210,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                rather than `includeResolved`, which stays true once fetched
                even after the reader narrows away from resolved rows. -->
           <OSelect
-            v-if="sectionVisibility.resolved"
+            v-if="!isMobile && sectionVisibility.resolved"
             :model-value="causeFilter"
             :options="causeOptions"
             :placeholder="t('oncall.causeFilterAny')"
             width="sm"
-            class="max-md:w-36"
             data-test="oncall-responses-cause-filter"
             @update:model-value="onCauseFilter"
           />
+          <!-- A phone toolbar is one row, so everything that narrows the list waits behind one button. -->
+          <OPopover
+            v-if="isMobile"
+            align="end"
+            content-class="w-72"
+            :aria-label="t('oncall.filters')"
+          >
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="filter-list"
+                :active="narrowed"
+                :aria-label="t('oncall.filters')"
+                data-test="oncall-responses-filters-btn"
+              />
+            </template>
+            <div class="flex flex-col gap-3 p-3" data-test="oncall-responses-filters-panel">
+              <OSelect
+                v-model="teamFilter"
+                :options="teamOptions"
+                :disabled="!teamsAvailable"
+                :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
+                data-test="oncall-responses-team-filter"
+                @update:model-value="() => fetchResponses()"
+              />
+              <OSelect
+                v-model="priorityFilter"
+                :options="priorityOptions"
+                data-test="oncall-responses-priority-filter"
+              />
+              <OSelect
+                v-if="sectionVisibility.resolved"
+                :model-value="causeFilter"
+                :options="causeOptions"
+                :placeholder="t('oncall.causeFilterAny')"
+                data-test="oncall-responses-cause-filter"
+                @update:model-value="onCauseFilter"
+              />
+              <OCheckbox
+                v-model="grouped"
+                :label="t('oncall.groupByAlert')"
+                data-test="oncall-responses-group-toggle"
+              />
+            </div>
+          </OPopover>
         </div>
       </template>
 
@@ -314,8 +360,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
            `sectionKey` rather than `key`: Vue reserves `key` on a slot outlet. -->
       <template #group-header="{ sectionKey }">
+        <!-- The cell spans the scrolled table, so a phone pins this to the visible width or the sentence runs off screen. -->
         <div
-          class="px-page-edge flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5"
+          class="px-page-edge flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 max-md:sticky max-md:left-0 max-md:w-[100cqw]"
           :data-test="`oncall-section-header-${sectionKey}`"
         >
           <span
@@ -561,7 +608,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- What already happened, without leaving the triage list. The detail
            screen stays the place to act; this is the place to read. -->
       <template #expansion="{ row }">
-        <div class="px-page-edge py-3" :data-test="`oncall-expansion-${row.rowKey}`">
+        <div
+          class="px-page-edge py-3 max-md:sticky max-md:left-0 max-md:w-[100cqw]"
+          :data-test="`oncall-expansion-${row.rowKey}`"
+        >
           <OInnerLoading v-if="expandedLoading" showing />
           <template v-else>
             <div class="mb-2 flex justify-end">
@@ -601,17 +651,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            more-menu, as it does on every other list in the app. -->
       <template #cell-actions="{ row }">
         <!-- The slot's wrapper is inline-flex and shrinks to content by design, so pin to the column's resolved width directly instead of `w-full`. -->
-        <span class="flex items-center justify-between" :style="{ width: actionsColumnWidthVar }">
+        <span
+          class="flex items-center justify-between max-md:w-auto! max-md:justify-center"
+          :style="{ width: actionsColumnWidthVar }"
+        >
           <ODropdown v-if="!row.latest.team_id">
             <template #trigger>
               <OButton
                 variant="outline"
                 size="xs"
+                class="max-md:ps-2 max-md:pe-2"
                 :loading="busyId === row.rowKey"
+                :aria-label="isMobile ? t('oncall.assignTeamShort') : undefined"
                 :data-test="`oncall-row-assign-${row.rowKey}`"
                 @click.stop
               >
-                {{ t("oncall.assignTeamShort") }}
+                <OIcon v-if="isMobile" name="group-add" size="sm" />
+                <template v-else>{{ t("oncall.assignTeamShort") }}</template>
               </OButton>
             </template>
 
@@ -635,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="primaryAction(row) === 'acknowledge'"
               variant="primary"
               size="xs"
-              class="w-28"
+              class="w-28 max-md:hidden"
               :loading="busyId === row.rowKey"
               :data-test="`oncall-row-ack-${row.rowKey}`"
               @click.stop="acknowledgeRow(row)"
@@ -646,7 +702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="primaryAction(row) === 'resolve'"
               variant="outline"
               size="xs"
-              class="w-28"
+              class="w-28 max-md:hidden"
               :loading="busyId === row.rowKey"
               :data-test="`oncall-row-resolve-${row.rowKey}`"
               @click.stop="resolveRow(row)"
@@ -657,7 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               variant="outline"
               size="xs"
-              class="w-28"
+              class="w-28 max-md:hidden"
               :data-test="`oncall-row-timeline-${row.rowKey}`"
               @click.stop="openResponse(row)"
             >
@@ -667,7 +723,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Hidden when the row has nothing left to offer: a closed page's
                  only action is already the button beside it, and a menu whose
                  single item is the thing you just clicked is furniture. -->
-            <ODropdown v-if="canAcknowledge(row) || menuActions(row).length">
+            <ODropdown v-if="isMobile || canAcknowledge(row) || menuActions(row).length">
               <template #trigger>
                 <OButton
                   variant="ghost"
@@ -679,6 +735,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OTooltip side="bottom" :content="t('oncall.moreActions')" />
                 </OButton>
+              </template>
+
+              <!-- A phone has room for one control per row, so the menu is always there and leads with the row's next step. -->
+              <template v-if="isMobile">
+                <ODropdownItem
+                  v-if="primaryAction(row) === 'acknowledge'"
+                  :data-test="`oncall-row-ack-${row.rowKey}-menu`"
+                  @select="acknowledgeRow(row)"
+                >
+                  <template #icon-left>
+                    <OIcon name="check" size="sm" />
+                  </template>
+                  {{ t("oncall.acknowledge") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  v-else-if="primaryAction(row) === 'resolve'"
+                  :data-test="`oncall-row-resolve-${row.rowKey}-menu`"
+                  @select="resolveRow(row)"
+                >
+                  <template #icon-left>
+                    <OIcon name="task-alt" size="sm" />
+                  </template>
+                  {{ t("oncall.resolve") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  v-else
+                  :data-test="`oncall-row-timeline-${row.rowKey}-menu`"
+                  @select="openResponse(row)"
+                >
+                  <template #icon-left>
+                    <OIcon name="format-list-bulleted" size="sm" />
+                  </template>
+                  {{ t("oncall.timeline") }}
+                </ODropdownItem>
+                <ODropdownSeparator v-if="canAcknowledge(row) || menuActions(row).length" />
               </template>
 
               <!-- Grouped rather than four loose items: they are one decision
@@ -820,6 +911,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
@@ -1046,6 +1138,11 @@ const isFiltered = computed(
     priorityFilter.value !== "all" ||
     mineScope.value ||
     activeFilter.value !== "all",
+);
+
+/// Only what the phone filter button hides: it lights up so a narrowed list never looks like the whole one.
+const narrowed = computed(
+  () => teamFilter.value !== "all" || priorityFilter.value !== "all" || !!causeFilter.value,
 );
 
 const showChecklist = computed(
