@@ -849,6 +849,7 @@ export const convertPromQLData = async (
         isTimeSeriesFlag = false;
         const series = it?.result?.map((metric: any) => {
           const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
+          const latestValue = values[values.length - 1]?.[1];
           gaugeIndex++;
 
           const seriesName = seriesNames.get(metric.metric) ?? "";
@@ -883,8 +884,7 @@ export const convertPromQLData = async (
             data: [
               {
                 name: seriesName,
-                // taking first value for gauge
-                value: values?.[0]?.[1] ?? 0,
+                value: latestValue ?? 0,
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
@@ -899,12 +899,12 @@ export const convertPromQLData = async (
                 itemStyle: {
                   color: (() => {
                     const defaultColor = null;
-                    if (!values?.[0]?.[1]) return defaultColor;
+                    if (!latestValue) return defaultColor;
                     return (
                       getSeriesColor(
                         panelSchema?.config?.color,
                         seriesName,
-                        values[0][1],
+                        latestValue,
                         chartMin,
                         chartMax,
                         store.state.theme,
