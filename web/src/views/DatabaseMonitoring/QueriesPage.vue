@@ -215,7 +215,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="columnVisibility"
         :persist-columns="true"
         table-id="dbm-queries"
-        :footer-title="t('dbm.queries.stmtClass.query')"
         :enable-column-resize="true"
         :row-class="rowClass"
         :get-row-style="rowStyle"
@@ -558,10 +557,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dbm-server-queries-mean-time"
             />
           </template>
-          <template #bottom>
-            <div v-if="serverTruncated" class="text-text-secondary px-page-edge py-1.5 text-xs">
-              {{ t("dbm.queries.serverList.truncated", { count: serverRows.length }) }}
-            </div>
+          <template v-if="serverTruncated" #footer-note>
+            <span>{{ t("dbm.queries.serverList.truncated", { count: serverRows.length }) }}</span>
           </template>
         </OTable>
       </section>
