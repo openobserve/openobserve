@@ -480,6 +480,14 @@ pub struct DomainOrgMapping {
     pub user_group: Option<String>,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct BudgetNotificationConfiguration {
+    pub org_id: String,
+    pub total_budget_amount: f64,
+    pub warn_at_amount: f64,
+    pub paused: bool,
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -513,6 +521,8 @@ pub struct OrganizationSettingPayload {
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -555,6 +565,9 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_org_mappings: Vec<DomainOrgMapping>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub budget_config: Vec<BudgetNotificationConfiguration>,
 }
 
 impl Default for OrganizationSetting {
@@ -590,6 +603,8 @@ impl Default for OrganizationSetting {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
+            #[cfg(feature = "cloud")]
+            budget_config: Vec::new(),
         }
     }
 }
@@ -1460,6 +1475,7 @@ mod tests {
             claim_parser_function: None,
             cross_links: None,
             domain_org_mappings: None,
+            budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1538,6 +1554,8 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1568,6 +1586,8 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

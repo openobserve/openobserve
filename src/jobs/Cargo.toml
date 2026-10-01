@@ -86,6 +86,7 @@ proto.workspace = true
 regex.workspace = true
 report_server.workspace = true
 reqwest.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tonic.workspace = true

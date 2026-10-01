@@ -69,8 +69,14 @@ const trackClasses = computed(() => [
 const fillClasses = computed(() => [
   "h-full rounded-full transition-[width] duration-300 ease-out",
   "flex items-center justify-center overflow-hidden",
-  variantFillClasses[props.variant ?? "default"],
+  props.color ? "" : variantFillClasses[props.variant ?? "default"],
 ]);
+
+const fillStyle = computed(() => ({
+  marginInlineStart: offset.value,
+  width: percentage.value,
+  ...(props.color ? { backgroundColor: props.color } : {}),
+}));
 </script>
 
 <template>
@@ -81,7 +87,7 @@ const fillClasses = computed(() => [
     aria-valuemin="0"
     aria-valuemax="100"
   >
-    <div :class="fillClasses" :style="{ marginInlineStart: offset, width: percentage }">
+    <div :class="fillClasses" :style="fillStyle">
       <span
         v-if="$slots.default"
         class="text-progress-bar-label text-xs leading-none font-semibold select-none"
