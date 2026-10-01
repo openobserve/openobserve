@@ -21,10 +21,23 @@
 
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+
+const METADATA_IPS: [IpAddr; 2] = [
+    IpAddr::V4(Ipv4Addr::new(169, 254, 169, 254)),
+    IpAddr::V6(Ipv6Addr::new(0xfd00, 0xec2, 0, 0, 0, 0, 0, 0x254)),
+];
+
+static ALLOWLIST: LazyLock<SsrfAllowlist> = LazyLock::new(|| {
+    let cfg = crate::get_config();
+    SsrfAllowlist::parse(
+        &cfg.common.ssrf_allowed_cidrs,
+        &cfg.common.ssrf_allowed_hosts,
+    )
+});
 
 pub struct SsrfGuard;
 
@@ -32,10 +45,15 @@ impl SsrfGuard {
     pub fn validate_url_with_config(url: &str) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
         let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        Self::validate_url_inner(url, allow_loopback, skip_ssrf)
+        Self::validate_url_inner(url, allow_loopback, skip_ssrf, &ALLOWLIST)
     }
 
-    fn validate_url_inner(url: &str, allow_loopback: bool, skip_ssrf: bool) -> Result<(), String> {
+    fn validate_url_inner(
+        url: &str,
+        allow_loopback: bool,
+        skip_ssrf: bool,
+        allowlist: &SsrfAllowlist,
+    ) -> Result<(), String> {
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
 
         if parsed.scheme() != "http" && parsed.scheme() != "https" {
@@ -61,7 +79,8 @@ impl SsrfGuard {
         };
 
         if let Ok(ip_addr) = unbracketed_host.parse::<IpAddr>() {
-            if Self::is_private_ip_inner(&ip_addr, allow_loopback) {
+            if Self::is_private_ip_inner(&ip_addr, allow_loopback) && !allowlist.allows_ip(&ip_addr)
+            {
                 return Err(format!(
                     "Access to private IP address {} is not allowed for security reasons. \
                      This prevents Server-Side Request Forgery (SSRF) attacks.",
@@ -70,8 +89,10 @@ impl SsrfGuard {
             }
         } else {
             let lower_host = host.to_lowercase();
+            let host_allowed = allowlist.allows_host(host);
 
             if !allow_loopback
+                && !host_allowed
                 && (lower_host == "localhost"
                     || lower_host.starts_with("localhost.")
                     || lower_host == "127.0.0.1")
@@ -79,11 +100,12 @@ impl SsrfGuard {
                 return Err("Access to localhost is not allowed for security reasons".to_string());
             }
 
-            if lower_host.ends_with(".internal")
-                || lower_host.ends_with(".local")
-                || lower_host.ends_with(".localdomain")
-                || lower_host.ends_with(".lan")
-                || lower_host.contains(".local.")
+            if !host_allowed
+                && (lower_host.ends_with(".internal")
+                    || lower_host.ends_with(".local")
+                    || lower_host.ends_with(".localdomain")
+                    || lower_host.ends_with(".lan")
+                    || lower_host.contains(".local."))
             {
                 return Err(format!(
                     "Access to internal domain {} is not allowed for security reasons",
@@ -112,21 +134,32 @@ impl SsrfGuard {
         Self::is_private_ip_inner(ip, false)
     }
 
-    /// Validate a single resolved IP against the SSRF policy, honoring
-    /// `ZO_SSRF_ALLOW_LOOPBACK`. Used by the custom DNS resolver so that
-    /// hostname → private-IP bypasses are blocked even when the literal
-    /// hostname string passed the pre-flight check.
+    /// Validate one IP against the SSRF policy, with no hostname allowlist entry to lift it.
     pub fn check_ip_with_config(ip: &IpAddr) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
         let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
         if skip_ssrf {
             return Ok(());
         }
-        Self::check_ip_inner(ip, allow_loopback)
+        Self::check_ip_inner(ip, allow_loopback, false, &ALLOWLIST)
     }
 
-    fn check_ip_inner(ip: &IpAddr, allow_loopback: bool) -> Result<(), String> {
-        if Self::is_private_ip_inner(ip, allow_loopback) {
+    /// `host_allowed` lifts the private-address check but never the metadata block.
+    fn check_ip_inner(
+        ip: &IpAddr,
+        allow_loopback: bool,
+        host_allowed: bool,
+        allowlist: &SsrfAllowlist,
+    ) -> Result<(), String> {
+        if allowlist.allows_ip(ip) {
+            return Ok(());
+        }
+        let blocked = if host_allowed {
+            is_metadata_ip(ip)
+        } else {
+            Self::is_private_ip_inner(ip, allow_loopback)
+        };
+        if blocked {
             return Err(format!(
                 "Access to private IP address {} is not allowed for security reasons. \
                  This prevents Server-Side Request Forgery (SSRF) attacks.",
@@ -142,18 +175,19 @@ impl SsrfGuard {
     pub async fn validate_url_with_config_async(url: &str) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
         let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        Self::validate_url_async_inner(url, allow_loopback, skip_ssrf).await
+        Self::validate_url_async_inner(url, allow_loopback, skip_ssrf, &ALLOWLIST).await
     }
 
     async fn validate_url_async_inner(
         url: &str,
         allow_loopback: bool,
         skip_ssrf: bool,
+        allowlist: &SsrfAllowlist,
     ) -> Result<(), String> {
         if skip_ssrf {
             return Ok(());
         }
-        Self::validate_url_inner(url, allow_loopback, skip_ssrf)?;
+        Self::validate_url_inner(url, allow_loopback, skip_ssrf, allowlist)?;
 
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
         let Some(host) = parsed.host_str() else {
@@ -177,10 +211,11 @@ impl SsrfGuard {
             Err(e) => return Err(format!("Failed to resolve host {}: {}", host, e)),
         };
 
+        let host_allowed = allowlist.allows_host(host);
         let mut saw_any = false;
         for sa in addrs {
             saw_any = true;
-            Self::check_ip_inner(&sa.ip(), allow_loopback)?;
+            Self::check_ip_inner(&sa.ip(), allow_loopback, host_allowed, allowlist)?;
         }
 
         if !saw_any && !allow_loopback {
@@ -245,27 +280,120 @@ impl SsrfGuard {
     }
 }
 
-/// Custom DNS resolver for reqwest that runs every resolved address through
-/// `SsrfGuard::check_ip_with_config`. Blocks hostname-points-at-private bypasses
-/// and DNS-rebind on redirect hops where the sync redirect callback can't DNS.
+/// Operator exceptions to the SSRF checks, parsed once from the two allowlist env vars.
+#[derive(Debug, Default)]
+struct SsrfAllowlist {
+    cidrs: Vec<Cidr>,
+    hosts: Vec<String>,
+}
+
+impl SsrfAllowlist {
+    fn parse(cidrs: &str, hosts: &str) -> Self {
+        let cidrs = split_list(cidrs)
+            .filter_map(|entry| {
+                let cidr = Cidr::parse(entry);
+                if cidr.is_none() {
+                    log::warn!("ZO_SSRF_ALLOWED_CIDRS: ignoring invalid CIDR '{entry}'");
+                }
+                cidr
+            })
+            .collect();
+        let hosts = split_list(hosts)
+            .filter_map(|entry| {
+                if entry.contains(['*', '/', ':']) || entry.contains(char::is_whitespace) {
+                    log::warn!("ZO_SSRF_ALLOWED_HOSTS: ignoring invalid hostname '{entry}'");
+                    return None;
+                }
+                Some(entry.to_ascii_lowercase())
+            })
+            .collect();
+        Self { cidrs, hosts }
+    }
+
+    fn allows_host(&self, host: &str) -> bool {
+        self.hosts.iter().any(|h| h.eq_ignore_ascii_case(host))
+    }
+
+    /// A metadata address is admitted only by a CIDR naming exactly that address.
+    fn allows_ip(&self, ip: &IpAddr) -> bool {
+        let ip = canonical_ip(ip);
+        if is_metadata_ip(&ip) {
+            return self.cidrs.iter().any(|c| c.is_single(&ip));
+        }
+        self.cidrs.iter().any(|c| c.contains(&ip))
+    }
+}
+
+#[derive(Debug)]
+struct Cidr {
+    network: IpAddr,
+    prefix: u8,
+}
+
+impl Cidr {
+    /// A bare address is a single-address CIDR.
+    fn parse(entry: &str) -> Option<Self> {
+        let (addr, prefix) = match entry.split_once('/') {
+            Some((addr, prefix)) => (addr, Some(prefix.parse::<u8>().ok()?)),
+            None => (entry, None),
+        };
+        let network = canonical_ip(&addr.parse::<IpAddr>().ok()?);
+        let max = if network.is_ipv4() { 32 } else { 128 };
+        let prefix = prefix.unwrap_or(max);
+        (prefix <= max).then_some(Self { network, prefix })
+    }
+
+    fn contains(&self, ip: &IpAddr) -> bool {
+        match (self.network, ip) {
+            (IpAddr::V4(net), IpAddr::V4(ip)) => prefix_eq(
+                u128::from(u32::from(net)),
+                u128::from(u32::from(*ip)),
+                self.prefix,
+                32,
+            ),
+            (IpAddr::V6(net), IpAddr::V6(ip)) => {
+                prefix_eq(u128::from(net), u128::from(*ip), self.prefix, 128)
+            }
+            _ => false,
+        }
+    }
+
+    fn is_single(&self, ip: &IpAddr) -> bool {
+        self.network == *ip && self.prefix == if ip.is_ipv4() { 32 } else { 128 }
+    }
+}
+
+/// Rejects resolved addresses at connect time, where the sync redirect callback cannot resolve DNS.
 #[derive(Debug, Default, Clone)]
 pub struct SsrfDnsResolver;
+
+impl SsrfDnsResolver {
+    async fn resolve_checked(
+        host: &str,
+        allowlist: &SsrfAllowlist,
+    ) -> Result<Vec<SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
+        let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host, 0)).await?.collect();
+        let cfg = crate::get_config();
+        if cfg.common.skip_ssrf_checks {
+            return Ok(addrs);
+        }
+        let host_allowed = allowlist.allows_host(host);
+        for sa in &addrs {
+            SsrfGuard::check_ip_inner(
+                &sa.ip(),
+                cfg.common.ssrf_allow_loopback,
+                host_allowed,
+                allowlist,
+            )?;
+        }
+        Ok(addrs)
+    }
+}
 
 impl Resolve for SsrfDnsResolver {
     fn resolve(&self, name: Name) -> Resolving {
         Box::pin(async move {
-            let host = name.as_str().to_string();
-            let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host.as_str(), 0))
-                .await
-                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?
-                .collect();
-
-            for sa in &addrs {
-                if let Err(e) = SsrfGuard::check_ip_with_config(&sa.ip()) {
-                    return Err(Box::<dyn std::error::Error + Send + Sync>::from(e));
-                }
-            }
-
+            let addrs = Self::resolve_checked(name.as_str(), &ALLOWLIST).await?;
             let iter: Addrs = Box::new(addrs.into_iter());
             Ok(iter)
         })
@@ -295,9 +423,155 @@ pub fn build_safe_client(builder: reqwest::ClientBuilder) -> reqwest::Result<req
         .build()
 }
 
+/// Parses the allowlist now so invalid entries are reported at startup, not on first request.
+pub fn init_allowlist() {
+    LazyLock::force(&ALLOWLIST);
+}
+
+fn split_list(list: &str) -> impl Iterator<Item = &str> {
+    list.split(',').map(str::trim).filter(|s| !s.is_empty())
+}
+
+/// An IPv4-mapped IPv6 address is matched as the IPv4 address it carries.
+fn canonical_ip(ip: &IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(*ip, IpAddr::V4),
+        IpAddr::V4(_) => *ip,
+    }
+}
+
+fn is_metadata_ip(ip: &IpAddr) -> bool {
+    let ip = match ip {
+        IpAddr::V6(v6) => v6
+            .to_ipv4_mapped()
+            .or_else(|| SsrfGuard::embedded_ipv4(v6))
+            .map_or(*ip, IpAddr::V4),
+        IpAddr::V4(_) => *ip,
+    };
+    METADATA_IPS.contains(&ip)
+}
+
+fn prefix_eq(a: u128, b: u128, prefix: u8, bits: u32) -> bool {
+    let shift = bits - u32::from(prefix);
+    shift >= bits || (a >> shift) == (b >> shift)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn none() -> SsrfAllowlist {
+        SsrfAllowlist::default()
+    }
+
+    #[tokio::test]
+    async fn test_allowed_cidr_admits_only_its_range() {
+        let allow = SsrfAllowlist::parse("10.1.2.0/24", "");
+        assert!(SsrfGuard::validate_url_inner("http://10.1.2.3/", false, false, &allow).is_ok());
+        assert!(SsrfGuard::validate_url_inner("http://10.9.9.9/", false, false, &allow).is_err());
+        let res =
+            SsrfGuard::validate_url_async_inner("http://10.1.2.3/", false, false, &allow).await;
+        assert!(res.is_ok(), "{res:?}");
+        let res =
+            SsrfGuard::validate_url_async_inner("http://10.9.9.9/", false, false, &allow).await;
+        assert!(res.is_err());
+        assert!(
+            SsrfGuard::check_ip_inner(&"10.1.2.3".parse().unwrap(), false, false, &allow).is_ok()
+        );
+        assert!(
+            SsrfGuard::check_ip_inner(&"::ffff:10.1.2.3".parse().unwrap(), false, false, &allow)
+                .is_ok()
+        );
+        assert!(
+            SsrfGuard::check_ip_inner(&"10.9.9.9".parse().unwrap(), false, false, &allow).is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_allowed_ipv6_cidr_admits_only_its_range() {
+        let allow = SsrfAllowlist::parse("fd12:3456::/32", "");
+        let res =
+            SsrfGuard::validate_url_async_inner("http://[fd12:3456::1]/", false, false, &allow)
+                .await;
+        assert!(res.is_ok(), "{res:?}");
+        let res =
+            SsrfGuard::validate_url_async_inner("http://[fd99::1]/", false, false, &allow).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_resolver_honours_allowed_cidr() {
+        let allow = SsrfAllowlist::parse("10.1.2.0/24", "");
+        let res = SsrfDnsResolver::resolve_checked("10.1.2.3", &allow).await;
+        assert_eq!(
+            res.map_err(|e| e.to_string()).unwrap(),
+            vec!["10.1.2.3:0".parse::<SocketAddr>().unwrap()]
+        );
+        assert!(
+            SsrfDnsResolver::resolve_checked("10.9.9.9", &allow)
+                .await
+                .is_err()
+        );
+        assert!(
+            SsrfDnsResolver::resolve_checked("10.1.2.3", &none())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_allowed_host_admits_its_private_resolution() {
+        let allow = SsrfAllowlist::parse("", "LocalHost");
+        let res =
+            SsrfGuard::validate_url_async_inner("http://localhost/", false, false, &allow).await;
+        assert!(res.is_ok(), "{res:?}");
+        let res = SsrfDnsResolver::resolve_checked("localhost", &allow).await;
+        assert!(res.is_ok(), "{:?}", res.map_err(|e| e.to_string()));
+        let res =
+            SsrfGuard::validate_url_async_inner("http://localhost/", false, false, &none()).await;
+        assert!(res.is_err());
+        assert!(
+            SsrfDnsResolver::resolve_checked("localhost", &none())
+                .await
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_allowed_host_still_blocks_metadata() {
+        let allow = SsrfAllowlist::parse("169.254.0.0/16,fd00::/8", "metadata-proxy.example.com");
+        for ip in [
+            "169.254.169.254",
+            "::ffff:169.254.169.254",
+            "64:ff9b::a9fe:a9fe",
+            "fd00:ec2::254",
+        ] {
+            let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, true, &allow);
+            assert!(res.is_err(), "{ip}");
+        }
+        assert!(
+            SsrfGuard::check_ip_inner(&"10.0.0.1".parse().unwrap(), false, true, &allow).is_ok()
+        );
+        let exact = SsrfAllowlist::parse("169.254.169.254/32", "");
+        assert!(
+            SsrfGuard::check_ip_inner(&"169.254.169.254".parse().unwrap(), false, false, &exact)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_allowlist_skips_invalid_entries() {
+        let allow = SsrfAllowlist::parse(
+            " 10.0.0.0/33 ,not-a-cidr, fd00::/8 ,10.0.0.0/x,,192.168.1.7",
+            "*.example.com, ok.example.com ,bad host,a/b",
+        );
+        assert_eq!(allow.cidrs.len(), 2, "{allow:?}");
+        assert_eq!(allow.hosts, vec!["ok.example.com".to_string()]);
+        assert!(allow.allows_ip(&"192.168.1.7".parse().unwrap()));
+        assert!(!allow.allows_ip(&"192.168.1.8".parse().unwrap()));
+        assert!(allow.allows_host("OK.example.com"));
+        assert!(!allow.allows_host("sub.ok.example.com"));
+    }
 
     #[test]
     fn test_is_private_ip() {
@@ -396,7 +670,7 @@ mod tests {
             "http://localhost/",
             "http://[::1]/",
         ] {
-            let res = SsrfGuard::validate_url_async_inner(url, true, false).await;
+            let res = SsrfGuard::validate_url_async_inner(url, true, false, &none()).await;
             assert!(res.is_ok(), "{url}: {res:?}");
         }
         for url in [
@@ -406,7 +680,7 @@ mod tests {
             "http://metadata.google.internal/",
             "http://[fd00::1]/",
         ] {
-            let res = SsrfGuard::validate_url_async_inner(url, true, false).await;
+            let res = SsrfGuard::validate_url_async_inner(url, true, false, &none()).await;
             assert!(res.is_err(), "{url} must be rejected");
         }
     }
@@ -414,13 +688,15 @@ mod tests {
     #[tokio::test]
     async fn test_async_allow_loopback_passes_unresolvable_host() {
         let unresolvable = "http://no-such-host.invalid/";
-        let res = SsrfGuard::validate_url_async_inner(unresolvable, true, false).await;
+        let res = SsrfGuard::validate_url_async_inner(unresolvable, true, false, &none()).await;
         assert!(res.is_ok(), "{res:?}");
-        let res = SsrfGuard::validate_url_async_inner("http://10.0.0.1/", true, false).await;
+        let res =
+            SsrfGuard::validate_url_async_inner("http://10.0.0.1/", true, false, &none()).await;
         assert!(res.is_err());
-        let res = SsrfGuard::validate_url_async_inner("http://127.0.0.1/", true, false).await;
+        let res =
+            SsrfGuard::validate_url_async_inner("http://127.0.0.1/", true, false, &none()).await;
         assert!(res.is_ok(), "{res:?}");
-        let res = SsrfGuard::validate_url_async_inner(unresolvable, false, false).await;
+        let res = SsrfGuard::validate_url_async_inner(unresolvable, false, false, &none()).await;
         assert!(
             res.is_err(),
             "the default path must still reject an unresolvable host"
@@ -429,7 +705,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_async_skip_ssrf_allows_everything() {
-        let res = SsrfGuard::validate_url_async_inner("http://169.254.169.254/", false, true).await;
+        let res =
+            SsrfGuard::validate_url_async_inner("http://169.254.169.254/", false, true, &none())
+                .await;
         assert!(res.is_ok(), "{res:?}");
     }
 
