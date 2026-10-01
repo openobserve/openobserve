@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import ODrawer from "./ODrawer.vue";
 import { DialogContent } from "reka-ui";
@@ -12,6 +12,16 @@ vi.mock("reka-ui", async (importOriginal) => {
     DialogPortal: actual.DialogContent, // render inline without teleport
   };
 });
+
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+function findDrawerPanel(wrapper: ReturnType<typeof mount>) {
+  return wrapper
+    .findAllComponents(DialogContent)
+    .find((c) => c.attributes("data-o2-drawer") !== undefined)!;
+}
 
 describe("ODrawer", () => {
   it("renders the trigger slot", () => {
@@ -211,16 +221,52 @@ describe("ODrawer", () => {
     });
   });
 
+  describe("open autofocus", () => {
+    it("focuses an autofocus element when the drawer has no form field or primary button", async () => {
+      const outsideButton = document.createElement("button");
+      document.body.appendChild(outsideButton);
+      const wrapper = mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "References" },
+        slots: {
+          default: '<button autofocus data-testid="autofocus-close">Close</button>',
+        },
+      });
+      const panel = findDrawerPanel(wrapper);
+      outsideButton.focus();
+
+      await panel.vm.$emit("openAutoFocus", new Event("openAutoFocus", { cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(document.activeElement).toBe(wrapper.find('[data-testid="autofocus-close"]').element);
+      wrapper.unmount();
+    });
+
+    it("focuses the drawer panel when no focusable fallback exists", async () => {
+      const outsideButton = document.createElement("button");
+      document.body.appendChild(outsideButton);
+      const wrapper = mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "Read only" },
+        slots: {
+          default: '<p data-testid="read-only-copy">No actions available.</p>',
+        },
+      });
+      const panel = findDrawerPanel(wrapper);
+      outsideButton.focus();
+
+      await panel.vm.$emit("openAutoFocus", new Event("openAutoFocus", { cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(document.activeElement).toBe(panel.element);
+      wrapper.unmount();
+    });
+  });
+
   describe("Escape key behaviour", () => {
     // reka-ui fires @escape-key-down via a document-level listener that does not
     // run in jsdom. We simulate it by calling vm.$emit('escapeKeyDown', …) on the
     // DialogContent component that owns the @escape-key-down handler.
-    function findDrawerPanel(wrapper: ReturnType<typeof mount>) {
-      return wrapper
-        .findAllComponents(DialogContent)
-        .find((c) => c.attributes("data-o2-drawer") !== undefined)!;
-    }
-
     it("emits update:open=false when Escape is pressed (non-persistent)", async () => {
       const wrapper = mount(ODrawer, {
         props: { open: true, title: "Test" },
