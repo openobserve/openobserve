@@ -45,7 +45,7 @@ fn reserved_key_response() -> Response {
     MetaHttpResponse::forbidden("This setting is managed by /prompts/settings")
 }
 
-/// A caller's own user-level settings are theirs; anyone else's need root, Admin, or users write.
+/// Own settings are the caller's; another user's need root, Admin, or an OpenFGA users write.
 async fn may_access_user_settings(org_id: &str, caller: &str, subject: &str) -> bool {
     if caller.eq_ignore_ascii_case(subject) || db::user::is_root_user(caller) {
         return true;
@@ -56,10 +56,22 @@ async fn may_access_user_settings(org_id: &str, caller: &str, subject: &str) -> 
     ) {
         return true;
     }
-    openobserve_core::auth::check_permissions(
-        org_id, org_id, caller, "users", "PUT", None, true, false, false,
-    )
-    .await
+    // With OpenFGA off `check_permissions` allows everyone, so only the role check above applies.
+    openfga_enabled()
+        && openobserve_core::auth::check_permissions(
+            org_id, org_id, caller, "users", "PUT", None, true, false, false,
+        )
+        .await
+}
+
+#[cfg(feature = "enterprise")]
+fn openfga_enabled() -> bool {
+    o2_openfga::config::get_config().enabled
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn openfga_enabled() -> bool {
+    false
 }
 
 fn foreign_user_response() -> Response {
