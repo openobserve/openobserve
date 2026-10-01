@@ -19,7 +19,7 @@ use std::{
     sync::{Arc, LazyLock as Lazy},
 };
 
-use chrono::{FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use config::utils::time;
 use datafusion::{
     arrow::{
@@ -73,15 +73,7 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
                 // in arrow, any value can be null.
                 // Here we decide to make our UDF to return null when either argument is null.
                 (Some(timestamp), (Some(format), Some(timezone))) => {
-                    let timestamp_micros = time::parse_i64_to_timestamp_micros(timestamp);
-                    let t = Utc.timestamp_nanos(timestamp_micros * 1000);
-                    let offset = time::parse_timezone_to_offset_at(timezone, timestamp_micros)?;
-                    let offset = i32::try_from(offset).ok()?;
-                    let fixed_offset = FixedOffset::east_opt(offset)?;
-                    let formatted = t.with_timezone(&fixed_offset);
-                    let mut result = String::new();
-                    write!(result, "{}", formatted.format(format)).ok()?;
-                    Some(result)
+                    format_timestamp(timestamp, format, timezone)
                 }
                 _ => None,
             }
@@ -91,6 +83,22 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.
     Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+}
+
+/// One row of `date_format`; `None` (NULL) for input it cannot represent.
+fn format_timestamp(timestamp: i64, format: &str, timezone: &str) -> Option<String> {
+    let timestamp_micros = time::try_parse_i64_to_timestamp_micros(timestamp)?;
+    let t = DateTime::<Utc>::from_timestamp_micros(timestamp_micros)?;
+    let offset = time::parse_timezone_to_offset_at(timezone, timestamp_micros)?;
+    let mut result = String::new();
+    if offset == 0 {
+        // `Utc` renders `%Z` as "UTC", where a zero `FixedOffset` renders "+00:00".
+        write!(result, "{}", t.format(format)).ok()?;
+    } else {
+        let fixed_offset = FixedOffset::east_opt(i32::try_from(offset).ok()?)?;
+        write!(result, "{}", t.with_timezone(&fixed_offset).format(format)).ok()?;
+    }
+    Some(result)
 }
 
 #[cfg(test)]
@@ -129,6 +137,31 @@ mod tests {
             }
             _ => panic!("expected array result"),
         }
+    }
+
+    #[test]
+    fn test_date_format_zero_offset_prints_utc_for_percent_z() {
+        let ts = time::parse_str_to_timestamp_micros("2026-10-01T00:00:00Z").unwrap();
+        for zone in ["UTC", "utc", "", "+00:00"] {
+            let out = call_date_format(ts, "%Y-%m-%d %Z", zone);
+            assert_eq!(out.value(0), "2026-10-01 UTC", "zone {zone:?}");
+        }
+        assert_eq!(call_date_format(ts, "%Z", "+05:30").value(0), "+05:30");
+    }
+
+    #[test]
+    fn test_date_format_overflowing_input_returns_null_not_panic() {
+        let ts = time::parse_str_to_timestamp_micros("2026-10-01T00:00:00Z").unwrap();
+        assert!(call_date_format(ts, "%Y", "+1:1:1:1:1:1:1:1:1:1:1").is_null(0));
+        assert!(call_date_format(-10_000_000_000_000, "%Y", "UTC").is_null(0));
+        assert_eq!(
+            call_date_format(30_000_000_000_000_000, "%Y", "UTC").value(0),
+            "2920"
+        );
+        assert_eq!(
+            call_date_format(-1_000_000_000_000, "%Y", "UTC").value(0),
+            "-29719"
+        );
     }
 
     #[test]

@@ -97,24 +97,29 @@ pub fn get_ymdh_from_micros(n: i64, hour_format: HourFormat) -> String {
 
 #[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> i64 {
+    // Only seconds far below the epoch overflow; they saturate rather than wrap.
+    try_parse_i64_to_timestamp_micros(v).unwrap_or(i64::MIN)
+}
+
+/// [`parse_i64_to_timestamp_micros`], or `None` when scaling to microseconds overflows.
+#[inline(always)]
+pub fn try_parse_i64_to_timestamp_micros(v: i64) -> Option<i64> {
     if v == 0 {
-        return Utc::now().timestamp_micros();
+        return Some(Utc::now().timestamp_micros());
     }
-    let mut duration = v;
-    if duration > BASE_TIME.timestamp_nanos_opt().unwrap_or_default() {
+    if v > BASE_TIME.timestamp_nanos_opt().unwrap_or_default() {
         // nanoseconds
-        duration /= 1000;
-    } else if duration > BASE_TIME.timestamp_micros() {
+        Some(v / 1000)
+    } else if v > BASE_TIME.timestamp_micros() {
         // microseconds
-        // noop
-    } else if duration > BASE_TIME.timestamp_millis() {
+        Some(v)
+    } else if v > BASE_TIME.timestamp_millis() {
         // milliseconds
-        duration *= 1000;
+        v.checked_mul(1000)
     } else {
         // seconds
-        duration *= 1_000_000;
+        v.checked_mul(1_000_000)
     }
-    duration
 }
 
 #[inline(always)]
@@ -279,10 +284,10 @@ pub fn parse_timezone_to_offset_opt(offset: &str) -> Option<i64> {
     let mut seconds: i64 = 0;
     for part in time.split(':') {
         let val = part.parse::<i64>().ok()?;
-        seconds = seconds * 60 + val * 60;
+        seconds = seconds.checked_mul(60)?.checked_add(val.checked_mul(60)?)?;
     }
 
-    Some(sign * seconds)
+    sign.checked_mul(seconds)
 }
 
 /// Resolve a timezone string into seconds east of UTC, evaluated at `reference_micros`.
@@ -538,6 +543,8 @@ mod tests {
         // invalid / unsupported input returns None instead of panicking
         assert_eq!(parse_timezone_to_offset_opt("America/New_York"), None);
         assert_eq!(parse_timezone_to_offset_opt("+ab:cd"), None);
+        assert_eq!(parse_timezone_to_offset_opt("+1:1:1:1:1:1:1:1:1:1:1"), None);
+        assert_eq!(parse_timezone_to_offset_opt("-9223372036854775807:0"), None);
     }
 
     #[test]
@@ -685,6 +692,14 @@ mod tests {
         // Negative timestamps should be treated as seconds
         let result = parse_i64_to_timestamp_micros(-1);
         assert_eq!(result, -1_000_000);
+    }
+
+    #[test]
+    fn test_parse_i64_to_timestamp_micros_overflow_is_checked() {
+        assert_eq!(try_parse_i64_to_timestamp_micros(-10_000_000_000_000), None);
+        assert_eq!(try_parse_i64_to_timestamp_micros(-1), Some(-1_000_000));
+        assert_eq!(parse_i64_to_timestamp_micros(-10_000_000_000_000), i64::MIN);
+        assert_eq!(parse_i64_to_timestamp_micros(i64::MIN), i64::MIN);
     }
 
     #[test]
