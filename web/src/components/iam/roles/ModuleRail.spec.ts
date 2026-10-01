@@ -202,6 +202,17 @@ describe("ModuleRail - selection", () => {
 
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["logs"]);
   });
+
+  // Role Overview is selected by the empty key, and it is a separate row from the
+  // `summary` permission module. Conflating the two sends the editor into that
+  // module's pane instead of back to the landing summary.
+  it("emits the empty key when Role Overview is chosen", async () => {
+    const wrapper = await mountRail([makeModule("summary", { groupId: "platform" })], "summary");
+
+    await wrapper.find('[data-test="edit-role-module-rail-overview"]').trigger("mousedown");
+
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([""]);
+  });
 });
 
 describe("ModuleRail - collapsible groups", () => {
