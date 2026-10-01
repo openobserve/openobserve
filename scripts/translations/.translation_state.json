@@ -19095,6 +19095,7 @@
     "exceptionMarkerTooltip": "3a5255ea45c369ce",
     "exceptionsWithCount": "601d0d3d584fa458",
     "exportTraces": "483b795b63104bd8",
+    "exportTracesFailed": "80d624a71f46e371",
     "failedToAnalyzeDimensions": "32d91e7d417eb1a1",
     "failedToFetchCorrelatedLogs": "abcd3cdf463ce634",
     "failedToFetchLlmInsights": "1489c0cf579b0b3f",
