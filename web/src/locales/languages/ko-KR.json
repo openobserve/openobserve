@@ -2188,7 +2188,6 @@
     "syntheticsTokensDesc": "프라이빗 Synthetics 에이전트가 작업을 가져오는 데 사용하는 조직 수준의 o2syn_ 토큰",
     "serviceAccountsName": "서비스 계정 이름",
     "basicUsers": "유저",
-    "organizationMembers": "조직 구성원",
     "invitations": "초대장",
     "quota": "할당량",
     "externalUserWarningTitle": "외부 사용자 경고",
@@ -2471,7 +2470,6 @@
       "memberUpdatedSuccessfully": "조직 멤버가 성공적으로 업데이트되었습니다."
     },
     "user": {
-      "organizationMembers": "조직 멤버",
       "delete": "삭제",
       "failedToLoadCustomRoles": "사용자 정의 역할을 불러오지 못했습니다.",
       "pleaseWaitLoadingUsers": "사용자를 불러오는 중입니다. 기다려 주세요...",
@@ -2677,7 +2675,6 @@
     "fetchingFunctions": "함수를 가져오는 중...",
     "associateFunction": "함수 연결",
     "noFunctionsFound": "함수를 찾을 수 없습니다",
-    "streamsUnit": "{count} 스트림 | {count} 스트림",
     "deleteAssociatedAlertsPipelinesBatch": "선택한 스트림과 연결된 모든 파이프라인 및 알림 삭제",
     "allFieldsCount": "모든 필드 ({count})",
     "performanceFieldsDialog": {
@@ -2790,7 +2787,6 @@
       "showList": "실행 목록 표시"
     },
     "history": {
-      "button": "실행",
       "title": "워크플로 기록",
       "started": "시작됨",
       "ended": "종료됨",
@@ -3349,7 +3345,6 @@
     "actionCannotBeUndone": "작업이 생성되면 이 작업은 취소하거나 되돌릴 수 없습니다.",
     "areYouSureProceed": "계속하시겠습니까?",
     "clearFilters": "필터 지우기",
-    "backfillJobLabel": "{count}개의 백필 작업 | {count}개의 백필 작업",
     "chunksUnit": "청크",
     "never": "없음",
     "jobTooltipLabel": "작업",
@@ -3368,7 +3363,6 @@
     "functionName": "함수 이름",
     "remoteDestination": "원격 대상",
     "failedToLoadPipeline": "파이프라인을 불러오지 못했습니다.",
-    "header": "파이프라인",
     "subtitle": "이동 중 데이터 변환, 강화 및 라우팅",
     "deleteNode": "삭제",
     "addPipeline": "파이프라인 추가",
@@ -5480,7 +5474,6 @@
       "dynamicVariables": "동적 변수"
     },
     "dashboards": {
-      "selected": "{count}개 선택됨",
       "failedToLoadFolder": "선택한 폴더의 대시보드를 불러오지 못했습니다.",
       "pleaseWait": "잠시만 기다려주세요...",
       "copySuffix": "{title} - 복사본",
@@ -6836,7 +6829,6 @@
     "reloadAlertsTooltip": "알림 다시 로드",
     "triggerDetection": "트리거 감지",
     "retrain": "재학습",
-    "selectedLabel": "선택됨",
     "resume": "재개",
     "deleteAlertTitle": "알림 삭제",
     "deleteAlertMessage": "이 알림을 삭제하시겠습니까?",
@@ -7460,7 +7452,6 @@
       "noCondition": "조건 없음",
       "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다.",
       "tryExpandingTimeRange": "시간 범위를 확장해 보세요",
-      "results": "결과",
       "ifCondition": "{condition}인 경우"
     },
     "historyTable": {
@@ -7932,8 +7923,6 @@
     "prebuiltDestination": "사전 구축된 {type} 대상",
     "errorValidations": "오류 검증",
     "outputMessagesLabel": "출력 메시지",
-    "incidentSingular": "인시던트",
-    "incidentPlural": "인시던트",
     "confirmDeleteTemplates": "{count}개의 템플릿을 삭제하시겠습니까? | {count}개의 템플릿을 삭제하시겠습니까?",
     "lastOutcome": "마지막 결과",
     "priority": "우선순위",
@@ -8288,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "템플릿 내보내기",
-    "selected": "선택됨",
     "deleteTemplateTitle": "템플릿 삭제",
     "deleteTemplateMessage": "템플릿을 삭제하시겠습니까?",
     "deleteTemplatesTitle": "템플릿 삭제",
@@ -8542,7 +8530,6 @@
     "deleteDestinationTitle": "대상 삭제",
     "deleteDestinationMessage": "대상을 삭제하시겠습니까?",
     "deleteDestinationsTitle": "대상 삭제",
-    "selected": "선택됨",
     "organizationLabel": "조직",
     "defaultPlaceholder": "예: default",
     "streamNameLabel": "스트림 이름",
@@ -9350,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "민감한 필드용 암호화 키",
-      "selected": "{count}개 선택됨",
       "delete": "삭제",
       "deleteCipherKeyTitle": "암호화 키 삭제",
       "deleteCipherKeyMessage": "암호화 키를 삭제하시겠습니까?",
@@ -9945,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "스트림",
-      "sessions": "세션",
       "failedToLoad": "세션을 로드하지 못했습니다.",
       "retry": "재시도",
       "tokenTooltip": "입력: {input} · 출력: {output} · 합계: {total}",
@@ -10057,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "스트림이 감지되지 않았습니다",
       "tabLabel": "서비스 카탈로그",
-      "footerTitle": "서비스",
       "filterPlaceholder": "서비스 이름별 필터링...",
       "columns": {
         "serviceName": "서비스",
@@ -10626,7 +10610,6 @@
     "create_regex_pattern_field": "Regex를 사용한 편집/삭제",
     "import": "임포트",
     "import_title": "패턴 가져오기",
-    "bottom_header": "{count} 패턴 | {count} 패턴",
     "filter_by_tag": "태그별 필터링",
     "refresh": "새로 고침",
     "loading_patterns": "패턴 불러오는 중...",
@@ -10682,7 +10665,6 @@
     "get_history": "기록 가져오기",
     "executed_at": "실행 날짜",
     "sql_query": "SQL 쿼리",
-    "results": "결과",
     "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다."
   },
   "correlation": {
@@ -10825,7 +10807,6 @@
     "function_definition": "함수 정의",
     "more_details": "추가 세부 정보",
     "query_function": "쿼리/ 함수",
-    "results": "결과",
     "max_limit": "최대 제한",
     "cancel_job_title": "예약 검색 취소",
     "cancel_job_message": "이 예약된 검색을 취소하시겠습니까?",
@@ -10932,9 +10913,6 @@
     "testBtn": "테스트",
     "importBtn": "임포트",
     "newModel": "새 모델",
-    "modelsCount": "{count} 모델",
-    "exportSelected": "내보내기 ({count})",
-    "deleteSelected": "삭제 ({count})",
     "importTitle": "수입 모델 가격",
     "errorValidations": "오류 검증",
     "outputMessages": "출력 메시지",
@@ -11452,11 +11430,6 @@
         "trace": "트레이스",
         "session": "세션"
       },
-      "scopeNoun": {
-        "span": "스팬",
-        "trace": "트레이스",
-        "session": "세션"
-      },
       "inQueueFilter": {
         "label": "큐에 있음",
         "notEnqueued": "대기열: 대기 안 됨",
@@ -11502,16 +11475,12 @@
         "sectionTitle": "대기열에 추가",
         "manageQueues": "대기열 관리"
       },
-      "bulkAdd": "대기열에 {count}개 추가",
-      "selectedCount": "{selected} / {total} 선택됨",
-      "footerTitle": "비정상 {scope}",
       "addSuccess": "{queue}에 추가됨 — 행은 Discovery에 남아 있고, 해당 상태는 대기열에 있습니다.",
       "addError": "대기열에 항목을 추가하지 못했습니다",
       "openQueue": "대기열 열기",
       "queuesError": "대기열을 불러오지 못했습니다"
     },
     "queues": {
-      "listTitle": "대기열",
       "searchPlaceholder": "대기열 검색...",
       "newButton": "새 대기열",
       "loadError": "대기열을 불러오지 못했습니다",
@@ -11570,7 +11539,6 @@
         "targetDataset": "대상 데이터셋",
         "noTargetDataset": "대상 데이터셋 없음",
         "searchPlaceholder": "항목 검색...",
-        "footerTitle": "항목",
         "allItems": "전체",
         "inTrace": "트레이스 {traceId} 내",
         "reviewAgain": "다시 검토",
@@ -11995,7 +11963,6 @@
       "clearBaseline": "기준선 지우기"
     },
     "datasets": {
-      "listTitle": "데이터셋",
       "searchPlaceholder": "데이터셋 검색...",
       "newButton": "새 데이터셋",
       "loadError": "데이터셋을 불러오지 못했습니다",
@@ -12039,7 +12006,6 @@
         "fallbackTitle": "데이터셋",
         "meta": "{count}개 항목 · 업데이트됨 {updated}",
         "loadError": "데이터셋을 불러오지 못했습니다",
-        "footerTitle": "항목",
         "tabs": {
           "items": "항목",
           "experiments": "실험"
@@ -12176,8 +12142,6 @@
       "summaryAgents": "영향을 받은 에이전트",
       "failuresTitle": "실패 분류",
       "failuresHint": "에이전트별로 종류별로 그룹화된 오류",
-      "footerLoops": "루프",
-      "footerFailures": "실패 클래스",
       "noLoops": "이 범위에서 루핑 동작이 감지되지 않음",
       "noFailures": "이 범위에서 에이전트 실패 없음",
       "noLoopsForAgent": "이 범위에서 {agent}에 대한 루프 동작이 없습니다 — 에이전트를 전환하거나 시간 범위를 넓히세요.",
@@ -12244,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "원격 태스크",
       "searchPlaceholder": "작업 검색",
       "newButton": "새 작업",
       "loadError": "원격 작업을 불러오지 못했습니다",
@@ -12892,7 +12855,6 @@
         "title": "평가 점수",
         "hint": "점수와 근거는 _llm_scores에서 가져옵니다. 실행을 선택하면 평가자 트레이스가 열려 추가 조사할 수 있습니다.",
         "filterLabel": "평가 점수 필터링",
-        "footerTitle": "평가 점수",
         "noThresholdHint": "이 점수 구성에 건강 임계값을 설정하여 건강하지 않은 점수를 분류하고 강조 표시합니다.",
         "noReasoning": "추론 기록 없음",
         "unknownAgent": "알 수 없는 에이전트",
@@ -12917,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "점수 구성 개요",
         "searchPlaceholder": "필터 구성...",
         "relativeTime": {
           "daysAgo": "{day}일 전",
@@ -13045,7 +13006,6 @@
         "updatedLabel": "업데이트됨"
       },
       "createTitle": "새 점수 구성",
-      "listTitle": "점수 구성",
       "searchPlaceholder": "구성 검색",
       "newButton": "새 점수 구성",
       "columns": {
@@ -13122,9 +13082,6 @@
         "errors": {
           "title": "유효성 검사 오류"
         }
-      },
-      "export": {
-        "bulkButton": "내보내기"
       }
     },
     "scorer": {
@@ -13178,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "스코어러",
       "searchPlaceholder": "스코어러 검색",
       "newButton": "새 스코어러",
       "usedByJob": "{count} 작업 | {count} 작업",
@@ -13219,9 +13175,6 @@
           "nameConflict": "Scorer {index}: 이름 \"{name}\"이(가) 이 조직에 이미 있습니다.",
           "duplicateName": "Scorer {index}: 이름 \"{name}\"이(가) 이 가져오기에서 두 번 이상 사용되었습니다."
         }
-      },
-      "export": {
-        "bulkButton": "내보내기"
       },
       "backTo": "득점자로 돌아가기",
       "badgeRemote": "리모트",
@@ -13411,11 +13364,9 @@
           "recentEmpty": "선택한 범위에서 실패한 실행이 없습니다."
         }
       },
-      "listTitle": "평가 작업",
       "searchPlaceholder": "작업 검색",
       "newButton": "새 작업",
       "scorerCount": "{count} 채점자 | {count} 채점자",
-      "deleteBulkButton": "삭제",
       "deleteBulkTitle": "평가 작업 삭제",
       "deleteBulkConfirm": "{count}개의 평가 작업을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
       "deletedBulk": "{count}개의 평가 작업이 삭제됨",
@@ -14395,10 +14346,6 @@
       "passed": "통과",
       "warning": "경고"
     },
-    "footer": {
-      "browserTests": "브라우저 테스트",
-      "checks": "검사"
-    },
     "journey": {
       "extract": {
         "action": "서브테스트로 추출",
@@ -14781,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "위치 추가",
-      "bottomHeader": "위치",
       "bulkDeleteConfirmMessage": "{count}개 위치를 삭제하시겠습니까?",
       "bulkDeleteConfirmTitle": "위치 삭제",
       "bulkDeleteFailed": "위치 삭제 실패",
@@ -14842,7 +14788,6 @@
       "regionPlaceholder": "예: us-east-1",
       "regionRequired": "리전이 필요합니다",
       "searchPlaceholder": "위치 검색…",
-      "selectedCount": "{selected} / {total} 위치 선택됨",
       "title": "위치",
       "publicTitle": "공개 위치",
       "privateTitle": "비공개 위치",
@@ -15096,8 +15041,7 @@
       "detailOrigin": "출처",
       "detailFirstParty": "퍼스트파티",
       "detailThirdParty": "서드파티",
-      "detailStackTrace": "스택 추적",
-      "footerEvents": "이벤트"
+      "detailStackTrace": "스택 추적"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15297,7 +15241,6 @@
       "bulkTriggerSuccess": "{count}개 검사 트리거됨. | {count}개 검사 트리거됨.",
       "bulkTriggerToast": "{count}개 검사 트리거 중… | {count}개 검사 트리거 중…",
       "check": "체크",
-      "checksFooterTitle": "체크",
       "checksCount": "{count}개 검사",
       "delete": "삭제",
       "duplicate": "복제",
@@ -15325,7 +15268,6 @@
       "pausing": "일시 중지 중...",
       "response": "응답",
       "scheduledAt": "예약 시간",
-      "selectedCount": "{selected}/{total} 선택됨",
       "status": "상태",
       "statusDegraded": "⚠ 성능 저하",
       "statusDown": "✗ 중단",
@@ -15508,7 +15450,6 @@
     "editTitle": "상태 페이지 편집",
     "back": "상태 페이지",
     "loadFailed": "상태 페이지를 불러오지 못했습니다",
-    "footerTitle": "상태 페이지",
     "searchPlaceholder": "상태 페이지 검색",
     "copyUrl": "URL 복사",
     "publicUrl": "공개 URL",
@@ -16019,7 +15960,9 @@
         "resetColumnWidths": "열 너비 재설정"
       },
       "removeColumnAria": "열 제거",
-      "formatColumnAria": "열 서식"
+      "formatColumnAria": "열 서식",
+      "selectedOfTotal": "{total}개 중 {selected}개 선택됨",
+      "selectedCount": "{selected}개 선택됨"
     },
     "predefinedThemes": {
       "title": "테마",
@@ -16974,7 +16917,6 @@
     },
     "move": "이동",
     "moveTitle": "{count}개의 SLO를 다른 폴더로 이동",
-    "moveSelected": "선택한 {count}개 이동",
     "exportTitle": "SLO 내보내기 | {count} SLO 내보내기",
     "exportSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 공급자용 Terraform으로 다운로드하세요.",
     "exportFailed": "SLO 정의를 읽을 수 없습니다. 다시 시도하십시오.",
@@ -17739,7 +17681,6 @@
       "otherRow": "기타 모든 쿼리",
       "truncatedText": "이 명령문은 전체를 저장하기에 너무 길어서 줄여서 표시됩니다.",
       "stmtClass": {
-        "query": "쿼리",
         "queryHint": "실제 SQL만 — SELECT, INSERT, UPDATE 및 DELETE.",
         "all": "쿼리 + 연결 오버헤드",
         "allHint": "또한 드라이버가 쿼리 사이에 보내는 부가 작업(BEGIN 및 COMMIT, SET, 풀 연결을 유지하는 검사)도 집계합니다.",
@@ -18340,7 +18281,6 @@
       "disclosureShort": "각 행은 실제 완료된 호출 하나입니다",
       "disclosureDetail": "보내는 트레이스를 기반으로 호출한 애플리케이션이 측정합니다. 완료된 호출만 여기에 표시됩니다. 아직 실행 중이거나 중단되어 응답이 없는 쿼리는 측정값을 생성하지 않았습니다.",
       "counts": {
-        "complete": "이 창의 모든 {count}개 데이터베이스 호출을 느린 순서대로 표시합니다.",
         "truncated": "이 창에서 가장 느린 {count}개 호출 — 여기에 표시된 것보다 더 많이 실행되었습니다.",
         "filtered": "{total}개 호출 중 {count}개 표시."
       },
@@ -18684,7 +18624,6 @@
         "unknown": "상태 미보고"
       },
       "counts": {
-        "complete": "{count}개 세션 표시 중.",
         "capped": "한 번에 읽을 수 있는 것보다 더 많은 세션이 샘플링되었습니다. 이는 현재 보유한 {count}개입니다.",
         "filtered": "전체 {total}개 세션 중 {count}개 표시 중."
       },
@@ -18801,8 +18740,7 @@
         "lastVacuum": "마지막 진공",
         "lastAutovacuum": "마지막 자동 진공",
         "lastAnalyze": "마지막 분석"
-      },
-      "countLine": "{count}개 테이블"
+      }
     },
     "recommendations": {
       "title": "권장 사항",
@@ -19147,7 +19085,6 @@
     "acknowledge": "확인",
     "acknowledgeHint": "책임을 인계받습니다. 에스컬레이션이 중지됩니다.",
     "actions": "작업",
-    "selectedCount": "{count}개 선택됨",
     "bulkAckDone": "호출 {count}건을 확인했습니다",
     "bulkAckPartial": "{count}건은 확인할 수 없습니다",
     "resolveCause": "원인이 무엇이었나요?",

@@ -2188,7 +2188,6 @@
     "syntheticsTokensDesc": "Mã thông báo o2syn_ cấp tổ chức mà các agent synthetics riêng của bạn sử dụng để lấy công việc",
     "serviceAccountsName": "Tên tài khoản dịch vụ",
     "basicUsers": "Người dùng",
-    "organizationMembers": "Thành viên tổ chức",
     "invitations": "Lời mời",
     "quota": "Hạn mức",
     "externalUserWarningTitle": "Cảnh báo người dùng bên ngoài",
@@ -2471,7 +2470,6 @@
       "memberUpdatedSuccessfully": "Cập nhật thành viên tổ chức thành công."
     },
     "user": {
-      "organizationMembers": "Thành viên tổ chức",
       "delete": "Xóa",
       "failedToLoadCustomRoles": "Không thể tải vai trò tùy chỉnh.",
       "pleaseWaitLoadingUsers": "Vui lòng chờ khi tải người dùng...",
@@ -2677,7 +2675,6 @@
     "fetchingFunctions": "Đang tải các hàm...",
     "associateFunction": "Liên kết hàm",
     "noFunctionsFound": "Không tìm thấy hàm nào",
-    "streamsUnit": "{count} luồng | {count} luồng",
     "deleteAssociatedAlertsPipelinesBatch": "Xóa tất cả Pipeline và cảnh báo liên kết với các luồng đã chọn",
     "allFieldsCount": "Tất cả các trường ({count})",
     "performanceFieldsDialog": {
@@ -2790,7 +2787,6 @@
       "showList": "Hiện danh sách các lần chạy"
     },
     "history": {
-      "button": "Lần chạy",
       "title": "Lịch sử quy trình",
       "started": "Đã bắt đầu",
       "ended": "Đã kết thúc",
@@ -3349,7 +3345,6 @@
     "actionCannotBeUndone": "Hành động này KHÔNG THỂ hoàn tác hoặc hủy bỏ sau khi công việc được tạo.",
     "areYouSureProceed": "Bạn có chắc chắn muốn tiếp tục không?",
     "clearFilters": "Xóa bộ lọc",
-    "backfillJobLabel": "{count} Công việc Backfill | {count} Công việc Backfill",
     "chunksUnit": "phân đoạn",
     "never": "Không bao giờ",
     "jobTooltipLabel": "Công việc",
@@ -3368,7 +3363,6 @@
     "functionName": "Tên hàm",
     "remoteDestination": "Đích từ xa",
     "failedToLoadPipeline": "Không tải được pipeline",
-    "header": "Pipeline",
     "subtitle": "Biến đổi, làm giàu và định tuyến dữ liệu đang xử lý",
     "deleteNode": "Xóa",
     "addPipeline": "Pipeline mới",
@@ -5480,7 +5474,6 @@
       "dynamicVariables": "Biến động"
     },
     "dashboards": {
-      "selected": "Đã chọn {count}",
       "failedToLoadFolder": "Không thể tải dashboard cho thư mục đã chọn.",
       "pleaseWait": "Vui lòng chờ...",
       "copySuffix": "{title} - Sao chép",
@@ -6836,7 +6829,6 @@
     "reloadAlertsTooltip": "Tải lại cảnh báo",
     "triggerDetection": "Phát hiện kích hoạt",
     "retrain": "Đào tạo lại",
-    "selectedLabel": "đã chọn",
     "resume": "Tiếp tục",
     "deleteAlertTitle": "Xóa cảnh báo",
     "deleteAlertMessage": "Bạn có chắc chắn muốn xóa cảnh báo này?",
@@ -7460,7 +7452,6 @@
       "noCondition": "Không có điều kiện",
       "noHistoryAvailable": "Không có lịch sử đánh giá cho cảnh báo này",
       "tryExpandingTimeRange": "Thử mở rộng phạm vi thời gian",
-      "results": "Kết quả",
       "ifCondition": "nếu {condition}"
     },
     "historyTable": {
@@ -7932,8 +7923,6 @@
     "prebuiltDestination": "Đích {type} dựng sẵn",
     "errorValidations": "Lỗi xác thực",
     "outputMessagesLabel": "Thông báo đầu ra",
-    "incidentSingular": "Sự cố",
-    "incidentPlural": "Sự cố",
     "confirmDeleteTemplates": "Bạn có chắc chắn muốn xóa {count} mẫu không? | Bạn có chắc chắn muốn xóa {count} mẫu không?",
     "lastOutcome": "Kết quả cuối cùng",
     "priority": "Ưu tiên",
@@ -8288,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "Xuất Mẫu",
-    "selected": "đã chọn",
     "deleteTemplateTitle": "Xóa Mẫu",
     "deleteTemplateMessage": "Bạn có chắc chắn muốn xóa mẫu này không?",
     "deleteTemplatesTitle": "Xóa các Mẫu",
@@ -8542,7 +8530,6 @@
     "deleteDestinationTitle": "Xóa Đích",
     "deleteDestinationMessage": "Bạn có chắc chắn muốn xóa đích không?",
     "deleteDestinationsTitle": "Xóa Các Đích",
-    "selected": "đã chọn",
     "organizationLabel": "Tổ chức",
     "defaultPlaceholder": "ví dụ: default",
     "streamNameLabel": "Tên Luồng",
@@ -9350,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "Khóa mã hóa cho các trường nhạy cảm",
-      "selected": "Đã chọn {count}",
       "delete": "Xóa",
       "deleteCipherKeyTitle": "Xóa Khóa Mã hóa",
       "deleteCipherKeyMessage": "Bạn có chắc chắn muốn xóa Khóa Mã hóa?",
@@ -9945,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "Stream",
-      "sessions": "phiên",
       "failedToLoad": "Tải phiên thất bại",
       "retry": "Thử lại",
       "tokenTooltip": "Đầu vào: {input} · Đầu ra: {output} · Tổng: {total}",
@@ -10057,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "Không phát hiện stream nào",
       "tabLabel": "Danh mục dịch vụ",
-      "footerTitle": "Dịch vụ",
       "filterPlaceholder": "Lọc theo tên dịch vụ...",
       "columns": {
         "serviceName": "Dịch vụ",
@@ -10626,7 +10610,6 @@
     "create_regex_pattern_field": "Che / Xóa bằng Regex",
     "import": "Nhập",
     "import_title": "Nhập mẫu",
-    "bottom_header": "{count} Mẫu | {count} Mẫu",
     "filter_by_tag": "Lọc theo thẻ",
     "refresh": "Làm mới",
     "loading_patterns": "Đang tải mẫu...",
@@ -10682,7 +10665,6 @@
     "get_history": "Lấy lịch sử",
     "executed_at": "Thực thi lúc",
     "sql_query": "Truy vấn SQL",
-    "results": "Kết quả",
     "delayMessage": "Lịch sử tìm kiếm có thể bị trễ trong"
   },
   "correlation": {
@@ -10825,7 +10807,6 @@
     "function_definition": "Định nghĩa hàm",
     "more_details": "Chi tiết thêm",
     "query_function": "Truy vấn / Hàm",
-    "results": "Kết quả",
     "max_limit": "Giới hạn tối đa",
     "cancel_job_title": "Hủy tìm kiếm đã lên lịch",
     "cancel_job_message": "Bạn có chắc chắn muốn hủy tìm kiếm đã lên lịch này không?",
@@ -10932,9 +10913,6 @@
     "testBtn": "Kiểm tra",
     "importBtn": "Nhập",
     "newModel": "Mô hình mới",
-    "modelsCount": "{count} Mô hình",
-    "exportSelected": "Xuất ({count})",
-    "deleteSelected": "Xóa ({count})",
     "importTitle": "Nhập giá mô hình",
     "errorValidations": "Xác thực lỗi",
     "outputMessages": "Thông báo đầu ra",
@@ -11452,11 +11430,6 @@
         "trace": "Trace",
         "session": "Phiên"
       },
-      "scopeNoun": {
-        "span": "span",
-        "trace": "trace",
-        "session": "phiên"
-      },
       "inQueueFilter": {
         "label": "Trong hàng đợi",
         "notEnqueued": "Trong hàng đợi: Chưa xếp hàng",
@@ -11502,16 +11475,12 @@
         "sectionTitle": "Thêm vào hàng đợi",
         "manageQueues": "Quản lý hàng đợi"
       },
-      "bulkAdd": "Thêm {count} vào hàng đợi",
-      "selectedCount": "Đã chọn {selected} trong tổng số {total}",
-      "footerTitle": "Không khỏe {scope}",
       "addSuccess": "Đã thêm vào {queue} — hàng này vẫn ở trong Discovery, trạng thái của nó nằm trong hàng đợi.",
       "addError": "Không thể thêm các mục vào hàng đợi",
       "openQueue": "Mở hàng đợi",
       "queuesError": "Không thể tải hàng đợi"
     },
     "queues": {
-      "listTitle": "Hàng đợi",
       "searchPlaceholder": "Tìm kiếm hàng đợi...",
       "newButton": "Hàng đợi mới",
       "loadError": "Không thể tải hàng đợi",
@@ -11570,7 +11539,6 @@
         "targetDataset": "Tập dữ liệu đích",
         "noTargetDataset": "Không có Tập dữ liệu đích",
         "searchPlaceholder": "Tìm kiếm mục...",
-        "footerTitle": "Mục",
         "allItems": "Tất cả",
         "inTrace": "Trong Trace {traceId}",
         "reviewAgain": "Xem xét lại",
@@ -11995,7 +11963,6 @@
       "clearBaseline": "Xóa đường cơ sở"
     },
     "datasets": {
-      "listTitle": "Tập dữ liệu",
       "searchPlaceholder": "Tìm kiếm tập dữ liệu...",
       "newButton": "Tập dữ liệu mới",
       "loadError": "Không thể tải tập dữ liệu",
@@ -12039,7 +12006,6 @@
         "fallbackTitle": "Tập dữ liệu",
         "meta": "{count} mục · đã cập nhật {updated}",
         "loadError": "Không thể tải tập dữ liệu",
-        "footerTitle": "Các mục",
         "tabs": {
           "items": "Mục",
           "experiments": "Thử nghiệm"
@@ -12176,8 +12142,6 @@
       "summaryAgents": "Các agent bị ảnh hưởng",
       "failuresTitle": "Phân loại lỗi",
       "failuresHint": "Lỗi được nhóm theo loại, theo từng agent",
-      "footerLoops": "Vòng lặp",
-      "footerFailures": "Các lớp sự cố",
       "noLoops": "Không phát hiện hành vi lặp trong phạm vi này",
       "noFailures": "Không có lỗi agent nào trong phạm vi này",
       "noLoopsForAgent": "Không có hành vi lặp nào cho {agent} trong khoảng này — hãy chuyển agent hoặc mở rộng phạm vi thời gian",
@@ -12244,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "Tác vụ từ xa",
       "searchPlaceholder": "Tìm kiếm tác vụ",
       "newButton": "Tác vụ mới",
       "loadError": "Không thể tải các tác vụ từ xa",
@@ -12892,7 +12855,6 @@
         "title": "Điểm đánh giá",
         "hint": "Điểm số và lý giải đến từ _llm_scores. Chọn một lần chạy để mở trace đánh giá của nó nhằm điều tra thêm.",
         "filterLabel": "Lọc điểm đánh giá",
-        "footerTitle": "Điểm đánh giá",
         "noThresholdHint": "Đặt ngưỡng lành mạnh trên cấu hình điểm số này để phân loại và làm nổi bật các điểm không lành mạnh.",
         "noReasoning": "Không có lý luận nào được ghi lại",
         "unknownAgent": "Tác nhân không xác định",
@@ -12917,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "Tổng quan cấu hình điểm",
         "searchPlaceholder": "Lọc cấu hình…",
         "relativeTime": {
           "daysAgo": "{day} ngày trước",
@@ -13045,7 +13006,6 @@
         "updatedLabel": "Đã cập nhật"
       },
       "createTitle": "Cấu hình điểm mới",
-      "listTitle": "Cấu hình điểm số",
       "searchPlaceholder": "Tìm kiếm cấu hình",
       "newButton": "Cấu hình điểm số mới",
       "columns": {
@@ -13122,9 +13082,6 @@
         "errors": {
           "title": "Lỗi xác thực"
         }
-      },
-      "export": {
-        "bulkButton": "Xuất"
       }
     },
     "scorer": {
@@ -13178,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "Bộ chấm điểm",
       "searchPlaceholder": "Tìm kiếm bộ chấm điểm",
       "newButton": "Bộ chấm điểm mới",
       "usedByJob": "{count} công việc | {count} công việc",
@@ -13219,9 +13175,6 @@
           "nameConflict": "Scorer {index}: tên \"{name}\" đã tồn tại trong tổ chức này",
           "duplicateName": "Scorer {index}: tên \"{name}\" được sử dụng nhiều hơn một lần trong lần nhập này"
         }
-      },
-      "export": {
-        "bulkButton": "Xuất"
       },
       "backTo": "Quay lại Bộ chấm điểm",
       "badgeRemote": "Remote",
@@ -13411,11 +13364,9 @@
           "recentEmpty": "Không có lần chạy thất bại nào trong khoảng thời gian đã chọn."
         }
       },
-      "listTitle": "Tác vụ đánh giá",
       "searchPlaceholder": "Tìm kiếm tác vụ",
       "newButton": "Tác vụ mới",
       "scorerCount": "{count} bộ chấm điểm | {count} bộ chấm điểm",
-      "deleteBulkButton": "Xóa",
       "deleteBulkTitle": "Xóa tác vụ đánh giá",
       "deleteBulkConfirm": "Bạn có chắc chắn muốn xóa {count} tác vụ đánh giá? Hành động này không thể hoàn tác.",
       "deletedBulk": "Đã xóa {count} tác vụ đánh giá",
@@ -14395,10 +14346,6 @@
       "passed": "Đạt",
       "warning": "Cảnh báo"
     },
-    "footer": {
-      "browserTests": "Kiểm tra trình duyệt",
-      "checks": "Kiểm tra"
-    },
     "journey": {
       "extract": {
         "action": "Tách thành bài test con",
@@ -14781,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "Thêm Vị trí",
-      "bottomHeader": "vị trí",
       "bulkDeleteConfirmMessage": "Bạn có chắc chắn muốn xóa {count} vị trí?",
       "bulkDeleteConfirmTitle": "Xóa Vị trí",
       "bulkDeleteFailed": "Không thể xóa vị trí",
@@ -14842,7 +14788,6 @@
       "regionPlaceholder": "ví dụ: us-east-1",
       "regionRequired": "Khu vực là bắt buộc",
       "searchPlaceholder": "Tìm kiếm vị trí…",
-      "selectedCount": "{selected} trên {total} vị trí đã chọn",
       "title": "Vị trí",
       "publicTitle": "Vị trí công khai",
       "privateTitle": "Vị trí riêng tư",
@@ -15096,8 +15041,7 @@
       "detailOrigin": "Nguồn gốc",
       "detailFirstParty": "Bên thứ nhất",
       "detailThirdParty": "Bên thứ ba",
-      "detailStackTrace": "Dấu vết ngăn xếp",
-      "footerEvents": "Sự kiện"
+      "detailStackTrace": "Dấu vết ngăn xếp"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15297,7 +15241,6 @@
       "bulkTriggerSuccess": "Đã kích hoạt {count} kiểm tra. | Đã kích hoạt {count} kiểm tra.",
       "bulkTriggerToast": "Đang kích hoạt {count} kiểm tra… | Đang kích hoạt {count} kiểm tra…",
       "check": "Kiểm tra",
-      "checksFooterTitle": "Kiểm tra",
       "checksCount": "{count} kiểm tra",
       "delete": "Xóa",
       "duplicate": "Nhân bản",
@@ -15325,7 +15268,6 @@
       "pausing": "Đang tạm dừng…",
       "response": "Phản hồi",
       "scheduledAt": "Lên lịch lúc",
-      "selectedCount": "Đã chọn {selected} trên {total}",
       "status": "Trạng thái",
       "statusDegraded": "⚠ Suy giảm",
       "statusDown": "✗ Ngừng hoạt động",
@@ -15508,7 +15450,6 @@
     "editTitle": "Chỉnh sửa trang trạng thái",
     "back": "Trang trạng thái",
     "loadFailed": "Không thể tải trang trạng thái",
-    "footerTitle": "trang trạng thái",
     "searchPlaceholder": "Tìm kiếm trang trạng thái",
     "copyUrl": "Sao chép URL",
     "publicUrl": "URL công khai",
@@ -16019,7 +15960,9 @@
         "resetColumnWidths": "Đặt lại độ rộng cột"
       },
       "removeColumnAria": "Xóa cột",
-      "formatColumnAria": "Định dạng cột"
+      "formatColumnAria": "Định dạng cột",
+      "selectedOfTotal": "Đã chọn {selected} trong {total}",
+      "selectedCount": "Đã chọn {selected}"
     },
     "predefinedThemes": {
       "title": "Chủ đề",
@@ -16974,7 +16917,6 @@
     },
     "move": "Di chuyển",
     "moveTitle": "Di chuyển {count} SLO sang thư mục khác",
-    "moveSelected": "Di chuyển {count} mục đã chọn",
     "exportTitle": "Xuất SLO | Xuất {count} SLO",
     "exportSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
     "exportFailed": "Không thể đọc định nghĩa SLO. Vui lòng thử lại.",
@@ -17739,7 +17681,6 @@
       "otherRow": "Tất cả truy vấn khác",
       "truncatedText": "Câu lệnh này quá dài để lưu trữ đầy đủ, vì vậy nó được hiển thị cắt ngắn.",
       "stmtClass": {
-        "query": "Truy vấn",
         "queryHint": "Chỉ SQL thực sự — SELECT, INSERT, UPDATE và DELETE.",
         "all": "Truy vấn + chi phí kết nối",
         "allHint": "Cũng tính các hoạt động ghi sổ mà trình điều khiển của bạn gửi giữa các truy vấn: BEGIN và COMMIT, SET, và các kiểm tra giữ cho kết nối nhóm luôn hoạt động.",
@@ -18340,7 +18281,6 @@
       "disclosureShort": "Mỗi hàng là một cuộc gọi đã hoàn thành thực tế",
       "disclosureDetail": "Được đo bởi ứng dụng thực hiện cuộc gọi, từ các trace bạn gửi. Chỉ những cuộc gọi đã hoàn thành có ở đây — một truy vấn đang chạy, hoặc một truy vấn bị treo và không bao giờ trở lại, không tạo ra phép đo nào.",
       "counts": {
-        "complete": "Hiển thị tất cả {count} cuộc gọi cơ sở dữ liệu trong cửa sổ này, chậm nhất trước.",
         "truncated": "{count} cuộc gọi chậm nhất trong cửa sổ này — có nhiều cuộc gọi hơn số hiển thị ở đây.",
         "filtered": "Hiển thị {count} trong số {total} cuộc gọi."
       },
@@ -18684,7 +18624,6 @@
         "unknown": "Trạng thái không được báo cáo"
       },
       "counts": {
-        "complete": "Hiển thị {count} phiên.",
         "capped": "Có nhiều phiên được lấy mẫu hơn mức chúng tôi có thể đọc cùng lúc. Đây là {count} phiên chúng tôi có.",
         "filtered": "Hiển thị {count} trong tổng số {total} phiên."
       },
@@ -18801,8 +18740,7 @@
         "lastVacuum": "Lần vacuum gần nhất",
         "lastAutovacuum": "Lần autovacuum gần nhất",
         "lastAnalyze": "Lần phân tích gần nhất"
-      },
-      "countLine": "{count} bảng"
+      }
     },
     "recommendations": {
       "title": "Khuyến nghị",
@@ -19147,7 +19085,6 @@
     "acknowledge": "Xác nhận",
     "acknowledgeHint": "Nhận trách nhiệm. Thao tác này dừng việc leo thang.",
     "actions": "Hành động",
-    "selectedCount": "Đã chọn {count}",
     "bulkAckDone": "Đã xác nhận {count} thông báo",
     "bulkAckPartial": "Không thể xác nhận {count}",
     "resolveCause": "Nguyên nhân là gì?",

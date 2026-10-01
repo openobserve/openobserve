@@ -2188,7 +2188,6 @@
     "syntheticsTokensDesc": "組織レベルのo2syn_トークンは、プライベートSyntheticsエージェントがジョブを取得するために使用します。",
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
-    "organizationMembers": "組織メンバー",
     "invitations": "招待状",
     "quota": "クォータ",
     "externalUserWarningTitle": "外部ユーザー警告",
@@ -2471,7 +2470,6 @@
       "memberUpdatedSuccessfully": "組織メンバーの更新に成功しました。"
     },
     "user": {
-      "organizationMembers": "組織メンバー",
       "delete": "削除",
       "failedToLoadCustomRoles": "カスタムロールの読み込みに失敗しました。",
       "pleaseWaitLoadingUsers": "ユーザーを読み込んでいます。お待ちください...",
@@ -2677,7 +2675,6 @@
     "fetchingFunctions": "関数を取得中...",
     "associateFunction": "関数を関連付ける",
     "noFunctionsFound": "関数が見つかりません",
-    "streamsUnit": "{count} ストリーム | {count} ストリーム",
     "deleteAssociatedAlertsPipelinesBatch": "選択したストリームに関連するすべてのパイプラインとアラートを削除します",
     "allFieldsCount": "すべてのフィールド ({count})",
     "performanceFieldsDialog": {
@@ -2790,7 +2787,6 @@
       "showList": "実行リストを表示"
     },
     "history": {
-      "button": "実行",
       "title": "ワークフロー履歴",
       "started": "開始",
       "ended": "終了",
@@ -3349,7 +3345,6 @@
     "actionCannotBeUndone": "この操作は、ジョブが作成されると取り消しやキャンセルはできません。",
     "areYouSureProceed": "続行してもよろしいですか？",
     "clearFilters": "フィルターをクリア",
-    "backfillJobLabel": "{count} バックフィルジョブ | {count} バックフィルジョブ",
     "chunksUnit": "チャンク",
     "never": "なし",
     "jobTooltipLabel": "ジョブ",
@@ -3368,7 +3363,6 @@
     "functionName": "関数名",
     "remoteDestination": "リモート宛先",
     "failedToLoadPipeline": "パイプラインを読み込めませんでした",
-    "header": "パイプライン",
     "subtitle": "転送中のデータの変換、強化、ルーティング",
     "deleteNode": "ノードを削除",
     "addPipeline": "パイプラインを追加",
@@ -5480,7 +5474,6 @@
       "dynamicVariables": "動的変数"
     },
     "dashboards": {
-      "selected": "{count} 選択済み",
       "failedToLoadFolder": "選択したフォルダのダッシュボードの読み込みに失敗しました。",
       "pleaseWait": "お待ちください...",
       "copySuffix": "{title} - コピー",
@@ -6836,7 +6829,6 @@
     "reloadAlertsTooltip": "アラートを再読み込み",
     "triggerDetection": "トリガー検出",
     "retrain": "再トレーニング",
-    "selectedLabel": "選択済み",
     "resume": "再開",
     "deleteAlertTitle": "アラートを削除",
     "deleteAlertMessage": "このアラートを削除してもよろしいですか？",
@@ -7460,7 +7452,6 @@
       "noCondition": "条件なし",
       "noHistoryAvailable": "このアラートの評価履歴はありません",
       "tryExpandingTimeRange": "時間範囲を広げてみてください",
-      "results": "結果",
       "ifCondition": "{condition} の場合"
     },
     "historyTable": {
@@ -7932,8 +7923,6 @@
     "prebuiltDestination": "プリビルト {type} 宛先",
     "errorValidations": "エラーバリデーション",
     "outputMessagesLabel": "出力メッセージ",
-    "incidentSingular": "インシデント",
-    "incidentPlural": "インシデント",
     "confirmDeleteTemplates": "{count} 個のテンプレートを削除してもよろしいですか？ | {count} 個のテンプレートを削除してもよろしいですか？",
     "lastOutcome": "直前の結果",
     "priority": "優先度",
@@ -8288,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "テンプレートをエクスポート",
-    "selected": "選択済み",
     "deleteTemplateTitle": "テンプレートを削除",
     "deleteTemplateMessage": "テンプレートを削除してもよろしいですか？",
     "deleteTemplatesTitle": "テンプレートを削除",
@@ -8542,7 +8530,6 @@
     "deleteDestinationTitle": "宛先を削除",
     "deleteDestinationMessage": "宛先を削除してもよろしいですか？",
     "deleteDestinationsTitle": "宛先を削除",
-    "selected": "選択済み",
     "organizationLabel": "組織",
     "defaultPlaceholder": "例: default",
     "streamNameLabel": "ストリーム名",
@@ -9350,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "機密フィールドの暗号化キー",
-      "selected": "{count} 件選択済み",
       "delete": "削除",
       "deleteCipherKeyTitle": "暗号化キーを削除",
       "deleteCipherKeyMessage": "暗号化キーを削除してもよろしいですか？",
@@ -9945,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "ストリーム",
-      "sessions": "セッション",
       "failedToLoad": "セッションを読み込めませんでした",
       "retry": "リトライ",
       "tokenTooltip": "入力:{input} · 出力:{output} · 合計:{total}",
@@ -10057,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "ストリームが検出されません",
       "tabLabel": "サービスカタログ",
-      "footerTitle": "サービス",
       "filterPlaceholder": "サービス名で絞り込み...",
       "columns": {
         "serviceName": "サービス",
@@ -10626,7 +10610,6 @@
     "create_regex_pattern_field": "正規表現を使用して編集/削除",
     "import": "インポート",
     "import_title": "インポートパターン",
-    "bottom_header": "{count} パターン | {count} パターン",
     "filter_by_tag": "タグで絞り込む",
     "refresh": "リフレッシュ",
     "loading_patterns": "パターンを読み込んでいます...",
@@ -10682,7 +10665,6 @@
     "get_history": "履歴を取得",
     "executed_at": "実行日",
     "sql_query": "SQL クエリー",
-    "results": "結果",
     "delayMessage": "検索履歴は次の理由で遅延する可能性があります"
   },
   "correlation": {
@@ -10825,7 +10807,6 @@
     "function_definition": "関数定義",
     "more_details": "さらに詳しく",
     "query_function": "クエリ/関数",
-    "results": "結果",
     "max_limit": "マックスリミット",
     "cancel_job_title": "予約検索をキャンセル",
     "cancel_job_message": "このスケジュールされた検索をキャンセルしてもよろしいですか?",
@@ -10932,9 +10913,6 @@
     "testBtn": "テスト",
     "importBtn": "インポート",
     "newModel": "新しいモデル",
-    "modelsCount": "{count} モデル",
-    "exportSelected": "エクスポート ({count})",
-    "deleteSelected": "削除 ({count})",
     "importTitle": "輸入モデル価格",
     "errorValidations": "エラー検証",
     "outputMessages": "出力メッセージ",
@@ -11452,11 +11430,6 @@
         "trace": "トレース",
         "session": "セッション"
       },
-      "scopeNoun": {
-        "span": "スパン",
-        "trace": "トレース",
-        "session": "セッション"
-      },
       "inQueueFilter": {
         "label": "キュー内",
         "notEnqueued": "キュー内: 未エンキュー",
@@ -11502,16 +11475,12 @@
         "sectionTitle": "キューに追加",
         "manageQueues": "キューの管理"
       },
-      "bulkAdd": "{count} をキューに追加",
-      "selectedCount": "{selected} / {total} 選択中",
-      "footerTitle": "異常 {scope}",
       "addSuccess": "{queue} に追加されました — 行は Discovery に残り、その状態はキューに保持されます。",
       "addError": "キューへのアイテムの追加に失敗しました",
       "openQueue": "キューを開く",
       "queuesError": "キューの読み込みに失敗しました"
     },
     "queues": {
-      "listTitle": "キュー",
       "searchPlaceholder": "キューを検索...",
       "newButton": "新規キュー",
       "loadError": "キューの読み込みに失敗しました",
@@ -11570,7 +11539,6 @@
         "targetDataset": "ターゲットデータセット",
         "noTargetDataset": "ターゲットデータセットなし",
         "searchPlaceholder": "アイテムを検索...",
-        "footerTitle": "アイテム",
         "allItems": "すべて",
         "inTrace": "トレース {traceId} 内",
         "reviewAgain": "再レビュー",
@@ -11995,7 +11963,6 @@
       "clearBaseline": "ベースラインをクリア"
     },
     "datasets": {
-      "listTitle": "データセット",
       "searchPlaceholder": "データセットを検索...",
       "newButton": "新しいデータセット",
       "loadError": "データセットの読み込みに失敗しました",
@@ -12039,7 +12006,6 @@
         "fallbackTitle": "データセット",
         "meta": "{count} 項目 · 更新日時 {updated}",
         "loadError": "データセットの読み込みに失敗しました",
-        "footerTitle": "項目",
         "tabs": {
           "items": "項目",
           "experiments": "実験"
@@ -12176,8 +12142,6 @@
       "summaryAgents": "影響を受けたエージェント",
       "failuresTitle": "障害の分類",
       "failuresHint": "エラーを種類別、エージェント別にグループ化",
-      "footerLoops": "ループ",
-      "footerFailures": "障害クラス",
       "noLoops": "この範囲でループ動作は検出されませんでした",
       "noFailures": "この範囲でエージェント障害はありません",
       "noLoopsForAgent": "この範囲では {agent} のループ動作がありません — エージェントを切り替えるか、時間範囲を広げてください。",
@@ -12244,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "リモートタスク",
       "searchPlaceholder": "タスクを検索",
       "newButton": "新規タスク",
       "loadError": "リモートタスクを読み込めませんでした",
@@ -12892,7 +12855,6 @@
         "title": "評価スコア",
         "hint": "スコアと推論は _llm_scores から得られます。ランを選択すると、その評価トレースが開き、さらに調査できます。",
         "filterLabel": "評価スコアをフィルター",
-        "footerTitle": "評価スコア",
         "noThresholdHint": "このスコア設定に健全性しきい値を設定して、不健全なスコアを分類および強調表示します。",
         "noReasoning": "推論が記録されていません",
         "unknownAgent": "不明なエージェント",
@@ -12917,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "スコア設定の概要",
         "searchPlaceholder": "フィルター構成...",
         "relativeTime": {
           "daysAgo": "{day}日前",
@@ -13045,7 +13006,6 @@
         "updatedLabel": "更新日"
       },
       "createTitle": "新しいスコア設定",
-      "listTitle": "スコア設定",
       "searchPlaceholder": "設定を検索",
       "newButton": "新しいスコア設定",
       "columns": {
@@ -13122,9 +13082,6 @@
         "errors": {
           "title": "検証エラー"
         }
-      },
-      "export": {
-        "bulkButton": "エクスポート"
       }
     },
     "scorer": {
@@ -13178,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "スコアラー",
       "searchPlaceholder": "スコアラーを検索",
       "newButton": "新しいスコアラー",
       "usedByJob": "{count} ジョブ | {count} ジョブ",
@@ -13219,9 +13175,6 @@
           "nameConflict": "スコアラー {index}: 名前 \"{name}\" はこの組織に既に存在します",
           "duplicateName": "スコアラー {index}: 名前 \"{name}\" はこのインポートで複数回使用されています"
         }
-      },
-      "export": {
-        "bulkButton": "エクスポート"
       },
       "backTo": "スコアラーに戻る",
       "badgeRemote": "リモート",
@@ -13411,11 +13364,9 @@
           "recentEmpty": "選択したウィンドウ内に失敗した実行はありません。"
         }
       },
-      "listTitle": "評価ジョブ",
       "searchPlaceholder": "ジョブを検索",
       "newButton": "新しいジョブ",
       "scorerCount": "{count} スコアラー | {count} スコアラー",
-      "deleteBulkButton": "削除",
       "deleteBulkTitle": "評価ジョブを削除",
       "deleteBulkConfirm": "{count} 件の評価ジョブを削除してもよろしいですか？この操作は元に戻せません。",
       "deletedBulk": "{count} 件の評価ジョブを削除しました",
@@ -14395,10 +14346,6 @@
       "passed": "成功",
       "warning": "警告"
     },
-    "footer": {
-      "browserTests": "ブラウザテスト",
-      "checks": "チェック"
-    },
     "journey": {
       "extract": {
         "action": "サブテストに抽出",
@@ -14781,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "ロケーションを追加",
-      "bottomHeader": "ロケーション",
       "bulkDeleteConfirmMessage": "{count} 件のロケーションを削除してもよろしいですか？",
       "bulkDeleteConfirmTitle": "ロケーションを削除",
       "bulkDeleteFailed": "ロケーションの削除に失敗しました",
@@ -14842,7 +14788,6 @@
       "regionPlaceholder": "例: us-east-1",
       "regionRequired": "リージョンが必要です",
       "searchPlaceholder": "ロケーションを検索…",
-      "selectedCount": "{selected} / {total} のロケーションが選択されました",
       "title": "ロケーション",
       "publicTitle": "パブリックロケーション",
       "privateTitle": "プライベートロケーション",
@@ -15096,8 +15041,7 @@
       "detailOrigin": "発生元",
       "detailFirstParty": "ファーストパーティ",
       "detailThirdParty": "サードパーティ",
-      "detailStackTrace": "スタックトレース",
-      "footerEvents": "イベント"
+      "detailStackTrace": "スタックトレース"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15297,7 +15241,6 @@
       "bulkTriggerSuccess": "{count} 件のチェックをトリガーしました。 | {count} 件のチェックをトリガーしました。",
       "bulkTriggerToast": "{count} 件のチェックをトリガーしています… | {count} 件のチェックをトリガーしています…",
       "check": "チェック",
-      "checksFooterTitle": "チェック",
       "checksCount": "{count} チェック",
       "delete": "削除",
       "duplicate": "複製",
@@ -15325,7 +15268,6 @@
       "pausing": "一時停止中...",
       "response": "応答",
       "scheduledAt": "スケジュール日時",
-      "selectedCount": "{selected}/{total} 選択中",
       "status": "ステータス",
       "statusDegraded": "⚠ 低下",
       "statusDown": "✗ ダウン",
@@ -15508,7 +15450,6 @@
     "editTitle": "ステータスページを編集",
     "back": "ステータスページ",
     "loadFailed": "ステータスページを読み込めませんでした",
-    "footerTitle": "ステータスページ",
     "searchPlaceholder": "ステータスページを検索",
     "copyUrl": "URLをコピー",
     "publicUrl": "公開URL",
@@ -16019,7 +15960,9 @@
         "resetColumnWidths": "列幅をリセット"
       },
       "removeColumnAria": "列を削除",
-      "formatColumnAria": "列の書式設定"
+      "formatColumnAria": "列の書式設定",
+      "selectedOfTotal": "{total} 件中 {selected} 件を選択中",
+      "selectedCount": "{selected} 件を選択中"
     },
     "predefinedThemes": {
       "title": "テーマ",
@@ -16974,7 +16917,6 @@
     },
     "move": "移動",
     "moveTitle": "{count} 個のSLOを別のフォルダに移動",
-    "moveSelected": "選択した {count} 個を移動",
     "exportTitle": "SLOをエクスポート | {count}個のSLOをエクスポート",
     "exportSubtitle": "定義を確認し、JSONまたはOpenObserveプロバイダー用のTerraformとしてダウンロードしてください。",
     "exportFailed": "SLO定義を読み取れませんでした。もう一度お試しください。",
@@ -17739,7 +17681,6 @@
       "otherRow": "その他すべてのクエリ",
       "truncatedText": "このステートメントは長すぎて完全には保存できなかったため、省略されて表示されています。",
       "stmtClass": {
-        "query": "クエリ",
         "queryHint": "実際のSQLのみ — SELECT、INSERT、UPDATE、DELETE。",
         "all": "クエリ + 接続オーバーヘッド",
         "allHint": "また、ドライバーがクエリ間で送信するブックキーピング（BEGIN、COMMIT、SET、プールされた接続を維持するためのチェック）もカウントします。",
@@ -18340,7 +18281,6 @@
       "disclosureShort": "各行は実際に完了した1つのコールです",
       "disclosureDetail": "送信されたトレースから、呼び出しを行ったアプリケーションによって測定されます。ここには完了した呼び出しのみが表示されます。まだ実行中のクエリや、ハングして応答が返らなかったクエリは測定されません。",
       "counts": {
-        "complete": "このウィンドウ内のすべての{count}データベースコールを、遅い順に表示しています。",
         "truncated": "このウィンドウ内の{count}件の最も遅いコール — ここに表示されているよりも多く実行されました。",
         "filtered": "{total}件中{count}件のコールを表示中。"
       },
@@ -18684,7 +18624,6 @@
         "unknown": "状態が報告されていません"
       },
       "counts": {
-        "complete": "{count} 件のセッションを表示中。",
         "capped": "一度に読み取れるよりも多くのセッションがサンプリングされました。これらは取得できた {count} 件です。",
         "filtered": "{count} 件のセッションを表示中（全 {total} 件中）"
       },
@@ -18801,8 +18740,7 @@
         "lastVacuum": "最終VACUUM",
         "lastAutovacuum": "最終自動VACUUM",
         "lastAnalyze": "最終ANALYZE"
-      },
-      "countLine": "{count} テーブル"
+      }
     },
     "recommendations": {
       "title": "推奨事項",
@@ -19147,7 +19085,6 @@
     "acknowledge": "対応する",
     "acknowledgeHint": "自分が対応を引き受けます。エスカレーションが停止します。",
     "actions": "アクション",
-    "selectedCount": "{count} 件を選択中",
     "bulkAckDone": "{count} 件の通知に対応しました",
     "bulkAckPartial": "{count} 件は対応できませんでした",
     "resolveCause": "原因は何でしたか？",

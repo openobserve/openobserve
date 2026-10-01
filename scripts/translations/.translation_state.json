@@ -587,8 +587,6 @@
       },
       "failuresHint": "882bc3eb14fa992f",
       "failuresTitle": "384c71bec302b913",
-      "footerFailures": "ee052f71f76e78a1",
-      "footerLoops": "c08f99e3947df0bf",
       "loopsHint": "e7e80fd2dbf66b9e",
       "loopsTitle": "6b6a70d972efb2b2",
       "noFailures": "d5e88acd93501b92",
@@ -675,7 +673,6 @@
         "deleteItemSuccess": "15d650348069b812",
         "deleteItemTitle": "fcfc38291577e1ba",
         "fallbackTitle": "4411e525721e7dd8",
-        "footerTitle": "fb8e7a1a3cb7b25d",
         "itemDetail": {
           "deleteButton": "fcfc38291577e1ba",
           "editNewVersion": "5fdcc3b4103c57da",
@@ -714,7 +711,6 @@
       "editError": "1ba88bf90eb0b2b5",
       "editSuccess": "8e418a319e01e796",
       "editTitle": "6ff62dc12aac1b32",
-      "listTitle": "e9faf7b714ee2400",
       "loadError": "cc694504b7a53cd3",
       "newButton": "33a1560e431bd250",
       "searchPlaceholder": "c5c6bd8d95a33ca2",
@@ -760,7 +756,6 @@
         "noQueues": "a48218ebf18357ac",
         "sectionTitle": "67e64116e5021705"
       },
-      "bulkAdd": "e9898b4dba51522f",
       "columns": {
         "actions": "ff8059dc6752afdd",
         "duration": "4fc52a3c4c558b51",
@@ -778,7 +773,6 @@
         "traces": "998741a58ed2b411",
         "type": "baaddf70fb5d432b"
       },
-      "footerTitle": "7c7657d18ccc988e",
       "inQueue": {
         "multiple": "3aa35c67215ff2fc",
         "none": "52b0a6c08d08f36e",
@@ -805,14 +799,8 @@
         "span": "b3393bfb2a55adff",
         "trace": "998741a58ed2b411"
       },
-      "scopeNoun": {
-        "session": "1225ae6c1ae69dcb",
-        "span": "cd6c32ae17a18e16",
-        "trace": "b5ac69fc467c01f3"
-      },
       "searchFooter": "31b8633077452cee",
       "searchPlaceholder": "b4d18406c8c24f79",
-      "selectedCount": "73ffb823f5889bf1",
       "spanParent": "a6066f978fed4e78"
     },
     "errorDiff": {
@@ -1691,7 +1679,6 @@
         "emptyBody": "352acbf085d7256b",
         "emptyTitle": "6b2d587de56f2a96",
         "fallbackTitle": "3b2fe03e36893916",
-        "footerTitle": "fb8e7a1a3cb7b25d",
         "inTrace": "9148de2b5c39c1c0",
         "loadError": "bbad7a24f0d58d7d",
         "noTargetDataset": "73a7b1a478ee9767",
@@ -1705,7 +1692,6 @@
         },
         "targetDataset": "dd912156bcc78d0f"
       },
-      "listTitle": "be77db1156d1f1b5",
       "loadError": "9744a56aa3cd3f8e",
       "newButton": "118b76239861fac3",
       "optionsLoadError": "d7c6745e1e832cd3",
@@ -1965,7 +1951,6 @@
         "keyLabel": "99a52df3ff3d4994",
         "title": "9826ba227111d267"
       },
-      "listTitle": "ba919f290695b762",
       "loadError": "8a0f0d0a59de8a38",
       "newButton": "718e58cc20d67514",
       "referencedBy": "64a1f87304e23f09",
@@ -2352,7 +2337,6 @@
     "saved": "022564c54312e2d6",
     "search": "6a279c5b3bf2a5ea",
     "selectDestinationType": "f2706be40f66125c",
-    "selected": "d7cbbb688b2e506c",
     "separator": "be237eda7fff4fd3",
     "separator_hint": "0164efb37fde523f",
     "separator_placeholder": "356cbba8c46bb5a3",
@@ -2734,7 +2718,6 @@
     "rowsSection": "101f2ff3de22441f",
     "rowsSectionDescription": "0890b041ad6db134",
     "savedSuccessfully": "b2c655467ea71e28",
-    "selected": "d7cbbb688b2e506c",
     "severityCritical": "427dd2969bd140be",
     "severityNoData": "3b41ba9c7cb8c5d6",
     "severityOk": "843ac01149cced78",
@@ -2802,7 +2785,6 @@
       "noCondition": "459075b78e6115c8",
       "noHistoryAvailable": "85cdd773b0a825dc",
       "promqlQuery": "50c2608f910f60d9",
-      "results": "219c4a6c86a716e9",
       "rowsSeparator": "8324d25b11a05a3e",
       "sql": "a7056a455639d1c7",
       "sqlQuery": "9a4f1370f2b72c82",
@@ -3382,8 +3364,6 @@
     },
     "importAlertTitle": "8003b4ed4b9e3e5b",
     "importedFromPanel": "4e66f1ce917a8daf",
-    "incidentPlural": "bfe868931580fb3b",
-    "incidentSingular": "36a606d4886552e8",
     "incidents": {
       "acknowledge": "f9236d9e87b6235e",
       "acknowledgeAriaLabel": "823b53ff3ed24b88",
@@ -4012,7 +3992,6 @@
     "selectAllColumnsNotAllowed": "0084c7802f234da2",
     "selectStreamGuideline": "df95838c5357ccab",
     "selectStreamTypeFirst": "5f327cac5fb1d2d3",
-    "selectedLabel": "d7cbbb688b2e506c",
     "sendingNotification": "f2318c290a603f87",
     "sensitivity": "ebb57a260d58207c",
     "serviceGraphHighFrequency": "e774812dc1ba228c",
@@ -5352,7 +5331,9 @@
         "toggleVisibilityAria": "35cf4f54e63dc35b"
       },
       "formatColumnAria": "5f0c0af6efc43083",
-      "removeColumnAria": "9807a23d19fdf7b2"
+      "removeColumnAria": "9807a23d19fdf7b2",
+      "selectedCount": "a59008ba5f776947",
+      "selectedOfTotal": "73ffb823f5889bf1"
     },
     "tableLoading": {
       "ariaLabel": "ddede8e80ae8dca6"
@@ -5966,7 +5947,6 @@
       "partialDeleteResult": "4a05075aa2f16ec9",
       "pleaseWait": "2dfd888fdd5e8018",
       "queryFields": "bedff62661a6f43b",
-      "selected": "529aacfdfd2b17bf",
       "titleRequired": "7c15e7448e6f4d1c"
     },
     "decimals": "74672912045e226a",
@@ -6915,7 +6895,6 @@
       },
       "counts": {
         "capped": "3c4e13af1b687e22",
-        "complete": "d8505577209bccdc",
         "filtered": "5ec5d98d2f6972f6"
       },
       "disclosure": {
@@ -7945,7 +7924,6 @@
         "all": "ab9dcc553467b834",
         "allHint": "8e5beeb9b29be0dd",
         "overheadLabel": "387ec3bc2fec5dab",
-        "query": "80d2e18c7da9f0be",
         "queryHint": "4610c57ac29e9a78"
       },
       "summary": {
@@ -8008,7 +7986,6 @@
         "when": "cf9c7aa24a26aac4"
       },
       "counts": {
-        "complete": "d90b359b81d66b8a",
         "filtered": "243ed475ffbf8ef5",
         "truncated": "50343595564709a2"
       },
@@ -8089,7 +8066,6 @@
         "seqTupRead": "2422e5368e6409fc",
         "totalBytes": "51cdf6b25609d894"
       },
-      "countLine": "f4bf8269e8f93c62",
       "countersCumulative": "59dce9341030416c",
       "engineUnsupportedDescription": "82d968f510b6e12d",
       "engineUnsupportedTitle": "2917dc3eae1cd638",
@@ -9159,7 +9135,6 @@
       "stepsComplete": "84d4065eebf89ed3",
       "stepsFailedPermanently": "5a8632395ee4b909"
     },
-    "organizationMembers": "51f5fdb4d6dd879f",
     "organizations": "2730183d6b776b40",
     "organizationsDesc": "f959e17daee2dd3d",
     "quota": "422b384753c3be82",
@@ -9257,7 +9232,6 @@
       "failedToRefreshUserList": "bf4c224365781e2d",
       "invitationRevokedSuccess": "9cca3539af7a1b8c",
       "orgMemberUpdatedSuccess": "b5f31eeadc42a082",
-      "organizationMembers": "51f5fdb4d6dd879f",
       "pleaseWait": "2dfd888fdd5e8018",
       "pleaseWaitLoadingUsers": "fb6392d9b349425a",
       "unknownError": "27c2ccd962c2b8dc",
@@ -10536,7 +10510,6 @@
     "streamNameRequired": "f98ca02b39217009",
     "streamNotFoundForType": "c51663ed92433bef",
     "streamTypeRequired": "485446c2f7d41caa",
-    "streamsUnit": "8936a357910a9990",
     "subtitle": "594d98b85f0c82cf",
     "timelineIcon": "89206b559f450ca0",
     "timezone": "4ceca1d52cede44d",
@@ -11232,7 +11205,6 @@
     "copyPattern": "c4692058f7689703",
     "currencySymbol": "09fc96082d34c2df",
     "defaultPricingTier": "cf657d0822adc050",
-    "deleteSelected": "6ba3259e660b9789",
     "deletedModelsNotif": "a59b8d1dd51486e6",
     "editTitle": "9aa2a0267481b70c",
     "enterModelName": "a0aa086b69e4c924",
@@ -11245,7 +11217,6 @@
     "errUnknown": "27c2ccd962c2b8dc",
     "errUpdate": "8eb4917bbe54bb69",
     "errorValidations": "1e3d7d927f0df715",
-    "exportSelected": "04d6c938a6607cb2",
     "fileUploadTab": "07994bd60004a6b8",
     "header": "9067acc52aa483f2",
     "importBtn": "2cff9baabf56ca00",
@@ -11272,7 +11243,6 @@
     "modelPricingCreation": "b274eabb51697744",
     "modelPricingDeleted": "1e6265a08c373287",
     "modelPricingSaved": "1c9858322dab8728",
-    "modelsCount": "adde12b2f00dbe6f",
     "nameRequired": "5844ed7b28d7259b",
     "nameTooLong": "337d7224ad3916e0",
     "newModel": "206333e13ccfa45e",
@@ -12433,7 +12403,6 @@
     "section_resolved": "5be3c2c8354e1eb9",
     "section_ringing": "426a858eacbbfb5a",
     "section_snoozed": "88096584e4a882be",
-    "selectedCount": "529aacfdfd2b17bf",
     "setDefaultTeam": "1b1793fa1ceb0eab",
     "setupCta": "54693f1432b43501",
     "setupDismiss": "16789232faef1c44",
@@ -12768,7 +12737,6 @@
       "createTitle": "f8b8a3dffabfe0a4",
       "createdAndActivated": "dfd25baf0a6f4be9",
       "createdButActivateFailed": "1eacbfcd907554df",
-      "deleteBulkButton": "e2d0a54968ead24e",
       "deleteBulkConfirm": "f0804069b7e85748",
       "deleteBulkTitle": "9506b63908061530",
       "deletedBulk": "dd62c9aaf108673b",
@@ -12911,7 +12879,6 @@
         "title": "a18aaffcb1094df2",
         "variableCount": "382749111e46bfdc"
       },
-      "listTitle": "b9f4405cc53cea2c",
       "maxAgeHelp": "578e46e7f6894880",
       "maxAgeHelpEmpty": "d41dc9a7c1732a20",
       "maxAgeLabel": "35541e107455799c",
@@ -13203,8 +13170,7 @@
           "noData": "dcb61373fe73eca0",
           "noThreshold": "237cddc737b07bf1",
           "unhealthy": "c1ebc7817870e5be"
-        },
-        "title": "2009ba306d3351b3"
+        }
       },
       "runs": {
         "columns": {
@@ -13221,7 +13187,6 @@
           "all": "7d87c534d08f768a",
           "unhealthy": "317b1fbc1e13beeb"
         },
-        "footerTitle": "7ab1f79821de48d3",
         "health": {
           "healthy": "7f1e323b6272c620",
           "unhealthy": "317b1fbc1e13beeb"
@@ -13311,9 +13276,6 @@
         "numeric": "3f8b44e65b65a469"
       },
       "ellipsis": "b4935894c8ce16bd",
-      "export": {
-        "bulkButton": "3664895579f0a7e6"
-      },
       "falseIsHealthy": "250cf56e27083bfe",
       "falseIsHealthyHint": "beb38390cde2d3cc",
       "gteLabel": "85d08e84787824d6",
@@ -13338,7 +13300,6 @@
         "outputMessages": "ace70a9ce0d04504",
         "title": "563af6e48e018f04"
       },
-      "listTitle": "8c70f1c12bd720da",
       "lteLabel": "ae1564a79ff31afe",
       "lteSymbol": "d79629340b6fda9d",
       "maxLabel": "a1a5936d3b0f8a69",
@@ -13458,9 +13419,6 @@
       "editTitleRemote": "0d47f046ba636cca",
       "endpointLabel": "f7f2495aa50ee719",
       "endpointSection": "3df9726c68ba76d6",
-      "export": {
-        "bulkButton": "3664895579f0a7e6"
-      },
       "extraFields": {
         "addButton": "41bdcc21222034c1",
         "colDescription": "526e0087cc3f254d",
@@ -13512,7 +13470,6 @@
       "includeReasoningHint": "52feece4c9b44962",
       "includeReasoningLabel": "08a9f904283ce8f3",
       "judgeSection": "0e37077800f83bc4",
-      "listTitle": "d8598427499abb65",
       "modelLabel": "5e2c614c23f02239",
       "modelPlaceholder": "a2a69af70d1b9be7",
       "nameLabel": "dcd1d5223f73b3a9",
@@ -14024,7 +13981,6 @@
     },
     "backfillJobDetailsTitle": "f94a2f700f1b4946",
     "backfillJobErrorTitle": "bbeed3302ccd6e78",
-    "backfillJobLabel": "e2defdca0d63e586",
     "backfillJobTitle": "6c060be269d8fefc",
     "backfillNumericRange": "79db571167d548da",
     "backfillStarted": "31a2ee4976bbfe6c",
@@ -14207,7 +14163,6 @@
     "functionName": "dae596892b2dd17c",
     "functionNode": "c803710302d5769d",
     "functionTooltip": "2d26984fd31b6004",
-    "header": "d1a8fffeb935847e",
     "history": "3e169d057d6e8911",
     "import": "2cff9baabf56ca00",
     "importErrors": {
@@ -14668,7 +14623,6 @@
     "applied_patterns_count": "39e539c27a110eb1",
     "associated_breadcrumb": "bf21982596e9f30d",
     "associated_search_placeholder": "49c266baaaa70981",
-    "bottom_header": "34ae52241a89f9e6",
     "cancel": "19766ed6ccb2f4a3",
     "click_test_input_hint": "e0f38f32a79842d5",
     "close": "7d9eb7acb13e2462",
@@ -15470,7 +15424,6 @@
     "delayMessage": "33ba3ca60b3d278e",
     "executed_at": "5f3ff136b10e28d5",
     "get_history": "0cccb92604f6a427",
-    "results": "219c4a6c86a716e9",
     "sql_query": "9a4f1370f2b72c82",
     "title": "66d7e4a1c738f0b1"
   },
@@ -15500,7 +15453,6 @@
     "more_details": "0c5bd1ad443efff6",
     "query_function": "6bb1b55a1dc76344",
     "restart": "6b983a81e5e8099e",
-    "results": "219c4a6c86a716e9",
     "sql_query": "9a4f1370f2b72c82",
     "start_time": "271189ae389a39d7",
     "status": "920e413c7d411b61",
@@ -15654,7 +15606,6 @@
       "fetchFailed": "69ff7e6c4224b7ea",
       "loadingData": "eeea941207b1247a",
       "processingDelete": "116a02c6093f8f82",
-      "selected": "529aacfdfd2b17bf",
       "subtitle": "9725bec9468f6ff1"
     },
     "claimParserFunction": "de37a8058088fb42",
@@ -16622,7 +16573,6 @@
     "loadFailed": "f899150fbd1cb0fa",
     "move": "6ecc3df6bffdd06c",
     "moveFailed": "55185d67bf51c3f1",
-    "moveSelected": "7d6b1cf112a066f9",
     "moveTitle": "7a264a052a9f0b7d",
     "moved": "bb9150beca4f2b96",
     "new": "ed61e43a48bb3bda",
@@ -17020,7 +16970,6 @@
       "showUptimePercent": "b8f4a81d61cb0b8b",
       "visibility": "7448611d5f93aa8a"
     },
-    "footerTitle": "449ab3614f7fecf1",
     "health": {
       "degraded": "a8494c12f2243903",
       "maintenance": "17ccfa5b681e3e7b",
@@ -17391,7 +17340,6 @@
       "failuresOnly": "49c697b59d88e265",
       "filterAll": "a52ace420f2175d0",
       "firstPartyOnly": "47d48b2138e92604",
-      "footerEvents": "8d14f6e72de8f18a",
       "groupConsole": "29a40861bafe31e7",
       "groupNetwork": "1744b96470b51bf3",
       "kindConsole": "29a40861bafe31e7",
@@ -17440,10 +17388,6 @@
       "failed": "031a8f0f659df890",
       "passed": "436fe71bb9561f05",
       "warning": "e981ddae45d8f4ca"
-    },
-    "footer": {
-      "browserTests": "ee45b73240407f3d",
-      "checks": "de07d07209556c79"
     },
     "histogramQueryFailed": "0068521c409fb6ad",
     "hoursAgo": "520c737ea62430c4",
@@ -17845,7 +17789,6 @@
     "locations": {
       "addAgent": "d3e039d4537a6bdb",
       "addLocation": "140d3619b9e5f38e",
-      "bottomHeader": "f0a5e562723ae8c0",
       "bulkDeleteConfirmMessage": "698dbbbae7951eaf",
       "bulkDeleteConfirmTitle": "53e8beee53a9bc04",
       "bulkDeleteFailed": "17b9b205ef48f13f",
@@ -17923,7 +17866,6 @@
       "regionPlaceholder": "17e85ba419e931c7",
       "regionRequired": "0547785eb4df74c7",
       "searchPlaceholder": "5e5a3153c9c9ed86",
-      "selectedCount": "a09061ee15c7e454",
       "statusConnecting": "d403c686f6a10480",
       "statusDown": "b86d11af79188e58",
       "statusOffline": "a1794783aab72d20",
@@ -18428,7 +18370,6 @@
       "bulkTriggerToast": "1eebc426ac2fdb31",
       "check": "9d60841e0a7891df",
       "checksCount": "c893e27883f46521",
-      "checksFooterTitle": "de07d07209556c79",
       "delete": "e2d0a54968ead24e",
       "duplicate": "02cdaabfca805d6a",
       "edit": "464c4ffd019e1e96",
@@ -18455,7 +18396,6 @@
       "pausing": "8e4d421f382e23f8",
       "response": "9061383b8e228ef3",
       "scheduledAt": "6a769fc80b760ad4",
-      "selectedCount": "73ffb823f5889bf1",
       "status": "920e413c7d411b61",
       "statusDegraded": "e4a50beeebd24830",
       "statusDown": "592accabe9da72fc",
@@ -19404,7 +19344,6 @@
         "status": "920e413c7d411b61"
       },
       "filterPlaceholder": "6c403ddc8a77c64c",
-      "footerTitle": "604dce445e326d95",
       "legend": {
         "title": "bf7d539c44f17179"
       },
@@ -19540,7 +19479,6 @@
         "placeholder": "dfdf19300240d7e4",
         "title": "86d34e63ba95a339"
       },
-      "sessions": "1225ae6c1ae69dcb",
       "stream": "1eec3071dd26e224",
       "streamLabel": "1eec3071dd26e224",
       "tokenTooltip": "f9bccdd581ce309d",
@@ -19821,7 +19759,6 @@
     "folder": "74ccd43303847f26",
     "header": "e2073645cb0dbbdd",
     "history": {
-      "button": "848f54e89660cea4",
       "duration": "4fc52a3c4c558b51",
       "durationHoursMinutes": "425dc6c72de6fdc5",
       "durationMinutesSeconds": "c4521614d0a2513f",
