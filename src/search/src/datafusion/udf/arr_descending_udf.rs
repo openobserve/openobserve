@@ -401,6 +401,14 @@ mod tests {
     }
 
     #[test]
+    fn test_arr_descending_orders_integers_above_2_pow_53_exactly() {
+        assert_eq!(
+            call_arr_descending("[1727000000000000001,1727000000000000002]"),
+            "[1727000000000000002,1727000000000000001]"
+        );
+    }
+
+    #[test]
     fn test_arr_descending_with_overflow_numbers_is_deterministic_and_ordered() {
         let result = call_arr_descending(r#"[1e400,-1e400,100.0,50,2e300,-3]"#);
         assert_eq!(result, "[1e+400,2e+300,100.0,50,-3,-1e+400]");
