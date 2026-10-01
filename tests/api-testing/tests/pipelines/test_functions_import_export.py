@@ -209,16 +209,11 @@ def test_the_same_function_imports_independently_into_two_orgs(client: OpenObser
     """Importing an exported file into a second org creates a second, separate
     function — editing one must not reach into the other."""
     name = unique_name("pytest_impexp_xorg")
-    other_org = None
-    try:
-        # Org creation is not under api/{org}/, so the prefix is bypassed.
-        created_org = client.post(
-            "api/organizations", json={"name": unique_name("pytestorg").lower()}, prefix=""
-        )
-        if created_org.status_code != 200:
-            pytest.skip(f"cannot create a second org here: {created_org.status_code}")
-        other_org = created_org.json()["identifier"]
+    other_org = _second_org(client)
+    if other_org is None:
+        pytest.skip("a second organization is not available here")
 
+    try:
         assert client.post("functions", json=vrl_payload(name, body=".a = 1")).status_code == 200
         resp = client.post("functions", json=vrl_payload(name, body=".b = 2"), org=other_org)
         assert resp.status_code == 200, (
@@ -234,6 +229,30 @@ def test_the_same_function_imports_independently_into_two_orgs(client: OpenObser
         client.delete(f"functions/{name}")
         if other_org:
             client.delete(f"functions/{name}", org=other_org)
+
+
+# Orgs cannot be deleted — `DELETE /api/organizations/{id}` 404s even for one
+# just created (see tests/orgs/test_organisations.py). A unique org per run would
+# therefore leak one org per run forever on a long-lived env, so this reuses a
+# single well-known org and only creates it the first time. Names are not unique
+# either — posting the same name again makes another org — so look it up first.
+SECOND_ORG_NAME = "pytest_fn_import_export_xorg"
+
+
+def _second_org(client: OpenObserveClient) -> str | None:
+    """Identifier of the shared second org, creating it once if absent."""
+    listed = client.get("api/organizations", prefix="")
+    if listed.status_code == 200:
+        body = listed.json()
+        for org in body.get("data", body.get("list", []) or []):
+            if org.get("name") == SECOND_ORG_NAME:
+                return org.get("identifier")
+
+    created = client.post("api/organizations", json={"name": SECOND_ORG_NAME}, prefix="")
+    if created.status_code != 200:
+        logger.warning("could not create the second org: %s %s", created.status_code, created.text)
+        return None
+    return created.json().get("identifier")
 
 
 def _pipeline_using_function(pipeline_name: str, function_name: str) -> dict:
