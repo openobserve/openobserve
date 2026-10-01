@@ -444,6 +444,20 @@ test.describe("Pre-Test Cleanup", () => {
       /^.+\s\(Copy\)$/                      // cloned built-in models (source=org, name ends with " (Copy)")
     ]);
 
+    // IAM leftovers from a CRASHED run: roles, groups, users and service accounts under
+    // the `ui_auto` prefix the IAM specs use.
+    //
+    // This is the ONLY place that sweeps them. Each IAM spec now deletes exactly what it
+    // created (makeTracker in IAM/iam-fixtures.js) rather than everything matching the
+    // prefix — doing the latter in every spec's beforeAll is what had them deleting each
+    // other's fixtures mid-test and flaking the ENT crosscheck gate. A sweep is still
+    // needed for artifacts an aborted run orphaned, but it belongs here, once, before
+    // anything else starts.
+    //
+    // Enterprise-only (rbac_enabled): on an OSS build /roles answers 4xx, so this skips
+    // quietly rather than failing the cleanup every other suite depends on.
+    await pm.apiCleanup.cleanupIamArtifacts('ui_auto');
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });
