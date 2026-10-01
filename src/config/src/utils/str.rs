@@ -124,6 +124,11 @@ pub fn mask_license_key(key: &str) -> String {
     format!("{head}*****{tail}")
 }
 
+/// Compares in time independent of where the inputs differ; only the length can leak.
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
+}
+
 pub trait StringExt {
     fn find(&self, needle: &str) -> bool;
     fn optional(&self) -> Option<String>;
@@ -539,6 +544,15 @@ mod tests {
         assert_eq!("Hello世界".to_string().truncate_utf8(9), "Hello世"); // Still before second Chinese character
         assert_eq!("Hello世界".to_string().truncate_utf8(10), "Hello世"); // Still before second Chinese character
         assert_eq!("Hello世界".to_string().truncate_utf8(11), "Hello世界"); // After both Chinese characters
+    }
+
+    #[test]
+    fn test_constant_time_eq_matches_only_equal() {
+        assert!(constant_time_eq(b"abc", b"abc"));
+        assert!(constant_time_eq(b"", b""));
+        assert!(!constant_time_eq(b"abc", b"abd"));
+        assert!(!constant_time_eq(b"abc", b"ab"));
+        assert!(!constant_time_eq(b"", b"a"));
     }
 
     #[test]

@@ -125,7 +125,6 @@ tonic.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
-urlencoding.workspace = true
 utoipa.workspace = true
 version-compare.workspace = true
 config.workspace = true
