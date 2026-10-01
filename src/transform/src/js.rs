@@ -32,10 +32,13 @@ thread_local! {
 /// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
 const DEFAULT_JS_EXEC_TIMEOUT_SECS: u64 = 5;
 
-/// Contexts kept per thread; each owns its own runtime and memory limit.
-const JS_CONTEXT_CACHE_SIZE: usize = 8;
+/// Contexts kept per thread, each with its own runtime; an idle one holds about 100 KiB.
+const JS_CONTEXT_CACHE_SIZE: usize = 64;
 
 const JS_MEMORY_LIMIT_BYTES: usize = 10 * 1024 * 1024;
+
+/// Heap all cached contexts on a thread may hold; the running one can add its own limit on top.
+const JS_CONTEXT_CACHE_BUDGET_BYTES: usize = 32 * 1024 * 1024;
 
 const JS_MAX_STACK_SIZE_BYTES: usize = 512 * 1024;
 
@@ -79,6 +82,7 @@ struct CachedJsContext {
     org_id: String,
     function: String,
     context: Context,
+    heap_bytes: usize,
 }
 
 /// Verifies that a sandboxed JS runtime and context can be created.
@@ -252,6 +256,18 @@ pub fn apply_js_fn(
         Ok(context) => context,
         Err(e) => return (row, Some(e)),
     };
+    let result = eval_js_fn(&context, js_config, row, org_id, stream_name);
+    account_js_context(org_id, &js_config.function, &context);
+    result
+}
+
+fn eval_js_fn(
+    context: &Context,
+    js_config: &JSRuntimeConfig,
+    row: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<String>) {
     context.with(|ctx| {
         let globals = ctx.globals();
 
@@ -407,8 +423,27 @@ fn cached_js_context(org_id: &str, function: &str) -> Result<Context, String> {
             org_id: org_id.to_string(),
             function: function.to_string(),
             context: context.clone(),
+            heap_bytes: 0,
         });
         Ok(context)
+    })
+}
+
+/// Records what the context just used holds, then evicts least recently used ones over budget.
+fn account_js_context(org_id: &str, function: &str, context: &Context) {
+    let heap_bytes = usize::try_from(context.runtime().memory_usage().malloc_size).unwrap_or(0);
+    JS_CONTEXTS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(entry) = cache
+            .iter_mut()
+            .find(|c| c.org_id == org_id && c.function == function)
+        {
+            entry.heap_bytes = heap_bytes;
+        }
+        let mut held: usize = cache.iter().map(|c| c.heap_bytes).sum();
+        while held > JS_CONTEXT_CACHE_BUDGET_BYTES && cache.len() > 1 {
+            held -= cache.remove(0).heap_bytes;
+        }
     })
 }
 
@@ -1097,5 +1132,43 @@ for (var i = 0; i < filtered.length; i++) {
         let result = compile_js_function(func_eval, "test_org");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("eval("));
+    }
+
+    #[test]
+    fn test_interleaved_functions_keep_their_contexts() {
+        let functions: Vec<_> = (0..12)
+            .map(|i| {
+                let src = format!("Math.calls{i} = (typeof Math.calls{i} === 'undefined' ? 0 : Math.calls{i}) + 1; row.calls = Math.calls{i};");
+                compile_js_function(&src, "test_org").unwrap()
+            })
+            .collect();
+        for round in 1..=2 {
+            for f in &functions {
+                let (out, err) = apply_js_fn(f, json!({}), "test_org", &[]);
+                assert!(err.is_none(), "{err:?}");
+                assert_eq!(out["calls"], json!(round), "{}", f.function);
+            }
+        }
+    }
+
+    #[test]
+    fn test_cached_contexts_stay_within_the_thread_budget() {
+        for i in 0..12 {
+            let src = format!(
+                "Math.kept{i} = (typeof Math.kept{i} === 'undefined') ? [] : Math.kept{i}; Math.kept{i}.push('x'.repeat(6 * 1024 * 1024)); row.kept = Math.kept{i}.length;"
+            );
+            let f = compile_js_function(&src, "test_org").unwrap();
+            let (_, err) = apply_js_fn(&f, json!({}), "test_org", &[]);
+            assert!(err.is_none(), "{err:?}");
+            let held: i64 = JS_CONTEXTS.with(|cache| {
+                cache
+                    .borrow()
+                    .iter()
+                    .map(|c| c.context.runtime().memory_usage().malloc_size)
+                    .sum()
+            });
+            let bound = (JS_CONTEXT_CACHE_BUDGET_BYTES + JS_MEMORY_LIMIT_BYTES) as i64;
+            assert!(held <= bound, "after {} functions: {held} > {bound}", i + 1);
+        }
     }
 }
