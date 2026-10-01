@@ -33,6 +33,8 @@ pub use migrator::{run_file_list, run_meta};
 
 const DEFAULT_EXT_AUTH_SALT: &str = "openobserve";
 const MIN_EXT_AUTH_SALT_LEN: usize = 16;
+// argon2 salts are at most 64 base64 characters, i.e. 48 bytes
+const MAX_EXT_AUTH_SALT_LEN: usize = 48;
 
 pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     // warm both pools before the migration starts hitting them
@@ -114,14 +116,20 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Existing installs only warn: rotating the salt breaks logins already derived from it.
+/// Existing installs only warn on a weak salt: rotating it breaks logins derived from it.
 fn check_ext_auth_salt(db_schema_version: u64, salt: &str) -> anyhow::Result<()> {
+    if salt.len() > MAX_EXT_AUTH_SALT_LEN {
+        return Err(anyhow::anyhow!(
+            "ZO_EXT_AUTH_SALT is {} bytes, but argon2 accepts at most {MAX_EXT_AUTH_SALT_LEN}; set it to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} characters (for example `openssl rand -hex 24`)",
+            salt.len()
+        ));
+    }
     if salt != DEFAULT_EXT_AUTH_SALT && salt.len() >= MIN_EXT_AUTH_SALT_LEN {
         return Ok(());
     }
     if db_schema_version == 0 {
         return Err(anyhow::anyhow!(
-            "ZO_EXT_AUTH_SALT must be set to a random secret of at least {MIN_EXT_AUTH_SALT_LEN} characters on a new install (for example `openssl rand -hex 32`), and kept the same on every node and restart"
+            "ZO_EXT_AUTH_SALT must be set to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} characters on a new install (for example `openssl rand -hex 24`), and kept the same on every node and restart"
         ));
     }
     log::warn!(
@@ -145,6 +153,43 @@ mod tests {
     #[test]
     fn a_new_install_accepts_a_random_ext_auth_salt() {
         assert!(check_ext_auth_salt(0, "3f9c2a7e5b1d8c4f6a0e2b9d7c5a3f1e").is_ok());
+    }
+
+    #[test]
+    fn an_accepted_ext_auth_salt_is_one_argon2_can_hash_with() {
+        for len in 0..=96 {
+            let salt = "a".repeat(len);
+            let accepted = check_ext_auth_salt(0, &salt).is_ok();
+            let hashable =
+                ::config::utils::hash::try_get_passcode_hash("Complexpass#123", &salt).is_some();
+            assert!(
+                !accepted || hashable,
+                "len {len}: accepted but argon2 refuses it"
+            );
+        }
+    }
+
+    #[test]
+    fn the_recommended_ext_auth_salt_is_accepted_and_a_hex_32_one_is_refused() {
+        let hex_24 = "9f2c4e6a8b0d1f3e5c7a9b1d3f5e7c9a0b2d4f6e8a1c3e5f";
+        assert_eq!(hex_24.len(), 48);
+        assert!(check_ext_auth_salt(0, hex_24).is_ok());
+        assert!(::config::utils::hash::try_get_passcode_hash("p", hex_24).is_some());
+        let hex_32 = "9f2c4e6a8b0d1f3e5c7a9b1d3f5e7c9a0b2d4f6e8a1c3e5f7a9b0c1d2e3f4a5b";
+        assert_eq!(hex_32.len(), 64);
+        for version in [0, 1, DB_SCHEMA_VERSION] {
+            let err = check_ext_auth_salt(version, hex_32)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("ZO_EXT_AUTH_SALT"), "{err}");
+            assert!(err.contains("openssl rand -hex 24"), "{err}");
+        }
+    }
+
+    #[test]
+    fn the_new_install_refusal_recommends_a_salt_that_fits() {
+        let err = check_ext_auth_salt(0, "").unwrap_err().to_string();
+        assert!(err.contains("openssl rand -hex 24"), "{err}");
     }
 
     #[test]
