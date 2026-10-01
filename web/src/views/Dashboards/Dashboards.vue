@@ -134,7 +134,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             show-index
             :global-filter="filterQuery"
             :show-global-filter="false"
-            :footer-title="t('dashboard.header')"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :current-page="currentPage"
@@ -400,45 +399,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </template>
-            <template #bottom>
-              <div class="flex w-full items-center justify-between gap-4 py-1">
-                <div class="flex shrink-0 items-center text-xs font-normal max-md:hidden">
-                  {{ resultTotal || 0 }} {{ t("dashboard.header") }}
-                </div>
-                <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-text-body me-1 text-sm">{{
-                    t("dashboard.dashboards.selected", { count: selectedIds.length })
-                  }}</span>
-                  <OButton
-                    variant="outline"
-                    size="sm-action"
-                    data-test="dashboard-list-move-across-folders-btn"
-                    @click="moveMultipleDashboards"
-                    icon-left="drive-file-move"
-                  >
-                    {{ t("common.move") }}
-                  </OButton>
-                  <OButton
-                    variant="outline"
-                    size="sm-action"
-                    icon-left="download"
-                    data-test="dashboard-list-export-dashboards-btn"
-                    @click="multipleExportDashboard"
-                  >
-                    {{ t("common.export") }}
-                  </OButton>
-                  <OButton
-                    variant="outline-destructive"
-                    size="sm-action"
-                    icon-left="delete"
-                    data-test="dashboard-list-delete-dashboards-btn"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                  >
-                    {{ t("common.delete") }}
-                  </OButton>
-                </div>
-              </div>
+            <template #selection-actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="dashboard-list-move-across-folders-btn"
+                @click="moveMultipleDashboards"
+                icon-left="drive-file-move"
+              >
+                {{ t("common.move") }}
+              </OButton>
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="download"
+                data-test="dashboard-list-export-dashboards-btn"
+                @click="multipleExportDashboard"
+              >
+                {{ t("common.export") }}
+              </OButton>
+              <OButton
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                data-test="dashboard-list-delete-dashboards-btn"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -1391,12 +1380,6 @@ export default defineComponent({
       { flush: "sync" },
     );
 
-    const resultTotal = computed(function () {
-      // Derived from the rendered rows so the footer count matches what the
-      // favorites filter / cross-folder search actually shows.
-      return dashboards.value.length;
-    });
-
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
         // Capture before the row reference is cleared — used below to drop a
@@ -1828,7 +1811,6 @@ export default defineComponent({
       importDashboard,
       migrationOptions,
       openMigration,
-      resultTotal,
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,
