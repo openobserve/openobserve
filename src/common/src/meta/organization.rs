@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::user::UserRole, stats::MemorySize};
+use o2_enterprise::enterprise::domain_management::meta::DomainManagementConfig;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -510,12 +511,18 @@ pub struct OrganizationSettingPayload {
     pub claim_parser_function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
+    #[cfg(feature = "cloud")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[cfg(feature = "cloud")]
     #[serde(default)]
     pub role_name_claim: Option<String>,
+    #[cfg(feature = "cloud")]
     #[serde(default)]
     pub create_missing_role: Option<bool>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_management_config: Option<DomainManagementConfig>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -564,6 +571,9 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub create_missing_role: bool,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_management_config: DomainManagementConfig,
 }
 
 impl Default for OrganizationSetting {
@@ -603,6 +613,8 @@ impl Default for OrganizationSetting {
             role_name_claim: None,
             #[cfg(feature = "cloud")]
             create_missing_role: false,
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
         }
     }
 }
@@ -1475,6 +1487,8 @@ mod tests {
             domain_org_mappings: None,
             role_name_claim: None,
             create_missing_role: None,
+            #[cfg(feature = "cloud")]
+            domain_management_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1557,6 +1571,8 @@ mod tests {
             role_name_claim: None,
             #[cfg(feature = "cloud")]
             create_missing_role: false,
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1591,6 +1607,8 @@ mod tests {
             role_name_claim: None,
             #[cfg(feature = "cloud")]
             create_missing_role: false,
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

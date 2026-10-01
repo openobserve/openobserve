@@ -41,6 +41,7 @@ use {
     db::{org_users, organization::get_org_setting},
     o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of,
     o2_enterprise::enterprise::cloud::org_invites,
+    o2_enterprise::enterprise::domain_management::meta::AccessDecision,
     openobserve_core::{
         org_domain_ownership::get_cached_org_for_domain,
         organization::list_org_users_by_user,
@@ -850,6 +851,8 @@ pub async fn process_domain_org_mapping(
     is_new_user: bool,
     claims: HashMap<String, Value>,
 ) -> Result<bool, anyhow::Error> {
+    let config = get_config();
+
     let Some((_, domain)) = user_email.split_once("@") else {
         log::warn!(
             "user email {user_email} could not be split correctly at @, skipping org domain mapping"
@@ -866,15 +869,10 @@ pub async fn process_domain_org_mapping(
     let org_settings = get_org_setting(&org_id).await?;
     let mappings = org_settings.domain_org_mappings;
 
-    let Some(mapped) = mappings.get(0) else {
-        log::warn!(
-            "mapping for domain {domain} cached, but not found in settings, skipping for user {user_email}"
-        );
-        return Ok(false);
-    };
-
-    log::info!("found domain org mapping for user {user_email} via org {org_id}, processing");
-    let config = get_config();
+    let mut allowed_orgs = HashSet::new();
+    let mut existing_orgs = HashSet::new();
+    let mut existing_roles = Vec::new();
+    let mapped_via_sso_parser: bool;
 
     let child_orgs = match list_billing_group_members_of(&org_id).await {
         Ok(v) => v,
@@ -886,14 +884,58 @@ pub async fn process_domain_org_mapping(
         }
     };
 
-    let mut allowed_orgs = HashSet::new();
-    let mut existing_orgs = HashSet::new();
-    let mut existing_roles = Vec::new();
-    let mapped_via_sso_parser: bool;
-
     allowed_orgs.insert(org_id.clone());
     allowed_orgs.extend(child_orgs.into_iter().map(|v| v.member_org_id));
 
+    let decision = org_settings.domain_management_config.evaluate(user_email);
+    if matches!(decision, AccessDecision::Deny) {
+        if is_new_user {
+            // for new user who is blocked via domain, we return false, so
+            // the normal flow can take place
+            return Ok(false);
+        }
+        let orgs = list_orgs_by_user(user_email).await?;
+        let mut orgs_to_remove = Vec::new();
+        for org in orgs {
+            if allowed_orgs.contains(&org.org_id) {
+                orgs_to_remove.push(org.org_id);
+            }
+        }
+
+        log::info!(
+            "user {user_email} blocked by domain management config of org {org_id}, removing orgs {orgs_to_remove:?}"
+        );
+
+        for org in orgs_to_remove {
+            if let Err(e) =
+                remove_user_from_org(&org, user_email, &config.auth.root_user_email).await
+            {
+                log::error!(
+                    "error removing user {user_email} from org {org} due to domain management blocking of org {org_id} : {e}"
+                );
+                continue;
+            }
+
+            if let Err(e) =
+                org_invites::delete_invites_for_user(&org, &user_email.to_lowercase()).await
+            {
+                log::error!(
+                    "error in deleting invites for user {user_email} for org {org} due to domain management blocking of org {org_id} : {e}",
+                );
+            }
+        }
+
+        return Ok(true);
+    }
+
+    let Some(mapped) = mappings.get(0) else {
+        log::warn!(
+            "mapping for domain {domain} cached, but not found in settings, skipping for user {user_email}"
+        );
+        return Ok(false);
+    };
+
+    log::info!("found domain org mapping for user {user_email} via org {org_id}, processing");
     if !is_new_user {
         let orgs = list_orgs_by_user(user_email).await?;
         for org in orgs {
@@ -1002,12 +1044,6 @@ pub async fn process_domain_org_mapping(
         {
             log::error!(
                 "error in deleting invites for user {user_email} for org {org} after updating sso mapped domain mapping : {e}",
-            );
-        }
-
-        if let Err(e) = org_users::remove(&org, user_email).await {
-            log::error!(
-                "error removing user {user_email} from org {org} after updating sso mapped domain : {e}"
             );
         }
     }

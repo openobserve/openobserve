@@ -210,6 +210,11 @@ pub async fn create(
         data.domain_org_mappings = mappings;
     }
 
+    if let Some(config) = settings.domain_management_config {
+        data.domain_management_config = config;
+        field_found = true;
+    }
+
     if !field_found {
         return MetaHttpResponse::bad_request("No valid field found");
     }
