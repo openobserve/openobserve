@@ -52,6 +52,8 @@ export class SyntheticsCreatePage {
       retriesDelayField: '[data-test="synthetics-check-retries-delay-input-field"]',
       alertThresholdField: '[data-test="synthetics-check-alerts-threshold-input-field"]',
       alertCooldownField: '[data-test="synthetics-check-alerts-cooldown-input-field"]',
+      variablesToggleButton: '[data-test="synthetics-journey-toggle-variables-btn"]',
+      variablesPanel: '[data-test="synthetics-check-variables-panel"]',
       variablesEmpty: '[data-test="synthetics-check-variables-panel-empty"]',
       variablesAddVariableButton: '[data-test="synthetics-check-variables-panel-add-variable-btn"]',
       variablesAddNameField: '[data-test="synthetics-check-variables-panel-add-name-input-field"]',
@@ -189,12 +191,19 @@ export class SyntheticsCreatePage {
     await this.page.locator(this.locators.alertCooldownField).fill(String(cooldownMins));
   }
 
-  // The empty state owns the only Add affordance until the first variable exists; an open form is reused.
+  // Only the browser view collapses the panel behind a toggle; http renders it open and tcp/tls/ssh have none.
   async openAddVariable() {
     if (await this.page.locator(this.locators.variablesAddNameField).isVisible()) return;
-    const empty = this.page.locator(this.locators.variablesEmpty);
-    if (await empty.count()) await empty.locator('button').first().click();
-    else await this.page.locator(this.locators.variablesAddVariableButton).click();
+    const panel = this.page.locator(this.locators.variablesPanel);
+    const toggle = this.page.locator(this.locators.variablesToggleButton);
+    await expect(panel.or(toggle).first()).toBeVisible({ timeout: 10000 });
+    // aria-pressed, not panel visibility, so a panel still animating open is never toggled shut.
+    const closedToggle = toggle.and(this.page.locator('[aria-pressed="false"]'));
+    if (await closedToggle.count()) await closedToggle.click();
+    await expect(panel).toBeVisible({ timeout: 10000 });
+    // The empty state and the header Add button swap once shared variables load, so let the click resolve either.
+    const emptyAdd = this.page.locator(this.locators.variablesEmpty).locator('button').first();
+    await emptyAdd.or(this.page.locator(this.locators.variablesAddVariableButton)).first().click();
     await expect(this.page.locator(this.locators.variablesAddNameField)).toBeVisible({ timeout: 10000 });
   }
 
