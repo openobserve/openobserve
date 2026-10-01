@@ -343,7 +343,12 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
     test('G-N1 · a blank role name is refused', {
         tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
     }, async ({ page }) => {
-        const before = await listRoles(page);
+        // Only THIS spec's roles. Comparing the whole org list made the assertion false
+        // the moment a neighbouring spec created a role between the two reads — it failed
+        // in the gate with `+ ui_auto_stg_st_save_...`, a role belonging to the staging
+        // spec running in another worker. Same lesson as GR-03: membership, not totals.
+        const mine = async () => (await listRoles(page)).filter((r) => r.startsWith(NS)).sort();
+        const before = await mine();
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.addRoleButton.click();
         await expect(pm.rolesPage.addRoleDialog).toBeVisible();
@@ -351,7 +356,7 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         await pm.rolesPage.addRoleSave.click();
 
         await expect(pm.rolesPage.addRoleDialog).toBeVisible();
-        expect(await listRoles(page)).toEqual(before);
+        expect(await mine(), 'a blank name created a role').toEqual(before);
     });
 
     test('G-N2 · a duplicate role name is refused and the original keeps its grants', {

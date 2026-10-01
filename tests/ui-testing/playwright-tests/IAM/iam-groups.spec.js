@@ -554,7 +554,9 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
         tag: ['@iam', '@iamGroups', '@P1', '@all']
     }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        const before = await listGroups(page);
+        // Only THIS spec's groups: the org-wide list changes under a concurrent spec,
+        // which is what made the equivalent role assertion (G-N1) flaky in the gate.
+        const before = (await listGroups(page)).filter((g) => g.startsWith(PREFIX)).sort();
 
         await pm.groupsPage.gotoGroups();
         await pm.groupsPage.addGroupButton.click();
@@ -564,14 +566,17 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
 
         // The dialog must stay open — a close here means a nameless group was stored.
         await expect(pm.groupsPage.addGroupDialog).toBeVisible();
-        expect(await listGroups(page)).toEqual(before);
+        expect((await listGroups(page)).filter((g) => g.startsWith(PREFIX)).sort(),
+            'a rejected name created a group').toEqual(before);
     });
 
     test('GR-N2 · a whitespace-only group name is refused', {
         tag: ['@iam', '@iamGroups', '@P2', '@all']
     }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        const before = await listGroups(page);
+        // Only THIS spec's groups: the org-wide list changes under a concurrent spec,
+        // which is what made the equivalent role assertion (G-N1) flaky in the gate.
+        const before = (await listGroups(page)).filter((g) => g.startsWith(PREFIX)).sort();
 
         await pm.groupsPage.gotoGroups();
         await pm.groupsPage.addGroupButton.click();
@@ -582,7 +587,8 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
         await pm.groupsPage.addGroupSaveButton.click();
 
         await expect(pm.groupsPage.addGroupDialog).toBeVisible();
-        expect(await listGroups(page)).toEqual(before);
+        expect((await listGroups(page)).filter((g) => g.startsWith(PREFIX)).sort(),
+            'a rejected name created a group').toEqual(before);
     });
 
     test('GR-N3 · a duplicate group name is refused and does not clobber the original', {
