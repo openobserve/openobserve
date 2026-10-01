@@ -144,8 +144,7 @@ export class SyntheticsListPage {
   }
 
   async moveToFolder(id, folderId) {
-    await this.openMoreMenu(id);
-    await this.page.locator(this.rowAction('move-item')).click();
+    await this.getRow(id).locator(this.rowAction('move-btn')).click();
     const dialog = this.page.locator(this.locators.moveDialog);
     await expect(dialog).toBeVisible({ timeout: 15000 });
     await selectOSelectOption(this.page, this.locators.moveFolderSelect, folderId);
