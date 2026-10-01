@@ -145,22 +145,30 @@ const makeTracker = () => {
         user: (e) => { if (e) users.push(e); return e; },
         folder: (id) => { if (id) folders.push(id); return id; },
 
-        /** Deletes everything this spec made. Returns what went, for the teardown log. */
+        /**
+         * Deletes everything this spec made. Returns what went, for the teardown log.
+         *
+         * Iterates COPIES. Draining with splice(0) emptied the arrays before survivors()
+         * could read them, so that assertion filtered empty lists, always returned [] and
+         * could never fire — a leaked fixture, or any of the swallowed DELETE failures
+         * below, would have gone silently undetected. The record has to outlive the
+         * deletion for the check to mean anything.
+         */
         async cleanup(page) {
             const gone = { groups: [], roles: [], users: [], folders: [] };
-            for (const g of groups.splice(0)) {
+            for (const g of [...groups]) {
                 await req(page, 'DELETE', `/groups/${g}`).catch(() => {});
                 gone.groups.push(g);
             }
-            for (const r of roles.splice(0)) {
+            for (const r of [...roles]) {
                 await req(page, 'DELETE', `/roles/${r}`).catch(() => {});
                 gone.roles.push(r);
             }
-            for (const u of users.splice(0)) {
+            for (const u of [...users]) {
                 await req(page, 'DELETE', `/users/${u}`).catch(() => {});
                 gone.users.push(u);
             }
-            for (const f of folders.splice(0)) {
+            for (const f of [...folders]) {
                 const listed = (await req(page, 'GET', `/dashboards?folder=${f}`)).body;
                 for (const d of (listed?.dashboards ?? listed?.list ?? [])) {
                     const id = dashboardIdOf(d) ?? d?.id;
@@ -172,13 +180,22 @@ const makeTracker = () => {
             return gone;
         },
 
-        /** Which of this spec's artifacts survived teardown — asserted, not assumed. */
+        /**
+         * Which of this spec's artifacts survived teardown — asserted, not assumed.
+         *
+         * Covers groups and folders as well as roles and users: cleanup() swallows every
+         * DELETE failure, so this is the only thing that notices one.
+         */
         async survivors(page) {
             const liveRoles = new Set(await listRoles(page));
+            const liveGroups = new Set(await listGroups(page));
             const liveUsers = new Set((await listUsers(page)).map((u) => u?.email));
+            const liveFolders = new Set((await listDashboardFolders(page)).map((f) => f?.folderId));
             return [
+                ...groups.filter((g) => liveGroups.has(g)),
                 ...roles.filter((r) => liveRoles.has(r)),
                 ...users.filter((u) => liveUsers.has(u)),
+                ...folders.filter((f) => liveFolders.has(f)),
             ];
         },
     };

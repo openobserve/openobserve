@@ -1,4 +1,4 @@
-// IAM → Edit Role · saved object format (O-01 .. O-05, O-B1)
+// IAM → Edit Role · saved object format (O-01 .. O-06, O-B1)
 //
 // Plan: .claude/commands/nvpworkflow/iam-roles-redesign-tests.md (Wave 2, flows 7-11)
 //
@@ -44,8 +44,9 @@ const obj = (resource) => `${resource}:_all_${org()}`;
 const F_OBJ = `${NS}_o_folder`;
 let fid;
 
-// Two logs streams plus a metrics one, so O-03 can prove each stream TYPE gets its
-// own object prefix rather than all collapsing onto `stream:`.
+// One logs stream is enough: O-04 only needs a single stream whose saved object must
+// carry the `logs:` prefix rather than collapsing onto `stream:`. ("Every Stream" is
+// asserted on the pinned scope row in the same test, which needs no fixture.)
 const S_LOG = `${NS}_o_log`;
 
 test.describe('IAM · Edit Role · saved object format', { tag: '@enterprise' }, () => {

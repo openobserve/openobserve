@@ -1,4 +1,4 @@
-// IAM → Edit Role · tabs and leaving the page (T-01 .. T-03, T-B1)
+// IAM → Edit Role · tabs and leaving the page (T-01 .. T-04, T-B1)
 //
 // Plan: .claude/commands/nvpworkflow/iam-roles-redesign-tests.md (Wave 2, flows 22-24)
 //

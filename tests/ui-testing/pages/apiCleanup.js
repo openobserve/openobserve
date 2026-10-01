@@ -3521,68 +3521,6 @@ class APICleanup {
      * Test groups created by ensureSemanticGroupsExist(): k8s-cluster, k8s-namespace, k8s-deployment, service
      * @param {Array<string>} groupIds - Array of semantic group IDs to delete (default: test group IDs)
      */
-    /**
-     * IAM leftovers a CRASHED run orphaned: roles, groups, users and service accounts
-     * under `prefix`.
-     *
-     * The ONLY prefix sweep for IAM. Each IAM spec deletes exactly what it created
-     * (makeTracker in playwright-tests/IAM/iam-fixtures.js); doing a prefix sweep in
-     * every spec's beforeAll is what had them deleting each other's fixtures mid-test.
-     * Recovery belongs here, once, before any suite starts.
-     *
-     * Order matters: a group pins the roles it holds, so groups go first.
-     * Enterprise-only — on an OSS build /roles answers 4xx and this returns quietly,
-     * because every other suite depends on cleanup succeeding.
-     */
-    async cleanupIamArtifacts(prefix = 'ui_auto') {
-        testLogger.info('Starting IAM artifact cleanup', { prefix });
-        const headers = { 'Authorization': this.authHeader, 'Content-Type': 'application/json' };
-        const api = (path) => `${this.baseUrl}/api/${this.org}${path}`;
-        const removed = { groups: [], roles: [], users: [] };
-
-        try {
-            const probe = await this._fetch(api('/roles'), { method: 'GET', headers });
-            if (!probe.ok) {
-                testLogger.info('IAM cleanup skipped — roles API unavailable (RBAC off / OSS build)', {
-                    status: probe.status,
-                });
-                return removed;
-            }
-
-            const json = async (res) => { try { return await res.json(); } catch { return null; } };
-            const del = async (path) => {
-                try { await this._fetch(api(path), { method: 'DELETE', headers }); } catch { /* best effort */ }
-            };
-
-            for (const g of (await json(await this._fetch(api('/groups'), { method: 'GET', headers }))) || []) {
-                if (typeof g === 'string' && g.startsWith(prefix)) { await del(`/groups/${g}`); removed.groups.push(g); }
-            }
-            for (const r of (await json(probe)) || []) {
-                if (typeof r === 'string' && r.startsWith(prefix)) { await del(`/roles/${r}`); removed.roles.push(r); }
-            }
-            const users = (await json(await this._fetch(api('/users'), { method: 'GET', headers })))?.data ?? [];
-            for (const u of users) {
-                if (typeof u?.email === 'string' && u.email.startsWith(prefix)) {
-                    await del(`/users/${u.email}`); removed.users.push(u.email);
-                }
-            }
-            const sas = (await json(await this._fetch(api('/service_accounts'), { method: 'GET', headers })))?.data ?? [];
-            for (const sa of sas) {
-                if (typeof sa?.email === 'string' && sa.email.startsWith(prefix) && !sa.is_system) {
-                    await del(`/service_accounts/${sa.email}`); removed.users.push(sa.email);
-                }
-            }
-
-            testLogger.info('IAM artifact cleanup complete', {
-                groups: removed.groups.length, roles: removed.roles.length, users: removed.users.length,
-            });
-        } catch (e) {
-            // Never fail the cleanup run: every other suite is waiting on it.
-            testLogger.warn('IAM artifact cleanup hit an error — continuing', { error: e?.message });
-        }
-        return removed;
-    }
-
     async cleanupCorrelationSettings(groupIds = ['k8s-cluster', 'k8s-namespace', 'k8s-deployment', 'service']) {
         testLogger.info('Starting correlation settings cleanup', { groupIds });
 
@@ -3656,6 +3594,68 @@ class APICleanup {
         } catch (error) {
             testLogger.error('Correlation settings cleanup failed', { error: error.message });
         }
+    }
+
+    /**
+     * IAM leftovers a CRASHED run orphaned: roles, groups, users and service accounts
+     * under `prefix`.
+     *
+     * The ONLY prefix sweep for IAM. Each IAM spec deletes exactly what it created
+     * (makeTracker in playwright-tests/IAM/iam-fixtures.js); doing a prefix sweep in
+     * every spec's beforeAll is what had them deleting each other's fixtures mid-test.
+     * Recovery belongs here, once, before any suite starts.
+     *
+     * Order matters: a group pins the roles it holds, so groups go first.
+     * Enterprise-only — on an OSS build /roles answers 4xx and this returns quietly,
+     * because every other suite depends on cleanup succeeding.
+     */
+    async cleanupIamArtifacts(prefix = 'ui_auto') {
+        testLogger.info('Starting IAM artifact cleanup', { prefix });
+        const headers = { 'Authorization': this.authHeader, 'Content-Type': 'application/json' };
+        const api = (path) => `${this.baseUrl}/api/${this.org}${path}`;
+        const removed = { groups: [], roles: [], users: [] };
+
+        try {
+            const probe = await this._fetch(api('/roles'), { method: 'GET', headers });
+            if (!probe.ok) {
+                testLogger.info('IAM cleanup skipped — roles API unavailable (RBAC off / OSS build)', {
+                    status: probe.status,
+                });
+                return removed;
+            }
+
+            const json = async (res) => { try { return await res.json(); } catch { return null; } };
+            const del = async (path) => {
+                try { await this._fetch(api(path), { method: 'DELETE', headers }); } catch { /* best effort */ }
+            };
+
+            for (const g of (await json(await this._fetch(api('/groups'), { method: 'GET', headers }))) || []) {
+                if (typeof g === 'string' && g.startsWith(prefix)) { await del(`/groups/${g}`); removed.groups.push(g); }
+            }
+            for (const r of (await json(probe)) || []) {
+                if (typeof r === 'string' && r.startsWith(prefix)) { await del(`/roles/${r}`); removed.roles.push(r); }
+            }
+            const users = (await json(await this._fetch(api('/users'), { method: 'GET', headers })))?.data ?? [];
+            for (const u of users) {
+                if (typeof u?.email === 'string' && u.email.startsWith(prefix)) {
+                    await del(`/users/${u.email}`); removed.users.push(u.email);
+                }
+            }
+            const sas = (await json(await this._fetch(api('/service_accounts'), { method: 'GET', headers })))?.data ?? [];
+            for (const sa of sas) {
+                if (typeof sa?.email === 'string' && sa.email.startsWith(prefix) && !sa.is_system) {
+                    await del(`/service_accounts/${sa.email}`); removed.users.push(sa.email);
+                }
+            }
+
+            testLogger.info('IAM artifact cleanup complete', {
+                groups: removed.groups.length, roles: removed.roles.length, users: removed.users.length,
+            });
+        } catch (e) {
+            // Never fail the cleanup run: every other suite is waiting on it.
+            testLogger.warn('IAM artifact cleanup hit an error — continuing', { error: e?.message });
+        }
+        return removed;
     }
 
     /**
