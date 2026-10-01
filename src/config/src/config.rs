@@ -2432,6 +2432,12 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(
+        name = "ZO_FIREHOSE_DECOMPRESSED_LIMIT",
+        default = 0,
+        help = "Bytes the gzip records of one Kinesis Firehose request may inflate to; 0 means 5x ZO_PAYLOAD_LIMIT"
+    )]
+    pub firehose_decompressed_limit: usize,
     #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
     // 0 falls back to default
     pub js_function_max_execution_time_secs: u64,
@@ -3773,6 +3779,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.http_worker_max_blocking == 0 {
         cfg.limit.http_worker_max_blocking = 256;
+    }
+    // CloudWatch subscription records are gzip at 5-10x, so a full body must not exhaust the budget
+    if cfg.limit.firehose_decompressed_limit == 0 {
+        cfg.limit.firehose_decompressed_limit = cfg.limit.req_payload_limit.saturating_mul(5);
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
@@ -6097,6 +6107,19 @@ mod tests {
         cfg.limit.batch_size = 4096; // within range
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.batch_size, 4096);
+    }
+
+    #[test]
+    fn test_check_limit_config_firehose_decompressed_limit() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.req_payload_limit = 200;
+        cfg.limit.firehose_decompressed_limit = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.firehose_decompressed_limit, 1000);
+
+        cfg.limit.firehose_decompressed_limit = 300;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.firehose_decompressed_limit, 300);
     }
 
     #[test]
