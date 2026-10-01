@@ -249,6 +249,45 @@ So to get the toggle button, mark your optional columns `hideable` and set
 `persist-columns` + `table-id`. There's no manual button to add — omit any of the
 three and the button silently won't appear.
 
+### The table footer
+
+**A footer is never hand-built.** `OTable` draws the same bar on every list: the
+pager on the end edge and, on the start edge, nothing — until the page has a
+reason to put something there. There is **no total label** ("12 Channels"): the
+pager's "x – y of z" is the count, so a line that only restates the row total is
+not written at all.
+
+- **Bulk actions → `#selection-actions`.** While rows are selected the bar shows
+  "N of M selected", a divider, then this slot. Hand it **the buttons only** — no
+  wrapper, no `v-if` on the selection length (the table already hides the slot
+  with nothing selected), no margin / height / padding classes, every button
+  `size="sm"`, a destructive action last. The count appears once, in the bar:
+  never render your own "N selected", and never put a count in a label
+  (`{{ t("common.delete") }}`, not "Delete (3)").
+- **A line the pager cannot say → `#footer-note`.** A cap or truncation, partial
+  data, "filtered x of y", a second figure, a conclusion. Put the `v-if` on the
+  `<template>` so the note renders only in the states where it says more, give it
+  **one root element**, and add no typography or padding — the bar sets its own
+  small secondary text. A root with `max-md:hidden` hides the note on a phone
+  without leaving an empty row. Rows selected wins over the note.
+
+```vue
+<OTable … selection="multiple" v-model:selected-ids="selectedIds">
+  <template #selection-actions>
+    <OButton variant="outline" size="sm" icon-left="download" data-test="channels-export-selected" @click="exportSelected">
+      {{ t("common.export") }}
+    </OButton>
+    <OButton variant="outline-destructive" size="sm" icon-left="delete" :loading="deleting" data-test="channels-delete-selected" @click="confirmBulkDelete = true">
+      {{ t("common.delete") }}
+    </OButton>
+  </template>
+
+  <template v-if="truncated" #footer-note>
+    <span data-test="channels-truncated">{{ t("channels.truncated", { count: rows.length }) }}</span>
+  </template>
+</OTable>
+```
+
 ### Columns: hideable + default-hidden + persisted
 
 ```ts
@@ -460,10 +499,13 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
       "You don't have access" rather than a create CTA that will 403.
 - [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`; inline
       buttons `max-md:hidden` + a `md:hidden` kebab mirroring them (`-menu` data-tests).
+- [ ] **Footer not hand-built** — bulk actions in `#selection-actions` (buttons
+      only, `size="sm"`, destructive last, no count in a label), a note the pager
+      cannot say in `#footer-note` (`v-if` on the `<template>`, one root element),
+      no total label and no page-rendered "N selected".
 - [ ] **Responsive** — toolbar recipe (`max-md:contents`, `mobile-dropdown`, search
-      floor), footer count `max-md:hidden`, secondary header actions in
-      `#actions-overflow`; checked at 375 / 768 / 1280 with 1280 identical to main
-      (see [responsive.md](responsive.md)).
+      floor), secondary header actions in `#actions-overflow`; checked at
+      375 / 768 / 1280 with 1280 identical to main (see [responsive.md](responsive.md)).
 - [ ] `n` / `/` / `r` keyboard shortcuts registered and bound.
 - [ ] **Registered in navigation** and gated for the right env/role — see
       [navigation-menus.md](navigation-menus.md).
