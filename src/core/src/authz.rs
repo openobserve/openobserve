@@ -240,7 +240,7 @@ pub async fn list_objects_for_user(
 
 /// Never before the first usage report: an unloaded license also reads as a reporting failure.
 #[cfg(feature = "enterprise")]
-async fn report_failure_lifts_rbac() -> bool {
+pub async fn report_failure_lifts_rbac() -> bool {
     use o2_enterprise::enterprise::license::{
         block_feature_for_report_failure, last_reported_timestamp,
     };
