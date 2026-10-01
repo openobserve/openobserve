@@ -1353,9 +1353,7 @@ async fn create_new_incident(
         use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
         let o2_cfg = get_o2_config();
 
-        if o2_cfg.incidents.enabled
-            && o2_cfg.incidents.rca_enabled
-            && !o2_cfg.ai.agent_url.is_empty()
+        if o2_cfg.incidents.enabled && o2_cfg.incidents.rca_enabled && o2_cfg.ai.has_agent_target()
         {
             if let Err(e) = crate::incidents::append_event(
                 org_id,
@@ -2365,7 +2363,7 @@ pub async fn trigger_rca_for_incident(
         return Ok(()); // Not an error - just not configured
     }
 
-    if config.ai.agent_url.is_empty() {
+    if !config.ai.has_agent_target() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
         // §6: no verdict is coming, so nothing may go on holding a page for
         // one. Every guard below reaches this same state.

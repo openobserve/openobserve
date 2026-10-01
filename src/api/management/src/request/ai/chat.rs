@@ -188,7 +188,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        if o2_cfg.ai.agent_url.is_empty() {
+        if !o2_cfg.ai.has_agent_target() {
             return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
