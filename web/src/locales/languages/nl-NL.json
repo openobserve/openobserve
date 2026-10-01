@@ -3659,7 +3659,40 @@
     "dataSource": "Gegevensbron",
     "uploadFile": "Bestand uploaden",
     "fromUrl": "Van URL",
-    "addFunction": "Functie toevoegen"
+    "addFunction": "Functie toevoegen",
+    "import": {
+      "title": "Functie importeren",
+      "outputMessages": "Uitvoerberichten",
+      "errorValidations": "Foutvalidaties",
+      "results": "Importresultaten",
+      "nameLabel": "Functienaam",
+      "nameRequired": "Functie - {index}: naam is vereist",
+      "nameExists": "Functie - {index}: \"{name}\" bestaat al",
+      "nameInvalid": "Functie - {index}: \"{name}\" is geen geldige functienaam. Gebruik letters, cijfers en underscores, beginnend met een letter of underscore.",
+      "duplicateName": "Functie - {index}: \"{name}\" komt meer dan eens voor in dit bestand",
+      "bodyRequired": "Functie - {index}: functiebody is vereist",
+      "transTypeInvalid": "Functie - {index}: type moet 0 zijn voor VRL of 1 voor JavaScript",
+      "paramsInvalid": "Functie - {index}: params moet een string zijn",
+      "transTypeLabel": "taal",
+      "transTypePlaceholder": "Kies een taal",
+      "paramsLabel": "Parameters",
+      "paramsHint": "Door komma's gescheiden argumentnamen. Standaard “row”.",
+      "overrideExisting": "De bestaande functie in plaats daarvan vervangen",
+      "nameInputRequired": "Voer een functienaam in",
+      "nameInputInvalid": "Gebruik letters, cijfers en underscores, beginnend met een letter of underscore",
+      "nameInputDuplicate": "Een andere functie in dit bestand gebruikt deze naam al",
+      "nameInputExists": "Deze naam is al in gebruik binnen deze organisatie",
+      "overrideAffects": "Overschrijven wijzigt ook deze pijpleidingen: {pipelines}",
+      "createSuccess": "Functie - {index}: \"{name}\" geïmporteerd",
+      "overridden": "Functie - {index}: \"{name}\" overschreven",
+      "createFailed": "Functie - {index}: \"{name}\" mislukt - {reason}",
+      "rejectedBody": "Corrigeer de definitie en importeer opnieuw.",
+      "rejectedLanguage": "Functie - {index}: \"{name}\" is afgewezen. Als het een JavaScript-functie is, stel de taal in — een definitie zonder taal wordt gelezen als VRL.",
+      "jsonStringEmpty": "JSON-string is leeg",
+      "invalidJsonFormat": "Ongeldige JSON-indeling",
+      "importSuccess": "{count} functie geïmporteerd | {count} functies geïmporteerd",
+      "nothingToImport": "Geen functies gevonden om te importeren. Controleer of het bestand geldige JSON is."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Dimensies analyseren...",
@@ -15870,7 +15903,8 @@
       "oncallAck": "Bevestigen",
       "oncallEscalate": "Escaleren",
       "oncallSnooze": "Snoozen",
-      "oncallResolve": "Oplossen"
+      "oncallResolve": "Oplossen",
+      "functionsImport": "Functie importeren"
     }
   },
   "components": {
@@ -16482,7 +16516,10 @@
       "enrichmentReloadStarted": "Herladen van verrijkingstabel gestart. Verwerking op de achtergrond...",
       "enrichmentJobStarted": "Taak voor verrijkingstabel gestart. Verwerking op de achtergrond...",
       "enrichmentCreationFailed": "Aanmaken van verrijkingstabel mislukt",
-      "functionDeletionAssociatedPipelines": "Verwijdering van functie mislukt omdat deze is gekoppeld aan pijplijnen. Klik op de bekijk-knop om bijbehorende pijplijnen te krijgen."
+      "functionDeletionAssociatedPipelines": "Verwijdering van functie mislukt omdat deze is gekoppeld aan pijplijnen. Klik op de bekijk-knop om bijbehorende pijplijnen te krijgen.",
+      "successfullyExportedFunctions": "{count} functie geëxporteerd | {count} functies geëxporteerd",
+      "errorExportingFunctions": "Fout bij het exporteren van functies. Probeer het opnieuw.",
+      "functionsMissingFromExport": "{names} staat niet meer in de lijst en is buiten de export gelaten | {names} staan niet meer in de lijst en zijn buiten de export gelaten"
     },
     "recommended": {
       "failedToImportDashboard": "Kan dashboard niet importeren: {error}",

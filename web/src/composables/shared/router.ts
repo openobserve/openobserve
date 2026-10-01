@@ -145,6 +145,7 @@ const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
+const ImportFunction = () => import("@/components/functions/ImportFunction.vue");
 const EnrichmentTableList = () => import("@/components/functions/EnrichmentTableList.vue");
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
 const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
@@ -662,6 +663,17 @@ const useRoutes = () => {
           path: "functions",
           name: "functionList",
           component: FunctionList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "functions/import",
+          name: "importFunction",
+          component: ImportFunction,
+          meta: {
+            titleKey: "function.import.title",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
