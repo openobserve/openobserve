@@ -430,8 +430,7 @@ impl Cidr {
     }
 }
 
-/// A connect-time or redirect refusal by the guard, found in a request error by
-/// [`find_ssrf_refusal`].
+/// A connect-time or redirect refusal by the guard, located by [`find_ssrf_refusal`].
 #[derive(Debug)]
 pub struct SsrfRefusal(String);
 
@@ -521,8 +520,7 @@ pub fn init_allowlist() {
     LazyLock::force(&ALLOWLIST);
 }
 
-/// The guard's refusal anywhere in `err`'s source chain; a refusal is permanent, so not worth a
-/// retry.
+/// The guard's refusal in `err`'s source chain; it is permanent, so never worth a retry.
 pub fn find_ssrf_refusal<'a>(
     err: &'a (dyn std::error::Error + 'static),
 ) -> Option<&'a SsrfRefusal> {
@@ -614,7 +612,15 @@ fn admitted_only_by(
             )
             .is_ok()
     };
-    !admits(&NO_ALLOWLIST) && admits(configured)
+    if admits(&NO_ALLOWLIST) {
+        return false;
+    }
+    if admits(configured) {
+        return true;
+    }
+    // Neither policy admits a proxy peer, so the target named in the URL decides.
+    SsrfGuard::validate_url_inner(url, allow_loopback, false, &NO_ALLOWLIST).is_err()
+        || configured.allows_host(&host)
 }
 
 /// Hosts of the env proxies reqwest uses, read the way hyper-util's `Matcher::from_env` reads them.
@@ -1269,6 +1275,12 @@ mod tests {
             ),
             "a peer neither policy admits is an egress proxy, as for the strict client"
         );
+        let proxy = Some("10.9.9.9".parse().unwrap());
+        assert!(
+            only("http://10.1.2.5/x", proxy),
+            "behind a proxy an allowlisted target is judged by the URL"
+        );
+        assert!(only("http://svc.internal/x", proxy));
     }
 
     fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {
