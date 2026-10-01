@@ -47,13 +47,10 @@ pub static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-/// One JSON number's place in [`number_total_cmp`]'s order: negative-overflow, a finite value
-/// (by its own total order below), or positive-overflow, giving exactly
-/// `NegOverflow < Finite(negative) < Finite(zero) < Finite(positive) < PosOverflow`.
+/// Overflowed numbers rank beyond every finite f64 so the order stays transitive.
 enum NumberOrderClass {
     NegOverflow(std::cmp::Reverse<String>),
-    // f64 has no Eq/Ord (NaN), but JSON numbers are never NaN, so this type's own Eq/Ord below
-    // (via total_cmp) are hand-written rather than derived.
+    // JSON numbers are never NaN, so the hand-written Ord via total_cmp is sound.
     Finite(f64),
     PosOverflow(String),
 }
@@ -154,11 +151,7 @@ pub(crate) fn json_total_cmp(a: &json::Value, b: &json::Value) -> Ordering {
     }
 }
 
-/// Compares two JSON numbers under one f64-compatible total order, even when one or both are
-/// `arbitrary_precision` numbers with no f64 representation: those are ordered as signed
-/// infinity (larger in magnitude than every finite f64), so the relation stays transitive
-/// against numbers that do have an f64. Two negative-overflow numbers are ordered so the more
-/// negative (longer digit string) sorts first, via `Reverse` on their canonical text.
+/// Numbers with no f64 form sort as signed infinity so mixed comparisons stay transitive.
 fn number_total_cmp(a: &json::Number, b: &json::Number) -> Ordering {
     number_order_class(a).cmp(&number_order_class(b))
 }
@@ -494,8 +487,6 @@ mod tests {
 
     #[test]
     fn test_number_total_cmp_orders_overflow_against_finite_correctly() {
-        // Regression for a transitivity break: comparing an overflowed number (no f64
-        // representation) against a finite one by raw JSON text put 100.0 < 1e400 < 50 < 100.0.
         let a = parse_number("100.0");
         let b = parse_number("1e400");
         let c = parse_number("50");
