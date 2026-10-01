@@ -47,11 +47,13 @@ pub static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-/// Overflowed numbers rank beyond every finite f64 so the order stays transitive.
+/// Overflowed numbers rank beyond every finite value so the order stays transitive.
 enum NumberOrderClass {
     NegOverflow(std::cmp::Reverse<String>),
+    // Every i64 and u64 fits, so integers above 2^53 keep their exact order.
+    Int(i128),
     // JSON numbers are never NaN, so the hand-written Ord via total_cmp is sound.
-    Finite(f64),
+    Float(f64),
     PosOverflow(String),
 }
 
@@ -67,12 +69,15 @@ impl Ord for NumberOrderClass {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Self::NegOverflow(a), Self::NegOverflow(b)) => a.cmp(b),
-            (Self::Finite(a), Self::Finite(b)) => a.total_cmp(b),
+            (Self::Int(a), Self::Int(b)) => a.cmp(b),
+            (Self::Float(a), Self::Float(b)) => a.total_cmp(b),
+            (Self::Int(a), Self::Float(b)) => int_float_cmp(*a, *b),
+            (Self::Float(a), Self::Int(b)) => int_float_cmp(*b, *a).reverse(),
             (Self::PosOverflow(a), Self::PosOverflow(b)) => a.cmp(b),
             (Self::NegOverflow(_), _) => Ordering::Less,
             (_, Self::NegOverflow(_)) => Ordering::Greater,
-            (Self::Finite(_), Self::PosOverflow(_)) => Ordering::Less,
-            (Self::PosOverflow(_), Self::Finite(_)) => Ordering::Greater,
+            (Self::PosOverflow(_), _) => Ordering::Greater,
+            (_, Self::PosOverflow(_)) => Ordering::Less,
         }
     }
 }
@@ -157,8 +162,14 @@ fn number_total_cmp(a: &json::Number, b: &json::Number) -> Ordering {
 }
 
 fn number_order_class(n: &json::Number) -> NumberOrderClass {
+    if let Some(i) = n.as_i64() {
+        return NumberOrderClass::Int(i.into());
+    }
+    if let Some(u) = n.as_u64() {
+        return NumberOrderClass::Int(u.into());
+    }
     match n.as_f64() {
-        Some(f) => NumberOrderClass::Finite(f),
+        Some(f) => NumberOrderClass::Float(f),
         None => {
             let text = n.to_string();
             if text.starts_with('-') {
@@ -167,6 +178,14 @@ fn number_order_class(n: &json::Number) -> NumberOrderClass {
                 NumberOrderClass::PosOverflow(text)
             }
         }
+    }
+}
+
+/// Exact `i` vs `f`: round-to-nearest keeps any strict order, and a tie means `f` is integral.
+fn int_float_cmp(i: i128, f: f64) -> Ordering {
+    match (i as f64).total_cmp(&f) {
+        Ordering::Equal => i.cmp(&(f as i128)),
+        ord => ord,
     }
 }
 
@@ -499,25 +518,85 @@ mod tests {
     #[test]
     fn test_number_total_cmp_is_transitive_over_all_triples() {
         let texts = [
-            "1e400", "-1e400", "100.0", "50", "-3", "2e300", "-2e300", "0", "-0.5", "0.5",
+            "1e400",
+            "-1e400",
+            "100.0",
+            "50",
+            "-3",
+            "2e300",
+            "-2e300",
+            "0",
+            "-0.5",
+            "0.5",
+            "9007199254740992",
+            "9007199254740993",
+            "9007199254740992.0",
+            "18446744073709551615",
+            "18446744073709551616.0",
+            "-1",
+            "-9223372036854775808",
+            "1727000000000000001",
+            "1727000000000000002",
         ];
         let numbers: Vec<json::Number> = texts.iter().map(|t| parse_number(t)).collect();
 
         for a in &numbers {
             for b in &numbers {
+                assert_eq!(
+                    number_total_cmp(a, b),
+                    number_total_cmp(b, a).reverse(),
+                    "{a} vs {b} is not antisymmetric"
+                );
                 for c in &numbers {
                     let ab = number_total_cmp(a, b);
                     let bc = number_total_cmp(b, c);
                     let ac = number_total_cmp(a, c);
-                    if ab == Ordering::Less && bc == Ordering::Less {
-                        assert_eq!(ac, Ordering::Less, "a<b<c but a vs c was {ac:?}");
-                    }
-                    if ab == Ordering::Greater && bc == Ordering::Greater {
-                        assert_eq!(ac, Ordering::Greater, "a>b>c but a vs c was {ac:?}");
+                    if ab != Ordering::Greater && bc != Ordering::Greater {
+                        let want = if ab == Ordering::Equal {
+                            bc
+                        } else {
+                            Ordering::Less
+                        };
+                        assert_eq!(ac, want, "{a} vs {b} is {ab:?}, {b} vs {c} is {bc:?}");
                     }
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_arr_sort_orders_integers_above_2_pow_53_exactly() {
+        assert_eq!(
+            call_arr_sort("[1727000000000000002,1727000000000000001]"),
+            "[1727000000000000001,1727000000000000002]"
+        );
+        assert_eq!(
+            call_arr_sort("[9007199254740993,9007199254740992]"),
+            "[9007199254740992,9007199254740993]"
+        );
+    }
+
+    #[test]
+    fn test_number_total_cmp_breaks_int_float_ties_exactly() {
+        let cmp = |a: &str, b: &str| number_total_cmp(&parse_number(a), &parse_number(b));
+        assert_eq!(
+            cmp("9007199254740993", "9007199254740992.0"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            cmp("9007199254740992", "9007199254740992.0"),
+            Ordering::Equal
+        );
+        assert_eq!(
+            cmp("18446744073709551615", "18446744073709551616.0"),
+            Ordering::Less
+        );
+        assert_eq!(cmp("-1", "18446744073709551615"), Ordering::Less);
+        assert_eq!(
+            cmp("-9223372036854775808", "-9223372036854775807"),
+            Ordering::Less
+        );
+        assert_eq!(cmp("2.5", "2"), Ordering::Greater);
     }
 
     #[test]
