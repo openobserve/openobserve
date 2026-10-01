@@ -51,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('iam.basicUsers')"
           sorting="client"
           selection="multiple"
           :is-row-selectable="(row: any) => row.enableDelete"
@@ -243,17 +242,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
             </ODropdown>
           </template>
-          <template #bottom>
-            <span class="text-xs font-normal max-md:hidden"
-              >{{ rows.length }}
-              {{
-                isEnterpriseOrCloud
-                  ? t("iam.organizationMembers") || t("iam.user.organizationMembers")
-                  : t("iam.basicUsers")
-              }}</span
-            >
+          <template #selection-actions>
             <OButton
-              v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
               variant="outline-destructive"
               size="sm"
@@ -1502,7 +1492,6 @@ export default defineComponent({
       router,
       store,
       config,
-      isEnterpriseOrCloud,
       isBuiltinRole,
       toCamelCase,
       usersState,
