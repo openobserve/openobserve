@@ -24,9 +24,10 @@ use config::{
         dashboards::{
             datetime_now,
             reports::{
-                HttpReportPayload, Report, ReportDashboard, ReportDestination,
-                ReportEmailAttachmentType, ReportEmailDetails, ReportFrequencyType,
-                ReportListFilters, ReportMediaType, ReportTimerangeType,
+                HttpReportPayload, REPORT_SECRET_HEADER, Report, ReportDashboard,
+                ReportDestination, ReportEmailAttachmentType, ReportEmailDetails,
+                ReportFrequencyType, ReportListFilters, ReportMediaType, ReportTimerangeType,
+                format_dashb_var,
             },
         },
         folder::Folder,
@@ -55,8 +56,6 @@ use lettre::{
 use reqwest::Client;
 
 use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz, short_url};
-
-const REPORT_SECRET_HEADER: &str = "x-o2-report-secret";
 
 /// Errors that can occur when interacting with reports.
 #[derive(Debug, thiserror::Error)]
@@ -975,15 +974,6 @@ async fn generate_report(
     Ok((pdf_data, email_dashb_url))
 }
 
-/// Percent-encodes both sides so a `&`, `#` or `"` in a variable can't break out of the URL.
-fn format_dashb_var(key: &str, value: &str) -> String {
-    format!(
-        "var-{}={}",
-        urlencoding::encode(key),
-        urlencoding::encode(value)
-    )
-}
-
 async fn wait_for_panel_data_load(page: &Page) -> Result<(), GenerateReportError> {
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(get_config().chrome.chrome_sleep_secs.into());
@@ -1217,14 +1207,6 @@ mod tests {
         };
         assert!(bind_to_path_org(&mut report, "org_a").is_ok());
         assert_eq!(report.org_id, "org_a");
-    }
-
-    #[test]
-    fn format_dashb_var_encodes_special_characters() {
-        let encoded = format_dashb_var("k", "a&b#c\"d");
-        assert_eq!(encoded, "var-k=a%26b%23c%22d");
-        let decoded_value = urlencoding::decode(encoded.strip_prefix("var-k=").unwrap()).unwrap();
-        assert_eq!(decoded_value, "a&b#c\"d");
     }
 
     #[test]

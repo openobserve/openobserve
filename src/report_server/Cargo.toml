@@ -16,7 +16,6 @@ chromiumoxide.workspace=true
 lettre.workspace=true
 chrono.workspace=true
 futures.workspace=true
-urlencoding.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

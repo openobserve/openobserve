@@ -8369,7 +8369,6 @@ dependencies = [
  "tracing-opentelemetry",
  "transform",
  "url",
- "urlencoding",
  "usage_reporting",
  "utoipa",
  "version-compare",
@@ -10355,7 +10354,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
- "urlencoding",
 ]
 
 [[package]]

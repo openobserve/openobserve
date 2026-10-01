@@ -8,7 +8,7 @@ use chromiumoxide::{
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
     handler::viewport::Viewport,
 };
-use config::{get_config, utils::time::now_micros};
+use config::{get_config, meta::dashboards::reports::format_dashb_var, utils::time::now_micros};
 use futures::StreamExt;
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -395,15 +395,6 @@ pub async fn generate_report(
     Ok((pdf_data, email_dashb_url))
 }
 
-/// Percent-encodes both sides so a `&`, `#` or `"` in a variable can't break out of the URL.
-fn format_dashb_var(key: &str, value: &str) -> String {
-    format!(
-        "var-{}={}",
-        urlencoding::encode(key),
-        urlencoding::encode(value)
-    )
-}
-
 /// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
 pub async fn send_email(
     pdf_data: &[u8],
@@ -720,13 +711,5 @@ mod tests {
         }
 
         assert_eq!(dashb_vars, "&var-env=prod&var-region=us-west");
-    }
-
-    #[test]
-    fn test_format_dashb_var_encodes_special_characters() {
-        let encoded = format_dashb_var("k", "a&b#c\"d");
-        assert_eq!(encoded, "var-k=a%26b%23c%22d");
-        let decoded_value = urlencoding::decode(encoded.strip_prefix("var-k=").unwrap()).unwrap();
-        assert_eq!(decoded_value, "a&b#c\"d");
     }
 }
