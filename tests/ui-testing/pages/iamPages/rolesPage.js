@@ -13,6 +13,10 @@ import { expect } from '@playwright/test';
 // the UI labels them List / Get / Create / Update / Delete / All.
 export const ACTIONS = ['AllowAll', 'AllowList', 'AllowGet', 'AllowPost', 'AllowPut', 'AllowDelete'];
 
+// One rail row per permission module. "Role Overview" is NOT one of these — it has its
+// own slug, `edit-role-module-rail-overview` (ModuleRail.vue).
+const RAIL_ITEM = 'edit-role-module-rail-item-';
+
 export class RolesPage {
     constructor(page) {
         this.page = page;
@@ -57,11 +61,11 @@ export class RolesPage {
         this.railScopeAll = page.locator('[data-test="edit-role-module-rail-scope-all"]');
         this.railScopeGranted = page.locator('[data-test="edit-role-module-rail-scope-granted"]');
         this.railTabs = page.locator('[data-test="edit-role-module-rail-tabs"]');
-        // The rail is rendered twice (desktop + responsive copy), so every rail slug
-        // matches two elements. Pin the visible one rather than relaxing strict mode.
-        this.railSummaryItem = page
-            .locator('[data-test="edit-role-module-rail-item-summary"]:visible')
-            .first();
+        // "Role Overview" — the landing pane, not a permission module. It carries its
+        // own slug (`-overview`, ModuleRail.vue), NOT `-item-summary`: that one belongs
+        // to the real `summary` permission module, and clicking it opens that module's
+        // pane instead of the overview.
+        this.railSummaryItem = page.locator('[data-test="edit-role-module-rail-overview"]');
         this.railNoMatch = page.locator('[data-test="edit-role-module-rail-no-match"]');
 
         // ---------- module pane ----------
@@ -107,9 +111,7 @@ export class RolesPage {
     }
 
     railItem(moduleKey) {
-        return this.page
-            .locator(`[data-test="edit-role-module-rail-item-${moduleKey}"]:visible`)
-            .first();
+        return this.page.locator(`[data-test="${RAIL_ITEM}${moduleKey}"]:visible`).first();
     }
     railGroup(groupId) {
         return this.page.locator(`[data-test="edit-role-module-rail-group-${groupId}"]`);
@@ -123,28 +125,21 @@ export class RolesPage {
         return this.page.locator(`[data-test="edit-role-module-rail-unsaved-${moduleKey}"]`);
     }
     railItems() {
-        return this.page.locator('[data-test^="edit-role-module-rail-item-"]:visible');
+        return this.page.locator(`[data-test^="${RAIL_ITEM}"]:visible`);
     }
 
-    /** Distinct module keys in the rail, immune to the duplicate desktop/mobile render. */
     /**
      * Distinct module keys in the rail.
      *
-     * `summary` is filtered because the rail's "Role Overview" nav item and the real
-     * `summary` permission module BOTH render as `edit-role-module-rail-item-summary`
-     * — two elements, one slug — and without the filter Role Overview counts as a
-     * module. The cost is that a published module is dropped too, so THIS LIST IS ONE
-     * SHORT of what the rail actually offers. Do not compare its length against a
-     * resource total: that reads as a missing module when nothing is missing, which
-     * is exactly how o2-enterprise#2717 came to be filed and closed as invalid.
-     * Test membership, or give Role Overview its own slug and drop the filter.
+     * Every `-item-` slug is a real permission module, `summary` included. "Role
+     * Overview" is not one of them — it renders as `edit-role-module-rail-overview`
+     * and so never reaches this list.
      */
     async railModuleKeys() {
         const slugs = await this.page
-            .locator('[data-test^="edit-role-module-rail-item-"]')
+            .locator(`[data-test^="${RAIL_ITEM}"]`)
             .evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
-        return [...new Set(slugs.map((s) => s.replace('edit-role-module-rail-item-', '')))]
-            .filter((k) => k !== 'summary');
+        return [...new Set(slugs.map((s) => s.replace(RAIL_ITEM, '')))];
     }
 
     scopeRow(key) {
@@ -281,9 +276,11 @@ export class RolesPage {
         await expect(this.pane).toBeVisible({ timeout: 15000 });
     }
 
-    async openSummary() {
+    /** `timeout` is the budget for the summary to paint — U-12 tightens it to assert
+     *  the editor is still responsive after a heavy module, not merely alive. */
+    async openSummary({ timeout = 15000 } = {}) {
         await this.railSummaryItem.click();
-        await expect(this.summary).toBeVisible({ timeout: 15000 });
+        await expect(this.summary).toBeVisible({ timeout });
     }
 
     // ================= grants =================

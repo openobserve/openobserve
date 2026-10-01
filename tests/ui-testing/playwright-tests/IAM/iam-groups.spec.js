@@ -159,7 +159,7 @@ const sweepLeftovers = async (page) => {
 
 // ---------- suite ----------
 
-test.describe('IAM · User Groups', () => {
+test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
     let pm;
 
     test.beforeEach(async ({ page }) => {
@@ -214,7 +214,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-01 ----------------
-    test('GR-01 · creating a group opens its editor, and it is listed and stored', async ({ page }, testInfo) => {
+    test('GR-01 · creating a group opens its editor, and it is listed and stored', {
+        tag: ['@iam', '@iamGroups', '@P0', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g01_${uniq()}`;
 
@@ -231,7 +233,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-02 ----------------
-    test('GR-02 · the editor opens on Roles with the Selected filter active', async ({ page }, testInfo) => {
+    test('GR-02 · the editor opens on Roles with the Selected filter active', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g02_${uniq()}`;
         await createGroupApi(page, name);
@@ -246,7 +250,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-03 ----------------
-    test('GR-03 · All lists every org role, Selected lists only the group\'s', async ({ page }, testInfo) => {
+    test('GR-03 · All lists every org role, Selected lists only the group\'s', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g03_${uniq()}`;
         await createGroupApi(page, name);
@@ -266,6 +272,7 @@ test.describe('IAM · User Groups', () => {
     // ---------------- GR-04 (B1 regression) ----------------
     test.fixme(
         'GR-04 · an empty group must not claim the org has no roles [o2-enterprise#2696]',
+        { tag: ['@iam', '@iamGroups', '@P2', '@bug', '@all'] },
         async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
             const name = `${PREFIX}_g04_${uniq()}`;
@@ -290,6 +297,7 @@ test.describe('IAM · User Groups', () => {
     // ---------------- GR-05 (B1, layout half) ----------------
     test.fixme(
         'GR-05 · the empty-state description is not clipped by the pagination bar [o2-enterprise#2696]',
+        { tag: ['@iam', '@iamGroups', '@P2', '@bug', '@all'] },
         async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
             const name = `${PREFIX}_g05_${uniq()}`;
@@ -310,7 +318,9 @@ test.describe('IAM · User Groups', () => {
     );
 
     // ---------------- GR-06 ----------------
-    test('GR-06 · assigning roles in the UI is what the API stores', async ({ page }, testInfo) => {
+    test('GR-06 · assigning roles in the UI is what the API stores', {
+        tag: ['@iam', '@iamGroups', '@P0', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g06_${uniq()}`;
         await createGroupApi(page, name);
@@ -327,7 +337,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-07 ----------------
-    test('GR-07 · assigning a user in the UI is what the API stores', async ({ page }, testInfo) => {
+    test('GR-07 · assigning a user in the UI is what the API stores', {
+        tag: ['@iam', '@iamGroups', '@P0', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g07_${uniq()}`;
         await createGroupApi(page, name);
@@ -346,7 +358,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-08 ----------------
-    test('GR-08 · the Service Accounts tab assigns a service account', async ({ page }, testInfo) => {
+    test('GR-08 · the Service Accounts tab assigns a service account', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g08_${uniq()}`;
         await createGroupApi(page, name);
@@ -369,7 +383,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-09 ----------------
-    test('GR-09 · removing a role in the UI removes it in the API', async ({ page }, testInfo) => {
+    test('GR-09 · removing a role in the UI removes it in the API', {
+        tag: ['@iam', '@iamGroups', '@P0', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g09_${uniq()}`;
         await createGroupApi(page, name);
@@ -386,7 +402,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-10 ----------------
-    test('GR-10 · search narrows the roles and users selection tables', async ({ page }, testInfo) => {
+    test('GR-10 · search narrows the roles and users selection tables', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g10_${uniq()}`;
         await createGroupApi(page, name);
@@ -404,7 +422,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-11 ----------------
-    test('GR-11 · search and the Selected filter compose', async ({ page }, testInfo) => {
+    test('GR-11 · search and the Selected filter compose', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g11_${uniq()}`;
         await createGroupApi(page, name);
@@ -423,7 +443,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-12 ----------------
-    test('GR-12 · a group holding many roles renders them all', async ({ page }, testInfo) => {
+    test('GR-12 · a group holding many roles renders them all', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g12_${uniq()}`;
         await createGroupApi(page, name);
@@ -439,7 +461,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-13 ----------------
-    test('GR-13 · a role deleted while a group still holds it does not break the editor', async ({ page }, testInfo) => {
+    test('GR-13 · a role deleted while a group still holds it does not break the editor', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g13_${uniq()}`;
         const doomed = `${PREFIX}_role_doomed_${uniq()}`;
@@ -459,7 +483,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-14 ----------------
-    test('GR-14 · a group deleted in the UI is gone from the list and the API', async ({ page }, testInfo) => {
+    test('GR-14 · a group deleted in the UI is gone from the list and the API', {
+        tag: ['@iam', '@iamGroups', '@P0', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g14_${uniq()}`;
         await createGroupApi(page, name);
@@ -474,7 +500,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-15 ----------------
-    test('GR-15 · a group with users but no roles saves cleanly', async ({ page }, testInfo) => {
+    test('GR-15 · a group with users but no roles saves cleanly', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g15_${uniq()}`;
         await createGroupApi(page, name);
@@ -499,7 +527,9 @@ test.describe('IAM · User Groups', () => {
     // the UI refuses what the API would refuse — the half that silently rots,
     // because a broken guard still looks like a working screen.
 
-    test('GR-N1 · a blank group name is refused', async ({ page }, testInfo) => {
+    test('GR-N1 · a blank group name is refused', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const before = await listGroups(page);
 
@@ -514,7 +544,9 @@ test.describe('IAM · User Groups', () => {
         expect(await listGroups(page)).toEqual(before);
     });
 
-    test('GR-N2 · a whitespace-only group name is refused', async ({ page }, testInfo) => {
+    test('GR-N2 · a whitespace-only group name is refused', {
+        tag: ['@iam', '@iamGroups', '@P2', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const before = await listGroups(page);
 
@@ -530,7 +562,9 @@ test.describe('IAM · User Groups', () => {
         expect(await listGroups(page)).toEqual(before);
     });
 
-    test('GR-N3 · a duplicate group name is refused and does not clobber the original', async ({ page }, testInfo) => {
+    test('GR-N3 · a duplicate group name is refused and does not clobber the original', {
+        tag: ['@iam', '@iamGroups', '@P0', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_gn3_${uniq()}`;
         await createGroupApi(page, name);
@@ -550,7 +584,9 @@ test.describe('IAM · User Groups', () => {
         expect((await listGroups(page)).filter((g) => g === name)).toHaveLength(1);
     });
 
-    test('GR-N4 · the name field is capped at its maxlength', async ({ page }, testInfo) => {
+    test('GR-N4 · the name field is capped at its maxlength', {
+        tag: ['@iam', '@iamGroups', '@P2', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         // AddGroup.vue sets :maxlength="100"; a longer paste must be truncated by the
         // control rather than sent and rejected (or worse, stored) server-side.
@@ -568,7 +604,9 @@ test.describe('IAM · User Groups', () => {
         expect((await listGroups(page)).some((g) => g.startsWith(`${PREFIX}_zzz`))).toBe(false);
     });
 
-    test('GR-N5 · Cancel discards staged role changes', async ({ page }, testInfo) => {
+    test('GR-N5 · Cancel discards staged role changes', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_gn5_${uniq()}`;
         await createGroupApi(page, name);
@@ -591,7 +629,9 @@ test.describe('IAM · User Groups', () => {
         expect((stored.roles ?? []).sort()).toEqual([ROLE_A]);
     });
 
-    test('GR-N6 · a search matching nothing empties the table without losing the selection', async ({ page }, testInfo) => {
+    test('GR-N6 · a search matching nothing empties the table without losing the selection', {
+        tag: ['@iam', '@iamGroups', '@P2', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_gn6_${uniq()}`;
         await createGroupApi(page, name);
@@ -609,7 +649,9 @@ test.describe('IAM · User Groups', () => {
         expect(await pm.groupsPage.isRowChecked('roles', ROLE_A)).toBe(true);
     });
 
-    test('GR-N7 · deleting a group is refused until confirmed', async ({ page }, testInfo) => {
+    test('GR-N7 · deleting a group is refused until confirmed', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_gn7_${uniq()}`;
         await createGroupApi(page, name);
@@ -626,7 +668,9 @@ test.describe('IAM · User Groups', () => {
     });
 
     // ---------------- GR-16 ----------------
-    test('GR-16 · the Roles list Users column counts DIRECT holders only', async ({ page }, testInfo) => {
+    test('GR-16 · the Roles list Users column counts DIRECT holders only', {
+        tag: ['@iam', '@iamGroups', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const name = `${PREFIX}_g16_${uniq()}`;
         await createGroupApi(page, name);
