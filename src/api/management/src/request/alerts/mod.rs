@@ -637,6 +637,9 @@ fn composite_list_item(
         owner: definition.owner,
         description: definition.description,
         alert_type: "composite".to_string(),
+        // Composites watch their children's outcomes, not a stream.
+        stream_name: None,
+        stream_type: None,
         condition: None,
         trigger_condition: None,
         enabled: definition.enabled,

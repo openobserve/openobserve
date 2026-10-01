@@ -140,6 +140,27 @@ test.describe('Clone Alert dialog testcases', {
     testLogger.info('Clone followed the stream chosen in the dialog');
   });
 
+  test('should pre-fill stream type and name from the alert being cloned', {
+    tag: ['@alert-clone-dialog', '@all', '@alerts', '@alerts-clone', '@P1'],
+  }, async ({ page }) => {
+    const source = await createSource(page, 'auto_alert_clone_prefill_src');
+
+    await openAlertList(page, source.name);
+    await pm.alertsPage.openCloneDialog(source.name);
+
+    // The dialog must open already pointed at the source alert's own stream —
+    // not blank, which forces every clone through a reselect the user never
+    // asked for (the clone is "same stream, new name" by default).
+    await expect(
+      page.locator('[data-test="to-be-clone-stream-type"] [data-test$="-trigger"]'),
+    ).toHaveAttribute('data-test-selected-value', 'logs');
+    await expect(
+      page.locator('[data-test="to-be-clone-stream-name"] [data-test$="-trigger"]'),
+    ).toHaveAttribute('data-test-selected-value', STREAM);
+
+    testLogger.info('Clone dialog pre-filled stream type and name from the source alert');
+  });
+
   test('should route the copy into the folder chosen in the dialog', {
     tag: ['@alert-clone-dialog', '@all', '@alerts', '@alerts-clone', '@P1'],
   }, async ({ page }) => {

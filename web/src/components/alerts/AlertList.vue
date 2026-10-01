@@ -2507,17 +2507,30 @@ export default defineComponent({
       toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonedIsComposite.value = row.alert_type === "Composite";
       // Pre-fill from the original alert's row — composite rows carry no
-      // single stream (stream_name is the "--" placeholder), so leave those blank.
-      toBeClonestreamType.value = toBeClonedIsComposite.value ? "" : row.stream_type || "";
+      // single stream, and a row that genuinely has none renders it as the
+      // "--" placeholder (both the list table's own convention and the one
+      // anomaly rows fall back to), which must not get selected as if it
+      // were a real stream type/name.
+      toBeClonestreamType.value =
+        toBeClonedIsComposite.value || !row.stream_type || row.stream_type === "--"
+          ? ""
+          : row.stream_type;
       toBeClonestreamName.value =
         toBeClonedIsComposite.value || !row.stream_name || row.stream_name === "--"
           ? ""
           : row.stream_name;
       showForm.value = true;
       // Load the stream-name options for the pre-filled stream type so the
-      // dialog's dropdown reflects it instead of showing an empty list.
+      // dialog's dropdown reflects it instead of showing an empty list. A
+      // failed load must not abort the clone itself — the dialog still opens,
+      // just with an empty stream-name list the user has to fill by hand —
+      // so the alert-to-clone fetch below always runs regardless.
       if (toBeClonestreamType.value) {
-        await updateStreams(false);
+        try {
+          await updateStreams(false);
+        } catch {
+          // handled above: dialog stays open with an empty stream-name list
+        }
       }
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
       if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
