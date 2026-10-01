@@ -90,8 +90,9 @@ def test_duplicate_name_is_refused_with_the_message_the_ui_matches(
 def test_override_rewrites_the_function_for_everything_using_it(
     client: OpenObserveClient, temp_vrl_function: str
 ):
-    """Choosing Override on import is a PUT, and a function is org-wide: the
-    pipeline that calls it gets the new body, it does not keep the old one."""
+    """Choosing Override on import is a PUT against the one org-wide function:
+    the stored body is replaced, and the pipeline that calls it is still
+    reported as depending on it rather than being detached by the rewrite."""
     pipeline_name = unique_name("pytest_impexp_pl")
     pipeline_id = None
     try:
