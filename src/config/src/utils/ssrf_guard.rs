@@ -47,6 +47,8 @@ static NO_ALLOWLIST: SsrfAllowlist = SsrfAllowlist {
     cidrs: Vec::new(),
     hosts: Vec::new(),
 };
+static PROXY_HOSTS: LazyLock<Vec<String>> =
+    LazyLock::new(|| proxy_hosts_from(|name| std::env::var(name).ok()));
 
 pub struct SsrfGuard;
 
@@ -428,12 +430,14 @@ impl Cidr {
 #[derive(Debug, Clone)]
 pub struct SsrfDnsResolver {
     allowlist: &'static SsrfAllowlist,
+    proxy_hosts: &'static [String],
 }
 
 impl Default for SsrfDnsResolver {
     fn default() -> Self {
         Self {
             allowlist: &NO_ALLOWLIST,
+            proxy_hosts: &PROXY_HOSTS,
         }
     }
 }
@@ -442,10 +446,12 @@ impl SsrfDnsResolver {
     async fn resolve_checked(
         host: &str,
         allowlist: &SsrfAllowlist,
+        proxy_hosts: &[String],
     ) -> Result<Vec<SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
         let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host, 0)).await?.collect();
         let cfg = crate::get_config();
-        if cfg.common.skip_ssrf_checks {
+        // reqwest resolves the operator's own egress proxy through this resolver too.
+        if cfg.common.skip_ssrf_checks || proxy_hosts.iter().any(|p| p.eq_ignore_ascii_case(host)) {
             return Ok(addrs);
         }
         let host_allowed = allowlist.allows_host(host);
@@ -463,9 +469,9 @@ impl SsrfDnsResolver {
 
 impl Resolve for SsrfDnsResolver {
     fn resolve(&self, name: Name) -> Resolving {
-        let allowlist = self.allowlist;
+        let (allowlist, proxy_hosts) = (self.allowlist, self.proxy_hosts);
         Box::pin(async move {
-            let addrs = Self::resolve_checked(name.as_str(), allowlist).await?;
+            let addrs = Self::resolve_checked(name.as_str(), allowlist, proxy_hosts).await?;
             let iter: Addrs = Box::new(addrs.into_iter());
             Ok(iter)
         })
@@ -502,7 +508,18 @@ fn build_scoped_client(
     scope: Scope,
     configured: &'static SsrfAllowlist,
 ) -> reqwest::Result<reqwest::Client> {
-    let allowlist = scope.allowlist(configured);
+    let resolver = SsrfDnsResolver {
+        allowlist: scope.allowlist(configured),
+        proxy_hosts: &PROXY_HOSTS,
+    };
+    build_guarded_client(builder, resolver)
+}
+
+fn build_guarded_client(
+    builder: reqwest::ClientBuilder,
+    resolver: SsrfDnsResolver,
+) -> reqwest::Result<reqwest::Client> {
+    let allowlist = resolver.allowlist;
     builder
         .redirect(reqwest::redirect::Policy::custom(move |attempt| {
             if attempt.previous().len() >= 5 {
@@ -519,8 +536,41 @@ fn build_scoped_client(
                 Err(e) => attempt.error(e),
             }
         }))
-        .dns_resolver(Arc::new(SsrfDnsResolver { allowlist }))
+        .dns_resolver(Arc::new(resolver))
         .build()
+}
+
+/// Hosts of the env proxies reqwest uses, read the way hyper-util's `Matcher::from_env` reads them.
+fn proxy_hosts_from(var: impl Fn(&str) -> Option<String>) -> Vec<String> {
+    // hyper-util ignores proxy env vars under CGI.
+    if var("REQUEST_METHOD").is_some() {
+        return Vec::new();
+    }
+    [
+        ["ALL_PROXY", "all_proxy"],
+        ["HTTP_PROXY", "http_proxy"],
+        ["HTTPS_PROXY", "https_proxy"],
+    ]
+    .iter()
+    .filter_map(|names| names.iter().find_map(|name| var(name)))
+    .filter_map(|value| proxy_host(&value))
+    .collect()
+}
+
+fn proxy_host(value: &str) -> Option<String> {
+    let value = value.trim();
+    let url = if value.contains("://") {
+        url::Url::parse(value)
+    } else {
+        url::Url::parse(&format!("http://{value}"))
+    }
+    .ok()?;
+    let host = url.host_str()?;
+    Some(
+        host.trim_start_matches('[')
+            .trim_end_matches(']')
+            .to_ascii_lowercase(),
+    )
 }
 
 fn split_list(list: &str) -> impl Iterator<Item = &str> {
@@ -608,18 +658,18 @@ mod tests {
     #[tokio::test]
     async fn test_resolver_honours_allowed_cidr() {
         let allow = SsrfAllowlist::parse("10.1.2.0/24", "");
-        let res = SsrfDnsResolver::resolve_checked("10.1.2.3", &allow).await;
+        let res = SsrfDnsResolver::resolve_checked("10.1.2.3", &allow, &[]).await;
         assert_eq!(
             res.map_err(|e| e.to_string()).unwrap(),
             vec!["10.1.2.3:0".parse::<SocketAddr>().unwrap()]
         );
         assert!(
-            SsrfDnsResolver::resolve_checked("10.9.9.9", &allow)
+            SsrfDnsResolver::resolve_checked("10.9.9.9", &allow, &[])
                 .await
                 .is_err()
         );
         assert!(
-            SsrfDnsResolver::resolve_checked("10.1.2.3", &none())
+            SsrfDnsResolver::resolve_checked("10.1.2.3", &none(), &[])
                 .await
                 .is_err()
         );
@@ -636,14 +686,14 @@ mod tests {
             let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, false, &allow);
             assert!(res.is_err(), "{ip}");
         }
-        let res = SsrfDnsResolver::resolve_checked("64:ff9b::a01:203", &allow).await;
+        let res = SsrfDnsResolver::resolve_checked("64:ff9b::a01:203", &allow, &[]).await;
         assert!(res.is_ok(), "{:?}", res.map_err(|e| e.to_string()));
         let res =
             SsrfGuard::validate_url_async_inner("http://[64:ff9b::a01:203]/", false, false, &allow)
                 .await;
         assert!(res.is_ok(), "{res:?}");
         assert!(
-            SsrfDnsResolver::resolve_checked("64:ff9b::a01:203", &none())
+            SsrfDnsResolver::resolve_checked("64:ff9b::a01:203", &none(), &[])
                 .await
                 .is_err()
         );
@@ -664,13 +714,13 @@ mod tests {
         let res =
             SsrfGuard::validate_url_async_inner("http://localhost/", false, false, &allow).await;
         assert!(res.is_ok(), "{res:?}");
-        let res = SsrfDnsResolver::resolve_checked("localhost", &allow).await;
+        let res = SsrfDnsResolver::resolve_checked("localhost", &allow, &[]).await;
         assert!(res.is_ok(), "{:?}", res.map_err(|e| e.to_string()));
         let res =
             SsrfGuard::validate_url_async_inner("http://localhost/", false, false, &none()).await;
         assert!(res.is_err());
         assert!(
-            SsrfDnsResolver::resolve_checked("localhost", &none())
+            SsrfDnsResolver::resolve_checked("localhost", &none(), &[])
                 .await
                 .is_err()
         );
@@ -988,6 +1038,66 @@ mod tests {
         let destination = build_scoped_client(builder(), Scope::Destination, allow).unwrap();
         let res = destination.get(&url).send().await;
         assert!(res.is_ok(), "{:?}", res.map_err(|e| error_chain(&e)));
+    }
+
+    #[tokio::test]
+    async fn test_a_proxy_configured_by_hostname_is_reachable() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+                    .await;
+            }
+        });
+        let proxy = format!("http://localhost:{port}");
+        let client = |proxy_hosts: &'static [String]| {
+            let builder = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .proxy(reqwest::Proxy::http(&proxy).unwrap());
+            let resolver = SsrfDnsResolver {
+                allowlist: &NO_ALLOWLIST,
+                proxy_hosts,
+            };
+            build_guarded_client(builder, resolver).unwrap()
+        };
+        let target = "http://hooks.example.com/";
+        let proxied = client(Box::leak(Box::new(proxy_hosts_from(|name| {
+            (name == "HTTP_PROXY").then(|| proxy.clone())
+        }))));
+        let res = proxied.get(target).send().await;
+        assert!(res.is_ok(), "{:?}", res.map_err(|e| error_chain(&e)));
+        let err = client(&[]).get(target).send().await.unwrap_err();
+        assert!(error_chain(&err).contains("not allowed"), "{err:?}");
+    }
+
+    #[test]
+    fn test_proxy_hosts_are_read_like_reqwest_reads_them() {
+        let env = |vars: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                vars.iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| v.to_string())
+            }
+        };
+        let hosts = proxy_hosts_from(env(&[
+            ("HTTPS_PROXY", "http://user:pass@Squid.Egress.svc:3128"),
+            ("https_proxy", "http://ignored.example:1"),
+            ("http_proxy", "squid-plain.svc:3128"),
+            ("ALL_PROXY", "socks5h://[fd00::5]:1080"),
+        ]));
+        assert_eq!(
+            hosts,
+            vec!["fd00::5", "squid-plain.svc", "squid.egress.svc"],
+            "{hosts:?}"
+        );
+        assert!(proxy_hosts_from(env(&[("HTTP_PROXY", "")])).is_empty());
+        let cgi = env(&[("REQUEST_METHOD", "GET"), ("HTTP_PROXY", "http://p.svc:1")]);
+        assert!(proxy_hosts_from(cgi).is_empty());
     }
 
     fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {
