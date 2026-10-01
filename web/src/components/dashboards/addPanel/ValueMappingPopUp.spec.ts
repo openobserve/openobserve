@@ -522,9 +522,9 @@ describe("ValueMappingPopUp", () => {
       expect(wrapper.emitted("save")![0]).toEqual([wrapper.vm.editedValueMapping]);
     });
 
-    it("rejects saving a regex with nested quantifiers and shows the reason", async () => {
+    it("rejects saving a lookaround regex and shows the reason", async () => {
       wrapper = createWrapper({
-        valueMapping: [{ type: "regex", pattern: "^(a+)+$", text: "bad", color: null }],
+        valueMapping: [{ type: "regex", pattern: "^(?=.*err).*$", text: "bad", color: null }],
       });
       await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
 
@@ -533,12 +533,26 @@ describe("ValueMappingPopUp", () => {
         '[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0-error"]',
       );
       expect(error.exists()).toBe(true);
-      expect(error.text()).toBe(i18n.global.t("dashboard.valueMappingUnsafeRegex"));
+      expect(error.text()).toBe(i18n.global.t("dashboard.valueMappingRegexUnsupported"));
     });
 
-    it("saves once an unsafe regex is fixed", async () => {
+    it("rejects saving a regex longer than 256 characters and shows the reason", async () => {
       wrapper = createWrapper({
-        valueMapping: [{ type: "regex", pattern: "^(a+)+$", text: "bad", color: null }],
+        valueMapping: [{ type: "regex", pattern: "a".repeat(257), text: "long", color: null }],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toBeFalsy();
+      expect(
+        wrapper
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0-error"]')
+          .text(),
+      ).toBe(i18n.global.t("dashboard.valueMappingRegexTooLong"));
+    });
+
+    it("saves once an unsupported regex is fixed", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "regex", pattern: "(a)\\1", text: "bad", color: null }],
       });
       const dialog = wrapper.findComponent(ODialogStub);
       await dialog.vm.$emit("click:primary");
@@ -553,9 +567,18 @@ describe("ValueMappingPopUp", () => {
       ).toBe(false);
     });
 
-    it("saves a regex whose group repeat is bounded", async () => {
+    it("saves common patterns that repeat a group", async () => {
       wrapper = createWrapper({
-        valueMapping: [{ type: "regex", pattern: "^(\\d+\\.){3}\\d+$", text: "ip", color: null }],
+        valueMapping: [
+          { type: "regex", pattern: "^(\\d+\\.){3}\\d+$", text: "ip", color: null },
+          {
+            type: "regex",
+            pattern: "^[\\w.+-]+@([\\w-]+\\.)+[a-z]{2,}$",
+            text: "mail",
+            color: null,
+          },
+          { type: "regex", pattern: "^(/[^/]+)+$", text: "path", color: null },
+        ],
       });
       await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
 

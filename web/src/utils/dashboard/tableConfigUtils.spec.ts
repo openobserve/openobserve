@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { RE2JS } from "re2js";
 import {
   OVERRIDE_CONFIG_TYPES,
   parseRegexPattern,
-  hasNestedQuantifier,
-  isSafeValueMappingPattern,
+  valueMappingPatternError,
   buildValueMappingCache,
   lookupValueMapping,
   lookupValueMappingFull,
@@ -184,114 +184,83 @@ describe("tableConfigUtils", () => {
   });
 
   describe("value-mapping regex safety", () => {
-    const NativeRegExp = RegExp;
-
     afterEach(() => {
-      globalThis.RegExp = NativeRegExp;
+      vi.restoreAllMocks();
     });
 
-    it("flags nested quantifiers", () => {
-      for (const pattern of ["(a+)+", "(.*)*", "^(a+)+$", "(\\d+\\.?)+", "((ab)*c)+", "(x{2,})*"]) {
-        expect(hasNestedQuantifier(pattern)).toBe(true);
-      }
+    it("matches a backtracking-prone pattern on a 1024-character value in linear time", () => {
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: "(a|aa)+$", text: "alt" },
+        { type: "regex", pattern: "(.*){12}!", text: "fixed" },
+        { type: "regex", pattern: "^(a+)+$", text: "nested" },
+      ]);
+      const start = performance.now();
+
+      expect(lookupValueMappingFull("a".repeat(1023) + "!", cache)?.text).toBe("fixed");
+      expect(lookupValueMappingFull("b".repeat(1024), cache)).toBeNull();
+      expect(performance.now() - start).toBeLessThan(500);
     });
 
-    it("does not flag quantifiers that are not nested", () => {
-      for (const pattern of [
-        "^err",
-        ".*error.*",
-        "(a|b)+",
-        "[(+*)]+",
-        "\\(a+\\)+",
-        "(?:ab)+c*",
-        "(a?)",
-      ]) {
-        expect(hasNestedQuantifier(pattern)).toBe(false);
-      }
-    });
-
-    it("flags an unbounded repeat of a group holding an unbounded quantifier", () => {
-      for (const pattern of ["(a+){2,}", "((a+){3})+", "(?:a*b)*"]) {
-        expect(hasNestedQuantifier(pattern)).toBe(true);
-      }
-    });
-
-    it("rejects a variable repeat count on a group holding a variable-width quantifier", () => {
-      const unsafe = [
-        "(a+){1,10}",
-        "(a+){1,5}",
-        "(a+){2,10}",
-        "(a+){0,3}b",
-        "(a{2,5})+",
-        "^(a+){2,1000}$",
-        "^(a{1,1000})+$",
-        "^(a+)+$",
-        "(.*)*",
+    it("accepts and matches common email, host, version, path and pod-name patterns", () => {
+      const cases: [string, string, string][] = [
+        ["^[\\w.+-]+@([\\w-]+\\.)+[a-z]{2,}$", "ops@mail.example.com", "ops@example"],
+        ["^[a-z0-9-]+(\\.[a-z0-9-]+)*$", "api.eu-1.example.com", "api..example"],
+        ["^v?\\d+(\\.\\d+)*$", "v1.20.3", "v1.x"],
+        ["^(/[^/]+)+$", "/api/v1/logs", "/api//logs"],
+        ["^([a-z0-9]+-)+[a-z0-9]{5}$", "ingester-7f9c4-abcde", "ingester"],
+        ["^(\\d{1,3}\\.){3}\\d{1,3}$", "10.0.12.7", "10.0.12"],
       ];
-      for (const pattern of unsafe) {
-        expect(hasNestedQuantifier(pattern)).toBe(true);
-        expect(isSafeValueMappingPattern(pattern)).toBe(false);
+      for (const [pattern, hit, miss] of cases) {
+        const cache = buildValueMappingCache([{ type: "regex", pattern, text: "hit" }]);
+        expect(lookupValueMapping(hit, cache)).toBe("hit");
+        expect(lookupValueMapping(miss, cache)).toBeNull();
+        expect(valueMappingPatternError(pattern)).toBeNull();
       }
     });
 
-    it("skips a variable-count brace group mapping and returns quickly on a catastrophic input", () => {
-      const cache = buildValueMappingCache([
-        { type: "regex", pattern: "^(a+){1,10}$", text: "bad" },
-        { type: "regex", pattern: "^(a{2,5})+$", text: "bad" },
-      ]);
-      const start = performance.now();
-
-      expect(lookupValueMappingFull("a".repeat(40) + "!", cache)).toBeNull();
-      expect(performance.now() - start).toBeLessThan(100);
-    });
-
-    it("accepts a fixed repeat count, or any repeat of a fixed-width group", () => {
-      for (const pattern of [
-        "^(\\d+\\.){3}\\d+$",
-        "^(\\d{1,3}\\.){3}\\d{1,3}$",
-        "(a+){3,3}",
-        "(a{2})+",
-        "(ab?)*",
-        "\\d{1,3}",
-      ]) {
-        expect(hasNestedQuantifier(pattern)).toBe(false);
-        expect(isSafeValueMappingPattern(pattern)).toBe(true);
+    it("refuses lookaround and backreferences, which the linear-time engine cannot run", () => {
+      for (const pattern of ["^(?=.*err).*$", "(?<!x)err", "err(?!or)", "(a)\\1", "/(?=a)a/i"]) {
+        expect(valueMappingPatternError(pattern)).toBe("unsupported");
       }
     });
 
-    it("keeps a bounded-repeat IPv4 mapping working at save and at render time", () => {
-      expect(isSafeValueMappingPattern("^(\\d+\\.){3}\\d+$")).toBe(true);
+    it("never matches an unsupported pattern at render and warns once per pattern", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const mappings = [{ type: "regex", pattern: "^(?=.*err).*$", text: "lookahead" }];
+
+      for (let i = 0; i < 3; i++) {
+        expect(lookupValueMapping("server error", buildValueMappingCache(mappings))).toBeNull();
+      }
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps legacy /pattern/flags mappings working", () => {
+      expect(valueMappingPatternError("/^err/i")).toBeNull();
       const cache = buildValueMappingCache([
-        { type: "regex", pattern: "^(\\d+\\.){3}\\d+$", text: "ipv4" },
+        { type: "regex", pattern: "/^ERR/i", text: "error" },
+        { type: "regex", pattern: "/^warn.end$/s", text: "warn" },
+        { type: "regex", pattern: "/^line2$/m", text: "multi" },
+        { type: "regex", pattern: "/\\/api\\/(?<ver>v\\d)/", text: "api" },
       ]);
 
-      expect(lookupValueMapping("1.2.3.4", cache)).toBe("ipv4");
-      expect(lookupValueMapping("1.2.3", cache)).toBeNull();
-      expect(isSafeValueMappingPattern("^(a+)+$")).toBe(false);
-      expect(isSafeValueMappingPattern("(.*)*")).toBe(false);
+      expect(lookupValueMapping("err_500", cache)).toBe("error");
+      expect(lookupValueMapping("warn\nend", cache)).toBe("warn");
+      expect(lookupValueMapping("line1\nline2", cache)).toBe("multi");
+      expect(lookupValueMapping("GET /api/v2/x", cache)).toBe("api");
     });
 
-    it("rejects unsafe or oversized patterns", () => {
-      expect(isSafeValueMappingPattern("^err")).toBe(true);
-      expect(isSafeValueMappingPattern("/^err/i")).toBe(true);
-      expect(isSafeValueMappingPattern("/^(a+)+$/")).toBe(false);
-      expect(isSafeValueMappingPattern("a".repeat(257))).toBe(false);
-    });
+    it("rejects a pattern longer than 256 characters at save and skips it at render", () => {
+      const long = `${"a".repeat(300)}|^err`;
 
-    it("skips a nested-quantifier mapping and returns quickly on a catastrophic input", () => {
-      const cache = buildValueMappingCache([{ type: "regex", pattern: "^(a+)+$", text: "bad" }]);
-      const start = performance.now();
-
-      expect(lookupValueMappingFull("a".repeat(27) + "!", cache)).toBeNull();
-      expect(performance.now() - start).toBeLessThan(100);
-    });
-
-    it("skips a pattern longer than 256 characters", () => {
-      const cache = buildValueMappingCache([
-        { type: "regex", pattern: `${"a".repeat(300)}|^err`, text: "long" },
-      ]);
-
-      expect(lookupValueMapping("err_500", cache)).toBeNull();
+      expect(valueMappingPatternError("a".repeat(256))).toBeNull();
+      expect(valueMappingPatternError(long)).toBe("tooLong");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(
+        lookupValueMapping(
+          "err_500",
+          buildValueMappingCache([{ type: "regex", pattern: long, text: "long" }]),
+        ),
+      ).toBeNull();
     });
 
     it("does not run a regex against a value longer than 1024 characters", () => {
@@ -302,19 +271,14 @@ describe("tableConfigUtils", () => {
     });
 
     it("compiles each pattern when the cache is built, not per lookup", () => {
-      let constructed = 0;
-      globalThis.RegExp = new Proxy(NativeRegExp, {
-        construct(target, args) {
-          constructed++;
-          return new target(...(args as [string, string]));
-        },
-      });
+      const compile = vi.spyOn(RE2JS, "compile");
       const cache = buildValueMappingCache([{ type: "regex", pattern: "^err", text: "error" }]);
-      const afterBuild = constructed;
+      const afterBuild = compile.mock.calls.length;
 
       for (let i = 0; i < 50; i++) lookupValueMapping(`err_${i}`, cache);
 
-      expect(constructed).toBe(afterBuild);
+      expect(afterBuild).toBe(1);
+      expect(compile.mock.calls.length).toBe(afterBuild);
     });
 
     it("gives the same answer on every lookup for a pattern with the g flag", () => {

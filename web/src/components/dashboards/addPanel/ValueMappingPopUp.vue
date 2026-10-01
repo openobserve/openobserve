@@ -179,7 +179,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";
 import { TEXT_SWATCHES, BG_SWATCHES } from "@/composables/dashboard/useColumnFormatting";
-import { isSafeValueMappingPattern } from "@/utils/dashboard/tableConfigUtils";
+import { valueMappingPatternError } from "@/utils/dashboard/tableConfigUtils";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
@@ -266,12 +266,10 @@ export default defineComponent({
     const applyValueMapping = () => {
       const errors: Record<number, I18nText> = {};
       editedValueMapping.value.forEach((mapping, index) => {
-        if (
-          mapping?.type === "regex" &&
-          !isSafeValueMappingPattern(String(mapping.pattern ?? ""))
-        ) {
-          errors[index] = t("dashboard.valueMappingUnsafeRegex");
-        }
+        if (mapping?.type !== "regex") return;
+        const error = valueMappingPatternError(String(mapping.pattern ?? ""));
+        if (error === "tooLong") errors[index] = t("dashboard.valueMappingRegexTooLong");
+        if (error === "unsupported") errors[index] = t("dashboard.valueMappingRegexUnsupported");
       });
       patternErrors.value = errors;
       if (Object.keys(errors).length > 0) return;
