@@ -89,6 +89,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-23": "#FFE6E6",
   "--color-chart-table-24": "#E8F4FD",
   "--color-chart-gridline": "rgba(0, 0, 0, 0.2)",
+  "--color-chart-band": "rgba(115, 115, 115, 0.22)",
   // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
   // string light returns is what makes ECharts use its own auto default (base.css:262).
   // Trace span palette (HEX/canvas variant), light values.

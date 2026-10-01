@@ -66,8 +66,10 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
 import {
   anomalyDetectionConfigDefaults,
+  anomalyNoticeBadgeKeys,
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
+import enLocale from "@/locales/languages/en-US.json";
 import { defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
@@ -1285,4 +1287,26 @@ describe("AnomalyDetectionConfig", () => {
       );
     });
   });
+});
+
+describe("anomalyNoticeBadgeKeys", () => {
+  const enText = (key: string) =>
+    key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
+
+  it.each(["window_floor", "window_skip", "hybrid_fallback", "retrain"])(
+    "maps %s to a label and tooltip that exist in en-US",
+    (noticeClass) => {
+      const keys = anomalyNoticeBadgeKeys(noticeClass);
+      expect(keys).not.toBeNull();
+      expect(typeof enText(keys!.labelKey)).toBe("string");
+      for (const key of keys!.tooltipKeys) expect(typeof enText(key)).toBe("string");
+    },
+  );
+
+  it.each([null, undefined, "", "some_future_class", 42])(
+    "shows no badge for an unknown class (%s)",
+    (noticeClass) => {
+      expect(anomalyNoticeBadgeKeys(noticeClass)).toBeNull();
+    },
+  );
 });

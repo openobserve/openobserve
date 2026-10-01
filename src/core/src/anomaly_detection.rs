@@ -1493,7 +1493,14 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
 
         // Run detection with fetched data
         let start_time = std::time::Instant::now();
-        let result = detector.detect_with_data(&data_points, start_time).await?;
+        // The window lets the detector skip the partial first bucket this unaligned start yields.
+        let result = detector
+            .detect_with_data_in_window(
+                &data_points,
+                start_time,
+                Some((start_time_us, end_time_us)),
+            )
+            .await?;
 
         log::info!(
             "[anomaly_detection {}] detection complete: points_scored={}, anomalies_found={}",
