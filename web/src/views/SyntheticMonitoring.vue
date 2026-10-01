@@ -125,7 +125,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :forbidden="forbidden"
           :timezone="store.state.timezone"
-          :footer-title="footerTitle"
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
@@ -1278,12 +1277,6 @@ const clearFilters = () => {
   statusFilter.value = "all";
   locationFilter.value = "all";
 };
-
-const footerTitle = computed(() =>
-  activeTab.value === "browser"
-    ? t("synthetics.footer.browserTests")
-    : t("synthetics.footer.checks"),
-);
 
 const emptyMessage = computed(() =>
   activeTab.value === "browser" ? t("synthetics.empty.browserTests") : t("synthetics.empty.checks"),

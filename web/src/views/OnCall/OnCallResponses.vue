@@ -221,71 +221,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template v-if="selectedIds.length || truncated || escalationCapped" #bottom>
-        <div v-if="selectedIds.length" class="flex w-full flex-wrap items-center gap-2">
-          <OText variant="body" as="span" data-test="oncall-bulk-count">
-            {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
-          </OText>
-          <OButton
-            variant="primary"
-            size="sm-toolbar"
-            :loading="bulkBusy"
-            data-test="oncall-bulk-ack"
-            @click="bulkAcknowledge"
-          >
-            {{ t("oncall.acknowledge") }}
-          </OButton>
-          <ODropdown>
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm-toolbar"
-                icon-right="expand-more"
-                :loading="bulkBusy"
-                data-test="oncall-bulk-snooze"
-              >
-                {{ t("oncall.snooze") }}
-              </OButton>
-            </template>
-            <ODropdownItem
-              v-for="option in snoozeOptions"
-              :key="option.minutes"
-              :data-test="`oncall-bulk-snooze-${option.minutes}`"
-              @select="bulkSnooze(option.minutes)"
-            >
-              {{ option.label }}
-            </ODropdownItem>
-          </ODropdown>
-          <OButton
-            variant="outline"
-            size="sm-toolbar"
-            :loading="bulkBusy"
-            data-test="oncall-bulk-resolve"
-            @click="confirmBulkResolve = true"
-          >
-            {{ t("oncall.resolve") }}
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm-toolbar"
-            data-test="oncall-bulk-cancel"
-            @click="selectedIds = []"
-          >
-            {{ t("oncall.cancel") }}
-          </OButton>
-        </div>
-
-        <!-- The server caps a page at 200 and the facets have to be honest about
-             what they counted, so say so rather than quietly under-reporting.
-             The escalation cap is stated for the same reason: a blank ladder cell
-             would otherwise read as "nothing has fired". -->
-        <span
-          v-if="!selectedIds.length && (truncated || escalationCapped)"
-          class="text-text-secondary flex flex-wrap gap-x-3 text-xs"
+      <template #selection-actions>
+        <OButton
+          variant="primary"
+          size="sm"
+          :loading="bulkBusy"
+          data-test="oncall-bulk-ack"
+          @click="bulkAcknowledge"
         >
-          <!-- The loaded length is never presented as the total: §G.5 is
-               explicit that the list endpoint has no count, and "the first
-               2000 of 2000" is a lie exactly when the number matters. -->
+          {{ t("oncall.acknowledge") }}
+        </OButton>
+        <ODropdown>
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-right="expand-more"
+              :loading="bulkBusy"
+              data-test="oncall-bulk-snooze"
+            >
+              {{ t("oncall.snooze") }}
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="option in snoozeOptions"
+            :key="option.minutes"
+            :data-test="`oncall-bulk-snooze-${option.minutes}`"
+            @select="bulkSnooze(option.minutes)"
+          >
+            {{ option.label }}
+          </ODropdownItem>
+        </ODropdown>
+        <OButton
+          variant="outline"
+          size="sm"
+          :loading="bulkBusy"
+          data-test="oncall-bulk-resolve"
+          @click="confirmBulkResolve = true"
+        >
+          {{ t("oncall.resolve") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          data-test="oncall-bulk-cancel"
+          @click="selectedIds = []"
+        >
+          {{ t("oncall.cancel") }}
+        </OButton>
+      </template>
+
+      <!-- Both caps are stated: a capped list under-reports, and a blank ladder cell would read as "nothing has fired". -->
+      <template v-if="truncated || escalationCapped" #footer-note>
+        <span class="flex flex-wrap gap-x-3">
+          <!-- The list endpoint has no count, so the loaded length is never presented as the total. -->
           <span v-if="truncated" data-test="oncall-responses-truncated">
             {{ t("oncall.listTruncatedNoTotal", { count: responses.length }) }}
           </span>

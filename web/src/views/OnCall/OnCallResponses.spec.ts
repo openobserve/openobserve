@@ -130,7 +130,8 @@ const stubs = {
         <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
       </div>
       <slot name='empty' />
-      <slot name='bottom' />
+      <slot v-if="selectedIds && selectedIds.length" name='selection-actions' />
+      <slot v-else name='footer-note' />
       <slot v-if="error" name='error' />
     </div>`,
   },
