@@ -338,6 +338,10 @@ pub async fn ingest(
     for ret in data.iter() {
         let mut item = match ret {
             Ok(item) => item,
+            Err(IngestionError::PayloadTooLarge(e)) => {
+                log::error!("IngestionError: {e}");
+                return Err(Error::PayloadTooLarge(e));
+            }
             Err(e) => {
                 log::error!("[LOGS:JSON] IngestionError: org_id: {org_id}, error: {e:?}");
                 return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
@@ -1068,13 +1072,24 @@ impl Iterator for IngestionDataIterator {
                 Some(e) => Some(Err(IngestionError::GCPError(e.clone()))),
                 None => iter.next().map(Ok),
             },
-            IngestionDataIter::KinesisFH(iter, err) => match err {
-                Some(e) => Some(Err(IngestionError::AWSError(e.clone()))),
+            IngestionDataIter::KinesisFH(iter, err) => match err.take() {
+                Some(e) => Some(Err(e)),
                 None => iter.next().map(Ok),
             },
         }
     }
 }
+
+#[derive(Debug)]
+struct DecompressedTooLarge;
+
+impl std::fmt::Display for DecompressedTooLarge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("decompressed record exceeds the size limit")
+    }
+}
+
+impl std::error::Error for DecompressedTooLarge {}
 
 trait IngestionDataExt {
     fn iter(self) -> IngestionDataIterator;
@@ -1110,9 +1125,10 @@ impl IngestionDataExt for IngestionData {
                     ),
                 }
             }
-            IngestionData::KinesisFH(request) => {
-                kinesis_fh_iter(&request, config::get_config().limit.req_payload_limit)
-            }
+            IngestionData::KinesisFH(request) => kinesis_fh_iter(
+                &request,
+                config::get_config().limit.firehose_decompressed_limit,
+            ),
         };
         IngestionDataIterator(iter)
     }
@@ -1127,7 +1143,7 @@ pub fn decode_and_decompress_to_vec(
     let mut gz = GzDecoder::new(decoded_data.as_slice());
     let mut vec = Vec::new();
     match gz.by_ref().take(limit as u64 + 1).read_to_end(&mut vec) {
-        Ok(_) if vec.len() > limit => Err("decompressed record exceeds the size limit".into()),
+        Ok(_) if vec.len() > limit => Err(Box::new(DecompressedTooLarge)),
         Ok(_) => Ok(vec),
         Err(_) => Ok(decoded_data),
     }
@@ -1142,7 +1158,7 @@ pub fn decode_and_decompress_to_string(
     let mut gz = GzDecoder::new(decoded_data.as_slice());
     let mut buf = Vec::new();
     match gz.by_ref().take(limit as u64 + 1).read_to_end(&mut buf) {
-        Ok(_) if buf.len() > limit => Err("decompressed record exceeds the size limit".into()),
+        Ok(_) if buf.len() > limit => Err(Box::new(DecompressedTooLarge)),
         Ok(_) => Ok(String::from_utf8(buf)?),
         Err(_) => Ok(String::from_utf8(decoded_data)?),
     }
@@ -1170,25 +1186,32 @@ fn kinesis_fh_iter(request: &KinesisFHRequest, limit: usize) -> IngestionDataIte
     // one budget for the whole request, or N records could each expand to `limit`
     let mut remaining = limit;
     for record in &request.records {
-        let parsed = decode_and_decompress_to_vec(&record.data, remaining)
-            .map_err(|e| e.to_string())
-            .and_then(|data| {
-                remaining = remaining
-                    .checked_sub(data.len())
-                    .ok_or_else(|| "decompressed records exceed the size limit".to_string())?;
-                deserialize_aws_record_from_vec(data, request_id).map_err(|e| e.to_string())
-            });
+        let parsed = match decode_and_decompress_to_vec(&record.data, remaining) {
+            Err(e) if e.is::<DecompressedTooLarge>() => Err(None),
+            Err(e) => Err(Some(e.to_string())),
+            Ok(data) => match remaining.checked_sub(data.len()) {
+                None => Err(None),
+                Some(left) => {
+                    remaining = left;
+                    deserialize_aws_record_from_vec(data, request_id)
+                        .map_err(|e| Some(e.to_string()))
+                }
+            },
+        };
         match parsed {
             Ok(parsed_events) => events.extend(parsed_events),
             Err(err) => {
-                return IngestionDataIter::KinesisFH(
-                    events.into_iter(),
-                    Some(KinesisFHIngestionResponse {
+                let err = match err {
+                    None => IngestionError::PayloadTooLarge(format!(
+                        "decompressed records of request {request_id} exceed the {limit} byte limit (ZO_FIREHOSE_DECOMPRESSED_LIMIT)"
+                    )),
+                    Some(err) => IngestionError::AWSError(KinesisFHIngestionResponse {
                         request_id: request_id.to_string(),
                         error_message: Some(err),
                         timestamp: req_timestamp,
                     }),
-                );
+                };
+                return IngestionDataIter::KinesisFH(events.into_iter(), Some(err));
             }
         }
     }
@@ -1946,9 +1969,18 @@ mod tests {
             unreachable!()
         };
         assert!(
-            err.is_some(),
-            "1800 decompressed bytes accepted under a 1000-byte budget"
+            matches!(err, Some(IngestionError::PayloadTooLarge(_))),
+            "1800 decompressed bytes under a 1000-byte budget gave {err:?}"
         );
+    }
+
+    #[test]
+    fn kinesis_record_that_is_not_json_is_not_reported_as_too_large() {
+        let request = kinesis_request(&[b"not json"]);
+        let IngestionDataIter::KinesisFH(_, err) = kinesis_fh_iter(&request, 1000) else {
+            unreachable!()
+        };
+        assert!(matches!(err, Some(IngestionError::AWSError(_))), "{err:?}");
     }
 
     #[test]
@@ -1960,5 +1992,30 @@ mod tests {
         };
         assert!(err.is_none(), "{err:?}");
         assert_eq!(events.count(), 3);
+    }
+
+    #[test]
+    fn kinesis_batch_inflating_past_the_body_cap_still_decodes() {
+        let body_cap = config::get_config().limit.req_payload_limit;
+        // 'w' is protobuf wire type 7, so the record cannot also decode as a metrics protobuf
+        let mut record = json_record(1024 * 1024);
+        record[6..1024 * 1024 - 2].fill(b'w');
+        let encoded = gzip_base64(&record);
+        let records = (0..body_cap / (1024 * 1024) + 2)
+            .map(|_| ingestion_common::KFHRecordRequest {
+                data: encoded.clone(),
+            })
+            .collect();
+        let request = KinesisFHRequest {
+            records,
+            request_id: "req1".to_string(),
+            timestamp: Some(0),
+        };
+        let mut decoded = 0;
+        for item in IngestionData::KinesisFH(request).iter() {
+            assert!(item.is_ok(), "refused after {decoded} records: {item:?}");
+            decoded += 1;
+        }
+        assert_eq!(decoded, body_cap / (1024 * 1024) + 2);
     }
 }
