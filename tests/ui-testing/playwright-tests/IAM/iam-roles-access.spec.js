@@ -47,7 +47,7 @@ const gotoIam = async (page) => {
     await page.waitForTimeout(2500);
 };
 
-test.describe('IAM · access control', () => {
+test.describe('IAM · access control', { tag: '@enterprise' }, () => {
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
@@ -123,13 +123,17 @@ test.describe('IAM · access control', () => {
         }
     });
 
-    test('A-01 · a read-only IAM user sees the Roles tab', async ({ browser }) => {
+    test('A-01 · a read-only IAM user sees the Roles tab', {
+        tag: ['@iam', '@iamRolesAccess', '@P1', '@all']
+    }, async ({ browser }) => {
         const page = await signIn(browser, U_READER);
         await gotoIam(page);
         await expect(page.locator('[data-test="iam-roles-tab"]')).toBeVisible({ timeout: 20000 });
     });
 
-    test('A-02 · a read-only IAM user cannot create a role', async ({ browser }) => {
+    test('A-02 · a read-only IAM user cannot create a role', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const page = await signIn(browser, U_READER);
         await gotoIam(page);
 
@@ -142,7 +146,9 @@ test.describe('IAM · access control', () => {
         }
     });
 
-    test('A-03 · an IAM admin can create and delete a role', async ({ browser }) => {
+    test('A-03 · an IAM admin can create and delete a role', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const page = await signIn(browser, U_ADMIN);
         await gotoIam(page);
         const name = `${PREFIX}_a_made_${uniq()}`;
@@ -166,14 +172,18 @@ test.describe('IAM · access control', () => {
     // offered that the backend then denies. Worth raising separately if we want the
     // tabs permission-gated; until that is decided this test asserts a behaviour the
     // product does not have.
-    test.fixme('A-04 · a user with no IAM grants gets no Roles tab', async ({ browser }) => {
+    test.fixme('A-04 · a user with no IAM grants gets no Roles tab', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const page = await signIn(browser, U_NONE);
         await gotoIam(page);
         // Nothing granted means nothing offered — the tab must not merely error on click.
         await expect(page.locator('[data-test="iam-roles-tab"]')).toHaveCount(0);
     });
 
-    test('A-05 · a user with no IAM grants cannot read roles through the API either', async ({ browser }) => {
+    test('A-05 · a user with no IAM grants cannot read roles through the API either', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const page = await signIn(browser, U_NONE);
         await gotoIam(page);
         const res = await req(page, 'GET', '/roles');
@@ -181,7 +191,9 @@ test.describe('IAM · access control', () => {
         expect(res.status, 'an ungranted user could list roles').toBeGreaterThanOrEqual(400);
     });
 
-    test('A-06 · group permissions do not leak into role permissions', async ({ browser }) => {
+    test('A-06 · group permissions do not leak into role permissions', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const page = await signIn(browser, U_GROUPS);
         await gotoIam(page);
 
@@ -192,7 +204,9 @@ test.describe('IAM · access control', () => {
         expect(roles.status, 'group:AllowAll leaked into role creation').toBeGreaterThanOrEqual(400);
     });
 
-    test('A-07 · a permission reaching a user through a group is honoured', async ({ browser }) => {
+    test('A-07 · a permission reaching a user through a group is honoured', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const page = await signIn(browser, U_VIAGRP);
         await gotoIam(page);
 
@@ -203,7 +217,9 @@ test.describe('IAM · access control', () => {
         await expect(page.locator('[data-test="iam-roles-tab"]')).toBeVisible({ timeout: 20000 });
     });
 
-    test('A-08 · removing the user from the group revokes that access', async ({ browser }) => {
+    test('A-08 · removing the user from the group revokes that access', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const root = await browser.newPage();
         try {
             await setGroup(root, G_CARRIER, { remove_users: [U_VIAGRP] });
@@ -219,7 +235,9 @@ test.describe('IAM · access control', () => {
         }
     });
 
-    test('A-09 · removing the role from the group revokes that access', async ({ browser }) => {
+    test('A-09 · removing the role from the group revokes that access', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const root = await browser.newPage();
         try {
             await setGroup(root, G_CARRIER, { remove_roles: [R_VIAGRP] });
@@ -234,7 +252,9 @@ test.describe('IAM · access control', () => {
         }
     });
 
-    test('A-10 · deleting a role revokes the access it carried', async ({ browser }) => {
+    test('A-10 · deleting a role revokes the access it carried', {
+        tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
+    }, async ({ browser }) => {
         const root = await browser.newPage();
         const doomed = `${PREFIX}_a_role_doomed`;
         const victim = `${PREFIX}_a_victim@example.com`;
