@@ -299,7 +299,7 @@ mod tests {
 
                     let actual = run_streaming(&ctx, modifier, func_name, op.clone(), range)
                         .await
-                        .expect("streaming path must not fall back on the sorted table");
+                        .expect("the sorted table streams");
 
                     assert_matrix_close(
                         canonical_matrix(expected),

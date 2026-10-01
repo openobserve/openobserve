@@ -154,6 +154,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         await page.waitForLoadState('domcontentloaded');
         const testQuery = 'SELECT count(*) as total FROM "e2e_automate"';
         await pm.logsPage.setQueryEditorContent(testQuery);
+        await pm.logsPage.waitForSearchQueryCommitted(testQuery);
 
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();

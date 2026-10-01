@@ -3551,6 +3551,21 @@ export class TracesPage {
     }).toPass({ timeout, intervals: [2000, 3000, 5000] });
   }
 
+  // A stream seconds old can answer the UI search with a transient error even after the API poll sees the span.
+  async searchUntilTraceResultVisible(timeout = 60000) {
+    const firstRow = this.page.locator(this.searchResultItem).first();
+    await expect(async () => {
+      await this.runTraceSearch();
+      if (await this.page.locator(this.errorMessage).isVisible()) {
+        const detailsBtn = this.page.locator('[data-test="traces-search-error-details-btn"]');
+        await detailsBtn.click({ timeout: 2000 }).catch(() => {});
+        const detail = await this.page.locator('[data-test="traces-search-detail-error-message"]').textContent({ timeout: 2000 }).catch(() => '');
+        testLogger.warn('Trace search returned an error; re-running', { detail: (detail || '').trim() });
+      }
+      await expect(firstRow).toBeVisible({ timeout: 5000 });
+    }).toPass({ timeout, intervals: [2000, 3000, 5000] });
+  }
+
   async getResultOperationNames() {
     return await this.page.locator(`${this.searchResultList} [data-test="trace-row-operation-name"]`).allInnerTexts();
   }

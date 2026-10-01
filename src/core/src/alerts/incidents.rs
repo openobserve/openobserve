@@ -2133,7 +2133,7 @@ pub async fn enrich_with_topology(
 
 /// Whether the service graph knows the `from -> to` dependency around `at`.
 async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
-    if crate::traces::service_graph::use_v4_source(org_id).await {
+    if crate::traces::service_graph::use_v4_source(org_id, None).await {
         dependency_edge_type_v4(org_id, from, to, at).await
     } else {
         dependency_edge_type_v1(org_id, from, to).await

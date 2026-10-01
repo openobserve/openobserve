@@ -82,8 +82,8 @@ impl TableProvider for StorageProvider {
             time_range,
             matchers.clone(),
             filters,
-            storage::BlockPreference {
-                enabled: streaming,
+            storage::SourcePreference {
+                streaming,
                 output_labels: &label_selector,
             },
         )

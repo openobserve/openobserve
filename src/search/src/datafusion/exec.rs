@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX},
+        promql::{EXEMPLARS_LABEL, HASH_LABEL},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -519,47 +519,37 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
     by_name.into_values().collect()
 }
 
-/// Registers the metrics files; an all-hash-sorted set also registers the
-/// `HASH_SORTED_TABLE_SUFFIX` table with its order declared.
-pub async fn register_metrics_table(
+/// Builds the session for a metrics scan whose files carry `sort_order`.
+pub async fn metrics_session_context(
     session: &SearchSession,
-    schema: Arc<Schema>,
-    table_name: &str,
-    files: Vec<FileKey>,
     sort_order: FileSortOrder,
 ) -> Result<SessionContext> {
-    let schema = metrics_query_schema(schema);
-    let ctx = DataFusionContextBuilder::new()
+    DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
         .stream_type(StreamType::Metrics)
         .sort_order(sort_order)
         .build(session.target_partitions)
-        .await?;
+        .await
+}
 
-    let file_stat_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
-    // a separate table: declaring the order on the main table would change its file grouping
-    if sort_order.is_sorted() {
-        let tables = TableBuilder::new()
-            .sort_order(sort_order)
-            .file_stat_cache(file_stat_cache.clone())
-            .build(session.clone(), files.clone(), schema.clone())
-            .await?;
-        let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
-        ctx.register_table(
-            format!("{table_name}{HASH_SORTED_TABLE_SUFFIX}"),
-            union_table,
-        )?;
-    }
-
+/// Registers the metrics files as `table_name`, declaring `sort_order` on the table.
+pub async fn register_metrics_table(
+    ctx: &SessionContext,
+    session: &SearchSession,
+    schema: Arc<Schema>,
+    table_name: &str,
+    files: Vec<FileKey>,
+    sort_order: FileSortOrder,
+) -> Result<()> {
+    let schema = metrics_query_schema(schema);
     let tables = TableBuilder::new()
-        .file_stat_cache(file_stat_cache)
+        .sort_order(sort_order)
+        .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
         .build(session.clone(), files, schema.clone())
         .await?;
-    let union_table = Arc::new(NewUnionTable::new(schema, tables));
-    ctx.register_table(table_name, union_table)?;
-
-    Ok(ctx)
+    ctx.register_table(table_name, Arc::new(NewUnionTable::new(schema, tables)))?;
+    Ok(())
 }
 
 fn metrics_query_schema(schema: Arc<Schema>) -> Arc<Schema> {
@@ -1517,24 +1507,27 @@ mod tests {
                 row_group_size: None,
             }];
 
-            let result =
-                register_metrics_table(&session, schema, "test_table", files, FileSortOrder::None)
-                    .await;
+            let ctx = metrics_session_context(&session, FileSortOrder::None).await?;
+            register_metrics_table(
+                &ctx,
+                &session,
+                schema,
+                "test_table",
+                files,
+                FileSortOrder::None,
+            )
+            .await?;
 
-            // Should create context successfully
-            assert!(result.is_ok());
-            if let Ok(ctx) = result {
-                // Verify table is registered
-                assert!(
-                    ctx.catalog("datafusion")
-                        .unwrap()
-                        .schema("public")
-                        .unwrap()
-                        .table("test_table")
-                        .await
-                        .is_ok()
-                );
-            }
+            // Verify table is registered
+            assert!(
+                ctx.catalog("datafusion")
+                    .unwrap()
+                    .schema("public")
+                    .unwrap()
+                    .table("test_table")
+                    .await
+                    .is_ok()
+            );
 
             Ok(())
         }
