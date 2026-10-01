@@ -1901,10 +1901,10 @@ pub struct Common {
     // This will completely skip ssrf checks, not just localhost
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
-    /// Comma-separated IPv4/IPv6 CIDRs that bypass the SSRF checks; changes need a restart.
+    /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
     #[env_config(name = "ZO_SSRF_ALLOWED_CIDRS", default = "")]
     pub ssrf_allowed_cidrs: String,
-    /// Comma-separated exact hostnames allowed to resolve to private IPs; changes need a restart.
+    /// Comma-separated hostnames only send-only destinations may resolve privately; needs restart.
     #[env_config(name = "ZO_SSRF_ALLOWED_HOSTS", default = "")]
     pub ssrf_allowed_hosts: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc

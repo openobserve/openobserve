@@ -192,7 +192,7 @@ async fn request(
     url: &str,
     body: Option<String>,
 ) -> Result<String> {
-    SsrfGuard::validate_url_with_config_async(url)
+    SsrfGuard::validate_destination_url_with_config_async(url)
         .await
         .map_err(|e| anyhow::anyhow!("URL blocked by SSRF guard: {e}"))?;
 
@@ -201,7 +201,7 @@ async fn request(
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let mut req = client.request(method, url::Url::parse(url)?);
 
     let mut has_content_type = false;

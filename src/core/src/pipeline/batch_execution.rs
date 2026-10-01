@@ -3001,9 +3001,9 @@ fn destination_http_client(
     endpoint: &config::meta::destinations::Endpoint,
     timeout: std::time::Duration,
 ) -> Result<reqwest::Client, String> {
-    // The DNS guard in build_safe_client never sees a literal IP, so the URL is checked here.
-    config::utils::ssrf_guard::SsrfGuard::validate_url_with_config(&endpoint.url)?;
-    config::utils::ssrf_guard::build_safe_client(
+    // The client's DNS guard never sees a literal IP, so the URL is checked here.
+    config::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config(&endpoint.url)?;
+    config::utils::ssrf_guard::build_safe_destination_client(
         reqwest::Client::builder()
             .timeout(timeout)
             .danger_accept_invalid_certs(endpoint.skip_tls_verify),

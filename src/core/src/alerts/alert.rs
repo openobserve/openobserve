@@ -3237,9 +3237,9 @@ pub(crate) async fn dispatch_test_message(
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
     // Block SSRF: validate the destination URL (including DNS resolution) before
-    // making any outbound request. The client is built through `build_safe_client`
+    // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
-    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
+    if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
         return Err(anyhow::anyhow!(
             "Destination URL blocked by SSRF guard: {e}"
         ));
@@ -3250,7 +3250,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let build_req = |body: String| {
         let mut req = match endpoint.method {
@@ -3458,7 +3458,7 @@ async fn send_discord_with_attachment(
     msg: String,
     png: std::sync::Arc<Vec<u8>>,
 ) -> Result<String, anyhow::Error> {
-    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
+    if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
         return Err(anyhow::anyhow!(
             "Destination URL blocked by SSRF guard: {e}"
         ));
@@ -3468,7 +3468,7 @@ async fn send_discord_with_attachment(
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
 
     let form = reqwest::multipart::Form::new()
