@@ -8,14 +8,13 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, put},
 };
+use config::{meta::dashboards::reports::REPORT_SECRET_HEADER, utils::str::constant_time_eq};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     models::{self, ReportType},
     report::{SMTP_CLIENT, generate_report, send_email},
 };
-
-const REPORT_SECRET_HEADER: &str = "x-o2-report-secret";
 
 /// HTTP response
 /// code 200 is success
@@ -148,16 +147,15 @@ pub fn create_router() -> Router {
 
 fn router_with_secret(secret: String) -> Router {
     Router::new()
-        .route("/api/healthz", get(healthz))
         .route("/api/{org_id}/reports/{name}/send", put(send_report))
-        .layer(middleware::from_fn(move |request, next| {
+        .route_layer(middleware::from_fn(move |request, next| {
             let secret = secret.clone();
             async move { require_shared_secret(&secret, request, next).await }
         }))
+        .route("/api/healthz", get(healthz))
 }
 
-/// A blank secret skips the check, since standalone `o2_report_server` doesn't send this header
-/// yet.
+/// A blank secret skips the check, since standalone `o2_report_server` doesn't send it yet.
 async fn require_shared_secret(secret: &str, request: Request, next: Next) -> Response {
     if secret.is_empty() {
         return next.run(request).await;
@@ -171,10 +169,6 @@ async fn require_shared_secret(secret: &str, request: Request, next: Next) -> Re
     } else {
         StatusCode::UNAUTHORIZED.into_response()
     }
-}
-
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
 }
 
 #[cfg(test)]
@@ -191,42 +185,51 @@ mod tests {
             .unwrap()
     }
 
-    #[tokio::test]
-    async fn test_request_without_secret_header_is_rejected_when_secret_set() {
-        let app = router_with_secret("topsecret".to_string());
-        let resp = app.oneshot(healthz_request()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    fn send_request(secret: Option<&str>) -> axum::http::Request<Body> {
+        let mut builder = axum::http::Request::builder()
+            .method("PUT")
+            .uri("/api/org_a/reports/r1/send");
+        if let Some(secret) = secret {
+            builder = builder.header(REPORT_SECRET_HEADER, secret);
+        }
+        builder.body(Body::empty()).unwrap()
     }
 
     #[tokio::test]
-    async fn test_request_with_matching_secret_header_passes() {
+    async fn test_healthz_needs_no_secret_when_secret_set() {
         let app = router_with_secret("topsecret".to_string());
-        let req = axum::http::Request::builder()
-            .uri("/api/healthz")
-            .header(REPORT_SECRET_HEADER, "topsecret")
-            .body(Body::empty())
-            .unwrap();
-        let resp = app.oneshot(req).await.unwrap();
+        let resp = app.oneshot(healthz_request()).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]
-    async fn test_request_with_wrong_secret_header_is_rejected() {
+    async fn test_send_without_secret_header_is_rejected_when_secret_set() {
         let app = router_with_secret("topsecret".to_string());
-        let req = axum::http::Request::builder()
-            .uri("/api/healthz")
-            .header(REPORT_SECRET_HEADER, "wrong")
-            .body(Body::empty())
-            .unwrap();
-        let resp = app.oneshot(req).await.unwrap();
+        let resp = app.oneshot(send_request(None)).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_send_with_matching_secret_header_passes_the_check() {
+        let app = router_with_secret("topsecret".to_string());
+        let resp = app.oneshot(send_request(Some("topsecret"))).await.unwrap();
+        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_send_with_wrong_secret_header_is_rejected() {
+        let app = router_with_secret("topsecret".to_string());
+        let resp = app.oneshot(send_request(Some("wrong"))).await.unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]
     async fn test_no_configured_secret_skips_check() {
         let app = router_with_secret(String::new());
-        let resp = app.oneshot(healthz_request()).await.unwrap();
+        let resp = app.clone().oneshot(healthz_request()).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
+        let resp = app.oneshot(send_request(None)).await.unwrap();
+        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[test]
