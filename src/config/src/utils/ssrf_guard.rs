@@ -30,6 +30,7 @@ const METADATA_IPS: [IpAddr; 2] = [
     IpAddr::V4(Ipv4Addr::new(169, 254, 169, 254)),
     IpAddr::V6(Ipv6Addr::new(0xfd00, 0xec2, 0, 0, 0, 0, 0, 0x254)),
 ];
+const CGNAT_METADATA_IP: Ipv4Addr = Ipv4Addr::new(100, 100, 100, 200);
 
 static ALLOWLIST: LazyLock<SsrfAllowlist> = LazyLock::new(|| {
     let cfg = crate::get_config();
@@ -144,7 +145,7 @@ impl SsrfGuard {
         Self::check_ip_inner(ip, allow_loopback, false, &ALLOWLIST)
     }
 
-    /// `host_allowed` lifts the private-address check but never the metadata block.
+    /// `host_allowed` lifts the private-address check except for link-local and metadata IPs.
     fn check_ip_inner(
         ip: &IpAddr,
         allow_loopback: bool,
@@ -155,7 +156,7 @@ impl SsrfGuard {
             return Ok(());
         }
         let blocked = if host_allowed {
-            is_metadata_ip(ip)
+            needs_explicit_cidr(ip)
         } else {
             Self::is_private_ip_inner(ip, allow_loopback)
         };
@@ -300,6 +301,12 @@ impl SsrfAllowlist {
             .collect();
         let hosts = split_list(hosts)
             .filter_map(|entry| {
+                if entry.parse::<IpAddr>().is_ok() {
+                    log::warn!(
+                        "ZO_SSRF_ALLOWED_HOSTS: ignoring IP '{entry}'; use ZO_SSRF_ALLOWED_CIDRS"
+                    );
+                    return None;
+                }
                 if entry.contains(['*', '/', ':']) || entry.contains(char::is_whitespace) {
                     log::warn!("ZO_SSRF_ALLOWED_HOSTS: ignoring invalid hostname '{entry}'");
                     return None;
@@ -441,14 +448,25 @@ fn canonical_ip(ip: &IpAddr) -> IpAddr {
 }
 
 fn is_metadata_ip(ip: &IpAddr) -> bool {
-    let ip = match ip {
+    METADATA_IPS.contains(&unwrap_embedded_ipv4(ip))
+}
+
+/// Cloud credential endpoints sit in these ranges, so only `ZO_SSRF_ALLOWED_CIDRS` can admit them.
+fn needs_explicit_cidr(ip: &IpAddr) -> bool {
+    match unwrap_embedded_ipv4(ip) {
+        IpAddr::V4(v4) => v4.is_link_local() || v4 == CGNAT_METADATA_IP,
+        IpAddr::V6(v6) => (v6.segments()[0] & 0xffc0) == 0xfe80 || is_metadata_ip(ip),
+    }
+}
+
+fn unwrap_embedded_ipv4(ip: &IpAddr) -> IpAddr {
+    match ip {
         IpAddr::V6(v6) => v6
             .to_ipv4_mapped()
             .or_else(|| SsrfGuard::embedded_ipv4(v6))
             .map_or(*ip, IpAddr::V4),
         IpAddr::V4(_) => *ip,
-    };
-    METADATA_IPS.contains(&ip)
+    }
 }
 
 fn prefix_eq(a: u128, b: u128, prefix: u8, bits: u32) -> bool {
@@ -557,6 +575,37 @@ mod tests {
             SsrfGuard::check_ip_inner(&"169.254.169.254".parse().unwrap(), false, false, &exact)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn test_allowed_host_does_not_lift_link_local() {
+        let host_only = SsrfAllowlist::parse("", "hooks.svc.example");
+        for ip in [
+            "169.254.170.2",
+            "169.254.169.253",
+            "::ffff:169.254.170.2",
+            "fe80::1",
+            "100.100.100.200",
+        ] {
+            let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, true, &host_only);
+            assert!(res.is_err(), "{ip}");
+        }
+        assert!(
+            SsrfGuard::check_ip_inner(&"100.64.0.1".parse().unwrap(), false, true, &host_only)
+                .is_ok()
+        );
+        let cidr = SsrfAllowlist::parse("169.254.170.0/24,fe80::/10,100.100.100.0/24", "");
+        for ip in ["169.254.170.2", "fe80::1", "100.100.100.200"] {
+            let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, true, &cidr);
+            assert!(res.is_ok(), "{ip}: {res:?}");
+        }
+    }
+
+    #[test]
+    fn test_allowed_hosts_skips_ip_literals() {
+        let allow = SsrfAllowlist::parse("", "10.0.0.5, fd00::5 ,ok.example.com");
+        assert_eq!(allow.hosts, vec!["ok.example.com".to_string()]);
+        assert!(!allow.allows_host("10.0.0.5"));
     }
 
     #[test]
