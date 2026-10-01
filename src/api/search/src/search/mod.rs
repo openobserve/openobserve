@@ -2021,4 +2021,72 @@ mod tests {
             "WHERE a = 1 AND str_match_ignore_case(\"level\", 'err')"
         );
     }
+
+    #[cfg(feature = "enterprise")]
+    fn non_member() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: "outsider@example.com".to_string(),
+        })
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn assert_unauthorized(resp: Response) {
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("Unauthorized Access"), "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_around_refuses_a_caller_outside_the_org() {
+        let query = || {
+            Query(HashMap::from([
+                (
+                    "sql".to_string(),
+                    base64::encode_url("SELECT * FROM \"victim\""),
+                ),
+                ("key".to_string(), "1790702573362064".to_string()),
+            ]))
+        };
+        let path = || Path(("default".to_string(), "allowed".to_string()));
+        assert_unauthorized(around_v1(path(), HeaderMap::new(), non_member(), query()).await).await;
+        let resp = around_v2(
+            path(),
+            HeaderMap::new(),
+            non_member(),
+            query(),
+            axum::body::Bytes::new(),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_search_partition_refuses_a_caller_outside_the_org() {
+        let resp = search_partition(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            non_member(),
+            Query(HashMap::new()),
+            Json(SearchPartitionRequest {
+                sql: "SELECT * FROM \"victim\"".to_string(),
+                start_time: 0,
+                end_time: 1,
+                encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+                sampling_ratio: None,
+                search_type: None,
+            }),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
 }

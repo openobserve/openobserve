@@ -2388,4 +2388,77 @@ mod tests {
         .await;
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
+
+    #[cfg(feature = "enterprise")]
+    async fn assert_unauthorized(resp: axum::response::Response) {
+        assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("Unauthorized Access"), "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_around_multi_refuses_a_caller_outside_the_org() {
+        use axum::{
+            extract::{Path, Query},
+            http::HeaderMap,
+        };
+        use config::utils::base64;
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let query = HashMap::from([(
+            "sql".to_string(),
+            base64::encode_url("SELECT * FROM \"victim\""),
+        )]);
+        let resp = super::around_multi(
+            Path(("default".to_string(), base64::encode_url("allowed"))),
+            HeaderMap::new(),
+            Query(query),
+            Headers(UserEmail {
+                user_id: "outsider@example.com".to_string(),
+            }),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_search_partition_multi_refuses_a_caller_outside_the_org() {
+        use axum::{
+            extract::{Path, Query},
+            http::HeaderMap,
+        };
+        use config::{meta::search::RequestEncoding, utils::base64};
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let resp = super::_search_partition_multi(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: "outsider@example.com".to_string(),
+            }),
+            axum::Json(MultiSearchPartitionRequest {
+                sql: vec![base64::encode_url("SELECT * FROM \"victim\"")],
+                start_time: 0,
+                end_time: 1,
+                encoding: RequestEncoding::Base64,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+            }),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
 }
