@@ -6887,6 +6887,7 @@
       "ok": "OK",
       "error": "Lỗi",
       "pending": "Đang chờ",
+      "skipped": "Đã bỏ qua",
       "unknown": "Không xác định",
       "flapping": "Chập chờn",
       "flipsSuffix": "lần lật",

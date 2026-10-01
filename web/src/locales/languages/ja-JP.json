@@ -6887,6 +6887,7 @@
       "ok": "OK",
       "error": "エラー",
       "pending": "保留中",
+      "skipped": "スキップ",
       "unknown": "不明",
       "flapping": "フラッピング",
       "flipsSuffix": "フリップ",

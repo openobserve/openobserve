@@ -21,6 +21,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import ImportFunction from "@/components/functions/ImportFunction.vue";
 import config from "@/aws-exports";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 
 const { mockList, mockCreate, mockUpdate, mockGetAssociatedPipelines, mockToastFn } = vi.hoisted(
@@ -128,6 +129,9 @@ describe("ImportFunction", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // The screen reads existing names through the shared query cache, which outlives
+    // a test and would serve the previous one's fixture.
+    queryClient.clear();
     // clearAllMocks drops call history but keeps queued `...Once` outcomes, and a
     // rejection queued for a write this screen no longer makes would be served to
     // whichever test writes next.

@@ -6887,6 +6887,7 @@
       "ok": "Ok",
       "error": "Erro",
       "pending": "Pendente",
+      "skipped": "Ignorado",
       "unknown": "Desconhecido",
       "flapping": "Flapping",
       "flipsSuffix": "alternâncias",

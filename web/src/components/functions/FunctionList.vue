@@ -725,18 +725,9 @@ export default defineComponent({
       confirmBulkDelete.value = true;
     };
 
-    // ── Export ────────────────────────────────────────────────────────────
-    // The list query already carries every field the file needs, so export reads
-    // from it instead of fetching each definition again.
-    //
-    // No dialog: unlike alerts and SLOs there is no second format to choose
-    // between (the provider has no openobserve_function resource), so a preview
-    // modal would be a format picker with one format. Export writes the file.
+    // No dialog: the provider has no function resource, so a preview would pick between one format.
 
-    // `streams` is left out: the deprecated stream association names streams that
-    // mean nothing in the org the file is imported into. `numArgs` is left out
-    // too — the server derives it from `params` on the way back in, so carrying
-    // it would put a field in the file that import reads from nowhere.
+    // `streams` names streams the target org lacks; `numArgs` the server derives from `params`.
     const exportPayload = (name: string) => {
       const fn: any = (functions.data.value ?? []).find((item: any) => item.name === name);
       if (!fn) return null;
@@ -750,9 +741,7 @@ export default defineComponent({
 
     const exportLoading = ref(false);
 
-    // The row came from this very list, so a miss means the cache has moved on
-    // (renamed or removed elsewhere). Re-read it once before giving up, the way
-    // the alerts list re-reads each definition it is about to export.
+    // The row came from this list, so a miss means the cache moved on: re-read once before giving up.
     const collectForExport = async (names: string[]) => {
       let payloads = names.map(exportPayload);
       if (payloads.some((payload) => !payload)) {
@@ -765,8 +754,7 @@ export default defineComponent({
       };
     };
 
-    // One function keeps its own name so re-importing it is self-describing; a
-    // multi-function file is dated, matching how the other lists name a bundle.
+    // One function keeps its name; a bundle is dated, as the other lists name theirs.
     const exportFileName = (payloads: Record<string, unknown>[]) => {
       if (payloads.length !== 1) {
         return `functions-${new Date().toISOString().slice(0, 10)}.json`;
@@ -781,8 +769,7 @@ export default defineComponent({
       try {
         const { payloads, missing } = await collectForExport(names);
         if (!payloads.length) throw new Error("no exportable function");
-        // A selection can outlive its rows. Exporting the rest is right, but
-        // the file would otherwise be short by names nobody mentioned.
+        // A selection outlives its rows, and the file would be short by names nobody mentioned.
         if (missing.length) {
           toast({
             variant: "info",
@@ -793,9 +780,7 @@ export default defineComponent({
             ),
           });
         }
-        // A single function is written as an object, several as an array — both
-        // are what the import screen accepts, and the object form is what a
-        // hand-edited one-function file looks like.
+        // Object for one, array for several: both import, and the object form is hand-editable.
         const written = downloadFile(
           exportFileName(payloads),
           JSON.stringify(payloads.length === 1 ? payloads[0] : payloads, null, 2),

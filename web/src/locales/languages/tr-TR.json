@@ -6887,6 +6887,7 @@
       "ok": "Tamam",
       "error": "Hata",
       "pending": "Beklemede",
+      "skipped": "Atlanan",
       "unknown": "Bilinmeyen",
       "flapping": "Dalgalanan",
       "flipsSuffix": "değişimler",

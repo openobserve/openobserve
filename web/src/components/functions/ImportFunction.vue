@@ -240,14 +240,13 @@ import BaseImport from "../common/BaseImport.vue";
 import { functionNameRegex } from "./AddFunction.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import jsTransformService from "@/services/jstransform";
-import { saveFunctionMutation } from "@/services/jstransform.queries";
+import { functionsQuery, saveFunctionMutation } from "@/services/jstransform.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { useOrgId } from "@/composables/query/useOrgId";
 
 type ImportStatus = "created" | "overridden" | "failed";
 
-// Every validation names the field it is about, so the output pane can put the
-// control that fixes it next to the message instead of asking the user to go
-// and find the offending line in the JSON.
+// Each validation names its field so the output pane can show the control that fixes it.
 type FieldError = {
   field: "function_name" | "name_exists" | "function_body" | "trans_type" | "params";
   message: I18nText;
@@ -255,8 +254,7 @@ type FieldError = {
   name: string;
 };
 
-// A plain I18nText is a branded string, so `typeof e === "object"` is what
-// separates the two arms — in the template as well as here.
+// I18nText is a branded string, so `typeof e === "object"` separates the two arms.
 type ImportError = I18nText | FieldError;
 
 export default defineComponent({
@@ -269,8 +267,7 @@ export default defineComponent({
     OInput: defineAsyncComponent(() => import("@/lib/forms/Input/OInput.vue")),
     OSelect: defineAsyncComponent(() => import("@/lib/forms/Select/OSelect.vue")),
     OCheckbox: defineAsyncComponent(() => import("@/lib/forms/Checkbox/OCheckbox.vue")),
-    // Async like every other Monaco consumer: the body editor only appears for an
-    // item whose body is missing, so most imports never pay for it.
+    // Async: the body editor only appears for a rejected item, so most imports never load it.
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
   },
   setup() {
@@ -284,54 +281,39 @@ export default defineComponent({
     const functionErrors = ref<ImportError[][]>([]);
     const importResults = ref<{ message: I18nText; status: ImportStatus }[]>([]);
 
-    // Keyed by position, unlike the override flag below: a fix-up box belongs to
-    // the item at that position — for a missing or unusable name there is no name
-    // to key it by at all. Safe only because this state is dropped when the
-    // document changes.
+    // Keyed by position: a missing name gives nothing else to key a fix-up box by.
     const userSelectedName = ref<Record<number, string>>({});
     const userSelectedBody = ref<Record<number, string>>({});
     const userSelectedTransType = ref<Record<number, string>>({});
     const userSelectedParams = ref<Record<number, string>>({});
 
-    // What the name box says about what has been typed so far, as opposed to the
-    // message above it, which describes the document as the last press found it.
+    // What the box says about what is typed now, not what the last press found.
     const nameInputError = ref<Record<number, I18nText | null>>({});
 
-    // Keyed by NAME. Index 0 of the next file is a different function, and an
-    // "override" the user meant for one must never be applied to another.
+    // Keyed by name: index 0 of the next file is a different function.
     const overrideExisting = ref<Record<string, boolean>>({});
     const dependentPipelines = ref<Record<string, string[]>>({});
 
-    // What this run has written: name -> the payload that was sent. NOT reset
-    // with the rest, because it describes the server rather than the editor — a
-    // function created by the first press exists whatever the user does to the
-    // document next. Fixing one item and pressing again is the normal retry, and
-    // it must not have the server reject everything the first press created.
-    const writtenByThisRun = ref<Map<string, string>>(new Map());
+    // Names this run created, so a retry updates them instead of being refused as clashes.
+    const writtenByThisRun = ref<Set<string>>(new Set());
 
-    // Names the org already holds, read once per import so a taken name is answered
-    // by the rename box before anything is sent rather than by a failed write.
-    // Declared beside the other per-run state because both the org watcher and the
-    // name box read it, and both sit above where it used to live.
+    // Names the org holds, so a taken name is answered before anything is sent.
     const existingNames = ref<Set<string> | null>(null);
 
     const loadExistingNames = async () => {
       if (existingNames.value) return;
       try {
-        const res: any = await jsTransformService.list(1, 100000, "name", false, "", orgId.value);
-        existingNames.value = new Set(
-          (res.data?.list ?? []).map((fn: any) => fn.name).filter(Boolean),
-        );
+        // The list page's own query, so an import reached from it reuses that cache.
+        const list = await queryClient.ensureQueryData(functionsQuery(orgId.value));
+        existingNames.value = new Set((list ?? []).map((fn: any) => fn.name).filter(Boolean));
       } catch (err) {
         console.error("Error while reading existing functions", err);
-        // Unreadable list means the server judges the clash, as it did before.
+        // Unreadable list leaves the clash to the server, as it was before.
         existingNames.value = new Set();
       }
     };
 
-    // The same entitlement the Add Function form applies. Offering JavaScript
-    // where the build cannot run it would only trade this validation error for a
-    // server-side one.
+    // The Add form's entitlement: offering JS the build cannot run only moves the error.
     const isJsAllowed = computed(
       () =>
         config.isEnterprise === "true" ||
@@ -351,8 +333,7 @@ export default defineComponent({
       saveFunctionMutation(orgId.value, () => isOverride.value),
     );
 
-    // Cleared on unmount: without it, navigating away inside the window pulls
-    // the user back to the Functions list from wherever they went.
+    // Cleared on unmount, or leaving within the window yanks the user back to the list.
     let redirectTimer: ReturnType<typeof setTimeout> | undefined;
     onBeforeUnmount(() => {
       if (redirectTimer !== undefined) clearTimeout(redirectTimer);
@@ -372,15 +353,11 @@ export default defineComponent({
 
     // Describes one org's functions and means nothing in the next.
     watch(orgId, () => {
-      writtenByThisRun.value = new Map();
+      writtenByThisRun.value = new Set();
       existingNames.value = null;
     });
 
-    // ── Document identity ──────────────────────────────────────────────────
-    // Every choice above belongs to the document that produced it. BaseImport
-    // re-emits for our own writes too (a rename restringifies the array), so the
-    // text we just wrote is recorded here and its echo ignored; anything else is
-    // the user loading a file, fetching a URL or typing, and starts over.
+    // BaseImport re-emits our own writes, so the text we wrote is recorded and its echo ignored.
     const currentDocument = ref("");
 
     const resetPendingState = () => {
@@ -395,9 +372,7 @@ export default defineComponent({
       dependentPipelines.value = {};
     };
 
-    // Compared on CONTENT, not on the text: BaseImport reformats what it holds
-    // and emits the text and the array separately, so the same document arrives
-    // in several spellings. Only a real change of content starts over.
+    // Compared on content: BaseImport reformats, so one document arrives in several spellings.
     const normalizeDocument = (value: unknown): string => {
       if (Array.isArray(value)) return JSON.stringify(value);
       const text = String(value ?? "").trim();
@@ -429,9 +404,7 @@ export default defineComponent({
       baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
     };
 
-    // Every fix-up control writes through here, so a typed value reaches the
-    // document by exactly one path and the JSON pane always shows what will be
-    // sent.
+    // One path from every fix-up control to the document, so the JSON pane never disagrees.
     const writeField = (index: number, field: string, value: unknown) => {
       const item = baseImportRef.value?.jsonArrayOfObj?.[index];
       if (!item) return;
@@ -439,8 +412,7 @@ export default defineComponent({
       writeBackToEditor();
     };
 
-    // The rules the next press will apply, run as the user types: a rename that
-    // cannot work says so in the box rather than after another round trip.
+    // The next press's rules, run as you type, so a dead rename says so immediately.
     const validateNameInput = (name: string, index: number): I18nText | null => {
       if (!name.trim()) return t("function.import.nameInputRequired");
       if (!functionNameRegex.test(name)) return t("function.import.nameInputInvalid");
@@ -448,8 +420,7 @@ export default defineComponent({
       if (items.some((other, i) => i !== index && other?.name === name)) {
         return t("function.import.nameInputDuplicate");
       }
-      // Same list the press checks against, so the box says what the next press
-      // would say rather than waiting for it.
+      // Same list the press checks, so the box answers now rather than after it.
       if (
         !writtenByThisRun.value.has(name) &&
         existingNames.value?.has(name) &&
@@ -481,18 +452,11 @@ export default defineComponent({
       writeField(index, "params", params);
     };
 
-    // What the item holds now, so a control offered over a rejected definition
-    // opens on that definition rather than on a blank. An absent or unusable
-    // `transType` reads as VRL, which is what the payload will send.
+    // A control over a rejected item opens on that item, not on a blank.
     const currentBody = (index: number) =>
       String(baseImportRef.value?.jsonArrayOfObj?.[index]?.function ?? "");
 
-    // Absent means VRL — that is what the payload sends, so the picker may say so.
-    // A value that is neither 0 nor 1 is not a language at all, and the picker
-    // shows nothing selected: normalising it to VRL would render a picker already
-    // displaying the answer, whose selection emits no change and writes nothing,
-    // leaving the document holding the value that was just rejected and the same
-    // error on every press.
+    // Absent is VRL (what gets sent); unusable is nothing, or picking VRL emits no change.
     const currentTransType = (index: number) => {
       const declared = baseImportRef.value?.jsonArrayOfObj?.[index]?.transType;
       if (declared === undefined || declared === null) return "0";
@@ -500,8 +464,7 @@ export default defineComponent({
       return text === "0" || text === "1" ? text : "";
     };
 
-    // The editor speaks the language the item declares, so a JavaScript function
-    // is not written against VRL tokenizing.
+    // The editor speaks the item's language, so JS is not tokenized as VRL.
     const bodyLanguage = (index: number) =>
       (userSelectedTransType.value[index] ?? currentTransType(index)) === "1"
         ? "javascript"
@@ -510,8 +473,7 @@ export default defineComponent({
     const onOverrideChoice = async (name: string, itemIndex: number, checked: boolean) => {
       if (!name) return;
       overrideExisting.value[name] = checked;
-      // Overriding replaces what is already there, so "already exists" stops
-      // describing the outcome and the name box has nothing left to complain about.
+      // Replacing makes the clash the intent, so the box has nothing left to object to.
       nameInputError.value[itemIndex] = checked
         ? null
         : validateNameInput(userSelectedName.value[itemIndex] ?? name, itemIndex);
@@ -538,14 +500,10 @@ export default defineComponent({
       if (!name.trim()) {
         errors.push(nameError(t("function.import.nameRequired", { index }), itemIndex, ""));
       } else if (!functionNameRegex.test(name)) {
-        // The Add Function form's own rule. The backend does not enforce it, so
-        // an import could otherwise create "my-fn with space": a function its
-        // edit form refuses to save and no VRL call can resolve. It is also what
-        // catches " parse_nginx ", whose spaces would hide a real clash.
+        // The Add form's rule; the backend does not enforce it, so import would create names no VRL call can resolve.
         errors.push(nameError(t("function.import.nameInvalid", { index, name }), itemIndex, name));
       } else if (seen.has(name)) {
-        // Two items in one file cannot both claim a name. This one is about the
-        // document, not the org, so it is the import screen's to catch.
+        // About the document rather than the org, so this screen is the one to catch it.
         errors.push(
           nameError(t("function.import.duplicateName", { index, name }), itemIndex, name),
         );
@@ -554,13 +512,7 @@ export default defineComponent({
         existingNames.value?.has(name) &&
         overrideExisting.value[name] !== true
       ) {
-        // A name the org already holds is answered by the rename box, so it is
-        // raised before anything is sent. Ticking replace makes the clash the
-        // intent rather than a problem, so it stops being an error.
-        //
-        // A name THIS RUN wrote is not a clash with anyone: re-sending it is an
-        // update of our own work. Without this, fixing one item and pressing
-        // again would report the item the last press created as taken.
+        // Raised before anything is sent; replacing clears it, and this run's own writes never clash.
         errors.push(conflictError(item, index, itemIndex));
       }
       if (name) seen.add(name);
@@ -603,15 +555,7 @@ export default defineComponent({
       name: item.name,
     });
 
-    // The server judged the definition — a VRL or JavaScript compile error, or
-    // anything else it would not take. The result line carries its reasoning; the
-    // controls carry the fix.
-    //
-    // Language comes FIRST, above the editor. It is the smaller control, and it
-    // decides how the body is read: the commonest rejection here is a JavaScript
-    // body with no `transType`, which defaults to VRL and is then handed to the
-    // VRL compiler. The body is not wrong in that case, so asking about it first
-    // — under a tall editor — sends the user to correct code that already works.
+    // Language first: it decides how the body is read, and a JS body typed as VRL is the commonest rejection.
     const rejectionErrors = (item: any, index: number, itemIndex: number): ImportError[] => [
       {
         field: "trans_type",
@@ -627,8 +571,7 @@ export default defineComponent({
       },
     ];
 
-    // Built once: it is both what is sent and what is remembered, so "did this
-    // item change since we wrote it?" compares like with like.
+    // Built once so what is sent and what is recorded cannot drift apart.
     const payloadFor = (item: any) => ({
       name: item.name as string,
       function: String(item.function).trim(),
@@ -639,17 +582,14 @@ export default defineComponent({
     const writeFunction = async (item: any, index: number, itemIndex: number) => {
       const name: string = item.name;
       const payload = payloadFor(item);
-      // Ours already: it exists because an earlier press of this run created it,
-      // so re-sending is an update of this run's own work. Without this a second
-      // press — the normal way to retry after fixing one item — would have the
-      // server reject everything the first press created.
+      // Ours from an earlier press, so a retry updates it instead of being refused.
       const ours = writtenByThisRun.value.has(name);
       const override = ours || overrideExisting.value[name] === true;
       isOverride.value = override;
 
       try {
         await saveFunction.mutateAsync(payload);
-        writtenByThisRun.value.set(name, JSON.stringify(payload));
+        writtenByThisRun.value.add(name);
         importResults.value.push({
           message: override
             ? t("function.import.overridden", { index, name })
@@ -667,8 +607,7 @@ export default defineComponent({
           }),
           status: "failed",
         });
-        // A taken name is the one rejection with a specific fix, so it gets the
-        // box that renames it rather than the generic pair.
+        // A taken name has one specific fix, so it gets the rename box.
         return /already exist/i.test(String(reason))
           ? [conflictError(item, index, itemIndex)]
           : rejectionErrors(item, index, itemIndex);
@@ -686,8 +625,7 @@ export default defineComponent({
         }
         const parsed = JSON.parse(jsonString);
         items = Array.isArray(parsed) ? parsed : [parsed];
-        // BaseImport restringifies what we hand it and emits the result back;
-        // that echo is this same document, not a new one.
+        // BaseImport echoes back what we hand it; that is this document, not a new one.
         adoptDocument(items);
         baseImportRef.value.jsonArrayOfObj = items;
       } catch (e: any) {
@@ -699,8 +637,7 @@ export default defineComponent({
         return;
       }
 
-      // A file that failed to parse leaves BaseImport holding an empty array, so
-      // without this an unreadable file reports a successful import of nothing.
+      // A failed parse leaves an empty array, which would report importing nothing as success.
       if (items.length === 0) {
         toast({ message: t("function.import.nothingToImport"), variant: "error" });
         if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
@@ -715,8 +652,7 @@ export default defineComponent({
       const errorGroups = items
         .map((item, i) => validate(item, i + 1, i, seen))
         .filter((group) => group.length > 0);
-      // The document has to be shaped right before any of it is sent; what the
-      // org already holds is the server's to judge.
+      // Shape is this screen's to judge before anything is sent.
       if (errorGroups.length > 0) {
         functionErrors.value = errorGroups;
         isImporting.value = false;
@@ -725,8 +661,7 @@ export default defineComponent({
       }
 
       let written = 0;
-      // What the server refused, each with the control that answers it. Nothing
-      // is held back by this screen, so every item here was actually attempted.
+      // What the server refused; every item here was actually attempted.
       const rejected: ImportError[][] = [];
       for (const [itemIndex, item] of items.entries()) {
         const errors = await writeFunction(item, itemIndex + 1, itemIndex);

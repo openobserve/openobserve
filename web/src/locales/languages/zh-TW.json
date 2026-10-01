@@ -6882,6 +6882,7 @@
       "ok": "正常",
       "error": "錯誤",
       "pending": "待觸發",
+      "skipped": "已跳過",
       "unknown": "未知",
       "flapping": "抖動",
       "flipsSuffix": "翻轉次數",
