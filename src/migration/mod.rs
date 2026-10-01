@@ -192,6 +192,26 @@ mod tests {
     }
 
     #[test]
+    fn the_shipped_example_ext_auth_salts_are_refused_on_a_new_install() {
+        let env_example = include_str!("../../.env.example")
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("ZO_EXT_AUTH_SALT"))
+            .and_then(|rest| rest.trim().strip_prefix('='))
+            .map(|value| value.trim().trim_matches('"').to_string())
+            .expect(".env.example sets ZO_EXT_AUTH_SALT");
+        let k8s = include_str!("../../deploy/k8s/statefulset.yaml");
+        let k8s = k8s
+            .lines()
+            .skip_while(|line| !line.contains("name: ZO_EXT_AUTH_SALT"))
+            .find_map(|line| line.trim().strip_prefix("value:"))
+            .map(|value| value.trim().trim_matches('"').to_string())
+            .expect("statefulset.yaml sets ZO_EXT_AUTH_SALT");
+        for salt in [env_example, k8s] {
+            assert!(check_ext_auth_salt(true, &salt).is_err(), "{salt:?}");
+        }
+    }
+
+    #[test]
     fn an_existing_install_keeps_starting_with_the_default_ext_auth_salt() {
         assert!(check_ext_auth_salt(false, DEFAULT_EXT_AUTH_SALT).is_ok());
         assert!(check_ext_auth_salt(false, "").is_ok());
