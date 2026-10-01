@@ -234,7 +234,9 @@ impl From<ReportError> for Response {
             | ReportError::NoDashboards
             | ReportError::InlineAttachmentTypeNotSupportedForPdf
             | ReportError::NoDashboardTabs
-            | ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
+            | ReportError::NoDestinations
+            | ReportError::TzOffsetOutOfRange
+            | ReportError::CronHasNoFutureOccurrence { .. } => MetaHttpResponse::bad_request(value),
             ReportError::ReportNotFound
             | ReportError::DashboardTabNotFound
             | ReportError::FolderNotFound => MetaHttpResponse::not_found(value),
