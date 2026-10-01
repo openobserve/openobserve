@@ -21,11 +21,10 @@ const PageManager = require('../../pages/page-manager.js');
 const {
   assertSyntheticsEnabled,
   ensureSyntheticsLocation,
-  workerPrefix,
   uniqueName,
   getCheck,
   findCheckByName,
-  deleteChecksByPrefix,
+  cleanupWorkerEntities,
 } = require('../utils/synthetics-helpers.js');
 
 const ORG = process.env['ORGNAME'];
@@ -51,25 +50,25 @@ test.describe('Synthetics create — HTTP', { tag: ['@synthetics', '@all'] }, ()
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    await deleteChecksByPrefix(page, workerPrefix(testInfo));
-    await context.close();
+    await cleanupWorkerEntities(browser, testInfo);
   });
 
   test('creates an HTTP check through the form', { tag: ['@P0'] }, async ({ page }, testInfo) => {
     const name = uniqueName('http', testInfo);
 
+    testLogger.info('Opening the HTTP create form', { name });
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'http');
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('https://example.com');
     // The form seeds one status_code assertion; this appends a second row.
     await pm.syntheticsCreatePage.addAssertion(1, 'response_time_ms', 'lt', 5000);
+    testLogger.info('Selecting a location and saving the check disabled');
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);
     await pm.syntheticsCreatePage.save();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Verifying the saved check through the list and the API');
     const created = await findCheckByName(page, name);
     expect(created, 'the check must be listed by the API').toBeTruthy();
     await pm.syntheticsListPage.search(name);
@@ -86,20 +85,24 @@ test.describe('Synthetics create — HTTP', { tag: ['@synthetics', '@all'] }, ()
 
   test('server rejects missing name, target and locations', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const name = uniqueName('invalid', testInfo);
+    testLogger.info('Opening the HTTP create form without a name');
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'http');
     await pm.syntheticsCreatePage.fillTarget('https://example.com');
     await pm.syntheticsCreatePage.selectLocation(locationId);
 
+    testLogger.info('Verifying save without a name is rejected');
     const noName = await pm.syntheticsCreatePage.saveCapturingResponse();
     expect(noName.status).toBe(400);
     await pm.syntheticsCreatePage.expectToast('name: must not be empty');
 
+    testLogger.info('Verifying save without a target is rejected');
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('');
     const noTarget = await pm.syntheticsCreatePage.saveCapturingResponse();
     expect(noTarget.status).toBe(400);
     await pm.syntheticsCreatePage.expectToast('target');
 
+    testLogger.info('Verifying save without a location is rejected');
     await pm.syntheticsCreatePage.fillTarget('https://example.com');
     await pm.syntheticsCreatePage.deselectLocation(locationId);
     const noLocation = await pm.syntheticsCreatePage.saveCapturingResponse();
@@ -111,16 +114,20 @@ test.describe('Synthetics create — HTTP', { tag: ['@synthetics', '@all'] }, ()
 
   test('cancelling a dirty form asks before leaving', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const name = uniqueName('dirty', testInfo);
+    testLogger.info('Opening the HTTP create form and typing a name', { name });
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'http');
     await pm.syntheticsCreatePage.fillName(name);
+    testLogger.info('Cancelling the dirty form and confirming leave');
     await pm.syntheticsCreatePage.cancel();
     await pm.syntheticsCreatePage.confirmLeave();
+    testLogger.info('Verifying the list is shown and no check was saved');
     await expect(page).toHaveURL(/\/synthetics(\?|$)/, { timeout: 30000 });
     expect(await findCheckByName(page, name)).toBeNull();
   });
 
   test('custom interval and cron schedules persist', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const intervalName = uniqueName('interval', testInfo);
+    testLogger.info('Creating a check with a custom interval', { name: intervalName });
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'http');
     await pm.syntheticsCreatePage.fillName(intervalName);
     await pm.syntheticsCreatePage.fillTarget('https://example.com');
@@ -130,6 +137,7 @@ test.describe('Synthetics create — HTTP', { tag: ['@synthetics', '@all'] }, ()
     await pm.syntheticsCreatePage.save();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Creating a check with a cron schedule');
     const cronName = uniqueName('cron', testInfo);
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'http');
     await pm.syntheticsCreatePage.fillName(cronName);
@@ -144,6 +152,7 @@ test.describe('Synthetics create — HTTP', { tag: ['@synthetics', '@all'] }, ()
     await pm.syntheticsCreatePage.save();
     await pm.syntheticsCreatePage.expectSavedAndListed();
 
+    testLogger.info('Verifying both schedules through the API');
     const interval = await findCheckByName(page, intervalName);
     expect(interval.frequency.type).toBe('minutes');
     expect(interval.frequency.interval).toBe(10);
