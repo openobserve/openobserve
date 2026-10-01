@@ -13,15 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { openobserveRum } from "@openobserve/browser-rum";
 import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
 
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: { addAction: vi.fn() },
 }));
 
 describe("product_analytics", () => {
+  beforeEach(() => {
+    vi.mocked(openobserveRum.addAction).mockClear();
+    config.enableAnalytics = "true";
+  });
+
   it("forwards track to the RUM SDK as a custom action", () => {
     analytics.track("dashboard_created", { source: "import" });
     expect(openobserveRum.addAction).toHaveBeenCalledWith("dashboard_created", {
@@ -32,5 +38,11 @@ describe("product_analytics", () => {
   it("forwards an event without properties", () => {
     analytics.track("alert_created");
     expect(openobserveRum.addAction).toHaveBeenCalledWith("alert_created", undefined);
+  });
+
+  it("sends nothing when telemetry is disabled", () => {
+    config.enableAnalytics = "false";
+    analytics.track("alert_created");
+    expect(openobserveRum.addAction).not.toHaveBeenCalled();
   });
 });
