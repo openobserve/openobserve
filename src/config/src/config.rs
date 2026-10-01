@@ -1474,6 +1474,7 @@ pub struct Auth {
     pub cookie_same_site_lax: bool,
     #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
+    /// Secret for presigned and ext-token logins; a new install refuses to start with the default.
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
     #[env_config(

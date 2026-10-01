@@ -49,6 +49,8 @@ spec:
               value: root@example.com
             - name: ZO_ROOT_USER_PASSWORD
               value: Complexpass#123
+            - name: ZO_EXT_AUTH_SALT
+              value: replace-with-output-of-openssl-rand-hex-32
             - name: ZO_DATA_DIR
               value: /data
           # command: ["/bin/bash", "-c", "while true; do sleep 1; done"]
