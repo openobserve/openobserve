@@ -2351,14 +2351,12 @@ export default defineComponent({
           });
         }
         addAlert();
-        if (config.enableAnalytics == "true") {
-          analytics.track("Button Click", {
-            button: action,
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Alerts",
-          });
-        }
+        analytics.track("Button Click", {
+          button: action,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Alerts",
+        });
         track("Button Click", {
           button: action,
           page: "Add Alert",
@@ -2886,15 +2884,13 @@ export default defineComponent({
             message: err?.data?.message || t("alerts.messages.deleteAlertFailed"),
           });
         });
-      if (config.enableAnalytics == "true") {
-        analytics.track("Button Click", {
-          button: "Delete Alert",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          alert_name: selectedDelete.value.name,
-          page: "Alerts",
-        });
-      }
+      analytics.track("Button Click", {
+        button: "Delete Alert",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        alert_name: selectedDelete.value.name,
+        page: "Alerts",
+      });
     };
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;

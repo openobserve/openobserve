@@ -426,19 +426,17 @@ export default defineComponent({
         this.searchObj.runQuery = true;
       }
 
-      if (config.isCloud == "true") {
-        analytics.track("Button Click", {
-          button: "Search Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          show_query: this.searchObj.meta.showQuery,
-          show_histogram: this.searchObj.meta.showHistogram,
-          sqlMode: this.searchObj.meta.sqlMode,
-          showFields: this.searchObj.meta.showFields,
-          page: "Search Logs",
-        });
-      }
+      analytics.track("Button Click", {
+        button: "Search Data",
+        user_org: this.store.state.selectedOrganization.identifier,
+        user_id: this.store.state.userInfo.email,
+        stream_name: this.searchObj.data.stream.selectedStream.join(","),
+        show_query: this.searchObj.meta.showQuery,
+        show_histogram: this.searchObj.meta.showHistogram,
+        sqlMode: this.searchObj.meta.sqlMode,
+        showFields: this.searchObj.meta.showFields,
+        page: "Search Logs",
+      });
     },
     async getMoreDataRecordsPerPage() {
       if (this.searchObj.meta.refreshInterval == 0) {
@@ -462,15 +460,13 @@ export default defineComponent({
           await this.getJobData(false);
         }
 
-        if (config.isCloud == "true") {
-          analytics.track("Button Click", {
-            button: "Get More Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get More Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
     async getMoreData() {
@@ -490,15 +486,13 @@ export default defineComponent({
           await this.getJobData(false);
         }
 
-        if (config.isCloud == "true") {
-          analytics.track("Button Click", {
-            button: "Get More Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get More Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
     async getLessData() {
@@ -520,15 +514,13 @@ export default defineComponent({
         await this.getQueryData(true);
         this.refreshHistogramChart();
 
-        if (config.isCloud == "true") {
-          analytics.track("Button Click", {
-            button: "Get Less Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get Less Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
   },

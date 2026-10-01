@@ -3161,7 +3161,7 @@ export default defineComponent({
         searchObj.runQuery = true;
       }
 
-      if (config.isCloud == "true" && value.userChangedValue) {
+      if (value.userChangedValue) {
         analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,

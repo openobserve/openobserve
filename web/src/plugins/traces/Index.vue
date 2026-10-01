@@ -1869,34 +1869,30 @@ const searchData = () => {
 
   runQueryFn();
 
-  if (config.isCloud == "true") {
-    analytics.track("Button Click", {
-      button: "Search Data",
-      user_org: store.state.selectedOrganization.identifier,
-      user_id: store.state.userInfo.email,
-      stream_name: searchObj.data.stream.selectedStream.value,
-      show_query: searchObj.meta.showQuery,
-      show_histogram: searchObj.meta.showHistogram,
-      sqlMode: searchObj.meta.sqlMode,
-      showFields: searchObj.meta.showFields,
-      page: "Search Logs",
-    });
-  }
+  analytics.track("Button Click", {
+    button: "Search Data",
+    user_org: store.state.selectedOrganization.identifier,
+    user_id: store.state.userInfo.email,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    show_query: searchObj.meta.showQuery,
+    show_histogram: searchObj.meta.showHistogram,
+    sqlMode: searchObj.meta.sqlMode,
+    showFields: searchObj.meta.showFields,
+    page: "Search Logs",
+  });
 };
 
 const getMoreData = () => {
   if (searchObj.meta.refreshInterval == 0) {
     getQueryData(true);
 
-    if (config.isCloud == "true") {
-      analytics.track("Button Click", {
-        button: "Get More Data",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        stream_name: searchObj.data.stream.selectedStream.value,
-        page: "Search Logs",
-      });
-    }
+    analytics.track("Button Click", {
+      button: "Get More Data",
+      user_org: store.state.selectedOrganization.identifier,
+      user_id: store.state.userInfo.email,
+      stream_name: searchObj.data.stream.selectedStream.value,
+      page: "Search Logs",
+    });
   }
 };
 

@@ -602,7 +602,7 @@ export default defineComponent({
     // Debounced query trigger for absolute time when auto-run is enabled.
     // Gives the user 2.5s to finish typing start/end time before firing.
     const triggerAbsoluteQueryDebounced = debounce((value: object) => {
-      if (config.isCloud == "true" && value.userChangedValue) {
+      if (value.userChangedValue) {
         analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
@@ -700,7 +700,7 @@ export default defineComponent({
         emit("searchdata");
       }
 
-      if (config.isCloud == "true" && value.userChangedValue) {
+      if (value.userChangedValue) {
         analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
