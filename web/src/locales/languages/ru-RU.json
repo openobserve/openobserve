@@ -3659,7 +3659,40 @@
     "dataSource": "Источник данных",
     "uploadFile": "Загрузить файл",
     "fromUrl": "Из URL",
-    "addFunction": "Добавить функцию"
+    "addFunction": "Добавить функцию",
+    "import": {
+      "title": "Импорт функции",
+      "outputMessages": "Выходные сообщения",
+      "errorValidations": "Ошибки валидации",
+      "results": "Результаты импорта",
+      "nameLabel": "Имя функции",
+      "nameRequired": "Функция - {index}: требуется имя",
+      "nameExists": "Функция - {index}: \"{name}\" уже существует",
+      "nameInvalid": "Функция - {index}: \"{name}\" — недопустимое имя функции. Используйте буквы, цифры и подчёркивания, начиная с буквы или подчёркивания.",
+      "duplicateName": "Функция - {index}: \"{name}\" встречается в этом файле более одного раза",
+      "bodyRequired": "Функция - {index}: требуется тело функции",
+      "transTypeInvalid": "Функция - {index}: тип должен быть 0 для VRL или 1 для JavaScript",
+      "paramsInvalid": "Функция - {index}: параметр params должен быть строкой",
+      "transTypeLabel": "Язык",
+      "transTypePlaceholder": "Выберите язык",
+      "paramsLabel": "Параметры",
+      "paramsHint": "Имена аргументов через запятую. По умолчанию — «row».",
+      "overrideExisting": "Вместо этого заменить существующую функцию",
+      "nameInputRequired": "Введите имя функции",
+      "nameInputInvalid": "Используйте буквы, цифры и подчёркивания, начиная с буквы или подчёркивания",
+      "nameInputDuplicate": "Другая функция в этом файле уже использует это имя",
+      "nameInputExists": "Это имя уже занято в этой организации",
+      "overrideAffects": "Переопределение также изменит эти конвейеры: {pipelines}",
+      "createSuccess": "Функция - {index}: \"{name}\" импортирована",
+      "overridden": "Функция - {index}: \"{name}\" переопределена",
+      "createFailed": "Функция - {index}: \"{name}\" — ошибка: {reason}",
+      "rejectedBody": "Исправьте определение и импортируйте снова.",
+      "rejectedLanguage": "Функция - {index}: \"{name}\" отклонена. Если это функция JavaScript, укажите язык — определение без языка читается как VRL.",
+      "jsonStringEmpty": "Строка JSON пуста",
+      "invalidJsonFormat": "Недопустимый формат JSON",
+      "importSuccess": "Импортирована {count} функция | Импортировано {count} функций",
+      "nothingToImport": "Не найдено функций для импорта. Проверьте, что файл содержит корректный JSON."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Анализ измерений...",
@@ -15870,7 +15903,8 @@
       "oncallAck": "Подтвердить",
       "oncallEscalate": "Эскалировать",
       "oncallSnooze": "Отложить",
-      "oncallResolve": "Разрешить"
+      "oncallResolve": "Разрешить",
+      "functionsImport": "Импорт функции"
     }
   },
   "components": {
@@ -16482,7 +16516,10 @@
       "enrichmentReloadStarted": "Перезагрузка таблицы обогащения началась. Обработка в фоновом режиме...",
       "enrichmentJobStarted": "Задача таблицы обогащения запущена. Обработка в фоновом режиме...",
       "enrichmentCreationFailed": "Не удалось создать таблицу обогащения",
-      "functionDeletionAssociatedPipelines": "Не удалось удалить функцию, так как она связана с конвейерами. Нажмите кнопку просмотра, чтобы увидеть связанные конвейеры."
+      "functionDeletionAssociatedPipelines": "Не удалось удалить функцию, так как она связана с конвейерами. Нажмите кнопку просмотра, чтобы увидеть связанные конвейеры.",
+      "successfullyExportedFunctions": "Успешно экспортирована {count} функция | Успешно экспортировано {count} функций",
+      "errorExportingFunctions": "Ошибка экспорта функций. Попробуйте ещё раз.",
+      "functionsMissingFromExport": "{names} больше нет в списке — исключено из экспорта | {names} больше нет в списке — исключены из экспорта"
     },
     "recommended": {
       "failedToImportDashboard": "Не удалось импортировать панель мониторинга: {error}",
