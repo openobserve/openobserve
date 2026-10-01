@@ -123,14 +123,6 @@ fn get_offset_minutes_from_tz(tz: &Tz, at_time: chrono::DateTime<Utc>) -> i32 {
     local_time.offset().fix().local_minus_utc() / 60
 }
 
-/// `start_micros + secs + tolerance`, or `None` when any step overflows.
-fn micros_after(start_micros: i64, secs: i64, tolerance: i64) -> Option<i64> {
-    Duration::try_seconds(secs)
-        .and_then(|d| d.num_microseconds())
-        .and_then(|d| start_micros.checked_add(d))
-        .and_then(|t| t.checked_add(tolerance))
-}
-
 impl TriggerCondition {
     // TODO: Currently, the frequency for alert is in seconds, but the
     // frequency for derived stream is in minutes. This needs to be fixed for alert.
@@ -1154,6 +1146,14 @@ pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
     offset_minutes
         .checked_mul(60)
         .and_then(FixedOffset::east_opt)
+}
+
+/// `start_micros + secs + tolerance`, or `None` when any step overflows.
+fn micros_after(start_micros: i64, secs: i64, tolerance: i64) -> Option<i64> {
+    Duration::try_seconds(secs)
+        .and_then(|d| d.num_microseconds())
+        .and_then(|d| start_micros.checked_add(d))
+        .and_then(|t| t.checked_add(tolerance))
 }
 
 #[cfg(test)]
