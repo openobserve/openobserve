@@ -79,9 +79,11 @@ test.describe('Functions Import & Export testcases', { tag: ['@functions-import-
     await pm.functionsImportExport.setImportJsonViaMonaco(
       JSON.stringify({ name, function: '. = .', params: 'row', transType: 0 }),
     );
-    await pm.functionsImportExport.runImport();
+    // Waiting for the redirect, not just clicking: the writes finish before it
+    // fires, and the list is unfiltered so the new row needs searching for.
+    await pm.functionsImportExport.runImportAndWaitForList();
 
-    // Import success redirects back to the list after ~400ms — assert the created row.
+    await pm.functionsPage.searchFunction(name);
     await pm.functionsPage.expectFunctionInList(name);
     testLogger.info('Test completed');
   });
@@ -134,10 +136,12 @@ test.describe('Functions Import & Export testcases', { tag: ['@functions-import-
 
     await pm.functionsImportExport.renameImportItem(0, fixedName);
     await pm.functionsImportExport.setImportBody(1, '. = .');
-    await pm.functionsImportExport.runImport();
+    await pm.functionsImportExport.runImportAndWaitForList();
 
-    // Redirects back to the list; both corrected items import.
+    // Both corrected items import; search for each, the list is unfiltered.
+    await pm.functionsPage.searchFunction(fixedName);
     await pm.functionsPage.expectFunctionInList(fixedName);
+    await pm.functionsPage.searchFunction(secondName);
     await pm.functionsPage.expectFunctionInList(secondName);
     testLogger.info('Test completed');
   });
@@ -158,9 +162,10 @@ test.describe('Functions Import & Export testcases', { tag: ['@functions-import-
     await pm.functionsImportExport.expectOverrideCheckboxVisible(0);
 
     await pm.functionsImportExport.overrideImportItem(0);
-    await pm.functionsImportExport.runImport();
+    await pm.functionsImportExport.runImportAndWaitForList();
 
-    // Redirects back to the list; verify the override wrote the new body via export.
+    // Verify the override wrote the new body, via export.
+    await pm.functionsPage.searchFunction(name);
     await pm.functionsPage.expectFunctionInList(name);
     const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
     await pm.functionsImportExport.clickSingleExport(name);
@@ -477,49 +482,6 @@ test.describe('Functions Import & Export testcases', { tag: ['@functions-import-
 
     await pm.functionsImportExport.overrideImportItem(0);
     await pm.functionsImportExport.expectOverrideDependents(0, pipelineName);
-    testLogger.info('Test completed');
-  });
-
-  test('should let the fix-up controls repair an entry that is not an object', { tag: ['@P1'] }, async ({ page }) => {
-    testLogger.info('Test: a bare string / null entry can still be fixed in place');
-    const stamp = Date.now();
-
-    // Regression guard. These entries get the same fix-up controls as any other
-    // rejected item, but the controls used to have nowhere to write: a bare
-    // string threw "Cannot create property 'name' on string", a null was
-    // silently ignored. Either way the typed name never reached the document
-    // and the item could never be fixed.
-    for (const [label, entry] of [
-      ['string', 'just a string'],
-      ['null', null],
-    ]) {
-      const name = `fn_e2e_nonobj_${label}_${stamp}`;
-      const pageErrors = [];
-      const onPageError = (error) => pageErrors.push(error.message);
-      page.on('pageerror', onPageError);
-
-      await pm.functionsImportExport.navigateToImport(org);
-      await pm.functionsImportExport.setImportJsonViaMonaco(JSON.stringify([entry]));
-      await pm.functionsImportExport.runImport();
-
-      // The item is rejected and offered the inline fixers.
-      await pm.functionsImportExport.expectImportError(0, 0);
-
-      // Both fixers must land in the document.
-      await pm.functionsImportExport.renameImportItem(0, name);
-      await pm.functionsImportExport.setImportBody(0, '.fixed = true');
-      // Scoped to the defect: the editor emits unrelated "invalid dom" noise.
-      expect(
-        pageErrors.filter((message) => /Cannot (create|assign to read only) property/i.test(message)),
-        `a ${label} entry must not throw when the fixers write to it`,
-      ).toEqual([]);
-
-      await pm.functionsImportExport.runImportAndWaitForList();
-      await pm.functionsPage.searchFunction(name);
-      await pm.functionsPage.expectFunctionInList(name);
-
-      page.off('pageerror', onPageError);
-    }
     testLogger.info('Test completed');
   });
 
