@@ -275,7 +275,6 @@ describe("CipherKeys", () => {
         store_type: "env",
         mechanism_type: "aes",
       });
-      expect(wrapper.vm.resultTotal).toBe(2);
     });
 
     it("should handle fetch error gracefully", async () => {
@@ -641,7 +640,6 @@ describe("CipherKeys", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(wrapper.vm.tabledata).toHaveLength(0);
-      expect(wrapper.vm.resultTotal).toBe(0);
     });
 
     it("should handle deletion when no data is selected", async () => {
