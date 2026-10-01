@@ -170,11 +170,16 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> j
 /// Escapes a row value for interpolation inside a VRL double-quoted string literal.
 fn escape_vrl_string_literal(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());
-    for c in value.chars() {
+    let mut chars = value.chars().peekable();
+    while let Some(c) = chars.next() {
         // Backslash must be escaped first, or a later escape's own backslash gets re-escaped.
         match c {
+            // VRL's template scan reads `\\}}` as `\` + `\}}`; a line continuation splits them.
+            '\\' if chars.peek() == Some(&'}') => escaped.push_str("\\\\\\\n"),
             '\\' => escaped.push_str("\\\\"),
             '"' => escaped.push_str("\\\""),
+            // An unescaped `{{` opens a template segment.
+            '{' => escaped.push_str("\\{"),
             '\n' => escaped.push_str("\\n"),
             '\r' => escaped.push_str("\\r"),
             '\t' => escaped.push_str("\\t"),
@@ -352,6 +357,70 @@ mod tests {
     fn a_convertible_result_is_returned_unchanged() {
         let body = "upcase!(.row)\n# uppercased.";
         assert_eq!(run_udf(body, "ok"), json::Value::String("OK".into()));
+    }
+
+    #[tokio::test]
+    async fn vrl_udf_every_short_mix_of_braces_and_escapes_round_trips() {
+        let alphabet = ['\\', '{', '}', '"', 'a', '\n'];
+        let mut payloads = vec![String::new()];
+        let mut all = Vec::new();
+        for _ in 0..4 {
+            payloads = payloads
+                .iter()
+                .flat_map(|p| alphabet.iter().map(move |c| format!("{p}{c}")))
+                .collect();
+            all.extend(payloads.iter().cloned());
+        }
+        let got = echo_rows(all.iter().map(String::as_str).collect()).await;
+        for (want, got) in all.iter().zip(&got) {
+            assert_eq!(got, want, "row value must round-trip verbatim");
+        }
+    }
+
+    async fn echo_rows(payloads: Vec<&str>) -> Vec<String> {
+        let sql = "select echo(log) as ret from t";
+        let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(payloads))])
+                .unwrap();
+        let vrl_udf = get_udf_vrl("echo".to_string(), " . = .col1", "col1", 1, "org1").unwrap();
+        let ctx = SessionContext::new();
+        ctx.register_udf(vrl_udf);
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        result
+            .iter()
+            .flat_map(|batch| {
+                let out = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap();
+                (0..out.len())
+                    .map(|i| out.value(i).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn vrl_udf_row_value_with_template_braces_round_trips() {
+        let payloads = vec![
+            "hello {{ user }}",
+            "{{",
+            "}}",
+            "{{}}",
+            "a {b} c",
+            r"\{{ x }}",
+            r"{\",
+            "{{{{ nested }}}}",
+            r"\}}",
+            r"a\}} b",
+            r"\\}}",
+        ];
+        let got = echo_rows(payloads.clone()).await;
+        assert_eq!(got, payloads, "row values must round-trip verbatim");
     }
 
     #[tokio::test]
