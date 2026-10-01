@@ -160,6 +160,9 @@ pub struct ListAlertsResponseBodyItem {
     // name or a KSUID through the summary.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expression_summary: Option<String>,
+    /// The downtime muting this row now, for the Muted chip. Enterprise only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_downtime: Option<config::meta::downtimes::ActiveDowntime>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -498,6 +501,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,
+            active_downtime: None,
         })
     }
 }
@@ -618,6 +622,81 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         child_count: None,
         referenced_by_composite_count: None,
         expression_summary: None,
+        active_downtime: None,
+    })
+}
+
+/// The Muted chip, from the cache or from the downtime the last firing recorded.
+#[cfg(feature = "enterprise")]
+pub async fn fill_active_downtimes(org: &str, list: &mut [ListAlertsResponseBodyItem]) {
+    if list.is_empty()
+        || !o2_enterprise::enterprise::common::config::get_config()
+            .downtimes
+            .enabled
+    {
+        return;
+    }
+    let now = config::utils::time::now_micros();
+    let ids: Vec<String> = list.iter().map(|item| item.alert_id.to_string()).collect();
+    let recorded = infra::table::alert_states::last_downtime_ids(&ids)
+        .await
+        .unwrap_or_default();
+    let rows = db::downtimes::list_cached(org);
+    for item in list.iter_mut() {
+        item.active_downtime = list_item_downtime(org, item, now).or_else(|| {
+            recorded
+                .get(&item.alert_id.to_string())
+                .and_then(|id| still_active(&rows, id, now))
+        });
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn fill_active_downtimes(_org: &str, _list: &mut [ListAlertsResponseBodyItem]) {}
+
+#[cfg(feature = "enterprise")]
+fn list_item_downtime(
+    org: &str,
+    item: &ListAlertsResponseBodyItem,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    use o2_enterprise::enterprise::downtimes::scope::composite_dimensions;
+    use openobserve_core::alerts::downtimes::{active_for_alert, active_for_anomaly};
+
+    let id = item.alert_id.to_string();
+    match item.alert_type.as_str() {
+        "anomaly_detection" => active_for_anomaly(
+            org,
+            &id,
+            &item.folder_id,
+            &composite_dimensions(&item.tags),
+            now,
+        ),
+        "composite" => active_for_alert(
+            org,
+            &id,
+            &item.folder_id,
+            &composite_dimensions(&item.tags),
+            now,
+        ),
+        _ => active_for_alert(org, &id, &item.folder_id, &Default::default(), now),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn still_active(
+    rows: &[config::meta::downtimes::Downtime],
+    downtime_id: &str,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let row = rows
+        .iter()
+        .find(|row| row.id == downtime_id && row.cancelled_at.is_none())?;
+    let window = o2_enterprise::enterprise::downtimes::schedule::window_at(&row.schedule, now)?;
+    Some(config::meta::downtimes::ActiveDowntime {
+        id: row.id.clone(),
+        name: row.name.clone(),
+        ends_at: window.end,
     })
 }
 
@@ -708,6 +787,7 @@ mod tests {
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,
+            active_downtime: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();

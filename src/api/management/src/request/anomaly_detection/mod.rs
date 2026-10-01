@@ -78,7 +78,10 @@ pub async fn list_configs(Path(org_id): Path<String>) -> Response {
         return resp;
     }
     match anomaly_service::list_configs(&org_id, None, None).await {
-        Ok(configs) => MetaHttpResponse::json(configs),
+        Ok(mut configs) => {
+            add_active_downtimes(&org_id, &mut configs).await;
+            MetaHttpResponse::json(configs)
+        }
         Err(e) => {
             tracing::error!("Failed to list anomaly configs: {}", e);
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -86,6 +89,51 @@ pub async fn list_configs(Path(org_id): Path<String>) -> Response {
         }
     }
 }
+
+/// Sets `active_downtime` on each config an active downtime's Anomaly detections target matches.
+#[cfg(feature = "enterprise")]
+async fn add_active_downtimes(org_id: &str, configs: &mut [serde_json::Value]) {
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        || db::downtimes::list_cached(org_id).is_empty()
+    {
+        return;
+    }
+    let semantic_groups = db::system_settings::get_semantic_field_groups(org_id).await;
+    let now = config::utils::time::now_micros();
+    for value in configs.iter_mut() {
+        let Some(obj) = value.as_object_mut() else {
+            continue;
+        };
+        let text = |key: &str| obj.get(key).and_then(|v| v.as_str()).map(str::to_string);
+        let (Some(anomaly_id), Some(folder_id)) = (text("anomaly_id"), text("folder_id")) else {
+            continue;
+        };
+        let tags: Vec<String> = obj
+            .get("tags")
+            .and_then(|t| serde_json::from_value(t.clone()).ok())
+            .unwrap_or_default();
+        let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+            text("custom_sql").as_deref(),
+            &tags,
+            &semantic_groups,
+        );
+        if let Some(downtime) = openobserve_core::alerts::downtimes::active_for_anomaly(
+            org_id,
+            &anomaly_id,
+            &folder_id,
+            &dims,
+            now,
+        ) && let Ok(active) = serde_json::to_value(downtime)
+        {
+            obj.insert("active_downtime".to_string(), active);
+        }
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn add_active_downtimes(_org_id: &str, _configs: &mut [serde_json::Value]) {}
 
 /// Get a specific anomaly detection configuration
 #[utoipa::path(

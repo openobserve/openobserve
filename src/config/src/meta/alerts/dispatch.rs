@@ -223,9 +223,9 @@ pub fn plan_dispatch(
                     row: row.clone(),
                 });
             }
-            DeliveryDecision::SuppressedBySilence | DeliveryDecision::SuppressedByWarningPolicy => {
-                suppressed += 1
-            }
+            DeliveryDecision::SuppressedBySilence
+            | DeliveryDecision::SuppressedByWarningPolicy
+            | DeliveryDecision::SuppressedByDowntime(_) => suppressed += 1,
             DeliveryDecision::SuppressedByPending => pending += 1,
             DeliveryDecision::NotFiring => {}
         }

@@ -46,6 +46,8 @@ export interface Incident {
   acknowledged_at?: number;
   created_at: number;
   updated_at: number;
+  /** Set while a downtime mutes the incident; cleared by the first firing after the window. */
+  muted_by_downtime_id?: string | null;
 }
 
 export interface IncidentTopology {

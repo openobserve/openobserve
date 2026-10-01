@@ -26,6 +26,8 @@ pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
 pub mod db_monitoring;
+#[cfg(feature = "enterprise")]
+pub mod downtimes;
 use ::common;
 use ::db;
 pub mod error_suggest;

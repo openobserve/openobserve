@@ -632,6 +632,7 @@ import { ref, computed, watch, nextTick, onBeforeMount } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useLocalTimezone } from "@/utils/zincutils";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import dashboardService from "@/services/dashboards";
@@ -1143,30 +1144,7 @@ const customFrequencyOptions = computed(() => [
 const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
 
-// @ts-ignore
-let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
-  return tz;
-});
-
-// Not translated on purpose: utils/timezone.ts resolveBrowserTimezone() parses
-// this exact "Browser Time (<zone>)" shape back to an IANA zone before saving, and
-// existing records hold it verbatim. The LABEL is translated in timezoneSelectOptions.
-const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const browserTime = raw("Browser Time (" + browserTz + ")");
-
-// Add the UTC option
-timezoneOptions.unshift("UTC");
-timezoneOptions.unshift(browserTime);
-
-// The browser-time entry keeps its English VALUE (resolveBrowserTimezone parses that
-// exact shape and stored reports hold it) but renders translated copy.
-const timezoneSelectOptions = computed(() =>
-  timezoneOptions.map((tz: string) =>
-    tz === browserTime
-      ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-      : { label: raw(tz), value: tz },
-  ),
-);
+const { timezoneOptions: timezoneSelectOptions } = useTimezoneOptions({ browserEntry: true });
 
 const getDashboaordFolders = () => {
   return new Promise((resolve, reject) => {
@@ -1302,7 +1280,6 @@ const saveReport = async (value: CreateReportForm) => {
 
   if (value.isCachedReport) reportPayload.destinations = [];
 
-  const org = store.state.selectedOrganization.identifier;
   const routeQuery = router.currentRoute.value.query;
   const reportId = routeQuery?.report_id as string | undefined;
   const folderId = selectedReportFolderId.value || "default";

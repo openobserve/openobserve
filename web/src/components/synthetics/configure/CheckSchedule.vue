@@ -19,6 +19,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, BrowserCheckSchedule } from "@/types/synthetics";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -143,35 +144,14 @@ watch(
   },
 );
 
-function buildTimezoneOptions(): { label: I18nText; value: string }[] {
-  try {
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const options: { label: I18nText; value: string }[] = [
-      {
-        // Label is display copy, but the VALUE is persisted and parsed back:
-        // resolveBrowserTimezone()/buildPayload match this exact "Browser Time
-        // (<zone>)" shape, so it stays English. Same as EditScript.vue:755,
-        // DateTime.vue:434, QueryConfig.vue:2580.
-        label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }),
-        value: raw("Browser Time (" + browserTz + ")"),
-      },
-      { label: raw("UTC"), value: "UTC" },
-    ];
-    // @ts-ignore - supportedValuesOf not in all TS versions
-    if (typeof Intl.supportedValuesOf === "function") {
-      // @ts-ignore
-      for (const tz of Intl.supportedValuesOf("timeZone") as string[]) {
-        if (tz !== "UTC") options.push({ label: raw(tz), value: tz });
-      }
-    }
-    return options;
-  } catch {
-    /* fall through */
-  }
-  return [{ label: raw("UTC"), value: "UTC" }];
-}
+const { browserTz, browserTimeValue, zones } = useTimezoneOptions({ browserEntry: true });
 
-const timezoneOptions = buildTimezoneOptions();
+// The browser entry's value is persisted and parsed back, so it stays English.
+const timezoneOptions: { label: I18nText; value: string }[] = zones.map((tz) =>
+  tz === browserTimeValue
+    ? { label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }), value: tz }
+    : { label: raw(tz), value: tz },
+);
 
 const timezone = computed({
   get: () => {

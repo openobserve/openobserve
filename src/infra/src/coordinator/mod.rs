@@ -17,6 +17,7 @@ pub mod ai_prompts;
 pub mod alerts;
 pub mod dashboards;
 pub mod destinations;
+pub mod downtimes;
 pub mod events;
 pub mod model_pricing;
 pub mod oncall;

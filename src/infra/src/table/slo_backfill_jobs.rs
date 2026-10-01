@@ -34,6 +34,10 @@ pub const STATE_DONE: i32 = 3;
 pub const STATE_FAILED: i32 = 4;
 pub const STATE_CANCELLED: i32 = 5;
 
+pub const KIND_BACKFILL: &str = "backfill";
+/// Re-measures slices a downtime corrected or un-corrected (D8).
+pub const KIND_REMEASURE: &str = "remeasure";
+
 pub async fn get(
     db: &DatabaseConnection,
     slo_id: &str,
@@ -70,10 +74,74 @@ pub async fn queue(
         rows_written: Set(0),
         error: Set(None),
         updated_at: Set(now),
+        kind: Set(KIND_BACKFILL.to_string()),
     }
     .insert(db)
     .await?;
     Ok(())
+}
+
+/// Queue a re-measure of `[range_start, range_end)`, widening the generation's job if one exists.
+pub async fn queue_remeasure(
+    db: &DatabaseConnection,
+    slo_id: &str,
+    generation: i32,
+    range_start: i64,
+    range_end: i64,
+    now: i64,
+) -> Result<(), Error> {
+    if get(db, slo_id, generation).await?.is_some() {
+        return extend_range(db, slo_id, generation, range_start, range_end, now).await;
+    }
+    slo_backfill_jobs::ActiveModel {
+        slo_id: Set(slo_id.to_string()),
+        definition_generation: Set(generation),
+        state: Set(STATE_QUEUED),
+        range_start: Set(range_start),
+        range_end: Set(range_end),
+        done_through: Set(None),
+        rows_written: Set(0),
+        error: Set(None),
+        updated_at: Set(now),
+        kind: Set(KIND_REMEASURE.to_string()),
+    }
+    .insert(db)
+    .await?;
+    Ok(())
+}
+
+/// Makes the job a re-measure of the range and restarts its walk; an unfinished job is widened.
+pub async fn extend_range(
+    db: &DatabaseConnection,
+    slo_id: &str,
+    generation: i32,
+    range_start: i64,
+    range_end: i64,
+    now: i64,
+) -> Result<(), Error> {
+    let Some(model) = get(db, slo_id, generation).await? else {
+        return Ok(());
+    };
+    let (start, end) = extended_range(&model, range_start, range_end);
+    let mut active = model.into_active_model();
+    active.state = Set(STATE_QUEUED);
+    active.range_start = Set(start);
+    active.range_end = Set(end);
+    active.done_through = Set(None);
+    active.error = Set(None);
+    active.updated_at = Set(now);
+    active.kind = Set(KIND_REMEASURE.to_string());
+    active.update(db).await?;
+    Ok(())
+}
+
+fn extended_range(model: &slo_backfill_jobs::Model, start: i64, end: i64) -> (i64, i64) {
+    let finished = matches!(model.state, STATE_DONE | STATE_CANCELLED | STATE_FAILED);
+    if finished {
+        (start, end)
+    } else {
+        (model.range_start.min(start), model.range_end.max(end))
+    }
 }
 
 /// Record a completed chunk. `done_through` is the earliest point filled,
@@ -331,5 +399,50 @@ mod tests {
         delete_by_org(&db, ORG).await.unwrap();
         delete_by_org(&db, ORG).await.unwrap();
         assert!(get(&db, OTHER_SLO, 1).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn a_remeasure_on_a_fresh_generation_is_its_own_job() {
+        let db = db().await;
+        queue_remeasure(&db, SLO, 1, 300, 600, 100).await.unwrap();
+        let j = get(&db, SLO, 1).await.unwrap().unwrap();
+        assert_eq!(j.kind, KIND_REMEASURE);
+        assert_eq!((j.range_start, j.range_end), (300, 600));
+        assert_eq!(j.state, STATE_QUEUED);
+    }
+
+    #[tokio::test]
+    async fn a_remeasure_replaces_a_finished_backfill_and_restarts_the_walk() {
+        let db = db().await;
+        queue(&db, SLO, 1, 0, 900, 100).await.unwrap();
+        record_progress(&db, SLO, 1, 0, 50).await.unwrap();
+        mark_done(&db, SLO, 1).await.unwrap();
+        queue_remeasure(&db, SLO, 1, 300, 600, 200).await.unwrap();
+
+        let j = get(&db, SLO, 1).await.unwrap().unwrap();
+        assert_eq!(j.kind, KIND_REMEASURE);
+        assert_eq!((j.range_start, j.range_end), (300, 600));
+        assert_eq!(j.done_through, None, "the walk must restart");
+        assert_eq!(j.state, STATE_QUEUED);
+    }
+
+    #[tokio::test]
+    async fn a_remeasure_widens_an_unfinished_job() {
+        let db = db().await;
+        queue(&db, SLO, 1, 0, 900, 100).await.unwrap();
+        record_progress(&db, SLO, 1, 600, 10).await.unwrap();
+        extend_range(&db, SLO, 1, 800, 1_200, 200).await.unwrap();
+
+        let j = get(&db, SLO, 1).await.unwrap().unwrap();
+        assert_eq!((j.range_start, j.range_end), (0, 1_200));
+        assert_eq!(j.done_through, None);
+        assert_eq!(j.kind, KIND_REMEASURE);
+    }
+
+    #[tokio::test]
+    async fn a_plain_backfill_is_queued_as_backfill() {
+        let db = db().await;
+        queue(&db, SLO, 1, 0, 900, 100).await.unwrap();
+        assert_eq!(get(&db, SLO, 1).await.unwrap().unwrap().kind, KIND_BACKFILL);
     }
 }

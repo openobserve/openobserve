@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, provide, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import { cloneDeep } from "lodash-es";
@@ -116,6 +116,7 @@ import {
   type ConditionForm,
 } from "@/components/pipeline/NodeForm/Condition.schema";
 import { findUnresolvableColumns } from "./conditionColumnCheck";
+import { CONDITION_OPERATORS_KEY } from "@/components/alerts/conditionOperators";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -135,6 +136,8 @@ const props = withDefaults(
     normalizeOperators?: boolean;
     normalizeColumnNames?: boolean;
     optional?: boolean;
+    /** Operator values offered in every row; defaults to FilterCondition's full list. */
+    operators?: string[];
   }>(),
   {
     fields: () => [],
@@ -144,8 +147,11 @@ const props = withDefaults(
     normalizeOperators: false,
     normalizeColumnNames: false,
     optional: false,
+    operators: undefined,
   },
 );
+
+provide(CONDITION_OPERATORS_KEY, computed(() => props.operators));
 
 const { t } = useI18nTyped();
 const filterGroupKey = ref(0);

@@ -55,6 +55,8 @@ pub struct Model {
     pub rows_written: i64,
     pub error: Option<String>,
     pub updated_at: i64,
+    /// `backfill`, or `remeasure` (D8): no status deltas, and a `reconcile` when the walk ends.
+    pub kind: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

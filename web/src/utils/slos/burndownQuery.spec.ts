@@ -19,6 +19,8 @@ import {
   bucketSecsFor,
   budgetUnitsFor,
   buildSloBurndownQuery,
+  correctedRanges,
+  isMissingCorrectedColumn,
   toBurndownSeries,
 } from "./burndownQuery";
 
@@ -262,5 +264,54 @@ describe("budgetUnitsFor", () => {
   it("never divides by zero on a malformed interval", () => {
     expect(budgetUnitsFor(300, "time_slice", 0)).toBe(300);
     expect(budgetUnitsFor(300, "time_slice", Number.NaN)).toBe(300);
+  });
+});
+
+describe("downtime corrections on the burndown (WP11)", () => {
+  const base = { sloId: "slo-1", generation: 2, startSecs: 0, bucketSecs: 300 };
+
+  it("selects corrected per bucket, and leaves it out on the retry", () => {
+    const sql = buildSloBurndownQuery(base);
+    expect(sql).toContain("SELECT slice_start, good, total, corrected_by,");
+    expect(sql).toContain("MAX(CASE WHEN corrected_by <> '' THEN 1 ELSE 0 END) AS corrected");
+    const retry = buildSloBurndownQuery({ ...base, withCorrected: false });
+    expect(retry).not.toContain("corrected");
+  });
+
+  it("carries corrected through the series without changing the arithmetic", () => {
+    const pts = toBurndownSeries(
+      [
+        { bucket: 0, good: 9, total: 10, corrected: 0 },
+        { bucket: 300, good: 0, total: 0, corrected: 1 },
+      ],
+      99,
+    );
+    expect(pts.map((p) => p.corrected)).toEqual([false, true]);
+    expect(pts[1].remaining).toBe(pts[0].remaining);
+  });
+
+  it("merges a run of three corrected buckets into one range and keeps two runs apart", () => {
+    const point = (ts: number, corrected: boolean) => ({ ts, remaining: 1, burn: 0, corrected });
+    const ranges = correctedRanges(
+      [
+        point(0, true),
+        point(300, true),
+        point(600, true),
+        point(900, false),
+        point(1200, true),
+      ],
+      300,
+    );
+    expect(ranges).toEqual([
+      [0, 900],
+      [1200, 1500],
+    ]);
+  });
+
+  it("recognises the error of a stream that has no corrected_by column yet", () => {
+    expect(isMissingCorrectedColumn(new Error("Schema error: No field named corrected_by"))).toBe(
+      true,
+    );
+    expect(isMissingCorrectedColumn(new Error("timeout"))).toBe(false);
   });
 });

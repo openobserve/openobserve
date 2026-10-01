@@ -27,6 +27,16 @@ describe("badgeGroups", () => {
     expect(r.icon).toBeUndefined();
   });
 
+  it("resolves downtimeStatus to dot mode with an amber active state", () => {
+    expect(resolveBadge("downtimeStatus", "active").variant).toBe("warning-soft");
+    expect(resolveBadge("downtimeStatus", "scheduled").variant).toBe("blue-soft");
+    expect(resolveBadge("downtimeStatus", "ended").variant).toBe("default-soft");
+    const cancelled = resolveBadge("downtimeStatus", "cancelled");
+    expect(cancelled.variant).toBe("default-outline");
+    expect(cancelled.dot).toBe(true);
+    expect(cancelled.labelKey).toBe("components.badge.downtimeStatus.cancelled");
+  });
+
   it("resolves logLevel to plain mode (no dot, no icon)", () => {
     const r = resolveBadge("logLevel", "error");
     expect(r.mode).toBe("plain");

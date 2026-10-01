@@ -445,6 +445,70 @@ mod tests {
         assert_eq!(r.actual_value, Some(1.0), "burn rate at exactly 1.0");
     }
 
+    /// D8: a burn window inside an `Exclude` downtime freezes; `CountAsGood` reads zero burn.
+    #[test]
+    fn a_burn_window_fully_inside_a_downtime_reads_zero_total() {
+        use config::meta::{
+            downtimes::{CorrectionWindow, SloCorrectionMode},
+            slo::{SliType, burn, slice::SliceRow},
+        };
+
+        const SLICE: i64 = 300;
+        const WM: i64 = 1_000_000;
+        let params = crate::slo::ingest::PassParams {
+            slo_id: "slo1".into(),
+            definition_generation: 1,
+            range_start: WM - 3600,
+            range_end: WM,
+            slice_interval_secs: SLICE,
+            rev: 7,
+            max_groups: 500,
+        };
+        let windows_for = |mode| {
+            let window = CorrectionWindow {
+                downtime_id: "dt".into(),
+                start: (WM - 3600) * 1_000_000,
+                end: WM * 1_000_000,
+                mode,
+            };
+            let mut slices: Vec<SliceRow> = (1..=12)
+                .map(|i| SliceRow {
+                    slo_id: "slo1".into(),
+                    definition_generation: 1,
+                    group_key: String::new(),
+                    slice_start: WM - i * SLICE,
+                    good: 50.0,
+                    total: 100.0,
+                    rev: 7,
+                    corrected_by: None,
+                })
+                .collect();
+            crate::slo::corrections::apply(&mut slices, &[window], SliType::Count, &params);
+            let buf = burn::fold_trailing(
+                burn::TrailingSlices::new(),
+                slices.iter().map(|s| (s.slice_start, s.good, s.total)),
+                WM,
+                3600,
+            );
+            let mut row = status(Some(burn::burn_windows_json(&buf, &[3600, 300], WM, SLICE)));
+            row.watermark_end = Some(WM);
+            let c = SloCondition {
+                long_window_secs: Some(3600),
+                short_window_secs: Some(300),
+                ..cond(SloAlertKind::BurnRate)
+            };
+            burn_windows(&row, &c, 0.9, false)
+        };
+
+        let (long, short) = windows_for(SloCorrectionMode::Exclude);
+        assert_eq!(long, Observation::Unobserved(UnobservedReason::ZeroTotal));
+        assert_eq!(short, Observation::Unobserved(UnobservedReason::ZeroTotal));
+
+        let (long, short) = windows_for(SloCorrectionMode::CountAsGood);
+        assert_eq!(long.sli(), Some(100.0));
+        assert_eq!(short.sli(), Some(100.0));
+    }
+
     /// The negative half of the contract: a window the ingest pass did NOT
     /// precompute must still freeze. Proves the round-trip test above passes
     /// for the right reason rather than because everything reads as observed.

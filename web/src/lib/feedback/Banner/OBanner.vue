@@ -59,6 +59,8 @@ const ariaRole = computed(
 const hasDefaultSlot = computed(() => !!slots.default);
 const hasIconSlot = computed(() => !!slots.icon);
 const hasActionsSlot = computed(() => !!slots.actions);
+const hasMetaSlot = computed(() => !!slots.meta);
+const hasFooterSlot = computed(() => !!slots.footer);
 const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
 const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 
@@ -165,6 +167,13 @@ const barVariantClass = computed(() => {
       >
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
+        <div v-if="hasFooterSlot" class="mt-1" data-test="o-banner-footer">
+          <slot name="footer" />
+        </div>
+      </div>
+
+      <div v-if="hasMetaSlot" class="shrink-0" data-test="o-banner-meta">
+        <slot name="meta" />
       </div>
     </div>
 
