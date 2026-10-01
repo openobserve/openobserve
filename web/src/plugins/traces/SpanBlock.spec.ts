@@ -680,6 +680,47 @@ describe("SpanBlock", () => {
       // left = (startTimeUs - newStart) / duration * 100 = 50000/400000*100 = 12.5
       expect(wrapper.vm.leftPosition).toBeCloseTo(12.5, 0);
     });
+
+    // Regression: a RUM view root lasts the whole page visit, so on an axis
+    // fitted to the trace it starts before the window and ends after it.
+    it("clamps a span that overruns both edges of the window to the window", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs - 1_000_000, durationUs: 25 * 60e6 },
+      });
+      expect(wrapper.vm.leftPosition).toBe(0);
+      expect(wrapper.vm.spanWidth).toBe(100);
+    });
+
+    it("draws only the in-window part of a span that starts before the window", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs - 100_000, durationUs: 200_000 },
+      });
+      // ends 100000us into a 350372us window
+      expect(wrapper.vm.leftPosition).toBe(0);
+      expect(wrapper.vm.spanWidth).toBeCloseTo(28.54, 1);
+    });
+
+    it("recalculates spanWidth when only the span's start moves", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs + 100_000 },
+      });
+      // 321372us from 100000us in would end past the window; 250372 of it is inside
+      expect(wrapper.vm.spanWidth).toBeCloseTo(71.46, 1);
+    });
+
+    // Regression: on a 25-minute axis a 300ms call is 0.6px wide and vanished.
+    it("keeps a minimum width on a span inside the window", async () => {
+      await wrapper.setProps({ span: { ...mockSpan, durationUs: 1 } });
+      expect(wrapper.vm.spanWidth).toBe(0);
+      expect(spanMarker().classes()).toContain("min-w-0.5");
+    });
+
+    it("gives no minimum width to a span that starts outside the window", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs - 1_000_000, durationUs: 0 },
+      });
+      expect(spanMarker().classes()).not.toContain("min-w-0.5");
+    });
   });
 
   describe("span-block-select-trigger click", () => {

@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left: leftPosition + '%',
           }"
           class="relative flex flex-nowrap items-center justify-start"
+          :class="startsInWindow ? 'min-w-0.5' : ''"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
@@ -311,17 +312,34 @@ export default defineComponent({
 
     const spanMarkerRef = ref(null);
 
-    const getLeftPosition = () => {
-      const left = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
-
-      return (left / props.baseTracePosition?.durationUs) * 100;
+    // Where the span starts and ends as a percentage of the window, unclamped:
+    // a span can run past either edge, e.g. a RUM view that outlasts the trace
+    // or any span once the timeline is zoomed in.
+    const getSpanExtent = () => {
+      const offset = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
+      const start = (offset / props.baseTracePosition?.durationUs) * 100;
+      return {
+        start,
+        end: start + (props.span?.durationUs / props.baseTracePosition?.durationUs) * 100,
+      };
     };
+
+    // The bar covers only the part of the span inside the window. The row clips
+    // the rest anyway, but the duration label is placed from these values, and
+    // unclamped it followed the bar's end off-screen.
+    const getLeftPosition = () => Math.min(Math.max(getSpanExtent().start, 0), 100);
 
     const getSpanWidth = () => {
-      return Number(
-        ((props.span?.durationUs / props.baseTracePosition?.durationUs) * 100).toFixed(2),
-      );
+      const { start, end } = getSpanExtent();
+      return Number(Math.max(Math.min(end, 100) - Math.max(start, 0), 0).toFixed(2));
     };
+
+    // A span inside the window keeps a sliver even when it is far shorter than
+    // a pixel at this scale, so a short call never reads as a missing bar.
+    const startsInWindow = computed(() => {
+      const { start } = getSpanExtent();
+      return start >= 0 && start <= 100;
+    });
 
     onMounted(async () => {
       durationStyle.value = getDurationStyle();
@@ -371,7 +389,12 @@ export default defineComponent({
     );
 
     watch(
-      () => props.span?.durationUs + props.baseTracePosition?.durationUs,
+      () => [
+        props.span?.startTimeUs,
+        props.span?.durationUs,
+        props.baseTracePosition?.startTimeUs,
+        props.baseTracePosition?.durationUs,
+      ],
       () => {
         spanWidth.value = getSpanWidth();
       },
@@ -478,6 +501,7 @@ export default defineComponent({
       getImageURL,
       leftPosition,
       spanWidth,
+      startsInWindow,
       getDurationStyle,
       spanBlock,
       onResize,
