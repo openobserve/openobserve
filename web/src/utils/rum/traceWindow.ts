@@ -58,3 +58,27 @@ export function spanWindowUs(
   if (!Number.isFinite(startNs) || !Number.isFinite(endNs)) return null;
   return { start: Math.floor(startNs / 1000), end: Math.ceil(endNs / 1000) };
 }
+
+type RumSpanMarkers = { rum_event_type?: unknown; _is_collapsed_group?: unknown };
+
+/**
+ * A RUM span that frames a trace rather than taking part in it: the view, which
+ * lasts as long as the page stayed open, and the collapsed group rows, which run
+ * from the view's first such event to its last.
+ */
+export function isRumContextSpan(span: RumSpanMarkers | null | undefined): boolean {
+  return span?.rum_event_type === "view" || span?._is_collapsed_group === true;
+}
+
+/**
+ * The spans a waterfall's time axis should fit. A view open for 25 minutes
+ * otherwise sets a 25-minute axis, and every request under it draws narrower
+ * than a pixel. Falls back to every span when only context spans are present.
+ */
+export function waterfallAxisSpans<T extends RumSpanMarkers & SpanTimes>(
+  spans: ReadonlyArray<T> | null | undefined,
+): ReadonlyArray<T> {
+  if (!spans) return [];
+  const participants = spans.filter((span) => !isRumContextSpan(span));
+  return participants.length ? participants : spans;
+}
