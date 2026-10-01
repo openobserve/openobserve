@@ -3659,7 +3659,40 @@
     "dataSource": "Data Source",
     "uploadFile": "Upload File",
     "fromUrl": "From URL",
-    "addFunction": "Add Function"
+    "addFunction": "Add Function",
+    "import": {
+      "title": "Import Function",
+      "outputMessages": "Output Messages",
+      "errorValidations": "Error Validations",
+      "results": "Import Results",
+      "nameLabel": "Function Name",
+      "nameRequired": "Function - {index}: name is required",
+      "nameExists": "Function - {index}: \"{name}\" already exists",
+      "nameInvalid": "Function - {index}: \"{name}\" is not a valid function name. Use letters, numbers and underscores, starting with a letter or underscore.",
+      "duplicateName": "Function - {index}: \"{name}\" appears more than once in this file",
+      "bodyRequired": "Function - {index}: function body is required",
+      "transTypeInvalid": "Function - {index}: type must be 0 for VRL or 1 for JavaScript",
+      "paramsInvalid": "Function - {index}: params must be a string",
+      "transTypeLabel": "Language",
+      "transTypePlaceholder": "Choose a language",
+      "paramsLabel": "Parameters",
+      "paramsHint": "Comma-separated argument names. Defaults to \u201crow\u201d.",
+      "overrideExisting": "Replace the existing function instead",
+      "nameInputRequired": "Enter a function name",
+      "nameInputInvalid": "Use letters, numbers and underscores, starting with a letter or underscore",
+      "nameInputDuplicate": "Another function in this file already uses this name",
+      "nameInputExists": "This name is already taken in this organization",
+      "overrideAffects": "Override also changes these pipelines: {pipelines}",
+      "createSuccess": "Function - {index}: \"{name}\" imported",
+      "overridden": "Function - {index}: \"{name}\" overridden",
+      "createFailed": "Function - {index}: \"{name}\" failed - {reason}",
+      "rejectedBody": "Correct the definition and import again.",
+      "rejectedLanguage": "Function - {index}: \"{name}\" was rejected. If it is a JavaScript function, set the language \u2014 a definition with no language is read as VRL.",
+      "jsonStringEmpty": "JSON string is empty",
+      "invalidJsonFormat": "Invalid JSON format",
+      "importSuccess": "Imported {count} function | Imported {count} functions",
+      "nothingToImport": "No functions found to import. Check the file is valid JSON."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Analyzing dimensions...",
@@ -15870,7 +15903,8 @@
       "oncallAck": "Acknowledge",
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
-      "oncallResolve": "Resolve"
+      "oncallResolve": "Resolve",
+      "functionsImport": "Import function"
     }
   },
   "components": {
@@ -16482,7 +16516,10 @@
       "enrichmentReloadStarted": "Enrichment table reload started. Processing in background...",
       "enrichmentJobStarted": "Enrichment table job started. Processing in background...",
       "enrichmentCreationFailed": "Enrichment Table creation failed",
-      "functionDeletionAssociatedPipelines": "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines."
+      "functionDeletionAssociatedPipelines": "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+      "successfullyExportedFunctions": "Successfully exported {count} function | Successfully exported {count} functions",
+      "errorExportingFunctions": "Error exporting functions. Please try again.",
+      "functionsMissingFromExport": "{names} is no longer in the list and was left out of the export | {names} are no longer in the list and were left out of the export"
     },
     "recommended": {
       "failedToImportDashboard": "Failed to import dashboard: {error}",
