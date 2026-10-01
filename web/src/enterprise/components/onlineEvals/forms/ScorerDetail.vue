@@ -95,8 +95,8 @@
 
       <!-- ── Body ── -->
       <div
-        class="flex min-h-0 flex-1 flex-col gap-4.5 overflow-auto"
-        :class="{ 'pb-4.5': activeTab !== 'runs', 'pt-4.5': activeTab !== 'versions' }"
+        class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+        :class="{ 'pb-4.5': activeTab !== 'runs', 'pt-2': activeTab !== 'versions' }"
       >
         <!-- Runs filter row — agent filter, right-aligned. The date picker +
              refresh live in the global toolbar above the cards, so they're not
