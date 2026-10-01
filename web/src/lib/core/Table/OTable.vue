@@ -1477,7 +1477,6 @@ defineExpose({
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
             :selection-multiple="selection.isMultiple.value"
-            :show-select-all="showSelectAll"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
             :expansion-enabled="expansion.isEnabled.value"
