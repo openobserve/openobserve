@@ -426,6 +426,19 @@ impl Cidr {
     }
 }
 
+/// A connect-time or redirect refusal by the guard, found in a request error by
+/// [`find_ssrf_refusal`].
+#[derive(Debug)]
+pub struct SsrfRefusal(String);
+
+impl std::fmt::Display for SsrfRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for SsrfRefusal {}
+
 /// Rejects resolved addresses at connect time, where the sync redirect callback cannot resolve DNS.
 #[derive(Debug, Clone)]
 pub struct SsrfDnsResolver {
@@ -461,7 +474,8 @@ impl SsrfDnsResolver {
                 cfg.common.ssrf_allow_loopback,
                 host_allowed,
                 allowlist,
-            )?;
+            )
+            .map_err(SsrfRefusal)?;
         }
         Ok(addrs)
     }
@@ -503,6 +517,21 @@ pub fn init_allowlist() {
     LazyLock::force(&ALLOWLIST);
 }
 
+/// The guard's refusal anywhere in `err`'s source chain; a refusal is permanent, so not worth a
+/// retry.
+pub fn find_ssrf_refusal<'a>(
+    err: &'a (dyn std::error::Error + 'static),
+) -> Option<&'a SsrfRefusal> {
+    let mut source = Some(err);
+    while let Some(e) = source {
+        if let Some(refusal) = e.downcast_ref::<SsrfRefusal>() {
+            return Some(refusal);
+        }
+        source = e.source();
+    }
+    None
+}
+
 fn build_scoped_client(
     builder: reqwest::ClientBuilder,
     scope: Scope,
@@ -533,7 +562,7 @@ fn build_guarded_client(
                 allowlist,
             ) {
                 Ok(()) => attempt.follow(),
-                Err(e) => attempt.error(e),
+                Err(e) => attempt.error(SsrfRefusal(e)),
             }
         }))
         .dns_resolver(Arc::new(resolver))
@@ -996,6 +1025,7 @@ mod tests {
             chain.contains("169.254.169.254") && chain.contains("not allowed"),
             "{chain}"
         );
+        assert!(find_ssrf_refusal(&err).is_some(), "{chain}");
     }
 
     #[tokio::test]
@@ -1035,6 +1065,8 @@ mod tests {
             .await
             .expect_err("the strict client must ignore the allowlist");
         assert!(error_chain(&err).contains("not allowed"), "{err:?}");
+        let refusal = find_ssrf_refusal(&err).expect("the refusal is in the error chain");
+        assert!(refusal.to_string().contains("not allowed"), "{refusal}");
         let destination = build_scoped_client(builder(), Scope::Destination, allow).unwrap();
         let res = destination.get(&url).send().await;
         assert!(res.is_ok(), "{:?}", res.map_err(|e| error_chain(&e)));
@@ -1073,6 +1105,16 @@ mod tests {
         assert!(res.is_ok(), "{:?}", res.map_err(|e| error_chain(&e)));
         let err = client(&[]).get(target).send().await.unwrap_err();
         assert!(error_chain(&err).contains("not allowed"), "{err:?}");
+        assert!(find_ssrf_refusal(&err).is_some(), "{err:?}");
+        let timeout = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(1))
+            .build()
+            .unwrap()
+            .get("http://192.0.2.1:9/")
+            .send()
+            .await
+            .unwrap_err();
+        assert!(find_ssrf_refusal(&timeout).is_none(), "{timeout:?}");
     }
 
     #[test]
