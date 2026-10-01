@@ -3714,8 +3714,8 @@ class APICleanup {
         }
     }
 
-    // Sweeps synthetics checks (all folders), folders, per-worker locations and agent tokens by prefix; 404 means the flag is off.
-    async cleanupSynthetics(prefixes = []) {
+    // A 404 on the checks list means ZO_SYNTHETICS_ENABLED is off, so there is nothing else to sweep.
+    async cleanupSynthetics(prefixes = [], { locationIds = [] } = {}) {
         if (!prefixes.length) return;
         testLogger.info('Starting synthetics cleanup', { prefixes: prefixes.map(p => p.source || p) });
         const apiBase = `${this.baseUrl}/api/${this.org}/synthetics`;
@@ -3723,6 +3723,7 @@ class APICleanup {
         const matches = (name) => typeof name === 'string' &&
             prefixes.some(p => (p instanceof RegExp) ? p.test(name) : name.startsWith(p));
         try {
+            await this._sweepStatusPages(matches, headers);
             const listRes = await this._fetch(apiBase, { method: 'GET', headers });
             if (listRes.status === 404) {
                 testLogger.info('Synthetics endpoint not available — skipping cleanup');
@@ -3739,41 +3740,63 @@ class APICleanup {
             } else {
                 testLogger.info('No synthetics checks matched cleanup patterns');
             }
-
-            // Per-worker public locations are ids of `<provider>-<prefixed region>`; the shared e2e-us-east-1 never matches.
-            const locRes = await this._fetch(`${apiBase}/locations`, { method: 'GET', headers });
-            if (locRes.ok) {
-                const locations = ((await locRes.json()).locations || [])
-                    .filter(l => typeof l.id === 'string' && matches(l.id.replace(/^[^-]+-/, '')));
-                for (const l of locations) {
-                    await this._fetch(`${apiBase}/locations/${encodeURIComponent(l.id)}`, { method: 'DELETE', headers });
-                }
-                if (locations.length) testLogger.info('Synthetics locations cleanup completed', { count: locations.length });
-            }
-
-            const folderBase = `${this.baseUrl}/api/v2/${this.org}/folders/synthetics`;
-            const folderRes = await this._fetch(folderBase, { method: 'GET', headers });
-            if (folderRes.ok) {
-                const folders = ((await folderRes.json()).list || []).filter(f => matches(f.name));
-                for (const f of folders) {
-                    await this._fetch(`${folderBase}/${encodeURIComponent(f.folderId)}`, { method: 'DELETE', headers });
-                }
-                if (folders.length) testLogger.info('Synthetics folders cleanup completed', { count: folders.length });
-            }
-
-            const tokRes = await this._fetch(`${apiBase}/agent-tokens`, { method: 'GET', headers });
-            if (tokRes.ok) {
-                const tokens = ((await tokRes.json()).tokens || []).filter(t => matches(t.name) && t.enabled);
-                for (const t of tokens) {
-                    await this._fetch(`${apiBase}/agent-tokens/${encodeURIComponent(t.name)}`, {
-                        method: 'PATCH', headers, body: JSON.stringify({ enabled: false }),
-                    });
-                }
-                if (tokens.length) testLogger.info('Synthetics tokens disabled', { count: tokens.length });
-            }
+            await this._sweepSyntheticsLocations(apiBase, headers, matches, locationIds);
+            await this._sweepSyntheticsFolders(headers, matches);
+            await this._disableSyntheticsTokens(apiBase, headers, matches);
         } catch (err) {
             testLogger.warn('Synthetics cleanup failed (non-fatal)', { error: err.message });
         }
+    }
+
+    // Per-worker public locations are ids of `<provider>-<prefixed region>`; shared ones are only removed when named in locationIds.
+    async _sweepSyntheticsLocations(apiBase, headers, matches, locationIds) {
+        const locRes = await this._fetch(`${apiBase}/locations`, { method: 'GET', headers });
+        if (!locRes.ok) return;
+        const locations = ((await locRes.json()).locations || [])
+            .filter(l => typeof l.id === 'string' && (locationIds.includes(l.id) || matches(l.id.replace(/^[^-]+-/, ''))));
+        let deleted = 0;
+        for (const l of locations) {
+            const res = await this._fetch(`${apiBase}/locations/${encodeURIComponent(l.id)}`, { method: 'DELETE', headers });
+            // The server refuses to delete a location that a check still uses.
+            if (res.ok) deleted++;
+            else testLogger.warn('Synthetics location not deleted', { id: l.id, status: res.status });
+        }
+        if (locations.length) testLogger.info('Synthetics locations cleanup completed', { deleted, matched: locations.length });
+    }
+
+    async _sweepSyntheticsFolders(headers, matches) {
+        const folderBase = `${this.baseUrl}/api/v2/${this.org}/folders/synthetics`;
+        const folderRes = await this._fetch(folderBase, { method: 'GET', headers });
+        if (!folderRes.ok) return;
+        const folders = ((await folderRes.json()).list || []).filter(f => matches(f.name));
+        for (const f of folders) {
+            await this._fetch(`${folderBase}/${encodeURIComponent(f.folderId)}`, { method: 'DELETE', headers });
+        }
+        if (folders.length) testLogger.info('Synthetics folders cleanup completed', { count: folders.length });
+    }
+
+    // Agent tokens have no delete endpoint, so disabling is the strongest cleanup available.
+    async _disableSyntheticsTokens(apiBase, headers, matches) {
+        const tokRes = await this._fetch(`${apiBase}/agent-tokens`, { method: 'GET', headers });
+        if (!tokRes.ok) return;
+        const tokens = ((await tokRes.json()).tokens || []).filter(t => matches(t.name) && t.enabled);
+        for (const t of tokens) {
+            await this._fetch(`${apiBase}/agent-tokens/${encodeURIComponent(t.name)}`, {
+                method: 'PATCH', headers, body: JSON.stringify({ enabled: false }),
+            });
+        }
+        if (tokens.length) testLogger.info('Synthetics tokens disabled', { count: tokens.length });
+    }
+
+    async _sweepStatusPages(matches, headers) {
+        const base = `${this.baseUrl}/api/${this.org}/status_pages`;
+        const listRes = await this._fetch(base, { method: 'GET', headers });
+        if (!listRes.ok) return;
+        const pages = ((await listRes.json()).pages || []).filter(p => matches(p.name));
+        for (const p of pages) {
+            await this._fetch(`${base}/${encodeURIComponent(p.id)}`, { method: 'DELETE', headers });
+        }
+        if (pages.length) testLogger.info('Status pages cleanup completed', { count: pages.length });
     }
 }
 

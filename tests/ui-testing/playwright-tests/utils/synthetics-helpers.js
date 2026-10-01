@@ -15,17 +15,19 @@
 
 // Synthetics e2e helpers: API setup/teardown and result-stream seeding.
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 const { ingestCustomData, waitForFieldValueSearchable } = require('./data-ingestion.js');
+const APICleanup = require('../../pages/apiCleanup.js');
 
 const RESULTS_STREAM = 'synthetics_results';
 const STEP_RESULTS_STREAM = 'synthetics_step_results';
 // Every entity a spec creates carries this prefix so cleanup.spec.js can sweep it.
 const E2E_PREFIX = 'synth_e2e_';
-// Shared infra: created once if no enabled public location exists, never deleted.
+// Shared by every worker, so per-worker cleanup skips it; only the cleanup.spec.js sweep deletes it.
 const E2E_LOCATION = {
   kind: 'public',
   id: 'e2e-us-east-1',
@@ -54,6 +56,11 @@ function workerPrefix(testInfo) {
 
 function uniqueName(kind, testInfo) {
   return `${workerPrefix(testInfo)}${kind}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Random per run so no secret literal lives in the repo and a redaction assert cannot match by chance.
+function dummySecret() {
+  return `dummy-${crypto.randomBytes(12).toString('hex')}`;
 }
 
 // The single-node meta store is SQLite; parallel workers writing checks can hit "database is locked".
@@ -101,10 +108,6 @@ async function listLocations(page, org = getOrgIdentifier()) {
 
 async function createLocation(page, payload, org = getOrgIdentifier()) {
   return request(page, 'post', `${apiBase(org)}/locations`, payload);
-}
-
-async function deleteLocation(page, id, org = getOrgIdentifier()) {
-  return request(page, 'delete', `${apiBase(org)}/locations/${id}`);
 }
 
 async function ensureSyntheticsLocation(page) {
@@ -155,7 +158,7 @@ function typeConfig(type) {
       return {
         port: 22,
         username: 'e2e',
-        auth: { type: 'password', secret: 'synth-e2e-secret' },
+        auth: { type: 'password', secret: dummySecret() },
         timeout_ms: 10000,
       };
     case 'browser':
@@ -220,25 +223,6 @@ async function findCheckByName(page, name) {
   return (await listChecks(page)).find((c) => c.name === name) ?? null;
 }
 
-async function listAllChecks(page) {
-  const { status, body } = await request(page, 'get', apiBase());
-  if (status !== 200) throw new Error(`GET synthetics list failed: HTTP ${status}`);
-  return body?.checks ?? [];
-}
-
-async function deleteChecksByPrefix(page, prefix) {
-  try {
-    const ids = (await listAllChecks(page))
-      .filter((c) => typeof c?.name === 'string' && c.name.startsWith(prefix))
-      .map((c) => c.id);
-    if (ids.length === 0) return;
-    await request(page, 'delete', apiBase(), { ids });
-    testLogger.info('Synthetics checks swept', { prefix, count: ids.length });
-  } catch (e) {
-    testLogger.debug('Synthetics prefix cleanup failed (non-fatal)', { prefix, error: e.message });
-  }
-}
-
 // Polls GET /synthetics/{id} until `predicate(check)` holds or the deadline passes.
 async function waitForCheck(page, id, predicate, { timeoutMs = 20000, intervalMs = 2000 } = {}) {
   const deadline = Date.now() + timeoutMs;
@@ -262,36 +246,10 @@ async function createSyntheticsFolder(page, name) {
   return body.folderId;
 }
 
-async function deleteSyntheticsFoldersByPrefix(page, prefix) {
-  const org = getOrgIdentifier();
-  try {
-    const { body } = await request(page, 'get', `${baseUrl()}/api/v2/${org}/folders/synthetics`);
-    for (const f of body?.list ?? []) {
-      if (typeof f?.name === 'string' && f.name.startsWith(prefix)) {
-        await request(page, 'delete', `${baseUrl()}/api/v2/${org}/folders/synthetics/${f.folderId}`);
-      }
-    }
-  } catch (e) {
-    testLogger.debug('Synthetics folder cleanup failed (non-fatal)', { prefix, error: e.message });
-  }
-}
-
 async function listTokens(page) {
   const { status, body } = await request(page, 'get', `${apiBase()}/agent-tokens`);
   if (status !== 200) throw new Error(`GET agent-tokens failed: HTTP ${status}`);
   return body?.tokens ?? [];
-}
-
-async function disableTokensByPrefix(page, prefix) {
-  try {
-    for (const t of await listTokens(page)) {
-      if (typeof t?.name === 'string' && t.name.startsWith(prefix) && t.enabled) {
-        await request(page, 'patch', `${apiBase()}/agent-tokens/${t.name}`, { enabled: false });
-      }
-    }
-  } catch (e) {
-    testLogger.debug('Synthetics token cleanup failed (non-fatal)', { prefix, error: e.message });
-  }
 }
 
 function loadFixture(file) {
@@ -411,15 +369,24 @@ async function seedResults(page, check, scenario, offsetsMin = [-1, -2, -3]) {
   return seeded;
 }
 
+// Skips the shared location because other workers may still be creating checks on it.
+async function cleanupWorkerEntities(browser, testInfo) {
+  const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+  const page = await context.newPage();
+  await new APICleanup(page).cleanupSynthetics([workerPrefix(testInfo)]);
+  await context.close();
+}
+
 module.exports = {
+  E2E_LOCATION_ID: E2E_LOCATION.id,
   apiBase,
   request,
   workerPrefix,
   uniqueName,
+  dummySecret,
   assertSyntheticsEnabled,
   listLocations,
   createLocation,
-  deleteLocation,
   ensureSyntheticsLocation,
   checkPayload,
   startOneHourAhead,
@@ -427,11 +394,9 @@ module.exports = {
   getCheck,
   listChecks,
   findCheckByName,
-  deleteChecksByPrefix,
   waitForCheck,
   createSyntheticsFolder,
-  deleteSyntheticsFoldersByPrefix,
   listTokens,
-  disableTokensByPrefix,
   seedResults,
+  cleanupWorkerEntities,
 };
