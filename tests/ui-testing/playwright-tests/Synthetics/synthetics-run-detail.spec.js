@@ -94,6 +94,8 @@ test.describe('Synthetics run detail (seeded)', { tag: ['@synthetics', '@all'] }
     testLogger.info('Verifying the error badge and banner');
     await r.expectStatusBadge('Error');
     await r.expectErrorBanner('Dispatch error');
+    testLogger.info('Verifying the run has no steps');
+    await r.expectNoDetailSteps();
   });
 
   test('id-less quota row opens the inline error view without navigating', { tag: ['@P1', '@regression'] }, async ({ page }) => {

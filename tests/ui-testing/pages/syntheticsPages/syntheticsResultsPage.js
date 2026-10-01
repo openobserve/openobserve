@@ -141,7 +141,8 @@ export class SyntheticsResultsPage {
 
   // The tile is label then value, so the value is anchored at the end.
   async expectKpiValue(key, value) {
-    await expect(this.page.locator(this.kpi(key))).toHaveText(new RegExp(`\\D${value}\\s*$`), { timeout: 30000 });
+    const escaped = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await expect(this.page.locator(this.kpi(key))).toHaveText(new RegExp(`\\D${escaped}\\s*$`), { timeout: 30000 });
   }
 
   async expectPageEmpty() {
@@ -156,6 +157,12 @@ export class SyntheticsResultsPage {
 
   async expectDetailStepRows(count) {
     await expect(this.page.locator(this.locators.row)).toHaveCount(count, { timeout: 30000 });
+  }
+
+  // Call after the error banner is visible, or a zero row count passes before the page loads.
+  async expectNoDetailSteps() {
+    await expect(this.page.locator(this.locators.detailStepsTab)).toHaveText(/\D0\s*$/, { timeout: 30000 });
+    await expect(this.page.locator(this.locators.row)).toHaveCount(0);
   }
 
   async expectStatusBadge(text) {

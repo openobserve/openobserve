@@ -71,6 +71,9 @@ test.describe('Synthetics results (seeded)', { tag: ['@synthetics', '@all'] }, (
     await r.expectKpiValue('warning-runs', seeded.counts.warning);
     await r.expectKpiValue('failed-runs', seeded.counts.failed);
     await r.expectKpiValue('error-runs', seeded.counts.error);
+    const { passed, warning, failed } = seeded.counts;
+    // Error runs mean the check could not run, so the page leaves them out of the pass rate.
+    await r.expectKpiValue('pass-rate', `${(((passed + warning) / (passed + warning + failed)) * 100).toFixed(1)}%`);
   });
 
   test('runs table lists every seeded run', { tag: ['@P0'] }, async () => {
