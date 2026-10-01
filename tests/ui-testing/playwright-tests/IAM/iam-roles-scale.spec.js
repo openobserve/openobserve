@@ -16,14 +16,23 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, createRole, setRolePerms, getPerms, sweepRoles, uniq, org, rbacEnabled,
+    ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('scl');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
 // Enough to have broken the old tree, few enough to seed in one PUT.
 const BULK = 1000;
-const S_PREFIX = `${PREFIX}_sc_s`;
+const S_PREFIX = `${NS}_sc_s`;
 
 // A role holding grants across many shapes at once, for the JSON round trip.
 const MIXED_RESOURCES = [
@@ -32,10 +41,19 @@ const MIXED_RESOURCES = [
 ];
 
 test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. every test in this file creates roles under one namespace and afterAll sweeps that
+    // namespace, and beforeAll/afterAll run once PER WORKER — not per file. Under
+    // `fullyParallel: true` this file's tests spread across workers, so each worker runs
+    // its own sweep and they delete each other's roles mid-test: measured as
+    // "teardown left roles behind: <this file's own prefix>". Serial pins the file to one
+    // worker, so there is exactly one setup and one teardown.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     const freshRole = async (page, tag) => {
-        const name = `${PREFIX}_sl_${tag}_${uniq()}`;
+        const name = `${NS}_sl_${tag}_${uniq()}`;
+        made.role(name);
         await createRole(page, name);
         return name;
     };
@@ -43,7 +61,6 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
         } finally {
             await page.close();
         }
@@ -52,10 +69,10 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            const removed = await sweepRoles(page);
+            const removed = (await made.cleanup(page)).roles;
             testLogger.info(`teardown removed ${removed.length} roles`);
-            const left = (await listRoles(page)).filter((r) => r.startsWith(PREFIX));
-            if (left.length) throw new Error(`teardown left roles behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }

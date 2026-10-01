@@ -11,16 +11,24 @@
 // Permissions section is absent, so the suite skips rather than fail or — worse —
 // pass vacuously.
 //
-// Every artifact is namespaced `ui_auto_*` and removed in afterAll, including
-// a sweep for leftovers from an earlier aborted run. Tests run sequentially in
-// one worker (no describe.configure) because they share the fixture roles.
+// Every artifact is namespaced under this file's OWN prefix (see PREFIX below) and
+// removed in afterAll, including
+// a sweep for leftovers from an earlier aborted run. Tests run sequentially because
+// this file declares mode: 'serial' — omitting it did NOT give one worker, which is
+// what this comment used to claim: `fullyParallel: true` spreads a file's tests across
+// workers, each running its own beforeAll and its own sweeping afterAll.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-const PREFIX = 'ui_auto';
+// This file's own namespace, NOT the shared `ui_auto`. sweepLeftovers below deletes
+// groups, roles, users and service accounts by this prefix, and the eleven IAM specs
+// run in parallel — while this said 'ui_auto' it deleted every other spec's fixtures
+// mid-test. Three letters, distinct from every other spec's token (see ns() in
+// iam-fixtures.js), so no namespace can be a prefix of another.
+const PREFIX = 'ui_auto_grp';
 const uniq = () => `${Date.now()}x${Math.floor(Math.random() * 10000)}`;
 
 // Fixture roles, created once via API. Names are underscore-only on purpose:
@@ -160,6 +168,13 @@ const sweepLeftovers = async (page) => {
 // ---------- suite ----------
 
 test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. The fixture roles, member and service account are made once
+    // in beforeAll and shared, and sweepLeftovers deletes this file's whole namespace —
+    // and beforeAll/afterAll run once PER WORKER, not per file. Without this, workers
+    // sweep each other mid-test: measured as "teardown left artifacts behind" naming
+    // this file's own groups.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     test.beforeEach(async ({ page }) => {
@@ -264,9 +279,17 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
         await expect(pm.groupsPage.rowsIn('roles')).toHaveCount(1);
         await expect(pm.groupsPage.rowCheckbox('roles', ROLE_A)).toBeVisible();
 
+        // MEMBERSHIP, not a count. This compared the rendered row count to
+        // listRoles().length, which are two reads a moment apart over state the whole
+        // org shares — any concurrent spec creating a role between them made it 15 vs 14.
+        // The claim worth testing is that "All" is not filtered to the group's own roles,
+        // and a role the group does NOT hold proves that without counting anything.
         await pm.groupsPage.showAllButton('roles').click();
-        const orgRoles = await listRoles(page);
-        await expect(pm.groupsPage.rowsIn('roles')).toHaveCount(orgRoles.length);
+        await expect(pm.groupsPage.rowCheckbox('roles', ROLE_A)).toBeVisible();
+        await expect(
+            pm.groupsPage.rowCheckbox('roles', ROLE_B),
+            'the All view still hid a role the group does not hold',
+        ).toBeVisible({ timeout: 15000 });
     });
 
     // ---------------- GR-04 (B1 regression) ----------------

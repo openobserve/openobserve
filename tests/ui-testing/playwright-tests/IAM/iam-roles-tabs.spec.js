@@ -14,19 +14,35 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, listUsers, createRole, getPerms, sweepRoles, sweepUsers,
+    ns, req, listRoles, listUsers, createRole, getPerms, makeTracker,
     MEMBER_PASSWORD, uniq, org, rbacEnabled,
 } = require('./iam-fixtures.js');
 
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('tab');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
+
 const obj = (resource) => `${resource}:_all_${org()}`;
 
-const U_MEMBER = `${PREFIX}_t_member@example.com`;
+const U_MEMBER = `${NS}_t_member@example.com`;
 
 test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. U_MEMBER is made once in beforeAll and T-01 assigns it.
+    // `fullyParallel: true` races individual TESTS, so the per-file namespaces in
+    // iam-fixtures.js only stop files colliding — this stops a file colliding with
+    // itself. Cost: a failure here skips the rest of the file rather than running them.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     const freshRole = async (page, tag) => {
-        const name = `${PREFIX}_tb_${tag}_${uniq()}`;
+        const name = `${NS}_tb_${tag}_${uniq()}`;
+        made.role(name);
         await createRole(page, name);
         return name;
     };
@@ -42,8 +58,7 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
-            await sweepUsers(page);
+            made.user(U_MEMBER);
             await req(page, 'POST', '/users', {
                 email: U_MEMBER, password: MEMBER_PASSWORD,
                 first_name: 'IAM', last_name: 'Tabs', role: 'user',
@@ -57,14 +72,12 @@ test.describe('IAM · Edit Role · tabs and leaving', { tag: '@enterprise' }, ()
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            const roles = await sweepRoles(page);
-            const users = await sweepUsers(page);
+            const gone = await made.cleanup(page);
+            const roles = gone.roles;
+            const users = gone.users;
             testLogger.info(`teardown removed ${roles.length} roles, ${users.length} users`);
-            const left = [
-                ...(await listRoles(page)).filter((r) => r.startsWith(PREFIX)),
-                ...(await listUsers(page)).map((u) => u.email).filter((e) => e.startsWith(PREFIX)),
-            ];
-            if (left.length) throw new Error(`teardown left artifacts behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }

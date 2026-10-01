@@ -14,18 +14,34 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, createRole, setRolePerms, getPerms, sweepRoles, uniq, org, rbacEnabled,
+    ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('scp');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
-const S_ONE = `${PREFIX}_w_s_one`;
+const S_ONE = `${NS}_w_s_one`;
 
 test.describe('IAM · Edit Role · wider scope', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. the seeded log stream is made once in beforeAll and shared.
+    // `fullyParallel: true` races individual TESTS, so the per-file namespaces in
+    // iam-fixtures.js only stop files colliding — this stops a file colliding with
+    // itself. Cost: a failure here skips the rest of the file rather than running them.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     const freshRole = async (page, tag) => {
-        const name = `${PREFIX}_sc_${tag}_${uniq()}`;
+        const name = `${NS}_sc_${tag}_${uniq()}`;
+        made.role(name);
         await createRole(page, name);
         return name;
     };
@@ -42,13 +58,13 @@ test.describe('IAM · Edit Role · wider scope', { tag: '@enterprise' }, () => {
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
-            await req(page, 'POST', `/${S_ONE}/_json`, [
+            const ing = await req(page, 'POST', `/${S_ONE}/_json`, [
                 { _timestamp: Date.now() * 1000, level: 'info', msg: 'scope seed' },
             ]);
+            expect(ing.status, `ingest into ${S_ONE} failed`).toBeLessThan(400);
             await expect
                 .poll(async () => (await req(page, 'GET', `/streams/${S_ONE}/schema?type=logs`)).status,
-                    { timeout: 30000, intervals: [500, 1000, 2000] })
+                    { timeout: 60000, intervals: [1000, 2000, 3000] })
                 .toBeLessThan(400);
             testLogger.info('scope fixtures ready');
         } finally {
@@ -59,11 +75,11 @@ test.describe('IAM · Edit Role · wider scope', { tag: '@enterprise' }, () => {
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await req(page, 'DELETE', `/streams/${S_ONE}?type=logs`).catch(() => {});
-            const removed = await sweepRoles(page);
+            // Stream deliberately left: deleting it raced a retry's re-ingest.
+            const removed = (await made.cleanup(page)).roles;
             testLogger.info(`teardown removed ${removed.length} roles`);
-            const left = (await listRoles(page)).filter((r) => r.startsWith(PREFIX));
-            if (left.length) throw new Error(`teardown left roles behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }
@@ -88,8 +104,10 @@ test.describe('IAM · Edit Role · wider scope', { tag: '@enterprise' }, () => {
             { object: `logs:${S_ONE}`, permission: 'AllowGet' },
         ]);
 
-        // `logs` is a row inside the stream module, not a rail module of its own.
-        await pm.rolesPage.openModule('stream');
+        // The `logs` SCOPE row is pinned one level in, inside the logs type —
+        // useModuleNavigation only returns streamTypeScopes once a type is open. At the
+        // stream module's top level the only scope row is `stream` itself.
+        await pm.rolesPage.openStreamType('logs');
         // While the type grant stands, the row it covers is locked.
         await expect(pm.rolesPage.scopeCheckbox('logs', 'AllowGet'))
             .toHaveAttribute('aria-checked', 'true', { timeout: 15000 });

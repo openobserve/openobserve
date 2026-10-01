@@ -28,41 +28,56 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, reqAs, allowed, listRoles, listUsers, createRole, setRolePerms,
-    sweepRoles, sweepUsers, loginAs, MEMBER_PASSWORD, org, rbacEnabled,
-    createDashboardFolder, createDashboardIn, sweepDashboardFolders,
+    ns, req, reqAs, allowed, listRoles, listUsers, createRole, setRolePerms, clearRolePerms,
+    makeTracker, loginAs, MEMBER_PASSWORD, org, rbacEnabled,
+    createDashboardFolder, createDashboardIn,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('enf');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
 // Two logs streams, so "can read the stream I was granted" is distinguishable from
 // "can read any stream". One stream cannot tell those apart.
-const S_GRANTED = `${PREFIX}_e_s_granted`;
-const S_OTHER = `${PREFIX}_e_s_other`;
+const S_GRANTED = `${NS}_e_s_granted`;
+const S_OTHER = `${NS}_e_s_other`;
 
-const U_STREAM = `${PREFIX}_e_stream@example.com`;
-const U_TYPE = `${PREFIX}_e_type@example.com`;
-const U_PAIR = `${PREFIX}_e_pair@example.com`;
-const U_BASE = `${PREFIX}_e_base@example.com`;    // nothing, ever — the baseline
-const U_FOLDER = `${PREFIX}_e_folder@example.com`;
-const U_ITEM = `${PREFIX}_e_item@example.com`;
+const U_STREAM = `${NS}_e_stream@example.com`;
+const U_TYPE = `${NS}_e_type@example.com`;
+const U_PAIR = `${NS}_e_pair@example.com`;
+const U_BASE = `${NS}_e_base@example.com`;    // nothing, ever — the baseline
+const U_FOLDER = `${NS}_e_folder@example.com`;
+const U_ITEM = `${NS}_e_item@example.com`;
 
-const R_STREAM = `${PREFIX}_e_role_stream`;
-const R_TYPE = `${PREFIX}_e_role_type`;
-const R_PAIR = `${PREFIX}_e_role_pair`;
-const R_FOLDER = `${PREFIX}_e_role_folder`;
-const R_ITEM = `${PREFIX}_e_role_item`;
+const R_STREAM = `${NS}_e_role_stream`;
+const R_TYPE = `${NS}_e_role_type`;
+const R_PAIR = `${NS}_e_role_pair`;
+const R_FOLDER = `${NS}_e_role_folder`;
+const R_ITEM = `${NS}_e_role_item`;
 
 // One folder with two dashboards, plus a dashboard in a second folder. The neighbour
 // proves a grant does not widen inside a folder; the other folder proves it does not
 // widen across folders.
-const F_MAIN = `${PREFIX}_e_folder_main`;
-const F_AWAY = `${PREFIX}_e_folder_away`;
+const F_MAIN = `${NS}_e_folder_main`;
+const F_AWAY = `${NS}_e_folder_away`;
 let fMain, fAway, dGranted, dNeighbour, dAway;
 
 let sessions = [];
 
 test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. the five roles and six accounts are made once in beforeAll, and beforeEach clears every role — concurrent tests would clear each other.
+    // `fullyParallel: true` races individual TESTS, so the per-file namespaces in
+    // iam-fixtures.js only stop files colliding — this stops a file colliding with
+    // itself. Cost: a failure here skips the rest of the file rather than running them.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     const signIn = async (browser, email) => {
@@ -95,32 +110,32 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
-            await sweepUsers(page);
-            await sweepDashboardFolders(page);
 
             const probe = await req(page, 'GET', '/roles');
             test.skip(probe.status === 403 || probe.status === 404, 'roles API unavailable — RBAC off');
 
             // Ingest so both streams exist with a schema; a grant on a stream the
-            // backend has never seen is not the thing under test.
+            // backend has never seen is not the thing under test. The ingest status is
+            // asserted rather than ignored — a silent 4xx here surfaced later as an
+            // inscrutable schema 404.
             for (const stream of [S_GRANTED, S_OTHER]) {
-                await req(page, 'POST', `/${stream}/_json`, [
+                const ing = await req(page, 'POST', `/${stream}/_json`, [
                     { _timestamp: Date.now() * 1000, level: 'info', msg: `seed ${stream}` },
                 ]);
+                expect(ing.status, `ingest into ${stream} failed`).toBeLessThan(400);
             }
             for (const stream of [S_GRANTED, S_OTHER]) {
                 await expect
                     .poll(async () => (await req(page, 'GET', `/streams/${stream}/schema?type=logs`)).status,
-                        { timeout: 30000, intervals: [500, 1000, 2000] })
+                        { timeout: 60000, intervals: [1000, 2000, 3000] })
                     .toBeLessThan(400);
             }
 
-            fMain = await createDashboardFolder(page, F_MAIN);
-            fAway = await createDashboardFolder(page, F_AWAY);
-            dGranted = await createDashboardIn(page, fMain, `${PREFIX}_e_dash_granted`);
-            dNeighbour = await createDashboardIn(page, fMain, `${PREFIX}_e_dash_neighbour`);
-            dAway = await createDashboardIn(page, fAway, `${PREFIX}_e_dash_away`);
+            fMain = made.folder(await createDashboardFolder(page, F_MAIN));
+            fAway = made.folder(await createDashboardFolder(page, F_AWAY));
+            dGranted = await createDashboardIn(page, fMain, `${NS}_e_dash_granted`);
+            dNeighbour = await createDashboardIn(page, fMain, `${NS}_e_dash_neighbour`);
+            dAway = await createDashboardIn(page, fAway, `${NS}_e_dash_away`);
             if (!dGranted || !dNeighbour || !dAway) {
                 throw new Error('dashboard seeding returned no id — the create response shape changed');
             }
@@ -128,6 +143,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
             // Base role `user` carries nothing, so the custom role is the whole of each
             // account's access. `admin` would make every assertion pass for the wrong reason.
             for (const email of [U_STREAM, U_TYPE, U_PAIR, U_BASE, U_FOLDER, U_ITEM]) {
+                made.user(email);
                 await req(page, 'POST', '/users', {
                     email, password: MEMBER_PASSWORD,
                     first_name: 'IAM', last_name: 'Enforce', role: 'user',
@@ -137,6 +153,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
                 [R_STREAM, U_STREAM], [R_TYPE, U_TYPE], [R_PAIR, U_PAIR],
                 [R_FOLDER, U_FOLDER], [R_ITEM, U_ITEM],
             ]) {
+                made.role(role);
                 await createRole(page, role);
                 await req(page, 'PUT', `/roles/${role}`, {
                     add: [], remove: [], add_users: [user], remove_users: [],
@@ -158,6 +175,16 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
     });
 
+    // The five roles are reused across tests (their user bindings are made once in
+    // beforeAll), so each test must start from a known empty state. Without this, E-01's
+    // grant was still on R_STREAM when E-06 opened it expecting none — test-scope
+    // instance of the same isolation bug the per-file namespaces fix at file scope.
+    test.beforeEach(async ({ page }) => {
+        for (const role of [R_STREAM, R_TYPE, R_PAIR, R_FOLDER, R_ITEM]) {
+            await clearRolePerms(page, role);
+        }
+    });
+
     test.afterEach(async () => {
         for (const s of sessions) await s.context.close().catch(() => {});
         sessions = [];
@@ -166,18 +193,16 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            for (const stream of [S_GRANTED, S_OTHER]) {
-                await req(page, 'DELETE', `/streams/${stream}?type=logs`).catch(() => {});
-            }
-            await sweepDashboardFolders(page);
-            const roles = await sweepRoles(page);
-            const users = await sweepUsers(page);
+            // The streams are deliberately LEFT. Deleting them made a retry's beforeAll
+            // re-ingest into a stream whose delete had not settled, and the schema poll
+            // then 404'd for the full minute. They are ui_auto_-prefixed, so the shared
+            // stream cleanup collects them.
+            const gone = await made.cleanup(page);
+            const roles = gone.roles;
+            const users = gone.users;
             testLogger.info(`teardown removed ${roles.length} roles, ${users.length} users`);
-            const left = [
-                ...(await listRoles(page)).filter((r) => r.startsWith(PREFIX)),
-                ...(await listUsers(page)).map((u) => u.email).filter((e) => e.startsWith(PREFIX)),
-            ];
-            if (left.length) throw new Error(`teardown left artifacts behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }
@@ -335,7 +360,23 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         await openRole(R_ITEM);
         await pm.rolesPage.openModule('dfolder');
         await pm.rolesPage.openNode(fMain);
-        await pm.rolesPage.grantEntity(dGranted, 'AllowGet');
+
+        // The folder's dashboards load after the pane opens, so wait for ROWS rather
+        // than for one slug — and if the expected row is absent, report the slugs that
+        // are present. A bare 15s timeout said nothing about why.
+        const rows = pm.rolesPage.entityCheckboxes('AllowGet');
+        await expect.poll(async () => await rows.count(), { timeout: 30000 }).toBeGreaterThan(0);
+        // The row's entity name is the COMPOSITE `<folderId>/<dashboardId>`, the same
+        // shape as the saved object (`dashboard:fid/did`) — not the dashboard id alone.
+        // Confirmed from the row slugs this test printed when it could not find them.
+        const box = pm.rolesPage.entityCheckbox(`${fMain}/${dGranted}`, 'AllowGet');
+        if (!(await box.isVisible({ timeout: 5000 }).catch(() => false))) {
+            const slugs = await page
+                .locator('[data-test^="edit-role-permissions-table-body-row-"]')
+                .evaluateAll((els) => els.map((e) => e.getAttribute('data-test')).slice(0, 10));
+            throw new Error(`no row for ${fMain}/${dGranted}; rows present: ${slugs}`);
+        }
+        await pm.rolesPage.setCheckbox(box, true);
         const payload = await pm.rolesPage.saveAndCapture();
         // The two-id shape: the item is addressed through its folder.
         expect(payload?.add?.[0]?.object).toBe(`dashboard:${fMain}/${dGranted}`);

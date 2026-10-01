@@ -26,24 +26,40 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, createRole, setRolePerms, getPerms, sweepRoles, uniq, org, rbacEnabled,
-    createDashboardFolder, createDashboardIn, sweepDashboardFolders,
+    ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
+    createDashboardFolder, createDashboardIn,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('obj');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
-const F_OBJ = `${PREFIX}_o_folder`;
+const F_OBJ = `${NS}_o_folder`;
 let fid;
 
 // Two logs streams plus a metrics one, so O-03 can prove each stream TYPE gets its
 // own object prefix rather than all collapsing onto `stream:`.
-const S_LOG = `${PREFIX}_o_log`;
+const S_LOG = `${NS}_o_log`;
 
 test.describe('IAM · Edit Role · saved object format', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. the dashboard folder and log stream are made once in beforeAll and shared.
+    // `fullyParallel: true` races individual TESTS, so the per-file namespaces in
+    // iam-fixtures.js only stop files colliding — this stops a file colliding with
+    // itself. Cost: a failure here skips the rest of the file rather than running them.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     const freshRole = async (page, tag) => {
-        const name = `${PREFIX}_ob_${tag}_${uniq()}`;
+        const name = `${NS}_ob_${tag}_${uniq()}`;
+        made.role(name);
         await createRole(page, name);
         return name;
     };
@@ -67,11 +83,9 @@ test.describe('IAM · Edit Role · saved object format', { tag: '@enterprise' },
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
-            await sweepDashboardFolders(page);
 
-            fid = await createDashboardFolder(page, F_OBJ);
-            await createDashboardIn(page, fid, `${PREFIX}_o_dash`);
+            fid = made.folder(await createDashboardFolder(page, F_OBJ));
+            await createDashboardIn(page, fid, `${NS}_o_dash`);
 
             await req(page, 'POST', `/${S_LOG}/_json`, [
                 { _timestamp: Date.now() * 1000, level: 'info', msg: 'object format seed' },
@@ -91,11 +105,10 @@ test.describe('IAM · Edit Role · saved object format', { tag: '@enterprise' },
         const page = await browser.newPage();
         try {
             await req(page, 'DELETE', `/streams/${S_LOG}?type=logs`).catch(() => {});
-            await sweepDashboardFolders(page);
-            const removed = await sweepRoles(page);
+            const removed = (await made.cleanup(page)).roles;
             testLogger.info(`teardown removed ${removed.length} roles`);
-            const left = (await listRoles(page)).filter((r) => r.startsWith(PREFIX));
-            if (left.length) throw new Error(`teardown left roles behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }
@@ -249,18 +262,23 @@ test.describe('IAM · Edit Role · saved object format', { tag: '@enterprise' },
         await pm.rolesPage.grantScope('function', 'AllowList');
         await expect(pm.rolesPage.unsavedCount).toContainText('2', { timeout: 15000 });
 
-        await pm.rolesPage.reviewChangesButton.click();
-        await expect(pm.rolesPage.drawer).toBeVisible({ timeout: 15000 });
+        await pm.rolesPage.openDrawer();
 
         // Undo the folder-item one from the drawer, by its own row.
         const undos = pm.rolesPage.drawerUndoButtons();
         const ids = await undos.evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
-        const target = ids.find((id) => id && id.includes('dashboard:'));
+        // The drawer slugs a change as `edit-role-unsaved-undo-<resource>-<entity>-<kind>`
+        // — a DASH after the resource, not the object's colon. Observed in CI:
+        // `...-undo-dashboard-7511309722683703296/7511309722725646336-added`.
+        const target = ids.find((id) => id && /-undo-dashboard[-:]/.test(id));
         expect(target, `no dashboard change in the drawer: ${ids}`).toBeTruthy();
         await page.locator(`[data-test="${target}"]`).click();
 
         // The function grant must survive; only the dashboard one goes.
         await expect(pm.rolesPage.unsavedCount).toContainText('1', { timeout: 15000 });
+        // The drawer only self-closes once nothing is staged; with one change left it
+        // stays open and its overlay swallows the click on Save.
+        await pm.rolesPage.closeDrawer();
         const payload = await pm.rolesPage.saveAndCapture();
         expect(payload.add).toEqual([{ object: obj('function'), permission: 'AllowList' }]);
     });
