@@ -408,9 +408,7 @@ export default defineComponent({
     const writeField = (index: number, field: string, value: unknown) => {
       const items: any[] = baseImportRef.value?.jsonArrayOfObj;
       if (!Array.isArray(items) || index < 0 || index >= items.length) return;
-      // A non-object entry gets the same fix-up controls, so they must be able to
-      // write to it: a primitive throws and a null silently no-ops, either way
-      // leaving the typed name nowhere to go and the error on screen regardless.
+      // Non-object entries get the same fix-up controls, so give them something writable.
       if (typeof items[index] !== "object" || items[index] === null) {
         items[index] = {};
       }
