@@ -18,23 +18,37 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, createRole, setRolePerms, sweepRoles, uniq, org, rbacEnabled,
+    ns, req, listRoles, createRole, setRolePerms, makeTracker, uniq, org, rbacEnabled,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('edt');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 // Seeded once; each has a distinct grant shape so the read-side tests do not
 // depend on whatever happens to exist in the org.
-const R_EMPTY = `${PREFIX}_ed_empty`;
-const R_SMALL = `${PREFIX}_ed_small`;   // stream List+Get
-const R_WIDE = `${PREFIX}_ed_wide`;     // AllowList+AllowGet on many modules
+const R_EMPTY = `${NS}_ed_empty`;
+const R_SMALL = `${NS}_ed_small`;   // stream List+Get
+const R_WIDE = `${NS}_ed_wide`;     // AllowList+AllowGet on many modules
 
 test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. the empty/small/wide fixture roles are made once in beforeAll and shared.
+    // `fullyParallel: true` races individual TESTS, so the per-file namespaces in
+    // iam-fixtures.js only stop files colliding — this stops a file colliding with
+    // itself. Cost: a failure here skips the rest of the file rather than running them.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
-            for (const r of [R_EMPTY, R_SMALL, R_WIDE]) await createRole(page, r);
+            for (const r of [R_EMPTY, R_SMALL, R_WIDE]) { made.role(r); await createRole(page, r); }
             await setRolePerms(page, R_SMALL, [
                 { object: `stream:_all_${org()}`, permission: 'AllowList' },
                 { object: `stream:_all_${org()}`, permission: 'AllowGet' },
@@ -64,10 +78,10 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            const removed = await sweepRoles(page);
+            const removed = (await made.cleanup(page)).roles;
             testLogger.info(`teardown removed ${removed.length} roles`);
-            const left = (await listRoles(page)).filter((r) => r.startsWith(PREFIX));
-            if (left.length) throw new Error(`teardown left roles behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }

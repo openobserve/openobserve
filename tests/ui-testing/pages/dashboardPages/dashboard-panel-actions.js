@@ -1,6 +1,8 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+
 export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
@@ -179,6 +181,22 @@ export default class DashboardactionPage {
   // Save panel button locator (for callers that only need a raw click)
   getPanelSaveBtn() {
     return this.panelSaveBtn;
+  }
+
+  // Raw discard-button locator for callers that must own the confirm dialog
+  // themselves (discardPanel() installs its own auto-accepting handler).
+  getPanelDiscardBtn() {
+    return this.discardPanelBtn;
+  }
+
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  // Scoped to the rendered layout branch: PanelEditor.vue mounts the field list
+  // twice, so the bare data-test matches 2 nodes.
+  getFieldListSearchInput() {
+    return this.page.locator(visibleOnly(SELECTORS.FIELD_LIST_SEARCH)).first();
   }
 
   // Save panel button

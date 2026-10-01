@@ -185,11 +185,11 @@ export const useHistogram = () => {
         const breakdownField: string | null =
           searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
-        // hasBreakdown is true only when the backend both returned a
-        // breakdown field AND the aggs actually contain zo_sql_breakdown values.
+        // every() (not some()) so a mixed-shape backend response — some rows tagged with zo_sql_breakdown, some not — falls back to the flat path instead of entering breakdown mode and silently skipping the untagged rows.
         const hasBreakdown =
           !!breakdownField &&
-          searchObj.data.queryResults.aggs.some((item: any) => item.zo_sql_breakdown !== undefined);
+          searchObj.data.queryResults.aggs.length > 0 &&
+          searchObj.data.queryResults.aggs.every((item: any) => item.zo_sql_breakdown != null);
 
         if (hasBreakdown) {
           // --- Stacked breakdown path ---
@@ -216,7 +216,7 @@ export const useHistogram = () => {
             breakdownMap.set(key, JSON.parse(JSON.stringify(item)));
           });
 
-          // Merge current page aggs into the map
+          // Merge current page aggs into the map.
           searchObj.data.queryResults.aggs.forEach((item: any) => {
             if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
               timestampSet.add(item.zo_sql_key);
