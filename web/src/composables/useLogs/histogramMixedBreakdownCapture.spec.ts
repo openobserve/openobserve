@@ -13,26 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Reproduces a second, independent histogram bug found via a live browser
- * capture (openobserve-histogram-debug.json): for the same query, with
- * histogram_breakdown_field set, some partitions returned hits WITHOUT
- * zo_sql_breakdown (flat: {zo_sql_key, zo_sql_num}) while others returned
- * hits WITH it ({zo_sql_key, zo_sql_breakdown, zo_sql_num}) — a mixed
- * response shape from the backend for what should be one consistent query.
- *
- * generateHistogramData's `hasBreakdown` check (useHistogram.ts) is an
- * all-or-nothing gate: ANY hit anywhere in aggs having zo_sql_breakdown
- * switches the ENTIRE render to the stacked path, which then silently drops
- * every hit that lacks zo_sql_breakdown — even though those hits have real,
- * valid zo_sql_num counts. That's a real captured symptom: 29 breakdown-
- * tagged hours rendered correctly, 140 flat hours rendered as zero.
- */
+// Repro of a live capture where some partitions returned hits without zo_sql_breakdown, which used to zero out the whole stacked render.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-// A representative slice of the real captured aggs: a run of flat (no
-// breakdown) hours immediately followed by a run of breakdown-tagged hours,
-// exactly as seen in openobserve-histogram-debug.json around 2026-09-24.
+// Representative slice of real captured aggs: flat (no breakdown) hours immediately followed by breakdown-tagged hours.
 const MIXED_AGGS = [
   { zo_sql_key: "2026-09-24T12:00:00", zo_sql_num: 37 },
   { zo_sql_key: "2026-09-24T11:00:00", zo_sql_num: 29 },

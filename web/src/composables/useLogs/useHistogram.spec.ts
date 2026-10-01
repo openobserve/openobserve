@@ -391,14 +391,7 @@ describe("useHistogram Composable", () => {
     });
 
     it("falls through to the flat path, without losing any counts, when only some aggs rows have zo_sql_breakdown", () => {
-      // A real hit can come back without zo_sql_breakdown even when
-      // histogram_breakdown_field is set — seen live where some backend
-      // partitions of the same query return the breakdown column and others
-      // don't (likely a caching inconsistency). Entering the stacked path on
-      // a partial match would surface a spurious "(unspecified)" legend
-      // entry that Visualize never shows for the same data, so this
-      // degrades to the flat single-series path instead — which doesn't
-      // key on zo_sql_breakdown at all, so no counts are lost either way.
+      // Partial breakdown coverage (seen live) must not trigger a spurious "(unspecified)" legend entry in the stacked path.
       setAggs([
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
         { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 99 },
@@ -415,10 +408,7 @@ describe("useHistogram Composable", () => {
     });
 
     it("falls through to the flat path for a lone zo_sql_breakdown: null row, without dropping its count", () => {
-      // null !== undefined, so a hasBreakdown check written as `!== undefined`
-      // alone would wrongly stay true here and then silently skip this row
-      // in the stacked merge (which also excludes null) — the same
-      // data-loss class this fix closes for undefined-only rows.
+      // null !== undefined, so a hasBreakdown check using only `!== undefined` would wrongly stay true and drop this row.
       setAggs([
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
         { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 99 },
@@ -603,8 +593,7 @@ describe("useHistogram Composable", () => {
       wrapper.vm.generateHistogramData();
       const hist = mockState.searchObj.data.histogram;
 
-      // hasBreakdown requires every() row to carry a breakdown value now —
-      // a lone tagged row is not enough to enter the stacked path.
+      // hasBreakdown requires every() row to carry a breakdown value — a lone tagged row isn't enough to enter the stacked path.
       expect(hist.breakdownField).toBeNull();
       expect(hist.breakdownSeries).toBeNull();
       expect(hist.yData).toEqual([13]);

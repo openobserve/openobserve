@@ -219,7 +219,7 @@ export const useSearchResponseHandler = () => {
     searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
-  // Carries histogram-owned fields through the wholesale queryResults reassignment below, which otherwise drops them when a concurrent search run overlaps the still-streaming histogram (see histogramStreamCapture.spec.ts).
+  // Carries histogram-owned fields through the streaming_aggs reassignment below, which otherwise drops them when a concurrent search run overlaps the still-streaming histogram (see histogramStreamCapture.spec.ts).
   const preserveHistogramFields = () => ({
     aggs: searchObj.data?.queryResults?.aggs,
     order_by: searchObj.data?.queryResults?.order_by,
@@ -269,10 +269,7 @@ export const useSearchResponseHandler = () => {
         searchObj.data.queryResults.took = response.content.results.took;
         searchObj.data.queryResults.total = response.content.results.total;
       } else {
-        searchObj.data.queryResults = {
-          ...response.content.results,
-          ...preserveHistogramFields(),
-        };
+        searchObj.data.queryResults = response.content.results;
       }
     }
 

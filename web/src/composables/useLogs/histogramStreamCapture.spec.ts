@@ -13,27 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Replays a real histogram SSE capture (nginx / k8s_cluster=production /
- * body_path str_match, trace prefix 01a0f10b289573bab993ba0264737534) through
- * the REAL handleHistogramStreamingHits/Metadata + generateHistogramData
- * pipeline — not mocked — to check whether the reported "empty bars at the
- * older end of the range" symptom reproduces from a single, uninterrupted
- * histogram stream alone, independent of any overlapping-stream theory.
- *
- * Only useHistogram is left unmocked here (unlike useSearchResponseHandler.spec.ts,
- * which mocks it) so the real merge-by-zo_sql_key logic actually runs and
- * searchObj.data.histogram.xData/yData reflect the real accumulated aggs.
- */
+// Replays a real histogram SSE capture through the unmocked handler + useHistogram pipeline to check for empty-bar gaps from a single stream alone.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchResponseHandler } from "./useSearchResponseHandler";
 
-// ---------------------------------------------------------------------------
-// Fixture: every (metadata, hits) pair from the captured stream, in the exact
-// order they arrived. histogram_interval is 3600s (1 hour) throughout;
-// order_by is "desc" throughout. time_offset values are verbatim from the
-// capture (microseconds).
-// ---------------------------------------------------------------------------
+// Fixture: every (metadata, hits) pair from the captured stream, in arrival order (histogram_interval 3600s, order_by desc).
 type Chunk = { start: number; end: number; hits: [string, number][] };
 
 const CHUNKS: Chunk[] = [
@@ -405,10 +389,7 @@ const NEWEST_KEY = CHUNKS[0].hits[0][0]; // "2026-09-30T05:00:00" — first to a
 const OLDEST_CHUNK = CHUNKS[CHUNKS.length - 1];
 const OLDEST_KEY = OLDEST_CHUNK.hits[OLDEST_CHUNK.hits.length - 1][0]; // "2026-09-25T05:00:00" — last to arrive
 
-// ---------------------------------------------------------------------------
-// Mock state — shared by useSearchResponseHandler AND the real useHistogram.
-// Range padded a bit beyond the fixture so skeleton generation covers it.
-// ---------------------------------------------------------------------------
+// Mock state shared by useSearchResponseHandler and the real useHistogram; range is padded beyond the fixture so skeleton generation covers it.
 const createMockState = () => ({
   searchObj: {
     organizationIdentifier: "default",
@@ -659,21 +640,7 @@ describe("histogram stream capture replay (real merge logic)", () => {
     expect(yData[oldestIdx]).toBe(33);
   });
 
-  // ---------------------------------------------------------------------
-  // Regression test for the root cause: a concurrent, non-paginated
-  // main-search "streaming_aggs" metadata event — e.g. a second full search
-  // run firing while the first search's histogram is still streaming (the
-  // live-mode debounce double-fire race) — used to hit
-  // handleStreamingMetadata's wholesale `searchObj.data.queryResults = {...}`
-  // reassignment, which only preserved `hits` — not `aggs` — dropping
-  // everything the histogram stream had accumulated so far.
-  // preserveHistogramFields() (useSearchResponseHandler.ts) now carries
-  // aggs and the other histogram-owned fields through that reassignment.
-  //
-  // Note: isPagination must be false here to reach the affected branch — a
-  // *paginated* fetch with streaming_aggs:true routes into a different,
-  // unaffected branch that only touches from/scan_size/took.
-  // ---------------------------------------------------------------------
+  // Regression: a concurrent, non-paginated streaming_aggs metadata event used to wipe accumulated histogram aggs; preserveHistogramFields() now protects it.
   it("preserves already-accumulated buckets when a concurrent, non-paginated main-search streaming_aggs event fires mid-stream", () => {
     const SPLIT = 20; // feed the first 20 chunks, then interfere, then the rest
 
@@ -684,9 +651,7 @@ describe("histogram stream capture replay (real merge logic)", () => {
     const aggsBeforeInterference = [...mockState.searchObj.data.queryResults.aggs];
     expect(aggsBeforeInterference.find((a: any) => a.zo_sql_key === NEWEST_KEY)).toBeDefined();
 
-    // A second, independent (non-paginated) main-search metadata event,
-    // streaming_aggs: true — the real handleStreamingMetadata code path,
-    // not mocked.
+    // Independent, non-paginated streaming_aggs metadata event — real handleStreamingMetadata path.
     responseHandler.handleSearchResponse(
       {
         type: "search",
