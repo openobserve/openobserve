@@ -101,7 +101,7 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
         expect(elapsed, `opening a ${BULK}-grant role took ${elapsed}ms`).toBeLessThan(60000);
 
         // "Opened" is not "usable": the rail must still navigate afterwards.
-        await pm.rolesPage.openModule('logs');
+        await pm.rolesPage.openModule('stream');
         await expect(pm.rolesPage.pane).toBeVisible({ timeout: 30000 });
         await pm.rolesPage.openSummary({ timeout: 30000 });
     });

@@ -88,7 +88,8 @@ test.describe('IAM · Edit Role · wider scope', { tag: '@enterprise' }, () => {
             { object: `logs:${S_ONE}`, permission: 'AllowGet' },
         ]);
 
-        await pm.rolesPage.openModule('logs');
+        // `logs` is a row inside the stream module, not a rail module of its own.
+        await pm.rolesPage.openModule('stream');
         // While the type grant stands, the row it covers is locked.
         await expect(pm.rolesPage.scopeCheckbox('logs', 'AllowGet'))
             .toHaveAttribute('aria-checked', 'true', { timeout: 15000 });

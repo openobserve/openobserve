@@ -357,6 +357,19 @@ export class RolesPage {
             .catch(() => {});
     }
 
+    /**
+     * Opens one stream TYPE (logs | metrics | traces | index).
+     *
+     * These are NOT rail modules: mapping.rs parents them to `stream`
+     * (`Resource::new("logs", ...).parent("stream")`), so the rail offers only
+     * `stream` and the types are rows inside it. openModule('logs') waits forever on
+     * a rail item that does not exist.
+     */
+    async openStreamType(type) {
+        await this.openModule('stream');
+        await this.openNode(type);
+    }
+
     /** Opens a folder or stream-type row, descending one level in the pane. */
     async openNode(nodeName) {
         await this.openEntity(nodeName).click();

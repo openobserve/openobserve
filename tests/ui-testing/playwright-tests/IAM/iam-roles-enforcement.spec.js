@@ -194,7 +194,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
 
         // Tick ONE stream's Get in the editor and save.
         await openRole(R_STREAM);
-        await pm.rolesPage.openModule('logs');
+        await pm.rolesPage.openStreamType('logs');
         await pm.rolesPage.grantEntity(S_GRANTED, 'AllowGet');
         const payload = await pm.rolesPage.saveAndCapture();
         expect(payload?.add, 'the editor sent no grant').toEqual([
@@ -217,7 +217,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         const base = await baseline(browser);
 
         await openRole(R_STREAM);
-        await pm.rolesPage.openModule('logs');
+        await pm.rolesPage.openStreamType('logs');
         await pm.rolesPage.grantEntity(S_GRANTED, 'AllowGet');
         await pm.rolesPage.saveAndCapture();
 
@@ -226,7 +226,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
 
         // Untick the same box in the editor — the removal path, not an API delete.
         await openRole(R_STREAM, 1);
-        await pm.rolesPage.openModule('logs');
+        await pm.rolesPage.openStreamType('logs');
         await pm.rolesPage.setCheckbox(pm.rolesPage.entityCheckbox(S_GRANTED, 'AllowGet'), false);
         const payload = await pm.rolesPage.saveAndCapture();
         expect(payload?.remove).toEqual([{ object: `logs:${S_GRANTED}`, permission: 'AllowGet' }]);
@@ -267,7 +267,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         await openRole(R_PAIR);
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
-        await pm.rolesPage.openModule('logs');
+        await pm.rolesPage.openStreamType('logs');
         await pm.rolesPage.grantEntity(S_GRANTED, 'AllowGet');
         const saved = await pm.rolesPage.saveAndCapture();
         expect(saved?.add, 'the editor did not send both grants in one save').toHaveLength(2);

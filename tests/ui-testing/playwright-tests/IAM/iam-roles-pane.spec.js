@@ -78,7 +78,8 @@ test.describe('IAM · Edit Role · pane navigation', { tag: '@enterprise' }, () 
         await pm.rolesPage.paneSearch.fill('zzz_no_such_stream');
         await expect(pm.rolesPage.paneSearch).toHaveValue('zzz_no_such_stream');
 
-        await pm.rolesPage.openModule('logs');
+        // `function` is a genuine rail module; `logs` is a row inside stream.
+        await pm.rolesPage.openModule('function');
         // A stale filter silently hides rows in a module the user never searched.
         if (await pm.rolesPage.paneSearch.isVisible({ timeout: 5000 }).catch(() => false)) {
             await expect(pm.rolesPage.paneSearch, 'the search carried into another module').toHaveValue('');
@@ -103,7 +104,7 @@ test.describe('IAM · Edit Role · pane navigation', { tag: '@enterprise' }, () 
 
         // 50 is one of ModulePane's three options ([25, 50, 100]).
         await pm.rolesPage.setPageSize(50);
-        await pm.rolesPage.openModule('logs');
+        await pm.rolesPage.openModule('function');
         await pm.rolesPage.openModule('stream');
         // pageSize is a v-model on EditRole, not pane state — it must outlive the key change.
         expect(await pm.rolesPage.pageSize(), 'page size reset when the module changed').toBe(50);
@@ -226,7 +227,11 @@ test.describe('IAM · Edit Role · pane navigation', { tag: '@enterprise' }, () 
         await pm.rolesPage.openModule('settings');
 
         await expect(pm.rolesPage.paneSearch, 'a one-row module rendered a search box').toHaveCount(0);
-        await expect(pm.rolesPage.panePagination, 'a one-row module rendered pagination').toHaveCount(0);
+        // ModulePane sets OTable's pagination to "none" for a module with no entities
+        // (paginationMode), but the pagination WRAPPER still renders — so absence has to
+        // be asserted on the controls themselves, not on the container.
+        await expect(pm.rolesPage.panePageSize, 'a one-row module offered a page size').toHaveCount(0);
+        await expect(pm.rolesPage.paneNextPage, 'a one-row module offered a next page').toHaveCount(0);
         await expect(pm.rolesPage.paneNoResources, 'a module listing itself claimed to be empty').toHaveCount(0);
     });
 

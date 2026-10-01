@@ -194,7 +194,8 @@ test.describe('IAM · Edit Role · saved object format', { tag: '@enterprise' },
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.openRole(second);
         await pm.rolesPage.waitForGrantsSettled(0);
-        await pm.rolesPage.openModule('logs');
+        // The individual streams live one level inside the stream module, under their type.
+        await pm.rolesPage.openStreamType('logs');
 
         const payload = await tickFirstRowAndSave(page);
         expect(payload.add).toHaveLength(1);

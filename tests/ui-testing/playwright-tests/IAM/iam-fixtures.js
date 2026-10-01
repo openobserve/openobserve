@@ -148,9 +148,23 @@ const sweepUsers = async (page) => {
 // (`<type>:<folderId>/<itemId>`), so List-vs-All on a folder and a grant on one
 // item inside it cannot be tested with flat resources.
 
+// The v2 folder routes put the version BEFORE the org (`/api/v2/<org>/folders/...`),
+// where req() builds `/api/<org>/...`. Going through req() produced a 404 on every
+// folder call, so these build the URL themselves.
+const v2 = (path) => `${process.env.ZO_BASE_URL.replace(/\/$/, '')}/api/v2/${org()}${path}`;
+
+const reqV2 = async (page, method, path, data) => {
+    const resp = await page.request.fetch(v2(path), {
+        method,
+        headers: getAuthHeaders(),
+        ...(data ? { data } : {}),
+    });
+    return { status: resp.status(), body: await resp.json().catch(() => ({})) };
+};
+
 /** Returns the generated folderId — grants are keyed on it, never on the name. */
 const createDashboardFolder = async (page, name) => {
-    const { status, body } = await req(page, 'POST', '/v2/folders/dashboards', {
+    const { status, body } = await reqV2(page, 'POST', '/folders/dashboards', {
         name, description: 'iam automation',
     });
     if (status >= 400) throw new Error(`create dashboard folder ${name}: ${status}`);
@@ -170,7 +184,7 @@ const createDashboardIn = async (page, folderId, title) => {
 };
 
 const listDashboardFolders = async (page) =>
-    (await req(page, 'GET', '/v2/folders/dashboards')).body?.list ?? [];
+    (await reqV2(page, 'GET', '/folders/dashboards')).body?.list ?? [];
 
 const sweepDashboardFolders = async (page) => {
     const removed = [];
@@ -182,7 +196,7 @@ const sweepDashboardFolders = async (page) => {
                 const id = d.v1?.dashboardId ?? d.dashboardId ?? d.id;
                 if (id) await req(page, 'DELETE', `/dashboards/${id}?folder=${f.folderId}`).catch(() => {});
             }
-            await req(page, 'DELETE', `/v2/folders/dashboards/${f.folderId}`).catch(() => {});
+            await reqV2(page, 'DELETE', `/folders/dashboards/${f.folderId}`).catch(() => {});
             removed.push(f.name);
         }
     }
@@ -210,4 +224,5 @@ module.exports = {
     listRoles, listGroups, getGroup, listUsers, getPerms,
     createRole, setRolePerms, setGroup, createGroupApi, sweepRoles,
     createDashboardFolder, createDashboardIn, listDashboardFolders, sweepDashboardFolders,
+    reqV2,
 };
