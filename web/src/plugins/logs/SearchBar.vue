@@ -1980,7 +1980,7 @@ import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import searchService from "@/services/search";
 
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
@@ -3161,8 +3161,8 @@ export default defineComponent({
         searchObj.runQuery = true;
       }
 
-      if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+      if (value.userChangedValue) {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,
@@ -3266,6 +3266,7 @@ export default defineComponent({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         showDownloadMenu.value = false;
+        analytics.track("logs_downloaded", { format });
       } catch (error) {
         showDownloadMenu.value = false;
         toast({

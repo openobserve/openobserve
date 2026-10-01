@@ -807,7 +807,7 @@ import {
 } from "@/services/stream.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import {
   formatSizeFromMB,
   getImageURL,
@@ -1673,6 +1673,8 @@ export default defineComponent({
           settings: modifiedSettings,
         })
         .then(async () => {
+          if (modifiedSettings.cross_links)
+            analytics.track("cross_link_saved", { scope: "stream" });
           if (
             store.state.logs?.logs?.data?.stream?.selectedStream?.includes(indexData.value.name)
           ) {
@@ -1693,7 +1695,7 @@ export default defineComponent({
             },
           );
 
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
             user_id: store.state.userInfo.email,

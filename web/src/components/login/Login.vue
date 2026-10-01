@@ -349,6 +349,7 @@ export default defineComponent({
                 if (store.state.zoConfig?.rum?.enabled) {
                   // Set user information first
                   openobserveRum.setUser({
+                    id: userInfo.email,
                     name: userInfo.given_name + " " + userInfo.family_name,
                     email: userInfo.email,
                   });

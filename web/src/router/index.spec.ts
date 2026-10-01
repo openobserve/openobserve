@@ -73,10 +73,8 @@ vi.mock("@/utils/zincutils", () => ({
   mergeRoutes: vi.fn((r1: any[], r2: any[]) => [...(r1 || []), ...(r2 || [])]),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
-  default: {
-    track: vi.fn(),
-  },
+vi.mock("@openobserve/browser-rum", () => ({
+  openobserveRum: { setViewName: vi.fn() },
 }));
 
 vi.mock("@/aws-exports", () => ({
@@ -95,7 +93,7 @@ vi.mock("@/layouts/MainLayout.vue", () => ({
 // ---------------------------------------------------------------------------
 import createAppRouter from "@/router/index";
 import { getDecodedUserInfo } from "@/utils/zincutils";
-import segment from "@/services/segment_analytics";
+import { openobserveRum } from "@openobserve/browser-rum";
 
 // ---------------------------------------------------------------------------
 // Helper: build a minimal Vuex store for tests
@@ -245,12 +243,17 @@ describe("router/index (factory)", () => {
       router = createAppRouter(store);
     });
 
-    it("should call segment.track when user is authenticated", async () => {
-      const trackSpy = vi.mocked(segment.track);
-      await router.push("/logs").catch(() => {});
-      // After navigation, segment.track should eventually be called
-      // (may not be called synchronously in jsdom due to async guard resolution)
-      expect(trackSpy).toBeDefined();
+    it("sets the RUM view name to the route name after navigation", async () => {
+      vi.mocked(openobserveRum.setViewName).mockClear();
+      await router.push("/logs");
+      expect(openobserveRum.setViewName).toHaveBeenCalledWith("logs");
+    });
+
+    it("does not set the RUM view name when the navigation is aborted", async () => {
+      router.beforeEach(() => false);
+      vi.mocked(openobserveRum.setViewName).mockClear();
+      await router.push("/logs");
+      expect(openobserveRum.setViewName).not.toHaveBeenCalled();
     });
   });
 

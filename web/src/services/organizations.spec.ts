@@ -16,6 +16,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import organizations from "@/services/organizations";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http");
 
@@ -513,5 +516,82 @@ describe("Organizations Service", () => {
       const passcodeResult = await organizations.update_organization_passcode(orgData.identifier);
       expect(passcodeResult.data.passcode).toBe("NEW123");
     });
+  });
+});
+
+describe("organizations product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after create succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await organizations.create({ name: "o" });
+    expect(analytics.track).toHaveBeenCalledWith("organization_created");
+  });
+
+  it("does not track when create fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(organizations.create({ name: "o" })).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after add_members succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await organizations.add_members({ invites: ["a", "b"], role: "admin" }, "org1");
+    expect(analytics.track).toHaveBeenCalledWith("user_invited", { count: 2 });
+  });
+
+  it("counts only the invites the server accepted", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockResolvedValue({ data: { data: { invalid_members: ["b"] } } }),
+    }));
+    await organizations.add_members({ invites: ["a", "b", "c"], role: "admin" }, "org1");
+    expect(analytics.track).toHaveBeenCalledWith("user_invited", { count: 2 });
+  });
+
+  it("does not track when every invite was invalid", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockResolvedValue({ data: { data: { invalid_members: ["a", "b"] } } }),
+    }));
+    await organizations.add_members({ invites: ["a", "b"], role: "admin" }, "org1");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("does not track when add_members fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(
+      organizations.add_members({ invites: ["a", "b"], role: "admin" }, "org1"),
+    ).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after update_organization_passcode succeeds", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockResolvedValue({ data: {} }) }));
+    await organizations.update_organization_passcode("org1");
+    expect(analytics.track).toHaveBeenCalledWith("ingestion_passcode_regenerated");
+  });
+
+  it("does not track when update_organization_passcode fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockRejectedValue(new Error("boom")) }));
+    await expect(organizations.update_organization_passcode("org1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after create_org_ingestion_token succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await organizations.create_org_ingestion_token("org1", { name: "t" });
+    expect(analytics.track).toHaveBeenCalledWith("ingestion_token_created");
+  });
+
+  it("does not track when create_org_ingestion_token fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(organizations.create_org_ingestion_token("org1", { name: "t" })).rejects.toThrow(
+      "boom",
+    );
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

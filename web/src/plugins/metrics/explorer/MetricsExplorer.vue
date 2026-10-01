@@ -641,7 +641,7 @@ import {
   refreshIntervalToLabel,
 } from "@/utils/dashboard/urlTimeParams";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -1687,7 +1687,7 @@ export default defineComponent({
 
     const track = (event: string, properties: Record<string, any> = {}) => {
       try {
-        segment.track(event, {
+        analytics.track(event, {
           org_id: store.state.selectedOrganization?.identifier,
           ...properties,
         });

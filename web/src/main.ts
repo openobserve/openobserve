@@ -163,7 +163,6 @@ const getConfig = async () => {
             // List of error patterns to ignore
             const ignoredErrorPatterns = [
               /ResizeObserver loop/i,
-              /RS SDK/i,
               /reo.dev/i,
               /Cannot set properties of null \(setting 'innerHTML'\)/,
             ];

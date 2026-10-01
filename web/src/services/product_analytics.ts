@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { vi } from "vitest";
+import { openobserveRum } from "@openobserve/browser-rum";
+import config from "@/aws-exports";
 
-vi.mock("@rudderstack/analytics-js", () => {
-  return {
-    RudderAnalytics: class {
-      ready = vi.fn();
-      load = vi.fn();
-      track = vi.fn();
-    },
-  };
-});
+export default {
+  track(event: string, properties?: object) {
+    // Product events honour the telemetry opt-out even where RUM itself is enabled.
+    if (config.enableAnalytics !== "true") return;
+    openobserveRum.addAction(event, properties);
+  },
+};

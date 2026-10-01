@@ -342,6 +342,8 @@ export default defineComponent({
       // Stop session replay recording on logout
       if (this.store.state.zoConfig?.rum?.enabled) {
         openobserveRum.stopSessionReplayRecording();
+        openobserveRum.clearUser();
+        openobserveRum.clearAccount();
       }
 
       // Always call backend logout to clear auth cookies (auth_tokens, auth_ext)
@@ -709,6 +711,25 @@ export default defineComponent({
           getConfig();
         }
       },
+    );
+
+    // main.ts mounts before the bootstrap config resolves, so rum.enabled can arrive after the org.
+    watch(
+      [
+        () => store.state.selectedOrganization?.identifier,
+        () => store.state.selectedOrganization?.label,
+        () => store.state.selectedOrganization?.subscription_type,
+        () => store.state.zoConfig?.rum?.enabled,
+      ],
+      ([identifier, name, subscriptionType, rumEnabled]) => {
+        if (!identifier || !rumEnabled) return;
+        openobserveRum.setAccount({
+          id: identifier,
+          name,
+          subscription_type: subscriptionType,
+        });
+      },
+      { immediate: true },
     );
 
     onMounted(async () => {
@@ -1335,6 +1356,7 @@ export default defineComponent({
         const userInfo = store.state.userInfo;
         // Set user information first
         openobserveRum.setUser({
+          id: userInfo.email,
           name: userInfo.given_name + " " + userInfo.family_name,
           email: userInfo.email,
         });

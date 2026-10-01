@@ -18,6 +18,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import EnrichmentTableList from "./EnrichmentTableList.vue";
+import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 
 // ── Hoist mocks so they can be referenced in vi.mock factories ─────────────────
 
@@ -64,7 +66,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((v) => v + " MB"),
@@ -485,6 +487,67 @@ describe("EnrichmentTableList", () => {
       ];
 
       expect(vm.selectedEnrichmentTableIds).toEqual(["table_a", "table_b"]);
+    });
+  });
+
+  describe("stream_deleted analytics", () => {
+    const trackedDeletes = () =>
+      vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "stream_deleted");
+
+    it("tracks a confirmed single delete", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 1 }],
+      ]);
+    });
+
+    it("does not track a single delete the server did not confirm", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 500 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([]);
+    });
+
+    it("tracks one event per bulk delete, counting only confirmed deletions", async () => {
+      vi.mocked(streamService.delete)
+        .mockResolvedValueOnce({ data: { code: 200 } } as any)
+        .mockRejectedValueOnce({ response: { status: 500 } })
+        .mockResolvedValueOnce({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b", "c"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 2 }],
+      ]);
+    });
+
+    it("does not track a bulk delete in which every delete failed", async () => {
+      vi.mocked(streamService.delete).mockRejectedValue({ response: { status: 500 } });
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(streamService.delete).toHaveBeenCalledTimes(2);
+      expect(trackedDeletes()).toEqual([]);
     });
   });
 

@@ -33,6 +33,7 @@ import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
+import analytics from "@/services/product_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -254,7 +255,13 @@ const detected = computed(() => detect.connected.value);
 
 // Fires once per false→true transition — a remount starts idle and stays silent.
 watch(detected, (connected, was) => {
-  if (connected && !was) emit("detected", detect.count.value);
+  if (connected && !was) {
+    analytics.track("data_source_connected", {
+      provider: props.content.provider.id,
+      stream_type: streamKind.value ?? "logs",
+    });
+    emit("detected", detect.count.value);
+  }
 });
 
 // Don't surface the "most likely fix" hint on the first miss — the user may
@@ -361,6 +368,7 @@ const scrollToStep = (i: number) => {
     });
 };
 const onStepCopy = (step: RichCardStep, index: number) => {
+  analytics.track("snippet_copied", { route: router.currentRoute.value.name });
   if (step.completeOn === "copy") copied.value = { ...copied.value, [step.id]: true };
   scrollToStep(index + 1);
 };

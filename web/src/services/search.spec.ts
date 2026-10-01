@@ -26,6 +26,8 @@ vi.mock("./http", () => ({
   })),
 }));
 
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("./stream", () => ({
   default: {},
 }));
@@ -38,6 +40,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 import http from "./http";
+import analytics from "./product_analytics";
 import { generateTraceContext } from "@/utils/zincutils";
 
 describe("Search Service", () => {
@@ -1054,6 +1057,30 @@ describe("Search Service", () => {
       expect(http).toHaveBeenCalledWith({
         headers: { traceparent: "existing-trace" },
       });
+    });
+  });
+
+  describe("schedule_search product analytics", () => {
+    it("tracks search_job_created once the request resolves", async () => {
+      const response = { data: { code: 200 } };
+      mockHttp.post.mockResolvedValue(response);
+
+      await expect(
+        search.schedule_search({ org_identifier: "org", query: {}, page_type: "logs" }),
+      ).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("search_job_created", { stream_type: "logs" });
+    });
+
+    it("does not track search_job_created when the request rejects", async () => {
+      mockHttp.post.mockRejectedValue(new Error("boom"));
+
+      await expect(
+        search.schedule_search({ org_identifier: "org", query: {}, page_type: "logs" }),
+      ).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

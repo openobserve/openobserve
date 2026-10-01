@@ -238,6 +238,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import analytics from "@/services/product_analytics";
 
 import { formatDate } from "@/utils/date";
 import {
@@ -1124,6 +1125,15 @@ const stopWatchdog = () => {
   if (watchdog !== null) clearInterval(watchdog);
   watchdog = null;
 };
+
+// Once per opened session: play/pause toggles and buffering must not re-count it.
+const stopPlayedWatch = watch(playerPlaybackState, (state) => {
+  if (state !== "playing") return;
+  analytics.track("session_replay_played", {
+    platform: isMobileReplay.value ? "mobile" : "browser",
+  });
+  stopPlayedWatch();
+});
 
 watch(playerPlaybackState, (state) => {
   const waiting = state === "buffering" || state === "waiting";
