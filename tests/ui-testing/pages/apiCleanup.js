@@ -1000,6 +1000,75 @@ class APICleanup {
     }
 
     /**
+     * Create a realtime pipeline whose middle node calls an existing function,
+     * so the function has a dependent the UI can warn about.
+     * @param {string} pipelineName
+     * @param {string} functionName - must already exist
+     * @param {string} [sourceStream]
+     * @param {string} [org]
+     * @returns {Promise<string>} the new pipeline's id
+     */
+    async createPipelineUsingFunction(pipelineName, functionName, sourceStream = 'e2e_automate', org = null) {
+        const targetOrg = org || this.org;
+        const stamp = Date.now();
+        const inputId = `in-${stamp}`;
+        const fnId = `fn-${stamp}`;
+        const outputId = `out-${stamp}`;
+        const edge = (id, source, target) => ({
+            id, source, target, type: 'custom', animated: true, updatable: true,
+            markerEnd: { type: 'arrowclosed', width: 20, height: 20 },
+            style: { strokeWidth: 2 },
+        });
+        const payload = {
+            pipeline_id: '', version: 0, enabled: true, org: targetOrg,
+            name: pipelineName, description: `E2E pipeline using ${functionName}`,
+            source: { source_type: 'realtime' }, paused_at: null,
+            nodes: [
+                { id: inputId, position: { x: 100, y: 100 }, io_type: 'input',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: sourceStream, org_id: targetOrg } },
+                { id: fnId, position: { x: 300, y: 200 }, io_type: 'default',
+                  data: { node_type: 'function', name: functionName, after_flatten: true } },
+                { id: outputId, position: { x: 500, y: 300 }, io_type: 'output',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: `${pipelineName}_dest`, org_id: targetOrg } },
+            ],
+            edges: [edge(`e1-${stamp}`, inputId, fnId), edge(`e2-${stamp}`, fnId, outputId)],
+        };
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/pipelines`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createPipelineUsingFunction: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json().catch(() => ({}));
+        testLogger.info('Created pipeline using function', { pipelineName, functionName, org: targetOrg });
+        return result.id;
+    }
+
+    /**
+     * Create a JavaScript function (transType 1) via API.
+     * @param {string} functionName
+     * @param {string} jsCode - Function body; JS is not VRL, so it is stored verbatim
+     * @param {string} [org] - Organization identifier
+     */
+    async createJsFunction(functionName, jsCode, org = null) {
+        const targetOrg = org || this.org;
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/functions`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: functionName, function: jsCode, params: 'row', transType: 1 })
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createJsFunction: HTTP ${response.status} — ${body}`);
+        }
+        testLogger.info('Created JS function via API', { functionName, org: targetOrg });
+        return await response.json().catch(() => ({}));
+    }
+
+    /**
      * Delete a single function in a specific organization
      * @param {string} org - The organization identifier
      * @param {string} functionName - The function name

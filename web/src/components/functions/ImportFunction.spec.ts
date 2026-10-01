@@ -668,6 +668,30 @@ describe("ImportFunction", () => {
         params: "row",
       });
     });
+
+    // An entry that is not an object is rejected like any other and offered the
+    // same controls, so those controls have to have somewhere to write. Writing
+    // into the entry itself threw on a primitive and did nothing at all on a
+    // null, so the typed name never reached the document and the item could not
+    // be fixed however long the user tried.
+    it.each([
+      ["a bare string", "just a string"],
+      ["a null", null],
+    ])("repairs %s entry rather than refusing to be fixed", async (_label, entry) => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, [entry]);
+
+      expect(() => wrapper.vm.updateFunctionName("fn_rescued", 0)).not.toThrow();
+      wrapper.vm.updateFunctionBody(".a = 1", 0);
+      await nextTick();
+
+      expect(JSON.parse(wrapper.vm.baseImportRef.jsonStr)[0]).toMatchObject({
+        name: "fn_rescued",
+        function: ".a = 1",
+      });
+    });
   });
 
   // Under RBAC the list is filtered, so a name can be taken without the screen

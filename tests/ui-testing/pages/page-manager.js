@@ -132,6 +132,7 @@ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationP
 // ===== FUNCTIONS PAGE OBJECTS =====
 const FunctionsPage = require("./functionsPages/functionsPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
+const FunctionsImportExportPage = require("./functionsPages/functionsImportExportPage.js");
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
@@ -277,6 +278,7 @@ class PageManager {
     // ===== FUNCTIONS PAGE OBJECTS =====
     this.functionsPage = new FunctionsPage(page);
     this.functionsFormValidation = new FunctionsFormValidationPage(page);
+    this.functionsImportExport = new FunctionsImportExportPage(page);
 
     // ===== CIPHER KEYS PAGE OBJECTS =====
     this.cipherKeysFormValidation = new CipherKeysFormValidationPage(page);
