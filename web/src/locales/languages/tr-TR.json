@@ -10126,6 +10126,7 @@
     "layoutVertical": "Dikey",
     "layoutForce": "Kuvvet Düzeni",
     "exportTraces": "İzleri Dışa Aktar",
+    "exportTracesFailed": "İzler dışa aktarılamadı",
     "waterfall": "Şelale",
     "flameGraph": "Alev Grafiği",
     "traceGraph": "İz Grafiği",

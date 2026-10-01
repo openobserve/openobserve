@@ -10126,6 +10126,7 @@
     "layoutVertical": "Verticale",
     "layoutForce": "Layout delle forze",
     "exportTraces": "Esporta tracce",
+    "exportTracesFailed": "Impossibile esportare le tracce",
     "waterfall": "Cascata",
     "flameGraph": "Grafico della fiamma",
     "traceGraph": "Grafico della traccia",

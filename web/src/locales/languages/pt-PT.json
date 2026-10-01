@@ -10126,6 +10126,7 @@
     "layoutVertical": "Vertical",
     "layoutForce": "Layout de força",
     "exportTraces": "Exportar rastreamentos",
+    "exportTracesFailed": "Falha ao exportar rastreamentos",
     "waterfall": "Cachoeira",
     "flameGraph": "Gráfico de chamas",
     "traceGraph": "Grafo de rastreamento",
