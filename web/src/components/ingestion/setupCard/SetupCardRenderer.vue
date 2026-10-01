@@ -255,7 +255,13 @@ const detected = computed(() => detect.connected.value);
 
 // Fires once per false→true transition — a remount starts idle and stays silent.
 watch(detected, (connected, was) => {
-  if (connected && !was) emit("detected", detect.count.value);
+  if (connected && !was) {
+    analytics.track("data_source_connected", {
+      provider: props.content.provider.id,
+      stream_type: streamKind.value ?? "logs",
+    });
+    emit("detected", detect.count.value);
+  }
 });
 
 // Don't surface the "most likely fix" hint on the first miss — the user may

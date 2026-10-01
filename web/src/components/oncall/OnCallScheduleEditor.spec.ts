@@ -26,6 +26,8 @@ import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 vi.mock("@/services/oncall", () => ({
   default: { setSchedule: vi.fn(), listUnavailability: vi.fn() },
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 const service = vi.mocked(oncallService);
 
@@ -359,6 +361,36 @@ describe("OnCallScheduleEditor", () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(false);
+  });
+
+  it("tracks oncall_schedule_saved from the editor once the schedule is saved", async () => {
+    service.setSchedule.mockResolvedValue({ data: {} } as any);
+    vi.mocked(analytics.track).mockClear();
+    const wrapper = render({ schedule: schedule([rota("On-call rotation")]) });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("oncall_schedule_saved", {
+      source: "editor",
+      rotation_count: 1,
+    });
+  });
+
+  it("does not track oncall_schedule_saved when the save is refused", async () => {
+    service.setSchedule.mockRejectedValue({ response: { data: { message: "no" } } });
+    vi.mocked(analytics.track).mockClear();
+    const wrapper = render({ schedule: schedule([rota("On-call rotation")]) });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+    await flushPromises();
+
+    expect(service.setSchedule).toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   /// `addRotation` pushes the row into the draft before anybody has filled it

@@ -1071,6 +1071,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
+            analytics.track("stream_deleted", { stream_type: deleteStreamType, count: 1 });
             toast({
               message: t("toastMessages.views.streamDeletedSuccessfully"),
               variant: "success",
@@ -1111,6 +1112,17 @@ export default defineComponent({
         .then((responses) => {
           const successfulDeletions = responses.filter((res) => res.data.code === 200);
           const failedDeletions = responses.filter((res) => res.data.code !== 200);
+          const deletedTypes = new Set(
+            items
+              .filter((_s: any, i: number) => responses[i].data.code === 200)
+              .map((s: any) => s.stream_type),
+          );
+          if (successfulDeletions.length > 0) {
+            analytics.track("stream_deleted", {
+              stream_type: deletedTypes.size === 1 ? [...deletedTypes][0] : "mixed",
+              count: successfulDeletions.length,
+            });
+          }
 
           if (successfulDeletions.length > 0) {
             toast({

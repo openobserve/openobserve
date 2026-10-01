@@ -51,6 +51,9 @@ vi.mock("@/services/oncall", () => ({
   },
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 vi.mock("@/services/alerts", () => ({
   default: { get_by_alert_id: vi.fn() },
 }));
@@ -441,6 +444,18 @@ describe("OnCallResponseDetail", () => {
     });
     // Two loads: mount, then the refresh that shows the new state.
     expect(service.getResponse).toHaveBeenCalledTimes(2);
+    expect(analytics.track).toHaveBeenCalledWith("oncall_page_acknowledged", { count: 1 });
+  });
+
+  it("does not track an acknowledgement the server refused", async () => {
+    const wrapper = await renderWith();
+    service.acknowledgeResponse.mockRejectedValue({ response: { data: { message: "no" } } });
+    vi.mocked(analytics.track).mockClear();
+
+    await wrapper.find('[data-test="oncall-response-ack-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   /// The bug this pins: the backend sets state to `acknowledged`, and every
@@ -644,6 +659,10 @@ describe("OnCallResponseDetail", () => {
           cause_note: "rolled back the 14:02 deploy",
         }),
       );
+      expect(analytics.track).toHaveBeenCalledWith("oncall_page_resolved", {
+        cause: "config_change_or_deploy",
+        count: 1,
+      });
     });
 
     /// Resolving must never be blocked on knowing why — a responder who cannot
@@ -657,6 +676,10 @@ describe("OnCallResponseDetail", () => {
       expect(service.resolveResponse).toHaveBeenCalledWith(
         expect.objectContaining({ cause: undefined, cause_note: undefined }),
       );
+      expect(analytics.track).toHaveBeenCalledWith("oncall_page_resolved", {
+        cause: "none",
+        count: 1,
+      });
     });
 
     it("offers every cause in the taxonomy", async () => {

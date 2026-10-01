@@ -55,7 +55,7 @@ const router = createRouter({
 const SUBS = { url: "https://o2.example.com", org: "test-org", token: "tok" };
 
 const CONTENT: RichCardContent = {
-  provider: { name: "Demo", tagline: "A demo card.", logo: "", tone: "#000" },
+  provider: { id: "demo", name: "Demo", tagline: "A demo card.", logo: "", tone: "#000" },
   steps: [
     {
       id: "install",
@@ -325,6 +325,28 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
     await wrapper.find('[data-test="ai-c-recheck"]').trigger("click");
     await flushPromises();
     expect(wrapper.emitted("detected")).toHaveLength(1);
+  });
+
+  it("tracks data_source_connected with the provider id, not its label, on connect", async () => {
+    vi.mocked(analytics.track).mockClear();
+    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
+    wrapper = mountCard(hostContent());
+    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("data_source_connected", {
+      provider: "demo",
+      stream_type: "metrics",
+    });
+  });
+
+  it("does not track data_source_connected when the check finds nothing", async () => {
+    vi.mocked(analytics.track).mockClear();
+    nameListMock.mockResolvedValue({ data: { list: [] } });
+    wrapper = mountCard(hostContent());
+    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    await flushPromises();
+    expect(analytics.track).not.toHaveBeenCalledWith("data_source_connected", expect.anything());
   });
 
   it("does not emit `detected` on a fresh mount (no transition happened)", async () => {

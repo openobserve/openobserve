@@ -918,6 +918,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
+            analytics.track("stream_deleted", { stream_type: "enrichment_tables", count: 1 });
             toast({
               message: t("toastMessages.functions.deletedSuccessfully", {
                 name: selectedDelete.value.name,
@@ -991,6 +992,12 @@ export default defineComponent({
             }
           });
 
+          if (successfulDeletions > 0) {
+            analytics.track("stream_deleted", {
+              stream_type: "enrichment_tables",
+              count: successfulDeletions,
+            });
+          }
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
               message: t("toastMessages.functions.successfullyDeletedEnrichmentTables", {

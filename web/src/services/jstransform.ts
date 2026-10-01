@@ -42,15 +42,31 @@ const jstransform = {
     return http().get(`/api/${org_identifier}/functions/${name}`);
   },
   update: (org_identifier: string, data: any) => {
-    return http().put(`/api/${org_identifier}/functions/${data.name}`, data);
+    return http()
+      .put(`/api/${org_identifier}/functions/${data.name}`, data)
+      .then((res) => {
+        analytics.track("function_updated");
+        return res;
+      });
   },
   delete: (org_identifier: string, transform_name: string, force?: boolean) => {
     const url = `/api/${org_identifier}/functions/${transform_name}`;
     const config = force ? { params: { force: true } } : {};
-    return http().delete(url, config);
+    return http()
+      .delete(url, config)
+      .then((res) => {
+        analytics.track("function_deleted", { count: 1 });
+        return res;
+      });
   },
   bulkDelete: (org_identifier: string, data: any) => {
-    return http().delete(`/api/${org_identifier}/functions/bulk`, { data });
+    return http()
+      .delete(`/api/${org_identifier}/functions/bulk`, { data })
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track("function_deleted", { count });
+        return res;
+      });
   },
   create_with_index: (
     org_identifier: string,
@@ -106,10 +122,12 @@ const jstransform = {
     data: any,
     append: boolean,
   ) => {
-    return http({ headers: { "Content-Type": "multipart/form-data" } }).post(
-      `/api/${org_identifier}/enrichment_tables/${table_name}?append=${append}`,
-      data,
-    );
+    return http({ headers: { "Content-Type": "multipart/form-data" } })
+      .post(`/api/${org_identifier}/enrichment_tables/${table_name}?append=${append}`, data)
+      .then((res) => {
+        analytics.track("enrichment_table_uploaded", { source: "file", append, reload: false });
+        return res;
+      });
   },
   create_enrichment_table_from_url: (
     org_identifier: string,
@@ -120,16 +138,30 @@ const jstransform = {
     retry: boolean = false,
     replace_failed: boolean = false,
   ) => {
-    return http().post(
-      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=${resume}&retry=${retry}`,
-      { url, replace_failed },
-    );
+    return http()
+      .post(
+        `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=${resume}&retry=${retry}`,
+        { url, replace_failed },
+      )
+      .then((res) => {
+        analytics.track("enrichment_table_uploaded", {
+          source: "url",
+          append: append_data,
+          reload: retry,
+        });
+        return res;
+      });
   },
   get_all_enrichment_table_statuses: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/enrichment_tables/status`);
   },
   test: (org_identifier: string, data: TestFunctionPayload) => {
-    return http().post(`/api/${org_identifier}/functions/test`, data);
+    return http()
+      .post(`/api/${org_identifier}/functions/test`, data)
+      .then((res) => {
+        analytics.track("function_tested");
+        return res;
+      });
   },
 };
 

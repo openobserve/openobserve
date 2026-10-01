@@ -3266,6 +3266,7 @@ export default defineComponent({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         showDownloadMenu.value = false;
+        analytics.track("logs_downloaded", { format });
       } catch (error) {
         showDownloadMenu.value = false;
         toast({

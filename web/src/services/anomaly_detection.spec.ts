@@ -502,4 +502,34 @@ describe("anomaly_detection service", () => {
       expect(analytics.track).not.toHaveBeenCalled();
     });
   });
+
+  describe("product analytics: anomaly lifecycle", () => {
+    const cases: Array<[string, string, () => Promise<unknown>, unknown[]]> = [
+      ["update", "put", () => anomaly_detection.update("org1", "a1", {}), ["alert_updated"]],
+      [
+        "triggerTraining",
+        "post",
+        () => anomaly_detection.triggerTraining("org1", "a1"),
+        ["anomaly_detection_training_started"],
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the request resolves", async (_label, verb, call, args) => {
+      const response = { data: { successful: ["a", "b"], unsuccessful: [], success: true } };
+      mockHttpInstance[verb].mockResolvedValue(response);
+
+      await expect(call()).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(...args);
+    });
+
+    it.each(cases)("%s does not track when the request rejects", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
 });

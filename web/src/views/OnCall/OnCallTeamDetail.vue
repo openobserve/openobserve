@@ -449,6 +449,7 @@ import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
+import analytics from "@/services/product_analytics";
 import {
   createOverrideMutation,
   deleteOverrideMutation,
@@ -1160,6 +1161,7 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
     firstId = created.data?.id ?? null;
 
     await coverWrite.mutateAsync(value.second);
+    analytics.track("oncall_override_created", { kind: "swap" });
 
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.swapSaved") });
@@ -1221,6 +1223,7 @@ async function saveCover(value: {
   coverSaving.value = true;
   try {
     await coverWrite.mutateAsync(value);
+    analytics.track("oncall_override_created", { kind: "cover" });
     coverOpen.value = false;
     coverGap.value = null;
     // The message is "{name} covers {team} · {range}" and it was called with no

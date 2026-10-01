@@ -419,6 +419,7 @@ export default defineComponent({
       }
 
       await createDashboard.mutateAsync({ json: dashboardJson, folderId });
+      analytics.track("dashboard_created");
     };
 
     const handleAddDashboard = async () => {

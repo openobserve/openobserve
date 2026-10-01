@@ -581,6 +581,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
@@ -1180,6 +1181,7 @@ export default defineComponent({
           data,
           folderId || "default",
         );
+        analytics.track("dashboard_created");
 
         // Post-write reload: the duplicate will not appear from a cache hit.
         await getDashboards(true);
@@ -1395,6 +1397,7 @@ export default defineComponent({
               ? selectedDelete.value.folder_id
               : (activeFolderId.value ?? "default"),
           );
+          analytics.track("dashboard_deleted", { count: 1 });
           showPositiveNotification(
             deletedWasHome
               ? t("dashboard.pinnedDeletedPinRemoved")
@@ -1673,6 +1676,9 @@ export default defineComponent({
         // across the per-folder calls.
         const successful = responses.flatMap((r: any) => r?.data?.successful ?? []);
         const unsuccessful = responses.flatMap((r: any) => r?.data?.unsuccessful ?? []);
+        if (successful.length > 0) {
+          analytics.track("dashboard_deleted", { count: successful.length });
+        }
         if (responses.some((r: any) => r?.data)) {
           const successCount = successful.length;
           const failCount = unsuccessful.length;

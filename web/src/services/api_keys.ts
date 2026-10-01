@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const apiKeys = {
   list: () => {
@@ -29,10 +30,20 @@ const apiKeys = {
     return http().put(`/api/usertoken/${data.id}`, data);
   },
   createRUMToken: (org_id: string) => {
-    return http().post(`/api/${org_id}/rumtoken`);
+    return http()
+      .post(`/api/${org_id}/rumtoken`)
+      .then((res) => {
+        analytics.track("rum_token_created");
+        return res;
+      });
   },
   updateRUMToken: (org_id: string, _id: string) => {
-    return http().put(`/api/${org_id}/rumtoken`);
+    return http()
+      .put(`/api/${org_id}/rumtoken`)
+      .then((res) => {
+        analytics.track("rum_token_regenerated");
+        return res;
+      });
   },
   deleteUserAPIKey: (id: string) => {
     return http().delete(`/api/usertoken/${id}`);

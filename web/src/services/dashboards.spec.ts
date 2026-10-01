@@ -706,20 +706,38 @@ describe("Dashboards Service", () => {
   });
 
   describe("product analytics", () => {
-    it("tracks dashboard_created once the request resolves and returns the response", async () => {
-      const response = { data: { code: 200 } };
-      mockHttp.post.mockResolvedValue(response);
+    it.each([
+      ["delete", "delete", () => dashboards.delete("test-org", "d1")],
+      ["bulkDelete", "delete", () => dashboards.bulkDelete("test-org", { ids: ["d1"] })],
+      ["new_Folder", "post", () => dashboards.new_Folder("test-org", {})],
+      ["create", "post", () => dashboards.create("test-org", {})],
+    ] as Array<[string, string, () => Promise<unknown>]>)(
+      "%s does not track, since replace and auto-setup flows call it too",
+      async (_label, verb, call) => {
+        mockHttp[verb].mockResolvedValue({ data: { successful: ["d1"], unsuccessful: [] } });
 
-      await expect(dashboards.create("test-org", {})).resolves.toBe(response);
+        await call();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      },
+    );
+
+    it("tracks dashboard_moved with the number of moved dashboards", async () => {
+      const response = { data: {} };
+      mockHttp.patch.mockResolvedValue(response);
+
+      await expect(dashboards.move_Dashboard("test-org", ["d1", "d2"], "a", "b")).resolves.toBe(
+        response,
+      );
 
       expect(analytics.track).toHaveBeenCalledTimes(1);
-      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_moved", { count: 2 });
     });
 
-    it("does not track dashboard_created when the request rejects", async () => {
-      mockHttp.post.mockRejectedValue(new Error("boom"));
+    it("does not track dashboard_moved when the move rejects", async () => {
+      mockHttp.patch.mockRejectedValue(new Error("boom"));
 
-      await expect(dashboards.create("test-org", {})).rejects.toThrow("boom");
+      await expect(dashboards.move_Dashboard("test-org", ["d1"], "a", "b")).rejects.toThrow("boom");
 
       expect(analytics.track).not.toHaveBeenCalled();
     });

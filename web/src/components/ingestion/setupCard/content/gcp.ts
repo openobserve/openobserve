@@ -34,6 +34,7 @@ const PUSH_ENDPOINT = "{url}/gcp/{org}/{stream}/_sub?API-Key={token}";
 export default function gcpCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "gcp",
       name: raw("Google Cloud"),
       tagline: t("ingestion.setupCard.taglineGcp"),
       logo: getImageURL("images/ingestion/gcp.svg"),

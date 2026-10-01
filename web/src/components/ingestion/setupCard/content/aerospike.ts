@@ -43,6 +43,7 @@ service:
 export default function aerospikeCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "aerospike",
       name: raw("Aerospike"),
       tagline: t("ingestion.setupCard.aerospikeTagline"),
       logo: getImageURL("images/ingestion/aerospike.svg"),

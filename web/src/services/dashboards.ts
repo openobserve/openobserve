@@ -44,14 +44,9 @@ const dashboards = {
     return http().get(`/api/${organization}/dashboards`, { params });
   },
   create: (organization: string, data: any, folderId?: string) => {
-    return http()
-      .post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
-        headers: { "Content-Type": "application/json; charset=UTF-8" },
-      })
-      .then((res) => {
-        analytics.track("dashboard_created");
-        return res;
-      });
+    return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
+      headers: { "Content-Type": "application/json; charset=UTF-8" },
+    });
   },
   delete: (organization: string, dashboardID: string, folderId?: string) => {
     return http().delete(
@@ -99,14 +94,19 @@ const dashboards = {
     from: string,
     dstFolderId: string,
   ) => {
-    return http().patch(
-      `/api/${organization}/dashboards/move?folder=${from}`,
-      {
-        dashboard_ids: dashboardIds,
-        dst_folder_id: dstFolderId,
-      },
-      { headers: { "Content-Type": "application/json; charset=UTF-8" } },
-    );
+    return http()
+      .patch(
+        `/api/${organization}/dashboards/move?folder=${from}`,
+        {
+          dashboard_ids: dashboardIds,
+          dst_folder_id: dstFolderId,
+        },
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
+      )
+      .then((res) => {
+        analytics.track("dashboard_moved", { count: dashboardIds.length });
+        return res;
+      });
   },
 };
 

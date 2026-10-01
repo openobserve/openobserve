@@ -48,7 +48,12 @@ const anomaly_detection = {
 
   // PUT /api/v2/{org}/alerts/{id} — delegates to anomaly config update when alert_type is "anomaly_detection"
   update: (org_identifier: string, anomaly_id: string, data: object) => {
-    return http().put(`/api/v2/${org_identifier}/alerts/${anomaly_id}`, data);
+    return http()
+      .put(`/api/v2/${org_identifier}/alerts/${anomaly_id}`, data)
+      .then((res) => {
+        analytics.track("alert_updated");
+        return res;
+      });
   },
 
   // DELETE /api/v2/{org}/alerts/{id} — falls back to anomaly config delete when ID not in alerts
@@ -65,7 +70,12 @@ const anomaly_detection = {
   },
 
   triggerTraining: (org_identifier: string, anomaly_id: string) => {
-    return http().post(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`, {});
+    return http()
+      .post(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`, {})
+      .then((res) => {
+        analytics.track("anomaly_detection_training_started");
+        return res;
+      });
   },
 
   cancelTraining: (org_identifier: string, anomaly_id: string) => {

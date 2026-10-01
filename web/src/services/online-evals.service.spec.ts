@@ -15,6 +15,8 @@ const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockDelete: vi.fn(),
 }));
 
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("@/services/http", () => ({
   default: () => ({
     get: mockGet,
@@ -25,6 +27,7 @@ vi.mock("@/services/http", () => ({
 }));
 
 import onlineEvalsService from "./online-evals.service";
+import analytics from "./product_analytics";
 
 beforeEach(() => {
   mockGet.mockReset();
@@ -215,5 +218,23 @@ describe("mutation endpoints return response.data directly", () => {
     mockDelete.mockResolvedValue({});
     await onlineEvalsService.providers.delete("org-1", "p1");
     expect(mockDelete).toHaveBeenCalledWith("/api/org-1/providers/p1");
+  });
+});
+
+describe("jobs.create analytics", () => {
+  beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+  it("tracks llm_eval_job_created once the server confirms", async () => {
+    mockPost.mockResolvedValue({ data: { id: "job-1" } });
+    await expect(onlineEvalsService.jobs.create("org-1", {} as any)).resolves.toEqual({
+      id: "job-1",
+    });
+    expect(analytics.track).toHaveBeenCalledWith("llm_eval_job_created");
+  });
+
+  it("does not track when the create is rejected", async () => {
+    mockPost.mockRejectedValue(new Error("boom"));
+    await expect(onlineEvalsService.jobs.create("org-1", {} as any)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });
