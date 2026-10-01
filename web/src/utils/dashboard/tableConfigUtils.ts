@@ -25,6 +25,7 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
+import { RE2JS } from "re2js";
 
 /** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
 export const OVERRIDE_CONFIG_TYPES = {
@@ -44,7 +45,19 @@ const MAX_VALUE_MAPPING_TEST_LENGTH = 1024;
 const REGEX_KEY_PREFIX = "__regex_";
 
 // Compiled at cache build so a table never recompiles a pattern per cell.
-const compiledRegexByCache = new WeakMap<Map<any, any>, Map<string, RegExp | null>>();
+const compiledRegexByCache = new WeakMap<Map<any, any>, Map<string, RE2JS | null>>();
+
+// g and y have no counterpart: RE2JS.test is stateless and searches the whole value.
+const RE2_FLAG_BY_JS_FLAG: Record<string, number> = {
+  i: RE2JS.CASE_INSENSITIVE,
+  m: RE2JS.MULTILINE,
+  s: RE2JS.DOTALL,
+};
+
+const warnedValueMappingPatterns = new Set<string>();
+
+/** Why a value-mapping regex cannot be saved. */
+export type ValueMappingPatternError = "tooLong" | "unsupported";
 
 /** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
 export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
@@ -66,37 +79,11 @@ export const parseRegexPattern = (input: string): { pattern: string; flags: stri
   return { pattern: input, flags: "" };
 };
 
-/** True when a group holding a variable-count quantifier is itself repeated a variable number of times, e.g. `(a+)+`, `(a{2,5})+`, `(a+){1,10}`; `(\d+\.){3}` passes. */
-export const hasNestedQuantifier = (pattern: string): boolean => {
-  const groupRepeats: boolean[] = [];
-  let repeats = false;
-  let inClass = false;
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i];
-    if (ch === "\\") {
-      i++;
-    } else if (inClass) {
-      inClass = ch !== "]";
-    } else if (ch === "[") {
-      inClass = true;
-    } else if (ch === "(") {
-      groupRepeats.push(repeats);
-      repeats = false;
-    } else if (ch === ")") {
-      const inner: boolean = repeats;
-      if (inner && isVariableRepetitionAt(pattern, i + 1)) return true;
-      repeats = (groupRepeats.pop() ?? false) || inner;
-    } else if (isVariableRepetitionAt(pattern, i)) {
-      repeats = true;
-    }
-  }
-  return false;
+/** Why a value-mapping regex cannot run: over the length cap, or syntax the linear-time engine rejects such as lookaround or backreferences. */
+export const valueMappingPatternError = (input: string): ValueMappingPatternError | null => {
+  if (input.length > MAX_VALUE_MAPPING_PATTERN_LENGTH) return "tooLong";
+  return tryCompileLinearRegex(input) ? null : "unsupported";
 };
-
-/** Whether a value-mapping regex is short enough and free of nested quantifiers to run on every table cell. */
-export const isSafeValueMappingPattern = (input: string): boolean =>
-  input.length <= MAX_VALUE_MAPPING_PATTERN_LENGTH &&
-  !hasNestedQuantifier(parseRegexPattern(input).pattern);
 
 /** Build a fast-lookup cache from `config.mappings`, storing the full mapping object. */
 export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
@@ -105,7 +92,7 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   }
 
   const cache = new Map<any, any>();
-  const compiled = new Map<string, RegExp | null>();
+  const compiled = new Map<string, RE2JS | null>();
 
   mappings.forEach((mapping: any) => {
     if (!mapping) return;
@@ -509,29 +496,23 @@ export const resolveMetricValueStyle = (
   return { text, textColor, bgColor };
 };
 
-const braceBoundsAt = (pattern: string, index: number): { min: number; max: number } | null => {
-  const match = /^\{(\d+)(,(\d*))?\}/.exec(pattern.slice(index));
-  if (!match) return null;
-  const min = Number(match[1]);
-  if (match[2] === undefined) return { min, max: min };
-  return { min, max: match[3] === "" ? Infinity : Number(match[3]) };
-};
-
-// `?` is not counted so optional parts such as `(ab?)*` stay allowed.
-const isVariableRepetitionAt = (pattern: string, index: number): boolean => {
-  const ch = pattern[index];
-  if (ch === "*" || ch === "+") return true;
-  const bounds = ch === "{" ? braceBoundsAt(pattern, index) : null;
-  return bounds !== null && bounds.max > bounds.min;
-};
-
-// g and y are dropped because a shared compiled regex with lastIndex state would alternate results.
-const compileValueMappingRegex = (input: string): RegExp | null => {
-  if (!isSafeValueMappingPattern(input)) return null;
+const tryCompileLinearRegex = (input: string): RE2JS | null => {
   const { pattern, flags } = parseRegexPattern(input);
+  let re2Flags = 0;
+  for (const flag of flags) re2Flags |= RE2_FLAG_BY_JS_FLAG[flag] ?? 0;
   try {
-    return new RegExp(pattern, flags.replace(/[gy]/g, ""));
+    return RE2JS.compile(RE2JS.translateRegExp(pattern), re2Flags);
   } catch {
     return null;
   }
+};
+
+const compileValueMappingRegex = (input: string): RE2JS | null => {
+  const regex =
+    input.length <= MAX_VALUE_MAPPING_PATTERN_LENGTH ? tryCompileLinearRegex(input) : null;
+  if (!regex && !warnedValueMappingPatterns.has(input)) {
+    warnedValueMappingPatterns.add(input);
+    console.warn(`Value mapping regex skipped, it is too long or unsupported: ${input}`);
+  }
+  return regex;
 };
