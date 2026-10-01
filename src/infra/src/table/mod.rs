@@ -18,11 +18,11 @@ use sea_orm_migration::MigratorTrait;
 
 use crate::{db::get_orm_client_ddl, dist_lock};
 
+pub mod ai_chat_sessions;
 pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
 pub mod alert_states;
-pub mod ai_chat_sessions;
 pub mod alerts;
 pub mod anomaly_detection;
 pub mod backfill_jobs;
