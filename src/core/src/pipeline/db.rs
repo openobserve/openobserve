@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{future::Future, sync::Arc};
+use std::{
+    collections::HashMap,
+    future::Future,
+    sync::{Arc, LazyLock, Mutex},
+    time::{Duration, Instant},
+};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -32,6 +37,14 @@ use crate::{
     common::infra::config::{PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES},
     pipeline::batch_execution::ExecutablePipeline,
 };
+
+const BROKEN_PIPELINE_LOG_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Enabled realtime pipelines this node could not compile, by pipeline id.
+static BROKEN_REALTIME_PIPELINES: LazyLock<tokio::sync::RwLock<HashMap<String, BrokenPipeline>>> =
+    LazyLock::new(Default::default);
+static BROKEN_PIPELINE_LAST_LOG: LazyLock<Mutex<HashMap<StreamParams, Instant>>> =
+    LazyLock::new(Default::default);
 
 #[derive(Debug, thiserror::Error)]
 pub enum PipelineError {
@@ -66,6 +79,12 @@ impl From<infra::errors::Error> for PipelineError {
             err => PipelineError::InfraError(err),
         }
     }
+}
+
+struct BrokenPipeline {
+    name: String,
+    stream: StreamParams,
+    error: String,
 }
 
 /// Stores a new pipeline to database.
@@ -114,6 +133,51 @@ pub async fn get_executable_pipelines(stream_params: &StreamParams) -> Vec<Execu
         .unwrap_or_default();
     pipelines.sort_by_key(|p| p.kind != PipelineKind::User);
     pipelines
+}
+
+/// Why each enabled realtime pipeline of `org` that this node could not compile failed, by id.
+pub async fn realtime_load_errors(org: &str) -> HashMap<String, String> {
+    BROKEN_REALTIME_PIPELINES
+        .read()
+        .await
+        .iter()
+        .filter(|(_, broken)| broken.stream.org_id == org)
+        .map(|(id, broken)| (id.clone(), broken.error.clone()))
+        .collect()
+}
+
+/// Logs, at most once a minute per stream, each enabled pipeline the stream is ingested without.
+pub async fn log_broken_realtime_pipelines(stream_params: &StreamParams) {
+    let broken = BROKEN_REALTIME_PIPELINES.read().await;
+    if broken.is_empty() {
+        return;
+    }
+    let mut on_stream = broken
+        .iter()
+        .filter(|(_, broken)| broken.stream == *stream_params)
+        .peekable();
+    if on_stream.peek().is_none() {
+        return;
+    }
+    let due = {
+        let mut last_log = BROKEN_PIPELINE_LAST_LOG
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        broken_pipeline_log_due(&mut last_log, stream_params, Instant::now())
+    };
+    if !due {
+        return;
+    }
+    for (id, broken) in on_stream {
+        log::error!(
+            "[Pipeline] stream {}/{}/{} is ingested without its enabled pipeline {} ({id}), which failed to load: {}",
+            stream_params.org_id,
+            stream_params.stream_type,
+            stream_params.stream_name,
+            broken.name,
+            broken.error
+        );
+    }
 }
 
 /// Returns all realtime pipelines for the given stream. User pipelines first.
@@ -268,12 +332,13 @@ where
     pipeline_stream_mapping_cache.clear();
     stream_exec_pl.clear();
     scheduled_pipelines_cache.clear();
+    BROKEN_REALTIME_PIPELINES.write().await.clear();
 
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
             match &pipeline.source {
                 config::meta::pipeline::components::PipelineSource::Realtime(stream_params) => {
-                    match ExecutablePipeline::new(&pipeline).await {
+                    match compile_realtime_pipeline(&pipeline, stream_params).await {
                         Err(e) => {
                             log::error!(
                                 "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
@@ -305,6 +370,45 @@ where
         scheduled_pipelines_cache.len()
     );
     Ok(())
+}
+
+/// Compiles a realtime pipeline and records the outcome for ingestion and the list API.
+async fn compile_realtime_pipeline(
+    pipeline: &Pipeline,
+    stream_params: &StreamParams,
+) -> anyhow::Result<ExecutablePipeline> {
+    let compiled = ExecutablePipeline::new(pipeline).await;
+    let mut broken = BROKEN_REALTIME_PIPELINES.write().await;
+    match &compiled {
+        Ok(_) => {
+            broken.remove(&pipeline.id);
+        }
+        Err(e) => {
+            broken.insert(
+                pipeline.id.clone(),
+                BrokenPipeline {
+                    name: pipeline.name.clone(),
+                    stream: stream_params.clone(),
+                    error: e.to_string(),
+                },
+            );
+        }
+    }
+    compiled
+}
+
+fn broken_pipeline_log_due(
+    last_log: &mut HashMap<StreamParams, Instant>,
+    stream_params: &StreamParams,
+    now: Instant,
+) -> bool {
+    match last_log.get(stream_params) {
+        Some(last) if now.duration_since(*last) < BROKEN_PIPELINE_LOG_INTERVAL => false,
+        _ => {
+            last_log.insert(stream_params.clone(), now);
+            true
+        }
+    }
 }
 
 /// Update STREAM_PIPELINES cache for realtime pipelines
@@ -484,7 +588,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 match &pipeline.source {
                     config::meta::pipeline::components::PipelineSource::Realtime(stream_params) => {
                         if pipeline.enabled {
-                            match ExecutablePipeline::new(&pipeline).await {
+                            match compile_realtime_pipeline(&pipeline, stream_params).await {
                                 Err(e) => {
                                     log::error!(
                                         "[Pipeline::watch] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
@@ -507,13 +611,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     );
                                 }
                             };
-                        } else if remove_realtime_pipeline_cache(pipeline_id).await {
-                            log::info!(
-                                "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
-                            );
+                        } else {
+                            BROKEN_REALTIME_PIPELINES.write().await.remove(pipeline_id);
+                            if remove_realtime_pipeline_cache(pipeline_id).await {
+                                log::info!(
+                                    "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
+                                );
+                            }
                         }
                     }
                     config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
+                        BROKEN_REALTIME_PIPELINES.write().await.remove(pipeline_id);
                         let mut scheduled_pipelines_cache = SCHEDULED_PIPELINES.write().await;
                         if pipeline.enabled {
                             scheduled_pipelines_cache.insert(pipeline_id.to_string(), pipeline);
@@ -534,6 +642,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra::db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 PIPELINE_ID_TO_ORG.write().await.remove(pipeline_id);
+                BROKEN_REALTIME_PIPELINES.write().await.remove(pipeline_id);
                 if remove_realtime_pipeline_cache(pipeline_id).await {
                     log::info!(
                         "[Pipeline]: realtime pipeline {pipeline_id} deleted and removed from cache."
@@ -807,5 +916,129 @@ mod tests {
         ));
 
         assert!(matches!(err, PipelineError::NotFound(id) if id == "0"));
+    }
+
+    fn function_pipeline(id: &str, source_stream: &StreamParams, function: &str) -> Pipeline {
+        let mut pipeline = realtime_pipeline(id, source_stream);
+        pipeline.nodes.push(Node::new(
+            "func".to_string(),
+            NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                name: function.to_string(),
+                after_flatten: false,
+                num_args: 0,
+                raw_fn: None,
+            }),
+            50.0,
+            0.0,
+            "default".to_string(),
+        ));
+        pipeline.edges = vec![
+            Edge::new("source".to_string(), "func".to_string()),
+            Edge::new("func".to_string(), "dest".to_string()),
+        ];
+        pipeline
+    }
+
+    fn put_vrl_function(org: &str, name: &str, source: &str) {
+        transform::QUERY_FUNCTIONS.insert(
+            format!("{org}/{name}"),
+            config::meta::function::Transform {
+                function: source.to_string(),
+                name: name.to_string(),
+                params: "row".to_string(),
+                num_args: 1,
+                trans_type: Some(0),
+                streams: None,
+            },
+        );
+    }
+
+    #[tokio::test]
+    async fn a_pipeline_using_a_denied_vrl_function_is_reported_broken_until_it_compiles() {
+        let stream = StreamParams::new("broken_org_1", "broken_stream_1", StreamType::Logs);
+        put_vrl_function("broken_org_1", "tag_host", ".node = get_hostname!()\n.");
+        let pipeline = function_pipeline("broken_pl_1", &stream, "tag_host");
+
+        assert!(compile_realtime_pipeline(&pipeline, &stream).await.is_err());
+        let errors = realtime_load_errors("broken_org_1").await;
+        let error = errors
+            .get("broken_pl_1")
+            .expect("broken pipeline is not reported");
+        assert!(error.contains("get_hostname"), "{error}");
+        assert!(realtime_load_errors("other_org").await.is_empty());
+        assert!(
+            crate::ingestion::get_stream_executable_pipelines(&stream)
+                .await
+                .is_empty()
+        );
+
+        put_vrl_function("broken_org_1", "tag_host", ".node = \"n1\"\n.");
+        assert!(compile_realtime_pipeline(&pipeline, &stream).await.is_ok());
+        assert!(realtime_load_errors("broken_org_1").await.is_empty());
+        transform::QUERY_FUNCTIONS.remove("broken_org_1/tag_host");
+    }
+
+    #[tokio::test]
+    async fn ingestion_into_a_stream_whose_pipeline_failed_to_load_still_succeeds() {
+        infra::db::create_table().await.unwrap();
+        let stream = StreamParams::new("broken_org_2", "broken_stream_2", StreamType::Logs);
+        put_vrl_function("broken_org_2", "tag_host", ".node = get_hostname!()\n.");
+        let pipeline = function_pipeline("broken_pl_2", &stream, "tag_host");
+        assert!(compile_realtime_pipeline(&pipeline, &stream).await.is_err());
+
+        let resp = crate::logs::ingest::ingest(
+            0,
+            &stream.org_id,
+            &stream.stream_name,
+            ingestion_common::IngestionRequest::JSON(bytes::Bytes::from(format!(
+                r#"[{{"_timestamp": {}, "message": "hello"}}]"#,
+                chrono::Utc::now().timestamp_micros()
+            ))),
+            ingestion_common::IngestUser::from_user_email("root@example.com".to_string()),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.code, 200, "{resp:?}");
+        assert_eq!(resp.status[0].status.successful, 1, "{resp:?}");
+        assert!(
+            realtime_load_errors("broken_org_2")
+                .await
+                .contains_key("broken_pl_2")
+        );
+        assert!(
+            BROKEN_PIPELINE_LAST_LOG
+                .lock()
+                .unwrap()
+                .contains_key(&stream),
+            "the ingestion batch did not report the pipeline it bypassed"
+        );
+
+        BROKEN_REALTIME_PIPELINES
+            .write()
+            .await
+            .remove("broken_pl_2");
+        transform::QUERY_FUNCTIONS.remove("broken_org_2/tag_host");
+    }
+
+    #[test]
+    fn a_broken_pipeline_is_logged_at_most_once_a_minute_per_stream() {
+        let stream_a = StreamParams::new("log_org", "stream_a", StreamType::Logs);
+        let stream_b = StreamParams::new("log_org", "stream_b", StreamType::Logs);
+        let mut last_log = HashMap::new();
+        let start = Instant::now();
+        assert!(broken_pipeline_log_due(&mut last_log, &stream_a, start));
+        assert!(!broken_pipeline_log_due(
+            &mut last_log,
+            &stream_a,
+            start + Duration::from_secs(59)
+        ));
+        assert!(broken_pipeline_log_due(&mut last_log, &stream_b, start));
+        assert!(broken_pipeline_log_due(
+            &mut last_log,
+            &stream_a,
+            start + BROKEN_PIPELINE_LOG_INTERVAL
+        ));
     }
 }
