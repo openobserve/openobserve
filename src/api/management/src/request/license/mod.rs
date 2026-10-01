@@ -102,10 +102,11 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
     Ok(())
 }
 
-// license admins need the instance id to request a license; key secrets stay root-only
+// license admins need the instance id to request a license, unless it doubles as the grpc token
 fn viewer_license_fields(
     is_root: bool,
     is_license_admin: bool,
+    internal_grpc_token: &str,
     redact_key: bool,
     key: Option<String>,
     mut license: Option<License>,
@@ -119,8 +120,10 @@ fn viewer_license_fields(
     } else {
         key
     };
-    let installation_id = if is_root || is_license_admin {
-        config::get_instance_id()
+    let instance_id = config::get_instance_id();
+    let is_grpc_token = internal_grpc_token.is_empty() || internal_grpc_token == instance_id;
+    let installation_id = if is_root || (is_license_admin && !is_grpc_token) {
+        instance_id
     } else {
         String::new()
     };
@@ -145,6 +148,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let (key, license, installation_id) = viewer_license_fields(
         is_root,
         is_license_admin,
+        &config::get_config().grpc.internal_grpc_token,
         o2_cfg.common.redact_license_key,
         key,
         license,
@@ -239,10 +243,20 @@ mod tests {
     }
 
     fn response_json(is_root: bool, is_license_admin: bool) -> String {
+        response_json_with_token(is_root, is_license_admin, "cluster-token-distinct")
+    }
+
+    fn response_json_with_token(is_root: bool, is_license_admin: bool, grpc_token: &str) -> String {
         config::cache_instance_id(INSTANCE_ID);
         let (key, license) = stored_license();
-        let (key, license, installation_id) =
-            viewer_license_fields(is_root, is_license_admin, false, Some(key), Some(license));
+        let (key, license, installation_id) = viewer_license_fields(
+            is_root,
+            is_license_admin,
+            grpc_token,
+            false,
+            Some(key),
+            Some(license),
+        );
         json::to_string(&LicenseResponse {
             key,
             license,
@@ -284,6 +298,19 @@ mod tests {
         assert_eq!(root["installation_id"], INSTANCE_ID);
         assert_eq!(root["license"]["installation_id"], INSTANCE_ID);
         assert_eq!(root["license"]["validator_auth"], VALIDATOR_AUTH);
+    }
+
+    #[test]
+    fn test_license_admins_never_get_an_installation_id_that_is_the_grpc_token() {
+        for token in ["", INSTANCE_ID] {
+            let admin = response_json_with_token(false, true, token);
+            let admin_json: json::Value = json::from_str(&admin).unwrap();
+            assert_eq!(admin_json["installation_id"], "", "token {token:?}");
+            assert!(!admin.contains(INSTANCE_ID), "{admin}");
+        }
+        let root = response_json_with_token(true, true, "");
+        let root: json::Value = json::from_str(&root).unwrap();
+        assert_eq!(root["installation_id"], INSTANCE_ID);
     }
 
     #[test]
