@@ -123,13 +123,6 @@ fn get_offset_minutes_from_tz(tz: &Tz, at_time: chrono::DateTime<Utc>) -> i32 {
     local_time.offset().fix().local_minus_utc() / 60
 }
 
-/// Returns `None` for an offset of a full day or more, which `FixedOffset` cannot represent.
-pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
-    offset_minutes
-        .checked_mul(60)
-        .and_then(FixedOffset::east_opt)
-}
-
 /// `start_micros + secs + tolerance`, or `None` when any step overflows.
 fn micros_after(start_micros: i64, secs: i64, tolerance: i64) -> Option<i64> {
     Duration::try_seconds(secs)
@@ -1154,6 +1147,13 @@ impl Serialize for AlertConditionParams {
             }
         }
     }
+}
+
+/// Returns `None` for an offset of a full day or more, which `FixedOffset` cannot represent.
+pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
+    offset_minutes
+        .checked_mul(60)
+        .and_then(FixedOffset::east_opt)
 }
 
 #[cfg(test)]

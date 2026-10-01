@@ -1057,21 +1057,6 @@ async fn prepare_alert(
     })
 }
 
-#[cfg(test)]
-mod prepare_alert_name_tests {
-    use super::prepared_alert_name;
-
-    #[test]
-    fn a_put_body_can_rename_an_alert() {
-        assert_eq!(prepared_alert_name("old-name", "new-name"), "new-name");
-    }
-
-    #[test]
-    fn the_route_name_remains_a_fallback_for_legacy_bodies() {
-        assert_eq!(prepared_alert_name("old-name", "  "), "old-name");
-    }
-}
-
 /// Validates the schedule unless `stored` already holds it, so an enable toggle still saves.
 fn check_schedule(stored: Option<&Alert>, alert: &Alert) -> Result<(), AlertError> {
     if stored.is_some_and(|stored| same_schedule(stored, alert)) {
@@ -1111,6 +1096,21 @@ fn same_schedule(a: &Alert, b: &Alert) -> bool {
         && x.cron == y.cron
         && x.silence == y.silence
         && x.tolerance_in_secs == y.tolerance_in_secs
+}
+
+#[cfg(test)]
+mod prepare_alert_name_tests {
+    use super::prepared_alert_name;
+
+    #[test]
+    fn a_put_body_can_rename_an_alert() {
+        assert_eq!(prepared_alert_name("old-name", "new-name"), "new-name");
+    }
+
+    #[test]
+    fn the_route_name_remains_a_fallback_for_legacy_bodies() {
+        assert_eq!(prepared_alert_name("old-name", "  "), "old-name");
+    }
 }
 
 pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
