@@ -269,7 +269,7 @@ async fn write_logs_by_stream(
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
-            log::warn!("stream [{stream_name}] is being deleted");
+            log::warn!("stream [{org_id}/{stream_name}] is being deleted");
             stream_skipped = true;
             continue; // skip
         }
@@ -561,7 +561,9 @@ async fn write_logs(
                         // the data doesn't satisfy the alert condition
                     }
                     Err(e) => {
-                        log::error!("[LOGS] Error while evaluating realtime alert: {e}");
+                        log::error!(
+                            "[LOGS] Error while evaluating realtime alert: org_id: {org_id}, error: {e}"
+                        );
                     }
                 }
             }

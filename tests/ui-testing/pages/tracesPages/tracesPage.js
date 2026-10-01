@@ -83,6 +83,7 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsViewSessionReplayButton = '[data-test="trace-details-view-session-replay-btn"]';
 
     // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
     // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
@@ -391,6 +392,33 @@ export class TracesPage {
 
   async expectTraceDetailsVisible() {
     await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
+  }
+
+  /** `fromUs` / `toUs` are microsecond epoch bounds (traceDetails.utils.ts resolveUrlTimeRange). */
+  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default' }) {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const url = `${baseUrl}/web/traces/trace-details?trace_id=${traceId}&stream=${stream}&from=${fromUs}&to=${toUs}&org_identifier=${org}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async expectTraceTreeSpanOperationName(spanId, operationName) {
+    await expect(this.page.locator(`[data-test="trace-tree-span-operation-name-${spanId}"]`)).toHaveText(operationName, { timeout: 30000 });
+  }
+
+  async expectSessionReplayButtonVisible() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Callers must first prove the RUM bridge span rendered, or an absent button proves nothing. */
+  async expectSessionReplayButtonHidden() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toHaveCount(0);
+  }
+
+  async clickSessionReplayButton() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+    await this.page.locator(this.traceDetailsViewSessionReplayButton).click();
   }
 
   async navigateBackFromTraceDetails() {
@@ -3520,6 +3548,21 @@ export class TracesPage {
     await expect(async () => {
       await this.runTraceSearch();
       expect(await this.getResultCountBadgeText()).toContain(expected);
+    }).toPass({ timeout, intervals: [2000, 3000, 5000] });
+  }
+
+  // A stream seconds old can answer the UI search with a transient error even after the API poll sees the span.
+  async searchUntilTraceResultVisible(timeout = 60000) {
+    const firstRow = this.page.locator(this.searchResultItem).first();
+    await expect(async () => {
+      await this.runTraceSearch();
+      if (await this.page.locator(this.errorMessage).isVisible()) {
+        const detailsBtn = this.page.locator('[data-test="traces-search-error-details-btn"]');
+        await detailsBtn.click({ timeout: 2000 }).catch(() => {});
+        const detail = await this.page.locator('[data-test="traces-search-detail-error-message"]').textContent({ timeout: 2000 }).catch(() => '');
+        testLogger.warn('Trace search returned an error; re-running', { detail: (detail || '').trim() });
+      }
+      await expect(firstRow).toBeVisible({ timeout: 5000 });
     }).toPass({ timeout, intervals: [2000, 3000, 5000] });
   }
 

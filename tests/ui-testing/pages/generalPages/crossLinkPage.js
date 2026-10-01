@@ -141,9 +141,16 @@ export class CrossLinkPage {
     async navigateToStreams() {
         testLogger.debug('Navigating to streams page via URL');
         const orgId = process.env["ORGNAME"] || 'default';
+        // enable_cross_linking only arrives with the org-scoped /api/<org>/config; the public /config lacks it and the tab stays hidden until it lands.
+        const isOrgConfig = (resp) => /\/api\/[^/]+\/config(\?|$)/.test(new URL(resp.url()).pathname) && resp.status() === 200;
+        let orgConfig = this.page.waitForResponse(isOrgConfig, { timeout: 20000 }).catch(() => null);
         await this.page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/streams?org_identifier=${orgId}`);
+        if (!(await orgConfig)) {
+            orgConfig = this.page.waitForResponse(isOrgConfig, { timeout: 20000 }).catch(() => null);
+            await this.page.reload();
+            await orgConfig;
+        }
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
     }
 
     async searchStream(streamName) {
@@ -155,25 +162,42 @@ export class CrossLinkPage {
         const inputInside = this.page.locator('[data-test="streams-search-stream-input"] input');
         await inputInside.click();
         await inputInside.fill(streamName);
-        await this.page.waitForTimeout(1500);
+        this.lastSearchedStream = streamName;
+        // The target row is already painted in the unfiltered list, so wait for the filter to drop every other row; clicking earlier hits a row the re-render replaces.
+        await this.page.waitForFunction((name) => {
+            const cells = [...document.querySelectorAll('[data-test^="log-stream-name-cell-"]')];
+            return cells.length > 0 && cells.every((c) => c.textContent.trim().includes(name));
+        }, streamName, { timeout: 15000 }).catch(() => {
+            testLogger.warn('Stream list did not narrow to the searched stream within 15s', { streamName });
+        });
     }
 
     async openStreamDetail() {
         testLogger.debug('Opening stream details');
         // Resolve the schema/Stream Detail action button via its data-test
         // (see LogStream.vue: data-test="log-stream-schema-btn").
-        const btn = this.page.locator('[data-test="log-stream-schema-btn"]').first();
+        const nameCell = this.lastSearchedStream
+            ? this.page.locator(`[data-test="log-stream-name-cell-${this.lastSearchedStream}"]`)
+            : null;
+        const row = nameCell && (await nameCell.count()) > 0
+            ? nameCell.locator("xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]").first()
+            : this.page;
+        const btn = row.locator('[data-test="log-stream-schema-btn"]').first();
+        const settingsTab = this.page.locator('[data-test="schema-settings-tab"]');
         await btn.waitFor({ state: 'visible', timeout: 15000 });
         await btn.click();
-        // Wait for the schema panel dialog to fully render with tabs
-        await this.page.waitForTimeout(3000);
+        // The tab strip only renders once the schema request resolves (schema.vue loadingState); one re-click covers a click swallowed by a list re-render.
+        if (!(await settingsTab.waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false))) {
+            await btn.click();
+            await settingsTab.waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     async isCrossLinkingTabVisible() {
         testLogger.debug('Checking if cross-linking tab is visible');
         const tab = this.page.locator('[data-test="schema-cross-linking-tab"]');
         try {
-            await tab.waitFor({ state: 'visible', timeout: 5000 });
+            await tab.waitFor({ state: 'visible', timeout: 15000 });
             return true;
         } catch {
             return false;
@@ -182,8 +206,10 @@ export class CrossLinkPage {
 
     async clickCrossLinkingTab() {
         testLogger.debug('Clicking cross-linking tab');
+        await this.page.locator('[data-test="schema-settings-tab"]').waitFor({ state: 'visible', timeout: 30000 });
         const tab = this.page.locator('[data-test="schema-cross-linking-tab"]');
-        await tab.waitFor({ state: 'visible', timeout: 10000 });
+        // The tab is gated on zoConfig.enable_cross_linking, which only lands with the org-scoped /config response.
+        await tab.waitFor({ state: 'visible', timeout: 20000 });
         await tab.click();
         // Wait for cross-link tab content to render
         await this.page.waitForTimeout(2000);

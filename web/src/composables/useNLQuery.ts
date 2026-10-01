@@ -16,6 +16,10 @@
 import { ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
 import useAiChat from "@/composables/useAiChat";
+import {
+  isPaidOverageConsentError,
+  usePaidOverageConsent,
+} from "@/composables/usePaidOverageConsent";
 import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
 import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
@@ -26,6 +30,7 @@ import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
  */
 export function useNLQuery(t: TranslateFn) {
   const { fetchAiChat, getStructuredContext } = useAiChat();
+  const { promptForConsent } = usePaidOverageConsent();
   const isGenerating = ref(false);
   const streamingResponse = ref(""); // Real-time streaming response for user engagement
 
@@ -431,30 +436,62 @@ export function useNLQuery(t: TranslateFn) {
         },
       ];
 
-      // Call AI assistant with streaming
-      const response = await fetchAiChat(
-        messages,
-        "", // Use default model from server config
-        orgId,
-        abortSignal, // Abort signal for request cancellation
-        context, // Explicit context with agent_type
-        sessionId, // Session ID for tracking across requests
-      );
+      // Call AI assistant with streaming. A consent retry reuses the exact
+      // messages, context, session, organization, and abort signal.
+      const fetchQuery = () =>
+        fetchAiChat(
+          messages,
+          "", // Use default model from server config
+          orgId,
+          abortSignal,
+          context,
+          sessionId,
+        );
+      let response = await fetchQuery();
 
-      if (!response || (response as any).cancelled) {
+      if (!response || "cancelled" in response) {
         return null;
       }
 
-      if (!(response as Response).ok) {
-        console.error("[NL2Q] AI assistant returned error:", (response as Response).status);
-        if ((response as Response).status === 403) {
+      if (!response.ok) {
+        let errorBody: unknown = null;
+        try {
+          errorBody = await response.json();
+        } catch {
+          // The body may not be JSON.
+        }
+
+        if (isPaidOverageConsentError(response.status, errorBody)) {
+          const accepted = await promptForConsent(
+            orgId,
+            "ai_credits",
+            errorBody.consent,
+            abortSignal,
+          );
+          const currentContext = await getStructuredContext();
+          const currentOrgId = currentContext?.organization_identifier || orgId;
+          if (!accepted || abortSignal?.aborted || currentOrgId !== orgId) {
+            if (!accepted && !abortSignal?.aborted && currentOrgId === orgId) {
+              streamingResponse.value = t("paidUsage.declinedNotice");
+            }
+            return null;
+          }
+
+          response = await fetchQuery();
+          if (!response || "cancelled" in response) return null;
+        }
+      }
+
+      if (!response.ok) {
+        console.error("[NL2Q] AI assistant returned error:", response.status);
+        if (response.status === 403) {
           streamingResponse.value = t(UNAUTHORIZED_MESSAGE_KEY);
         }
         return null;
       }
 
       // Read streaming response
-      const reader = (response as Response).body?.getReader();
+      const reader = response.body?.getReader();
       if (!reader) {
         console.error("[NL2Q] No reader available from response");
         return null;

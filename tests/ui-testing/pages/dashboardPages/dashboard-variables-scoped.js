@@ -2966,14 +2966,38 @@ export default class DashboardVariablesScoped {
    */
   async selectEveryOptionIndividually(variableName) {
     const options = this.getVariableInnerOption(variableName);
-    const count = await options.count();
-    for (let i = 0; i < count; i++) {
-      const option = options.nth(i);
-      const isChecked = (await option.locator('[data-select-checkbox] svg').count()) > 0;
-      if (!isChecked) {
-        await option.click();
-      }
-    }
+    const loadingMore = this.getVariablePopoverLocator(variableName).locator(
+      '[data-test="variable-query-value-selector-loading-more"]'
+    );
+    const uncheckedOptions = options.filter({
+      hasNot: this.page.locator("[data-select-checkbox] svg"),
+    });
+
+    // Values stream in after the popover opens, so keep ticking until the option list stops growing and every option sticks.
+    let previousCount = -1;
+    await expect
+      .poll(
+        async () => {
+          if ((await loadingMore.count()) > 0) return false;
+          const count = await options.count();
+          for (let i = 0; i < count; i++) {
+            const option = options.nth(i);
+            const isChecked = (await option.locator("[data-select-checkbox] svg").count()) > 0;
+            if (!isChecked) {
+              await option.click().catch(() => {});
+            }
+          }
+          const settled = count > 0 && count === previousCount;
+          previousCount = count;
+          return (
+            settled &&
+            (await loadingMore.count()) === 0 &&
+            (await uncheckedOptions.count()) === 0
+          );
+        },
+        { timeout: 30000, intervals: [500, 1000, 1500, 2000] }
+      )
+      .toBe(true);
   }
 
   /**

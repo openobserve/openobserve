@@ -89,7 +89,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 90: create the Prompt registry, webhook outbox, and Experiment attribution columns.
 // 91: add firing-episode columns for alert recovery.
 // 92: add recovery_destinations to alerts.
-pub const DB_SCHEMA_VERSION: u64 = 92;
+// 93: create oncall_response_reports.
+// 94: create synthetics_refs.
+pub const DB_SCHEMA_VERSION: u64 = 94;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -447,6 +449,11 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ENABLED",
         SyntheticsReloadClass::RestartRequired,
     ),
+    ("ZO_SYNTHETICS_SUBTESTS_ENABLED", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
+        SyntheticsReloadClass::Hot,
+    ),
     ("ZO_SYNTHETICS_LAMBDA_BROWSER", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_LAMBDA_NET", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_API_ENDPOINT", SyntheticsReloadClass::Hot),
@@ -505,6 +512,8 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
+        subtests_enabled: _,
+        subtests_replication_grace_secs: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
         status_page_public_rpm,
@@ -1084,6 +1093,20 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
+    /// Off by default so no composed check can exist until an org opts in.
+    #[env_config(
+        name = "ZO_SYNTHETICS_SUBTESTS_ENABLED",
+        default = false,
+        help = "Enables subtest references in browser checks. Off by default; while false the server refuses composition writes and the UI hides Insert subtest."
+    )]
+    pub subtests_enabled: bool,
+    /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
+    #[env_config(
+        name = "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
+        default = 300,
+        help = "Super-cluster only. Seconds after a parent's last change during which a missing subtest is reported as pending replication, not as missing."
+    )]
+    pub subtests_replication_grace_secs: u64,
     /// Seconds between status-page snapshot rebuild ticks.
     #[env_config(
         name = "ZO_STATUS_PAGE_REBUILD_INTERVAL",
@@ -1719,7 +1742,7 @@ pub struct Search {
     #[env_config(
         name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
-        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 5% of node memory clamped to 128-4096 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
     )]
     pub metrics_blocks_cache_max_size: usize,
     #[env_config(
@@ -2250,6 +2273,12 @@ pub struct Common {
     pub result_cache_selection_strategy: String,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
+    #[env_config(
+        name = "ZO_MCP_ENABLED",
+        default = true,
+        help = "Enable the MCP server. When false the tool registry is not built at boot (it derives ~200 tools with their JSON schemas from the OpenAPI spec) and the MCP endpoints report it as disabled."
+    )]
+    pub mcp_enabled: bool,
     #[env_config(
         name = "ZO_REGEX_PATTERNS_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/regex.json",
@@ -4323,7 +4352,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
     match configured {
-        0 => (mem_total / SIZE_IN_MB as usize / 50).clamp(128, 1024),
+        0 => (mem_total / SIZE_IN_MB as usize / 20).clamp(128, 4096),
         1..=9 => 0,
         size => size,
     }
@@ -4833,9 +4862,11 @@ mod tests {
     #[test]
     fn metrics_blocks_cache_auto_budget_preserves_explicit_limits() {
         let gib = 1024 * 1024 * 1024;
-        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 128);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 983);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 64 * gib), 1024);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 2 * gib), 128);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 204);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 2457);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 80 * gib), 4096);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 128 * gib), 4096);
         assert_eq!(metrics_blocks_cache_size_mb(1, 48 * gib), 0);
         assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
         assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);
@@ -4949,6 +4980,8 @@ mod tests {
     /// `synthetics_restart_required_changes`.
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
+        "ZO_SYNTHETICS_SUBTESTS_ENABLED",
+        "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
         "ZO_SYNTHETICS_API_ENDPOINT",
@@ -4982,8 +5015,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            15,
-            "Synthetics has 15 keys; every one needs a reload class"
+            17,
+            "Synthetics has 17 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5020,6 +5053,8 @@ mod tests {
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
                 "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
+                "ZO_SYNTHETICS_SUBTESTS_ENABLED",
+                "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
             ]
         );
 
@@ -5057,11 +5092,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn composition_is_off_by_default() {
+        let cfg = Config::init().unwrap();
+        assert!(
+            !cfg.synthetics.subtests_enabled,
+            "composition must ship dark: a fresh deployment must refuse subtest writes"
+        );
+    }
+
     /// Mutates every field away from its current value, so the two tests below
     /// run against the whole struct — an implementation that warns about an
     /// extra key cannot hide in the fields a subset forgot to touch.
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
+        cfg.subtests_enabled = !cfg.subtests_enabled;
+        cfg.subtests_replication_grace_secs += 1;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");
         cfg.api_endpoint = "https://example.invalid".to_string();

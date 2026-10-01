@@ -14,16 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { defineComponent, shallowRef } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // vi.mock is hoisted — must be at top of file
-vi.mock("lodash-es", () => ({
-  cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
-}));
-
 vi.mock("@/utils/zincutils", () => ({
   getPath: vi.fn(() => "/test/path"),
 }));
@@ -37,23 +34,42 @@ vi.mock("vuex", () => ({
   })),
 }));
 
+// Hoisted so the append assertions can read the same spies the component calls.
+const playerSpies = vi.hoisted(() => ({
+  addEvent: vi.fn(),
+  getCurrentTime: vi.fn(() => 0),
+  destroyReplayer: vi.fn(),
+  meta: { startTime: 1704110400000, endTime: 1704110520000, totalTime: 120000 },
+  instances: [] as any[],
+}));
+
+// A plain function, not an arrow: the component calls `new rrwebPlayer(...)`.
 vi.mock("@openobserve/rrweb-player", () => ({
-  default: vi.fn(() => ({
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    play: vi.fn(),
-    pause: vi.fn(),
-    setSpeed: vi.fn(),
-    toggleSkipInactive: vi.fn(),
-    goto: vi.fn(),
-    getMetaData: vi.fn(() => ({
-      startTime: 1704110400000,
-      endTime: 1704110520000,
-      totalTime: 120000,
-    })),
-    triggerResize: vi.fn(),
-    $set: vi.fn(),
-  })),
+  default: vi.fn(function () {
+    const listeners: Record<string, (event?: any) => void> = {};
+    const instance = {
+      listeners,
+      addEventListener: vi.fn((name: string, handler: (event?: any) => void) => {
+        listeners[name] = handler;
+      }),
+      removeEventListener: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      setSpeed: vi.fn(),
+      toggleSkipInactive: vi.fn(),
+      goto: vi.fn(),
+      getMetaData: vi.fn(() => ({ ...playerSpies.meta })),
+      getReplayer: vi.fn(() => ({
+        getCurrentTime: playerSpies.getCurrentTime,
+        destroy: playerSpies.destroyReplayer,
+      })),
+      addEvent: playerSpies.addEvent,
+      triggerResize: vi.fn(),
+      $set: vi.fn(),
+    };
+    playerSpies.instances.push(instance);
+    return instance;
+  }),
 }));
 
 vi.mock("@openobserve/rrweb-player/dist/style.css", () => ({}));
@@ -104,6 +120,17 @@ const mockSegments = [
   },
 ];
 
+// A segment that arrives after the player was built, later than the mocked playhead.
+const laterSegment = {
+  records: [
+    {
+      type: 3,
+      timestamp: 1704110500000,
+      data: { source: 0, adds: [], removes: [], attributes: [], texts: [] },
+    },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // Mount factory — single source of truth for stubs/plugins
 // ---------------------------------------------------------------------------
@@ -127,6 +154,31 @@ function mountComponent(props: Record<string, any> = {}) {
       },
     },
   });
+}
+
+// Production fills segments by assigning a shallowRef; setProps cannot show that regression.
+function mountWithShallowSegments(initial: any[]) {
+  const segments = shallowRef<any[]>(initial);
+  const Parent = defineComponent({
+    components: { VideoPlayer },
+    setup: () => ({ segments, events: mockEvents }),
+    template: `<VideoPlayer :events="events" :segments="segments" :is-loading="false" />`,
+  });
+
+  const parent = mount(Parent, {
+    global: {
+      plugins: [i18n],
+      provide: { store },
+      stubs: {
+        OIcon: {
+          template: '<i data-test="OIcon" :data-name="name"></i>',
+          props: ["name", "size"],
+        },
+      },
+    },
+  });
+
+  return { parent, segments };
 }
 
 // ---------------------------------------------------------------------------
@@ -291,8 +343,9 @@ describe("VideoPlayer", () => {
   // ==========================================================================
 
   describe("togglePlay", () => {
+    // isPlaying is derived from the playback state now, so the tests drive it through togglePlay.
     it("should set isPlaying to true when togglePlay is called while not playing", () => {
-      wrapper.vm.playerState.isPlaying = false;
+      expect(wrapper.vm.playerState.isPlaying).toBe(false);
 
       wrapper.vm.togglePlay();
 
@@ -300,7 +353,8 @@ describe("VideoPlayer", () => {
     });
 
     it("should set isPlaying to false when togglePlay is called while playing", () => {
-      wrapper.vm.playerState.isPlaying = true;
+      wrapper.vm.togglePlay();
+      expect(wrapper.vm.playerState.isPlaying).toBe(true);
 
       wrapper.vm.togglePlay();
 
@@ -371,6 +425,86 @@ describe("VideoPlayer", () => {
       expect(playerEl.style.width).toMatch(/^\d+px$/);
 
       localWrapper.unmount();
+    });
+
+    it("should build the player when a parent assigns a shallowRef segment list", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      expect(rrwebPlayerMock).not.toHaveBeenCalled();
+
+      segments.value = [...mockSegments];
+      await flushPromises();
+      await parent.vm.$nextTick();
+      await flushPromises();
+
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+
+      parent.unmount();
+    });
+
+    it("should append later segments through addEvent instead of rebuilding the player", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+      playerSpies.addEvent.mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [...mockSegments];
+      await flushPromises();
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+
+      segments.value = [...segments.value, laterSegment];
+      await flushPromises();
+      await parent.vm.$nextTick();
+      await flushPromises();
+
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+      expect(playerSpies.addEvent).toHaveBeenCalledTimes(1);
+      expect(playerSpies.addEvent.mock.calls[0][0]).toMatchObject({
+        type: 3,
+        timestamp: 1704110500000,
+      });
+
+      parent.unmount();
+    });
+
+    it("should skip an appended record that is at or before the playhead", async () => {
+      playerSpies.addEvent.mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [...mockSegments];
+      await flushPromises();
+
+      // Playhead sits past the appended record's timestamp; the player would apply it at once.
+      playerSpies.getCurrentTime.mockReturnValueOnce(20000);
+      const stale = {
+        records: [{ type: 3, timestamp: 1704110410000, data: { source: 3, id: 1, x: 0, y: 0 } }],
+      };
+      segments.value = [...segments.value, stale];
+      await flushPromises();
+      await parent.vm.$nextTick();
+      await flushPromises();
+
+      expect(playerSpies.addEvent).not.toHaveBeenCalled();
+
+      parent.unmount();
+    });
+
+    it("should destroy the replayer before the player on unmount", async () => {
+      playerSpies.destroyReplayer.mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [...mockSegments];
+      await flushPromises();
+
+      parent.unmount();
+
+      expect(playerSpies.destroyReplayer).toHaveBeenCalledTimes(1);
     });
 
     it("should not create a player instance when segments array is empty", async () => {
@@ -703,6 +837,528 @@ describe("VideoPlayer", () => {
       expect(playerEl.style.width).toMatch(/^\d+(\.\d+)?px$/);
 
       localWrapper.unmount();
+    });
+  });
+
+  // ==========================================================================
+  // PLAYBACK OVER A PARTLY LOADED SESSION (fixed timeline, buffering, seeks)
+  // ==========================================================================
+
+  describe("Playback over a partly loaded session", () => {
+    const origin = 1704110400000;
+    // The player's first event is one minute into the session, as for an event_time window.
+    const sessionStart = origin - 60_000;
+    const sessionEnd = sessionStart + 600_000;
+
+    const batch = (timestamp: number) => ({
+      records: [
+        {
+          type: 3,
+          timestamp,
+          data: { source: 0, adds: [], removes: [], attributes: [], texts: [] },
+        },
+      ],
+    });
+
+    async function mountPlayer(props: Record<string, any> = {}) {
+      playerSpies.instances.length = 0;
+      const local = mountComponent({
+        events: [],
+        segments: [],
+        sessionStartMs: sessionStart,
+        sessionEndMs: sessionEnd,
+        loadState: "loading",
+        speed: 1,
+        ...props,
+      });
+      await flushPromises();
+      await local.setProps({ segments: mockSegments });
+      await flushPromises();
+      await local.vm.$nextTick();
+      return { local, instance: playerSpies.instances[0] };
+    }
+
+    async function append(local: any, meta: Partial<typeof playerSpies.meta>, timestamp: number) {
+      Object.assign(playerSpies.meta, meta);
+      await local.setProps({ segments: [...(local.props("segments") as any[]), batch(timestamp)] });
+      await flushPromises();
+      await local.vm.$nextTick();
+      await flushPromises();
+    }
+
+    async function playTo(local: any, instance: any, payload: number) {
+      local.vm.togglePlay();
+      instance.listeners["ui-update-current-time"]({ payload });
+      await local.vm.$nextTick();
+    }
+
+    beforeEach(() => {
+      playerSpies.meta = { startTime: origin, endTime: origin + 120_000, totalTime: 120_000 };
+      playerSpies.getCurrentTime.mockReturnValue(0);
+    });
+
+    it("keeps the duration label fixed across three batch appends", async () => {
+      Object.assign(playerSpies.meta, { endTime: origin + 5_000, totalTime: 5_000 });
+      const { local } = await mountPlayer();
+      expect(local.vm.playerState.duration).toBe("10:00");
+
+      for (const [i, end] of [60_000, 120_000, 180_000].entries()) {
+        await append(local, { endTime: origin + end, totalTime: end }, origin + end - 1 - i);
+        expect(local.vm.playerState.duration).toBe("10:00");
+      }
+      local.unmount();
+    });
+
+    it("widens the timeline only when loaded records run past the metadata end", async () => {
+      const { local } = await mountPlayer({ sessionEndMs: origin + 60_000 });
+      expect(local.vm.playerState.duration).toBe("03:00");
+      await append(local, { endTime: origin + 30_000, totalTime: 30_000 }, origin + 29_000);
+      expect(local.vm.playerState.duration).toBe("03:00");
+      local.unmount();
+    });
+
+    it("emits ready once the player is built and reports its loaded edge in session ms", async () => {
+      const { local } = await mountPlayer();
+      expect(local.emitted("ready")).toHaveLength(1);
+      expect(local.emitted("loaded-end-change")?.at(-1)).toEqual([180_000]);
+      local.unmount();
+    });
+
+    it("shows the time label in session ms, not the player's own time", async () => {
+      const { local, instance } = await mountPlayer();
+      instance.listeners["ui-update-current-time"]({ payload: 2_000 });
+      await local.vm.$nextTick();
+      expect(local.find('[data-test="video-player-time"]').text()).toBe("01:02");
+      local.unmount();
+    });
+
+    it("pauses one margin before the loaded edge, with epoch timestamps and an origin after the session start", async () => {
+      const { local, instance } = await mountPlayer();
+      await playTo(local, instance, 118_999);
+      expect(local.vm.playbackState).toBe("playing");
+
+      instance.listeners["ui-update-current-time"]({ payload: 119_000 });
+      await local.vm.$nextTick();
+
+      expect(local.vm.playbackState).toBe("buffering");
+      expect(instance.pause).toHaveBeenCalled();
+      expect(local.vm.playerState.isPlaying).toBe(true);
+      expect(local.find('[data-test="replay-overlay-buffering"]').text()).toContain(
+        "Loading the next part of the session",
+      );
+      local.unmount();
+    });
+
+    it("resumes at the held time, not at 0, once an append leaves two margins of headroom", async () => {
+      const { local, instance } = await mountPlayer();
+      await playTo(local, instance, 119_000);
+      instance.goto.mockClear();
+
+      await append(local, { endTime: origin + 130_000, totalTime: 130_000 }, origin + 129_000);
+
+      expect(instance.goto).toHaveBeenCalledWith(119_000, true);
+      expect(instance.goto).not.toHaveBeenCalledWith(0, expect.anything());
+      expect(local.vm.playbackState).toBe("playing");
+      local.unmount();
+    });
+
+    it("ends in Buffering through the finish safety net when a skip overshoots the margin", async () => {
+      const { local, instance } = await mountPlayer();
+      await playTo(local, instance, 1_000);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("buffering");
+      local.unmount();
+    });
+
+    it("resumes unconditionally when loading completes inside the margin, then ends on finish", async () => {
+      const { local, instance } = await mountPlayer();
+      await playTo(local, instance, 119_000);
+      instance.goto.mockClear();
+
+      await append(local, { endTime: origin + 120_500, totalTime: 120_500 }, origin + 120_400);
+      expect(local.vm.playbackState).toBe("buffering");
+      expect(instance.goto).not.toHaveBeenCalled();
+
+      await local.setProps({ loadState: "complete" });
+      expect(instance.goto).toHaveBeenCalledWith(119_000, true);
+
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("ended");
+      local.unmount();
+    });
+
+    it("goes to Failed on finish when the load failed, and to Ended when it completed", async () => {
+      const failed = await mountPlayer({ loadState: "failed" });
+      await playTo(failed.local, failed.instance, 1_000);
+      failed.instance.listeners.finish();
+      await failed.local.vm.$nextTick();
+      expect(failed.local.vm.playbackState).toBe("failed");
+      failed.local.unmount();
+
+      const complete = await mountPlayer({ loadState: "complete" });
+      await playTo(complete.local, complete.instance, 1_000);
+      complete.instance.listeners.finish();
+      await complete.local.vm.$nextTick();
+      expect(complete.local.vm.playbackState).toBe("ended");
+      complete.local.unmount();
+    });
+
+    it("treats the run edge as the end once the run holds the last segment, while holes still load", async () => {
+      const { local, instance } = await mountPlayer({ runComplete: true });
+      await playTo(local, instance, 119_500);
+      expect(local.vm.playbackState).toBe("playing");
+
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("ended");
+      local.unmount();
+    });
+
+    it("resumes from Buffering once the last segment of the run is in the player", async () => {
+      const { local, instance } = await mountPlayer();
+      await playTo(local, instance, 119_000);
+      instance.goto.mockClear();
+
+      Object.assign(playerSpies.meta, { endTime: origin + 120_500, totalTime: 120_500 });
+      await local.setProps({
+        runComplete: true,
+        segments: [...(local.props("segments") as any[]), batch(origin + 120_400)],
+      });
+      expect(local.vm.playbackState).toBe("buffering");
+      await flushPromises();
+      await local.vm.$nextTick();
+      await flushPromises();
+
+      expect(instance.goto).toHaveBeenCalledWith(119_000, true);
+      expect(local.vm.playbackState).toBe("playing");
+      local.unmount();
+    });
+
+    it("reports how many segments the player holds, after it has converted them", async () => {
+      const { local } = await mountPlayer();
+      expect(local.emitted("segments-taken")?.at(-1)).toEqual([1]);
+      await append(local, { endTime: origin + 130_000, totalTime: 130_000 }, origin + 129_000);
+      expect(local.emitted("segments-taken")?.at(-1)).toEqual([2]);
+      local.unmount();
+    });
+
+    it("does not start rrweb on build while a pending seek is still outstanding", async () => {
+      playerSpies.instances.length = 0;
+      const local = mountComponent({
+        events: [],
+        segments: [],
+        sessionStartMs: sessionStart,
+        sessionEndMs: sessionEnd,
+        loadState: "loading",
+        pendingSeekMs: 300_000,
+        speed: 1,
+      });
+      await flushPromises();
+      expect(local.vm.playbackState).toBe("loading");
+      local.vm.togglePlay();
+      await local.setProps({ intent: "play", segments: mockSegments });
+      await flushPromises();
+      await local.vm.$nextTick();
+      const instance = playerSpies.instances[0];
+
+      expect(local.emitted("ready")).toHaveLength(1);
+      expect(instance.goto).not.toHaveBeenCalled();
+      expect(instance.play).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("buffering");
+      local.unmount();
+    });
+
+    it("keeps the mode set by a seek the parent makes on ready", async () => {
+      playerSpies.instances.length = 0;
+      let local: any = null;
+      local = mountComponent({
+        events: [],
+        segments: [],
+        sessionStartMs: sessionStart,
+        sessionEndMs: sessionEnd,
+        loadState: "loading",
+        pendingSeekMs: 90_000,
+        intent: "play",
+        speed: 1,
+        onReady: () => local.vm.seekTo(90_000, true),
+      });
+      await flushPromises();
+      await local.setProps({ segments: mockSegments });
+      await flushPromises();
+      await local.vm.$nextTick();
+      const instance = playerSpies.instances[0];
+
+      expect(instance.goto).toHaveBeenLastCalledWith(30_000, true);
+      expect(local.vm.playbackState).toBe("playing");
+      local.unmount();
+    });
+
+    it("cancels the auto-resume when the user pauses while buffering", async () => {
+      const { local, instance } = await mountPlayer();
+      await playTo(local, instance, 119_000);
+      local.vm.togglePlay();
+      expect(local.vm.playbackState).toBe("paused");
+      instance.goto.mockClear();
+
+      await append(local, { endTime: origin + 200_000, totalTime: 200_000 }, origin + 199_000);
+
+      expect(instance.goto).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("paused");
+      local.unmount();
+    });
+
+    it("from Failed, a covered seek plays if the user was playing and shows the frame if paused", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "failed" });
+      await playTo(local, instance, 1_000);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+
+      local.vm.seekTo(90_000, true);
+      expect(instance.goto).toHaveBeenLastCalledWith(30_000, true);
+      expect(local.vm.playbackState).toBe("playing");
+
+      instance.listeners.finish();
+      local.vm.seekTo(90_000, false);
+      expect(instance.goto).toHaveBeenLastCalledWith(30_000, false);
+      expect(local.vm.playbackState).toBe("paused");
+      local.unmount();
+    });
+
+    it("leaves rrweb's playhead alone for a pending seek, and loses no record between the edge and the target", async () => {
+      const { local, instance } = await mountPlayer();
+      instance.listeners["ui-update-current-time"]({ payload: 10_000 });
+      instance.goto.mockClear();
+
+      await local.setProps({ pendingSeekMs: 300_000 });
+      expect(instance.goto).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("waiting");
+      expect(local.vm.playerState.time).toBe("05:00");
+      expect(local.find('[data-test="replay-overlay-waiting"]').text()).toContain(
+        "Loading up to 05:00",
+      );
+
+      instance.listeners["ui-update-current-time"]({ payload: 20_000 });
+      expect(local.vm.playerState.actualTime).toBe(10_000);
+
+      playerSpies.addEvent.mockClear();
+      playerSpies.getCurrentTime.mockReturnValue(10_000);
+      await append(local, { endTime: origin + 250_000, totalTime: 250_000 }, origin + 200_000);
+      expect(playerSpies.addEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ timestamp: origin + 200_000 }),
+      );
+
+      await local.setProps({ pendingSeekMs: null });
+      local.vm.seekTo(300_000, false);
+      expect(instance.goto).toHaveBeenLastCalledWith(240_000, false);
+      local.unmount();
+    });
+
+    it("dims the played fill while a seek waits on data", async () => {
+      const { local } = await mountPlayer({ pendingSeekMs: 300_000 });
+      expect(local.find('[data-test="video-player-progress"]').classes()).toContain("opacity-50");
+      local.unmount();
+    });
+
+    it("sends Play in Ended to the parent as a seek to 0 instead of restarting the controller", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "complete" });
+      await playTo(local, instance, 1_000);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      instance.play.mockClear();
+      instance.goto.mockClear();
+
+      local.vm.togglePlay();
+
+      expect(local.emitted("seek-request")?.at(-1)).toEqual([0]);
+      expect(instance.play).not.toHaveBeenCalled();
+      expect(instance.goto).not.toHaveBeenCalled();
+      local.unmount();
+    });
+
+    it("never calls the controller's play() while the load is incomplete", async () => {
+      const { local, instance } = await mountPlayer();
+      local.vm.togglePlay();
+      expect(instance.play).not.toHaveBeenCalled();
+      expect(instance.goto).toHaveBeenLastCalledWith(0, true);
+      local.unmount();
+    });
+
+    it("turns bar clicks and ±10 s into seek requests in session ms instead of seeking itself", async () => {
+      const { local, instance } = await mountPlayer();
+      instance.goto.mockClear();
+
+      await local
+        .find('[data-test="video-player-playback-bar"]')
+        .trigger("click", { clientX: 400 });
+      expect(local.emitted("seek-request")?.at(-1)).toEqual([300_000]);
+
+      instance.listeners["ui-update-current-time"]({ payload: 0 });
+      local.vm.$.setupState.skipTo("forward");
+      expect(local.emitted("seek-request")?.at(-1)).toEqual([70_000]);
+      expect(instance.goto).not.toHaveBeenCalled();
+      local.unmount();
+    });
+
+    it("shows the load percentage, then Fully loaded for 3 s", async () => {
+      vi.useFakeTimers();
+      try {
+        const { local } = await mountPlayer({ loadPercent: 45.6 });
+        expect(local.find('[data-test="replay-status-chip"]').text()).toBe("Loading 45%");
+
+        await local.setProps({ loadState: "complete" });
+        expect(local.find('[data-test="replay-status-chip"]').text()).toBe("Fully loaded");
+
+        vi.advanceTimersByTime(3000);
+        await local.vm.$nextTick();
+        expect(local.find('[data-test="replay-status-chip"]').exists()).toBe(false);
+        local.unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("in a live session, ends at the loaded end with nothing in flight and resumes in place with goto", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "live", runComplete: true });
+      await playTo(local, instance, 119_900);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("ended");
+      expect(local.emitted("update:intent")?.at(-1)).toEqual(["play"]);
+      instance.play.mockClear();
+      instance.goto.mockClear();
+
+      await append(local, { endTime: origin + 150_000, totalTime: 150_000 }, origin + 149_000);
+
+      expect(instance.goto).toHaveBeenCalledWith(119_900, true);
+      expect(instance.play).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("playing");
+      local.unmount();
+    });
+
+    it("in a live session, does not resume on new activity once the user moved the playhead", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "live", runComplete: true });
+      await playTo(local, instance, 119_900);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      local.vm.seekTo(90_000, false);
+      instance.goto.mockClear();
+
+      await append(local, { endTime: origin + 150_000, totalTime: 150_000 }, origin + 149_000);
+
+      expect(instance.goto).not.toHaveBeenCalled();
+      expect(local.vm.playbackState).toBe("paused");
+      local.unmount();
+    });
+
+    it("in a live session, buffers at the edge while a batch is in flight", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "live" });
+      await playTo(local, instance, 119_000);
+      expect(local.vm.playbackState).toBe("buffering");
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+      expect(local.vm.playbackState).toBe("buffering");
+      local.unmount();
+    });
+
+    it("shows no chip while live and never Fully loaded", async () => {
+      vi.useFakeTimers();
+      try {
+        const { local } = await mountPlayer({ loadPercent: 45.6 });
+        await local.setProps({ loadState: "live", loadPercent: 100 });
+        const chip = () => local.find('[data-test="replay-status-chip"]');
+        expect(chip().exists()).toBe(false);
+
+        vi.advanceTimersByTime(5000);
+        await local.vm.$nextTick();
+        expect(chip().exists()).toBe(false);
+
+        await local.setProps({ loadState: "complete" });
+        expect(chip().exists()).toBe(false);
+        local.unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("shows a failed chip and overlay whose Retry reaches the parent", async () => {
+      const { local, instance } = await mountPlayer({ loadState: "failed", failedFromMs: 60_000 });
+      await playTo(local, instance, 1_000);
+      instance.listeners.finish();
+      await local.vm.$nextTick();
+
+      expect(local.find('[data-test="replay-overlay-failed"]').text()).toContain(
+        "Couldn't load 01:00 – 10:00",
+      );
+      await local.find('[data-test="replay-status-chip-failed"]').trigger("click");
+      await local.find('[data-test="replay-overlay-retry"]').trigger("click");
+      expect(local.emitted("retry")).toHaveLength(2);
+      local.unmount();
+    });
+
+    it("draws the loaded band and counts the parts that could not load", async () => {
+      const { local } = await mountPlayer({
+        loadedRanges: [
+          { start: 60_000, end: 180_000, state: "inPlayer" },
+          { start: 180_000, end: 185_000, state: "skipped" },
+          { start: 500_000, end: 600_000, state: "unavailable" },
+        ],
+      });
+      expect(local.findAll('[data-test="replay-load-band-inPlayer"]')).toHaveLength(1);
+      expect(local.find('[data-test="replay-load-band-skipped"]').attributes("title")).toBe(
+        "This part couldn't load",
+      );
+      expect(local.find('[data-test="replay-load-band-unavailable"]').attributes("title")).toBe(
+        "Not available: past the 50,000-segment limit",
+      );
+      expect(local.find('[data-test="replay-status-chip"]').text()).toContain(
+        "· 1 part couldn't load",
+      );
+      local.unmount();
+    });
+
+    it("tells the user that a hovered span is not loaded yet", async () => {
+      const { local } = await mountPlayer({
+        loadedRanges: [{ start: 60_000, end: 180_000, state: "inPlayer" }],
+      });
+      const bar = local.find('[data-test="video-player-playback-bar"]');
+      await bar.trigger("mousemove", { clientX: 400 });
+      expect(local.find('[data-test="video-player-hover-tooltip"]').text()).toBe(
+        "05:00 · not loaded yet",
+      );
+      await bar.trigger("mousemove", { clientX: 160 });
+      expect(local.find('[data-test="video-player-hover-tooltip"]').text()).toBe("02:00");
+      local.unmount();
+    });
+  });
+
+  describe("Error and empty states", () => {
+    it("shows the load error with a Retry that reaches the parent", async () => {
+      const local = mountComponent({ loadState: "error" });
+      await flushPromises();
+      expect(local.find('[data-test="replay-overlay-error"]').text()).toContain(
+        "Couldn't load the session replay.",
+      );
+      await local.find('[data-test="replay-overlay-retry"]').trigger("click");
+      expect(local.emitted("retry")).toHaveLength(1);
+      local.unmount();
+    });
+
+    it("shows a real empty state for a session with no replay", async () => {
+      const local = mountComponent({ loadState: "empty" });
+      await flushPromises();
+      expect(local.find('[data-test="replay-overlay-empty"]').text()).toContain(
+        "No session replay available",
+      );
+      local.unmount();
+    });
+
+    it("shows the retry attempt under the loading spinner", async () => {
+      const local = mountComponent({ isLoading: true, retryAttempt: 2 });
+      await flushPromises();
+      expect(local.find('[data-test="video-player-retrying"]').text()).toBe("Retrying (2 of 3)…");
+      local.unmount();
     });
   });
 });

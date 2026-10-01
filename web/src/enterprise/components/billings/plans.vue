@@ -128,11 +128,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </div>
             <div
+              v-if="aiUsage.mode === 'consent_required'"
+              class="text-status-warning-text mt-2 text-left"
+              style="font-size: var(--text-compact)"
+            >
+              <span>{{ t("paidUsage.consentRequiredMessage") }}</span>
+              <OButton
+                variant="ghost"
+                size="sm"
+                class="ms-1"
+                data-test="billing-open-paid-usage-settings"
+                @click="
+                  $router.push({
+                    name: 'paidUsage',
+                    query: { org_identifier: store.state.selectedOrganization.identifier },
+                  })
+                "
+              >
+                {{ t("paidUsage.managePaidUsage") }}
+              </OButton>
+            </div>
+            <div
               v-else-if="aiUsage.mode === 'pay_as_you_go'"
               class="text-info mt-2"
               style="font-size: var(--text-compact)"
             >
-              {{ t("billing.aiPaygMessage") }}
+              {{
+                paidOverageStatus?.payer
+                  ? t("paidUsage.payerBillingCycle")
+                  : t("paidUsage.organizationBillingCycle")
+              }}
             </div>
           </div>
         </div>
@@ -177,6 +202,8 @@ import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
+import paidOverage from "@/services/paidOverage";
+import type { PaidOverageStatus } from "@/services/paidOverage";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
@@ -227,14 +254,18 @@ export default defineComponent({
           // membership not available
         });
     },
-    fetchAiUsage() {
-      BillingService.get_ai_usage(this.store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          this.aiUsage = res.data;
-        })
-        .catch(() => {
-          // AI usage not available
-        });
+    async fetchAiUsage() {
+      try {
+        const orgId = this.store.state.selectedOrganization.identifier;
+        const [usageResponse, consentResponse] = await Promise.all([
+          BillingService.get_ai_usage(orgId),
+          paidOverage.get(orgId),
+        ]);
+        this.aiUsage = usageResponse.data;
+        this.paidOverageStatus = consentResponse.data;
+      } catch {
+        // AI usage or consent status is not available.
+      }
     },
     async fetchPricingData() {
       try {
@@ -396,6 +427,7 @@ export default defineComponent({
     const billingProvider = ref("");
     const subscriptionType = ref("");
     const aiUsage = ref<any>(null);
+    const paidOverageStatus = ref<PaidOverageStatus | null>(null);
     const aiIcon = computed(() =>
       isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
@@ -441,6 +473,7 @@ export default defineComponent({
       billingProvider,
       subscriptionType,
       aiUsage,
+      paidOverageStatus,
       aiIcon,
       aiUsageRatio,
       proPlanFeatures,

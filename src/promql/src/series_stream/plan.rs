@@ -23,8 +23,8 @@ use config::{
     meta::{
         plan::generate_plan_string,
         promql::{
-            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, MetricsBlockScan,
-            NAME_LABEL, VALUE_LABEL, value::EvalContext,
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, MetricsBlockScan, NAME_LABEL, VALUE_LABEL,
+            value::EvalContext,
         },
     },
 };
@@ -46,6 +46,7 @@ use tokio::task::JoinSet;
 
 use super::{SeriesSource, blocks, hash_sorted::HashSortedSeriesStream};
 use crate::{
+    ScanSource,
     aggregations::AggOp,
     functions::KEEP_METRIC_NAME_FUNC,
     utils::{apply_matchers, apply_time_window},
@@ -106,53 +107,69 @@ struct PlannedPartition {
 
 pub(crate) async fn execute_partitioned(
     ctx: &SessionContext,
-    schema: &Schema,
+    source: &ScanSource,
     selector: &StreamingSelector<'_>,
     label_cols: LabelColumns,
     lookback: i64,
     eval_ctx: &EvalContext,
-) -> Result<Option<Vec<SourceFuture>>> {
-    if schema
-        .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
-    {
-        return Ok(None);
-    }
+) -> Result<Vec<SourceFuture>> {
     let label_cols = Arc::new(label_cols);
     let partitions = ctx.state().config().target_partitions();
-    if let Some(scan) = ctx.state().config().get_extension::<MetricsBlockScan>()
-        && scan.table_name == selector.table_name
-        && blocks::query_window(eval_ctx, selector.offset, lookback).is_some()
-    {
-        let intervals = hash_partitions(partitions).collect::<Vec<_>>();
-        let prepared = blocks::prepare(
-            &scan,
-            selector.matchers,
-            Arc::clone(&label_cols),
-            &intervals,
-            selector.offset,
-            lookback,
-            eval_ctx,
-        )
-        .await
-        .map_err(|error| DataFusionError::External(error.into()))?;
-        return Ok(Some(
-            prepared
-                .into_iter()
-                .map(|partition| {
-                    Box::pin(async move {
-                        Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
-                            partition,
-                        )))
-                    }) as SourceFuture
-                })
-                .collect(),
-        ));
+    match source {
+        ScanSource::Blocks(scan) => {
+            execute_blocks(scan, selector, label_cols, partitions, lookback, eval_ctx).await
+        }
+        ScanSource::HashSorted => {
+            execute_hash_sorted(ctx, selector, label_cols, partitions, lookback, eval_ctx).await
+        }
+        ScanSource::Table => Err(DataFusionError::Execution(format!(
+            "{} is a table source and cannot stream",
+            selector.table_name
+        ))),
     }
-    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
-    let Ok(df) = ctx.table(sorted_table.as_str()).await else {
-        return Ok(None);
-    };
+}
+
+async fn execute_blocks(
+    scan: &MetricsBlockScan,
+    selector: &StreamingSelector<'_>,
+    label_cols: Arc<LabelColumns>,
+    partitions: usize,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Vec<SourceFuture>> {
+    let intervals = hash_partitions(partitions).collect::<Vec<_>>();
+    let prepared = blocks::prepare(
+        scan,
+        selector.matchers,
+        label_cols,
+        &intervals,
+        selector.offset,
+        lookback,
+        eval_ctx,
+    )
+    .await
+    .map_err(|error| DataFusionError::External(error.into()))?;
+    Ok(prepared
+        .into_iter()
+        .map(|partition| {
+            Box::pin(async move {
+                Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
+                    partition,
+                )))
+            }) as SourceFuture
+        })
+        .collect())
+}
+
+async fn execute_hash_sorted(
+    ctx: &SessionContext,
+    selector: &StreamingSelector<'_>,
+    label_cols: Arc<LabelColumns>,
+    partitions: usize,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Vec<SourceFuture>> {
+    let df = ctx.table(selector.table_name).await?;
     let df = apply_time_window(
         df,
         eval_ctx.start - selector.offset,
@@ -167,25 +184,20 @@ pub(crate) async fn execute_partitioned(
             columns.push(name);
         }
     }
-    let Some(partition_inputs) =
-        build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?
-    else {
-        return Ok(None);
-    };
+    let partition_inputs =
+        build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?;
     let offset = selector.offset;
-    Ok(Some(
-        partition_inputs
-            .into_iter()
-            .map(|streams| {
-                let columns = Arc::clone(&label_cols);
-                Box::pin(async move {
-                    HashSortedSeriesStream::start(streams, columns, offset)
-                        .await
-                        .map(SeriesSource::DataFusion)
-                }) as SourceFuture
-            })
-            .collect(),
-    ))
+    Ok(partition_inputs
+        .into_iter()
+        .map(|streams| {
+            let columns = Arc::clone(&label_cols);
+            Box::pin(async move {
+                HashSortedSeriesStream::start(streams, columns, offset)
+                    .await
+                    .map(SeriesSource::DataFusion)
+            }) as SourceFuture
+        })
+        .collect())
 }
 
 /// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
@@ -249,7 +261,7 @@ async fn build_partition_inputs(
     columns: &[&str],
     partitions: usize,
     trace_id: &str,
-) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
+) -> Result<Vec<Vec<SendableRecordBatchStream>>> {
     let (mut state, logical_plan) = df.clone().into_parts();
     // Outer hash shards provide parallelism; keep each shard's ordered scan chains intact.
     state
@@ -328,26 +340,24 @@ where
 fn execute_planned_partitions(
     plans: Vec<PlannedPartition>,
     trace_id: &str,
-) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
+) -> Result<Vec<Vec<SendableRecordBatchStream>>> {
     let mut inputs = Vec::with_capacity(plans.len());
     for (partition, PlannedPartition { plan, task_ctx }) in plans.into_iter().enumerate() {
         if partition == 0 && config::get_config().common.print_key_sql {
             log::info!("{}", generate_plan_string(trace_id, plan.as_ref()));
         }
         let Some(input) = ordered_partition_input(&plan) else {
-            log::info!(
-                "[trace_id: {trace_id}] [PromQL] streaming fused agg fallback: partition {partition} plan cannot stream in order:\n{}",
+            return Err(DataFusionError::Execution(format!(
+                "hash-sorted partition {partition} plan cannot stream in order:\n{}",
                 generate_plan_string(trace_id, plan.as_ref())
-            );
-            return Ok(None);
+            )));
         };
         inputs.push((input, task_ctx));
     }
     inputs
         .into_iter()
         .map(|(plan, task_ctx)| execute_stream_partitioned(plan, task_ctx))
-        .collect::<Result<Vec<_>>>()
-        .map(Some)
+        .collect()
 }
 
 /// Uniform partition of the u64 hash space into `count` inclusive ranges.
@@ -550,7 +560,6 @@ mod tests {
             }],
             "empty_shard",
         )
-        .unwrap()
         .unwrap();
         assert_eq!(streams.len(), 1);
         assert!(streams[0].is_empty());
@@ -622,7 +631,6 @@ mod tests {
             "preserve_shard_chains",
         )
         .await
-        .expect("hash shard planning must succeed")
         .expect("hash shards must preserve the declared input ordering");
         assert_eq!(inputs.len(), partitions);
         let mut actual = Vec::new();
@@ -813,9 +821,8 @@ mod tests {
                 },
             ],
             "late_invalid_shard",
-        )
-        .unwrap();
-        assert!(rejected.is_none());
+        );
+        assert!(rejected.is_err());
         assert_eq!(executions.load(Ordering::SeqCst), 0);
         let accepted = execute_planned_partitions(
             vec![
@@ -830,32 +837,28 @@ mod tests {
             ],
             "all_valid_shards",
         )
-        .unwrap()
         .unwrap();
         assert_eq!(accepted.len(), 2);
         assert_eq!(executions.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]
-    async fn test_streaming_falls_back_without_sorted_table() {
+    async fn test_hash_sorted_source_without_a_table_is_an_error() {
         let ctx = session_ctx();
+
+        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hash_sorted_source_without_declared_ordering_is_an_error() {
+        let ctx = session_ctx();
+        // the same data registered without the ordering
+        // declaration: the plan needs a real sort, so the gate must reject it
         let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
         ctx.register_table("m", Arc::new(table)).unwrap();
 
         let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
-        assert!(result.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_streaming_falls_back_when_ordering_is_not_declared() {
-        let ctx = session_ctx();
-        // same data registered under the sorted name but without the ordering
-        // declaration: the plan needs a real sort, so the gate must reject it
-        let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
-        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-            .unwrap();
-
-        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 }

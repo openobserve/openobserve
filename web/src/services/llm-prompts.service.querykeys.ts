@@ -3,6 +3,9 @@ import { orgKey } from "@/composables/query/keys";
 
 export const llmPromptKeys = {
   all: (org: string) => orgKey(org, "llm", "prompts"),
-  list: (org: string) => orgKey(org, "llm", "prompts", "list"),
+  list: (org: string, folderId?: string) =>
+    folderId
+      ? orgKey(org, "llm", "prompts", "list", folderId)
+      : orgKey(org, "llm", "prompts", "list"),
   settings: (org: string) => orgKey(org, "llm", "prompts", "settings"),
 };

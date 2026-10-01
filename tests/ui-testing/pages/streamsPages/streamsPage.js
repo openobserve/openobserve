@@ -3,6 +3,7 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { LogsPage } from '../logsPages/logsPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
+import { gotoStreamsViaNav } from '../commonActions.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const http = require('http');
@@ -273,7 +274,7 @@ export class StreamsPage {
 
     // Methods from legacy streamsPage.js
     async gotoStreamsPage() {
-        await this.page.locator('[data-test="menu-link-\\/streams-item"]').click();
+        await gotoStreamsViaNav(this.page);
     }
 
     async streamsPageDefaultOrg() {

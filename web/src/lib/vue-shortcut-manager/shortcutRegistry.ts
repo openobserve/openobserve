@@ -146,6 +146,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     pages: ["shortcuts.pages.functions", "shortcuts.pages.enrichmentTables"],
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
+  { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
   {
     titleKey: "shortcuts.modules.iam",
     title: "IAM",
@@ -581,9 +582,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "functions",
     shortcuts: [
       { id: "functionsAdd", key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
+      { id: "functionsImport", key: "i", descriptionKey: "shortcuts.actions.functionsImport" },
       { id: "functionsRefresh", key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
       { id: "functionsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
       { id: "functionsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "functionsRowExport",
+        display: "x",
+        descriptionKey: "shortcuts.actions.tableRowExport",
+      },
       {
         id: "functionsRowDelete",
         display: "del / ⌫",
@@ -735,6 +742,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       {
         id: "syntheticsTokensFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+    ],
+  },
+
+  // ── Synthetics — Journey editor ─────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.syntheticsJourney",
+    scope: "synthetics-journey",
+    shortcuts: [
+      {
+        id: "syntheticsJourneyFocusSearch",
         key: "/",
         descriptionKey: "shortcuts.actions.focusSearch",
       },
