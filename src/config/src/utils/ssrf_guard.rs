@@ -324,10 +324,17 @@ impl SsrfAllowlist {
     /// A metadata address is admitted only by a CIDR naming exactly that address.
     fn allows_ip(&self, ip: &IpAddr) -> bool {
         let ip = canonical_ip(ip);
+        // Embedded IPv4 is blocked as that IPv4, so it must be allowed as that IPv4 (DNS64).
+        let embedded = unwrap_embedded_ipv4(&ip);
         if is_metadata_ip(&ip) {
-            return self.cidrs.iter().any(|c| c.is_single(&ip));
+            return self
+                .cidrs
+                .iter()
+                .any(|c| c.is_single(&ip) || c.is_single(&embedded));
         }
-        self.cidrs.iter().any(|c| c.contains(&ip))
+        self.cidrs
+            .iter()
+            .any(|c| c.contains(&ip) || c.contains(&embedded))
     }
 }
 
@@ -535,6 +542,39 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn test_allowed_cidr_admits_its_nat64_and_6to4_forms() {
+        let allow = SsrfAllowlist::parse("10.1.2.0/24", "");
+        for ip in ["64:ff9b::a01:203", "2002:a01:203::1", "::10.1.2.3"] {
+            let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, false, &allow);
+            assert!(res.is_ok(), "{ip}: {res:?}");
+        }
+        for ip in ["64:ff9b::a09:909", "2002:a09:909::1"] {
+            let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, false, &allow);
+            assert!(res.is_err(), "{ip}");
+        }
+        let res = SsrfDnsResolver::resolve_checked("64:ff9b::a01:203", &allow).await;
+        assert!(res.is_ok(), "{:?}", res.map_err(|e| e.to_string()));
+        let res =
+            SsrfGuard::validate_url_async_inner("http://[64:ff9b::a01:203]/", false, false, &allow)
+                .await;
+        assert!(res.is_ok(), "{res:?}");
+        assert!(
+            SsrfDnsResolver::resolve_checked("64:ff9b::a01:203", &none())
+                .await
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_nat64_metadata_needs_the_exact_cidr() {
+        let ip: IpAddr = "64:ff9b::a9fe:a9fe".parse().unwrap();
+        let range = SsrfAllowlist::parse("169.254.0.0/16", "");
+        assert!(SsrfGuard::check_ip_inner(&ip, false, false, &range).is_err());
+        let exact = SsrfAllowlist::parse("169.254.169.254/32", "");
+        assert!(SsrfGuard::check_ip_inner(&ip, false, false, &exact).is_ok());
     }
 
     #[tokio::test]
