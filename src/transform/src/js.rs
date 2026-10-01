@@ -253,10 +253,8 @@ pub fn apply_js_fn(
         Err(e) => return (row, Some(e)),
     };
     context.with(|ctx| {
-        // Set up the execution environment
         let globals = ctx.globals();
 
-        // Inject input data as JSON string
         let input_json = match serde_json::to_string(&row) {
             Ok(json) => json,
             Err(e) => {
@@ -267,7 +265,6 @@ pub fn apply_js_fn(
             }
         };
 
-        // Set global variables
         if let Err(e) = globals.set("inputJson", input_json.as_str()) {
             return (row.clone(), Some(format!("Failed to set input: {}", e)));
         }
@@ -289,19 +286,9 @@ pub fn apply_js_fn(
         // Strip #ResultArray# marker for execution (invalid JS syntax)
         let func_for_execution = strip_result_array_marker(&js_config.function);
 
-        // Detect if this is a ResultArray function to use appropriate variable name
-        // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single
-        // object)
-        // Only match #ResultArray# at the start of the function (not in comments)
         let is_result_array = RESULT_ARRAY.is_match(&js_config.function);
         let var_name = if is_result_array { "rows" } else { "row" };
 
-        // Create execution wrapper that catches errors and returns them as structured data
-        // Use 'rows' for #ResultArray# functions (consistent with VRL), 'row' for regular
-        // functions The function's return value is captured; if undefined, use the
-        // input variable Wrap user function to capture return value or mutated
-        // input For #ResultArray# functions, use 'rows' variable (array input)
-        // For regular functions, use 'row' variable (single object input)
         let exec_code = format!(
             r#"
                 (function() {{
@@ -324,7 +311,6 @@ pub fn apply_js_fn(
             var_name, func_for_execution, var_name
         );
 
-        // Execute the function
         let guard = JsDeadlineGuard::new(exec_timeout());
         let eval_result = ctx.eval::<String, _>(exec_code);
         if guard.expired() {
@@ -333,59 +319,53 @@ pub fn apply_js_fn(
             return (row, Some(msg));
         }
         match eval_result {
-            Ok(result_json) => {
-                // Parse the result to check if there was an error
-                match serde_json::from_str::<json::Value>(&result_json) {
-                    Ok(result_obj) => {
-                        if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
-                            && success
-                        {
-                            // Extract the actual data
-                            if let Some(data) = result_obj.get("data") {
-                                (data.clone(), None)
-                            } else {
-                                (row.clone(), Some("No data returned".to_string()))
-                            }
-                        } else if let Some(success) =
-                            result_obj.get("success").and_then(|v| v.as_bool())
-                            && !success
-                        {
-                            // Extract error details
-                            let error_msg = result_obj
-                                .get("error")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("Unknown error");
-                            let line = result_obj
-                                .get("line")
-                                .and_then(|v| v.as_str())
-                                .filter(|s| *s != "unknown");
-                            let column = result_obj
-                                .get("column")
-                                .and_then(|v| v.as_str())
-                                .filter(|s| *s != "unknown");
-
-                            // Only append line/column if we have valid values
-                            let error_message = match (line, column) {
-                                (Some(l), Some(c)) => {
-                                    format!("{} (line: {}, column: {})", error_msg, l, c)
-                                }
-                                (Some(l), None) => format!("{} (line: {})", error_msg, l),
-                                (None, Some(c)) => format!("{} (column: {})", error_msg, c),
-                                (None, None) => error_msg.to_string(),
-                            };
-
-                            log::error!("{}/{:?} {}", org_id, stream_name, error_message);
-                            (row, Some(error_message))
+            Ok(result_json) => match serde_json::from_str::<json::Value>(&result_json) {
+                Ok(result_obj) => {
+                    if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
+                        && success
+                    {
+                        if let Some(data) = result_obj.get("data") {
+                            (data.clone(), None)
                         } else {
-                            (row.clone(), Some("Unexpected response format".to_string()))
+                            (row.clone(), Some("No data returned".to_string()))
                         }
+                    } else if let Some(success) =
+                        result_obj.get("success").and_then(|v| v.as_bool())
+                        && !success
+                    {
+                        let error_msg = result_obj
+                            .get("error")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown error");
+                        let line = result_obj
+                            .get("line")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| *s != "unknown");
+                        let column = result_obj
+                            .get("column")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| *s != "unknown");
+
+                        let error_message = match (line, column) {
+                            (Some(l), Some(c)) => {
+                                format!("{} (line: {}, column: {})", error_msg, l, c)
+                            }
+                            (Some(l), None) => format!("{} (line: {})", error_msg, l),
+                            (None, Some(c)) => format!("{} (column: {})", error_msg, c),
+                            (None, None) => error_msg.to_string(),
+                        };
+
+                        log::error!("{}/{:?} {}", org_id, stream_name, error_message);
+                        (row, Some(error_message))
+                    } else {
+                        (row.clone(), Some("Unexpected response format".to_string()))
                     }
-                    Err(e) => (
-                        row.clone(),
-                        Some(format!("Failed to parse JS output: {}", e)),
-                    ),
                 }
-            }
+                Err(e) => (
+                    row.clone(),
+                    Some(format!("Failed to parse JS output: {}", e)),
+                ),
+            },
             Err(e) => {
                 let error_msg = format!("JS execution failed: {}", e);
                 log::error!("{}/{:?} {}", org_id, stream_name, error_msg);

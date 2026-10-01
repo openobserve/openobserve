@@ -124,11 +124,6 @@ pub fn mask_license_key(key: &str) -> String {
     format!("{head}*****{tail}")
 }
 
-/// Compares in time independent of where the inputs differ; only the length can leak.
-pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
-}
-
 pub trait StringExt {
     fn find(&self, needle: &str) -> bool;
     fn optional(&self) -> Option<String>;
@@ -168,6 +163,11 @@ impl StringExt for String {
 
         self[..end].to_string()
     }
+}
+
+/// Compares in time independent of where the inputs differ; only the length can leak.
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
 }
 
 #[cfg(test)]
