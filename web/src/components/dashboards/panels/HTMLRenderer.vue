@@ -23,20 +23,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="['prose prose-sm max-w-none px-2 py-1', isDark && 'prose-invert']"
       data-test="html-renderer"
     ></div>
+    <Teleport v-for="embed in refusedEmbeds" :key="embed.key" :to="embed.slot">
+      <OBanner
+        variant="info"
+        dense
+        icon="block"
+        :content="t('dashboard.htmlPanelEmbedBlocked')"
+        data-test="html-renderer-blocked-embed"
+      />
+    </Teleport>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, onMounted, ref, watch } from "vue";
+import { defineComponent, computed, onMounted, ref, shallowRef, watch } from "vue";
 import { useTheme } from "@/composables/useTheme";
+import { useI18nTyped } from "@/types/i18n";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
 import { sanitizeHtmlPanel } from "@/utils/dashboard/htmlPanelSanitizer";
 
 // fallback scope suffix for panels rendered without a panelId
 let htmlPanelSeq = 0;
+let refusedEmbedSeq = 0;
 
 export default defineComponent({
   name: "HTMLRenderer",
+  components: { OBanner },
   props: {
     htmlContent: {
       type: String,
@@ -57,7 +70,9 @@ export default defineComponent({
   },
   setup(props): any {
     const { isDark } = useTheme();
+    const { t } = useI18nTyped();
     const contentRef = ref<HTMLElement | null>(null);
+    const refusedEmbeds = shallowRef<{ key: number; slot: HTMLElement }[]>([]);
 
     const instanceSeq = ++htmlPanelSeq;
     const scopeId = computed(() => {
@@ -75,16 +90,22 @@ export default defineComponent({
 
     // re-serializing through v-html would let CSSOM-decoded text re-parse as markup
     const renderContent = () => {
+      const slots: { key: number; slot: HTMLElement }[] = [];
       contentRef.value?.replaceChildren(
-        sanitizeHtmlPanel(processedContent.value ?? "", `#${scopeId.value}`),
+        sanitizeHtmlPanel(processedContent.value ?? "", `#${scopeId.value}`, (slot) =>
+          slots.push({ key: ++refusedEmbedSeq, slot }),
+        ),
       );
+      refusedEmbeds.value = slots;
     };
 
     onMounted(renderContent);
     watch([processedContent, scopeId], renderContent, { flush: "post" });
 
     return {
+      t,
       contentRef,
+      refusedEmbeds,
       isDark,
       scopeId,
       processedContent,

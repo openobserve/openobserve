@@ -5233,6 +5233,7 @@
     "valueMappingEmptyDescription": "Mapeie valores, intervalos ou padrões para o texto de exibição e cores.",
     "valueMappingRegexTooLong": "Use no máximo 256 caracteres no padrão.",
     "valueMappingRegexUnsupported": "Este padrão é inválido ou não é suportado. Não é possível usar lookahead, lookbehind nem referências anteriores.",
+    "htmlPanelEmbedBlocked": "Esta incorporação está bloqueada. Só é possível incorporar páginas https de outro site.",
     "configSectionFieldOverrides": "Substituições de campo",
     "configSectionFieldOverridesTooltip": "Mapeie as unidades para as colunas selecionadas para melhorar a visualização dos dados.",
     "addFieldOverride": "Adicionar substituição de campo",

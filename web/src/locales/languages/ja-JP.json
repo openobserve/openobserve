@@ -5233,6 +5233,7 @@
     "valueMappingEmptyDescription": "値、範囲、またはパターンを表示テキストと色にマッピングします。",
     "valueMappingRegexTooLong": "パターンは256文字以内にしてください。",
     "valueMappingRegexUnsupported": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。",
+    "htmlPanelEmbedBlocked": "この埋め込みはブロックされています。埋め込めるのは別サイトの https ページのみです。",
     "configSectionFieldOverrides": "フィールドオーバーライド",
     "configSectionFieldOverridesTooltip": "選択した列に単位をマップして、データの視覚化を強化します。",
     "addFieldOverride": "フィールドオーバーライドを追加",

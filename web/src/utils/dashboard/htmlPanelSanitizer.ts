@@ -20,6 +20,8 @@ const DOCUMENT_SELECTOR = /^(html|body|:root)(?![\w-])/i;
 
 const IFRAME_SANDBOX = "allow-scripts allow-same-origin";
 
+const refusedIframes = new WeakSet<Element>();
+
 type ScopableRule = CSSRule & { selectorText?: string; cssRules?: CSSRuleList };
 
 // A private instance keeps the iframe hook out of every other sanitize call in the app.
@@ -38,8 +40,12 @@ export const isAllowedIframeSrc = (src: string, pageOrigin: string): boolean => 
 /** Escape `</`, the only sequence that can end a `<style>` element, so a bare `<` in range media queries keeps working. */
 export const escapeStyleText = (cssText: string): string => cssText.replace(/<\//g, "\\3c /");
 
-/** Sanitize panel HTML and scope its CSS under `prefix`; mount the fragment directly, never through innerHTML. */
-export const sanitizeHtmlPanel = (html: string, prefix: string): DocumentFragment => {
+/** Sanitize panel HTML and scope its CSS under `prefix`, turning each iframe whose src is refused into an empty slot for `onRefusedEmbed`; mount the fragment directly, never through innerHTML. */
+export const sanitizeHtmlPanel = (
+  html: string,
+  prefix: string,
+  onRefusedEmbed?: (slot: HTMLElement) => void,
+): DocumentFragment => {
   const fragment = htmlPanelPurifier.sanitize(html, {
     ADD_TAGS: ["iframe", "style"],
     ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp"],
@@ -50,6 +56,13 @@ export const sanitizeHtmlPanel = (html: string, prefix: string): DocumentFragmen
 
   fragment.querySelectorAll("style").forEach((styleEl) => {
     styleEl.textContent = escapeStyleText(scopeCss(styleEl.textContent || "", prefix));
+  });
+
+  fragment.querySelectorAll("iframe").forEach((frame) => {
+    if (!refusedIframes.has(frame)) return;
+    const slot = frame.ownerDocument.createElement("div");
+    frame.replaceWith(slot);
+    onRefusedEmbed?.(slot);
   });
 
   return fragment;
@@ -96,6 +109,7 @@ htmlPanelPurifier.addHook("afterSanitizeAttributes", (node) => {
   const src = node.getAttribute("src") || "";
   if (src && !isAllowedIframeSrc(src, window.location.origin)) {
     node.removeAttribute("src");
+    refusedIframes.add(node);
   }
   node.setAttribute("sandbox", IFRAME_SANDBOX);
 });

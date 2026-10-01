@@ -5233,6 +5233,7 @@
     "valueMappingEmptyDescription": "قيم الخرائط أو النطاقات أو الأنماط لعرض النصوص والألوان.",
     "valueMappingRegexTooLong": "اجعل النمط 256 حرفًا أو أقل.",
     "valueMappingRegexUnsupported": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية.",
+    "htmlPanelEmbedBlocked": "هذا التضمين محظور. يمكن تضمين صفحات https من موقع آخر فقط.",
     "configSectionFieldOverrides": "تنسيق الأعمدة",
     "configSectionFieldOverridesTooltip": "قم بتكوين أنواع الخلايا، الألوان، الوحدات، والقواعد الشرطية لكل عمود.",
     "addFieldOverride": "تكوين تنسيق الأعمدة",
