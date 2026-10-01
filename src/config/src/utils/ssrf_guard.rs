@@ -26,11 +26,15 @@ use std::{
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
-const METADATA_IPS: [IpAddr; 2] = [
+/// Cloud metadata and credential endpoints (IMDS, ECS task role, EKS Pod Identity, Alibaba).
+const METADATA_IPS: [IpAddr; 6] = [
     IpAddr::V4(Ipv4Addr::new(169, 254, 169, 254)),
+    IpAddr::V4(Ipv4Addr::new(169, 254, 170, 2)),
+    IpAddr::V4(Ipv4Addr::new(169, 254, 170, 23)),
+    IpAddr::V4(Ipv4Addr::new(100, 100, 100, 200)),
     IpAddr::V6(Ipv6Addr::new(0xfd00, 0xec2, 0, 0, 0, 0, 0, 0x254)),
+    IpAddr::V6(Ipv6Addr::new(0xfd00, 0xec2, 0, 0, 0, 0, 0, 0x23)),
 ];
-const CGNAT_METADATA_IP: Ipv4Addr = Ipv4Addr::new(100, 100, 100, 200);
 
 static ALLOWLIST: LazyLock<SsrfAllowlist> = LazyLock::new(|| {
     let cfg = crate::get_config();
@@ -538,7 +542,7 @@ fn is_metadata_ip(ip: &IpAddr) -> bool {
 /// Cloud credential endpoints sit in these ranges, so only `ZO_SSRF_ALLOWED_CIDRS` can admit them.
 fn needs_explicit_cidr(ip: &IpAddr) -> bool {
     match unwrap_embedded_ipv4(ip) {
-        IpAddr::V4(v4) => v4.is_link_local() || v4 == CGNAT_METADATA_IP,
+        IpAddr::V4(v4) => v4.is_link_local() || is_metadata_ip(ip),
         IpAddr::V6(v6) => (v6.segments()[0] & 0xffc0) == 0xfe80 || is_metadata_ip(ip),
     }
 }
@@ -711,9 +715,38 @@ mod tests {
             SsrfGuard::check_ip_inner(&"100.64.0.1".parse().unwrap(), false, true, &host_only)
                 .is_ok()
         );
-        let cidr = SsrfAllowlist::parse("169.254.170.0/24,fe80::/10,100.100.100.0/24", "");
+        let cidr = SsrfAllowlist::parse("169.254.170.2/32,fe80::/10,100.100.100.200/32", "");
         for ip in ["169.254.170.2", "fe80::1", "100.100.100.200"] {
             let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, true, &cidr);
+            assert!(res.is_ok(), "{ip}: {res:?}");
+        }
+    }
+
+    #[test]
+    fn test_every_credential_endpoint_needs_its_exact_cidr() {
+        let wide = SsrfAllowlist::parse("169.254.0.0/16,100.64.0.0/10,fd00::/8", "");
+        for (ip, exact) in [
+            ("169.254.169.254", "169.254.169.254/32"),
+            ("169.254.170.2", "169.254.170.2/32"),
+            ("169.254.170.23", "169.254.170.23/32"),
+            ("100.100.100.200", "100.100.100.200/32"),
+            ("fd00:ec2::254", "fd00:ec2::254/128"),
+            ("fd00:ec2::23", "fd00:ec2::23/128"),
+            ("::ffff:169.254.170.2", "169.254.170.2/32"),
+            ("64:ff9b::a9fe:aa17", "169.254.170.23/32"),
+            ("64:ff9b::6464:64c8", "100.100.100.200/32"),
+        ] {
+            let ip_addr: IpAddr = ip.parse().unwrap();
+            for host_allowed in [false, true] {
+                let res = SsrfGuard::check_ip_inner(&ip_addr, false, host_allowed, &wide);
+                assert!(res.is_err(), "{ip} host_allowed={host_allowed}");
+            }
+            let exact = SsrfAllowlist::parse(exact, "");
+            let res = SsrfGuard::check_ip_inner(&ip_addr, false, false, &exact);
+            assert!(res.is_ok(), "{ip}: {res:?}");
+        }
+        for ip in ["169.254.1.1", "100.64.0.1", "fd00::1"] {
+            let res = SsrfGuard::check_ip_inner(&ip.parse().unwrap(), false, false, &wide);
             assert!(res.is_ok(), "{ip}: {res:?}");
         }
     }
