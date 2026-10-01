@@ -1090,6 +1090,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_negative_interval_is_bad_request() {
+        assert_eq!(
+            status(ReportError::NegativeInterval),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
     // 404 Not Found
     #[test]
     fn test_report_not_found_is_not_found() {
