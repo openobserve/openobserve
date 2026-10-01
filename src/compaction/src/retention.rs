@@ -682,7 +682,7 @@ fn generate_local_dirs(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    mut date_start: DateTime<Utc>,
+    date_start: DateTime<Utc>,
     date_end: DateTime<Utc>,
 ) -> Vec<PathBuf> {
     let cfg = get_config();
@@ -692,16 +692,23 @@ fn generate_local_dirs(
         stream_type,
         stream_name,
     );
+    // a partly covered day also holds hours outside the range, so only whole days go by directory
+    let start = date_start.timestamp_micros();
+    let into_day = start.rem_euclid(day_micros(1));
+    let first_whole_day = if into_day == 0 {
+        start
+    } else {
+        start - into_day + day_micros(1)
+    };
     let mut dirs_to_delete = Vec::new();
-    while date_start < date_end {
-        let date = date_start.format("%Y/%m/%d").to_string();
+    for (date, _) in generate_deletion_dates(first_whole_day, date_end.timestamp_micros()) {
+        let date = date.replace('-', "/");
         for stream_dir in &stream_dirs {
             let day_path = stream_dir.join(&date);
             if day_path.exists() {
                 dirs_to_delete.push(day_path);
             }
         }
-        date_start += Duration::days(1); // Move to the next day
     }
 
     dirs_to_delete
@@ -1234,6 +1241,42 @@ mod tests {
             now,
         );
         assert!(dirs.is_empty());
+    }
+
+    #[test]
+    fn test_generate_local_dirs_keeps_hours_outside_the_range() {
+        let stream = format!("local_dirs_{}", config::utils::time::now_micros());
+        let stream_dir = PathBuf::from(format!(
+            "{}files/org/logs/{stream}",
+            get_config().common.data_stream_dir
+        ));
+        for hour in [
+            "2026/09/30/21",
+            "2026/09/30/23",
+            "2026/10/01/01",
+            "2026/10/01/03",
+            "2026/10/02/01",
+        ] {
+            std::fs::create_dir_all(stream_dir.join(hour)).unwrap();
+        }
+        let dt = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
+        let dirs =
+            |start, end| generate_local_dirs("org", StreamType::Logs, &stream, dt(start), dt(end));
+        let partly = dirs("2026-10-01T02:00:00Z", "2026-10-01T04:00:00Z");
+        let across_midnight = dirs("2026-09-30T22:00:00Z", "2026-10-01T02:00:00Z");
+        let with_a_whole_day = dirs("2026-09-30T22:00:00Z", "2026-10-02T02:00:00Z");
+        let ending_mid_day = dirs("2026-10-01T00:00:00Z", "2026-10-02T02:00:00Z");
+        let whole_days = dirs("2026-09-30T00:00:00Z", "2026-10-02T00:00:00Z");
+        std::fs::remove_dir_all(&stream_dir).unwrap();
+
+        assert!(partly.is_empty(), "{partly:?}");
+        assert!(across_midnight.is_empty(), "{across_midnight:?}");
+        assert_eq!(with_a_whole_day, vec![stream_dir.join("2026/10/01")]);
+        assert_eq!(ending_mid_day, vec![stream_dir.join("2026/10/01")]);
+        assert_eq!(
+            whole_days,
+            vec![stream_dir.join("2026/09/30"), stream_dir.join("2026/10/01")]
+        );
     }
 
     /// Verify deletion ranges are non-overlapping and in order.
