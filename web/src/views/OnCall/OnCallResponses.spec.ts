@@ -63,6 +63,21 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ query: routeQuery }),
 }));
 
+// Mutable per case, so the phone tests can switch while every other test stays desktop.
+const mockViewport = vi.hoisted(() => ({ mdUp: true, lgUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => mockViewport.mdUp && !mockViewport.lgUp),
+      isDesktop: computed(() => mockViewport.lgUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.lgUp),
+    }),
+  };
+});
+
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
 const incidents = vi.mocked(incidentsService);
@@ -176,6 +191,8 @@ const stubs = {
     },
   },
   ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  // Open by construction, like ODropdown above: what the phone filter panel holds is the assertion, not the toggle.
+  OPopover: { name: "OPopover", template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdownItem: {
     name: "ODropdownItem",
     emits: ["select"],
@@ -1296,6 +1313,67 @@ describe("OnCallResponses", () => {
       ]);
 
       expect(sections(wrapper)).toEqual({ ringing: 1 });
+    });
+  });
+
+  /// A phone has one toolbar row and one control per table row, so the laptop's spread is folded rather than clipped.
+  describe("on a phone", () => {
+    beforeEach(() => {
+      mockViewport.mdUp = false;
+      mockViewport.lgUp = false;
+    });
+
+    afterEach(() => {
+      mockViewport.mdUp = true;
+      mockViewport.lgUp = true;
+    });
+
+    it("moves the team, priority and cause filters behind one button", async () => {
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.find('[data-test="oncall-responses-filters-btn"]').exists()).toBe(true);
+      const panel = wrapper.find('[data-test="oncall-responses-filters-panel"]');
+      for (const control of ["team-filter", "priority-filter", "cause-filter", "group-toggle"]) {
+        expect(panel.find(`[data-test="oncall-responses-${control}"]`).exists()).toBe(true);
+        // Moved, not duplicated: a second copy left inline would wrap the row again.
+        expect(wrapper.findAll(`[data-test="oncall-responses-${control}"]`)).toHaveLength(1);
+      }
+    });
+
+    /// The labelled button does not fit the one-control column, so the menu leads with the row's next step.
+    it("leads the row menu with acknowledge while the page is ringing", async () => {
+      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      const wrapper = await withPages([page()]);
+
+      await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(service.acknowledgeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+    });
+
+    it("leads the row menu with resolve once the page is owned", async () => {
+      const wrapper = await withPages([
+        page({ state: "acknowledged", acked_by: "engineer@example.com" }),
+      ]);
+
+      expect(wrapper.find('[data-test="oncall-row-resolve-alert:al_ckt-menu"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').exists()).toBe(false);
+    });
+
+    /// A closed row has no menu on a laptop; on a phone its button is gone, so the menu is the only way in.
+    it("keeps a menu on a closed row so its timeline stays reachable", async () => {
+      const wrapper = await withPages([
+        page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
+      ]);
+
+      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(true);
+      await wrapper.find('[data-test="oncall-row-timeline-alert:al_ckt-menu"]').trigger("click");
+
+      expect(push).toHaveBeenCalled();
     });
   });
 });
