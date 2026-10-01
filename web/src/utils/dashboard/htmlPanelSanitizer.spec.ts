@@ -127,17 +127,27 @@ describe("htmlPanelSanitizer", () => {
       addHookSpy.mockRestore();
     });
 
-    it("drops the allow attribute and same-origin sources", () => {
-      const out = render(
-        `<iframe src="${window.location.origin}/web" allow="camera"></iframe>` +
-          '<iframe src="https://example.com" allow="geolocation"></iframe>',
+    it("drops the allow attribute and hands each refused embed to the caller as a slot", () => {
+      const slots: HTMLElement[] = [];
+      const container = document.createElement("div");
+      container.appendChild(
+        sanitizeHtmlPanel(
+          `<p>a</p><iframe src="${window.location.origin}/web" allow="camera"></iframe><p>b</p>` +
+            '<iframe src="https://example.com" allow="geolocation"></iframe>' +
+            '<iframe srcdoc="<p>X</p>"></iframe>',
+          "#o2-html-panel-p1",
+          (slot) => slots.push(slot),
+        ),
       );
-      const [sameOrigin, crossOrigin] = Array.from(out.querySelectorAll("iframe"));
+      const iframes = Array.from(container.querySelectorAll("iframe"));
 
-      expect(sameOrigin.hasAttribute("src")).toBe(false);
-      expect(crossOrigin.getAttribute("src")).toBe("https://example.com");
-      expect(sameOrigin.hasAttribute("allow")).toBe(false);
-      expect(crossOrigin.hasAttribute("allow")).toBe(false);
+      expect(slots).toHaveLength(1);
+      expect(slots[0].previousElementSibling?.textContent).toBe("a");
+      expect(slots[0].nextElementSibling?.textContent).toBe("b");
+      expect(iframes).toHaveLength(2);
+      expect(iframes[0].getAttribute("src")).toBe("https://example.com");
+      expect(iframes[0].hasAttribute("allow")).toBe(false);
+      expect(iframes[1].hasAttribute("srcdoc")).toBe(false);
     });
   });
 });

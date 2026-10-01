@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import DOMPurify from "dompurify";
 import HTMLRenderer from "./HTMLRenderer.vue";
+import i18n from "@/locales";
 import { htmlPanelPurifier } from "@/utils/dashboard/htmlPanelSanitizer";
 
 // Mock external dependencies.
@@ -53,7 +54,7 @@ describe("HTMLRenderer", () => {
     return mount(HTMLRenderer, {
       props,
       global: {
-        plugins: [],
+        plugins: [i18n],
       },
     });
   };
@@ -491,15 +492,44 @@ describe("HTMLRenderer", () => {
       expect(iframe?.hasAttribute("allowfullscreen")).toBe(true);
     });
 
-    it("removes srcdoc and non-https src from iframes", () => {
+    it("removes srcdoc from an iframe that has no src", () => {
       wrapper = createWrapper({
-        htmlContent: '<iframe src="http://example.com" srcdoc="<p>X</p>"></iframe>',
+        htmlContent: '<iframe srcdoc="<p>X</p>"></iframe>',
       });
 
       const iframe = wrapper.find('[data-test="html-renderer"]').element.querySelector("iframe");
       expect(iframe?.hasAttribute("srcdoc")).toBe(false);
-      expect(iframe?.hasAttribute("src")).toBe(false);
       expect(iframe?.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
+    });
+
+    it("shows a notice in place of an iframe whose src is refused", async () => {
+      wrapper = createWrapper({
+        htmlContent:
+          `<p>before</p><iframe src="${window.location.origin}/web/logs"></iframe>` +
+          '<iframe src="http://example.com" srcdoc="<p>X</p>"></iframe><p>after</p>',
+      });
+      await flushPromises();
+
+      const content = wrapper.find('[data-test="html-renderer"]').element;
+      const notices = content.querySelectorAll('[data-test="html-renderer-blocked-embed"]');
+      expect(content.querySelector("iframe")).toBeNull();
+      expect(notices).toHaveLength(2);
+      expect(notices[0].textContent?.trim()).toBe(i18n.global.t("dashboard.htmlPanelEmbedBlocked"));
+      expect(content.textContent).toMatch(/before[\s\S]*after/);
+    });
+
+    it("shows no notice for an allowed embed and drops notices when the content changes", async () => {
+      wrapper = createWrapper({
+        htmlContent: `<iframe src="${window.location.origin}/web"></iframe>`,
+      });
+      await flushPromises();
+      expect(wrapper.findAll('[data-test="html-renderer-blocked-embed"]')).toHaveLength(1);
+
+      await wrapper.setProps({ htmlContent: '<iframe src="https://example.com/embed"></iframe>' });
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test="html-renderer-blocked-embed"]')).toHaveLength(0);
+      expect(wrapper.find("iframe").attributes("src")).toBe("https://example.com/embed");
     });
   });
 
