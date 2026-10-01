@@ -179,7 +179,7 @@ test.describe('Clone Alert dialog testcases', {
     testLogger.info('Clone routed to the chosen folder, not default');
   });
 
-  test('should demand a name, a stream type and a stream name before cloning', {
+  test('should demand a name and a stream name before cloning', {
     tag: ['@alert-clone-dialog', '@all', '@alerts', '@alerts-clone', '@P2'],
   }, async ({ page }) => {
     const source = await createSource(page, 'auto_alert_clone_validation');
@@ -194,12 +194,11 @@ test.describe('Clone Alert dialog testcases', {
     await pm.alertsPage.fillCloneName(source.name);
     await expect(pm.alertsPage.cloneSaveButton()).toBeEnabled();
 
-    // An ordinary alert has a stream, and the copy cannot inherit it silently:
-    // both selects start empty and each is refused in turn.
-    await pm.alertsPage.submitCloneDialog();
-    await expect(pm.alertsPage.toastWithText('Please select stream type')).toBeVisible({ timeout: 10000 });
-
-    await pm.alertsPage.selectCloneStreamType('logs');
+    // Both stream selects are now pre-filled from the source alert, so Save
+    // would succeed immediately — stream type can no longer be caught blank
+    // through the UI. Switching the stream type to a different one resets the
+    // stream name back to blank, which is still refused.
+    await pm.alertsPage.selectCloneStreamType('metrics');
     await pm.alertsPage.submitCloneDialog();
     await expect(pm.alertsPage.toastWithText('Please select stream name')).toBeVisible({ timeout: 10000 });
 
@@ -209,6 +208,6 @@ test.describe('Clone Alert dialog testcases', {
       (await listAlerts(page)).filter((row) => row.name === source.name),
       'a refused clone must leave the folder with only the source',
     ).toHaveLength(1);
-    testLogger.info('Clone refused until both stream selects are answered');
+    testLogger.info('Clone refused until the stream name select is answered');
   });
 });
