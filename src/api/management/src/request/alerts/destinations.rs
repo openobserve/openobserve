@@ -159,8 +159,8 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         });
     }
 
-    // SSRF protection: Validate URL (including DNS resolution) before making request.
-    if let Err(error_msg) = SsrfGuard::validate_url_with_config_async(url).await {
+    // The policy real sends use; an allowlist-only target gets no body back.
+    if let Err(error_msg) = SsrfGuard::validate_destination_url_with_config_async(url).await {
         return MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
@@ -177,7 +177,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         client_builder = client_builder.danger_accept_invalid_certs(true);
     }
 
-    let client = match common::utils::ssrf_guard::build_safe_client(client_builder) {
+    let client = match common::utils::ssrf_guard::build_safe_destination_client(client_builder) {
         Ok(client) => client,
         Err(e) => {
             return MetaHttpResponse::json(TestDestinationResponse {
@@ -221,6 +221,14 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         Ok(response) => {
             let status_code = response.status().as_u16();
             let success = response.status().is_success();
+            if config::utils::ssrf_guard::admitted_only_by_allowlist(&response) {
+                return MetaHttpResponse::json(TestDestinationResponse {
+                    success,
+                    status_code: Some(status_code),
+                    response_body: None,
+                    error: None,
+                });
+            }
 
             match response.text().await {
                 Ok(response_body) => MetaHttpResponse::json(TestDestinationResponse {
@@ -777,12 +785,117 @@ pub async fn test_send(
 
 #[cfg(test)]
 mod tests {
-    use axum::http::StatusCode;
+    use std::future::Future;
+
+    use axum::{Json, extract::Path, http::StatusCode};
     use db::alerts::destinations::DestinationError;
     use openobserve_core::http::destination_error_response;
 
+    use super::{TestDestinationRequest, test_destination};
+    use crate::models::destinations::DestinationType;
+
     fn status(err: DestinationError) -> StatusCode {
         destination_error_response(err).status()
+    }
+
+    /// Runs the test at `path` in a child process with `envs`, because the SSRF allowlist is read
+    /// once per process.
+    fn isolated<F: Future<Output = ()>>(
+        path: &str,
+        envs: &[(&str, &str)],
+        task: impl FnOnce() -> F,
+    ) {
+        let test = path.split_once("::").map_or(path, |(_, test)| test);
+        if std::env::var("O2_SSRF_ISOLATED_TEST").as_deref() == Ok(test) {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(task());
+            return;
+        }
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        for (name, _) in std::env::vars().filter(|(name, _)| name.contains("SSRF")) {
+            command.env_remove(name);
+        }
+        let output = command
+            .args(["--exact", test, "--nocapture"])
+            .env("O2_SSRF_ISOLATED_TEST", test)
+            .envs(envs.iter().copied())
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("1 passed"),
+            "{test} failed in its child process:\n{stdout}\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    /// The JSON the destination test returns for a GET to a local server that answers `secret`.
+    async fn tested_secret_server() -> serde_json::Value {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nsecret")
+                    .await;
+            }
+        });
+        let req = TestDestinationRequest {
+            url: format!("http://127.0.0.1:{port}/"),
+            method: Some("GET".to_string()),
+            headers: None,
+            body: None,
+            skip_tls_verify: None,
+            destination_type: DestinationType::Http,
+            recipients: None,
+        };
+        let resp = test_destination(Path("default".to_string()), Json(req)).await;
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[test]
+    fn test_destination_test_accepts_an_allowlisted_target_and_shows_its_status_only() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::test_destination_test_accepts_an_allowlisted_target_and_shows_its_status_only"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let res = tested_secret_server().await;
+                assert_eq!(res["success"], true, "{res}");
+                assert_eq!(res["statusCode"], 200, "{res}");
+                assert!(res["responseBody"].is_null(), "{res}");
+            },
+        );
+    }
+
+    #[test]
+    fn test_destination_test_shows_the_body_of_a_target_the_strict_policy_admits() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::test_destination_test_shows_the_body_of_a_target_the_strict_policy_admits"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_SSRF_ALLOW_LOOPBACK", "true"),
+            ],
+            || async {
+                let res = tested_secret_server().await;
+                assert_eq!(res["statusCode"], 200, "{res}");
+                assert_eq!(res["responseBody"], "secret", "{res}");
+            },
+        );
     }
 
     // 404 Not Found

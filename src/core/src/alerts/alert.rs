@@ -3304,6 +3304,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         }
     };
     let resp_status = resp.status();
+    let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
     let resp_body = resp.text().await?;
 
     log::debug!(
@@ -3357,14 +3358,9 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         log::error!(
             "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
-        return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {}",
-            resp_status,
-            resp_body
-        ));
     }
 
-    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
+    send_outcome(resp_status, &resp_body, hide_body)
 }
 
 /// Send a multipart/alternative email.
@@ -3482,18 +3478,28 @@ async fn send_discord_with_attachment(
 
     let resp = client.post(url).multipart(form).send().await?;
     let resp_status = resp.status();
+    let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
     let resp_body = resp.text().await?;
     if !resp_status.is_success() {
         log::error!(
             "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
-        return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {}",
-            resp_status,
-            resp_body
-        ));
     }
-    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
+    send_outcome(resp_status, &resp_body, hide_body)
+}
+
+/// What the caller of a send sees; a peer only the operator allowlist admits shows its status only.
+fn send_outcome(
+    status: reqwest::StatusCode,
+    body: &str,
+    hide_body: bool,
+) -> Result<String, anyhow::Error> {
+    match (status.is_success(), hide_body) {
+        (true, false) => Ok(format!("sent status: {status}, body: {body}")),
+        (true, true) => Ok(format!("sent status: {status}")),
+        (false, false) => Err(anyhow::anyhow!("sent error status: {status}, err: {body}")),
+        (false, true) => Err(anyhow::anyhow!("sent error status: {status}")),
+    }
 }
 
 async fn send_sns_notification(
@@ -4591,11 +4597,18 @@ mod threshold_validation_tests {
 
 #[cfg(test)]
 mod send_path_tests {
-    use config::meta::destinations::{Template, TemplateKind};
+    use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
-    use super::{NotificationOutcome, all_workflows_failed, choose_template};
+    use super::{
+        NotificationOutcome, all_workflows_failed, choose_template, send_discord_with_attachment,
+        send_http_notification,
+    };
+    use crate::{
+        alerts::notifications::platform::{Platform, send_resolve},
+        ssrf_test_support::{isolated, secret_server},
+    };
 
     #[test]
     fn skipped_incident_destinations_do_not_hide_total_workflow_failure() {
@@ -4695,6 +4708,76 @@ mod send_path_tests {
         let outcome = NotificationOutcome::default();
         assert!(outcome.succeeded.is_empty());
         assert!(outcome.failed.is_empty());
+    }
+
+    fn endpoint(base: &str, path: &str) -> Endpoint {
+        Endpoint {
+            url: format!("{base}{path}"),
+            method: HTTPType::POST,
+            ..Default::default()
+        }
+    }
+
+    /// What the caller of each send path sees from a destination that answers `secret`.
+    async fn caller_sees(base: &str) -> Vec<Result<String, String>> {
+        let png = std::sync::Arc::new(vec![0u8; 8]);
+        let shown = |r: Result<String, anyhow::Error>| r.map_err(|e| e.to_string());
+        vec![
+            shown(send_http_notification(&endpoint(base, "/ok"), "{}".into()).await),
+            shown(send_http_notification(&endpoint(base, "/fail"), "{}".into()).await),
+            shown(
+                send_discord_with_attachment(&endpoint(base, "/ok"), "{}".into(), png.clone())
+                    .await,
+            ),
+            shown(send_discord_with_attachment(&endpoint(base, "/fail"), "{}".into(), png).await),
+            shown(send_resolve(Platform::PagerDuty, &endpoint(base, "/fail"), "ep-1").await),
+        ]
+    }
+
+    fn assert_sends_and_failures(seen: &[Result<String, String>]) {
+        let delivered: Vec<bool> = seen.iter().map(Result::is_ok).collect();
+        assert_eq!(delivered, [true, false, true, false, false], "{seen:?}");
+    }
+
+    #[test]
+    fn a_destination_only_the_allowlist_admits_shows_the_caller_its_status_only() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_only_the_allowlist_admits_shows_the_caller_its_status_only"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let seen = caller_sees(&secret_server().await).await;
+                assert_sends_and_failures(&seen);
+                for shown in &seen {
+                    let (Ok(s) | Err(s)) = shown;
+                    assert!(s.contains("status") && !s.contains("secret"), "{s}");
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_the_strict_policy_admits_still_shows_its_body() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_the_strict_policy_admits_still_shows_its_body"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_SSRF_ALLOW_LOOPBACK", "true"),
+            ],
+            || async {
+                let seen = caller_sees(&secret_server().await).await;
+                assert_sends_and_failures(&seen);
+                for shown in &seen {
+                    let (Ok(s) | Err(s)) = shown;
+                    assert!(s.contains("secret"), "{s}");
+                }
+            },
+        );
     }
 
     #[cfg(feature = "enterprise")]
