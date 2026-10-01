@@ -21,6 +21,7 @@ use chrono::Timelike;
 use config::{
     SMTP_CLIENT, get_chrome_launch_options, get_config,
     meta::{
+        alerts::fixed_offset,
         dashboards::{
             datetime_now,
             reports::{
@@ -113,6 +114,9 @@ pub enum ReportError {
 
     #[error("Report cron schedule '{cron}' has no future occurrence")]
     CronHasNoFutureOccurrence { cron: String },
+
+    #[error("Report frequency interval cannot be negative")]
+    NegativeInterval,
 
     #[error(transparent)]
     DbError(anyhow::Error),
@@ -434,16 +438,7 @@ pub async fn update_by_id(
         return Err(ReportError::NameContainsForwardSlash);
     }
 
-    if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let now = chrono::Utc::now().second();
-        report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
-        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
-            return Err(ReportError::ParseCronError(e));
-        }
-    } else if report.frequency.interval == 0 {
-        report.frequency.interval = 1;
-    }
+    validate_schedule(&mut report)?;
 
     if report.dashboards.is_empty() {
         return Err(ReportError::NoDashboards);
@@ -1043,16 +1038,20 @@ fn validate_schedule(report: &mut Report) -> Result<(), ReportError> {
     if !TZ_OFFSET_RANGE_MINUTES.contains(&report.tz_offset) {
         return Err(ReportError::TzOffsetOutOfRange);
     }
+    let tz = fixed_offset(report.tz_offset).ok_or(ReportError::TzOffsetOutOfRange)?;
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
         let now = chrono::Utc::now().second();
         report.frequency.cron =
             super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
         let schedule = Schedule::from_str(&report.frequency.cron)?;
-        if schedule.upcoming(chrono::Utc).next().is_none() {
+        // The scheduler reads the cron in the report's offset, so check it there.
+        if schedule.upcoming(tz).next().is_none() {
             return Err(ReportError::CronHasNoFutureOccurrence {
                 cron: report.frequency.cron.clone(),
             });
         }
+    } else if report.frequency.interval < 0 {
+        return Err(ReportError::NegativeInterval);
     } else if report.frequency.interval == 0 {
         report.frequency.interval = 1;
     }
@@ -1061,6 +1060,8 @@ fn validate_schedule(report: &mut Report) -> Result<(), ReportError> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Datelike;
+
     use super::*;
 
     #[test]
@@ -1241,6 +1242,74 @@ mod tests {
         report.frequency.interval = 0;
         assert!(validate_schedule(&mut report).is_ok());
         assert_eq!(report.frequency.interval, 1);
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_negative_interval() {
+        for frequency_type in [ReportFrequencyType::Hours, ReportFrequencyType::Months] {
+            let mut report = Report::default();
+            report.frequency.frequency_type = frequency_type;
+            report.frequency.interval = -1;
+            let err = validate_schedule(&mut report);
+            assert!(matches!(err, Err(ReportError::NegativeInterval)), "{err:?}");
+        }
+    }
+
+    #[test]
+    fn validate_schedule_checks_the_cron_in_the_report_offset() {
+        let target = chrono::Utc::now() + chrono::Duration::hours(2);
+        let cron = format!(
+            "0 {} {} {} {} * {}",
+            target.minute(),
+            target.hour(),
+            target.day(),
+            target.month(),
+            target.year()
+        );
+        assert!(
+            validate_schedule(&mut scheduled(0, &cron)).is_ok(),
+            "{cron}"
+        );
+        let err = validate_schedule(&mut scheduled(720, &cron));
+        assert!(
+            matches!(err, Err(ReportError::CronHasNoFutureOccurrence { .. })),
+            "{cron}: {err:?}"
+        );
+    }
+
+    fn report_with_schedule(tz_offset: i32, cron: &str) -> Report {
+        let mut report = scheduled(tz_offset, cron);
+        report.name = "weekly".to_string();
+        report
+    }
+
+    #[tokio::test]
+    async fn update_by_id_rejects_the_schedules_that_save_rejects() {
+        let saved = config::CONFIG.load_full();
+        let mut cfg = config::Config::init().unwrap();
+        cfg.common.report_server_url = "http://report-server.example".to_string();
+        config::CONFIG.store(std::sync::Arc::new(cfg));
+        let mut outcomes = vec![];
+        for (tz_offset, cron) in [(1440, "0 0 * * * *"), (0, "0 0 0 1 1 * 2020")] {
+            let created = save(
+                "org_a",
+                "default",
+                "",
+                report_with_schedule(tz_offset, cron),
+                true,
+            )
+            .await
+            .map_err(|e| e.to_string());
+            let updated = update_by_id("org_a", "r1", None, report_with_schedule(tz_offset, cron))
+                .await
+                .map_err(|e| e.to_string());
+            outcomes.push((created, updated));
+        }
+        config::CONFIG.store(saved);
+        for (created, updated) in outcomes {
+            assert!(created.is_err(), "{created:?}");
+            assert_eq!(created, updated);
+        }
     }
 
     #[test]
