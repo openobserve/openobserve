@@ -57,6 +57,10 @@ use usage_reporting::publish_error;
 
 use crate::alerts::{ConditionExt, ConditionGroupExt};
 
+/// Largest destination response body echoed back into node outputs and errors.
+#[cfg(feature = "enterprise")]
+const DESTINATION_BODY_ECHO_LIMIT: usize = 4096;
+
 // Global batch buffer for accumulating remote stream records
 #[cfg(feature = "enterprise")]
 #[derive(Debug)]
@@ -141,10 +145,6 @@ impl BatchBuffer {
         std::mem::take(&mut self.records)
     }
 }
-
-/// Largest destination response body echoed back into node outputs and errors.
-#[cfg(feature = "enterprise")]
-const DESTINATION_BODY_ECHO_LIMIT: usize = 4096;
 
 #[cfg(feature = "enterprise")]
 static BATCH_BUFFERS: Lazy<Mutex<HashMap<String, BatchBuffer>>> =
