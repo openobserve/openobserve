@@ -206,6 +206,7 @@ mod m20260923_000001_create_llm_prompts;
 mod m20260924_000001_add_recovery_episode_columns;
 mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
+mod m20261003_000001_create_rum_pa_tables;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -309,6 +310,15 @@ pub(crate) async fn create_slo_tables_for_test(
     let manager = SchemaManager::new(db);
     m20260727_000001_create_slo_tables::Migration
         .up(&manager)
+        .await
+}
+
+/// Apply only the RUM Product Analytics tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    m20261003_000001_create_rum_pa_tables::Migration
+        .up(&SchemaManager::new(db))
         .await
 }
 
@@ -506,6 +516,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260918_000001_create_oncall_response_reports::Migration),
             Box::new(m20260908_000001_create_synthetics_refs::Migration),
             Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
+            Box::new(m20261003_000001_create_rum_pa_tables::Migration),
         ]
     }
 }
@@ -560,6 +571,7 @@ mod tests {
         (93, "m20260918_000001_create_oncall_response_reports"),
         (94, "m20260908_000001_create_synthetics_refs"),
         (95, "m20261001_000001_add_anomaly_band_settings"),
+        (96, "m20261003_000001_create_rum_pa_tables"),
     ];
 
     #[test]

@@ -488,10 +488,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { isSessionLive } from "@/utils/rum/sessionReplayLive";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQuery } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
@@ -773,8 +774,17 @@ const tableColumns = [
   },
 ];
 
+// The filter the list was last built from, so a return that brings a new one (from Product analytics) re-applies it.
+let lastAppliedUrlFilter: string | null = null;
+
+// The router returns every value as a string, so the list's own numeric from/to must compare as strings too.
+function urlFilterSignature(query: LocationQuery | Record<string, unknown>): string {
+  return JSON.stringify(["query", "from", "to", "period"].map((k) => String(query[k] ?? "")));
+}
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
+  lastAppliedUrlFilter = urlFilterSignature(router.currentRoute.value.query);
 });
 
 onMounted(async () => {
@@ -814,6 +824,18 @@ let activatedBefore = false;
 onActivated(() => {
   if (!activatedBefore) {
     activatedBefore = true;
+    return;
+  }
+  const signature = urlFilterSignature(router.currentRoute.value.query);
+  if (
+    router.currentRoute.value.name === "Sessions" &&
+    enteredFromAnalytics &&
+    signature !== lastAppliedUrlFilter
+  ) {
+    lastAppliedUrlFilter = signature;
+    restoreUrlQueryParams();
+    syncDateTimeFromSession();
+    getSessions();
     return;
   }
   if (!hasCompleteResult.value) getSessions();
@@ -1647,6 +1669,15 @@ const getSessionStatusColor = (row: any) => {
 
 const router = useRouter();
 
+// A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
+let enteredFromAnalytics = false;
+const stopEntryTracking = router.afterEach((to, from) => {
+  if (to.name === "Sessions") {
+    enteredFromAnalytics = from.matched.some((r) => r.name === PA_ROUTES.shell);
+  }
+});
+onBeforeUnmount(stopEntryTracking);
+
 const { shareUrl } = useRum();
 const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
 
@@ -1735,6 +1766,16 @@ function restoreUrlQueryParams() {
   }
 }
 
+function syncDateTimeFromSession() {
+  const date = sessionState.data.datetime;
+  if (date.valueType === "relative") {
+    const resolved = getConsumableRelativeTime(date.relativeTimePeriod);
+    if (resolved) dateTime.value = { ...dateTime.value, ...date, ...resolved };
+  } else {
+    dateTime.value = { ...dateTime.value, ...date };
+  }
+}
+
 function updateUrlQueryParams() {
   if (!isMounted.value) return;
 
@@ -1755,6 +1796,7 @@ function updateUrlQueryParams() {
   if (deviceSegment.value !== "all") query["device"] = deviceSegment.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
+  lastAppliedUrlFilter = urlFilterSignature(query);
   router.push({ query });
 }
 

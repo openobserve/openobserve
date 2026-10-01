@@ -146,8 +146,21 @@ describe("AddRole", () => {
       w.unmount();
     });
 
-    it("offers the DB Monitoring viewer start-from option", () => {
-      expect(wrapper.find('[data-test="add-role-start-from-dbm-radio"]').exists()).toBe(true);
+    it("offers every start-from preset in one dropdown, the RUM presets included", () => {
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.exists()).toBe(true);
+      expect(wrapper.findAll('[type="radio"], [role="radio"]')).toHaveLength(0);
+      expect((select.props("options") as { value: string }[]).map((o) => o.value)).toEqual([
+        "custom",
+        "readonly",
+        "dbm",
+        "k8s",
+        "rum_viewer",
+        "rum_editor",
+      ]);
+      const labels = (select.props("options") as { label: string }[]).map((o) => o.label);
+      expect(labels).toContain(i18n.global.t("iam.role.startFrom.rum_viewer"));
+      expect(labels).toContain(i18n.global.t("iam.role.startFrom.rum_editor"));
     });
 
     it("preserves the maxlength attribute on the input", () => {
@@ -158,16 +171,10 @@ describe("AddRole", () => {
       expect(wrapper.find('[data-test="add-role-start-from-section"]').exists()).toBe(true);
     });
 
-    it("offers custom, readonly and Kubernetes-viewer start-from options", () => {
-      expect(wrapper.find('[data-test="add-role-start-from-custom-radio"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-role-start-from-readonly-radio"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-role-start-from-k8s-radio"]').exists()).toBe(true);
-    });
-
-    it("labels the Kubernetes-viewer option from i18n", () => {
-      // ORadio forwards data-test onto the radio button, so the label text sits on the section.
-      expect(wrapper.find('[data-test="add-role-start-from-section"]').text()).toContain(
-        i18n.global.t("iam.role.startFrom.k8s"),
+    it("starts the dropdown on the custom preset", () => {
+      expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe("custom");
+      expect(wrapper.find('[data-test="add-role-start-from-select"]').text()).toContain(
+        i18n.global.t("iam.role.startFrom.custom"),
       );
     });
 
@@ -325,19 +332,22 @@ describe("AddRole", () => {
       ]);
     });
 
-    it("emits startFrom: k8s when the k8s radio is clicked", async () => {
-      const { createRole } = await import("@/services/iam");
-      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+    it.each(["k8s", "rum_viewer", "rum_editor"])(
+      "emits startFrom: %s when it is picked from the dropdown",
+      async (preset) => {
+        const { createRole } = await import("@/services/iam");
+        vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
 
-      await getNameInput(wrapper).setValue("k8s_click");
-      await wrapper.find('[data-test="add-role-start-from-k8s-radio"]').trigger("click");
-      await flushPromises();
-      await submitForm(wrapper);
+        await getNameInput(wrapper).setValue("picked");
+        wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", preset);
+        await flushPromises();
+        await submitForm(wrapper);
 
-      expect(wrapper.emitted("added:role")[0]).toEqual([
-        { role_name: "k8s_click", startFrom: "k8s" },
-      ]);
-    });
+        expect(wrapper.emitted("added:role")[0]).toEqual([
+          { role_name: "picked", startFrom: preset },
+        ]);
+      },
+    );
 
     it("shows an error toast on a non-403 failure and does not emit added:role", async () => {
       const { createRole } = await import("@/services/iam");

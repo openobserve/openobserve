@@ -400,14 +400,22 @@ function onScrollOrResize() {
   if (isOpen.value) close();
 }
 
+let openedAt = { w: 0, h: 0 };
+
+// Pages dispatch synthetic resize events to reflow charts; only a real viewport change moves the tile.
+function onResize() {
+  if (window.innerWidth !== openedAt.w || window.innerHeight !== openedAt.h) onScrollOrResize();
+}
+
 watch(isOpen, (open) => {
   if (open) {
+    openedAt = { w: window.innerWidth, h: window.innerHeight };
     document.addEventListener("pointerdown", onDocumentPointerDown, true);
-    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onScrollOrResize, true);
   } else {
     document.removeEventListener("pointerdown", onDocumentPointerDown, true);
-    window.removeEventListener("resize", onScrollOrResize);
+    window.removeEventListener("resize", onResize);
     window.removeEventListener("scroll", onScrollOrResize, true);
   }
 });
@@ -415,7 +423,7 @@ watch(isOpen, (open) => {
 onBeforeUnmount(() => {
   clearTimers();
   document.removeEventListener("pointerdown", onDocumentPointerDown, true);
-  window.removeEventListener("resize", onScrollOrResize);
+  window.removeEventListener("resize", onResize);
   window.removeEventListener("scroll", onScrollOrResize, true);
   if (openGroupKey.value === props.groupKey) openGroupKey.value = null;
 });
