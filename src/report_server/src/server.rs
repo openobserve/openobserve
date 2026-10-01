@@ -46,15 +46,19 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Falls back to `::` when `addr` isn't a valid IPv6 literal (e.g. the shared IPv4 default).
+/// An IPv4 loopback bind stays on loopback (`::1`); any other non-IPv6 value falls back to `::`.
 fn report_server_ipv6_bind_addr(addr: &str) -> std::net::Ipv6Addr {
     if addr.is_empty() {
         return std::net::Ipv6Addr::UNSPECIFIED;
     }
-    addr.parse().unwrap_or_else(|_| {
-        log::warn!("ZO_REPORT_SERVER_HTTP_ADDR '{addr}' is not a valid IPv6 address; using ::");
-        std::net::Ipv6Addr::UNSPECIFIED
-    })
+    match addr.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V6(ip)) => ip,
+        Ok(std::net::IpAddr::V4(ip)) if ip.is_loopback() => std::net::Ipv6Addr::LOCALHOST,
+        _ => {
+            log::warn!("ZO_REPORT_SERVER_HTTP_ADDR '{addr}' is not a valid IPv6 address; using ::");
+            std::net::Ipv6Addr::UNSPECIFIED
+        }
+    }
 }
 
 async fn shutdown_signal() {
@@ -104,9 +108,17 @@ mod tests {
     }
 
     #[test]
-    fn test_ipv6_bind_addr_ipv4_default_falls_back_to_unspecified() {
+    fn test_ipv6_bind_addr_ipv4_loopback_default_maps_to_ipv6_loopback() {
         assert_eq!(
             report_server_ipv6_bind_addr("127.0.0.1"),
+            std::net::Ipv6Addr::LOCALHOST
+        );
+    }
+
+    #[test]
+    fn test_ipv6_bind_addr_other_ipv4_falls_back_to_unspecified() {
+        assert_eq!(
+            report_server_ipv6_bind_addr("0.0.0.0"),
             std::net::Ipv6Addr::UNSPECIFIED
         );
     }
