@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
@@ -72,6 +72,21 @@ vi.mock("vue-router", async () => {
   return {
     useRoute: () => reactive(routeState),
     useRouter: () => ({ push }),
+  };
+});
+
+// Mutable per case, so the tablet and phone tests can switch while every other test stays desktop.
+const mockViewport = vi.hoisted(() => ({ mdUp: true, lgUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => mockViewport.mdUp && !mockViewport.lgUp),
+      isDesktop: computed(() => mockViewport.lgUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.lgUp),
+    }),
   };
 });
 
@@ -175,9 +190,13 @@ const stubs = {
   ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdownItem: {
     name: "ODropdownItem",
+    props: ["disabled"],
     emits: ["select"],
-    template: `<button @click="$emit('select')"><slot /></button>`,
+    template: `<button :disabled="disabled" @click="$emit('select')"><slot /></button>`,
   },
+  // The compact header's menu uses both; unstubbed they need a reka-ui menu root the ODropdown stub does not provide.
+  ODropdownGroup: { name: "ODropdownGroup", props: ["label"], template: "<div><slot /></div>" },
+  ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
   OToggleGroup: { name: "OToggleGroup", template: "<div><slot /></div>" },
   OToggleGroupItem: {
     name: "OToggleGroupItem",
@@ -1325,6 +1344,91 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       const call = toastSpy.mock.calls.at(-1)![0];
       expect(call.variant).toBe("info");
       expect(String(call.message)).toContain("last step");
+    });
+  });
+
+  /// Seven header buttons wrap to three rows on a tablet or phone, so everything but claiming and closing shares one menu.
+  describe("below the laptop breakpoint", () => {
+    beforeEach(() => {
+      mockViewport.lgUp = false;
+    });
+
+    afterEach(() => {
+      mockViewport.mdUp = true;
+      mockViewport.lgUp = true;
+    });
+
+    it("keeps acknowledge and resolve on the row and folds the rest into one menu", async () => {
+      const wrapper = await renderWith();
+
+      for (const kept of ["ack-btn", "resolve-btn", "more-btn"]) {
+        expect(wrapper.find(`[data-test="oncall-response-${kept}"]`).exists()).toBe(true);
+      }
+      for (const folded of ["escalate-btn", "handoff-btn", "promote-btn"]) {
+        expect(wrapper.find(`[data-test="oncall-response-${folded}"]`).exists()).toBe(false);
+        expect(wrapper.find(`[data-test="oncall-response-${folded}-menu"]`).exists()).toBe(true);
+      }
+      expect(wrapper.find('[data-test="oncall-response-snooze-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-snooze-30-menu"]').exists()).toBe(true);
+    });
+
+    it("snoozes from the menu", async () => {
+      const wrapper = await renderWith();
+      service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+
+      await wrapper.find('[data-test="oncall-response-snooze-30-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(service.snoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+    });
+
+    it("opens the hand-off drawer from the menu", async () => {
+      const wrapper = await renderWith();
+
+      await wrapper.find('[data-test="oncall-response-handoff-btn-menu"]').trigger("click");
+
+      expect(wrapper.find('[data-test="oncall-handoff-submit"]').exists()).toBe(true);
+    });
+
+    /// A greyed-out verb has no tooltip to explain it on touch, so the reason is printed on the item.
+    it("says on the item why escalate is unavailable", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: { fired: [], next_targets: [], next_at: null, exhausted: true },
+      } as any);
+      const wrapper = await renderWith();
+
+      const item = wrapper.find('[data-test="oncall-response-escalate-btn-menu"]');
+      expect(item.attributes("disabled")).toBeDefined();
+      expect(item.text()).toContain("nobody left to escalate to");
+    });
+
+    it("drops the menu when a closed page is already tied to an incident", async () => {
+      const wrapper = await renderWith({
+        state: "resolved",
+        closed_at: 1_700_000_100_000_000,
+        incident_id: "inc_9",
+      });
+
+      expect(wrapper.find('[data-test="oncall-response-more-btn"]').exists()).toBe(false);
+    });
+
+    /// The title row has no room for both the alert's name and its tags, so the tags open the body instead.
+    it("leads the body with the state and elapsed time", async () => {
+      const wrapper = await renderWith();
+
+      const meta = wrapper.find('[data-test="oncall-response-meta"]');
+      expect(meta.find('[data-test="oncall-response-elapsed"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-test="oncall-response-elapsed"]')).toHaveLength(1);
+    });
+
+    it("applies on a phone too", async () => {
+      mockViewport.mdUp = false;
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-more-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-meta"]').exists()).toBe(true);
     });
   });
 });
