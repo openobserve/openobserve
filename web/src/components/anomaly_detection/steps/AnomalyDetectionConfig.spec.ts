@@ -1428,7 +1428,7 @@ describe("anomalyNoticeBadgeKeys", () => {
   );
 });
 
-// Mirrors the server's window-share rules: buckets 1..=288, 0 < recover <= fire <= 100.
+// Mirrors the server's window-share rules: buckets >= 1 within 24h, 0 < recover <= fire <= 100.
 describe("anomalyWindowShareErrors", () => {
   const errors = (cfg: Record<string, unknown>) => anomalyWindowShareErrors(cfg);
   const clean = { buckets: null, fire: null, recover: null };
@@ -1447,7 +1447,7 @@ describe("anomalyWindowShareErrors", () => {
     ).toEqual(clean);
   });
 
-  it.each([0, 289, 2.5, -1])("rejects %s buckets", (n) => {
+  it.each([0, 2.5, -1])("rejects %s buckets", (n) => {
     expect(errors({ alert_window_buckets: n }).buckets).toBe("alerts.anomaly.windowBucketsRange");
   });
 
@@ -1465,7 +1465,11 @@ describe("anomalyWindowShareErrors", () => {
     expect(at(288, 5, "m")).toBeNull();
     expect(at(24, 1, "h")).toBeNull();
     expect(at(25, 1, "h")).toBe("alerts.anomaly.windowBucketsSpan");
-    expect(at(289, 5, "m")).toBe("alerts.anomaly.windowBucketsRange");
+    expect(at(289, 5, "m")).toBe("alerts.anomaly.windowBucketsSpan");
+    // No fixed bucket cap: 1-minute buckets fill a day at 1440.
+    expect(at(720, 1, "m")).toBeNull();
+    expect(at(1440, 1, "m")).toBeNull();
+    expect(at(1441, 1, "m")).toBe("alerts.anomaly.windowBucketsSpan");
     expect(at(2, 1, "d")).toBe("alerts.anomaly.windowBucketsSpan");
     // An unparsable resolution leaves the span to the server.
     expect(at(100, 0, "x")).toBeNull();
@@ -1498,9 +1502,11 @@ describe("anomalyBandGrouping", () => {
     expect(anomalyBandGrouping(null)).toBe("hour_of_week");
   });
 
-  // The trainer falls back to hour of day on a stream holding under 21 days, so the label must say so.
+  // The trainer picks from the data the stream returns: under 21 days hour of day, under 3 days global.
   it("labels hour of week with its data condition, and global as it is", () => {
     expect(anomalyExpectedGroupingKey(300)).toBe("alerts.anomaly.bandGroupingHourOfWeekIfData");
+    const label = String(i18n.global.t("alerts.anomaly.bandGroupingHourOfWeekIfData"));
+    for (const outcome of ["hour of week", "hour of day", "global"]) expect(label).toContain(outcome);
     expect(anomalyExpectedGroupingKey(7200)).toBe("alerts.anomaly.bandGroupingGlobal");
   });
 });

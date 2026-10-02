@@ -163,8 +163,8 @@ describe("AnomalyAlerting - direction and window share", () => {
     expect(w.find('[data-test="anomaly-window-share-hint"]').exists()).toBe(false);
   });
 
-  it("flags a bucket count outside 1 to 288", async () => {
-    const w = await mountComp({ config: makeConfig({ alert_window_buckets: 289 }) });
+  it("flags a bucket count below 1", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_window_buckets: 0 }) });
     expect(w.find('[data-test="anomaly-window-share-error"]').text()).toBe(
       t("alerts.anomaly.windowBucketsRange"),
     );

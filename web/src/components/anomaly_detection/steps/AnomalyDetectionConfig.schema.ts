@@ -120,7 +120,6 @@ export interface AnomalyStoredIntervals {
 
 export type AnomalyBandGrouping = "hour_of_week" | "hour_of_day" | "global";
 
-/** Locale key per grouping, shared by the derived label and the stored `band_grouping`. */
 export const ANOMALY_BAND_GROUPING_KEYS: Record<AnomalyBandGrouping, string> = {
   hour_of_week: "alerts.anomaly.bandGroupingHourOfWeek",
   hour_of_day: "alerts.anomaly.bandGroupingHourOfDay",
@@ -134,7 +133,7 @@ export const ANOMALY_MIN_TRAINING_DAYS = 21;
 export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
   intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "hour_of_week";
 
-/** Pre-training label key: hour of week depends on how much data the stream returns, so it names the fallback. */
+/** Pre-training label key: the trainer groups by the data the stream returns, so the label names every outcome. */
 export const anomalyExpectedGroupingKey = (intervalSeconds: number | null): string =>
   anomalyBandGrouping(intervalSeconds) === "global"
     ? ANOMALY_BAND_GROUPING_KEYS.global
@@ -333,7 +332,7 @@ export const anomalyWindowShareErrors = (
   const recoverRaw = cfg?.alert_window_recover_pct;
   const bucketsOk =
     isBlankNumber(buckets) ||
-    (Number.isInteger(Number(buckets)) && Number(buckets) >= 1 && Number(buckets) <= 288);
+    (Number.isInteger(Number(buckets)) && Number(buckets) >= 1);
   const fire = isBlankNumber(fireRaw) ? 100 : Number(fireRaw);
   const fireOk = Number.isFinite(fire) && fire > 0 && fire <= 100;
   const interval = anomalyIntervalSeconds(
