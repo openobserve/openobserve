@@ -156,15 +156,16 @@ export function generateAnomalySummary(
           }),
         );
       }
-      const directionKey =
-        ANOMALY_DIRECTION_KEYS[config.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both;
-      parts.push(t("alerts.anomaly.summaryDirection", { direction: chip(t(directionKey as any)) }));
-      parts.push(
-        t("alerts.anomaly.summaryWindowShare", {
-          rule: chip(t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(config))),
-        }),
-      );
     }
+    // The gates are configured whether or not notifications are on, so they show either way.
+    const directionKey =
+      ANOMALY_DIRECTION_KEYS[config.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both;
+    parts.push(t("alerts.anomaly.summaryDirection", { direction: chip(t(directionKey as any)) }));
+    parts.push(
+      t("alerts.anomaly.summaryWindowShare", {
+        rule: chip(t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(config))),
+      }),
+    );
   }
 
   const bulletPoints = parts.join("\n");

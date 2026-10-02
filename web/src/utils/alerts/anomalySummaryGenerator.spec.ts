@@ -131,6 +131,20 @@ describe("generateAnomalySummary — band width and delivery", () => {
     expect(generateAnomalySummary(config({ band_width: null }), [], t)).toContain("level 97");
   });
 
+  it("still states direction and window share with notifications off", () => {
+    const summary = generateAnomalySummary(
+      config({ alert_enabled: false, alert_direction: "above", alert_window_buckets: 4 }),
+      [],
+      t,
+    );
+    expect(summary).toContain(String(t("alerts.anomaly.directionAbove" as any)));
+    expect(summary).toContain(
+      String(
+        t("alerts.anomaly.windowShareCompact" as any, { fire: 100, buckets: 4, recover: 100 }),
+      ),
+    );
+  });
+
   it("states direction and window share once alerting is on", () => {
     const summary = generateAnomalySummary(
       config({

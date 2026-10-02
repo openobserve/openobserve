@@ -53,7 +53,6 @@ const ADDED = [
   "alerts.anomaly.sensitivityBalanced",
   "alerts.anomaly.sensitivityAggressive",
   "alerts.anomaly.level",
-  // Mode-aware copy: the budget-mode strings and the per-kind deviation labels.
   "alerts.anomaly.sensitivityBudgetTooltip",
   "alerts.anomaly.budgetHintPerDay",
   "alerts.anomaly.budgetHintPerWeek",
@@ -225,115 +224,115 @@ const STALE_PERCENTILE_PROMISE_TOOLTIPS: Record<string, string> = {
 const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint: string }> = {
   "ar-SA": {
     tooltip:
-      "تُقارن كل فترة بشريط يساوي القيمة المتوقعة ± المستوى × σ، حيث σ هو التشتت المعتاد لتلك الساعة. تُطلق الفترة الواقعة خارج الشريط تنبيهًا. الشريط الأعرض (مستوى أعلى) يرسل تنبيهات أقل، والأضيق يرسل أكثر. تُطبَّق التغييرات دون إعادة تدريب.",
+      "تُقارن كل فترة بشريط يساوي القيمة المتوقعة ± المستوى × σ، حيث σ هو التشتت المعتاد لتلك الساعة. تُعلَّم الفترة الواقعة خارج الشريط على أنها شاذة. الشريط الأعرض (مستوى أعلى) يرسل تنبيهات أقل، والأضيق يرسل أكثر. تُطبَّق التغييرات دون إعادة تدريب.",
     budgetTooltip:
       "الحد الأقصى لعدد التنبيهات التي يمكن لهذا الإعداد إرسالها، ويُفرض عند الإرسال. يستمر الكشف في تقييم كل فترة؛ وعند استنفاد الميزانية تُمنع التنبيهات الإضافية حتى تتجدد.",
-    hint: "تُطلق الفترة تنبيهًا عندما تقع خارج القيمة المتوقعة ± {k}σ.",
+    hint: "تُعلَّم الفترة على أنها شاذة عندما تقع خارج القيمة المتوقعة ± {k}σ.",
   },
   "de-DE": {
     tooltip:
-      "Jeder Bucket wird mit einem Band aus Erwartungswert ± Stufe × σ verglichen, wobei σ die typische Streuung für diese Stunde ist. Ein Bucket außerhalb des Bands löst eine Warnmeldung aus. Ein breiteres Band (höhere Stufe) sendet weniger Warnmeldungen, ein schmaleres mehr. Änderungen gelten ohne erneutes Training.",
+      "Jeder Bucket wird mit einem Band aus Erwartungswert ± Stufe × σ verglichen, wobei σ die typische Streuung für diese Stunde ist. Ein Bucket außerhalb des Bands wird als Anomalie markiert. Ein breiteres Band (höhere Stufe) sendet weniger Warnmeldungen, ein schmaleres mehr. Änderungen gelten ohne erneutes Training.",
     budgetTooltip:
       "Die maximale Zahl von Warnmeldungen, die diese Konfiguration zustellen darf — bei der Zustellung erzwungen. Die Erkennung bewertet weiterhin jeden Bucket; ist das Budget aufgebraucht, werden weitere Warnmeldungen unterdrückt, bis es sich auffüllt.",
-    hint: "Ein Bucket löst eine Warnmeldung aus, wenn er außerhalb von Erwartungswert ± {k}σ liegt.",
+    hint: "Ein Bucket wird markiert, wenn er außerhalb von Erwartungswert ± {k}σ liegt.",
   },
   "en-US": {
     tooltip:
-      "Each bucket is compared with a band of expected ± level × σ, where σ is the typical spread for that hour. A bucket outside the band alerts. A wider band (higher level) sends fewer alerts; a narrower one sends more. Changes apply without retraining.",
+      "Each bucket is compared with a band of expected ± level × σ, where σ is the typical spread for that hour. A bucket outside the band is flagged as anomalous. A wider band (higher level) sends fewer alerts; a narrower one sends more. Changes apply without retraining.",
     budgetTooltip:
       "The maximum number of alerts this configuration may deliver, enforced at delivery. Detection still scores every bucket; once the budget is spent, further alerts are suppressed until it refills.",
-    hint: "A bucket alerts when it falls outside expected ± {k}σ.",
+    hint: "A bucket is flagged when it falls outside expected ± {k}σ.",
   },
   "es-ES": {
     tooltip:
-      "Cada bucket se compara con una banda de esperado ± nivel × σ, donde σ es la dispersión típica de esa hora. Un bucket fuera de la banda genera una alerta. Una banda más ancha (nivel más alto) envía menos alertas; una más estrecha, más. Los cambios se aplican sin reentrenar.",
+      "Cada bucket se compara con una banda de esperado ± nivel × σ, donde σ es la dispersión típica de esa hora. Un bucket fuera de la banda se marca como anómalo. Una banda más ancha (nivel más alto) envía menos alertas; una más estrecha, más. Los cambios se aplican sin reentrenar.",
     budgetTooltip:
       "El número máximo de alertas que esta configuración puede entregar, aplicado en la entrega. La detección sigue puntuando cada bucket; agotado el presupuesto, las alertas adicionales se suprimen hasta que se repone.",
-    hint: "Un bucket genera una alerta cuando queda fuera de esperado ± {k}σ.",
+    hint: "Un bucket se marca cuando queda fuera de esperado ± {k}σ.",
   },
   "fr-FR": {
     tooltip:
-      "Chaque intervalle est comparé à une bande égale à la valeur attendue ± niveau × σ, où σ est la dispersion typique pour cette heure. Un intervalle hors de la bande déclenche une alerte. Une bande plus large (niveau plus élevé) envoie moins d'alertes ; une bande plus étroite en envoie plus. Les modifications s'appliquent sans réentraînement.",
+      "Chaque intervalle est comparé à une bande égale à la valeur attendue ± niveau × σ, où σ est la dispersion typique pour cette heure. Un intervalle hors de la bande est signalé comme anormal. Une bande plus large (niveau plus élevé) envoie moins d'alertes ; une bande plus étroite en envoie plus. Les modifications s'appliquent sans réentraînement.",
     budgetTooltip:
       "Le nombre maximal d'alertes que cette configuration peut délivrer, appliqué à la livraison. La détection continue de noter chaque compartiment ; une fois le budget épuisé, les alertes supplémentaires sont supprimées jusqu'à ce qu'il se reconstitue.",
-    hint: "Un intervalle déclenche une alerte lorsqu'il sort de la valeur attendue ± {k}σ.",
+    hint: "Un intervalle est signalé lorsqu'il sort de la valeur attendue ± {k}σ.",
   },
   "it-IT": {
     tooltip:
-      "Ogni intervallo viene confrontato con una fascia pari al valore previsto ± livello × σ, dove σ è la dispersione tipica per quell'ora. Un intervallo fuori dalla fascia genera un avviso. Una fascia più ampia (livello più alto) invia meno avvisi; una più stretta ne invia di più. Le modifiche si applicano senza riaddestramento.",
+      "Ogni intervallo viene confrontato con una fascia pari al valore previsto ± livello × σ, dove σ è la dispersione tipica per quell'ora. Un intervallo fuori dalla fascia viene segnalato come anomalo. Una fascia più ampia (livello più alto) invia meno avvisi; una più stretta ne invia di più. Le modifiche si applicano senza riaddestramento.",
     budgetTooltip:
       "Il numero massimo di avvisi che questa configurazione può recapitare, applicato al recapito. Il rilevamento continua a valutare ogni bucket; esaurito il budget, gli avvisi ulteriori vengono soppressi finché non si ricarica.",
-    hint: "Un intervallo genera un avviso quando esce dal valore previsto ± {k}σ.",
+    hint: "Un intervallo viene segnalato quando esce dal valore previsto ± {k}σ.",
   },
   "ja-JP": {
     tooltip:
-      "各バケットは予想値 ± レベル × σ の帯と比較されます。σ はその時間帯の典型的なばらつきです。帯の外にあるバケットはアラートを発します。帯を広く (レベルを高く) するとアラートは減り、狭くすると増えます。変更は再学習なしで適用されます。",
+      "各バケットは予想値 ± レベル × σ の帯と比較されます。σ はその時間帯の典型的なばらつきです。帯の外にあるバケットは異常としてフラグされます。帯を広く (レベルを高く) するとアラートは減り、狭くすると増えます。変更は再学習なしで適用されます。",
     budgetTooltip:
       "この設定が配信できるアラートの上限で、配信時に強制されます。検出はすべてのバケットをスコアリングし続けます。予算を使い切ると、回復するまで追加のアラートは抑制されます。",
-    hint: "バケットが予想値 ± {k}σ の外に出るとアラートを発します。",
+    hint: "バケットが予想値 ± {k}σ の外に出ると異常としてフラグされます。",
   },
   "ko-KR": {
     tooltip:
-      "각 버킷은 예상값 ± 수준 × σ 띠와 비교되며, σ는 해당 시간대의 일반적인 산포입니다. 띠 밖에 있는 버킷은 알림을 보냅니다. 띠가 넓을수록(수준이 높을수록) 알림이 줄고, 좁을수록 늘어납니다. 변경 사항은 재학습 없이 적용됩니다.",
+      "각 버킷은 예상값 ± 수준 × σ 띠와 비교되며, σ는 해당 시간대의 일반적인 산포입니다. 띠 밖에 있는 버킷은 이상으로 표시됩니다. 띠가 넓을수록(수준이 높을수록) 알림이 줄고, 좁을수록 늘어납니다. 변경 사항은 재학습 없이 적용됩니다.",
     budgetTooltip:
       "이 구성이 전달할 수 있는 알림의 최대 개수로, 전달 시점에 강제됩니다. 감지는 모든 버킷을 계속 채점하며, 예산이 소진되면 회복될 때까지 추가 알림이 억제됩니다.",
-    hint: "버킷이 예상값 ± {k}σ를 벗어나면 알림을 보냅니다.",
+    hint: "버킷이 예상값 ± {k}σ를 벗어나면 이상으로 표시됩니다.",
   },
   "nl-NL": {
     tooltip:
-      "Elk interval wordt vergeleken met een band van verwachte waarde ± niveau × σ, waarbij σ de typische spreiding voor dat uur is. Een interval buiten de band geeft een waarschuwing. Een bredere band (hoger niveau) stuurt minder waarschuwingen, een smallere meer. Wijzigingen gelden zonder opnieuw te trainen.",
+      "Elk interval wordt vergeleken met een band van verwachte waarde ± niveau × σ, waarbij σ de typische spreiding voor dat uur is. Een interval buiten de band wordt als afwijkend gemarkeerd. Een bredere band (hoger niveau) stuurt minder waarschuwingen, een smallere meer. Wijzigingen gelden zonder opnieuw te trainen.",
     budgetTooltip:
       "Het maximale aantal meldingen dat deze configuratie mag bezorgen, afgedwongen bij bezorging. Detectie blijft elke bucket scoren; is het budget op, dan worden verdere meldingen onderdrukt tot het zich aanvult.",
-    hint: "Een interval geeft een waarschuwing als het buiten verwachte waarde ± {k}σ valt.",
+    hint: "Een interval wordt gemarkeerd als het buiten verwachte waarde ± {k}σ valt.",
   },
   "pl-PL": {
     tooltip:
-      "Każdy przedział jest porównywany z pasem wartość oczekiwana ± poziom × σ, gdzie σ to typowy rozrzut dla danej godziny. Przedział poza pasem wywołuje alert. Szerszy pas (wyższy poziom) wysyła mniej alertów, węższy więcej. Zmiany obowiązują bez ponownego trenowania.",
+      "Każdy przedział jest porównywany z pasem wartość oczekiwana ± poziom × σ, gdzie σ to typowy rozrzut dla danej godziny. Przedział poza pasem jest oznaczany jako anomalia. Szerszy pas (wyższy poziom) wysyła mniej alertów, węższy więcej. Zmiany obowiązują bez ponownego trenowania.",
     budgetTooltip:
       "Maksymalna liczba alertów, jaką ta konfiguracja może dostarczyć, egzekwowana przy dostarczaniu. Wykrywanie nadal ocenia każdy przedział; po wyczerpaniu budżetu kolejne alerty są wstrzymywane, aż budżet się odnowi.",
-    hint: "Przedział wywołuje alert, gdy wychodzi poza wartość oczekiwaną ± {k}σ.",
+    hint: "Przedział jest oznaczany, gdy wychodzi poza wartość oczekiwaną ± {k}σ.",
   },
   "pt-PT": {
     tooltip:
-      "Cada intervalo é comparado com uma faixa de valor esperado ± nível × σ, em que σ é a dispersão típica dessa hora. Um intervalo fora da faixa gera um alerta. Uma faixa mais larga (nível mais alto) envia menos alertas; uma mais estreita envia mais. As alterações aplicam-se sem novo treino.",
+      "Cada intervalo é comparado com uma faixa de valor esperado ± nível × σ, em que σ é a dispersão típica dessa hora. Um intervalo fora da faixa é assinalado como anómalo. Uma faixa mais larga (nível mais alto) envia menos alertas; uma mais estreita envia mais. As alterações aplicam-se sem novo treino.",
     budgetTooltip:
       "O número máximo de alertas que esta configuração pode entregar, aplicado na entrega. A deteção continua a pontuar todos os buckets; esgotado o orçamento, os alertas adicionais são suprimidos até ele se repor.",
-    hint: "Um intervalo gera um alerta quando sai do valor esperado ± {k}σ.",
+    hint: "Um intervalo é assinalado quando sai do valor esperado ± {k}σ.",
   },
   "ru-RU": {
     tooltip:
-      "Каждый интервал сравнивается с полосой «ожидаемое значение ± уровень × σ», где σ — типичный разброс для этого часа. Интервал за пределами полосы вызывает оповещение. Более широкая полоса (более высокий уровень) даёт меньше оповещений, более узкая — больше. Изменения применяются без переобучения.",
+      "Каждый интервал сравнивается с полосой «ожидаемое значение ± уровень × σ», где σ — типичный разброс для этого часа. Интервал за пределами полосы помечается как аномальный. Более широкая полоса (более высокий уровень) даёт меньше оповещений, более узкая — больше. Изменения применяются без переобучения.",
     budgetTooltip:
       "Максимальное число оповещений, которое эта конфигурация может доставить; ограничение применяется при доставке. Обнаружение продолжает оценивать каждый бакет; когда бюджет исчерпан, дальнейшие оповещения подавляются, пока он не восстановится.",
-    hint: "Интервал вызывает оповещение, когда выходит за пределы ожидаемого значения ± {k}σ.",
+    hint: "Интервал помечается, когда выходит за пределы ожидаемого значения ± {k}σ.",
   },
   "tr-TR": {
     tooltip:
-      "Her aralık, beklenen ± seviye × σ bandıyla karşılaştırılır; σ o saat için tipik yayılımdır. Bandın dışındaki bir aralık uyarı tetikler. Daha geniş bir bant (daha yüksek seviye) daha az uyarı, daha dar bir bant daha fazla uyarı gönderir. Değişiklikler yeniden eğitim olmadan uygulanır.",
+      "Her aralık, beklenen ± seviye × σ bandıyla karşılaştırılır; σ o saat için tipik yayılımdır. Bandın dışındaki bir aralık anormal olarak işaretlenir. Daha geniş bir bant (daha yüksek seviye) daha az uyarı, daha dar bir bant daha fazla uyarı gönderir. Değişiklikler yeniden eğitim olmadan uygulanır.",
     budgetTooltip:
       "Bu yapılandırmanın teslim edebileceği en fazla uyarı sayısı; teslimde uygulanır. Algılama her aralığı puanlamaya devam eder; bütçe tükenince, yenilenene kadar ek uyarılar bastırılır.",
-    hint: "Bir aralık beklenen ± {k}σ dışına çıktığında uyarı verir.",
+    hint: "Bir aralık beklenen ± {k}σ dışına çıktığında işaretlenir.",
   },
   "vi-VN": {
     tooltip:
-      "Mỗi khoảng được so sánh với dải giá trị dự kiến ± mức × σ, trong đó σ là độ phân tán điển hình của giờ đó. Khoảng nằm ngoài dải sẽ kích hoạt cảnh báo. Dải rộng hơn (mức cao hơn) gửi ít cảnh báo hơn; dải hẹp hơn gửi nhiều hơn. Thay đổi được áp dụng mà không cần huấn luyện lại.",
+      "Mỗi khoảng được so sánh với dải giá trị dự kiến ± mức × σ, trong đó σ là độ phân tán điển hình của giờ đó. Khoảng nằm ngoài dải sẽ được gắn cờ là bất thường. Dải rộng hơn (mức cao hơn) gửi ít cảnh báo hơn; dải hẹp hơn gửi nhiều hơn. Thay đổi được áp dụng mà không cần huấn luyện lại.",
     budgetTooltip:
       "Số cảnh báo tối đa mà cấu hình này được phép gửi, được áp đặt khi gửi. Việc phát hiện vẫn chấm điểm mọi bucket; khi ngân sách cạn, các cảnh báo tiếp theo bị chặn cho đến khi ngân sách hồi phục.",
-    hint: "Một khoảng sẽ cảnh báo khi nằm ngoài giá trị dự kiến ± {k}σ.",
+    hint: "Một khoảng sẽ được gắn cờ khi nằm ngoài giá trị dự kiến ± {k}σ.",
   },
   "zh-CN": {
     tooltip:
-      "每个时间桶都会与“预期值 ± 级别 × σ”的带进行比较，其中 σ 是该小时的典型离散度。落在带外的时间桶会触发告警。带越宽（级别越高），告警越少；带越窄，告警越多。更改无需重新训练即可生效。",
+      "每个时间桶都会与“预期值 ± 级别 × σ”的带进行比较，其中 σ 是该小时的典型离散度。落在带外的时间桶会被标记为异常。带越宽（级别越高），告警越少；带越窄，告警越多。更改无需重新训练即可生效。",
     budgetTooltip:
       "此配置可投递告警的上限，在投递时强制执行。检测仍会为每个数据桶评分；预算用尽后，多余的告警将被抑制，直到预算恢复。",
-    hint: "当时间桶超出预期值 ± {k}σ 时会触发告警。",
+    hint: "当时间桶超出预期值 ± {k}σ 时会被标记为异常。",
   },
   "zh-TW": {
     tooltip:
-      "每個時間桶都會與「預期值 ± 級別 × σ」的帶比較，其中 σ 是該小時的典型離散度。落在帶外的時間桶會觸發警示。帶越寬（級別越高），警示越少；帶越窄，警示越多。變更不需重新訓練即可生效。",
+      "每個時間桶都會與「預期值 ± 級別 × σ」的帶比較，其中 σ 是該小時的典型離散度。落在帶外的時間桶會被標記為異常。帶越寬（級別越高），警示越少；帶越窄，警示越多。變更不需重新訓練即可生效。",
     budgetTooltip:
       "此設定可傳送警示的上限，於傳送時強制執行。偵測仍會為每個區間評分；預算用盡後，多餘的警示會被抑制，直到預算回復。",
-    hint: "當時間桶超出預期值 ± {k}σ 時會觸發警示。",
+    hint: "當時間桶超出預期值 ± {k}σ 時會被標記為異常。",
   },
 };
 
