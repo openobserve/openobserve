@@ -1455,7 +1455,6 @@ async fn handle_anomaly_detection_triggers(
     // processed by the training scheduler yet, or processed but status not yet
     // flipped), move it to Active so the UI reflects the real state.
     #[cfg(feature = "enterprise")]
-    // "Detection ran cleanly" is Firing, NotifyFailed or Normal: the model executed in each.
     if matches!(
         trigger_status,
         RunOutcome::Firing | RunOutcome::NotifyFailed | RunOutcome::Normal
