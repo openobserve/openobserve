@@ -12717,6 +12717,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Por quê",
+      "noReasoning": "Nenhum raciocínio registrado para esta pontuação.",
       "scoredAt": "Pontuado {time}",
       "moreCount": "+{count} mais",
       "allScores": "Todas as pontuações ({count})"
@@ -13142,6 +13143,18 @@
         "usedByIntro": "Tarefas e experimentos que fazem referência a este avaliador.",
         "usedByEmpty": "Ainda não há tarefas ou experimentos que referenciem este avaliador.",
         "usedByExperiment": "Experimento",
+        "versions": {
+          "empty": "Nenhuma versão encontrada para este pontuador.",
+          "template": "Modelo",
+          "fields": {
+            "description": "Descrição",
+            "variables": "Variáveis",
+            "params": "Parâmetros",
+            "producesScoreConfig": "Configuração de pontuação",
+            "referenceBased": "Baseado em referência",
+            "outputSchema": "Esquema de saída"
+          }
+        },
         "lastUpdated": "Última atualização",
         "metadataSection": "Metadados",
         "createdLabel": "Criado",

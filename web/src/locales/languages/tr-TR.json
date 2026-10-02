@@ -12717,6 +12717,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Neden",
+      "noReasoning": "Bu puan için gerekçe kaydedilmedi.",
       "scoredAt": "Puanlandı: {time}",
       "moreCount": "+{count} daha",
       "allScores": "Tüm puanlar ({count})"
@@ -13142,6 +13143,18 @@
         "usedByIntro": "Bu puanlayıcıya referans veren işler ve deneyler.",
         "usedByEmpty": "Henüz bu puanlayıcıya referans veren iş veya deney yok.",
         "usedByExperiment": "Deney",
+        "versions": {
+          "empty": "Bu puanlayıcı için sürüm bulunamadı.",
+          "template": "Şablon",
+          "fields": {
+            "description": "Açıklama",
+            "variables": "Değişkenler",
+            "params": "Parametreler",
+            "producesScoreConfig": "Puan Yapılandırması",
+            "referenceBased": "Referans Tabanlı",
+            "outputSchema": "Çıktı Şeması"
+          }
+        },
         "lastUpdated": "Son güncelleme",
         "metadataSection": "Meta Veri",
         "createdLabel": "Oluşturuldu",

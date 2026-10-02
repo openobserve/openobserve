@@ -12717,6 +12717,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Pourquoi",
+      "noReasoning": "Aucun raisonnement enregistré pour ce score.",
       "scoredAt": "Noté {time}",
       "moreCount": "+{count} de plus",
       "allScores": "Tous les scores ({count})"
@@ -13142,6 +13143,18 @@
         "usedByIntro": "Tâches et expériences qui référencent ce scorer.",
         "usedByEmpty": "Aucune tâche ni expérience ne référence encore ce scorer.",
         "usedByExperiment": "Expérience",
+        "versions": {
+          "empty": "Aucune version trouvée pour ce scorer.",
+          "template": "Modèle",
+          "fields": {
+            "description": "Description",
+            "variables": "Variables",
+            "params": "Paramètres",
+            "producesScoreConfig": "Configuration du score",
+            "referenceBased": "Basé sur référence",
+            "outputSchema": "Schéma de sortie"
+          }
+        },
         "lastUpdated": "Dernière mise à jour",
         "metadataSection": "Métadonnées",
         "createdLabel": "Créé",

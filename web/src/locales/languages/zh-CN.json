@@ -12717,6 +12717,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "为什么",
+      "noReasoning": "未记录此评分的推理过程。",
       "scoredAt": "评分于 {time}",
       "moreCount": "+{count} 更多",
       "allScores": "所有评分 ({count})"
@@ -13142,6 +13143,18 @@
         "usedByIntro": "引用此评分器的作业和实验。",
         "usedByEmpty": "尚无作业或实验引用此评分器。",
         "usedByExperiment": "实验",
+        "versions": {
+          "empty": "未找到此评分器的版本。",
+          "template": "模板",
+          "fields": {
+            "description": "描述",
+            "variables": "变量",
+            "params": "参数",
+            "producesScoreConfig": "评分配置",
+            "referenceBased": "基于参考",
+            "outputSchema": "输出模式"
+          }
+        },
         "lastUpdated": "最后更新",
         "metadataSection": "元数据",
         "createdLabel": "创建于",

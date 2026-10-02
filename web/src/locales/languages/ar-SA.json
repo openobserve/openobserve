@@ -12717,6 +12717,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "لماذا",
+      "noReasoning": "لم يُسجَّل أي تعليل لهذه النتيجة.",
       "scoredAt": "تم التقييم {time}",
       "moreCount": "+{count} أخرى",
       "allScores": "جميع النتائج ({count})"
@@ -13142,6 +13143,18 @@
         "usedByIntro": "المهام والتجارب التي تشير إلى هذا المُقيِّم.",
         "usedByEmpty": "لا توجد مهام أو تجارب تشير إلى هذا المُقيِّم بعد.",
         "usedByExperiment": "تجربة",
+        "versions": {
+          "empty": "لم يتم العثور على أي إصدارات لهذا المقيّم.",
+          "template": "القالب",
+          "fields": {
+            "description": "الوصف",
+            "variables": "المتغيرات",
+            "params": "المعاملات",
+            "producesScoreConfig": "تكوين النتيجة",
+            "referenceBased": "قائم على المرجع",
+            "outputSchema": "مخطط الإخراج"
+          }
+        },
         "lastUpdated": "آخر تحديث",
         "metadataSection": "البيانات الوصفية",
         "createdLabel": "تأسيس",

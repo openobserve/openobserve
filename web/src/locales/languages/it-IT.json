@@ -12717,6 +12717,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Perché",
+      "noReasoning": "Nessuna motivazione registrata per questo punteggio.",
       "scoredAt": "Valutato {time}",
       "moreCount": "+{count} altri",
       "allScores": "Tutti i punteggi ({count})"
@@ -13142,6 +13143,18 @@
         "usedByIntro": "Job ed esperimenti che fanno riferimento a questo scorer.",
         "usedByEmpty": "Nessun job o esperimento fa ancora riferimento a questo scorer.",
         "usedByExperiment": "Esperimento",
+        "versions": {
+          "empty": "Nessuna versione trovata per questo scorer.",
+          "template": "Template",
+          "fields": {
+            "description": "Descrizione",
+            "variables": "Variabili",
+            "params": "Parametri",
+            "producesScoreConfig": "Configurazione punteggio",
+            "referenceBased": "Basato su riferimento",
+            "outputSchema": "Schema di output"
+          }
+        },
         "lastUpdated": "Ultimo aggiornamento",
         "metadataSection": "Metadati",
         "createdLabel": "Creato",

@@ -13446,7 +13446,18 @@
         "usedByExperiment": "72bf6e495cc8a5b5",
         "usedByIntro": "790d230e7947d01a",
         "variablesSuffix": "7af0b3e47c35820f",
-        "versionsIntro": "cf7ef0f4ba338da3"
+        "versions": {
+          "empty": "c5b9b51d51541459",
+          "fields": {
+            "description": "526e0087cc3f254d",
+            "outputSchema": "21e3cb67113e1770",
+            "params": "e68b36b17cbd9908",
+            "producesScoreConfig": "84039a14d5ad9a94",
+            "referenceBased": "6d8da6a187890423",
+            "variables": "02db55bac5e3f7ce"
+          },
+          "template": "0575f29df888a27e"
+        }
       },
       "editTitleLlm": "98f8f724b53567cc",
       "editTitleRemote": "0d47f046ba636cca",
@@ -13635,6 +13646,7 @@
     "traceScoreChip": {
       "allScores": "1e99f88511c40151",
       "moreCount": "ecccea94c62457a7",
+      "noReasoning": "08eb3dcea6dc1659",
       "reasoning": "d3ae14a50bfe463f",
       "scoredAt": "49f475a142832d91"
     },
