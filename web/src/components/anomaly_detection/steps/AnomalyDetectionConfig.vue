@@ -204,8 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="detection_function"
                 :options="detectionFunctions"
                 data-test="anomaly-detection-function"
-                class="alert-v3-select"
-                style="width: 6.875rem"
+                class="alert-v3-select max-w-27.5 min-w-27.5"
                 @update:model-value="onDetectionFunctionChange"
               />
               <OFormSelect
@@ -217,8 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :loading="loadingFields"
                 data-test="anomaly-detection-function-field"
-                class="alert-v3-select"
-                style="width: 8.75rem"
+                class="alert-v3-select max-w-35 min-w-24 flex-1"
               >
                 <template #empty>
                   <div class="text-muted-foreground px-3 py-2">

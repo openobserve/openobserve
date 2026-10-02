@@ -174,7 +174,7 @@ test.describe('Anomaly Detection', () => {
   });
 
   // ════════════════════════════════════════════════════════════════════════
-  // Sensitivity — tier toggle and percentile input share the `threshold` field
+  // Sensitivity — tier toggle and level input share the `band_width` field (k, in σ)
   // ════════════════════════════════════════════════════════════════════════
 
   test.describe('Sensitivity', () => {
@@ -188,52 +188,56 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.cancel();
     });
 
-    test('each tier writes its percentile into the shared threshold field', {
+    test('each tier writes its band width into the shared level field', {
       tag: ['@anomaly', '@P0', '@smoke', '@all'],
     }, async () => {
-      for (const [tier, percentile] of [[99, '99'], [97, '97'], [95, '95']]) {
+      for (const [tier, level] of [[4, '4'], [3, '3'], [2.5, '2.5']]) {
         await pm.anomalyDetectionPage.selectSensitivityTier(tier);
-        expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe(percentile);
+        expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe(level);
         expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(tier);
       }
     });
 
-    test('typing a tier percentile lights that tier up', {
+    test('a new alert starts at Balanced, 3σ', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setSensitivityPercentile(95);
-      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(95);
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('3');
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(3);
     });
 
-    test('an off-tier percentile is accepted with no tier selected', {
+    test('typing a tier value lights that tier up', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setSensitivityPercentile(88);
+      await pm.anomalyDetectionPage.setSensitivityLevel(2.5);
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(2.5);
+    });
+
+    test('an off-tier level is accepted with no tier selected', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setSensitivityLevel(3.5);
       await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeHidden();
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBeNull();
     });
 
-    test('the hint names the percentile the buckets are judged against', {
+    test('the hint names the band the buckets are judged against', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
-      await pm.anomalyDetectionPage.selectSensitivityTier(97);
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
 
       const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
       await expect(hint).toBeVisible();
-      await expect(hint).toContainText('97%');
+      await expect(hint).toContainText('± 3σ');
 
-      // The number is interpolated, not baked into the string: a stale hint would keep 97.
-      await pm.anomalyDetectionPage.selectSensitivityTier(99);
-      await expect(hint).toContainText('99%');
+      // The number is interpolated, not baked into the string: a stale hint would keep 3.
+      await pm.anomalyDetectionPage.selectSensitivityTier(4);
+      await expect(hint).toContainText('± 4σ');
     });
 
-    // The hint deliberately states no flag rate: the bar is the p-mark of the model's own
-    // training scores, so how many alerts it yields depends on the data, not the resolution.
     test('the hint does not vary with the resolution', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.selectSensitivityTier(97);
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
       const atFiveMinutes = await pm.anomalyDetectionPage.getSensitivityHintLocator().textContent();
 
@@ -241,41 +245,32 @@ test.describe('Anomaly Detection', () => {
       await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toHaveText(atFiveMinutes);
     });
 
-    for (const [label, value] of [['below the floor', 49], ['above the ceiling', 100], ['fractional', 97.5]]) {
-      test(`rejects a ${label} percentile`, {
+    for (const [label, value] of [['below the floor', 0.5], ['above the ceiling', 10.5]]) {
+      test(`rejects a ${label} band width`, {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async () => {
-        await pm.anomalyDetectionPage.setSensitivityPercentile(value);
+        await pm.anomalyDetectionPage.setSensitivityLevel(value);
         await pm.anomalyDetectionPage.save();
         await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toHaveText(
-          'Enter a whole number between 50 and 99',
+          'Enter a band width from 1 to 10.',
         );
       });
     }
 
-    test('the hint is suppressed while the percentile is invalid', {
+    test('the hint is suppressed while the level is invalid', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setSensitivityPercentile(49);
+      await pm.anomalyDetectionPage.setSensitivityLevel(0.5);
       await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
     });
 
-    test('the percentile control is labeled Level and disowns the detection-function meaning', {
+    test('the level control is labeled Level and measured in σ', {
       tag: ['@anomaly', '@P0', '@smoke', '@all'],
     }, async () => {
-      const label = pm.anomalyDetectionPage.getSensitivityPercentileLabelLocator();
+      const label = pm.anomalyDetectionPage.getSensitivityLevelLabelLocator();
       await expect(label).toBeVisible();
       await expect(label).toHaveText('Level');
-      await expect(label).not.toContainText('Percentile');
-
-      const info = pm.anomalyDetectionPage.getSensitivityPercentileInfoLocator();
-      await expect(info).toBeVisible();
-
-      await info.hover();
-      const tooltip = pm.anomalyDetectionPage.getTooltipContentLocator();
-      await expect(tooltip).toBeVisible();
-      await expect(tooltip).toContainText('confidence');
-      await expect(tooltip).toContainText('Detection Function');
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toContainText('σ');
     });
   });
 
@@ -517,7 +512,7 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
         await pm.anomalyDetectionPage.setTrainingWindow(7);
         await pm.anomalyDetectionPage.selectRetrainInterval(7);
-        await pm.anomalyDetectionPage.selectSensitivityTier(97);
+        await pm.anomalyDetectionPage.selectSensitivityTier(3);
 
         await pm.anomalyDetectionPage.openAlertingTab();
         await pm.anomalyDetectionPage.toggleNotifications(true);
@@ -565,7 +560,7 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.openAddAnomalyWizard();
         await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
         await pm.anomalyDetectionPage.openConfigTab();
-        await pm.anomalyDetectionPage.selectSensitivityTier(97);
+        await pm.anomalyDetectionPage.selectSensitivityTier(3);
         await pm.anomalyDetectionPage.openAlertingTab();
         await pm.anomalyDetectionPage.toggleNotifications(false);
         await pm.anomalyDetectionPage.saveAndExpectSuccess();
@@ -578,10 +573,10 @@ test.describe('Anomaly Detection', () => {
         await expect(pm.anomalyDetectionPage.getNameValueLocator()).toContainText(name);
 
         await pm.anomalyDetectionPage.openConfigTab();
-        // The percentile readback only exists where the tier controls do; on
+        // The level readback only exists where the tier controls do; on
         // older builds the edit-load path is still covered by the name above.
         if (await pm.anomalyDetectionPage.hasSensitivityTiers()) {
-          expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe('97');
+          expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('3');
         }
 
         await pm.anomalyDetectionPage.cancel();
@@ -883,7 +878,7 @@ test.describe('Anomaly Detection', () => {
       // so a 1h look-back would cap the query short of it.
       await pm.anomalyDetectionPage.setDetectionWindow(2, 'h');
       await pm.anomalyDetectionPage.setTrainingWindow(1);
-      await pm.anomalyDetectionPage.selectSensitivityTier(95);
+      await pm.anomalyDetectionPage.selectSensitivityTier(2.5);
 
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);
@@ -1015,7 +1010,7 @@ test.describe('Anomaly Detection', () => {
       return name;
     };
 
-    test('budget controls replace the percentile tier when a config carries a budget', {
+    test('budget controls replace the band-width tier when a config carries a budget', {
       tag: ['@anomaly', '@P0', '@smoke', '@all'],
     }, async ({ page }) => {
       const name = await ownConfig(page, 'budget', 4);
@@ -1025,7 +1020,7 @@ test.describe('Anomaly Detection', () => {
       await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeVisible();
       expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('4');
       expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('day');
-      await expect(pm.anomalyDetectionPage.getPercentileTierLocator()).toBeHidden();
+      await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeHidden();
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -1111,16 +1106,20 @@ test.describe('Anomaly Detection', () => {
       expect(saved.alert_budget_per_day).toBe(4);
     });
 
-    test('a config without a budget still renders the percentile tier', {
+    test('a config without a budget renders the band-width tier, prefilled from training or 3', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async ({ page }) => {
       const name = await ownConfig(page, 'nobudget');
       await pm.anomalyDetectionPage.openEdit(name);
       await pm.anomalyDetectionPage.openConfigTab();
 
-      await expect(pm.anomalyDetectionPage.getPercentileTierLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeVisible();
       await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeHidden();
-      expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe('97');
+      // No band_width on an API-created config: the level is band_k rounded to 0.5, or 3 before training.
+      const level = Number(await pm.anomalyDetectionPage.getSensitivityLevel());
+      expect(level).toBeGreaterThanOrEqual(1);
+      expect(level).toBeLessThanOrEqual(10);
+      expect(level * 2).toBe(Math.round(level * 2));
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -1167,16 +1166,16 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.cancel();
     });
 
-    test('budget mode does not render the percentile info tooltip', {
+    test('budget mode does not render the band-width level control', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async ({ page }) => {
       const name = await ownConfig(page, 'budgetinfo', 4);
       await pm.anomalyDetectionPage.openEdit(name);
       await pm.anomalyDetectionPage.openConfigTab();
 
-      // The Level label + its info icon belong to percentile mode only.
+      // The server rejects band_width beside a budget, so the level control belongs to band mode only.
       await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeVisible();
-      await expect(pm.anomalyDetectionPage.getSensitivityPercentileInfoLocator()).toBeHidden();
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
 
       await pm.anomalyDetectionPage.cancel();
     });

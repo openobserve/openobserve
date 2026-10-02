@@ -56,8 +56,8 @@ class AnomalyDetectionPage {
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
             detectionFunction: '[data-test="anomaly-detection-function"]',
-            // The Detection Function info icon renders as a bare OIcon (no data-test,
-            // unlike the sensitivity info icon), so anchor on the label and take the
+            // The Detection Function info icon renders as a bare OIcon (no data-test),
+            // so anchor on the label and take the
             // cursor-pointer icon span — the OTooltip's hidden anchor span (also
             // aria-hidden) has no cursor-pointer class and is excluded.
             detectionFunctionInfo:
@@ -75,12 +75,11 @@ class AnomalyDetectionPage {
             trainingWindow: '[data-test="anomaly-training-window"]',
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
             sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
-            sensitivityPercentile: '[data-test="anomaly-sensitivity-percentile"]',
-            sensitivityPercentileInfo: '[data-test="anomaly-sensitivity-percentile-info"]',
+            sensitivityLevel: '[data-test="anomaly-sensitivity-level"]',
             sensitivityError: '[data-test="anomaly-sensitivity-error"]',
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
             // Budget mode (edit-only sensitivity): renders when the config
-            // carries alert_budget_per_day, replacing the percentile tier.
+            // carries alert_budget_per_day, replacing the band-width tier.
             budgetTiers: '[data-test="anomaly-budget-tiers"]',
             budgetCount: '[data-test="anomaly-budget-count"]',
             budgetPeriod: '[data-test="anomaly-budget-period"]',
@@ -120,7 +119,7 @@ class AnomalyDetectionPage {
             rowTriggerDetection: (name) => `[data-test="alert-list-${name}-trigger-detection"]`,
             rowRetrain: (name) => `[data-test="alert-list-${name}-retrain-anomaly"]`,
 
-            sensitivityTierItem: (pct) => `[data-test="anomaly-sensitivity-tier-${pct}"]`,
+            sensitivityTierItem: (k) => `[data-test="anomaly-sensitivity-tier-${k}"]`,
             budgetTierItem: (value) => `[data-test="anomaly-budget-tier-${value}"]`,
             queryTab: (mode) => `[data-test="anomaly-query-tab-${mode}"]`,
             filterField: (idx) => `[data-test="anomaly-filter-field-${idx}"]`,
@@ -453,17 +452,17 @@ class AnomalyDetectionPage {
     // Sensitivity
 
     /**
-     * Pick a sensitivity tier.
+     * Pick a sensitivity tier: Conservative 4, Balanced 3, Aggressive 2.5 (band width in σ).
      *
      * The tier toggle arrived with the anomaly revamp; builds before it expose a
      * plain threshold slider instead. Left at its default there so the flows
      * that merely pass through this step still run.
      *
-     * @param {95|97|99} percentile
+     * @param {4|3|2.5} k
      * @returns {Promise<boolean>} whether the tier control was present
      */
-    async selectSensitivityTier(percentile) {
-        const tier = this.page.locator(this.selectors.sensitivityTierItem(percentile));
+    async selectSensitivityTier(k) {
+        const tier = this.page.locator(this.selectors.sensitivityTierItem(k));
         if (!(await tier.count())) {
             testLogger.info('Sensitivity tiers absent on this build; keeping the default threshold');
             return false;
@@ -472,18 +471,18 @@ class AnomalyDetectionPage {
         return true;
     }
 
-    /** True when the build exposes the revamped tier/percentile sensitivity controls. */
+    /** True when the build exposes the tier/level sensitivity controls. */
     async hasSensitivityTiers() {
         return (await this.page.locator(this.selectors.sensitivityTier).count()) > 0;
     }
 
-    /** Tier toggle and percentile input share the `threshold` field. */
-    async setSensitivityPercentile(percentile) {
-        await this.fillFormInput(this.selectors.sensitivityPercentile, percentile);
+    /** Tier toggle and level input share the `band_width` field. */
+    async setSensitivityLevel(k) {
+        await this.fillFormInput(this.selectors.sensitivityLevel, k);
     }
 
-    async getSensitivityPercentile() {
-        return this.getFormInputValue(this.selectors.sensitivityPercentile);
+    async getSensitivityLevel() {
+        return this.getFormInputValue(this.selectors.sensitivityLevel);
     }
 
     async getActiveSensitivityTier() {
@@ -503,18 +502,13 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.sensitivityError);
     }
 
-    /** The info icon beside the percentile label ("Level" disambiguation). */
-    getSensitivityPercentileInfoLocator() {
-        return this.page.locator(this.selectors.sensitivityPercentileInfo);
+    getSensitivityLevelLocator() {
+        return this.page.locator(this.selectors.sensitivityLevel);
     }
 
-    /**
-     * The inline percentile label span ("Level"). It carries no data-test, so
-     * anchor it as the info icon's parent — the icon is a child of the label,
-     * not a sibling.
-     */
-    getSensitivityPercentileLabelLocator() {
-        return this.page.locator(this.selectors.sensitivityPercentileInfo).locator('xpath=..');
+    /** The inline "Level" label span; it carries no data-test and sits just before the input. */
+    getSensitivityLevelLabelLocator() {
+        return this.page.locator(this.selectors.sensitivityLevel).locator('xpath=preceding-sibling::span[1]');
     }
 
     // Budget mode (edit-only sensitivity)
@@ -554,7 +548,7 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.budgetTiers);
     }
 
-    getPercentileTierLocator() {
+    getSensitivityTierLocator() {
         return this.page.locator(this.selectors.sensitivityTier);
     }
 
