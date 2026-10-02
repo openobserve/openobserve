@@ -3470,7 +3470,7 @@ pub async fn enable_alert_bulk(
     tag = "Alerts",
     operation_id = "TriggerAlert",
     summary = "Manually trigger alert",
-    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring.",
+    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. For an anomaly detection alert it runs detection now and returns `message`, `claim_lost`, `anomaly_id`, `anomalies_found`, `points_scored` and `anomalies`; `claim_lost: true` means another detection run for this alert is in progress, so nothing was scored.",
     security(
         ("Authorization"= [])
     ),
@@ -3480,7 +3480,7 @@ pub async fn enable_alert_bulk(
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success; for an anomaly alert, the detection result (see description)", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -3542,8 +3542,7 @@ pub async fn trigger_alert(
                 )
                 .await
                 {
-                    // The core reply carries `claim_lost`, so an in-flight run is not shown as
-                    // fresh.
+                    // The reply carries `claim_lost`, so an in-flight run is not shown as fresh.
                     Ok(result) => MetaHttpResponse::json(result),
                     Err(e) => {
                         let msg = e.to_string().to_lowercase();

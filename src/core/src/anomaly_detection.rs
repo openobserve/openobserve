@@ -1396,7 +1396,7 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
     anyhow::bail!("Anomaly detection is an enterprise feature")
 }
 
-/// Run detection for a configuration
+/// Run detection now; `claim_lost: true` in the reply means another run holds the lease.
 pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
     let db = get_orm_client_ro().await;
 
