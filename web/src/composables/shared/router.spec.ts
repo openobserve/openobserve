@@ -341,6 +341,26 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("parentRoutes — /signup", () => {
+    it("redirects to /login with mode=signup", () => {
+      const { parentRoutes } = useRoutes();
+      const signupRoute = parentRoutes.find((r: any) => r.path === "/signup");
+      expect(signupRoute.redirect({ query: {} })).toEqual({
+        path: "/login",
+        query: { mode: "signup" },
+      });
+    });
+
+    it("keeps the other query params it was opened with", () => {
+      const { parentRoutes } = useRoutes();
+      const signupRoute = parentRoutes.find((r: any) => r.path === "/signup");
+      expect(signupRoute.redirect({ query: { utm_source: "blog", mode: "x" } })).toEqual({
+        path: "/login",
+        query: { utm_source: "blog", mode: "signup" },
+      });
+    });
+  });
+
   // =========================================================================
   // 4. parentRoutes — /cb callback
   // =========================================================================
@@ -2031,9 +2051,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 4 parentRoutes", () => {
+    it("should have exactly 5 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(4);
+      expect(parentRoutes).toHaveLength(5);
     });
 
     it("should have unique paths in parentRoutes", () => {
@@ -2043,12 +2063,13 @@ describe("useRoutes (router.ts)", () => {
       expect(paths).toHaveLength(uniquePaths.length);
     });
 
-    it("should have component or beforeEnter defined for every parentRoute", () => {
+    it("should have a component, beforeEnter or redirect defined for every parentRoute", () => {
       const { parentRoutes } = useRoutes();
       parentRoutes.forEach((route: any) => {
         const hasComponent = route.component !== undefined;
         const hasBeforeEnter = typeof route.beforeEnter === "function";
-        expect(hasComponent || hasBeforeEnter).toBe(true);
+        const hasRedirect = route.redirect !== undefined;
+        expect(hasComponent || hasBeforeEnter || hasRedirect).toBe(true);
       });
     });
 
