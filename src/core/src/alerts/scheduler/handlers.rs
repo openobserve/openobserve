@@ -1382,8 +1382,8 @@ async fn handle_anomaly_detection_triggers(
             {
                 // As scheduled alerts: the condition met is Firing even when cooldown silenced it.
                 Ok(run) => (
-                    if run.claim_lost {
-                        // Another run held the lease and judged this window; nothing was evaluated.
+                    if run.claim_lost || run.ineligible {
+                        // Another run held the lease, or the row is no longer runnable.
                         RunOutcome::Skipped
                     } else if run.notify_failed {
                         RunOutcome::NotifyFailed
