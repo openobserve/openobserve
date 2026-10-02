@@ -24,6 +24,7 @@ import {
   ANOMALY_X_ALIAS,
 } from "@/utils/alerts/anomalyChartQuery";
 import { histogramKeyToMicros } from "@/utils/rum/errorIssueUtils";
+import { anomalyIntervalSeconds } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 /** One metric-query bucket; every reading is `null` where the bucket has none. */
 export interface AnomalyBandRow {
@@ -66,14 +67,22 @@ const BAND_STACK = "band";
 
 const ISOLATED_SYMBOL_SIZE = 6;
 
+const MAX_FRACTION_DIGITS = 6;
+
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
-/** Precision by magnitude, so a value and the bounds beside it read alike. */
-export function formatReading(value: number): string {
+/** Precision by magnitude, so a value and the bounds beside it read alike; or exactly `fractionDigits`. */
+export function formatReading(value: number, fractionDigits?: number): string {
+  if (fractionDigits !== undefined) {
+    return value.toLocaleString(undefined, {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    });
+  }
   const magnitude = Math.abs(value);
   if (magnitude >= 100) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
   if (magnitude >= 1) {
@@ -83,6 +92,45 @@ export function formatReading(value: number): string {
     });
   }
   return value.toLocaleString(undefined, { maximumSignificantDigits: 3 });
+}
+
+/** One precision for a value and its bounds: the magnitude default, unless a differing pair would read equal. */
+function readingFormatter(value: number | null, bounds: number[]): (x: number) => string {
+  const clash = (fmt: (x: number) => string) =>
+    value !== null && bounds.some((b) => b !== value && fmt(b) === fmt(value));
+  if (!clash((x) => formatReading(x))) return (x) => formatReading(x);
+  for (let digits = 0; digits < MAX_FRACTION_DIGITS; digits++) {
+    const fmt = (x: number) => formatReading(x, digits);
+    if (!clash(fmt)) return fmt;
+  }
+  return (x) => formatReading(x, MAX_FRACTION_DIGITS);
+}
+
+/** Milliseconds of a `histogram_interval` such as "5m"; null when it does not parse. */
+export function anomalyIntervalMs(interval: string | undefined): number | null {
+  const match = /^(\d+)([smhd])$/.exec(interval?.trim() ?? "");
+  const seconds = match ? anomalyIntervalSeconds(Number(match[1]), match[2]) : null;
+  return seconds === null ? null : seconds * 1000;
+}
+
+/** The query emits no row for an empty bucket, so a null row marks each gap and breaks the line. */
+export function withGapBreaks(rows: AnomalyBandRow[], intervalMs: number | null): AnomalyBandRow[] {
+  if (intervalMs === null || intervalMs <= 0) return rows;
+  return rows.flatMap((row, i) => {
+    const prev = rows[i - 1];
+    if (!prev || row.tsMs - prev.tsMs <= intervalMs) return [row];
+    const gap: AnomalyBandRow = {
+      tsMs: prev.tsMs + intervalMs,
+      value: null,
+      flagged: null,
+      expected: null,
+      lower: null,
+      upper: null,
+      event: null,
+      threshold: null,
+    };
+    return [gap, row];
+  });
 }
 
 function anomalyLine(row: AnomalyBandRow, labels: AnomalyBandLabels): string {
@@ -140,9 +188,11 @@ function tooltipFormatter(rows: AnomalyBandRow[], labels: AnomalyBandLabels) {
         : "";
       lines.push(`${marker}<b>${anomalyLine(row, labels)}</b>`);
     }
-    if (row.value !== null) lines.push(`${labels.value}: ${formatReading(row.value)}`);
+    const bounds = [row.lower, row.upper].filter((b): b is number => b !== null);
+    const reading = readingFormatter(row.value, bounds);
+    if (row.value !== null) lines.push(`${labels.value}: ${reading(row.value)}`);
     if (row.lower !== null && row.upper !== null) {
-      lines.push(`${labels.range}: [${formatReading(row.lower)}, ${formatReading(row.upper)}]`);
+      lines.push(`${labels.range}: [${reading(row.lower)}, ${reading(row.upper)}]`);
     }
     if (row.expected !== null) lines.push(`${labels.expected}: ${formatReading(row.expected)}`);
     if (row.event !== null) lines.push(`${labels.event}: ${formatReading(row.event)}`);
@@ -151,11 +201,13 @@ function tooltipFormatter(rows: AnomalyBandRow[], labels: AnomalyBandLabels) {
 }
 
 export function buildAnomalyBandOptions(
-  rows: AnomalyBandRow[],
+  bucketRows: AnomalyBandRow[],
   labels: AnomalyBandLabels,
   colors: AnomalyBandColors,
   span: AnomalyBandWindow,
+  intervalMs: number | null = null,
 ) {
+  const rows = withGapBreaks(bucketRows, intervalMs);
   // Stacking is by data index, so every series keeps one entry per row, nulls included.
   const series = (pick: (row: AnomalyBandRow) => number | null) =>
     rows.map((row) => [row.tsMs, pick(row)]);
@@ -214,7 +266,6 @@ export function buildAnomalyBandOptions(
         tooltip: { show: false },
         lineStyle: { opacity: 0 },
         itemStyle: { color: colors.band },
-        // The band token carries its own alpha per theme, so the legend swatch and the fill match.
         areaStyle: { color: colors.band, opacity: 1 },
         data: series(bandHeight),
       },

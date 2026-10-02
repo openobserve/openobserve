@@ -172,6 +172,7 @@ import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQ
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
 import {
+  anomalyIntervalMs,
   buildAnomalyBandOptions,
   latestBandK,
   toAnomalyBandRows,
@@ -407,6 +408,7 @@ const metricOptions = computed(() => {
       grid: chartColor(GRID_TOKEN),
     },
     { startMs: windowUs.value.startUs / 1000, endMs: windowUs.value.endUs / 1000 },
+    anomalyIntervalMs(interval.value),
   );
 });
 

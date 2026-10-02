@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  anomalyIntervalMs,
   buildAnomalyBandOptions,
   formatReading,
   latestBandK,
@@ -252,6 +253,49 @@ describe("buildAnomalyBandOptions", () => {
       value.symbolSize(null, { dataIndex }),
     );
     expect(sizes).toEqual([6, 0, 6, 0, 0, 0]);
+  });
+
+  it("breaks the line and band across a bucket the query returned no row for", () => {
+    const fiveMin = 300_000;
+    const rows = [
+      row(0, { lower: 5, upper: 15 }),
+      row(fiveMin, { lower: 5, upper: 15 }),
+      row(7 * fiveMin, { lower: 5, upper: 15 }),
+      row(8 * fiveMin, { lower: 5, upper: 15 }),
+    ];
+    const opts: any = buildAnomalyBandOptions(rows, LABELS, COLORS, SPAN, fiveMin);
+    const value = seriesNamed(opts, LABELS.value)[0];
+    expect(value.connectNulls).toBe(false);
+    expect(value.data).toEqual([
+      [0, 10],
+      [fiveMin, 10],
+      [2 * fiveMin, null],
+      [7 * fiveMin, 10],
+      [8 * fiveMin, 10],
+    ]);
+    const [, height] = seriesNamed(opts, LABELS.range);
+    expect(height.data[2]).toEqual([2 * fiveMin, null]);
+    expect(options(rows).series[2].data).toHaveLength(4);
+  });
+
+  it("parses the histogram interval the gap check needs", () => {
+    expect(anomalyIntervalMs("5m")).toBe(300_000);
+    expect(anomalyIntervalMs("1h")).toBe(3_600_000);
+    expect(anomalyIntervalMs(undefined)).toBeNull();
+    expect(anomalyIntervalMs("5 minutes")).toBeNull();
+  });
+
+  it("shows a value and the bound it crossed at a precision that tells them apart", () => {
+    const html = options([
+      row(1000, { value: 100.49, lower: 90, upper: 100.48 }),
+    ]).tooltip.formatter([{ axisValue: 1000, axisValueLabel: "00:00" }]);
+    expect(html).toContain("Value: 100.49");
+    expect(html).toContain("Expected range: [90.00, 100.48]");
+    const plain = options([row(1000, { value: 150, lower: 90, upper: 120 })]).tooltip.formatter([
+      { axisValue: 1000, axisValueLabel: "00:00" },
+    ]);
+    expect(plain).toContain("Value: 150");
+    expect(plain).toContain("Expected range: [90.00, 120]");
   });
 
   it("lists the event legend entry only when a drop or absence exists", () => {
