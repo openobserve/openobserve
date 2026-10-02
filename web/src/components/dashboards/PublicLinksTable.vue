@@ -186,7 +186,7 @@
           </OButton>
           <OButton
             v-if="canPause(row)"
-            variant="ghost"
+            :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
             size="icon-xs-sq"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
             class="max-md:hidden"
