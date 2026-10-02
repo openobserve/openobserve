@@ -157,6 +157,9 @@ export interface DrawerProps {
 
   /** Render the portal in place for a contained drawer surface. Default: false. */
   inline?: boolean;
+
+  /** Called before the close button, Escape or an outside click closes the drawer; return false to keep it open. */
+  closeGuard?: () => boolean;
 }
 
 export interface DrawerEmits {

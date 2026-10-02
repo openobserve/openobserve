@@ -43,10 +43,18 @@ import PublicLinksPanel from "./PublicLinksPanel.vue";
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "title", "size", "formId", "primaryButtonLabel", "secondaryButtonLabel"],
+  props: [
+    "open",
+    "title",
+    "size",
+    "formId",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "closeGuard",
+  ],
   emits: ["update:open", "click:primary", "click:secondary"],
   template:
-    '<div><span class="drawer-primary-label">{{ primaryButtonLabel }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
+    '<div><slot name="header-right" /><span class="drawer-primary-label">{{ primaryButtonLabel }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
 };
 const ODropdownStub = { name: "ODropdown", template: '<div><slot name="trigger" /><slot /></div>' };
 const ODropdownItemStub = {
@@ -59,7 +67,7 @@ const OTableStub = {
   name: "OTable",
   props: ["data", "columns"],
   template:
-    '<div><div v-for="row in data" :key="row.id"><div v-for="col in columns" :key="col.id"><slot :name="\'cell-\' + col.id" :row="row" /></div></div></div>',
+    '<div><slot name="toolbar-trailing" /><div v-for="row in data" :key="row.id"><div v-for="col in columns" :key="col.id"><slot :name="\'cell-\' + col.id" :row="row" /></div></div></div>',
 };
 const VVSStub = {
   name: "VariablesValueSelector",
@@ -174,17 +182,33 @@ describe("PublicLinksPanel", () => {
     expect(w.text()).not.toContain("Name is required");
   });
 
-  it("lists existing links and opens a blank form from the primary button", async () => {
+  it("lists existing links and opens a blank form from the toolbar button", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     const w = build();
     await flushPromises();
     expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
     expect(w.text()).toContain("NOC wall");
-    expect(w.find(".drawer-primary-label").text()).toBe("New public link");
+    expect(w.find(".drawer-primary-label").text()).toBe("");
 
-    await w.find(".drawer-primary").trigger("click");
+    await w.find('[data-test="dashboards-public-links-panel-new-btn"]').trigger("click");
     await flushPromises();
     expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
+  });
+
+  it("returns to the link list when the form is closed, and closes from the list", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    await w.find('[data-test="dashboards-public-links-panel-new-btn"]').trigger("click");
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
+
+    const guard = w.findComponent({ name: "ODrawer" }).props("closeGuard") as () => boolean;
+    expect(guard()).toBe(false);
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
+
+    expect(guard()).toBe(true);
   });
 
   it("pauses a live link straight from its menu", async () => {

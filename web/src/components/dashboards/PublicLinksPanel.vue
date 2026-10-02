@@ -17,6 +17,7 @@
   <ODrawer
     v-model:open="open"
     :width="74"
+    :close-guard="guardClose"
     :bleed="currentView === 'list' && !forbidden && !loadFailed"
     data-test="dashboards-public-links-panel"
     :title="
@@ -30,6 +31,17 @@
     @click:primary="onPrimary"
     @click:secondary="closeForm"
   >
+    <template #header-right>
+      <OButton
+        v-if="currentView === 'list' && !forbidden && !loadFailed"
+        variant="primary"
+        size="sm-action"
+        data-test="dashboards-public-links-panel-new-btn"
+        @click="openForm(null)"
+      >
+        {{ t("dashboard.publicLinks.newLink") }}
+      </OButton>
+    </template>
     <div
       v-if="forbidden"
       class="text-text-secondary py-2 text-sm"
@@ -471,6 +483,15 @@ const open = computed({
   set: (v: boolean) => emit("update:modelValue", v),
 });
 
+// Close and Escape on the form or success view return to the link list; the drawer closes only from the list.
+function guardClose(): boolean {
+  if (currentView.value === "list" || !links.value.length) return true;
+  editing.value = null;
+  form.reset(publicLinkDefaults());
+  view.value = "list";
+  return false;
+}
+
 const timezone = computed<string>(
   () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );
@@ -529,7 +550,7 @@ const primaryLabel = computed<I18nText | undefined>(() => {
       : t("dashboard.publicLinks.createLink");
   }
   if (currentView.value === "created") return t("dashboard.publicLinks.backToLinks");
-  return t("dashboard.publicLinks.newLink");
+  return undefined;
 });
 
 const form = useOForm<PublicLinkForm>({
@@ -603,8 +624,7 @@ function closeForm() {
 }
 
 function onPrimary() {
-  if (currentView.value === "list") openForm(null);
-  else if (currentView.value === "created") view.value = "list";
+  if (currentView.value === "created") view.value = "list";
 }
 
 async function submit(value: PublicLinkForm) {

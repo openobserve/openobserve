@@ -89,6 +89,20 @@ describe("ODrawer", () => {
     expect(emitted?.[0]).toEqual([false]);
   });
 
+  it("stays open when closeGuard returns false, and closes when it returns true", async () => {
+    let allow = false;
+    const wrapper = mount(ODrawer, {
+      props: { open: true, title: "Drawer", closeGuard: () => allow },
+    });
+    const closeBtn = wrapper.find('button[aria-label="Close drawer"]');
+    await closeBtn.trigger("click");
+    expect(wrapper.emitted("update:open")).toBeFalsy();
+
+    allow = true;
+    await closeBtn.trigger("click");
+    expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
+  });
+
   it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent" },
@@ -230,6 +244,19 @@ describe("ODrawer", () => {
       const emitted = wrapper.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted?.[0]).toEqual([false]);
+    });
+
+    it("cancels Escape when closeGuard vetoes it, so the drawer stays open", async () => {
+      const guard = vi.fn(() => false);
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test", closeGuard: guard },
+      });
+      const panel = findDrawerPanel(wrapper);
+      const event = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+      await panel.vm.$emit("escapeKeyDown", event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("update:open")).toBeFalsy();
     });
 
     it("does NOT emit update:open when Escape is pressed and persistent=true", async () => {
