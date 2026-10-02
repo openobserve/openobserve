@@ -24,6 +24,7 @@ use config::{
     cluster::LOCAL_NODE,
     meta::{
         pipeline::{Pipeline, PipelineKind},
+        self_reporting::error::{ErrorData, ErrorSource, PipelineError as PipelineErrorReport},
         stream::StreamParams,
     },
 };
@@ -135,28 +136,20 @@ pub async fn get_executable_pipelines(stream_params: &StreamParams) -> Vec<Execu
     pipelines
 }
 
-/// Why each enabled realtime pipeline of `org` that this node could not compile failed, by id.
-pub async fn realtime_load_errors(org: &str) -> HashMap<String, String> {
-    BROKEN_REALTIME_PIPELINES
-        .read()
-        .await
-        .iter()
-        .filter(|(_, broken)| broken.stream.org_id == org)
-        .map(|(id, broken)| (id.clone(), broken.error.clone()))
-        .collect()
-}
-
-/// Logs, at most once a minute per stream, each enabled pipeline the stream is ingested without.
-pub async fn log_broken_realtime_pipelines(stream_params: &StreamParams) {
-    let broken = BROKEN_REALTIME_PIPELINES.read().await;
-    if broken.is_empty() {
-        return;
-    }
-    let mut on_stream = broken
-        .iter()
-        .filter(|(_, broken)| broken.stream == *stream_params)
-        .peekable();
-    if on_stream.peek().is_none() {
+/// Reports, at most once a minute per stream, each enabled pipeline the stream is ingested without.
+pub async fn report_broken_realtime_pipelines(stream_params: &StreamParams) {
+    let on_stream: Vec<ErrorData> = {
+        let broken = BROKEN_REALTIME_PIPELINES.read().await;
+        if broken.is_empty() {
+            return;
+        }
+        broken
+            .iter()
+            .filter(|(_, broken)| broken.stream == *stream_params)
+            .map(|(id, broken)| broken_pipeline_error(id, broken))
+            .collect()
+    };
+    if on_stream.is_empty() {
         return;
     }
     let due = {
@@ -168,15 +161,18 @@ pub async fn log_broken_realtime_pipelines(stream_params: &StreamParams) {
     if !due {
         return;
     }
-    for (id, broken) in on_stream {
-        log::error!(
-            "[Pipeline] stream {}/{}/{} is ingested without its enabled pipeline {} ({id}), which failed to load: {}",
-            stream_params.org_id,
-            stream_params.stream_type,
-            stream_params.stream_name,
-            broken.name,
-            broken.error
-        );
+    for error_data in on_stream {
+        if let ErrorSource::Pipeline(report) = &error_data.error_source {
+            log::error!(
+                "[Pipeline] stream {}/{}/{}: {} ({})",
+                stream_params.org_id,
+                stream_params.stream_type,
+                stream_params.stream_name,
+                report.error.as_deref().unwrap_or_default(),
+                report.pipeline_id,
+            );
+        }
+        usage_reporting::publish_error(error_data).await;
     }
 }
 
@@ -395,6 +391,22 @@ async fn compile_realtime_pipeline(
         }
     }
     compiled
+}
+
+fn broken_pipeline_error(pipeline_id: &str, broken: &BrokenPipeline) -> ErrorData {
+    ErrorData {
+        _timestamp: chrono::Utc::now().timestamp_micros(),
+        stream_params: broken.stream.clone(),
+        error_source: ErrorSource::Pipeline(PipelineErrorReport {
+            pipeline_id: pipeline_id.to_string(),
+            pipeline_name: broken.name.clone(),
+            error: Some(format!(
+                "Records are ingested without this pipeline: it failed to load: {}",
+                broken.error
+            )),
+            node_errors: HashMap::new(),
+        }),
+    }
 }
 
 fn broken_pipeline_log_due(
@@ -960,12 +972,12 @@ mod tests {
         let pipeline = function_pipeline("broken_pl_1", &stream, "tag_host");
 
         assert!(compile_realtime_pipeline(&pipeline, &stream).await.is_err());
-        let errors = realtime_load_errors("broken_org_1").await;
+        let errors = broken_on_node("broken_org_1").await;
         let error = errors
             .get("broken_pl_1")
             .expect("broken pipeline is not reported");
         assert!(error.contains("get_hostname"), "{error}");
-        assert!(realtime_load_errors("other_org").await.is_empty());
+        assert!(broken_on_node("other_org").await.is_empty());
         assert!(
             crate::ingestion::get_stream_executable_pipelines(&stream)
                 .await
@@ -974,7 +986,7 @@ mod tests {
 
         put_vrl_function("broken_org_1", "tag_host", ".node = \"n1\"\n.");
         assert!(compile_realtime_pipeline(&pipeline, &stream).await.is_ok());
-        assert!(realtime_load_errors("broken_org_1").await.is_empty());
+        assert!(broken_on_node("broken_org_1").await.is_empty());
         transform::QUERY_FUNCTIONS.remove("broken_org_1/tag_host");
     }
 
@@ -1003,7 +1015,7 @@ mod tests {
         assert_eq!(resp.code, 200, "{resp:?}");
         assert_eq!(resp.status[0].status.successful, 1, "{resp:?}");
         assert!(
-            realtime_load_errors("broken_org_2")
+            broken_on_node("broken_org_2")
                 .await
                 .contains_key("broken_pl_2")
         );
@@ -1020,6 +1032,36 @@ mod tests {
             .await
             .remove("broken_pl_2");
         transform::QUERY_FUNCTIONS.remove("broken_org_2/tag_host");
+    }
+
+    async fn broken_on_node(org: &str) -> HashMap<String, String> {
+        BROKEN_REALTIME_PIPELINES
+            .read()
+            .await
+            .iter()
+            .filter(|(_, broken)| broken.stream.org_id == org)
+            .map(|(id, broken)| (id.clone(), broken.error.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn a_broken_pipeline_is_reported_to_the_pipeline_error_stream() {
+        let stream = StreamParams::new("err_org", "err_stream", StreamType::Logs);
+        let broken = BrokenPipeline {
+            name: "mask_pii".to_string(),
+            stream: stream.clone(),
+            error: "unknown function get_hostname".to_string(),
+        };
+        let data = broken_pipeline_error("pl_7", &broken);
+        assert_eq!(data.stream_params, stream);
+        let ErrorSource::Pipeline(report) = data.error_source else {
+            panic!("not reported as a pipeline error");
+        };
+        assert_eq!(report.pipeline_id, "pl_7");
+        assert_eq!(report.pipeline_name, "mask_pii");
+        let error = report.error.unwrap_or_default();
+        assert!(error.contains("get_hostname"), "{error}");
+        assert!(error.contains("ingested without"), "{error}");
     }
 
     #[test]
