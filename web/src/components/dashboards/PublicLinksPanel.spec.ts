@@ -139,9 +139,15 @@ describe("PublicLinksPanel", () => {
     expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
 
     await submit(w);
+    expect(admin.create).not.toHaveBeenCalled();
+
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "NOC wall");
+    await submit(w);
 
     expect(admin.create).toHaveBeenCalledWith("default", "dash-1", {
-      name: "",
+      name: "NOC wall",
       visibility: "public",
       time_range: { editable: true, default_range_secs: 3600, allowed_presets_secs: [3600, 86400] },
       frozen_variables: { env: "prod" },
@@ -152,6 +158,20 @@ describe("PublicLinksPanel", () => {
     expect(
       w.find('[data-test="dashboards-public-links-panel-created-url"] input').element,
     ).toHaveProperty("value", `${window.location.origin}/web/public/dashboards/new-slug`);
+  });
+
+  it("starts every opening with a clean form, even after a failed attempt", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build();
+    await flushPromises();
+    await submit(w);
+    expect(w.text()).toContain("Name is required");
+
+    await w.setProps({ modelValue: false });
+    await w.setProps({ modelValue: true });
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
+    expect(w.text()).not.toContain("Name is required");
   });
 
   it("lists existing links and opens a blank form from the primary button", async () => {

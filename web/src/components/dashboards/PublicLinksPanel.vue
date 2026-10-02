@@ -16,7 +16,7 @@
 <template>
   <ODrawer
     v-model:open="open"
-    size="xl"
+    :width="74"
     data-test="dashboards-public-links-panel"
     :title="
       dashboardTitle
@@ -94,6 +94,7 @@
       <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
         <OFormInput
           name="name"
+          required
           :label="t('dashboard.publicLinks.name')"
           :placeholder="t('dashboard.publicLinks.namePlaceholder')"
           data-test="dashboards-public-links-panel-name-input"
@@ -543,6 +544,7 @@ function openForm(link: PublicLink | null) {
 
 function closeForm() {
   editing.value = null;
+  form.reset(publicLinkDefaults());
   if (links.value.length) view.value = "list";
   else open.value = false;
 }
@@ -611,6 +613,8 @@ watch(open, (isOpen) => {
   editing.value = null;
   createdLink.value = null;
   revoking.value = null;
+  // A dashboard with no links opens straight on the form, so errors from an earlier attempt must not carry over.
+  form.reset(publicLinkDefaults());
 });
 watch(
   () => [open.value, props.editLinkId, links.value] as const,

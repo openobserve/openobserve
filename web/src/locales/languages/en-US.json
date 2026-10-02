@@ -6040,6 +6040,7 @@
       "editNote": "The link's address stays the same. Changes appear on the public page at its next update.",
       "name": "Name",
       "namePlaceholder": "e.g. Acme — customer view",
+      "nameRequired": "Name is required",
       "nameTooLong": "Name must be at most 256 characters",
       "untitled": "Untitled link",
       "status": "Status",

@@ -27,32 +27,38 @@ import type { PublicLink } from "@/services/public_dashboards_admin";
 
 const schema = makePublicLinkSchema(gt, 30, "2026-09-25");
 
+const named = () => ({ ...publicLinkDefaults(), name: "NOC wall" });
+
 describe("PublicLinkForm schema", () => {
-  it("accepts the defaults", () => {
-    expect(schema.safeParse(publicLinkDefaults()).success).toBe(true);
+  it("accepts a named link with the default settings", () => {
+    expect(schema.safeParse(named()).success).toBe(true);
+  });
+
+  it("requires a name", () => {
+    const r = schema.safeParse({ ...named(), name: "   " });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0].path).toEqual(["name"]);
   });
 
   it("rejects a refresh below the server minimum", () => {
-    const r = schema.safeParse({ ...publicLinkDefaults(), rebuildSecs: "10" });
+    const r = schema.safeParse({ ...named(), rebuildSecs: "10" });
     expect(r.success).toBe(false);
     expect(r.error?.issues[0].path).toEqual(["rebuildSecs"]);
   });
 
   it("rejects an expiry before today but allows today", () => {
-    expect(schema.safeParse({ ...publicLinkDefaults(), expires: "2026-09-24" }).success).toBe(
-      false,
-    );
-    expect(schema.safeParse({ ...publicLinkDefaults(), expires: "2026-09-25" }).success).toBe(true);
+    expect(schema.safeParse({ ...named(), expires: "2026-09-24" }).success).toBe(false);
+    expect(schema.safeParse({ ...named(), expires: "2026-09-25" }).success).toBe(true);
   });
 
   it("needs a default that is one of the available ranges when viewers can switch", () => {
-    const r = schema.safeParse({ ...publicLinkDefaults(), presets: [86400], defaultPreset: 3600 });
+    const r = schema.safeParse({ ...named(), presets: [86400], defaultPreset: 3600 });
     expect(r.success).toBe(false);
     expect(r.error?.issues[0].path).toEqual(["defaultPreset"]);
   });
 
   it("ignores the ranges list when the time range is locked", () => {
-    const value = { ...publicLinkDefaults(), timeEditable: false, presets: [], defaultPreset: 900 };
+    const value = { ...named(), timeEditable: false, presets: [], defaultPreset: 900 };
     expect(schema.safeParse(value).success).toBe(true);
   });
 });

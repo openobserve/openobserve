@@ -23,7 +23,11 @@ export const PRESET_SECONDS = [900, 3600, 21600, 86400, 604800, 2592000];
 export const makePublicLinkSchema = (t: TranslateFn, minRebuildSecs: number, today: string) =>
   z
     .object({
-      name: z.string().trim().max(256, t("dashboard.publicLinks.nameTooLong")),
+      name: z
+        .string()
+        .trim()
+        .min(1, t("dashboard.publicLinks.nameRequired"))
+        .max(256, t("dashboard.publicLinks.nameTooLong")),
       timeEditable: z.boolean(),
       presets: z.array(z.number()),
       defaultPreset: z.number(),

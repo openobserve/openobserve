@@ -889,7 +889,11 @@ fn validate_limits(cfg: &PublicDashboardConfig) -> Result<(), String> {
         cfg.rebuild_secs,
         config::get_config().public_dashboards.min_rebuild_secs,
     )?;
-    if cfg.name.trim().chars().count() > 256 {
+    let name = cfg.name.trim();
+    if name.is_empty() {
+        return Err("name is required".to_string());
+    }
+    if name.chars().count() > 256 {
         return Err("name must be at most 256 characters".to_string());
     }
     check_presets(&cfg.time_range)?;
@@ -1212,5 +1216,27 @@ mod tests {
         assert!(check_presets(&tr((1..=11).map(|i| i * 60).collect(), None)).is_err());
         assert!(check_presets(&tr(vec![30], None)).is_err());
         assert!(check_presets(&tr(vec![3600], Some(91 * 86_400))).is_err());
+    }
+
+    #[test]
+    fn name_is_required_and_capped() {
+        let cfg = |name: &str| PublicDashboardConfig {
+            name: name.to_string(),
+            visibility: Default::default(),
+            time_range: TimeRangePolicy {
+                editable: false,
+                default_range_secs: Some(3600),
+                allowed_presets_secs: vec![3600],
+            },
+            frozen_variables: BTreeMap::new(),
+            rebuild_secs: 3600,
+            expires_at: None,
+        };
+        assert_eq!(
+            validate_limits(&cfg("   ")).unwrap_err(),
+            "name is required"
+        );
+        assert!(validate_limits(&cfg(&"x".repeat(257))).is_err());
+        assert!(validate_limits(&cfg("NOC wall")).is_ok());
     }
 }
