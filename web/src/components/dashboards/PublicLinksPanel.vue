@@ -107,7 +107,6 @@
           multiple
           required
           :label="t('dashboard.publicDashboard.availableRanges')"
-          :help-text="t('dashboard.publicLinks.presetsHelp')"
           data-test="dashboards-public-links-panel-presets-select"
         />
         <OFormSelect
