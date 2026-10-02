@@ -236,27 +236,74 @@
           <OTimeCell :value="row.last_rebuilt_at" unit="us" />
         </template>
         <template #cell-actions="{ row }">
-          <div class="flex items-center gap-0.5" @click.stop>
+          <div class="flex items-center justify-end gap-0.5" @click.stop>
             <OButton
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="content-copy"
+              class="max-md:hidden"
               :data-test="`dashboards-public-links-panel-${row.id}-copy-btn`"
               @click="copyLink(row)"
             >
               <OTooltip side="bottom" :content="t('dashboard.publicDashboard.copyLink')" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="open-in-new"
+              class="max-md:hidden"
+              :data-test="`dashboards-public-links-panel-${row.id}-open-btn`"
+              @click="openPublicPage(row)"
+            >
+              <OTooltip side="bottom" :content="t('dashboard.publicLinks.openPublicPage')" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="edit"
+              class="max-md:hidden"
+              :data-test="`dashboards-public-links-panel-${row.id}-edit-btn`"
+              @click="openForm(row)"
+            >
+              <OTooltip side="bottom" :content="t('dashboard.publicLinks.editSettings')" />
+            </OButton>
+            <OButton
+              v-if="canPause(row)"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+              size="icon-xs-sq"
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              class="max-md:hidden"
+              :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
+              @click="setPaused(row, row.enabled)"
+            >
+              <OTooltip
+                side="bottom"
+                :content="
+                  row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
+                "
+              />
             </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
                   icon-left="more-vert"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
+                  :title="t('dashboard.moreActions')"
                   :data-test="`dashboards-public-links-panel-${row.id}-menu-btn`"
                 />
               </template>
               <ODropdownItem
+                icon-left="content-copy"
+                class="md:hidden"
+                :data-test="`dashboards-public-links-panel-${row.id}-copy-menu`"
+                @select="copyLink(row)"
+              >
+                {{ t("dashboard.publicDashboard.copyLink") }}
+              </ODropdownItem>
+              <ODropdownItem
                 icon-left="open-in-new"
+                class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-open-menu`"
                 @select="openPublicPage(row)"
               >
@@ -264,14 +311,16 @@
               </ODropdownItem>
               <ODropdownItem
                 icon-left="edit"
+                class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-edit-menu`"
                 @select="openForm(row)"
               >
                 {{ t("dashboard.publicLinks.editSettings") }}
               </ODropdownItem>
               <ODropdownItem
-                v-if="row.status !== 'expired' && row.status !== 'dashboard_deleted'"
+                v-if="canPause(row)"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
                 @select="setPaused(row, row.enabled)"
               >
@@ -496,13 +545,12 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "actions",
-    header: raw(""),
+    header: t("dashboard.actions"),
     isAction: true,
     pinned: "right",
-    size: 80,
-    minSize: 80,
     sortable: false,
-    meta: { align: "center" },
+    size: 150,
+    meta: { align: "center", actionCount: 5 },
   },
 ];
 
@@ -516,6 +564,11 @@ function rangesText(link: PublicLink): I18nText {
 
 function expiryNote(link: PublicLink): ExpiryNote | null {
   return publicLinkExpiry(link, timezone.value, t);
+}
+
+// Expired and orphaned links can't be resumed, so they offer no pause toggle.
+function canPause(link: PublicLink): boolean {
+  return link.status !== "expired" && link.status !== "dashboard_deleted";
 }
 
 function serverMessage(e: unknown): I18nText {
