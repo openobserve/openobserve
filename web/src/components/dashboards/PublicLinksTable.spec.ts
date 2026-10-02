@@ -151,12 +151,12 @@ describe("PublicLinksTable", () => {
     vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: LINKS } } as never);
   });
 
-  it("opens on live links with their name, dashboard, folder and status", async () => {
+  it("opens on all links with their name, dashboard, folder and status", async () => {
     const w = build();
     await flushPromises();
-    expect(rows(w)).toHaveLength(1);
+    expect(rows(w)).toHaveLength(5);
     expect(find(w, "dashboards-public-links-l1-name").text()).toContain("NOC wall");
-    expect(find(w, "dashboards-public-links-l1-name").text()).toContain("Cloud in Ops");
+    expect(find(w, "dashboards-public-links-l1-dashboard").text()).toBe("Ops / Cloud");
     expect(find(w, "dashboards-public-links-l1-status").text()).toBe("Live");
     expect(find(w, "dashboards-public-links-l1-ranges").text()).toBe("1h · 1d");
     expect(find(w, "dashboards-public-links-l1-expires").text()).toBe("Never");
@@ -171,7 +171,7 @@ describe("PublicLinksTable", () => {
 
     await selectTile(w, "attention");
     expect(rows(w)).toHaveLength(2);
-    expect(find(w, "dashboards-public-links-l3-name").text()).toContain(
+    expect(find(w, "dashboards-public-links-l3-dashboard").text()).toBe(
       "Dashboard no longer exists",
     );
     expect(find(w, "dashboards-public-links-l3-status").text()).toBe("Dashboard deleted");
@@ -331,6 +331,7 @@ describe("PublicLinksTable", () => {
     } as never);
     const w = build();
     await flushPromises();
+    await selectTile(w, "live");
     const empty = find(w, "dashboards-public-links-empty");
     expect(empty.text()).toContain("No public links found");
 

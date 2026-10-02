@@ -79,14 +79,31 @@
       </template>
 
       <template #cell-name="{ row }">
-        <div class="flex min-w-0 flex-col" :data-test="`dashboards-public-links-${row.id}-name`">
-          <span class="text-text-body truncate text-sm">
-            {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
-          </span>
-          <span class="text-text-secondary truncate text-xs">
-            {{ dashboardText(row) }}
-          </span>
-        </div>
+        <span
+          class="text-text-body truncate text-sm"
+          :data-test="`dashboards-public-links-${row.id}-name`"
+        >
+          {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
+        </span>
+      </template>
+      <template #cell-dashboard="{ row }">
+        <span
+          v-if="!row.dashboard_title"
+          class="text-text-muted truncate text-sm"
+          :data-test="`dashboards-public-links-${row.id}-dashboard`"
+        >
+          {{ t("dashboard.publicLinks.dashboardMissing") }}
+        </span>
+        <span
+          v-else
+          class="truncate text-sm"
+          :data-test="`dashboards-public-links-${row.id}-dashboard`"
+        >
+          <span class="text-text-secondary">{{
+            raw(`${row.folder_name ?? row.folder_id ?? "default"} / `)
+          }}</span>
+          <span class="text-text-body">{{ raw(row.dashboard_title) }}</span>
+        </span>
       </template>
       <template #cell-status="{ row }">
         <OTag
@@ -332,7 +349,7 @@ const refreshLinks = () => linksQuery.refetch();
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
 
-const statusFilter = ref<StatusFilter>("live");
+const statusFilter = ref<StatusFilter>("all");
 const searchQuery = ref("");
 const editing = ref<PublicLink | null>(null);
 const panelOpen = ref(false);
@@ -402,7 +419,7 @@ const filtered = computed(
   () => links.value.length > 0 && (!!searchQuery.value.trim() || statusFilter.value !== "all"),
 );
 
-const columns = publicLinkColumns(t);
+const columns = publicLinkColumns(t, { withDashboard: true });
 
 function hasDashboard(link: PublicLink): boolean {
   return link.status !== "dashboard_deleted";
@@ -410,14 +427,6 @@ function hasDashboard(link: PublicLink): boolean {
 
 function canPause(link: PublicLink): boolean {
   return link.status !== "expired" && link.status !== "dashboard_deleted";
-}
-
-function dashboardText(link: PublicLink): I18nText {
-  if (!link.dashboard_title) return t("dashboard.publicLinks.dashboardMissing");
-  return t("dashboard.publicLinks.dashboardInFolder", {
-    dashboard: raw(link.dashboard_title),
-    folder: raw(link.folder_name ?? link.folder_id ?? "default"),
-  });
 }
 
 function serverMessage(e: unknown): I18nText {

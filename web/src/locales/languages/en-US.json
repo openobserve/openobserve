@@ -6068,7 +6068,7 @@
       "presetsRequired": "Pick at least one time range",
       "defaultNotAvailable": "The default must be one of the available time ranges",
       "openDashboard": "Open dashboard",
-      "dashboardInFolder": "{dashboard} in {folder}",
+      "folderDashboard": "Folder / Dashboard",
       "dashboardMissing": "Dashboard no longer exists",
       "fixedRange": "Fixed: {range}",
       "expires": "Expires",

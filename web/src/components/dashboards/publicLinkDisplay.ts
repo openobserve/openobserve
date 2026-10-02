@@ -51,8 +51,11 @@ export function defaultRange(link: PublicLink): number {
   return link.time_range.default_range_secs ?? link.time_range.allowed_presets_secs[0] ?? 0;
 }
 
-/** The columns every public link table shows, so the share panel and the org-wide list match. */
-export function publicLinkColumns(t: TranslateFn): OTableColumnDef[] {
+/** The columns every public link table shows; the org-wide list adds the link's folder and dashboard. */
+export function publicLinkColumns(
+  t: TranslateFn,
+  opts: { withDashboard?: boolean } = {},
+): OTableColumnDef[] {
   const col = (id: string, header: I18nText, size: number, accessorKey?: string) => ({
     id,
     header,
@@ -71,15 +74,30 @@ export function publicLinkColumns(t: TranslateFn): OTableColumnDef[] {
       sortable: true,
       resizable: true,
       size: 200,
-      minSize: 140,
+      minSize: 100,
       meta: { align: "left", flex: true },
     },
+    ...(opts.withDashboard
+      ? [
+          {
+            id: "dashboard",
+            header: t("dashboard.publicLinks.folderDashboard"),
+            accessorFn: (link: PublicLink) =>
+              `${link.folder_name ?? ""} / ${link.dashboard_title ?? ""}`.toLowerCase(),
+            sortable: true,
+            resizable: true,
+            hideable: true,
+            size: 150,
+            meta: { align: "left" as const },
+          },
+        ]
+      : []),
     col("status", t("dashboard.publicLinks.status"), 110, "status"),
-    col("ranges", t("dashboard.publicLinks.timeRanges"), 110),
-    col("refresh", t("dashboard.publicLinks.refresh"), 100, "rebuild_secs"),
-    col("expires", t("dashboard.publicLinks.expires"), 110, "expires_at"),
+    col("ranges", t("dashboard.publicLinks.timeRanges"), 100),
+    col("refresh", t("dashboard.publicLinks.refresh"), 90, "rebuild_secs"),
+    col("expires", t("dashboard.publicLinks.expires"), 115, "expires_at"),
     col("updated", t("dashboard.publicLinks.updated"), 120, "last_rebuilt_at"),
-    col("published_by", t("dashboard.publicLinks.publishedBy"), 160, "published_by"),
+    col("published_by", t("dashboard.publicLinks.publishedBy"), 150, "published_by"),
     {
       id: "actions",
       header: t("dashboard.actions"),
