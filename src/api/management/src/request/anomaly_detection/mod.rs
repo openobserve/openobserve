@@ -473,17 +473,7 @@ pub struct HistoryQuery {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AnomalyConfigResponse {
-    /// Ignored; see `band_grouping`.
-    #[schema(deprecated)]
-    pub seasonality: String,
-    /// Written by training: `hour_of_week`, `hour_of_day` or `global`.
-    pub band_grouping: Option<String>,
-    /// The trained band half-width k in sigmas; `band_width`, when set, overrides it.
-    pub band_k: Option<f64>,
-    /// Start of the data the in-force model trained on, in microseconds; single-config reads only.
-    pub training_data_start_us: Option<i64>,
-    /// End of the data the in-force model trained on, in microseconds; single-config reads only.
-    pub training_data_end_us: Option<i64>,
+    // The config row is returned flat, with every column as a top-level key
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

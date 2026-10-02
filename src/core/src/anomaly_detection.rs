@@ -139,6 +139,9 @@ const ALERT_DIRECTIONS: [&str; 3] = ["both", "above", "below"];
 /// One day of 5-minute buckets.
 const ALERT_WINDOW_BUCKETS_RANGE: std::ops::RangeInclusive<i32> = 1..=288;
 
+/// Each window bucket is re-fetched as look-back on every run, so the window is capped in time.
+const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
+
 #[cfg(feature = "enterprise")]
 type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
 
@@ -338,6 +341,7 @@ struct BandSettings<'a> {
     alert_window_buckets: Option<i32>,
     alert_window_fire_pct: Option<f64>,
     alert_window_recover_pct: Option<f64>,
+    histogram_interval: &'a str,
 }
 
 /// Resolve a folder name (e.g. "default") to the PK stored in `folders.id`.
@@ -858,10 +862,6 @@ pub async fn update_config(
         existing.threshold,
     )
     .map_err(validation_error)?;
-    // `Some(None)` clears back to the default and needs no bound; only an explicit value does.
-    if let Some(Some(half_width)) = req.level_half_width_seconds {
-        validate_level_half_width(half_width).map_err(validation_error)?;
-    }
     if let Some(days) = req.retrain_interval_days {
         validate_retrain_interval_days(days).map_err(validation_error)?;
     }
@@ -1538,10 +1538,9 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
     // The scheduled job run now: scores past the cursor, writes rows, gates delivery itself.
     #[cfg(feature = "enterprise")]
     {
-        let result = o2_enterprise::enterprise::anomaly_detection::scheduler::run_manual_detection(
-            anomaly_id,
-        )
-        .await?;
+        let result =
+            o2_enterprise::enterprise::anomaly_detection::scheduler::run_detection_now(anomaly_id)
+                .await?;
 
         log::info!(
             "[anomaly_detection {}] manual detection complete: points_scored={}, anomalies_found={}",
@@ -1555,9 +1554,18 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
             .iter()
             .filter(|p| p.is_anomaly)
             .collect();
+        // A lost claim means another run holds the config, which is not "no anomalies".
+        let claim_lost = result.model_loaded_from
+            == o2_enterprise::enterprise::anomaly_detection::scheduler::CLAIM_LOST_SOURCE;
+        let message = if claim_lost {
+            "Detection already running; try again shortly"
+        } else {
+            "Detection completed"
+        };
 
         Ok(serde_json::json!({
-            "message": "Detection completed",
+            "message": message,
+            "claim_lost": claim_lost,
             "anomaly_id": anomaly_id,
             "anomalies_found": result.anomaly_count,
             "points_scored": result.data_points_processed,
@@ -1694,9 +1702,6 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     }
 
     validated_budget_create(req.percentile, req.alert_budget_per_day)?;
-    if let Some(half_width) = req.level_half_width_seconds {
-        validate_level_half_width(half_width)?;
-    }
     validate_band_settings(
         &BandSettings {
             band_width: req.band_width,
@@ -1704,6 +1709,7 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
             alert_window_buckets: req.alert_window_buckets,
             alert_window_fire_pct: req.alert_window_fire_pct,
             alert_window_recover_pct: req.alert_window_recover_pct,
+            histogram_interval: &req.histogram_interval,
         },
         req.alert_budget_per_day,
     )?;
@@ -1793,21 +1799,6 @@ fn validate_detection_function(combined: &str) -> Result<()> {
 fn validate_budget_value(budget: f64) -> Result<()> {
     if !budget.is_finite() || budget <= 0.0 {
         anyhow::bail!("alert_budget_per_day must be a finite value greater than 0");
-    }
-    Ok(())
-}
-
-/// Bounded at the API, not only clamped at fit time, so a typo cannot store an ignored value.
-fn validate_level_half_width(half_width_seconds: i64) -> Result<()> {
-    const ONE_YEAR_SECONDS: i64 = 365 * 86_400;
-    if half_width_seconds <= 0 {
-        anyhow::bail!("level_half_width_seconds must be greater than 0");
-    }
-    if half_width_seconds > ONE_YEAR_SECONDS {
-        anyhow::bail!(
-            "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the \
-             level window must fit inside the training window"
-        );
     }
     Ok(())
 }
@@ -1921,6 +1912,16 @@ fn validate_band_settings(
             ALERT_WINDOW_BUCKETS_RANGE.end()
         );
     }
+    // An unparseable interval is the interval rule's to report, not this one's.
+    if let Some(buckets) = settings.alert_window_buckets
+        && let Ok(histogram_secs) = parse_interval(settings.histogram_interval)
+        && i64::from(buckets).saturating_mul(histogram_secs) > MAX_ALERT_WINDOW_SECONDS
+    {
+        anyhow::bail!(
+            "alert_window_buckets ({buckets}) times histogram_interval ({}) must span at most 24h",
+            settings.histogram_interval
+        );
+    }
     let fire = settings.alert_window_fire_pct.unwrap_or(100.0);
     let recover = settings.alert_window_recover_pct.unwrap_or(fire);
     if !(fire.is_finite()
@@ -1959,6 +1960,10 @@ fn validated_band_settings(
             alert_window_recover_pct: req
                 .alert_window_recover_pct
                 .unwrap_or(existing.alert_window_recover_pct),
+            histogram_interval: req
+                .histogram_interval
+                .as_deref()
+                .unwrap_or(&existing.histogram_interval),
         },
         req.alert_budget_per_day
             .unwrap_or(existing.alert_budget_per_day),
@@ -2816,10 +2821,7 @@ fn declared_value_column(query_mode: &str, detection_function: &str) -> Option<S
 
 /// Parse search results into time-series data points.
 ///
-/// Extracts `timestamp`, `value`, and (when present) `hour` and `dow` from each hit.
-/// `hour` and `dow` are included by filter-based queries via `date_part()`; they are
-/// absent for custom SQL queries, in which case `QueryDataPoint` carries `None` and
-/// `build_feature_vector` falls back to Rust-side extraction from the timestamp.
+/// Extracts `timestamp` and `value` from each hit.
 ///
 /// `value_column` is the config-declared column carrying the metric; `None` keeps the
 /// legacy name fallback.
@@ -2884,21 +2886,9 @@ fn parse_search_results_to_timeseries(
             }
         };
 
-        // Extract pre-computed temporal features (present for filter-based queries only).
-        let hour = hit
-            .get("hour")
-            .and_then(|v| v.as_f64())
-            .map(|h| h as f32 / 24.0);
-        let dow = hit
-            .get("dow")
-            .and_then(|v| v.as_f64())
-            .map(|d| d as f32 / 7.0);
-
         data_points.push(QueryDataPoint {
             timestamp_us,
             value,
-            hour,
-            dow,
         });
     }
 
@@ -4185,42 +4175,6 @@ mod tests {
     // ── P0.4: the interval rule as a shared pure seam ───────────────────────
 
     /// A value the create path rejects can never reach `SeasonalBaseline::fit`.
-    mod level_half_width_rule {
-        use super::*;
-
-        #[test]
-        fn a_non_null_half_width_inside_the_bound_is_accepted() {
-            for seconds in [1_i64, 3_600, 86_400, 365 * 86_400] {
-                assert!(
-                    validate_level_half_width(seconds).is_ok(),
-                    "{seconds}s is within one year and must be accepted"
-                );
-            }
-        }
-
-        #[test]
-        fn a_non_positive_half_width_is_rejected() {
-            for seconds in [0_i64, -1, -86_400] {
-                assert!(
-                    validate_level_half_width(seconds).is_err(),
-                    "{seconds}s cannot describe a level window"
-                );
-            }
-        }
-
-        #[test]
-        fn a_half_width_past_one_year_is_rejected() {
-            let err = validate_level_half_width(365 * 86_400 + 1)
-                .expect_err("one second past a year must not be stored");
-            let msg = err.to_string();
-            assert!(msg.contains("31536000"), "the bound must be stated: {msg}");
-            assert!(
-                !msg.contains("  "),
-                "the message must not carry a broken line continuation: {msg:?}"
-            );
-        }
-    }
-
     mod interval_pair_rule {
         use super::*;
 
@@ -6369,6 +6323,7 @@ mod tests {
                 alert_window_buckets: None,
                 alert_window_fire_pct: None,
                 alert_window_recover_pct: None,
+                histogram_interval: "5m",
             }
         }
 
@@ -6444,6 +6399,29 @@ mod tests {
         }
 
         #[test]
+        fn the_window_spans_at_most_a_day_of_histogram_buckets() {
+            for (interval, n, ok) in [
+                ("5m", 288, true),
+                ("1h", 24, true),
+                ("1h", 25, false),
+                ("1d", 1, true),
+                ("1d", 2, false),
+                ("junk", 288, true),
+            ] {
+                let s = BandSettings {
+                    alert_window_buckets: Some(n),
+                    histogram_interval: interval,
+                    ..defaults()
+                };
+                assert_eq!(
+                    validate_band_settings(&s, None).is_ok(),
+                    ok,
+                    "{n} x {interval}"
+                );
+            }
+        }
+
+        #[test]
         fn recover_must_sit_in_zero_to_fire_and_fire_at_most_one_hundred() {
             let cases = [
                 (Some(80.0), Some(60.0), true),
@@ -6491,6 +6469,17 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_band_settings(&recover_above_stored_fire, &stored).is_err());
+            let four_hours_of_five_minute_buckets = UpdateAnomalyConfigRequest {
+                alert_window_buckets: Some(Some(48)),
+                ..Default::default()
+            };
+            assert!(validated_band_settings(&four_hours_of_five_minute_buckets, &stored).is_ok());
+            let hourly = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("1h".to_string()),
+                ..Default::default()
+            };
+            stored.alert_window_buckets = Some(48);
+            assert!(validated_band_settings(&hourly, &stored).is_err());
         }
 
         #[test]
