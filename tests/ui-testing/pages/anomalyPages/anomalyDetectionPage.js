@@ -451,13 +451,13 @@ class AnomalyDetectionPage {
     // Sensitivity
 
     /**
-     * Pick a sensitivity tier: Conservative 4, Balanced 3, Aggressive 2.5 (band width in σ).
+     * Pick a sensitivity tier: 'auto' (trained k), or Conservative 4, Balanced 3, Aggressive 2.5 (band width in σ).
      *
      * The tier toggle arrived with the anomaly revamp; builds before it expose a
      * plain threshold slider instead. Left at its default there so the flows
      * that merely pass through this step still run.
      *
-     * @param {4|3|2.5} k
+     * @param {'auto'|4|3|2.5} k
      * @returns {Promise<boolean>} whether the tier control was present
      */
     async selectSensitivityTier(k) {
@@ -490,7 +490,9 @@ class AnomalyDetectionPage {
         );
         if ((await active.count()) === 0) return null;
         const dataTest = await active.first().getAttribute('data-test');
-        return dataTest ? Number(dataTest.replace('anomaly-sensitivity-tier-', '')) : null;
+        if (!dataTest) return null;
+        const tier = dataTest.replace('anomaly-sensitivity-tier-', '');
+        return tier === 'auto' ? tier : Number(tier);
     }
 
     getSensitivityHintLocator() {

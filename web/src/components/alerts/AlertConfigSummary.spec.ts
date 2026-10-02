@@ -282,10 +282,8 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(value(wrapper, "query-mode")).toBe(translated("alerts.anomaly.filters"));
     expect(value(wrapper, "detection-function")).toBe("avg(took)");
     expect(value(wrapper, "filters")).toBe("service = 'checkout'");
-    // 97 indexes TRAINING scores — shown as the percentile, never restated as a live anomaly rate.
-    expect(value(wrapper, "sensitivity")).toBe(
-      translated("alerts.anomaly.summaryThresholdPercentile", { percentile: 97 }),
-    );
+    // No band width and no trained k yet: Auto, never the legacy percentile.
+    expect(value(wrapper, "sensitivity")).toBe(translated("alerts.anomaly.sensitivityAuto"));
   });
 
   it("shows the enforced cap for a budget-mode config instead of the derived percentile", () => {
@@ -332,10 +330,10 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(field(wrapper, "last-error").exists()).toBe(false);
   });
 
-  it("explains the band: grouping, training span, and a legacy trained k as sensitivity", () => {
+  it("explains the band: grouping, training span, and Auto with the trained k", () => {
     const wrapper = mountSummary(
       anomalyConfig({
-        band_grouping: "hour_of_week",
+        band_grouping: "weekend_hour",
         band_k: 3.4567,
         training_data_start_us: 1786924800000000,
         training_data_end_us: 1788134400000000,
@@ -343,7 +341,7 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     );
 
     expect(value(wrapper, "band-grouping")).toBe(
-      translated("alerts.anomaly.bandGroupingHourOfWeek"),
+      translated("alerts.anomaly.bandGroupingWeekendHour"),
     );
     expect(value(wrapper, "training-span")).toBe(
       translated("alerts.anomaly.trainingSpanValue", {
@@ -352,12 +350,12 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
       }),
     );
     expect(value(wrapper, "sensitivity")).toBe(
-      translated("alerts.anomaly.summaryBandWidthAuto", { k: 3.46 }),
+      translated("alerts.anomaly.sensitivityAutoTrained", { k: 3.46 }),
     );
     expect(field(wrapper, "band-width").exists()).toBe(false);
   });
 
-  it("shows the set band width as the sensitivity, over the trained k and the percentile", () => {
+  it("shows the set band width as the sensitivity, over the trained k", () => {
     const wrapper = mountSummary(anomalyConfig({ band_width: 3.5, band_k: 3.2 }));
     expect(value(wrapper, "sensitivity")).toBe("3.5σ");
   });
@@ -383,7 +381,10 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     );
   });
 
-  it("names every grouping the trainer writes", () => {
+  it("names every grouping the trainer writes, and the retired ones a row keeps until retrain", () => {
+    expect(
+      value(mountSummary(anomalyConfig({ band_grouping: "hour_of_week" })), "band-grouping"),
+    ).toBe(translated("alerts.anomaly.bandGroupingHourOfWeek"));
     expect(
       value(mountSummary(anomalyConfig({ band_grouping: "hour_of_day" })), "band-grouping"),
     ).toBe(translated("alerts.anomaly.bandGroupingHourOfDay"));

@@ -198,11 +198,21 @@ test.describe('Anomaly Detection', () => {
       }
     });
 
-    test('a new alert starts at Balanced, 3σ', {
+    test('a new alert starts at Auto, with the level blank', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('3');
-      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(3);
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+    });
+
+    test('Auto clears an override back to a blank level', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(4);
+      await pm.anomalyDetectionPage.selectSensitivityTier('auto');
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
     });
 
     test('typing a tier value lights that tier up', {
@@ -1106,7 +1116,7 @@ test.describe('Anomaly Detection', () => {
       expect(saved.alert_budget_per_day).toBe(4);
     });
 
-    test('a config without a budget renders the band-width tier, prefilled from training or 3', {
+    test('a config without a budget renders the band-width tier at Auto, never the trained k', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async ({ page }) => {
       const name = await ownConfig(page, 'nobudget');
@@ -1115,11 +1125,9 @@ test.describe('Anomaly Detection', () => {
 
       await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeVisible();
       await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeHidden();
-      // No band_width on an API-created config: the level is band_k to 2 decimals, or 3 before training.
-      const level = Number(await pm.anomalyDetectionPage.getSensitivityLevel());
-      expect(level).toBeGreaterThanOrEqual(1);
-      expect(level).toBeLessThanOrEqual(10);
-      expect(Math.round(level * 100) / 100).toBe(level);
+      // No band_width on an API-created config: Auto, so an untouched save cannot pin band_k.
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
 
       await pm.anomalyDetectionPage.cancel();
     });

@@ -126,9 +126,9 @@ describe("anomalyIntervalPayload", () => {
 
 // Band width, direction and window share: each default is the value the server reads NULL as.
 describe("band and delivery defaults", () => {
-  it("creates at Balanced 3σ, both directions and every out-of-band bucket alerting", () => {
+  it("creates at Auto, both directions and every out-of-band bucket alerting", () => {
     const c = defaultAnomalyConfig();
-    expect(c.band_width).toBe(3);
+    expect(c.band_width).toBeNull();
     // The percentile stays at its default, so the backend contract is unchanged.
     expect(c.threshold).toBe(97);
     expect(c.alert_direction).toBe("both");
@@ -139,9 +139,9 @@ describe("band and delivery defaults", () => {
 });
 
 describe("anomalyBandPayload", () => {
-  it("sends the create defaults as they are, band width included", () => {
+  it("sends the create defaults as they are, Auto as a null band width", () => {
     expect(anomalyBandPayload(defaultAnomalyConfig(), false)).toEqual({
-      band_width: 3,
+      band_width: null,
       alert_direction: "both",
       alert_window_buckets: 1,
       alert_window_fire_pct: 100,

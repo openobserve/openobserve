@@ -107,7 +107,6 @@ import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
-  ANOMALY_DEFAULT_BAND_WIDTH,
   anomalyBandWidthPrefill,
   anomalyBudgetPerDay,
   anomalyIntervalSeconds,
@@ -315,8 +314,8 @@ export const defaultAnomalyConfig = () => ({
   threshold: 97,
   // Set only when the backend stored a budget; undefined/null = percentile mode.
   alert_budget_per_day: undefined as number | undefined,
-  // Always sent for a non-budget alert; null only in budget mode, which the server rejects it beside.
-  band_width: ANOMALY_DEFAULT_BAND_WIDTH as number | string | null,
+  // Null is Auto: the trained k decides. A number overrides it live.
+  band_width: null as number | string | null,
   alert_direction: "both" as "both" | "above" | "below",
   alert_window_buckets: 1 as number | string | null,
   alert_window_fire_pct: 100 as number | string | null,

@@ -34,6 +34,7 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
@@ -74,7 +75,7 @@ import {
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
 import enLocale from "@/locales/languages/en-US.json";
-import { defaultAnomalyConfig } from "@/composables/useAlertForm";
+import { anomalyBandPayload, defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
 // Mount factory — keeps stubs and global plugins in one place
@@ -143,8 +144,8 @@ const renderedFilterFields = (w: VueWrapper): unknown[] =>
     .filter((c: any) => /^filters\[\d+\]\.field$/.test(c.props("name") || ""))
     .map((c: any) => c.findComponent(OSelect).props("modelValue"));
 
-// The sensitivity tiers, in render order: Conservative, Balanced, Aggressive (band width in σ).
-const SENSITIVITY_TIERS = [4, 3, 2.5];
+// The sensitivity tiers, in render order: Auto, then Conservative, Balanced, Aggressive (band width in σ).
+const SENSITIVITY_TIERS = ["auto", 4, 3, 2.5];
 
 // data-state of each tier button. A missing button reads as undefined so a
 // "no tier is active" assertion cannot pass just because nothing rendered.
@@ -505,7 +506,7 @@ describe("AnomalyDetectionConfig", () => {
 
   // jsdom lays nothing out, so the sliding pill never measures; data-state is the assertable selection.
   describe("sensitivity — tier toggle + level input on band_width", () => {
-    it("maps Conservative, Balanced and Aggressive to 4, 3 and 2.5", async () => {
+    it("offers Auto, then maps Conservative, Balanced and Aggressive to 4, 3 and 2.5", async () => {
       wrapper = mountConfig();
       await flushPromises();
 
@@ -514,18 +515,44 @@ describe("AnomalyDetectionConfig", () => {
           wrapper.find(`[data-test="anomaly-sensitivity-tier-${value}"]`).text(),
         ),
       ).toEqual([
+        i18n.global.t("alerts.anomaly.sensitivityAuto"),
         i18n.global.t("alerts.anomaly.sensitivityConservative"),
         i18n.global.t("alerts.anomaly.sensitivityBalanced"),
         i18n.global.t("alerts.anomaly.sensitivityAggressive"),
       ]);
     });
 
-    it("a new config defaults to Balanced, 3σ", async () => {
+    it("a new config defaults to Auto, with no band width", async () => {
       wrapper = mountConfig();
       await flushPromises();
 
-      expect(getForm(wrapper).state.values.band_width).toBe(3);
-      expect(tierStates(wrapper)).toEqual(["off", "on", "off"]);
+      expect(getForm(wrapper).state.values.band_width).toBeNull();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
+      expect(sensitivityHintText(wrapper)).toBeUndefined();
+    });
+
+    it("names the trained k beside Auto once the config carries one", async () => {
+      wrapper = mountConfig({ band_width: null, band_k: 3.4567 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').text()).toBe(
+        i18n.global.t("alerts.anomaly.sensitivityAutoTrained", { k: 3.46 }),
+      );
+      expect(getForm(wrapper).state.values.band_width).toBeNull();
+    });
+
+    it("clicking Auto clears an override and writes null back", async () => {
+      const { wrapper: w, config } = mountReturning({ band_width: 4 });
+      wrapper = w;
+      await flushPromises();
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(getForm(wrapper).state.values.band_width).toBeNull();
+      expect((config as any).band_width).toBeNull();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
     });
 
     it("clicking a tier sets band_width and writes it back to props.config", async () => {
@@ -545,7 +572,7 @@ describe("AnomalyDetectionConfig", () => {
       wrapper = mountConfig({ band_width: 3.5 });
       await flushPromises();
 
-      expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
       expect((levelInput(wrapper).element as HTMLInputElement).value).toBe("3.5");
       expect(sensitivityHintText(wrapper)).toBe(
         i18n.global.t("alerts.anomaly.bandWidthHint", { k: 3.5 }),
@@ -561,10 +588,10 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       expect(getForm(wrapper).state.values.band_width).toBe(4);
-      expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
+      expect(tierStates(wrapper)).toEqual(["off", "on", "off", "off"]);
     });
 
-    it.each([0.5, 10.5, ""])("rejects %s with the band-width range message", async (bad) => {
+    it.each([0.5, 10.5, 0])("rejects %s with the band-width range message", async (bad) => {
       wrapper = mountConfig({ band_width: 3 });
       await flushPromises();
       const form = getForm(wrapper);
@@ -596,7 +623,24 @@ describe("AnomalyDetectionConfig", () => {
       expect(form.state.isValid).toBe(true);
     });
 
-    it("clearing the level writes null back, which validation then blocks", async () => {
+    // Saving must never pin k: both an Auto create and an untouched Auto edit send null.
+    it.each([
+      ["a new alert left on Auto", {}],
+      [
+        "an untouched edit of an Auto alert",
+        { band_width: anomalyBandWidthPrefill({ band_width: null, band_k: 3.4 }), band_k: 3.4 },
+      ],
+    ])("%s saves band_width null", async (_label, stored) => {
+      const { wrapper: w, config } = mountReturning({ ...defaultAnomalyConfig(), ...stored });
+      wrapper = w;
+      await flushPromises();
+
+      await expect((wrapper.vm as any).validate()).resolves.toBe(true);
+      await flushPromises();
+      expect(anomalyBandPayload(config, false).band_width).toBeNull();
+    });
+
+    it("clearing the level is Auto: null goes back and validation passes", async () => {
       const { wrapper: w, config } = mountReturning({ band_width: 4 });
       wrapper = w;
       await flushPromises();
@@ -606,7 +650,8 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       expect((config as any).band_width).toBeNull();
-      await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
+      await expect((wrapper.vm as any).validate()).resolves.toBe(true);
     });
 
     it("never writes the percentile threshold, which the server still keeps", async () => {
@@ -794,7 +839,7 @@ describe("AnomalyDetectionConfig", () => {
       const field = wrapper.find('[data-test="anomaly-training-window"]');
       expect(field.text()).toContain(i18n.global.t("alerts.anomaly.daysUnit"));
       expect(wrapper.text()).not.toContain(
-        i18n.global.t("alerts.anomaly.bandGroupingHourOfWeekIfData"),
+        i18n.global.t("alerts.anomaly.bandGroupingWeekendHourIfData"),
       );
     });
 
@@ -850,6 +895,16 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(wrapper.text()).toContain("SQL Preview");
       expect(wrapper.text()).not.toContain("Anomaly Score Range");
+    });
+
+    // "Auto (trained k = 6)" plus three presets cannot fit a 390px row, so narrow screens get a menu.
+    it("collapses the tier group to a dropdown on narrow screens", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+      const group = wrapper
+        .findAllComponents(OToggleGroup)
+        .find((c) => c.vm.$attrs["data-test"] === "anomaly-sensitivity-tier");
+      expect(group?.props("mobileDropdown")).toBe(true);
     });
 
     it("gives the tier group an accessible name", async () => {
@@ -1242,8 +1297,8 @@ describe("anomalyWindowShareErrors", () => {
 
 // Mirrors absence.rs slot_resolution_for: (span + 1h) / cycle >= 3, and an hourly-or-finer bucket.
 describe("anomalyBandGrouping", () => {
-  it.each([60, 300, 3600])("groups %ss buckets by hour of week", (interval) => {
-    expect(anomalyBandGrouping(interval)).toBe("hour_of_week");
+  it.each([60, 300, 3600])("groups %ss buckets by weekday/weekend × hour", (interval) => {
+    expect(anomalyBandGrouping(interval)).toBe("weekend_hour");
   });
 
   it("is global for any bucket coarser than 1h", () => {
@@ -1251,15 +1306,15 @@ describe("anomalyBandGrouping", () => {
     expect(anomalyBandGrouping(86400)).toBe("global");
   });
 
-  it("assumes hour of week while the interval is not yet valid", () => {
-    expect(anomalyBandGrouping(null)).toBe("hour_of_week");
+  it("assumes weekday/weekend × hour while the interval is not yet valid", () => {
+    expect(anomalyBandGrouping(null)).toBe("weekend_hour");
   });
 
-  // The trainer picks from the data the stream returns: under 21 days hour of day, under 3 days global.
-  it("labels hour of week with its data condition, and global as it is", () => {
-    expect(anomalyExpectedGroupingKey(300)).toBe("alerts.anomaly.bandGroupingHourOfWeekIfData");
-    const label = String(i18n.global.t("alerts.anomaly.bandGroupingHourOfWeekIfData"));
-    for (const outcome of ["hour of week", "hour of day", "global"])
+  // The trainer picks from the data the stream returns: under 3 days global.
+  it("labels weekday/weekend × hour with its data condition, and global as it is", () => {
+    expect(anomalyExpectedGroupingKey(300)).toBe("alerts.anomaly.bandGroupingWeekendHourIfData");
+    const label = String(i18n.global.t("alerts.anomaly.bandGroupingWeekendHourIfData"));
+    for (const outcome of ["weekday/weekend × hour of day", "3+ days", "global"])
       expect(label).toContain(outcome);
     expect(anomalyExpectedGroupingKey(7200)).toBe("alerts.anomaly.bandGroupingGlobal");
   });
@@ -1271,19 +1326,16 @@ describe("anomalyBandWidthPrefill", () => {
     expect(anomalyBandWidthPrefill({ band_width: 3.5, band_k: 4.2 })).toBe(3.5);
   });
 
-  it.each([
-    [3.2667, 3.27],
-    [4.744, 4.74],
-    [3, 3],
-    [0.6, 1],
-    [12, 10],
-  ])("keeps a legacy trained k of %s to two decimals: %s", (bandK, expected) => {
-    expect(anomalyBandWidthPrefill({ band_width: null, band_k: bandK })).toBe(expected);
-  });
+  // Prefilling the trained k would turn an untouched save into a pinned override.
+  it.each([3.2667, 3, null])(
+    "is Auto without a stored band width, whatever the trained k (%s)",
+    (bandK) => {
+      expect(anomalyBandWidthPrefill({ band_width: null, band_k: bandK })).toBeNull();
+    },
+  );
 
-  it("falls back to Balanced 3 for a legacy alert with no trained k", () => {
-    expect(anomalyBandWidthPrefill({ band_width: null, band_k: null })).toBe(3);
-    expect(anomalyBandWidthPrefill({})).toBe(3);
+  it("is Auto for a config with no band fields at all", () => {
+    expect(anomalyBandWidthPrefill({})).toBeNull();
   });
 
   it("leaves a budget-mode alert without one, which the server rejects beside a budget", () => {

@@ -75,7 +75,7 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     retrain_interval_days: z.coerce.number(),
     // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
     sensitivity_mode: z.enum(["band", "budget"]),
-    // The raw input value is kept so a cleared field is judged in superRefine, not coerced to 0.
+    // Blank (null or a cleared "") is Auto; raw so superRefine judges it, not coerced to 0.
     band_width: z.union([z.string(), z.number(), z.null()]),
     budget_count: z.coerce.number(),
     budget_period: z.enum(["day", "week"]),
@@ -117,26 +117,28 @@ export interface AnomalyStoredIntervals {
   window: AnomalyStoredInterval;
 }
 
-export type AnomalyBandGrouping = "hour_of_week" | "hour_of_day" | "global";
+export type AnomalyBandGrouping = "weekend_hour" | "global";
 
-export const ANOMALY_BAND_GROUPING_KEYS: Record<AnomalyBandGrouping, string> = {
+// The two retired groupings stay labelled: a row keeps its value until it retrains.
+export const ANOMALY_BAND_GROUPING_KEYS: Record<string, string> = {
+  weekend_hour: "alerts.anomaly.bandGroupingWeekendHour",
+  global: "alerts.anomaly.bandGroupingGlobal",
   hour_of_week: "alerts.anomaly.bandGroupingHourOfWeek",
   hour_of_day: "alerts.anomaly.bandGroupingHourOfDay",
-  global: "alerts.anomaly.bandGroupingGlobal",
 };
 
 /** The trainer fetches at least this many days of history, whatever the configured window. */
 export const ANOMALY_MIN_TRAINING_DAYS = 21;
 
-/** The grouping the trainer picks (absence.rs `slot_resolution_for`): its 21-day floor always fills hour-of-week slots, unless a bucket is coarser than 1h. */
+/** The grouping the trainer picks (absence.rs `slot_resolution_for`): weekday/weekend × hour, unless a bucket is coarser than 1h. */
 export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
-  intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "hour_of_week";
+  intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "weekend_hour";
 
 /** Pre-training label key: the trainer groups by the data the stream returns, so the label names every outcome. */
 export const anomalyExpectedGroupingKey = (intervalSeconds: number | null): string =>
   anomalyBandGrouping(intervalSeconds) === "global"
     ? ANOMALY_BAND_GROUPING_KEYS.global
-    : "alerts.anomaly.bandGroupingHourOfWeekIfData";
+    : "alerts.anomaly.bandGroupingWeekendHourIfData";
 
 /** A window narrower than one schedule gap plus one bucket deterministically skips buckets (spec §4.3). */
 export const lookBackWindowFloorSeconds = (
@@ -174,7 +176,7 @@ export const formatAnomalySeconds = (secs: number): string => {
 const isBlankNumber = (v: unknown): boolean => v === "" || v === null || v === undefined;
 
 /** Balanced: the same k the trainer never goes below. */
-export const ANOMALY_DEFAULT_BAND_WIDTH = 3;
+export const ANOMALY_BALANCED_BAND_WIDTH = 3;
 
 // Mirrors the server's band_width rule: finite and within [1, 10].
 const isBandWidth = (n: number): boolean => Number.isFinite(n) && n >= 1 && n <= 10;
@@ -232,7 +234,7 @@ export const createAnomalyDetectionConfigSchema = (
     }
 
     if (value.sensitivity_mode === "band") {
-      if (isBlankNumber(value.band_width) || !isBandWidth(Number(value.band_width))) {
+      if (!isBlankNumber(value.band_width) && !isBandWidth(Number(value.band_width))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["band_width"],
@@ -316,7 +318,7 @@ export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined)
   return Number.isFinite(budget) && budget > 0 ? budget : null;
 };
 
-/** Band width to show on edit: a stored override, else the trained k so an untouched save keeps the band, else the default. */
+/** Band width to show on edit: a stored override, else null (Auto) — never the trained k, which saving would pin. */
 export const anomalyBandWidthPrefill = (
   cfg: Record<string, any> | null | undefined,
 ): number | null => {
@@ -324,9 +326,13 @@ export const anomalyBandWidthPrefill = (
   if (!isBlankNumber(cfg?.band_width) && Number.isFinite(Number(cfg?.band_width))) {
     return Number(cfg?.band_width);
   }
-  const trained = isBlankNumber(cfg?.band_k) ? NaN : Number(cfg?.band_k);
-  if (!Number.isFinite(trained)) return ANOMALY_DEFAULT_BAND_WIDTH;
-  return Math.min(10, Math.max(1, Math.round(trained * 100) / 100));
+  return null;
+};
+
+/** The trained k rounded for display, or null before training. */
+export const anomalyTrainedK = (cfg: Record<string, any> | null | undefined): number | null => {
+  const k = isBlankNumber(cfg?.band_k) ? NaN : Number(cfg?.band_k);
+  return Number.isFinite(k) ? Math.round(k * 100) / 100 : null;
 };
 
 export const ANOMALY_DIRECTION_KEYS: Record<string, string> = {
@@ -427,6 +433,6 @@ export const anomalyDetectionConfigDefaults = (
   training_window_days: cfg?.training_window_days ?? 28,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
   sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "band",
-  band_width: isBlankNumber(cfg?.band_width) ? ANOMALY_DEFAULT_BAND_WIDTH : Number(cfg?.band_width),
+  band_width: isBlankNumber(cfg?.band_width) ? null : Number(cfg?.band_width),
   ...budgetFieldsFromPerDay(anomalyBudgetPerDay(cfg)),
 });

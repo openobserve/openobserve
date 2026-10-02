@@ -8,6 +8,7 @@ import { type TranslateFn } from "@/types/i18n";
 import {
   ANOMALY_DIRECTION_KEYS,
   anomalyExpectedGroupingKey,
+  anomalyTrainedK,
   anomalyIntervalSeconds,
   anomalyWindowShareEffective,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
@@ -108,22 +109,16 @@ export function generateAnomalySummary(
       const blankToNaN = (v: unknown) =>
         v === null || v === undefined || v === "" ? NaN : Number(v);
       const bandWidth = blankToNaN(config.band_width);
-      const percentile = blankToNaN(config.threshold);
-      if (Number.isFinite(bandWidth)) {
-        parts.push(
-          t("alerts.anomaly.summaryThreshold", {
-            threshold: chip(`${bandWidth}σ`),
-          }),
-        );
-      } else if (Number.isFinite(percentile)) {
-        // The stored percentile indexes TRAINING scores; never restate it as
-        // a live anomaly rate — that arithmetic was measured false.
-        parts.push(
-          t("alerts.anomaly.summaryThreshold", {
-            threshold: chip(t("alerts.anomaly.summaryThresholdPercentile", { percentile })),
-          }),
-        );
-      }
+      const trainedK = anomalyTrainedK(config);
+      const auto =
+        trainedK === null
+          ? t("alerts.anomaly.sensitivityAuto")
+          : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK });
+      parts.push(
+        t("alerts.anomaly.summaryThreshold", {
+          threshold: chip(Number.isFinite(bandWidth) ? `${bandWidth}σ` : auto),
+        }),
+      );
     }
   }
 

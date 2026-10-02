@@ -521,6 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OToggleGroup
                 :model-value="budgetTier"
                 :aria-label="t('alerts.sensitivity')"
+                mobile-dropdown
                 data-test="anomaly-budget-tiers"
                 @update:model-value="onBudgetTier"
               >
@@ -557,13 +558,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div v-else class="flex flex-wrap items-center gap-3">
-              <OFormToggleGroup
-                name="band_width"
+              <OToggleGroup
+                :model-value="bandTier"
                 :aria-label="t('alerts.sensitivity')"
+                mobile-dropdown
                 data-test="anomaly-sensitivity-tier"
+                @update:model-value="onBandTier"
               >
-                <!-- Both controls share one field, so the message is rendered once below. -->
-                <template #error />
                 <OToggleGroupItem
                   v-for="tier in sensitivityTiers"
                   :key="tier.value"
@@ -573,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ tier.label }}
                 </OToggleGroupItem>
-              </OFormToggleGroup>
+              </OToggleGroup>
               <!-- Inline, not OFormInput's `label` prop: a stacked label would push the
                    whole control row a label-height below the Sensitivity heading. -->
               <div class="flex items-center gap-2">
@@ -664,11 +665,12 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
-  ANOMALY_DEFAULT_BAND_WIDTH,
+  ANOMALY_BALANCED_BAND_WIDTH,
   ANOMALY_MIN_TRAINING_DAYS,
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
   anomalyIntervalSeconds,
+  anomalyTrainedK,
   formatAnomalySeconds,
   hasTimestampAliasInSql,
   lookBackWindowFloorSeconds,
@@ -756,10 +758,18 @@ export default defineComponent({
       { label: t("alerts.anomaly.retrainSevenDays"), value: 7 },
       { label: t("alerts.anomaly.retrainFourteenDays"), value: 14 },
     ]);
-    // Values stay numbers — reka-ui matches the active item with ohash.isEqual.
+    const trainedK = computed(() => anomalyTrainedK(props.config));
+    // Preset values stay numbers — reka-ui matches the active item with ohash.isEqual.
     const sensitivityTiers = computed(() => [
+      {
+        value: "auto" as const,
+        label:
+          trainedK.value === null
+            ? t("alerts.anomaly.sensitivityAuto")
+            : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK.value }),
+      },
       { value: 4, label: t("alerts.anomaly.sensitivityConservative") },
-      { value: ANOMALY_DEFAULT_BAND_WIDTH, label: t("alerts.anomaly.sensitivityBalanced") },
+      { value: ANOMALY_BALANCED_BAND_WIDTH, label: t("alerts.anomaly.sensitivityBalanced") },
       { value: 2.5, label: t("alerts.anomaly.sensitivityAggressive") },
     ]);
     // 1/week is the burden gate's median target, 4/day the org-wide on-call ceiling.
@@ -855,6 +865,18 @@ export default defineComponent({
       if (!tier) return;
       form.setFieldValue("budget_count", tier.count);
       form.setFieldValue("budget_period", tier.period as "day" | "week");
+    };
+
+    const bandTier = computed(() => {
+      const value = bandWidth.value;
+      if (value === "" || value === null || value === undefined) return "auto";
+      return sensitivityTiers.value.find((tier) => tier.value === Number(value))?.value ?? "";
+    });
+
+    const onBandTier = (value: unknown) => {
+      const tier = sensitivityTiers.value.find((entry) => entry.value === value);
+      if (!tier) return;
+      form.setFieldValue("band_width", tier.value === "auto" ? null : tier.value);
     };
 
     // Suppressed on bad input: the error is the feedback.
@@ -1217,6 +1239,8 @@ export default defineComponent({
       lookBackWindowHint,
       legacyWindowWarning,
       sensitivityTiers,
+      bandTier,
+      onBandTier,
       sensitivityHint,
       budgetMode,
       budgetTiers,

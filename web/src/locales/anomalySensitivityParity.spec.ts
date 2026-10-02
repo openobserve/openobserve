@@ -62,7 +62,6 @@ const ADDED = [
   "alerts.anomaly.budgetRange",
   "alerts.anomaly.summaryBudgetPerDay",
   "alerts.anomaly.summaryBudgetPerWeek",
-  "alerts.anomaly.summaryThresholdPercentile",
   "alerts.anomaly.seriesScoreDeviation",
   "alerts.anomaly.seriesDropDeviation",
   "alerts.anomaly.seriesExpected",
@@ -95,11 +94,13 @@ const ADDED = [
   "alerts.anomaly.bandGrouping",
   "alerts.anomaly.trainingSpan",
   "alerts.anomaly.trainingSpanValue",
-  "alerts.anomaly.summaryBandWidthAuto",
   "alerts.anomaly.bandCaption",
   "alerts.anomaly.trainingWindowFloorHint",
   "alerts.anomaly.windowBucketsSpan",
-  "alerts.anomaly.bandGroupingHourOfWeekIfData",
+  "alerts.anomaly.bandGroupingWeekendHour",
+  "alerts.anomaly.bandGroupingWeekendHourIfData",
+  "alerts.anomaly.sensitivityAuto",
+  "alerts.anomaly.sensitivityAutoTrained",
   "alerts.anomaly.detectionAlreadyRunning",
   "alerts.anomaly.daysUnit",
   "alerts.anomaly.windowShareCompact",
@@ -133,6 +134,9 @@ const REMOVED = [
   "alerts.anomaly.summaryBandWidthManual",
   "alerts.anomaly.trainingWindowSeasonality",
   "alerts.anomaly.percentile",
+  "alerts.anomaly.summaryThresholdPercentile",
+  "alerts.anomaly.summaryBandWidthAuto",
+  "alerts.anomaly.bandGroupingHourOfWeekIfData",
 ];
 
 // Still read by AlertConfigSummary.vue — it sits one paragraph from the

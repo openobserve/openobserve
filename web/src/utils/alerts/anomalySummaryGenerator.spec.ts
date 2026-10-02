@@ -49,18 +49,16 @@ const config = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("generateAnomalySummary — sensitivity line", () => {
-  it("states the stored level, never a live anomaly rate", () => {
-    // The stored number indexes TRAINING scores and promises nothing about live buckets.
-    const summary = generateAnomalySummary(config(), [], t);
-    expect(summary).toContain("level 97");
-    expect(summary).not.toContain("anomaly rate");
-    // A bare "97" beside "Threshold" would read as a count or a percentage of alerts.
-    expect(summary).not.toMatch(/Threshold:[^<]*<[^>]*>\s*97\s*</);
-  });
-
-  it("reports the conservative tier as its level", () => {
-    expect(generateAnomalySummary(config({ threshold: 99 }), [], t)).toContain("level 99");
-  });
+  it.each([97, 99])(
+    "states Auto over a legacy percentile of %s, never a live anomaly rate",
+    (threshold) => {
+      const summary = generateAnomalySummary(config({ threshold }), [], t);
+      expect(summary).toContain(String(t("alerts.anomaly.sensitivityAuto")));
+      expect(summary).not.toMatch(/\blevel \d/);
+      expect(summary).not.toContain("anomaly rate");
+      expect(summary).not.toMatch(new RegExp(`Threshold:[^<]*<[^>]*>\\s*${threshold}\\s*<`));
+    },
+  );
 
   it("a stored budget replaces the level with the enforced cap", () => {
     const summary = generateAnomalySummary(config({ alert_budget_per_day: 2 }), [], t);
@@ -85,11 +83,10 @@ describe("generateAnomalySummary — sensitivity line", () => {
     [null, "null"],
     [undefined, "undefined"],
     ["abc", "non-numeric"],
-  ])("omits the sensitivity line entirely for %s (%s)", (threshold) => {
-    const summary = generateAnomalySummary(config({ threshold }), [], t);
-    expect(summary).not.toContain("Threshold:");
-    expect(summary).not.toMatch(/\blevel \d/);
-    expect(summary).not.toContain("anomaly rate");
+  ])("reads a blank band width %s (%s) as Auto", (band_width) => {
+    const summary = generateAnomalySummary(config({ band_width }), [], t);
+    expect(summary).toContain(String(t("alerts.anomaly.sensitivityAuto")));
+    expect(summary).not.toMatch(/\d+(\.\d+)?σ/);
     // The rest of the summary still renders.
     expect(summary).toContain("14 days");
   });
@@ -101,7 +98,7 @@ describe("generateAnomalySummary — training line", () => {
   it("names the band grouping the trainer will pick, which reads at least 21 days", () => {
     for (const days of [7, 14, 21]) {
       expect(generateAnomalySummary(config({ training_window_days: days }), [], t)).toContain(
-        `(${grouping("bandGroupingHourOfWeekIfData")})`,
+        `(${grouping("bandGroupingWeekendHourIfData")})`,
       );
     }
   });
@@ -127,8 +124,15 @@ describe("generateAnomalySummary — band width and delivery", () => {
     expect(summary).not.toMatch(/\blevel \d/);
   });
 
-  it("falls back to the percentile only without a band width", () => {
-    expect(generateAnomalySummary(config({ band_width: null }), [], t)).toContain("level 97");
+  it("states Auto without a band width, never the legacy percentile", () => {
+    const summary = generateAnomalySummary(config({ band_width: null }), [], t);
+    expect(summary).toContain(String(t("alerts.anomaly.sensitivityAuto")));
+    expect(summary).not.toMatch(/\blevel \d/);
+  });
+
+  it("names the trained k beside Auto on an edit of a trained Auto alert", () => {
+    const summary = generateAnomalySummary(config({ band_width: null, band_k: 3.4567 }), [], t);
+    expect(summary).toContain(String(t("alerts.anomaly.sensitivityAutoTrained", { k: 3.46 })));
   });
 
   it("still states direction and window share with notifications off", () => {
