@@ -1372,7 +1372,7 @@ async fn handle_anomaly_detection_triggers(
 
     // Run detection via enterprise and track outcome for the triggers stream.
     let run_start_us = now_micros();
-    let (trigger_status, trigger_error, trigger_success_response, anomaly_count) = {
+    let (trigger_status, trigger_error, trigger_success_response, gate_passed) = {
         #[cfg(feature = "enterprise")]
         {
             match o2_enterprise::enterprise::anomaly_detection::scheduler::run_detection_for_config(
@@ -1382,7 +1382,10 @@ async fn handle_anomaly_detection_triggers(
             {
                 // As scheduled alerts: the condition met is Firing even when cooldown silenced it.
                 Ok(run) => (
-                    if run.notify_failed {
+                    if run.claim_lost {
+                        // Another run held the lease and judged this window; nothing was evaluated.
+                        RunOutcome::Skipped
+                    } else if run.notify_failed {
                         RunOutcome::NotifyFailed
                     } else if run.gate_passed {
                         RunOutcome::Firing
@@ -1391,14 +1394,14 @@ async fn handle_anomaly_detection_triggers(
                     },
                     None,
                     Some(serde_json::json!({ "anomalies_found": run.anomaly_count }).to_string()),
-                    run.anomaly_count,
+                    run.gate_passed,
                 ),
                 Err(e) => {
                     log::error!(
                         "[anomaly_detection] detection failed for {}/{anomaly_id}: {e}",
                         trigger.org
                     );
-                    (RunOutcome::Error, Some(e.to_string()), None, 0i32)
+                    (RunOutcome::Error, Some(e.to_string()), None, false)
                 }
             }
         }
@@ -1408,7 +1411,7 @@ async fn handle_anomaly_detection_triggers(
                 RunOutcome::Skipped,
                 Some("enterprise feature not enabled".to_string()),
                 None,
-                0i32,
+                false,
             )
         }
     };
@@ -1437,8 +1440,8 @@ async fn handle_anomaly_detection_triggers(
 
     // Persist last_satisfied_at in trigger.data (mirrors alerts pattern).
     // trigger.start_time (set by the OSS scheduler pull SQL) is already last_triggered_at.
-    // We only need to update last_satisfied_at when anomalies were found.
-    if anomaly_count > 0 {
+    // Satisfied means the alert condition was met, the same rule that records Firing.
+    if gate_passed {
         use config::meta::triggers::ScheduledTriggerData;
         let mut td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap_or_default();
         td.last_satisfied_at = Some(run_end_us);
