@@ -63,4 +63,22 @@ describe("isIgnoredNoise", () => {
   it("handles undefined message and stack", () => {
     expect(isIgnoredNoise(undefined, undefined)).toBe(false);
   });
+
+  // The three config/org-settings prefixes above also fire for a genuine
+  // failure, not just a cancellation — these must still be captured.
+  it("still captures a genuine 500 on the full-configuration fetch", () => {
+    expect(
+      isIgnoredNoise("Failed to load the full configuration: Request failed with status code 500"),
+    ).toBe(false);
+  });
+
+  it("still captures a genuine 500 on getOrganizationSettings", () => {
+    expect(
+      isIgnoredNoise("Error in getOrganizationSettings: Request failed with status code 500"),
+    ).toBe(false);
+  });
+
+  it("still captures a genuine network error while fetching config", () => {
+    expect(isIgnoredNoise("Error while fetching config: Network Error")).toBe(false);
+  });
 });

@@ -23,9 +23,14 @@
  */
 export const IGNORED_NOISE_PATTERNS: RegExp[] = [
   /Cleanup socket failed, socket not found/i,
-  /^Failed to load the full configuration:/i,
-  /^Error in getOrganizationSettings:/i,
-  /^Error while fetching config:/i,
+  // These three prefixes also fire for a genuine failure (a real 500, a
+  // network timeout) — require an actual cancellation token after the
+  // prefix, not just the prefix itself, or a real failure stringifies to
+  // e.g. "Error in getOrganizationSettings: Request failed with status code
+  // 500" and would be silently dropped here.
+  /^Failed to load the full configuration:[\s\S]*(?:CancelledError|ERR_CANCELED)/i,
+  /^Error in getOrganizationSettings:[\s\S]*(?:CancelledError|ERR_CANCELED)/i,
+  /^Error while fetching config:[\s\S]*(?:CancelledError|ERR_CANCELED)/i,
   // Monaco editor disposal cancelling a pending operation — the message is
   // the bare word, with no distinguishing stack.
   /^Canceled$/,
