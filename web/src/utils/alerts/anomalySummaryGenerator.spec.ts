@@ -101,7 +101,7 @@ describe("generateAnomalySummary — training line", () => {
   it("names the band grouping the trainer will pick, which reads at least 21 days", () => {
     for (const days of [7, 14, 21]) {
       expect(generateAnomalySummary(config({ training_window_days: days }), [], t)).toContain(
-        `(${grouping("bandGroupingHourOfWeek")})`,
+        `(${grouping("bandGroupingHourOfWeekIfData")})`,
       );
     }
   });

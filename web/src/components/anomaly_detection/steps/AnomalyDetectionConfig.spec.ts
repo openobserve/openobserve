@@ -67,6 +67,7 @@ import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
 import {
   anomalyDetectionConfigDefaults,
   anomalyBandGrouping,
+  anomalyExpectedGroupingKey,
   anomalyNoticeBadgeKeys,
   anomalyWindowShareErrors,
   lookBackWindowFloorSeconds,
@@ -1014,7 +1015,7 @@ describe("AnomalyDetectionConfig", () => {
     it.each([28, 21, 7, 1])("%s days groups by hour of week at a 5m resolution", async (days) => {
       wrapper = mountConfig({ training_window_days: days });
       await flushPromises();
-      const key = "alerts.anomaly.bandGroupingHourOfWeek";
+      const key = "alerts.anomaly.bandGroupingHourOfWeekIfData";
       expect(label(wrapper)).toBe(i18n.global.t(key));
       expect(wrapper.text()).toContain(i18n.global.t(key));
     });
@@ -1409,7 +1410,7 @@ describe("anomalyNoticeBadgeKeys", () => {
   const enText = (key: string) =>
     key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
 
-  it.each(["window_floor", "window_skip", "hybrid_fallback", "retrain"])(
+  it.each(["window_floor", "window_skip", "retrain"])(
     "maps %s to a label and tooltip that exist in en-US",
     (noticeClass) => {
       const keys = anomalyNoticeBadgeKeys(noticeClass);
@@ -1419,7 +1420,7 @@ describe("anomalyNoticeBadgeKeys", () => {
     },
   );
 
-  it.each([null, undefined, "", "some_future_class", 42])(
+  it.each([null, undefined, "", "some_future_class", "hybrid_fallback", 42])(
     "shows no badge for an unknown class (%s)",
     (noticeClass) => {
       expect(anomalyNoticeBadgeKeys(noticeClass)).toBeNull();
@@ -1495,5 +1496,11 @@ describe("anomalyBandGrouping", () => {
 
   it("assumes hour of week while the interval is not yet valid", () => {
     expect(anomalyBandGrouping(null)).toBe("hour_of_week");
+  });
+
+  // The trainer falls back to hour of day on a stream holding under 21 days, so the label must say so.
+  it("labels hour of week with its data condition, and global as it is", () => {
+    expect(anomalyExpectedGroupingKey(300)).toBe("alerts.anomaly.bandGroupingHourOfWeekIfData");
+    expect(anomalyExpectedGroupingKey(7200)).toBe("alerts.anomaly.bandGroupingGlobal");
   });
 });

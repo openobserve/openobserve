@@ -730,9 +730,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
-  ANOMALY_BAND_GROUPING_KEYS,
   ANOMALY_MIN_TRAINING_DAYS,
-  anomalyBandGrouping,
+  anomalyExpectedGroupingKey,
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
   anomalyIntervalSeconds,
@@ -911,15 +910,16 @@ export default defineComponent({
       return Number.isFinite(days) && days < ANOMALY_MIN_TRAINING_DAYS;
     });
 
-    const bandGroupingLabel = computed(() => {
-      const grouping = anomalyBandGrouping(
-        anomalyIntervalSeconds(
-          Number(histogramIntervalValue.value),
-          String(histogramIntervalUnit.value),
-        ),
-      );
-      return t(ANOMALY_BAND_GROUPING_KEYS[grouping] as any);
-    });
+    const bandGroupingLabel = computed(() =>
+      t(
+        anomalyExpectedGroupingKey(
+          anomalyIntervalSeconds(
+            Number(histogramIntervalValue.value),
+            String(histogramIntervalUnit.value),
+          ),
+        ) as any,
+      ),
+    );
 
     const sensitivityTooltip = computed(() =>
       budgetMode.value

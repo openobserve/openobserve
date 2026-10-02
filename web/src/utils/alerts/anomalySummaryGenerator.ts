@@ -6,8 +6,7 @@
 
 import { type TranslateFn } from "@/types/i18n";
 import {
-  ANOMALY_BAND_GROUPING_KEYS,
-  anomalyBandGrouping,
+  anomalyExpectedGroupingKey,
   anomalyIntervalSeconds,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
@@ -72,14 +71,12 @@ export function generateAnomalySummary(
     parts.push(t("alerts.anomaly.summaryDetectionWindow", { window: chip(win) }));
 
     const seasonality = t(
-      ANOMALY_BAND_GROUPING_KEYS[
-        anomalyBandGrouping(
-          anomalyIntervalSeconds(
-            Number(config.histogram_interval_value),
-            String(config.histogram_interval_unit),
-          ),
-        )
-      ] as any,
+      anomalyExpectedGroupingKey(
+        anomalyIntervalSeconds(
+          Number(config.histogram_interval_value),
+          String(config.histogram_interval_unit),
+        ),
+      ) as any,
     );
     parts.push(
       t("alerts.anomaly.summaryTraining", {

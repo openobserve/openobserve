@@ -134,6 +134,12 @@ export const ANOMALY_MIN_TRAINING_DAYS = 21;
 export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
   intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "hour_of_week";
 
+/** Pre-training label key: hour of week depends on how much data the stream returns, so it names the fallback. */
+export const anomalyExpectedGroupingKey = (intervalSeconds: number | null): string =>
+  anomalyBandGrouping(intervalSeconds) === "global"
+    ? ANOMALY_BAND_GROUPING_KEYS.global
+    : "alerts.anomaly.bandGroupingHourOfWeekIfData";
+
 /** A window narrower than one schedule gap plus one bucket deterministically skips buckets (spec §4.3). */
 export const lookBackWindowFloorSeconds = (
   scheduleValue: number,
@@ -301,11 +307,6 @@ export const anomalyNoticeBadgeKeys = (
       return {
         labelKey: "alerts.anomaly.noticeWindowSkip",
         tooltipKeys: ["alerts.anomaly.noticeSkipScored", "alerts.anomaly.noticeSkipAbsence"],
-      };
-    case "hybrid_fallback":
-      return {
-        labelKey: "alerts.anomaly.noticeHybridFallback",
-        tooltipKeys: ["alerts.anomaly.noticeHybridFallbackTooltip"],
       };
     case "retrain":
       return {

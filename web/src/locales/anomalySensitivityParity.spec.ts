@@ -81,7 +81,6 @@ const ADDED = [
   "alerts.anomaly.noDetectionResults",
   "alerts.anomaly.tooltipAnomalyAbove",
   "alerts.anomaly.tooltipAnomalyBelow",
-  // Band width, delivery direction and window share, the band explanation, the chart caption.
   "alerts.anomaly.bandWidth",
   "alerts.anomaly.bandWidthAuto",
   "alerts.anomaly.bandWidthHint",
@@ -113,6 +112,7 @@ const ADDED = [
   "alerts.anomaly.bandCaption",
   "alerts.anomaly.trainingWindowFloorHint",
   "alerts.anomaly.windowBucketsSpan",
+  "alerts.anomaly.bandGroupingHourOfWeekIfData",
 ];
 
 // Keys orphaned by retired UI; a locale still carrying one is dead copy nothing else would flag.
@@ -129,8 +129,9 @@ const REMOVED = [
   "alerts.anomaly.sensitivityHintEveryNDays",
   "alerts.anomaly.summaryThresholdRate",
   "alerts.anomaly.seriesDeviation",
-  // The band grouping labels replaced it; nothing derives a weekly seasonality any more.
   "alerts.anomaly.seasonalityWeekly",
+  "alerts.anomaly.noticeHybridFallback",
+  "alerts.anomaly.noticeHybridFallbackTooltip",
 ];
 
 // Still read by AlertConfigSummary.vue — it sits one paragraph from the
