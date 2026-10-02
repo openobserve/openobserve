@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (otomatik)",
       "summaryBandWidthManual": "{k}σ (elle)",
       "bandCaption": "Bant: beklenen ± {k}σ",
+      "trainingWindowFloorHint": "Hafta içi ve hafta sonu örüntülerinin öğrenilmesi için eğitim en az {days} günlük geçmiş kullanır (akış bu kadar veriyi saklıyorsa).",
       "seriesAnomaly": "Anomali",
       "seriesDropAbsence": "Düşüş / yokluk",
       "seriesDropDeviation": "Beklenenin altına düşüş",

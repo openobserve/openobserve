@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (automatica)",
       "summaryBandWidthManual": "{k}σ (manuale)",
       "bandCaption": "Fascia: valore previsto ± {k}σ",
+      "trainingWindowFloorHint": "L'addestramento usa almeno {days} giorni di storico per apprendere gli andamenti dei giorni feriali e del fine settimana (se lo stream conserva così tanti dati).",
       "seriesAnomaly": "Anomalia",
       "seriesDropAbsence": "Calo / assenza",
       "seriesDropDeviation": "Calo sotto il previsto",

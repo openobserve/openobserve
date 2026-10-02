@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (automatycznie)",
       "summaryBandWidthManual": "{k}σ (ręcznie)",
       "bandCaption": "Pas: wartość oczekiwana ± {k}σ",
+      "trainingWindowFloorHint": "Trening wykorzystuje co najmniej {days} dni historii, aby nauczyć się wzorców dni roboczych i weekendów (jeśli strumień przechowuje tyle danych).",
       "seriesAnomaly": "Anomalia",
       "seriesDropAbsence": "Spadek / brak danych",
       "seriesDropDeviation": "Spadek poniżej wartości oczekiwanej",

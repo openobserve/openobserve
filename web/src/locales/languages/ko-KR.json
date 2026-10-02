@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (자동)",
       "summaryBandWidthManual": "{k}σ (수동)",
       "bandCaption": "띠: 예상값 ± {k}σ",
+      "trainingWindowFloorHint": "평일과 주말 패턴을 학습할 수 있도록 학습에는 최소 {days}일의 기록이 사용됩니다(스트림에 그만큼의 데이터가 보존되어 있는 경우).",
       "seriesAnomaly": "이상",
       "seriesDropAbsence": "감소 / 부재",
       "seriesDropDeviation": "예상치 미달",

@@ -488,6 +488,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}
               </span>
+              <span
+                v-if="trainingFloorApplies"
+                class="text-text-secondary pt-1 text-xs"
+                data-test="anomaly-training-window-floor-hint"
+              >
+                {{ t("alerts.anomaly.trainingWindowFloorHint", { days: minTrainingDays }) }}
+              </span>
             </div>
           </div>
           <!-- Retrain Every -->
@@ -724,6 +731,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
   ANOMALY_BAND_GROUPING_KEYS,
+  ANOMALY_MIN_TRAINING_DAYS,
   anomalyBandGrouping,
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
@@ -895,6 +903,13 @@ export default defineComponent({
     const sensitivityError = computed(() =>
       budgetMode.value ? budgetCountError.value : thresholdError.value,
     );
+
+    const trainingFloorApplies = computed(() => {
+      const value = trainingWindowDays.value;
+      if (value === "" || value === null || value === undefined) return false;
+      const days = Number(value);
+      return Number.isFinite(days) && days < ANOMALY_MIN_TRAINING_DAYS;
+    });
 
     const bandGroupingLabel = computed(() => {
       const grouping = anomalyBandGrouping(
@@ -1299,6 +1314,8 @@ export default defineComponent({
       sensitivityTooltip,
       bandGroupingLabel,
       bandWidthError,
+      trainingFloorApplies,
+      minTrainingDays: ANOMALY_MIN_TRAINING_DAYS,
       onCustomSqlChange,
     };
   },

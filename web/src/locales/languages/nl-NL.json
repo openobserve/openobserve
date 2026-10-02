@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (automatisch)",
       "summaryBandWidthManual": "{k}σ (handmatig)",
       "bandCaption": "Band: verwachte waarde ± {k}σ",
+      "trainingWindowFloorHint": "De training gebruikt minstens {days} dagen geschiedenis, zodat patronen van werkdagen en weekenden worden geleerd (als de stream zoveel gegevens bewaart).",
       "seriesAnomaly": "Anomalie",
       "seriesDropAbsence": "Daling / afwezigheid",
       "seriesDropDeviation": "Daling onder verwachte waarde",

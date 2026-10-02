@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ（自动）",
       "summaryBandWidthManual": "{k}σ（手动）",
       "bandCaption": "带：预期值 ± {k}σ",
+      "trainingWindowFloorHint": "训练至少使用 {days} 天的历史数据，以便学习工作日和周末的规律（前提是数据流保留了这么多数据）。",
       "seriesAnomaly": "异常",
       "seriesDropAbsence": "下降 / 缺失",
       "seriesDropDeviation": "低于预期的下跌",

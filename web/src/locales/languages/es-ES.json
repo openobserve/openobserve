@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (automático)",
       "summaryBandWidthManual": "{k}σ (manual)",
       "bandCaption": "Banda: esperado ± {k}σ",
+      "trainingWindowFloorHint": "El entrenamiento usa al menos {days} días de historial para aprender los patrones de días laborables y fines de semana (si el flujo conserva tantos datos).",
       "seriesAnomaly": "Anomalía",
       "seriesDropAbsence": "Caída / ausencia",
       "seriesDropDeviation": "Caída por debajo de lo esperado",

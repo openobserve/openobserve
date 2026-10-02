@@ -98,13 +98,12 @@ describe("generateAnomalySummary — sensitivity line", () => {
 describe("generateAnomalySummary — training line", () => {
   const grouping = (key: string) => String(t(`alerts.anomaly.${key}` as any));
 
-  it("names the band grouping the trainer will pick, not a weekly seasonality", () => {
-    expect(generateAnomalySummary(config({ training_window_days: 14 }), [], t)).toContain(
-      `(${grouping("bandGroupingHourOfDay")})`,
-    );
-    expect(generateAnomalySummary(config({ training_window_days: 21 }), [], t)).toContain(
-      `(${grouping("bandGroupingHourOfWeek")})`,
-    );
+  it("names the band grouping the trainer will pick, which reads at least 21 days", () => {
+    for (const days of [7, 14, 21]) {
+      expect(generateAnomalySummary(config({ training_window_days: days }), [], t)).toContain(
+        `(${grouping("bandGroupingHourOfWeek")})`,
+      );
+    }
   });
 
   it("is global for a resolution coarser than 1h", () => {

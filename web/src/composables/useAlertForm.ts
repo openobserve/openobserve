@@ -308,7 +308,7 @@ export const defaultAnomalyConfig = () => ({
   // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
   detection_window_value: 3,
   detection_window_unit: "h" as AnomalyIntervalUnit,
-  training_window_days: 14,
+  training_window_days: 28,
   retrain_interval_days: 7,
   threshold: 97,
   // Set only when the backend stored a budget; undefined/null = percentile mode.

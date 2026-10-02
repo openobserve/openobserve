@@ -1011,16 +1011,32 @@ describe("AnomalyDetectionConfig", () => {
   describe("training window — band grouping label", () => {
     const label = (w: VueWrapper) => (w.vm as any).bandGroupingLabel;
 
-    it.each([
-      [21, "alerts.anomaly.bandGroupingHourOfWeek"],
-      [20, "alerts.anomaly.bandGroupingHourOfDay"],
-      [3, "alerts.anomaly.bandGroupingHourOfDay"],
-      [2, "alerts.anomaly.bandGroupingGlobal"],
-    ])("%s days groups by %s", async (days, key) => {
+    it.each([28, 21, 7, 1])("%s days groups by hour of week at a 5m resolution", async (days) => {
       wrapper = mountConfig({ training_window_days: days });
       await flushPromises();
+      const key = "alerts.anomaly.bandGroupingHourOfWeek";
       expect(label(wrapper)).toBe(i18n.global.t(key));
       expect(wrapper.text()).toContain(i18n.global.t(key));
+    });
+
+    const floorHint = (w: VueWrapper) => w.find('[data-test="anomaly-training-window-floor-hint"]');
+
+    it.each([20, 7, 1])("%s days shows the 21-day training floor", async (days) => {
+      wrapper = mountConfig({ training_window_days: days });
+      await flushPromises();
+      expect(floorHint(wrapper).text()).toBe(
+        i18n.global.t("alerts.anomaly.trainingWindowFloorHint", { days: 21 }),
+      );
+    });
+
+    it.each([21, 28, 60])("%s days hides the training floor hint", async (days) => {
+      wrapper = mountConfig({ training_window_days: days });
+      await flushPromises();
+      expect(floorHint(wrapper).exists()).toBe(false);
+    });
+
+    it("defaults a new config to 28 days", () => {
+      expect(anomalyDetectionConfigDefaults(undefined).training_window_days).toBe(28);
     });
 
     it("is global for a detection resolution coarser than 1h, however long the window", async () => {
@@ -1453,21 +1469,26 @@ describe("anomalyWindowShareErrors", () => {
 // Mirrors absence.rs slot_resolution_for: (span + 1h) / cycle >= 3, and an hourly-or-finer bucket.
 describe("anomalyBandGrouping", () => {
   it.each([
-    [21, 300, "hour_of_week"],
-    [20, 300, "hour_of_day"],
-    [3, 3600, "hour_of_day"],
-    [2, 300, "global"],
-    [0, 300, "global"],
-  ])("%s days at %ss buckets groups by %s", (days, interval, grouping) => {
-    expect(anomalyBandGrouping(days, interval)).toBe(grouping);
-  });
+    [21, 300],
+    [20, 300],
+    [3, 3600],
+    [1, 300],
+    [0, 60],
+    [NaN, 300],
+  ])(
+    "%s days at %ss buckets groups by hour of week: the trainer reads at least 21 days",
+    (days, interval) => {
+      expect(anomalyBandGrouping(days, interval)).toBe("hour_of_week");
+    },
+  );
 
-  it("is global for any bucket coarser than 1h", () => {
+  it("is global for any bucket coarser than 1h, whatever the window", () => {
+    expect(anomalyBandGrouping(1, 3601)).toBe("global");
     expect(anomalyBandGrouping(60, 3601)).toBe("global");
     expect(anomalyBandGrouping(60, 86400)).toBe("global");
   });
 
-  it("judges by the span alone when the interval is not yet valid", () => {
-    expect(anomalyBandGrouping(21, null)).toBe("hour_of_week");
+  it("judges by the floored span alone when the interval is not yet valid", () => {
+    expect(anomalyBandGrouping(5, null)).toBe("hour_of_week");
   });
 });

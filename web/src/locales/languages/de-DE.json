@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (automatisch)",
       "summaryBandWidthManual": "{k}σ (manuell)",
       "bandCaption": "Band: Erwartungswert ± {k}σ",
+      "trainingWindowFloorHint": "Das Training nutzt mindestens {days} Tage Verlauf, damit Muster von Werktagen und Wochenenden gelernt werden (sofern der Stream so viele Daten aufbewahrt).",
       "seriesAnomaly": "Anomalie",
       "seriesDropAbsence": "Einbruch / Ausbleiben",
       "seriesDropDeviation": "Abfall unter Erwartung",

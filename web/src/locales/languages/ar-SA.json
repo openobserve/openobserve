@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (تلقائي)",
       "summaryBandWidthManual": "{k}σ (يدوي)",
       "bandCaption": "الشريط: القيمة المتوقعة ± {k}σ",
+      "trainingWindowFloorHint": "يستخدم التدريب سجلًا لا يقل عن {days} يومًا حتى يتعلم أنماط أيام الأسبوع وعطلة نهاية الأسبوع (إذا كان التدفق يحتفظ بهذا القدر من البيانات).",
       "seriesAnomaly": "شذوذ",
       "seriesDropAbsence": "انخفاض / غياب",
       "seriesDropDeviation": "انخفاض دون المتوقع",

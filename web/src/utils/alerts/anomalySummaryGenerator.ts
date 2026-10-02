@@ -74,7 +74,7 @@ export function generateAnomalySummary(
     const seasonality = t(
       ANOMALY_BAND_GROUPING_KEYS[
         anomalyBandGrouping(
-          Number(config.training_window_days || 14),
+          Number(config.training_window_days || 28),
           anomalyIntervalSeconds(
             Number(config.histogram_interval_value),
             String(config.histogram_interval_unit),
@@ -170,7 +170,7 @@ function generatePlainEnglish(config: any, wizardStep: number, t: TranslateFn): 
   const stream = esc(config.stream_name);
   const fn = esc(config.detection_function || "count");
   const schedule = esc(`${config.schedule_interval_value}${config.schedule_interval_unit}`);
-  const trainingDays = config.training_window_days || 14;
+  const trainingDays = config.training_window_days || 28;
 
   if (wizardStep < 2) {
     return t("alerts.anomaly.summaryConfiguring", {

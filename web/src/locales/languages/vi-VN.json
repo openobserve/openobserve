@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (tự động)",
       "summaryBandWidthManual": "{k}σ (thủ công)",
       "bandCaption": "Dải: giá trị dự kiến ± {k}σ",
+      "trainingWindowFloorHint": "Quá trình huấn luyện dùng ít nhất {days} ngày lịch sử để học được mẫu hình ngày thường và cuối tuần (nếu luồng lưu giữ đủ dữ liệu).",
       "seriesAnomaly": "Bất thường",
       "seriesDropAbsence": "Sụt giảm / vắng mặt",
       "seriesDropDeviation": "Giảm dưới mức dự kiến",

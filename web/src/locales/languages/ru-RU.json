@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (авто)",
       "summaryBandWidthManual": "{k}σ (вручную)",
       "bandCaption": "Полоса: ожидаемое значение ± {k}σ",
+      "trainingWindowFloorHint": "Для обучения используется не менее {days} дней истории, чтобы модель усвоила закономерности будних и выходных дней (если поток хранит столько данных).",
       "seriesAnomaly": "Аномалия",
       "seriesDropAbsence": "Падение / отсутствие",
       "seriesDropDeviation": "Падение ниже ожидаемого",

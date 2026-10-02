@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (auto)",
       "summaryBandWidthManual": "{k}σ (manuelle)",
       "bandCaption": "Bande : valeur attendue ± {k}σ",
+      "trainingWindowFloorHint": "L'entraînement utilise au moins {days} jours d'historique afin d'apprendre les tendances des jours ouvrés et du week-end (si le flux conserve autant de données).",
       "seriesAnomaly": "Anomalie",
       "seriesDropAbsence": "Chute / absence",
       "seriesDropDeviation": "Chute sous la valeur attendue",

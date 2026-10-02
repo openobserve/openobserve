@@ -14,6 +14,10 @@ import {
 } from "@/composables/useAlertForm";
 
 describe("defaultAnomalyConfig", () => {
+  it("defaults the training window to 28 days", () => {
+    expect(defaultAnomalyConfig().training_window_days).toBe(28);
+  });
+
   it("defaults threshold to the 97th percentile", () => {
     expect(defaultAnomalyConfig().threshold).toBe(97);
   });

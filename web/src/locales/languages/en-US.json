@@ -7794,6 +7794,7 @@
       "summaryBandWidthAuto": "{k}σ (auto)",
       "summaryBandWidthManual": "{k}σ (manual)",
       "bandCaption": "Band: expected ± {k}σ",
+      "trainingWindowFloorHint": "Training uses at least {days} days of history so weekday and weekend patterns are learned (if the stream keeps that much data).",
       "seriesAnomaly": "Anomaly",
       "seriesDropAbsence": "Drop / absence",
       "seriesDropDeviation": "Drop below expected",
