@@ -503,15 +503,7 @@ describe("AnomalyDetectionConfig", () => {
     });
   });
 
-  // =========================================================================
-  // Sensitivity — ONE form field (`band_width`, the band's k in σ) behind two
-  // controls: the three-tier toggle group and the level input. Picking a tier
-  // sets the number; typing a number re-highlights the matching tier, or none.
-  //
-  // The sliding pill is NOT asserted here: jsdom lays nothing out, so
-  // OToggleGroup's measure() always bails on offsetParent === null. data-state
-  // on the buttons is the assertable selection state.
-  // =========================================================================
+  // jsdom lays nothing out, so the sliding pill never measures; data-state is the assertable selection.
   describe("sensitivity — tier toggle + level input on band_width", () => {
     it("maps Conservative, Balanced and Aggressive to 4, 3 and 2.5", async () => {
       wrapper = mountConfig();
@@ -1280,12 +1272,12 @@ describe("anomalyBandWidthPrefill", () => {
   });
 
   it.each([
-    [3.24, 3],
-    [3.26, 3.5],
-    [4.74, 4.5],
+    [3.2667, 3.27],
+    [4.744, 4.74],
+    [3, 3],
     [0.6, 1],
     [12, 10],
-  ])("rounds a legacy trained k of %s to the nearest half: %s", (bandK, expected) => {
+  ])("keeps a legacy trained k of %s to two decimals: %s", (bandK, expected) => {
     expect(anomalyBandWidthPrefill({ band_width: null, band_k: bandK })).toBe(expected);
   });
 

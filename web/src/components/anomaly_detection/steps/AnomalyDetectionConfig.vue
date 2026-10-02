@@ -55,8 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`anomaly-filter-field-${idx}`"
                 :options="filteredStreamFields"
                 :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
-                class="alert-v3-select filter-field-select"
-                style="width: 12.5rem"
+                class="alert-v3-select filter-field-select max-w-50 min-w-50"
                 :loading="loadingFields"
               >
                 <template #empty>
@@ -73,16 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="`filters[${idx}].operator`"
                 :data-test="`anomaly-filter-operator-${idx}`"
                 :options="filterOperators"
-                class="alert-v3-select"
-                style="width: 6.875rem"
+                class="alert-v3-select max-w-27.5 min-w-27.5"
               />
               <OFormInput
                 v-if="operatorNeedsValue(filter.operator)"
                 :name="`filters[${idx}].value`"
                 :data-test="`anomaly-filter-value-${idx}`"
                 :placeholder="t('alerts.placeholders.value')"
-                class="alert-v3-input"
-                style="max-width: 10rem"
+                class="alert-v3-input max-w-40"
               />
               <OButton
                 variant="ghost"
@@ -452,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Uses a #content slot (not :content) so the font-size
                        span survives. -->
                   <template #content
-                    ><span style="font-size: var(--text-sm)">{{
+                    ><span class="text-sm">{{
                       t("alerts.anomaly.trainingWindowTooltip")
                     }}</span></template
                   >
@@ -583,14 +580,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
                 >
-                  {{ t("alerts.anomaly.percentile") }}
+                  {{ t("alerts.anomaly.level") }}
                 </span>
                 <OFormInput
                   name="band_width"
                   type="number"
                   suffix="σ"
                   :model-modifiers="{ number: true }"
-                  :aria-label="t('alerts.anomaly.percentile')"
+                  :aria-label="t('alerts.anomaly.level')"
                   class="max-w-21.75 min-w-21.75"
                   data-test="anomaly-sensitivity-level"
                 >

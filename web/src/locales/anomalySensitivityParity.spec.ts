@@ -52,7 +52,7 @@ const ADDED = [
   "alerts.anomaly.sensitivityConservative",
   "alerts.anomaly.sensitivityBalanced",
   "alerts.anomaly.sensitivityAggressive",
-  "alerts.anomaly.percentile",
+  "alerts.anomaly.level",
   // Mode-aware copy: the budget-mode strings and the per-kind deviation labels.
   "alerts.anomaly.sensitivityBudgetTooltip",
   "alerts.anomaly.budgetHintPerDay",
@@ -133,6 +133,7 @@ const REMOVED = [
   "alerts.anomaly.bandWidthK",
   "alerts.anomaly.summaryBandWidthManual",
   "alerts.anomaly.trainingWindowSeasonality",
+  "alerts.anomaly.percentile",
 ];
 
 // Still read by AlertConfigSummary.vue — it sits one paragraph from the
@@ -384,7 +385,7 @@ describe("anomaly sensitivity locale parity", () => {
     }).toEqual(PINNED_COPY[name]);
   });
 
-  // The control is the band width now; a tooltip still quoting a percentile preset describes a dead knob.
+  // The control sets k directly, so its tooltip speaks in σ and quotes no percentile preset.
   it.each(ALL_LOCALES)("%s describes the band in σ, not a training percentile", (_name, locale) => {
     const tooltip = String(at(locale, "alerts.anomaly.sensitivityTooltip"));
     expect(tooltip).toContain("σ");
@@ -492,7 +493,7 @@ describe("anomaly sensitivity locale parity", () => {
   // Detection Function's p50/p95/p99. The label is what a reader sees first, so
   // it must not reach for the Detection Function's vocabulary to name itself.
   it("en-US labels the sensitivity number without detection-function vocabulary", () => {
-    const label = String(at(en, "alerts.anomaly.percentile")).toLowerCase();
+    const label = String(at(en, "alerts.anomaly.level")).toLowerCase();
     expect(label).not.toContain("percentile");
     expect(label).not.toMatch(/\bp\d{2}\b/);
     // Still a label, not a sentence — it sits in a 21.75rem-wide field column.

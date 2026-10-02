@@ -326,7 +326,7 @@ export const anomalyBandWidthPrefill = (
   }
   const trained = isBlankNumber(cfg?.band_k) ? NaN : Number(cfg?.band_k);
   if (!Number.isFinite(trained)) return ANOMALY_DEFAULT_BAND_WIDTH;
-  return Math.min(10, Math.max(1, Math.round(trained * 2) / 2));
+  return Math.min(10, Math.max(1, Math.round(trained * 100) / 100));
 };
 
 export const ANOMALY_DIRECTION_KEYS: Record<string, string> = {

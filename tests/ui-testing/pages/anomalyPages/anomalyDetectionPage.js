@@ -56,10 +56,9 @@ class AnomalyDetectionPage {
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
             detectionFunction: '[data-test="anomaly-detection-function"]',
-            // The Detection Function info icon renders as a bare OIcon (no data-test),
-            // so anchor on the label and take the
-            // cursor-pointer icon span — the OTooltip's hidden anchor span (also
-            // aria-hidden) has no cursor-pointer class and is excluded.
+            // The Detection Function info icon renders as a bare OIcon (no data-test), so anchor on
+            // the label and take the cursor-pointer icon span — the OTooltip's hidden anchor span
+            // (also aria-hidden) has no cursor-pointer class and is excluded.
             detectionFunctionInfo:
               'div.font-semibold:has-text("Detection Function") span[aria-hidden="true"].cursor-pointer',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
