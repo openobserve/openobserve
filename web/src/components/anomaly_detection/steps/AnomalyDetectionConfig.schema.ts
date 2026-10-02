@@ -173,7 +173,7 @@ export const formatAnomalySeconds = (secs: number): string => {
 
 const isBlankNumber = (v: unknown): boolean => v === "" || v === null || v === undefined;
 
-/** Balanced: the trainer's own k floor, which the old percentile presets almost always landed on. */
+/** Balanced: the same k the trainer never goes below. */
 export const ANOMALY_DEFAULT_BAND_WIDTH = 3;
 
 // Mirrors the server's band_width rule: finite and within [1, 10].
