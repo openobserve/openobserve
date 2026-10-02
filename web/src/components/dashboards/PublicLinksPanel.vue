@@ -152,6 +152,13 @@
         <div class="text-text-secondary text-xs">
           {{ t("dashboard.publicDashboard.defaultVariableValues") }}
         </div>
+        <OBanner
+          variant="info"
+          icon="info"
+          dense
+          :content="t('dashboard.publicLinks.frozenVariablesNote')"
+          data-test="dashboards-public-links-panel-variables-note"
+        />
         <VariablesValueSelector
           :key="formKey"
           :variablesConfig="variablesConfig"
