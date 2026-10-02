@@ -885,10 +885,7 @@ pub fn validate_edit(cfg: &PublicDashboardConfig, link: &PublicDashboard) -> Res
 }
 
 fn validate_limits(cfg: &PublicDashboardConfig) -> Result<(), String> {
-    check_rebuild_secs(
-        cfg.rebuild_secs,
-        config::get_config().public_dashboards.min_rebuild_secs,
-    )?;
+    check_rebuild_secs(cfg.rebuild_secs)?;
     let name = cfg.name.trim();
     if name.is_empty() {
         return Err("name is required".to_string());
@@ -917,12 +914,10 @@ fn check_presets(tr: &TimeRangePolicy) -> Result<(), String> {
     Ok(())
 }
 
-fn check_rebuild_secs(secs: i32, floor: u64) -> Result<(), String> {
-    if i64::from(secs) < floor.max(1) as i64 {
-        return Err(format!(
-            "rebuild_secs must be at least {} seconds",
-            floor.max(1)
-        ));
+// A zero or negative cadence would reschedule the trigger in a tight loop.
+fn check_rebuild_secs(secs: i32) -> Result<(), String> {
+    if secs < 1 {
+        return Err("rebuild_secs must be at least 1 second".to_string());
     }
     Ok(())
 }
@@ -968,13 +963,14 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_secs_below_floor_is_rejected_not_raised() {
-        assert!(check_rebuild_secs(10, 10).is_ok());
-        assert!(check_rebuild_secs(60, 10).is_ok());
-        let err = check_rebuild_secs(5, 10).unwrap_err();
-        assert_eq!(err, "rebuild_secs must be at least 10 seconds");
-        // A zero floor still refuses a non-positive cadence.
-        assert!(check_rebuild_secs(0, 0).is_err());
+    fn rebuild_secs_must_be_positive() {
+        assert!(check_rebuild_secs(1).is_ok());
+        assert!(check_rebuild_secs(5).is_ok());
+        assert_eq!(
+            check_rebuild_secs(0).unwrap_err(),
+            "rebuild_secs must be at least 1 second"
+        );
+        assert!(check_rebuild_secs(-5).is_err());
     }
 
     #[test]

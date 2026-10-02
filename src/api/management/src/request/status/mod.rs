@@ -215,8 +215,6 @@ struct ConfigResponse<'a> {
     synthetics_enabled: bool,
     /// Hides the publish button and the Public links view when the feature is off.
     public_dashboards_enabled: bool,
-    /// Floor for a public dashboard's "Refresh every" cadence; the share dialog enforces it.
-    public_dashboard_min_rebuild_secs: u64,
     oncall_enabled: bool,
     /// Whether private locations — pools served by long-running agents deployed
     /// inside the customer's network — are available. Enterprise only, so the
@@ -611,7 +609,6 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         public_dashboards_enabled: cfg.public_dashboards.enabled,
-        public_dashboard_min_rebuild_secs: cfg.public_dashboards.min_rebuild_secs,
         oncall_enabled,
         synthetics_private_locations_enabled,
         synthetics_subtests_enabled,

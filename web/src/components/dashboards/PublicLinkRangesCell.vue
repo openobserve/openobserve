@@ -14,11 +14,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <span v-if="!link.time_range.editable" class="text-text-body text-sm">
-    {{ t("dashboard.publicLinks.fixedRange", { range: raw(shortRange(defaultRange(link))) }) }}
-  </span>
-  <span v-else class="text-text-body text-sm">
-    <template v-for="(secs, i) in link.time_range.allowed_presets_secs" :key="secs">
+  <span class="text-text-body text-sm">
+    <template v-for="(secs, i) in ranges" :key="secs">
       <span v-if="i > 0" class="text-text-secondary">{{ raw(" · ") }}</span>
       <span :class="secs === defaultRange(link) ? 'font-semibold' : ''">{{
         raw(shortRange(secs))
@@ -28,11 +25,16 @@
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped, raw } from "@/types/i18n";
+import { computed } from "vue";
+import { raw } from "@/types/i18n";
 import type { PublicLink } from "@/services/public_dashboards_admin";
 import { defaultRange, shortRange } from "./publicLinkDisplay";
 
-defineProps<{ link: PublicLink }>();
+const props = defineProps<{ link: PublicLink }>();
 
-const { t } = useI18nTyped();
+const ranges = computed(() =>
+  props.link.time_range.editable
+    ? props.link.time_range.allowed_presets_secs
+    : [defaultRange(props.link)],
+);
 </script>

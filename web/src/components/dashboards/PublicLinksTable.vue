@@ -116,7 +116,7 @@
         <PublicLinkRangesCell :link="row" :data-test="`dashboards-public-links-${row.id}-ranges`" />
       </template>
       <template #cell-refresh="{ row }">
-        <span class="text-text-body text-sm">{{ formatExactDuration(row.rebuild_secs) }}</span>
+        <span class="text-text-body text-sm">{{ refreshLabel(row.rebuild_secs, t) }}</span>
       </template>
       <template #cell-expires="{ row }">
         <PublicLinkExpiresCell
@@ -286,7 +286,6 @@ import useNotifications from "@/composables/useNotifications";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOrgId } from "@/composables/query";
 import { copyToClipboard } from "@/utils/clipboard";
-import { formatExactDuration } from "@/utils/formatters";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -308,7 +307,7 @@ import {
   setPublicLinkPausedMutation,
 } from "@/services/public_dashboards.queries";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
-import { publicLinkColumns, publicLinkUrl } from "./publicLinkDisplay";
+import { publicLinkColumns, publicLinkUrl, refreshLabel } from "./publicLinkDisplay";
 import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 

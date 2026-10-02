@@ -1094,12 +1094,6 @@ pub struct PublicDashboards {
     )]
     pub rpm: u64,
     #[env_config(
-        name = "ZO_PUBLIC_DASHBOARD_MIN_REBUILD_SECS",
-        default = 30,
-        help = "Minimum seconds between snapshot rebuilds; a link asking for a shorter cadence is rejected."
-    )]
-    pub min_rebuild_secs: u64,
-    #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_DEFAULT_REBUILD_SECS",
         default = 60,
         help = "Default seconds between snapshot rebuilds when the share does not specify a cadence."
@@ -1108,7 +1102,7 @@ pub struct PublicDashboards {
     #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_SNAPSHOT_CACHE_TTL_SECS",
         default = 30,
-        help = "In-process cache TTL for public-dashboard point-reads; keep <= ZO_PUBLIC_DASHBOARD_MIN_REBUILD_SECS so viewers never lag a rebuild behind."
+        help = "In-process cache TTL for public-dashboard point-reads; keep it below the shortest link refresh so viewers never lag a rebuild behind."
     )]
     pub snapshot_cache_ttl_secs: u64,
 }

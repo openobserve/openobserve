@@ -17,6 +17,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { PublicLink } from "@/services/public_dashboards_admin";
+import { formatExactDuration } from "@/utils/formatters";
 import { todayIn } from "./PublicLinkForm.schema";
 
 export interface ExpiryNote {
@@ -28,6 +29,11 @@ export function shortRange(secs: number): string {
   if (secs % 86400 === 0) return `${secs / 86400}d`;
   if (secs % 3600 === 0) return `${secs / 3600}h`;
   return `${secs / 60}m`;
+}
+
+// 30 days is offered as "1 month", and reads the same wherever the interval is shown.
+export function refreshLabel(secs: number, t: TranslateFn): I18nText {
+  return secs === 2592000 ? t("dashboard.publicDashboard.refreshMonth") : formatExactDuration(secs);
 }
 
 export function publicLinkUrl(link: PublicLink): string {

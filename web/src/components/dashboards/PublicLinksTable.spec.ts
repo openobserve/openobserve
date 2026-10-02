@@ -175,7 +175,8 @@ describe("PublicLinksTable", () => {
       "Dashboard no longer exists",
     );
     expect(find(w, "dashboards-public-links-l3-status").text()).toBe("Dashboard deleted");
-    expect(find(w, "dashboards-public-links-l5-ranges").text()).toBe("Fixed: 1d");
+    expect(find(w, "dashboards-public-links-l5-ranges").text()).toBe("1d");
+    expect(find(w, "dashboards-public-links-l5-ranges").find(".font-semibold").text()).toBe("1d");
 
     await selectTile(w, "paused");
     expect(rows(w)).toHaveLength(1);

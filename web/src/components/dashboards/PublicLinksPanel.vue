@@ -124,14 +124,12 @@
           :label="t('dashboard.publicDashboard.defaultRange')"
           data-test="dashboards-public-links-panel-default-select"
         />
-        <OFormInput
+        <OFormSelect
           name="rebuildSecs"
-          type="number"
-          :min="minRebuildSecs"
+          :options="refreshOptions"
           required
           :label="t('dashboard.publicDashboard.refreshEvery')"
-          :help-text="t('dashboard.publicDashboard.refreshEveryMin', { secs: minRebuildSecs })"
-          data-test="dashboards-public-links-panel-rebuild-input"
+          data-test="dashboards-public-links-panel-rebuild-select"
         />
         <OFormDate
           name="expires"
@@ -276,7 +274,7 @@
           <PublicLinkRangesCell :link="row" />
         </template>
         <template #cell-refresh="{ row }">
-          <span class="text-text-body text-sm">{{ formatExactDuration(row.rebuild_secs) }}</span>
+          <span class="text-text-body text-sm">{{ refreshLabel(row.rebuild_secs, t) }}</span>
         </template>
         <template #cell-expires="{ row }">
           <PublicLinkExpiresCell
@@ -408,7 +406,6 @@ import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useOrgId } from "@/composables/query";
 import { copyToClipboard } from "@/utils/clipboard";
-import { formatExactDuration } from "@/utils/formatters";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -442,6 +439,7 @@ import {
 } from "@/services/public_dashboards.queries";
 import {
   PRESET_SECONDS,
+  REFRESH_SECONDS,
   makePublicLinkSchema,
   publicLinkDefaults,
   publicLinkFormFrom,
@@ -449,7 +447,12 @@ import {
   toPublicLinkConfig,
   type PublicLinkForm,
 } from "./PublicLinkForm.schema";
-import { publicLinkColumns, publicLinkUrl as publicUrl, shortRange } from "./publicLinkDisplay";
+import {
+  publicLinkColumns,
+  publicLinkUrl as publicUrl,
+  refreshLabel,
+  shortRange,
+} from "./publicLinkDisplay";
 
 type VariableValues = { values?: Array<{ name: string; value: unknown }> };
 type PanelView = "list" | "form" | "created";
@@ -497,9 +500,6 @@ function guardClose(): boolean {
 
 const timezone = computed<string>(
   () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-);
-const minRebuildSecs = computed(
-  () => Number(store.state.zoConfig?.public_dashboard_min_rebuild_secs) || 30,
 );
 const today = computed(() => todayIn(timezone.value));
 
@@ -557,7 +557,7 @@ const primaryLabel = computed<I18nText | undefined>(() => {
 
 const form = useOForm<PublicLinkForm>({
   defaultValues: publicLinkDefaults(),
-  schema: makePublicLinkSchema(t, minRebuildSecs.value, today.value),
+  schema: makePublicLinkSchema(t, today.value),
   onSubmit: (value) => submit(value),
 });
 const selectedPresets = form.useStore((s) => s.values.presets);
@@ -568,6 +568,15 @@ const presetOptions = computed<PresetOption[]>(() =>
 const selectedPresetOptions = computed<PresetOption[]>(() =>
   presetOptions.value.filter((o) => selectedPresets.value.includes(o.value)),
 );
+// An edited link keeps an interval the list doesn't offer, so saving doesn't silently change it.
+const refreshOptions = computed<PresetOption[]>(() => {
+  const own = editing.value?.rebuild_secs;
+  const secs =
+    own === undefined || REFRESH_SECONDS.includes(own)
+      ? REFRESH_SECONDS
+      : [...REFRESH_SECONDS, own].sort((a, b) => a - b);
+  return secs.map((value) => ({ value, label: refreshLabel(value, t) }));
+});
 
 // Editing seeds the pickers from the link's frozen values, creating from the live selection.
 const variableSeed = computed(() => ({
@@ -697,6 +706,12 @@ watch(
   },
   { immediate: true },
 );
+watch(selectedPresetOptions, (options) => {
+  const first = options[0];
+  if (first && !options.some((o) => o.value === form.state.values.defaultPreset)) {
+    form.setFieldValue("defaultPreset", first.value);
+  }
+});
 watch(
   () => [pendingEditId.value, links.value] as const,
   ([editId, list]) => {

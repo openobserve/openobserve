@@ -136,7 +136,6 @@ describe("PublicLinksPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
-    store.state.zoConfig = { ...store.state.zoConfig, public_dashboard_min_rebuild_secs: 10 };
   });
 
   it("opens on the create form when the dashboard has no links, and shows the new link", async () => {
@@ -284,6 +283,51 @@ describe("PublicLinksPanel", () => {
     expect(linkId).toBe("l1");
     expect(cfg.frozen_variables).toEqual({ env: "stage" });
     expect(cfg.rebuild_secs).toBe(600);
+  });
+
+  it("moves the default time range to the first chosen range when it is no longer chosen", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build({ editLinkId: "l1" });
+    await flushPromises();
+    const form = (
+      w.vm as unknown as {
+        form: {
+          setFieldValue: (k: string, v: number[]) => void;
+          state: { values: { defaultPreset: number } };
+        };
+      }
+    ).form;
+
+    form.setFieldValue("presets", [86400, 604800]);
+    await flushPromises();
+    expect(form.state.values.defaultPreset).toBe(86400);
+
+    form.setFieldValue("presets", [604800, 86400, 2592000]);
+    await flushPromises();
+    expect(form.state.values.defaultPreset).toBe(86400);
+
+    form.setFieldValue("presets", [604800]);
+    await flushPromises();
+    expect(form.state.values.defaultPreset).toBe(604800);
+  });
+
+  it("offers refresh intervals from 10 seconds and keeps the link's own", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build({ editLinkId: "l1" });
+    await flushPromises();
+    const options = (
+      w.vm as unknown as {
+        refreshOptions: { value: number; label: string }[];
+      }
+    ).refreshOptions;
+    const byValue = (v: number) => options.find((o) => o.value === v);
+
+    expect(options[0].value).toBe(10);
+    expect(byValue(600)?.label).toBe("10 minutes");
+    expect(byValue(2592000)?.label).toBe("1 month");
+    expect(options.map((o) => o.value)).toEqual(
+      [...options.map((o) => o.value)].sort((a, b) => a - b),
+    );
   });
 
   it("shows the server's reason when an action is refused", async () => {

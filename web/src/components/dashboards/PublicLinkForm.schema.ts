@@ -20,7 +20,11 @@ import type { TranslateFn } from "@/types/i18n";
 
 export const PRESET_SECONDS = [900, 3600, 21600, 86400, 604800, 2592000];
 
-export const makePublicLinkSchema = (t: TranslateFn, minRebuildSecs: number, today: string) =>
+export const REFRESH_SECONDS = [
+  10, 15, 30, 60, 300, 900, 1800, 3600, 7200, 21600, 86400, 172800, 604800, 1209600, 2592000,
+];
+
+export const makePublicLinkSchema = (t: TranslateFn, today: string) =>
   z
     .object({
       name: z
@@ -30,13 +34,7 @@ export const makePublicLinkSchema = (t: TranslateFn, minRebuildSecs: number, tod
         .max(256, t("dashboard.publicLinks.nameTooLong")),
       presets: z.array(z.number()),
       defaultPreset: z.number(),
-      // OFormInput emits a string even for type="number".
-      rebuildSecs: z
-        .union([z.string(), z.number()])
-        .refine(
-          (v) => Number.isInteger(Number(v)) && Number(v) >= minRebuildSecs,
-          t("dashboard.publicDashboard.refreshEveryMin", { secs: minRebuildSecs }),
-        ),
+      rebuildSecs: z.number(),
       // YYYY-MM-DD strings compare correctly as text.
       expires: z
         .string()
@@ -64,7 +62,7 @@ export const publicLinkDefaults = (): PublicLinkForm => ({
   name: "",
   presets: [3600, 86400],
   defaultPreset: 3600,
-  rebuildSecs: "60",
+  rebuildSecs: 60,
   expires: "",
 });
 
@@ -76,7 +74,7 @@ export const publicLinkFormFrom = (link: PublicLink, timezone: string): PublicLi
     name: link.name,
     presets: link.time_range.editable && allowed.length ? allowed : [defaultPreset],
     defaultPreset,
-    rebuildSecs: String(link.rebuild_secs),
+    rebuildSecs: link.rebuild_secs,
     expires: link.expires_at
       ? formatInTimeZone(link.expires_at / 1000, timezone, "yyyy-MM-dd")
       : "",
@@ -107,7 +105,7 @@ export const toPublicLinkConfig = (
       allowed_presets_secs: presets,
     },
     frozen_variables: frozenVariables,
-    rebuild_secs: Number(value.rebuildSecs),
+    rebuild_secs: value.rebuildSecs,
     expires_at: value.expires ? endOfDayMicros(value.expires, timezone) : null,
   };
 };

@@ -25,7 +25,7 @@ import {
 } from "./PublicLinkForm.schema";
 import type { PublicLink } from "@/services/public_dashboards_admin";
 
-const schema = makePublicLinkSchema(gt, 30, "2026-09-25");
+const schema = makePublicLinkSchema(gt, "2026-09-25");
 
 const named = () => ({ ...publicLinkDefaults(), name: "NOC wall" });
 
@@ -40,10 +40,8 @@ describe("PublicLinkForm schema", () => {
     expect(r.error?.issues[0].path).toEqual(["name"]);
   });
 
-  it("rejects a refresh below the server minimum", () => {
-    const r = schema.safeParse({ ...named(), rebuildSecs: "10" });
-    expect(r.success).toBe(false);
-    expect(r.error?.issues[0].path).toEqual(["rebuildSecs"]);
+  it("defaults the refresh to 1 minute", () => {
+    expect(publicLinkDefaults().rebuildSecs).toBe(60);
   });
 
   it("rejects an expiry before today but allows today", () => {
