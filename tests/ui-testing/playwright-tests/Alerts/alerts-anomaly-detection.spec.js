@@ -1115,11 +1115,11 @@ test.describe('Anomaly Detection', () => {
 
       await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeVisible();
       await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeHidden();
-      // No band_width on an API-created config: the level is band_k rounded to 0.5, or 3 before training.
+      // No band_width on an API-created config: the level is band_k to 2 decimals, or 3 before training.
       const level = Number(await pm.anomalyDetectionPage.getSensitivityLevel());
       expect(level).toBeGreaterThanOrEqual(1);
       expect(level).toBeLessThanOrEqual(10);
-      expect(level * 2).toBe(Math.round(level * 2));
+      expect(Math.round(level * 100) / 100).toBe(level);
 
       await pm.anomalyDetectionPage.cancel();
     });
