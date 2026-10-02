@@ -6,8 +6,10 @@
 
 import { type TranslateFn } from "@/types/i18n";
 import {
+  ANOMALY_DIRECTION_KEYS,
   anomalyExpectedGroupingKey,
   anomalyIntervalSeconds,
+  anomalyWindowShareEffective,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // Escape user-controlled strings before embedding in HTML (XSS prevention) —
@@ -103,10 +105,17 @@ export function generateAnomalySummary(
     } else {
       // A cleared field reaches here as "", and Number("")/Number(null) are
       // both 0, so blanks need excluding before any number is shown.
-      const stored = config.threshold;
-      const percentile =
-        stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
-      if (Number.isFinite(percentile)) {
+      const blankToNaN = (v: unknown) =>
+        v === null || v === undefined || v === "" ? NaN : Number(v);
+      const bandWidth = blankToNaN(config.band_width);
+      const percentile = blankToNaN(config.threshold);
+      if (Number.isFinite(bandWidth)) {
+        parts.push(
+          t("alerts.anomaly.summaryThreshold", {
+            threshold: chip(`${bandWidth}σ`),
+          }),
+        );
+      } else if (Number.isFinite(percentile)) {
         // The stored percentile indexes TRAINING scores; never restate it as
         // a live anomaly rate — that arithmetic was measured false.
         parts.push(
@@ -147,6 +156,14 @@ export function generateAnomalySummary(
           }),
         );
       }
+      const directionKey =
+        ANOMALY_DIRECTION_KEYS[config.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both;
+      parts.push(t("alerts.anomaly.summaryDirection", { direction: chip(t(directionKey as any)) }));
+      parts.push(
+        t("alerts.anomaly.summaryWindowShare", {
+          rule: chip(t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(config))),
+        }),
+      );
     }
   }
 

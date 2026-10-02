@@ -107,6 +107,8 @@ import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
+  ANOMALY_DEFAULT_BAND_WIDTH,
+  anomalyBandWidthPrefill,
   anomalyBudgetPerDay,
   anomalyIntervalSeconds,
   anomalyWindowShareErrors,
@@ -313,8 +315,8 @@ export const defaultAnomalyConfig = () => ({
   threshold: 97,
   // Set only when the backend stored a budget; undefined/null = percentile mode.
   alert_budget_per_day: undefined as number | undefined,
-  // Null means auto: k comes from the percentile.
-  band_width: null as number | string | null,
+  // Always sent for a non-budget alert; null only in budget mode, which the server rejects it beside.
+  band_width: ANOMALY_DEFAULT_BAND_WIDTH as number | string | null,
   alert_direction: "both" as "both" | "above" | "below",
   alert_window_buckets: 1 as number | string | null,
   alert_window_fire_pct: 100 as number | string | null,
@@ -2983,6 +2985,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_function: parsedFn,
           detection_function_field: parsedField,
           threshold: data.threshold ?? data.percentile ?? 97,
+          band_width: anomalyBandWidthPrefill(data),
           filters: Array.isArray(data.filters) ? data.filters : [],
           histogram_interval_value: histInterval.value,
           histogram_interval_unit: histInterval.unit,

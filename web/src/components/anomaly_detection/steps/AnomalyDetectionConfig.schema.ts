@@ -74,9 +74,8 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
     // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
-    sensitivity_mode: z.enum(["percentile", "budget"]),
-    threshold: z.coerce.number(),
-    // Empty means auto, so the raw input value is kept and judged in superRefine.
+    sensitivity_mode: z.enum(["band", "budget"]),
+    // The raw input value is kept so a cleared field is judged in superRefine, not coerced to 0.
     band_width: z.union([z.string(), z.number(), z.null()]),
     budget_count: z.coerce.number(),
     budget_period: z.enum(["day", "week"]),
@@ -174,6 +173,9 @@ export const formatAnomalySeconds = (secs: number): string => {
 
 const isBlankNumber = (v: unknown): boolean => v === "" || v === null || v === undefined;
 
+/** Balanced: the trainer's own k floor, which the old percentile presets almost always landed on. */
+export const ANOMALY_DEFAULT_BAND_WIDTH = 3;
+
 // Mirrors the server's band_width rule: finite and within [1, 10].
 const isBandWidth = (n: number): boolean => Number.isFinite(n) && n >= 1 && n <= 10;
 
@@ -229,17 +231,8 @@ export const createAnomalyDetectionConfigSchema = (
       }
     }
 
-    if (value.sensitivity_mode === "percentile") {
-      // The server clamps to 50–99.9 then truncates with `as i32`, so 99 is the real ceiling.
-      const p = value.threshold;
-      if (!Number.isInteger(p) || p < 50 || p > 99) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["threshold"],
-          message: t("alerts.anomaly.sensitivityRange"),
-        });
-      }
-      if (!isBlankNumber(value.band_width) && !isBandWidth(Number(value.band_width))) {
+    if (value.sensitivity_mode === "band") {
+      if (isBlankNumber(value.band_width) || !isBandWidth(Number(value.band_width))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["band_width"],
@@ -323,6 +316,39 @@ export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined)
   return Number.isFinite(budget) && budget > 0 ? budget : null;
 };
 
+/** Band width to show on edit: a stored override, else the trained k so an untouched save keeps the band, else the default. */
+export const anomalyBandWidthPrefill = (
+  cfg: Record<string, any> | null | undefined,
+): number | null => {
+  if (anomalyBudgetPerDay(cfg) !== null) return null;
+  if (!isBlankNumber(cfg?.band_width) && Number.isFinite(Number(cfg?.band_width))) {
+    return Number(cfg?.band_width);
+  }
+  const trained = isBlankNumber(cfg?.band_k) ? NaN : Number(cfg?.band_k);
+  if (!Number.isFinite(trained)) return ANOMALY_DEFAULT_BAND_WIDTH;
+  return Math.min(10, Math.max(1, Math.round(trained * 2) / 2));
+};
+
+export const ANOMALY_DIRECTION_KEYS: Record<string, string> = {
+  both: "alerts.anomaly.directionBoth",
+  above: "alerts.anomaly.directionAbove",
+  below: "alerts.anomaly.directionBelow",
+};
+
+/** Window share as the server applies it: blank buckets mean 1, blank fire 100%, blank recover = fire. */
+export const anomalyWindowShareEffective = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: number; fire: number; recover: number } => {
+  const fire = isBlankNumber(cfg?.alert_window_fire_pct) ? 100 : Number(cfg?.alert_window_fire_pct);
+  return {
+    buckets: isBlankNumber(cfg?.alert_window_buckets) ? 1 : Number(cfg?.alert_window_buckets),
+    fire,
+    recover: isBlankNumber(cfg?.alert_window_recover_pct)
+      ? fire
+      : Number(cfg?.alert_window_recover_pct),
+  };
+};
+
 /** Locale keys for the window-share inputs that break the server's rules; null where the value is valid. */
 export const anomalyWindowShareErrors = (
   cfg: Record<string, any> | null | undefined,
@@ -331,8 +357,7 @@ export const anomalyWindowShareErrors = (
   const fireRaw = cfg?.alert_window_fire_pct;
   const recoverRaw = cfg?.alert_window_recover_pct;
   const bucketsOk =
-    isBlankNumber(buckets) ||
-    (Number.isInteger(Number(buckets)) && Number(buckets) >= 1);
+    isBlankNumber(buckets) || (Number.isInteger(Number(buckets)) && Number(buckets) >= 1);
   const fire = isBlankNumber(fireRaw) ? 100 : Number(fireRaw);
   const fireOk = Number.isFinite(fire) && fire > 0 && fire <= 100;
   const interval = anomalyIntervalSeconds(
@@ -401,8 +426,7 @@ export const anomalyDetectionConfigDefaults = (
   detection_window_unit: cfg?.detection_window_unit ?? "h",
   training_window_days: cfg?.training_window_days ?? 28,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
-  sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "percentile",
-  threshold: cfg?.threshold == null || cfg.threshold === "" ? 97 : Number(cfg.threshold),
-  band_width: isBlankNumber(cfg?.band_width) ? "" : Number(cfg?.band_width),
+  sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "band",
+  band_width: isBlankNumber(cfg?.band_width) ? ANOMALY_DEFAULT_BAND_WIDTH : Number(cfg?.band_width),
   ...budgetFieldsFromPerDay(anomalyBudgetPerDay(cfg)),
 });

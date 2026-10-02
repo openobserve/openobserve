@@ -70,7 +70,11 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
-import { ANOMALY_BAND_GROUPING_KEYS } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+import {
+  ANOMALY_BAND_GROUPING_KEYS,
+  ANOMALY_DIRECTION_KEYS,
+  anomalyWindowShareEffective,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { formatTimestampInTimezone } from "@/utils/date";
 
@@ -228,6 +232,18 @@ const anomalyFiltersText = computed(() => {
   return parts.length ? parts.join(" AND ") : EMPTY;
 });
 
+// band_width overrides the trained k live, so it is the k in force.
+const anomalyBandWidth = (a: any): string => {
+  const set = isBlank(a?.band_width) ? NaN : Number(a.band_width);
+  const trained = isBlank(a?.band_k) ? NaN : Number(a.band_k);
+  const k = Number.isFinite(set) ? set : trained;
+  if (!Number.isFinite(k)) return EMPTY;
+  const shown = Math.round(k * 100) / 100;
+  return Number.isFinite(set)
+    ? `${shown}σ`
+    : t("alerts.anomaly.summaryBandWidthAuto", { k: shown });
+};
+
 const anomalyTimestamp = (us: unknown): string => {
   const n = Number(us);
   if (!Number.isFinite(n) || n <= 0) return EMPTY;
@@ -275,20 +291,21 @@ const anomalySourceFields = computed(() => {
       },
     );
   }
-  // Budget mode: the enforced cap is the sensitivity statement. Percentile
-  // mode: the stored value indexes TRAINING scores — never restated as a live
-  // anomaly rate, which was measured false.
+  // Budget mode: the enforced cap. Otherwise the band width in force; the percentile only for a legacy untrained row.
   const budget = isBlank(a?.alert_budget_per_day) ? NaN : Number(a.alert_budget_per_day);
   const percentile = isBlank(a?.threshold) ? NaN : Number(a.threshold);
+  const bandWidth = anomalyBandWidth(a);
   const roundBudget = (n: number) => Math.round(n * 1e6) / 1e6;
   const sensitivityValue =
     Number.isFinite(budget) && budget > 0
       ? budget < 1
         ? t("alerts.anomaly.summaryBudgetPerWeek", { count: roundBudget(budget * 7) })
         : t("alerts.anomaly.summaryBudgetPerDay", { count: roundBudget(budget) })
-      : Number.isFinite(percentile)
-        ? t("alerts.anomaly.summaryThresholdPercentile", { percentile })
-        : EMPTY;
+      : bandWidth !== EMPTY
+        ? bandWidth
+        : Number.isFinite(percentile)
+          ? t("alerts.anomaly.summaryThresholdPercentile", { percentile })
+          : EMPTY;
   fields.push({
     key: "sensitivity",
     label: t("alerts.sensitivity"),
@@ -348,6 +365,16 @@ const anomalyScheduleFields = computed(() => {
           ? a.alert_destinations.join(", ")
           : EMPTY,
     },
+    {
+      key: "alert-direction",
+      label: t("alerts.anomaly.alertDirection"),
+      value: t((ANOMALY_DIRECTION_KEYS[a?.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both) as any),
+    },
+    {
+      key: "window-share",
+      label: t("alerts.anomaly.windowShare"),
+      value: t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(a)),
+    },
   ];
 });
 
@@ -357,18 +384,6 @@ const anomalyTrainingSpan = (a: any): string => {
   return start === EMPTY || end === EMPTY
     ? EMPTY
     : t("alerts.anomaly.trainingSpanValue", { start, end });
-};
-
-// A manual band_width overrides the trained k live, so it is the k in force.
-const anomalyBandWidth = (a: any): string => {
-  const manual = isBlank(a?.band_width) ? NaN : Number(a.band_width);
-  const trained = isBlank(a?.band_k) ? NaN : Number(a.band_k);
-  const k = Number.isFinite(manual) ? manual : trained;
-  if (!Number.isFinite(k)) return EMPTY;
-  const shown = Math.round(k * 100) / 100;
-  return Number.isFinite(manual)
-    ? t("alerts.anomaly.summaryBandWidthManual", { k: shown })
-    : t("alerts.anomaly.summaryBandWidthAuto", { k: shown });
 };
 
 const anomalyModelFields = computed(() => {
@@ -396,11 +411,6 @@ const anomalyModelFields = computed(() => {
       key: "band-grouping",
       label: t("alerts.anomaly.bandGrouping"),
       value: groupingKey ? t(groupingKey as any) : EMPTY,
-    },
-    {
-      key: "band-width",
-      label: t("alerts.anomaly.bandWidthK"),
-      value: anomalyBandWidth(a),
     },
     {
       key: "model-version",

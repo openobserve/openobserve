@@ -332,7 +332,7 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(field(wrapper, "last-error").exists()).toBe(false);
   });
 
-  it("explains the band: grouping, training span, and the trained k as auto", () => {
+  it("explains the band: grouping, training span, and a legacy trained k as sensitivity", () => {
     const wrapper = mountSummary(
       anomalyConfig({
         band_grouping: "hour_of_week",
@@ -351,15 +351,35 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
         end: "2026-08-31 00:00:00",
       }),
     );
-    expect(value(wrapper, "band-width")).toBe(
+    expect(value(wrapper, "sensitivity")).toBe(
       translated("alerts.anomaly.summaryBandWidthAuto", { k: 3.46 }),
     );
+    expect(field(wrapper, "band-width").exists()).toBe(false);
   });
 
-  it("shows a manual band width over the trained k", () => {
-    const wrapper = mountSummary(anomalyConfig({ band_width: 4, band_k: 3.2 }));
-    expect(value(wrapper, "band-width")).toBe(
-      translated("alerts.anomaly.summaryBandWidthManual", { k: 4 }),
+  it("shows the set band width as the sensitivity, over the trained k and the percentile", () => {
+    const wrapper = mountSummary(anomalyConfig({ band_width: 3.5, band_k: 3.2 }));
+    expect(value(wrapper, "sensitivity")).toBe("3.5σ");
+  });
+
+  it("shows the alert direction and the window share with the server defaults filled in", () => {
+    const defaults = mountSummary(anomalyConfig());
+    expect(value(defaults, "alert-direction")).toBe(translated("alerts.anomaly.directionBoth"));
+    expect(value(defaults, "window-share")).toBe(
+      translated("alerts.anomaly.windowShareCompact", { fire: 100, buckets: 1, recover: 100 }),
+    );
+
+    const set = mountSummary(
+      anomalyConfig({
+        alert_direction: "above",
+        alert_window_buckets: 5,
+        alert_window_fire_pct: 80,
+        alert_window_recover_pct: 60,
+      }),
+    );
+    expect(value(set, "alert-direction")).toBe(translated("alerts.anomaly.directionAbove"));
+    expect(value(set, "window-share")).toBe(
+      translated("alerts.anomaly.windowShareCompact", { fire: 80, buckets: 5, recover: 60 }),
     );
   });
 
@@ -376,7 +396,6 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     const wrapper = mountSummary(anomalyConfig());
     expect(value(wrapper, "band-grouping")).toBe("—");
     expect(value(wrapper, "training-span")).toBe("—");
-    expect(value(wrapper, "band-width")).toBe("—");
   });
 
   it("surfaces the training error when there is one", () => {

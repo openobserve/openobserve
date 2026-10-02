@@ -57,9 +57,9 @@
       class="rounded-default border-border-default flex flex-col overflow-hidden border"
       data-test="alerts-anomalydetectionchart-metric"
     >
-      <PanelBar class="w-full justify-between gap-2">
+      <PanelBar class="w-full flex-wrap justify-between gap-x-2 gap-y-0.5">
         {{ t("alerts.anomaly.metricChart") }}
-        <span class="flex items-center gap-2">
+        <span class="flex flex-wrap items-center gap-x-2">
           <span
             v-if="bandCaption"
             class="text-text-secondary text-2xs font-normal"

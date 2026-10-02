@@ -119,3 +119,33 @@ describe("generateAnomalySummary — training line", () => {
     expect(summary).toContain(`(${grouping("bandGroupingGlobal")})`);
   });
 });
+
+describe("generateAnomalySummary — band width and delivery", () => {
+  it("states the band width when one is set, instead of the percentile", () => {
+    const summary = generateAnomalySummary(config({ band_width: 3.5 }), [], t);
+    expect(summary).toContain("3.5σ");
+    expect(summary).not.toMatch(/\blevel \d/);
+  });
+
+  it("falls back to the percentile only without a band width", () => {
+    expect(generateAnomalySummary(config({ band_width: null }), [], t)).toContain("level 97");
+  });
+
+  it("states direction and window share once alerting is on", () => {
+    const summary = generateAnomalySummary(
+      config({
+        alert_enabled: true,
+        alert_destination_ids: ["slack"],
+        alert_direction: "below",
+        alert_window_buckets: 5,
+        alert_window_fire_pct: 80,
+      }),
+      [],
+      t,
+    );
+    expect(summary).toContain(String(t("alerts.anomaly.directionBelow" as any)));
+    expect(summary).toContain(
+      String(t("alerts.anomaly.windowShareCompact" as any, { fire: 80, buckets: 5, recover: 80 })),
+    );
+  });
+});

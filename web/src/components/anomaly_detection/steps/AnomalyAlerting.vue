@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Priority & tags (Feature 2). Anomaly configs appear in the same
            alert list, so they carry the same triage metadata. -->
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex h-9 w-47.5 items-center font-semibold">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.priority") }}
           <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex h-9 w-47.5 items-center font-semibold">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.tags") }}
           <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Enable Notifications toggle -->
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.anomaly.notifications") }}
           <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
@@ -79,13 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Destination picker (shown when alert_enabled) -->
-      <div v-if="config.alert_enabled" class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
+      <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.destination") }}
           <span class="text-status-error-text ms-1">*</span>
         </div>
-        <div class="flex flex-col">
-          <div class="flex items-center">
+        <div class="flex min-w-0 flex-1 basis-60 flex-col">
+          <div class="flex flex-wrap items-center gap-y-1">
             <OSelect
               v-model="configModel.alert_destination_ids"
               :options="destinations"
@@ -93,8 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
-              class="h-auto! min-h-auto!"
-              style="min-width: 18.75rem; max-width: 26.25rem"
+              class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
               data-test="anomaly-destination"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
@@ -148,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex h-9 w-47.5 items-center font-semibold">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.anomaly.alertDirection") }}
           <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.alertDirectionTooltip')" side="right" />
@@ -168,14 +167,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="mb-6! flex items-start pb-0!">
-        <div class="flex h-9 w-47.5 items-center font-semibold">
+      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
+        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.anomaly.windowShare") }}
           <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.windowShareTooltip')" side="right" />
           </OIcon>
         </div>
-        <div class="flex flex-col gap-1">
+        <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
           <div class="flex flex-wrap items-start gap-3">
             <OInput
               v-model="configModel.alert_window_buckets"
@@ -254,7 +253,11 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import { anomalyWindowShareErrors } from "./AnomalyDetectionConfig.schema";
+import {
+  ANOMALY_DIRECTION_KEYS,
+  anomalyWindowShareEffective,
+  anomalyWindowShareErrors,
+} from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
   name: "AnomalyAlerting",
@@ -299,11 +302,12 @@ export default defineComponent({
       },
     });
 
-    const directionOptions = computed(() => [
-      { label: t("alerts.anomaly.directionBoth"), value: "both" },
-      { label: t("alerts.anomaly.directionAbove"), value: "above" },
-      { label: t("alerts.anomaly.directionBelow"), value: "below" },
-    ]);
+    const directionOptions = computed(() =>
+      Object.entries(ANOMALY_DIRECTION_KEYS).map(([value, key]) => ({
+        label: t(key as any),
+        value,
+      })),
+    );
 
     // NULL on the wire means both, so an unset row still shows a selected option.
     const directionModel = computed({
@@ -324,17 +328,9 @@ export default defineComponent({
         .map((key) => t(key as any)),
     );
 
-    // Blank inputs fall back to the server defaults: 1 bucket, 100% fire, recover = fire.
-    const windowShareHint = computed(() => {
-      const blank = (v: unknown) => v === "" || v === null || v === undefined;
-      const c = props.config;
-      const fire = blank(c.alert_window_fire_pct) ? 100 : Number(c.alert_window_fire_pct);
-      return t("alerts.anomaly.windowShareHint", {
-        buckets: blank(c.alert_window_buckets) ? 1 : Number(c.alert_window_buckets),
-        fire,
-        recover: blank(c.alert_window_recover_pct) ? fire : Number(c.alert_window_recover_pct),
-      });
-    });
+    const windowShareHint = computed(() =>
+      t("alerts.anomaly.windowShareHint", anomalyWindowShareEffective(props.config)),
+    );
 
     // Dynamically decide how many chips to show based on text length.
     // Restored from pre-refactor version; the template still depends on it.
