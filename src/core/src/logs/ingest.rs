@@ -314,10 +314,11 @@ pub async fn ingest(
             }
         };
 
-        if let Some(extend) = extend_json.as_ref() {
-            for (key, val) in extend.iter() {
-                item[key] = val.clone();
-            }
+        if let Some(extend) = extend_json.as_ref()
+            && let Err(e) = add_extra_fields(&mut item, extend)
+        {
+            log::error!("[LOGS:JSON] IngestionError: org_id: {org_id}, error: {e}");
+            return Err(e);
         }
 
         // store a copy of original data before it's being transformed and/or flattened, when
@@ -795,6 +796,27 @@ fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
         Ok(records) => Ok(records),
         Err(_) => Ok(vec![json::from_slice(body)?]),
     }
+}
+
+/// Adds the RUM routes' extra fields to a record, which only an object or `null` can take.
+fn add_extra_fields(item: &mut json::Value, extend: &HashMap<String, json::Value>) -> Result<()> {
+    let kind = match item {
+        json::Value::Object(_) | json::Value::Null => None,
+        json::Value::Array(_) => Some("an array"),
+        json::Value::String(_) => Some("a string"),
+        json::Value::Number(_) => Some("a number"),
+        json::Value::Bool(_) => Some("a boolean"),
+    };
+    if let Some(kind) = kind {
+        // `item[key] = …` panics on these, which drops the request without any response
+        return Err(Error::IngestionError(format!(
+            "Failed processing: a record must be a JSON object, got {kind}"
+        )));
+    }
+    for (key, val) in extend.iter() {
+        item[key] = val.clone();
+    }
+    Ok(())
 }
 
 /// Count one rejected record on a stream's status, separating an ingestion-window
@@ -1513,6 +1535,51 @@ mod tests {
         // Which is what the collector turns into code 6.
         assert!(status.failed > status.policy_dropped);
         assert_eq!(status.error, "Can't parse timestamp");
+    }
+
+    fn rum_extra_fields() -> HashMap<String, json::Value> {
+        HashMap::from([
+            ("ip".to_string(), json::json!("127.0.0.1")),
+            ("geo_info".to_string(), json::json!({"country": null})),
+        ])
+    }
+
+    /// A RUM record the extra fields cannot be added to is refused, and left as it was.
+    #[test]
+    fn a_rum_record_that_is_not_an_object_is_refused() {
+        for (record, kind) in [
+            (json::json!([]), "an array"),
+            (json::json!([{"service": "web"}]), "an array"),
+            (json::json!("text"), "a string"),
+            (json::json!(123), "a number"),
+            (json::json!(true), "a boolean"),
+        ] {
+            let mut item = record.clone();
+            let err = add_extra_fields(&mut item, &rum_extra_fields()).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!("Error# Failed processing: a record must be a JSON object, got {kind}")
+            );
+            assert_eq!(item, record);
+        }
+    }
+
+    #[test]
+    fn the_rum_extra_fields_are_added_to_an_object_or_null_record() {
+        let mut object = json::json!({"service": "web"});
+        add_extra_fields(&mut object, &rum_extra_fields()).unwrap();
+        assert_eq!(
+            object,
+            json::json!({"service": "web", "ip": "127.0.0.1", "geo_info": {"country": null}})
+        );
+
+        // serde_json's index-assign turns null into an object
+        let mut null = json::Value::Null;
+        add_extra_fields(&mut null, &rum_extra_fields()).unwrap();
+        assert_eq!(
+            null,
+            json::json!({"ip": "127.0.0.1", "geo_info": {"country": null}})
+        );
     }
 
     #[test]
