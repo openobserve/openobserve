@@ -129,7 +129,8 @@ export function buildAnomalyMetricQuery(
     anomalyId,
     interval,
     `${scored(latest("actual_value"))} AS ${ANOMALY_VALUE_ALIAS}, ` +
-      `CASE WHEN ${verdict} THEN ${latest("actual_value")} END AS ${ANOMALY_FLAGGED_ALIAS}` +
+      `CASE WHEN ${verdict} THEN ${latest("actual_value")} END AS ${ANOMALY_FLAGGED_ALIAS}, ` +
+      `${scored(latest("threshold_value"))} AS ${ANOMALY_THRESHOLD_ALIAS}` +
       expected +
       bounds +
       event,

@@ -148,6 +148,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex h-9 w-47.5 items-center font-semibold">
+          {{ t("alerts.anomaly.alertDirection") }}
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+            <OTooltip :content="t('alerts.anomaly.alertDirectionTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="flex h-11 items-center">
+          <OSelect
+            v-model="directionModel"
+            :options="directionOptions"
+            labelKey="label"
+            valueKey="value"
+            :searchable="false"
+            width="sm"
+            data-test="anomaly-alert-direction"
+          />
+        </div>
+      </div>
+
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex h-9 w-47.5 items-center font-semibold">
+          {{ t("alerts.anomaly.windowShare") }}
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+            <OTooltip :content="t('alerts.anomaly.windowShareTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="flex flex-col gap-1">
+          <div class="flex flex-wrap items-start gap-3">
+            <OInput
+              v-model="configModel.alert_window_buckets"
+              type="number"
+              :model-modifiers="{ number: true }"
+              :label="t('alerts.anomaly.windowBuckets')"
+              :placeholder="raw('1')"
+              :error="!!windowShareErrors.buckets"
+              width="xs"
+              data-test="anomaly-window-buckets"
+            />
+            <OInput
+              v-model="configModel.alert_window_fire_pct"
+              type="number"
+              :model-modifiers="{ number: true }"
+              :label="t('alerts.anomaly.windowFirePct')"
+              :placeholder="raw('100')"
+              :error="!!windowShareErrors.fire"
+              width="xs"
+              data-test="anomaly-window-fire-pct"
+            />
+            <OInput
+              v-model="configModel.alert_window_recover_pct"
+              type="number"
+              :model-modifiers="{ number: true }"
+              :label="t('alerts.anomaly.windowRecoverPct')"
+              :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
+              :error="!!windowShareErrors.recover"
+              width="xs"
+              data-test="anomaly-window-recover-pct"
+            />
+          </div>
+          <div
+            v-for="message in windowShareMessages"
+            :key="message"
+            class="text-input-error-text text-xs"
+            data-test="anomaly-window-share-error"
+            role="alert"
+          >
+            {{ message }}
+          </div>
+          <span
+            v-if="!windowShareMessages.length"
+            class="text-text-secondary text-xs"
+            data-test="anomaly-window-share-hint"
+          >
+            {{ windowShareHint }}
+          </span>
+        </div>
+      </div>
+
       <!-- Info note when notifications disabled -->
       <div
         v-if="!config.alert_enabled"
@@ -169,15 +248,17 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import { anomalyWindowShareErrors } from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OTagInput, OTooltip, OIcon, OTag },
+  components: { OButton, OSwitch, OSelect, OInput, OTagInput, OTooltip, OIcon, OTag },
 
   props: {
     config: {
@@ -218,6 +299,43 @@ export default defineComponent({
       },
     });
 
+    const directionOptions = computed(() => [
+      { label: t("alerts.anomaly.directionBoth"), value: "both" },
+      { label: t("alerts.anomaly.directionAbove"), value: "above" },
+      { label: t("alerts.anomaly.directionBelow"), value: "below" },
+    ]);
+
+    // NULL on the wire means both, so an unset row still shows a selected option.
+    const directionModel = computed({
+      get: () => configModel.value.alert_direction ?? "both",
+      set: (v: string) => {
+        configModel.value.alert_direction = v;
+      },
+    });
+
+    const windowShareErrors = computed(() => anomalyWindowShareErrors(props.config));
+    const windowShareMessages = computed(() =>
+      [
+        windowShareErrors.value.buckets,
+        windowShareErrors.value.fire,
+        windowShareErrors.value.recover,
+      ]
+        .filter((key): key is string => key !== null)
+        .map((key) => t(key as any)),
+    );
+
+    // Blank inputs fall back to the server defaults: 1 bucket, 100% fire, recover = fire.
+    const windowShareHint = computed(() => {
+      const blank = (v: unknown) => v === "" || v === null || v === undefined;
+      const c = props.config;
+      const fire = blank(c.alert_window_fire_pct) ? 100 : Number(c.alert_window_fire_pct);
+      return t("alerts.anomaly.windowShareHint", {
+        buckets: blank(c.alert_window_buckets) ? 1 : Number(c.alert_window_buckets),
+        fire,
+        recover: blank(c.alert_window_recover_pct) ? fire : Number(c.alert_window_recover_pct),
+      });
+    });
+
     // Dynamically decide how many chips to show based on text length.
     // Restored from pre-refactor version; the template still depends on it.
     const MAX_CHARS = 42;
@@ -248,12 +366,18 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       configModel,
       priorityOptions,
       tagsModel,
       openAddDestination,
       visibleChipCount,
+      directionOptions,
+      directionModel,
+      windowShareErrors,
+      windowShareMessages,
+      windowShareHint,
     };
   },
 });

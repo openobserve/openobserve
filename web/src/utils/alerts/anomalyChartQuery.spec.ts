@@ -238,6 +238,18 @@ describe("expected band on the metric chart", () => {
   });
 });
 
+describe("band k on the metric chart", () => {
+  it("reads k from the same latest scored row as the band, never from an event row", () => {
+    const sql = buildAnomalyMetricQuery("cfg1", "5m", ALL_KINDS) as string;
+    expect(sql).toContain(
+      `CASE WHEN max(${SCORED_RANK}) = 1 THEN ${latest("threshold_value")} END AS threshold_value`,
+    );
+    expect(buildAnomalyMetricQuery("cfg1", "5m")).toContain(
+      "last_value(threshold_value ORDER BY created_at) AS threshold_value",
+    );
+  });
+});
+
 describe("bucket aggregation", () => {
   it("groups and orders by the time bucket, so a re-scored bucket draws once", () => {
     // Detection windows overlap: a bucket near a run boundary is scored again

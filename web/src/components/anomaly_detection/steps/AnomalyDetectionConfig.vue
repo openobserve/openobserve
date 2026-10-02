@@ -484,10 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="static-text text-xs" :class="'text-text-secondary'">
                 {{
                   t("alerts.anomaly.trainingWindowSeasonality", {
-                    seasonality:
-                      Number(trainingWindowDays) >= 7
-                        ? t("alerts.anomaly.seasonalityWeekly")
-                        : raw("hour-of-day"),
+                    seasonality: bandGroupingLabel,
                   })
                 }}
               </span>
@@ -625,6 +622,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #error />
                 </OFormInput>
               </div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
+                >
+                  {{ t("alerts.anomaly.bandWidth") }}
+                </span>
+                <OFormInput
+                  name="band_width"
+                  type="number"
+                  :model-modifiers="{ number: true }"
+                  :placeholder="t('alerts.anomaly.bandWidthAuto')"
+                  :aria-label="t('alerts.anomaly.bandWidth')"
+                  class="max-w-21.75 min-w-21.75"
+                  data-test="anomaly-band-width"
+                >
+                  <template #error />
+                </OFormInput>
+              </div>
             </div>
             <div
               v-if="sensitivityError"
@@ -640,6 +655,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="anomaly-sensitivity-hint"
             >
               {{ sensitivityHint }}
+            </span>
+            <div
+              v-if="!budgetMode && bandWidthError"
+              class="text-input-error-text pt-1 text-xs"
+              data-test="anomaly-band-width-error"
+              role="alert"
+            >
+              {{ bandWidthError }}
+            </div>
+            <span
+              v-if="!budgetMode"
+              class="text-text-secondary text-xs"
+              data-test="anomaly-band-width-hint"
+            >
+              {{ t("alerts.anomaly.bandWidthHint") }}
             </span>
           </div>
         </div>
@@ -693,6 +723,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
+  ANOMALY_BAND_GROUPING_KEYS,
+  anomalyBandGrouping,
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
   anomalyIntervalSeconds,
@@ -856,12 +888,24 @@ export default defineComponent({
     const detectionWindowError = fieldError("detection_window_value");
     const thresholdError = fieldError("threshold");
     const budgetCountError = fieldError("budget_count");
+    const bandWidthError = fieldError("band_width");
 
     const budgetMode = computed(() => sensitivityMode.value === "budget");
 
     const sensitivityError = computed(() =>
       budgetMode.value ? budgetCountError.value : thresholdError.value,
     );
+
+    const bandGroupingLabel = computed(() => {
+      const grouping = anomalyBandGrouping(
+        Number(trainingWindowDays.value),
+        anomalyIntervalSeconds(
+          Number(histogramIntervalValue.value),
+          String(histogramIntervalUnit.value),
+        ),
+      );
+      return t(ANOMALY_BAND_GROUPING_KEYS[grouping] as any);
+    });
 
     const sensitivityTooltip = computed(() =>
       budgetMode.value
@@ -989,6 +1033,8 @@ export default defineComponent({
           }
         } else {
           cfg.threshold = toModelNumber(v.threshold);
+          cfg.band_width =
+            v.band_width === "" || v.band_width == null ? null : toModelNumber(v.band_width);
         }
       },
       { deep: true },
@@ -1251,6 +1297,8 @@ export default defineComponent({
       onBudgetTier,
       sensitivityError,
       sensitivityTooltip,
+      bandGroupingLabel,
+      bandWidthError,
       onCustomSqlChange,
     };
   },

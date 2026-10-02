@@ -70,6 +70,7 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
+import { ANOMALY_BAND_GROUPING_KEYS } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { formatTimestampInTimezone } from "@/utils/date";
 
@@ -350,8 +351,29 @@ const anomalyScheduleFields = computed(() => {
   ];
 });
 
+const anomalyTrainingSpan = (a: any): string => {
+  const start = anomalyTimestamp(a?.training_data_start_us);
+  const end = anomalyTimestamp(a?.training_data_end_us);
+  return start === EMPTY || end === EMPTY
+    ? EMPTY
+    : t("alerts.anomaly.trainingSpanValue", { start, end });
+};
+
+// A manual band_width overrides the trained k live, so it is the k in force.
+const anomalyBandWidth = (a: any): string => {
+  const manual = isBlank(a?.band_width) ? NaN : Number(a.band_width);
+  const trained = isBlank(a?.band_k) ? NaN : Number(a.band_k);
+  const k = Number.isFinite(manual) ? manual : trained;
+  if (!Number.isFinite(k)) return EMPTY;
+  const shown = Math.round(k * 100) / 100;
+  return Number.isFinite(manual)
+    ? t("alerts.anomaly.summaryBandWidthManual", { k: shown })
+    : t("alerts.anomaly.summaryBandWidthAuto", { k: shown });
+};
+
 const anomalyModelFields = computed(() => {
   const a = props.alert;
+  const groupingKey = (ANOMALY_BAND_GROUPING_KEYS as Record<string, string>)[a?.band_grouping];
   const fields: SummaryField[] = [
     {
       key: "status",
@@ -364,6 +386,21 @@ const anomalyModelFields = computed(() => {
       key: "last-trained",
       label: t("alerts.anomaly.lastTrained"),
       value: anomalyTimestamp(a?.training_completed_at),
+    },
+    {
+      key: "training-span",
+      label: t("alerts.anomaly.trainingSpan"),
+      value: anomalyTrainingSpan(a),
+    },
+    {
+      key: "band-grouping",
+      label: t("alerts.anomaly.bandGrouping"),
+      value: groupingKey ? t(groupingKey as any) : EMPTY,
+    },
+    {
+      key: "band-width",
+      label: t("alerts.anomaly.bandWidthK"),
+      value: anomalyBandWidth(a),
     },
     {
       key: "model-version",

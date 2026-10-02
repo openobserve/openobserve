@@ -81,6 +81,36 @@ const ADDED = [
   "alerts.anomaly.noDetectionResults",
   "alerts.anomaly.tooltipAnomalyAbove",
   "alerts.anomaly.tooltipAnomalyBelow",
+  // Band width, delivery direction and window share, the band explanation, the chart caption.
+  "alerts.anomaly.bandWidth",
+  "alerts.anomaly.bandWidthAuto",
+  "alerts.anomaly.bandWidthHint",
+  "alerts.anomaly.bandWidthRange",
+  "alerts.anomaly.bandGroupingHourOfWeek",
+  "alerts.anomaly.bandGroupingHourOfDay",
+  "alerts.anomaly.bandGroupingGlobal",
+  "alerts.anomaly.alertDirection",
+  "alerts.anomaly.alertDirectionTooltip",
+  "alerts.anomaly.directionBoth",
+  "alerts.anomaly.directionAbove",
+  "alerts.anomaly.directionBelow",
+  "alerts.anomaly.windowShare",
+  "alerts.anomaly.windowShareTooltip",
+  "alerts.anomaly.windowBuckets",
+  "alerts.anomaly.windowFirePct",
+  "alerts.anomaly.windowRecoverPct",
+  "alerts.anomaly.windowRecoverSameAsFire",
+  "alerts.anomaly.windowShareHint",
+  "alerts.anomaly.windowBucketsRange",
+  "alerts.anomaly.windowFireRange",
+  "alerts.anomaly.windowRecoverRange",
+  "alerts.anomaly.bandGrouping",
+  "alerts.anomaly.trainingSpan",
+  "alerts.anomaly.trainingSpanValue",
+  "alerts.anomaly.bandWidthK",
+  "alerts.anomaly.summaryBandWidthAuto",
+  "alerts.anomaly.summaryBandWidthManual",
+  "alerts.anomaly.bandCaption",
 ];
 
 // Keys orphaned by retired UI; a locale still carrying one is dead copy nothing else would flag.
@@ -97,6 +127,8 @@ const REMOVED = [
   "alerts.anomaly.sensitivityHintEveryNDays",
   "alerts.anomaly.summaryThresholdRate",
   "alerts.anomaly.seriesDeviation",
+  // The band grouping labels replaced it; nothing derives a weekly seasonality any more.
+  "alerts.anomaly.seasonalityWeekly",
 ];
 
 // Still read by AlertConfigSummary.vue — it sits one paragraph from the
@@ -188,112 +220,112 @@ const STALE_PERCENTILE_PROMISE_TOOLTIPS: Record<string, string> = {
 const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint: string }> = {
   "ar-SA": {
     tooltip:
-      "تحصل كل فترة على درجة: مدى بُعد قيمتها عن القيمة المتوقعة لتلك الساعة، مقيسًا بوحدات التشتت المعتاد. نصف عرض الشريط هو درجة التدريب عند هذا المئين (97 تعني أن 97٪ من فترات التدريب حصلت على درجة أقل)، ولا يقل أبدًا عن 3 وحدات تشتت معتاد. تُطلق الفترة الواقعة خارج الشريط تنبيهًا. قد تختلف البيانات الفعلية عن بيانات التدريب، لذا فهذا ليس معدل تنبيهات. القيمة الأقل تضيّق الشريط وترسل عادة تنبيهات أكثر؛ وتباعد فترة التهدئة التنبيهات المتكررة.",
+      "تحصل كل فترة على درجة: مدى بُعد قيمتها عن القيمة المتوقعة لتلك الساعة، مقيسًا بوحدات التشتت المعتاد. نصف عرض الشريط هو درجة التدريب عند هذا المئين (97 تعني أن 97٪ من فترات التدريب حصلت على درجة أقل)، ولا يقل أبدًا عن 3 وحدات تشتت معتاد. إذا حددت عرض شريط، فإنه يحل محل هذا العرض المشتق من المئين. تُطلق الفترة الواقعة خارج الشريط تنبيهًا. قد تختلف البيانات الفعلية عن بيانات التدريب، لذا فهذا ليس معدل تنبيهات. القيمة الأقل تضيّق الشريط وترسل عادة تنبيهات أكثر؛ وتباعد فترة التهدئة التنبيهات المتكررة.",
     budgetTooltip:
       "الحد الأقصى لعدد التنبيهات التي يمكن لهذا الإعداد إرسالها، ويُفرض عند الإرسال. يستمر الكشف في تقييم كل فترة؛ وعند استنفاد الميزانية تُمنع التنبيهات الإضافية حتى تتجدد.",
     hint: "تُطلق النافذة تنبيهًا عندما تبدو أكثر غرابة من {percentile}% مما رآه النموذج أثناء التدريب. ويعتمد عدد التنبيهات الناتجة على بياناتك.",
   },
   "de-DE": {
     tooltip:
-      "Jeder Bucket erhält einen Score: wie weit sein Wert vom erwarteten Wert für diese Stunde entfernt liegt, gemessen in typischen Streuungen. Die halbe Breite des Bands ist der Trainings-Score bei diesem Perzentil (97 bedeutet, dass 97 % der Trainings-Buckets niedriger lagen), aber nie weniger als 3 typische Streuungen. Ein Bucket außerhalb des Bands löst eine Warnmeldung aus. Live-Daten können vom Training abweichen; dies ist also keine Alarmrate. Ein niedrigerer Wert verengt das Band und sendet in der Regel mehr Warnmeldungen; eine Abklingzeit begrenzt Wiederholungen.",
+      "Jeder Bucket erhält einen Score: wie weit sein Wert vom erwarteten Wert für diese Stunde entfernt liegt, gemessen in typischen Streuungen. Die halbe Breite des Bands ist der Trainings-Score bei diesem Perzentil (97 bedeutet, dass 97 % der Trainings-Buckets niedriger lagen), aber nie weniger als 3 typische Streuungen. Wenn Sie eine Bandbreite festlegen, ersetzt sie diese aus dem Perzentil abgeleitete Breite. Ein Bucket außerhalb des Bands löst eine Warnmeldung aus. Live-Daten können vom Training abweichen; dies ist also keine Alarmrate. Ein niedrigerer Wert verengt das Band und sendet in der Regel mehr Warnmeldungen; eine Abklingzeit begrenzt Wiederholungen.",
     budgetTooltip:
       "Die maximale Zahl von Warnmeldungen, die diese Konfiguration zustellen darf — bei der Zustellung erzwungen. Die Erkennung bewertet weiterhin jeden Bucket; ist das Budget aufgebraucht, werden weitere Warnmeldungen unterdrückt, bis es sich auffüllt.",
     hint: "Ein Bucket löst eine Warnmeldung aus, wenn er ungewöhnlicher erscheint als {percentile} % dessen, was das Modell im Training gesehen hat. Wie viele Warnmeldungen das bedeutet, hängt von Ihren Daten ab.",
   },
   "en-US": {
     tooltip:
-      "Each bucket gets a score: how far its value sits from the expected value for that hour, in units of typical spread. The band's half-width is the training score at this percentile (97 means 97% of training buckets scored lower), and never less than 3 typical spreads. A bucket outside the band alerts. Live data can differ from training, so this is not an alert rate. A lower value narrows the band and generally sends more alerts; a cooldown spaces out repeats.",
+      "Each bucket gets a score: how far its value sits from the expected value for that hour, in units of typical spread. The band's half-width is the training score at this percentile (97 means 97% of training buckets scored lower), and never less than 3 typical spreads. If you set a band width, it replaces this percentile-derived width. A bucket outside the band alerts. Live data can differ from training, so this is not an alert rate. A lower value narrows the band and generally sends more alerts; a cooldown spaces out repeats.",
     budgetTooltip:
       "The maximum number of alerts this configuration may deliver, enforced at delivery. Detection still scores every bucket; once the budget is spent, further alerts are suppressed until it refills.",
     hint: "A bucket alerts when it looks more unusual than {percentile}% of what the model saw in training. How many alerts that means depends on your data.",
   },
   "es-ES": {
     tooltip:
-      "Cada bucket recibe una puntuación: lo lejos que está su valor del valor esperado para esa hora, en unidades de dispersión típica. La mitad del ancho de la banda es la puntuación de entrenamiento en este percentil (97 significa que el 97 % de los buckets de entrenamiento puntuaron por debajo), y nunca menos de 3 dispersiones típicas. Un bucket fuera de la banda genera una alerta. Los datos reales pueden diferir del entrenamiento, así que esto no es una tasa de alertas. Un valor más bajo estrecha la banda y suele enviar más alertas; un periodo de enfriamiento espacia las repeticiones.",
+      "Cada bucket recibe una puntuación: lo lejos que está su valor del valor esperado para esa hora, en unidades de dispersión típica. La mitad del ancho de la banda es la puntuación de entrenamiento en este percentil (97 significa que el 97 % de los buckets de entrenamiento puntuaron por debajo), y nunca menos de 3 dispersiones típicas. Si estableces un ancho de banda, sustituye este ancho derivado del percentil. Un bucket fuera de la banda genera una alerta. Los datos reales pueden diferir del entrenamiento, así que esto no es una tasa de alertas. Un valor más bajo estrecha la banda y suele enviar más alertas; un periodo de enfriamiento espacia las repeticiones.",
     budgetTooltip:
       "El número máximo de alertas que esta configuración puede entregar, aplicado en la entrega. La detección sigue puntuando cada bucket; agotado el presupuesto, las alertas adicionales se suprimen hasta que se repone.",
     hint: "Un intervalo genera una alerta cuando parece más inusual que el {percentile}% de lo que el modelo vio durante el entrenamiento. Cuántas alertas supone eso depende de tus datos.",
   },
   "fr-FR": {
     tooltip:
-      "Chaque intervalle reçoit un score : l'écart entre sa valeur et la valeur attendue pour cette heure, exprimé en dispersions typiques. La demi-largeur de la bande est le score d'entraînement à ce percentile (97 signifie que 97 % des intervalles d'entraînement ont obtenu un score inférieur), et jamais moins de 3 dispersions typiques. Un intervalle hors de la bande déclenche une alerte. Les données réelles peuvent différer de l'entraînement : ce n'est donc pas un taux d'alertes. Une valeur plus basse resserre la bande et envoie généralement plus d'alertes ; un délai de récupération espace les répétitions.",
+      "Chaque intervalle reçoit un score : l'écart entre sa valeur et la valeur attendue pour cette heure, exprimé en dispersions typiques. La demi-largeur de la bande est le score d'entraînement à ce percentile (97 signifie que 97 % des intervalles d'entraînement ont obtenu un score inférieur), et jamais moins de 3 dispersions typiques. Si vous définissez une largeur de bande, elle remplace cette largeur dérivée du percentile. Un intervalle hors de la bande déclenche une alerte. Les données réelles peuvent différer de l'entraînement : ce n'est donc pas un taux d'alertes. Une valeur plus basse resserre la bande et envoie généralement plus d'alertes ; un délai de récupération espace les répétitions.",
     budgetTooltip:
       "Le nombre maximal d'alertes que cette configuration peut délivrer, appliqué à la livraison. La détection continue de noter chaque compartiment ; une fois le budget épuisé, les alertes supplémentaires sont supprimées jusqu'à ce qu'il se reconstitue.",
     hint: "Un intervalle déclenche une alerte lorsqu'il paraît plus inhabituel que {percentile}% de ce que le modèle a vu à l'entraînement. Le nombre d'alertes que cela représente dépend de vos données.",
   },
   "it-IT": {
     tooltip:
-      "Ogni intervallo riceve un punteggio: quanto il suo valore si discosta dal valore previsto per quell'ora, in unità di dispersione tipica. La semi-ampiezza della fascia è il punteggio di addestramento a questo percentile (97 significa che il 97% degli intervalli di addestramento ha ottenuto un punteggio inferiore) e non è mai inferiore a 3 dispersioni tipiche. Un intervallo fuori dalla fascia genera un avviso. I dati reali possono differire dall'addestramento, quindi questo non è un tasso di avvisi. Un valore più basso restringe la fascia e in genere invia più avvisi; un periodo di cooldown distanzia le ripetizioni.",
+      "Ogni intervallo riceve un punteggio: quanto il suo valore si discosta dal valore previsto per quell'ora, in unità di dispersione tipica. La semi-ampiezza della fascia è il punteggio di addestramento a questo percentile (97 significa che il 97% degli intervalli di addestramento ha ottenuto un punteggio inferiore) e non è mai inferiore a 3 dispersioni tipiche. Se imposti un'ampiezza della fascia, sostituisce questa ampiezza ricavata dal percentile. Un intervallo fuori dalla fascia genera un avviso. I dati reali possono differire dall'addestramento, quindi questo non è un tasso di avvisi. Un valore più basso restringe la fascia e in genere invia più avvisi; un periodo di cooldown distanzia le ripetizioni.",
     budgetTooltip:
       "Il numero massimo di avvisi che questa configurazione può recapitare, applicato al recapito. Il rilevamento continua a valutare ogni bucket; esaurito il budget, gli avvisi ulteriori vengono soppressi finché non si ricarica.",
     hint: "Un intervallo genera un avviso quando appare più insolito del {percentile}% di ciò che il modello ha visto durante l'addestramento. Quanti avvisi comporti dipende dai tuoi dati.",
   },
   "ja-JP": {
     tooltip:
-      "各バケットにはスコアが付きます。これは、値がその時間帯の予想値からどれだけ離れているかを、典型的なばらつきの単位で表したものです。帯の半幅はこのパーセンタイルでの学習スコアです（97 は学習バケットの 97% がそれより低いスコアだったことを意味します）。ただし、典型的なばらつきの 3 倍より狭くなることはありません。帯の外にあるバケットはアラートを発します。実データは学習時と異なる場合があるため、これはアラート率ではありません。値を下げると帯が狭まり、通常はアラートが増えます。クールダウンにより繰り返しの間隔が空きます。",
+      "各バケットにはスコアが付きます。これは、値がその時間帯の予想値からどれだけ離れているかを、典型的なばらつきの単位で表したものです。帯の半幅はこのパーセンタイルでの学習スコアです（97 は学習バケットの 97% がそれより低いスコアだったことを意味します）。ただし、典型的なばらつきの 3 倍より狭くなることはありません。 帯の幅を設定した場合は、このパーセンタイルから求めた幅の代わりにその値が使われます。帯の外にあるバケットはアラートを発します。実データは学習時と異なる場合があるため、これはアラート率ではありません。値を下げると帯が狭まり、通常はアラートが増えます。クールダウンにより繰り返しの間隔が空きます。",
     budgetTooltip:
       "この設定が配信できるアラートの上限で、配信時に強制されます。検出はすべてのバケットをスコアリングし続けます。予算を使い切ると、回復するまで追加のアラートは抑制されます。",
     hint: "バケットは、モデルがトレーニングで見たものの {percentile}% よりも異常に見える場合にアラートを発します。それが何件のアラートになるかはデータ次第です。",
   },
   "ko-KR": {
     tooltip:
-      "각 버킷에는 점수가 매겨집니다. 이는 값이 해당 시간대의 예상값에서 얼마나 떨어져 있는지를 일반적인 산포 단위로 나타낸 것입니다. 띠의 절반 폭은 이 백분위수에서의 학습 점수이며(97은 학습 버킷의 97%가 그보다 낮은 점수였다는 뜻), 일반적인 산포의 3배보다 좁아지지 않습니다. 띠 밖에 있는 버킷은 알림을 보냅니다. 실제 데이터는 학습 데이터와 다를 수 있으므로 이는 알림 비율이 아닙니다. 값을 낮추면 띠가 좁아지고 일반적으로 더 많은 알림이 전송됩니다. 쿨다운은 반복 알림 사이에 간격을 둡니다.",
+      "각 버킷에는 점수가 매겨집니다. 이는 값이 해당 시간대의 예상값에서 얼마나 떨어져 있는지를 일반적인 산포 단위로 나타낸 것입니다. 띠의 절반 폭은 이 백분위수에서의 학습 점수이며(97은 학습 버킷의 97%가 그보다 낮은 점수였다는 뜻), 일반적인 산포의 3배보다 좁아지지 않습니다. 띠 폭을 설정하면 이 백분위수 기반 폭 대신 그 값이 사용됩니다. 띠 밖에 있는 버킷은 알림을 보냅니다. 실제 데이터는 학습 데이터와 다를 수 있으므로 이는 알림 비율이 아닙니다. 값을 낮추면 띠가 좁아지고 일반적으로 더 많은 알림이 전송됩니다. 쿨다운은 반복 알림 사이에 간격을 둡니다.",
     budgetTooltip:
       "이 구성이 전달할 수 있는 알림의 최대 개수로, 전달 시점에 강제됩니다. 감지는 모든 버킷을 계속 채점하며, 예산이 소진되면 회복될 때까지 추가 알림이 억제됩니다.",
     hint: "버킷이 학습 중 모델이 확인한 데이터의 {percentile}%보다 더 이례적으로 보이면 알림이 발생합니다. 알림이 몇 건 발생하는지는 데이터에 따라 다릅니다.",
   },
   "nl-NL": {
     tooltip:
-      "Elk interval krijgt een score: hoe ver de waarde afligt van de verwachte waarde voor dat uur, gemeten in typische spreidingen. De halve breedte van de band is de trainingsscore bij dit percentiel (97 betekent dat 97% van de trainingsintervallen lager scoorde), en nooit minder dan 3 typische spreidingen. Een interval buiten de band geeft een waarschuwing. Live data kan afwijken van de training, dus dit is geen waarschuwingsfrequentie. Een lagere waarde maakt de band smaller en stuurt doorgaans meer waarschuwingen; een afkoelperiode spreidt herhalingen.",
+      "Elk interval krijgt een score: hoe ver de waarde afligt van de verwachte waarde voor dat uur, gemeten in typische spreidingen. De halve breedte van de band is de trainingsscore bij dit percentiel (97 betekent dat 97% van de trainingsintervallen lager scoorde), en nooit minder dan 3 typische spreidingen. Als u een bandbreedte instelt, vervangt die deze uit het percentiel afgeleide breedte. Een interval buiten de band geeft een waarschuwing. Live data kan afwijken van de training, dus dit is geen waarschuwingsfrequentie. Een lagere waarde maakt de band smaller en stuurt doorgaans meer waarschuwingen; een afkoelperiode spreidt herhalingen.",
     budgetTooltip:
       "Het maximale aantal meldingen dat deze configuratie mag bezorgen, afgedwongen bij bezorging. Detectie blijft elke bucket scoren; is het budget op, dan worden verdere meldingen onderdrukt tot het zich aanvult.",
     hint: "Een bucket geeft een alarm wanneer deze ongewoner lijkt dan {percentile}% van wat het model tijdens de training zag. Hoeveel alarmen dat oplevert, hangt af van uw gegevens.",
   },
   "pl-PL": {
     tooltip:
-      "Każdy przedział otrzymuje wynik: jak daleko jego wartość odbiega od wartości oczekiwanej dla danej godziny, mierzony w typowych rozrzutach. Połowa szerokości pasa to wynik treningowy przy tym percentylu (97 oznacza, że 97% przedziałów treningowych uzyskało niższy wynik), ale nigdy mniej niż 3 typowe rozrzuty. Przedział poza pasem wywołuje alert. Dane bieżące mogą różnić się od treningowych, więc nie jest to częstotliwość alertów. Niższa wartość zawęża pas i zwykle wysyła więcej alertów; okres wyciszenia rozkłada powtórzenia w czasie.",
+      "Każdy przedział otrzymuje wynik: jak daleko jego wartość odbiega od wartości oczekiwanej dla danej godziny, mierzony w typowych rozrzutach. Połowa szerokości pasa to wynik treningowy przy tym percentylu (97 oznacza, że 97% przedziałów treningowych uzyskało niższy wynik), ale nigdy mniej niż 3 typowe rozrzuty. Jeśli ustawisz szerokość pasa, zastępuje ona tę szerokość wyznaczoną z percentyla. Przedział poza pasem wywołuje alert. Dane bieżące mogą różnić się od treningowych, więc nie jest to częstotliwość alertów. Niższa wartość zawęża pas i zwykle wysyła więcej alertów; okres wyciszenia rozkłada powtórzenia w czasie.",
     budgetTooltip:
       "Maksymalna liczba alertów, jaką ta konfiguracja może dostarczyć, egzekwowana przy dostarczaniu. Wykrywanie nadal ocenia każdy przedział; po wyczerpaniu budżetu kolejne alerty są wstrzymywane, aż budżet się odnowi.",
     hint: "Przedział generuje alert, gdy wygląda na bardziej nietypowy niż {percentile}% tego, co model widział podczas uczenia. To, ile to oznacza alertów, zależy od Twoich danych.",
   },
   "pt-PT": {
     tooltip:
-      "Cada intervalo recebe uma pontuação: a distância entre o seu valor e o valor esperado para essa hora, em unidades de dispersão típica. A meia-largura da faixa é a pontuação de treino neste percentil (97 significa que 97% dos intervalos de treino tiveram pontuação inferior) e nunca menos de 3 dispersões típicas. Um intervalo fora da faixa gera um alerta. Os dados reais podem diferir do treino, por isso isto não é uma taxa de alertas. Um valor mais baixo estreita a faixa e geralmente envia mais alertas; um período de espera espaça as repetições.",
+      "Cada intervalo recebe uma pontuação: a distância entre o seu valor e o valor esperado para essa hora, em unidades de dispersão típica. A meia-largura da faixa é a pontuação de treino neste percentil (97 significa que 97% dos intervalos de treino tiveram pontuação inferior) e nunca menos de 3 dispersões típicas. Se definir uma largura de faixa, esta substitui a largura derivada do percentil. Um intervalo fora da faixa gera um alerta. Os dados reais podem diferir do treino, por isso isto não é uma taxa de alertas. Um valor mais baixo estreita a faixa e geralmente envia mais alertas; um período de espera espaça as repetições.",
     budgetTooltip:
       "O número máximo de alertas que esta configuração pode entregar, aplicado na entrega. A deteção continua a pontuar todos os buckets; esgotado o orçamento, os alertas adicionais são suprimidos até ele se repor.",
     hint: "Um bucket gera alerta quando parece mais incomum do que {percentile}% do que o modelo viu no treinamento. Quantos alertas isso significa depende dos seus dados.",
   },
   "ru-RU": {
     tooltip:
-      "Каждый интервал получает оценку: насколько его значение отклоняется от ожидаемого для этого часа, в единицах типичного разброса. Полуширина полосы — это оценка обучения на этом процентиле (97 означает, что у 97% интервалов обучения оценка была ниже), но не меньше 3 типичных разбросов. Интервал за пределами полосы вызывает оповещение. Реальные данные могут отличаться от обучающих, поэтому это не частота оповещений. Меньшее значение сужает полосу и обычно приводит к большему числу оповещений; период ожидания разносит повторы.",
+      "Каждый интервал получает оценку: насколько его значение отклоняется от ожидаемого для этого часа, в единицах типичного разброса. Полуширина полосы — это оценка обучения на этом процентиле (97 означает, что у 97% интервалов обучения оценка была ниже), но не меньше 3 типичных разбросов. Если задать ширину полосы, она заменяет эту ширину, полученную из процентиля. Интервал за пределами полосы вызывает оповещение. Реальные данные могут отличаться от обучающих, поэтому это не частота оповещений. Меньшее значение сужает полосу и обычно приводит к большему числу оповещений; период ожидания разносит повторы.",
     budgetTooltip:
       "Максимальное число оповещений, которое эта конфигурация может доставить; ограничение применяется при доставке. Обнаружение продолжает оценивать каждый бакет; когда бюджет исчерпан, дальнейшие оповещения подавляются, пока он не восстановится.",
     hint: "Интервал срабатывает, когда выглядит необычнее, чем {percentile}% увиденного моделью при обучении. Сколько это даст оповещений, зависит от ваших данных.",
   },
   "tr-TR": {
     tooltip:
-      "Her aralık bir puan alır: değerinin o saat için beklenen değerden ne kadar uzak olduğu, tipik yayılım biriminde. Bandın yarı genişliği bu yüzdelikteki eğitim puanıdır (97, eğitim aralıklarının %97'sinin daha düşük puan aldığı anlamına gelir) ve hiçbir zaman 3 tipik yayılımdan az değildir. Bandın dışındaki bir aralık uyarı tetikler. Canlı veriler eğitimden farklı olabilir, bu nedenle bu bir uyarı oranı değildir. Daha düşük bir değer bandı daraltır ve genellikle daha fazla uyarı gönderir; bekleme süresi tekrarları aralıklandırır.",
+      "Her aralık bir puan alır: değerinin o saat için beklenen değerden ne kadar uzak olduğu, tipik yayılım biriminde. Bandın yarı genişliği bu yüzdelikteki eğitim puanıdır (97, eğitim aralıklarının %97'sinin daha düşük puan aldığı anlamına gelir) ve hiçbir zaman 3 tipik yayılımdan az değildir. Bir bant genişliği ayarlarsanız, yüzdelikten türetilen bu genişliğin yerini alır. Bandın dışındaki bir aralık uyarı tetikler. Canlı veriler eğitimden farklı olabilir, bu nedenle bu bir uyarı oranı değildir. Daha düşük bir değer bandı daraltır ve genellikle daha fazla uyarı gönderir; bekleme süresi tekrarları aralıklandırır.",
     budgetTooltip:
       "Bu yapılandırmanın teslim edebileceği en fazla uyarı sayısı; teslimde uygulanır. Algılama her aralığı puanlamaya devam eder; bütçe tükenince, yenilenene kadar ek uyarılar bastırılır.",
     hint: "Bir zaman aralığı, modelin eğitimde gördüklerinin %{percentile}'inden daha sıra dışı göründüğünde uyarı verir. Bunun kaç uyarıya karşılık geldiği verinize bağlıdır.",
   },
   "vi-VN": {
     tooltip:
-      "Mỗi khoảng được tính một điểm: giá trị của nó lệch bao xa so với giá trị dự kiến của giờ đó, tính theo đơn vị độ phân tán điển hình. Nửa độ rộng của dải là điểm huấn luyện tại phân vị này (97 nghĩa là 97% khoảng huấn luyện có điểm thấp hơn) và không bao giờ nhỏ hơn 3 độ phân tán điển hình. Một khoảng nằm ngoài dải sẽ kích hoạt cảnh báo. Dữ liệu thực tế có thể khác dữ liệu huấn luyện, nên đây không phải là tỷ lệ cảnh báo. Giá trị thấp hơn sẽ thu hẹp dải và thường gửi nhiều cảnh báo hơn; thời gian chờ giúp giãn cách các lần lặp lại.",
+      "Mỗi khoảng được tính một điểm: giá trị của nó lệch bao xa so với giá trị dự kiến của giờ đó, tính theo đơn vị độ phân tán điển hình. Nửa độ rộng của dải là điểm huấn luyện tại phân vị này (97 nghĩa là 97% khoảng huấn luyện có điểm thấp hơn) và không bao giờ nhỏ hơn 3 độ phân tán điển hình. Nếu bạn đặt độ rộng dải, giá trị đó sẽ thay thế độ rộng suy ra từ phân vị này. Một khoảng nằm ngoài dải sẽ kích hoạt cảnh báo. Dữ liệu thực tế có thể khác dữ liệu huấn luyện, nên đây không phải là tỷ lệ cảnh báo. Giá trị thấp hơn sẽ thu hẹp dải và thường gửi nhiều cảnh báo hơn; thời gian chờ giúp giãn cách các lần lặp lại.",
     budgetTooltip:
       "Số cảnh báo tối đa mà cấu hình này được phép gửi, được áp đặt khi gửi. Việc phát hiện vẫn chấm điểm mọi bucket; khi ngân sách cạn, các cảnh báo tiếp theo bị chặn cho đến khi ngân sách hồi phục.",
     hint: "Một khung thời gian sẽ phát cảnh báo khi nó trông bất thường hơn {percentile}% những gì mô hình đã thấy trong quá trình huấn luyện. Số lượng cảnh báo cụ thể phụ thuộc vào dữ liệu của bạn.",
   },
   "zh-CN": {
     tooltip:
-      "每个时间桶都会得到一个分数：其值与该小时预期值的偏离程度，以典型离散度为单位。带的半宽是该百分位上的训练分数（97 表示 97% 的训练时间桶分数更低），且绝不小于 3 个典型离散度。落在带外的时间桶会触发告警。实时数据可能与训练数据不同，因此这不是告警率。数值越低，带越窄，通常会发送更多告警；冷却期会拉开重复告警的间隔。",
+      "每个时间桶都会得到一个分数：其值与该小时预期值的偏离程度，以典型离散度为单位。带的半宽是该百分位上的训练分数（97 表示 97% 的训练时间桶分数更低），且绝不小于 3 个典型离散度。 如果设置了带宽，它将取代这个由百分位数得出的宽度。落在带外的时间桶会触发告警。实时数据可能与训练数据不同，因此这不是告警率。数值越低，带越窄，通常会发送更多告警；冷却期会拉开重复告警的间隔。",
     budgetTooltip:
       "此配置可投递告警的上限，在投递时强制执行。检测仍会为每个数据桶评分；预算用尽后，多余的告警将被抑制，直到预算恢复。",
     hint: "当某个时间桶看起来比模型在训练中见到的 {percentile}% 更异常时，就会触发告警。具体会产生多少条告警取决于你的数据。",
   },
   "zh-TW": {
     tooltip:
-      "每個時間桶都會得到一個分數：其值與該小時預期值的偏離程度，以典型離散度為單位。帶的半寬是此百分位數上的訓練分數（97 表示 97% 的訓練時間桶分數較低），且絕不小於 3 個典型離散度。落在帶外的時間桶會觸發警示。即時資料可能與訓練資料不同，因此這不是警示率。數值越低，帶越窄，通常會傳送更多警示；冷卻期會拉開重複警示的間隔。",
+      "每個時間桶都會得到一個分數：其值與該小時預期值的偏離程度，以典型離散度為單位。帶的半寬是此百分位數上的訓練分數（97 表示 97% 的訓練時間桶分數較低），且絕不小於 3 個典型離散度。 如果設定了帶寬，它會取代這個由百分位數得出的寬度。落在帶外的時間桶會觸發警示。即時資料可能與訓練資料不同，因此這不是警示率。數值越低，帶越窄，通常會傳送更多警示；冷卻期會拉開重複警示的間隔。",
     budgetTooltip:
       "此設定可傳送警示的上限，於傳送時強制執行。偵測仍會為每個區間評分；預算用盡後，多餘的警示會被抑制，直到預算回復。",
     hint: "當某個時間桶看起來比模型在訓練中見過的 {percentile}% 更不尋常時，就會觸發警示。這代表多少個警示取決於你的資料。",

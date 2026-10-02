@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAnomalyBandOptions,
   formatReading,
+  latestBandK,
   toAnomalyBandRows,
   type AnomalyBandRow,
 } from "@/utils/alerts/anomalyBandChart";
@@ -51,6 +52,7 @@ const row = (tsMs: number, over: Partial<AnomalyBandRow> = {}): AnomalyBandRow =
   lower: null,
   upper: null,
   event: null,
+  threshold: null,
   ...over,
 });
 
@@ -69,6 +71,7 @@ describe("toAnomalyBandRows", () => {
         expected_lower: 5,
         expected_upper: 11,
         event_value: null,
+        threshold_value: 3.4,
       },
     ]);
     expect(rows).toEqual([
@@ -80,6 +83,7 @@ describe("toAnomalyBandRows", () => {
         lower: 5,
         upper: 11,
         event: null,
+        threshold: 3.4,
       },
     ]);
   });
@@ -266,5 +270,18 @@ describe("formatReading", () => {
     expect(formatReading(-2.5)).toBe("-2.50");
     expect(formatReading(0.012345)).toBe("0.0123");
     expect(formatReading(0)).toBe("0");
+  });
+});
+
+describe("latestBandK", () => {
+  it("reads k from the newest bucket that carries one", () => {
+    expect(
+      latestBandK([row(1000, { threshold: 3 }), row(2000, { threshold: 4.5 }), row(3000)]),
+    ).toBe(4.5);
+  });
+
+  it("is null when no bucket carries a k", () => {
+    expect(latestBandK([row(1000), row(2000)])).toBeNull();
+    expect(latestBandK([])).toBeNull();
   });
 });

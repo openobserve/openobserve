@@ -4,7 +4,12 @@
  * Generates human-readable summaries of anomaly detection configurations
  */
 
-import { raw, type TranslateFn } from "@/types/i18n";
+import { type TranslateFn } from "@/types/i18n";
+import {
+  ANOMALY_BAND_GROUPING_KEYS,
+  anomalyBandGrouping,
+  anomalyIntervalSeconds,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // Escape user-controlled strings before embedding in HTML (XSS prevention) —
 // mirrors alertSummaryGenerator.ts's esc(), so both generators emit HTML that
@@ -66,10 +71,17 @@ export function generateAnomalySummary(
     const win = `${config.detection_window_value}${config.detection_window_unit}`;
     parts.push(t("alerts.anomaly.summaryDetectionWindow", { window: chip(win) }));
 
-    const seasonality =
-      (config.training_window_days || 14) >= 7
-        ? t("alerts.anomaly.seasonalityWeekly")
-        : raw("hour-of-day");
+    const seasonality = t(
+      ANOMALY_BAND_GROUPING_KEYS[
+        anomalyBandGrouping(
+          Number(config.training_window_days || 14),
+          anomalyIntervalSeconds(
+            Number(config.histogram_interval_value),
+            String(config.histogram_interval_unit),
+          ),
+        )
+      ] as any,
+    );
     parts.push(
       t("alerts.anomaly.summaryTraining", {
         days: chip(t("alerts.anomaly.summaryTrainingDays", { days: config.training_window_days })),

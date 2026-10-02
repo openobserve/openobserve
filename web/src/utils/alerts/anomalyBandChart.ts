@@ -18,6 +18,7 @@ import {
   ANOMALY_EXPECTED_ALIAS,
   ANOMALY_FLAGGED_ALIAS,
   ANOMALY_LOWER_ALIAS,
+  ANOMALY_THRESHOLD_ALIAS,
   ANOMALY_UPPER_ALIAS,
   ANOMALY_VALUE_ALIAS,
   ANOMALY_X_ALIAS,
@@ -33,6 +34,7 @@ export interface AnomalyBandRow {
   lower: number | null;
   upper: number | null;
   event: number | null;
+  threshold: number | null;
 }
 
 export interface AnomalyBandLabels {
@@ -105,9 +107,18 @@ export function toAnomalyBandRows(hits: Array<Record<string, unknown>>): Anomaly
       lower: toNumber(hit[ANOMALY_LOWER_ALIAS]),
       upper: toNumber(hit[ANOMALY_UPPER_ALIAS]),
       event: toNumber(hit[ANOMALY_EVENT_ALIAS]),
+      threshold: toNumber(hit[ANOMALY_THRESHOLD_ALIAS]),
     }))
     .filter((row) => row.tsMs > 0)
     .sort((a, b) => a.tsMs - b.tsMs);
+}
+
+/** The k that drew the newest band: a band row's threshold_value is its k, and an edit or retrain changes it. */
+export function latestBandK(rows: AnomalyBandRow[]): number | null {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].threshold !== null) return rows[i].threshold;
+  }
+  return null;
 }
 
 /** The band is drawn as a stacked pair (lower, then upper − lower), so it needs both bounds or neither. */

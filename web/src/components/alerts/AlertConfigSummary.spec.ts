@@ -332,6 +332,53 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(field(wrapper, "last-error").exists()).toBe(false);
   });
 
+  it("explains the band: grouping, training span, and the trained k as auto", () => {
+    const wrapper = mountSummary(
+      anomalyConfig({
+        band_grouping: "hour_of_week",
+        band_k: 3.4567,
+        training_data_start_us: 1786924800000000,
+        training_data_end_us: 1788134400000000,
+      }),
+    );
+
+    expect(value(wrapper, "band-grouping")).toBe(
+      translated("alerts.anomaly.bandGroupingHourOfWeek"),
+    );
+    expect(value(wrapper, "training-span")).toBe(
+      translated("alerts.anomaly.trainingSpanValue", {
+        start: "2026-08-17 00:00:00",
+        end: "2026-08-31 00:00:00",
+      }),
+    );
+    expect(value(wrapper, "band-width")).toBe(
+      translated("alerts.anomaly.summaryBandWidthAuto", { k: 3.46 }),
+    );
+  });
+
+  it("shows a manual band width over the trained k", () => {
+    const wrapper = mountSummary(anomalyConfig({ band_width: 4, band_k: 3.2 }));
+    expect(value(wrapper, "band-width")).toBe(
+      translated("alerts.anomaly.summaryBandWidthManual", { k: 4 }),
+    );
+  });
+
+  it("names every grouping the trainer writes", () => {
+    expect(
+      value(mountSummary(anomalyConfig({ band_grouping: "hour_of_day" })), "band-grouping"),
+    ).toBe(translated("alerts.anomaly.bandGroupingHourOfDay"));
+    expect(value(mountSummary(anomalyConfig({ band_grouping: "global" })), "band-grouping")).toBe(
+      translated("alerts.anomaly.bandGroupingGlobal"),
+    );
+  });
+
+  it("dashes the band fields for a config trained before they existed", () => {
+    const wrapper = mountSummary(anomalyConfig());
+    expect(value(wrapper, "band-grouping")).toBe("—");
+    expect(value(wrapper, "training-span")).toBe("—");
+    expect(value(wrapper, "band-width")).toBe("—");
+  });
+
   it("surfaces the training error when there is one", () => {
     const wrapper = mountSummary(
       anomalyConfig({ status: "failed", last_error: "not enough data points" }),

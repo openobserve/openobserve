@@ -66,7 +66,9 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
 import {
   anomalyDetectionConfigDefaults,
+  anomalyBandGrouping,
   anomalyNoticeBadgeKeys,
+  anomalyWindowShareErrors,
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
 import enLocale from "@/locales/languages/en-US.json";
@@ -934,6 +936,104 @@ describe("AnomalyDetectionConfig", () => {
   // Without these an additive implementation that leaves the old control in
   // place would pass every test above.
   // =========================================================================
+  describe("band width — optional override in percentile mode", () => {
+    const bandWidthInput = (w: VueWrapper) => w.find('[data-test="anomaly-band-width"] input');
+
+    it("renders empty (auto) with its hint in percentile mode", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect((bandWidthInput(wrapper).element as HTMLInputElement).value).toBe("");
+      expect(wrapper.find('[data-test="anomaly-band-width-hint"]').text()).toBe(
+        i18n.global.t("alerts.anomaly.bandWidthHint"),
+      );
+    });
+
+    it("is not offered in budget mode, where the server rejects it", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-band-width"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-band-width-hint"]').exists()).toBe(false);
+    });
+
+    it("seeds a stored band width and writes edits back as a number", async () => {
+      const { wrapper: w, config } = mountReturning({ band_width: 4 });
+      wrapper = w;
+      await flushPromises();
+
+      expect((bandWidthInput(wrapper).element as HTMLInputElement).value).toBe("4");
+      await bandWidthInput(wrapper).setValue("5.5");
+      await flushPromises();
+      await nextTick();
+      expect((config as any).band_width).toBe(5.5);
+    });
+
+    it("clearing the input writes null, which the server reads as auto", async () => {
+      const { wrapper: w, config } = mountReturning({ band_width: 4 });
+      wrapper = w;
+      await flushPromises();
+
+      await bandWidthInput(wrapper).setValue("");
+      await flushPromises();
+      await nextTick();
+      expect((config as any).band_width).toBeNull();
+    });
+
+    it.each([0.5, 10.5])("rejects %s, outside the server's 1 to 10", async (bad) => {
+      wrapper = mountConfig({ band_width: bad });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await flushPromises();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "band_width")).toBe(
+        i18n.global.t("alerts.anomaly.bandWidthRange"),
+      );
+      expect(wrapper.find('[data-test="anomaly-band-width-error"]').exists()).toBe(true);
+    });
+
+    it.each([1, 10, 3.25])("accepts %s", async (ok) => {
+      wrapper = mountConfig({ band_width: ok });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(true);
+    });
+  });
+
+  describe("training window — band grouping label", () => {
+    const label = (w: VueWrapper) => (w.vm as any).bandGroupingLabel;
+
+    it.each([
+      [21, "alerts.anomaly.bandGroupingHourOfWeek"],
+      [20, "alerts.anomaly.bandGroupingHourOfDay"],
+      [3, "alerts.anomaly.bandGroupingHourOfDay"],
+      [2, "alerts.anomaly.bandGroupingGlobal"],
+    ])("%s days groups by %s", async (days, key) => {
+      wrapper = mountConfig({ training_window_days: days });
+      await flushPromises();
+      expect(label(wrapper)).toBe(i18n.global.t(key));
+      expect(wrapper.text()).toContain(i18n.global.t(key));
+    });
+
+    it("is global for a detection resolution coarser than 1h, however long the window", async () => {
+      wrapper = mountConfig({
+        training_window_days: 30,
+        histogram_interval_value: 2,
+        histogram_interval_unit: "h",
+      });
+      await flushPromises();
+      expect(label(wrapper)).toBe(i18n.global.t("alerts.anomaly.bandGroupingGlobal"));
+    });
+  });
+
   describe("sensitivity — the removed slider and the relocated chart", () => {
     it("no longer declares a threshold_range form field or renders the slider", async () => {
       wrapper = mountConfig();
@@ -1309,4 +1409,65 @@ describe("anomalyNoticeBadgeKeys", () => {
       expect(anomalyNoticeBadgeKeys(noticeClass)).toBeNull();
     },
   );
+});
+
+// Mirrors the server's window-share rules: buckets 1..=288, 0 < recover <= fire <= 100.
+describe("anomalyWindowShareErrors", () => {
+  const errors = (cfg: Record<string, unknown>) => anomalyWindowShareErrors(cfg);
+  const clean = { buckets: null, fire: null, recover: null };
+
+  it("accepts the defaults and blank inputs", () => {
+    expect(errors({ alert_window_buckets: 1, alert_window_fire_pct: 100 })).toEqual(clean);
+    expect(errors({})).toEqual(clean);
+    expect(
+      errors({ alert_window_buckets: "", alert_window_fire_pct: "", alert_window_recover_pct: "" }),
+    ).toEqual(clean);
+  });
+
+  it("accepts 4 of 5 at 80% with recovery below 60%", () => {
+    expect(
+      errors({ alert_window_buckets: 5, alert_window_fire_pct: 80, alert_window_recover_pct: 60 }),
+    ).toEqual(clean);
+  });
+
+  it.each([0, 289, 2.5, -1])("rejects %s buckets", (n) => {
+    expect(errors({ alert_window_buckets: n }).buckets).toBe("alerts.anomaly.windowBucketsRange");
+  });
+
+  it.each([0, -5, 100.1])("rejects a fire share of %s", (n) => {
+    expect(errors({ alert_window_fire_pct: n }).fire).toBe("alerts.anomaly.windowFireRange");
+  });
+
+  it("rejects a recover share above fire, or of zero", () => {
+    expect(errors({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }).recover).toBe(
+      "alerts.anomaly.windowRecoverRange",
+    );
+    expect(errors({ alert_window_recover_pct: 0 }).recover).toBe(
+      "alerts.anomaly.windowRecoverRange",
+    );
+    // A blank fire share is 100, so recover may go up to it.
+    expect(errors({ alert_window_recover_pct: 100 }).recover).toBeNull();
+  });
+});
+
+// Mirrors absence.rs slot_resolution_for: (span + 1h) / cycle >= 3, and an hourly-or-finer bucket.
+describe("anomalyBandGrouping", () => {
+  it.each([
+    [21, 300, "hour_of_week"],
+    [20, 300, "hour_of_day"],
+    [3, 3600, "hour_of_day"],
+    [2, 300, "global"],
+    [0, 300, "global"],
+  ])("%s days at %ss buckets groups by %s", (days, interval, grouping) => {
+    expect(anomalyBandGrouping(days, interval)).toBe(grouping);
+  });
+
+  it("is global for any bucket coarser than 1h", () => {
+    expect(anomalyBandGrouping(60, 3601)).toBe("global");
+    expect(anomalyBandGrouping(60, 86400)).toBe("global");
+  });
+
+  it("judges by the span alone when the interval is not yet valid", () => {
+    expect(anomalyBandGrouping(21, null)).toBe("hour_of_week");
+  });
 });

@@ -59,8 +59,17 @@
     >
       <PanelBar class="w-full justify-between gap-2">
         {{ t("alerts.anomaly.metricChart") }}
-        <span class="text-text-secondary text-2xs font-normal">
-          {{ t("alerts.anomaly.metricChartHint") }}
+        <span class="flex items-center gap-2">
+          <span
+            v-if="bandCaption"
+            class="text-text-secondary text-2xs font-normal"
+            data-test="alerts-anomalydetectionchart-band-caption"
+          >
+            {{ bandCaption }}
+          </span>
+          <span class="text-text-secondary text-2xs font-normal">
+            {{ t("alerts.anomaly.metricChartHint") }}
+          </span>
         </span>
       </PanelBar>
       <div class="h-100 w-full">
@@ -164,6 +173,7 @@ import searchService from "@/services/search";
 import streamService from "@/services/stream";
 import {
   buildAnomalyBandOptions,
+  latestBandK,
   toAnomalyBandRows,
   type AnomalyBandRow,
 } from "@/utils/alerts/anomalyBandChart";
@@ -369,6 +379,11 @@ const metricQuery = computed(() =>
 const metricRows = ref<AnomalyBandRow[]>([]);
 const metricLoading = ref(false);
 const metricError = ref("");
+
+const bandCaption = computed(() => {
+  const k = latestBandK(metricRows.value);
+  return k === null ? "" : t("alerts.anomaly.bandCaption", { k: Math.round(k * 100) / 100 });
+});
 
 const metricOptions = computed(() => {
   void store.state.theme; // The resolved token values are cached — re-read on a flip.

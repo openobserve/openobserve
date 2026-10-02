@@ -261,6 +261,27 @@ describe("AnomalyDetectionChart", () => {
     });
   });
 
+  describe("band caption", () => {
+    const caption = (w: any) => w.find('[data-test="alerts-anomalydetectionchart-band-caption"]');
+
+    it("states the k of the newest band, from that row's threshold_value", async () => {
+      respond([
+        { ...HIT, zo_sql_key: "2026-10-01T00:05:00", threshold_value: 3 },
+        { ...HIT, zo_sql_key: "2026-10-01T00:10:00", threshold_value: 4.256 },
+      ]);
+      wrapper = await mountChart();
+      expect(caption(wrapper).text()).toBe(
+        i18n.global.t("alerts.anomaly.bandCaption", { k: 4.26 }),
+      );
+      expect(caption(wrapper).text()).toContain("4.26");
+    });
+
+    it("is absent when no row carries a k", async () => {
+      wrapper = await mountChart();
+      expect(caption(wrapper).exists()).toBe(false);
+    });
+  });
+
   describe("mixed rows, as the live query returns them", () => {
     // Real server output for seeded rows: re-judged bucket, absence only, negative plus drop, legacy.
     const LIVE_HITS = [

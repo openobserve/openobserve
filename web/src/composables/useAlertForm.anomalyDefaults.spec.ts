@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  anomalyBandPayload,
   anomalyIntervalPayload,
   anomalyWindowSecondsToParts,
   defaultAnomalyConfig,
@@ -116,5 +117,76 @@ describe("anomalyIntervalPayload", () => {
       schedule_interval: "1h",
       detection_window_seconds: 3990,
     });
+  });
+});
+
+// Band width, direction and window share: each default is the value the server reads NULL as.
+describe("band and delivery defaults", () => {
+  it("creates with auto band width, both directions and every out-of-band bucket alerting", () => {
+    const c = defaultAnomalyConfig();
+    expect(c.band_width).toBeNull();
+    expect(c.alert_direction).toBe("both");
+    expect(c.alert_window_buckets).toBe(1);
+    expect(c.alert_window_fire_pct).toBe(100);
+    expect(c.alert_window_recover_pct).toBeNull();
+  });
+});
+
+describe("anomalyBandPayload", () => {
+  it("sends the create defaults as they are", () => {
+    expect(anomalyBandPayload(defaultAnomalyConfig(), false)).toEqual({
+      band_width: null,
+      alert_direction: "both",
+      alert_window_buckets: 1,
+      alert_window_fire_pct: 100,
+      alert_window_recover_pct: null,
+    });
+  });
+
+  it("sends a set band width and window share as numbers", () => {
+    expect(
+      anomalyBandPayload(
+        {
+          band_width: "4.5",
+          alert_direction: "above",
+          alert_window_buckets: 5,
+          alert_window_fire_pct: 80,
+          alert_window_recover_pct: 60,
+        },
+        false,
+      ),
+    ).toEqual({
+      band_width: 4.5,
+      alert_direction: "above",
+      alert_window_buckets: 5,
+      alert_window_fire_pct: 80,
+      alert_window_recover_pct: 60,
+    });
+  });
+
+  // The update path replaces every field, so a cleared input must go out as null, not be omitted.
+  it("sends cleared inputs as null and an unset direction as both", () => {
+    expect(
+      anomalyBandPayload(
+        {
+          band_width: "",
+          alert_direction: null,
+          alert_window_buckets: "",
+          alert_window_fire_pct: "",
+          alert_window_recover_pct: "",
+        },
+        false,
+      ),
+    ).toEqual({
+      band_width: null,
+      alert_direction: "both",
+      alert_window_buckets: null,
+      alert_window_fire_pct: null,
+      alert_window_recover_pct: null,
+    });
+  });
+
+  it("never sends a band width beside a budget, which the server rejects", () => {
+    expect(anomalyBandPayload({ band_width: 4 }, true).band_width).toBeNull();
   });
 });

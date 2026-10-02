@@ -94,3 +94,29 @@ describe("generateAnomalySummary — sensitivity line", () => {
     expect(summary).toContain("14 days");
   });
 });
+
+describe("generateAnomalySummary — training line", () => {
+  const grouping = (key: string) => String(t(`alerts.anomaly.${key}` as any));
+
+  it("names the band grouping the trainer will pick, not a weekly seasonality", () => {
+    expect(generateAnomalySummary(config({ training_window_days: 14 }), [], t)).toContain(
+      `(${grouping("bandGroupingHourOfDay")})`,
+    );
+    expect(generateAnomalySummary(config({ training_window_days: 21 }), [], t)).toContain(
+      `(${grouping("bandGroupingHourOfWeek")})`,
+    );
+  });
+
+  it("is global for a resolution coarser than 1h", () => {
+    const summary = generateAnomalySummary(
+      config({
+        training_window_days: 30,
+        histogram_interval_value: 2,
+        histogram_interval_unit: "h",
+      }),
+      [],
+      t,
+    );
+    expect(summary).toContain(`(${grouping("bandGroupingGlobal")})`);
+  });
+});

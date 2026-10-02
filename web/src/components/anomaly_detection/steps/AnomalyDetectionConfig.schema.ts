@@ -76,6 +76,8 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
     sensitivity_mode: z.enum(["percentile", "budget"]),
     threshold: z.coerce.number(),
+    // Empty means auto, so the raw input value is kept and judged in superRefine.
+    band_width: z.union([z.string(), z.number(), z.null()]),
     budget_count: z.coerce.number(),
     budget_period: z.enum(["day", "week"]),
   });
@@ -116,6 +118,28 @@ export interface AnomalyStoredIntervals {
   window: AnomalyStoredInterval;
 }
 
+export type AnomalyBandGrouping = "hour_of_week" | "hour_of_day" | "global";
+
+/** Locale key per grouping, shared by the derived label and the stored `band_grouping`. */
+export const ANOMALY_BAND_GROUPING_KEYS: Record<AnomalyBandGrouping, string> = {
+  hour_of_week: "alerts.anomaly.bandGroupingHourOfWeek",
+  hour_of_day: "alerts.anomaly.bandGroupingHourOfDay",
+  global: "alerts.anomaly.bandGroupingGlobal",
+};
+
+/** The grouping the trainer picks (absence.rs `slot_resolution_for`): an hourly bucket, and 3 whole cycles in the span plus 1h. */
+export const anomalyBandGrouping = (
+  trainingDays: number,
+  intervalSeconds: number | null,
+): AnomalyBandGrouping => {
+  if (intervalSeconds !== null && intervalSeconds > 3600) return "global";
+  const spanHours = trainingDays * 24;
+  const fills = (cycleHours: number) => Math.floor((spanHours + 1) / cycleHours) >= 3;
+  if (fills(168)) return "hour_of_week";
+  if (fills(24)) return "hour_of_day";
+  return "global";
+};
+
 /** A window narrower than one schedule gap plus one bucket deterministically skips buckets (spec §4.3). */
 export const lookBackWindowFloorSeconds = (
   scheduleValue: number,
@@ -148,6 +172,11 @@ export const formatAnomalySeconds = (secs: number): string => {
   }
   return parts.length ? parts.join(" ") : "0s";
 };
+
+const isBlankNumber = (v: unknown): boolean => v === "" || v === null || v === undefined;
+
+// Mirrors the server's band_width rule: finite and within [1, 10].
+const isBandWidth = (n: number): boolean => Number.isFinite(n) && n >= 1 && n <= 10;
 
 const sameInterval = (stored: AnomalyStoredInterval, value: unknown, unit: unknown): boolean =>
   Number(value) === stored.value && unit === stored.unit;
@@ -209,6 +238,13 @@ export const createAnomalyDetectionConfigSchema = (
           code: z.ZodIssueCode.custom,
           path: ["threshold"],
           message: t("alerts.anomaly.sensitivityRange"),
+        });
+      }
+      if (!isBlankNumber(value.band_width) && !isBandWidth(Number(value.band_width))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["band_width"],
+          message: t("alerts.anomaly.bandWidthRange"),
         });
       }
     } else if (!Number.isFinite(value.budget_count) || value.budget_count <= 0) {
@@ -293,6 +329,29 @@ export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined)
   return Number.isFinite(budget) && budget > 0 ? budget : null;
 };
 
+/** Locale keys for the window-share inputs that break the server's rules; null where the value is valid. */
+export const anomalyWindowShareErrors = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: string | null; fire: string | null; recover: string | null } => {
+  const buckets = cfg?.alert_window_buckets;
+  const fireRaw = cfg?.alert_window_fire_pct;
+  const recoverRaw = cfg?.alert_window_recover_pct;
+  const bucketsOk =
+    isBlankNumber(buckets) ||
+    (Number.isInteger(Number(buckets)) && Number(buckets) >= 1 && Number(buckets) <= 288);
+  const fire = isBlankNumber(fireRaw) ? 100 : Number(fireRaw);
+  const fireOk = Number.isFinite(fire) && fire > 0 && fire <= 100;
+  const recover = Number(recoverRaw);
+  const recoverOk =
+    isBlankNumber(recoverRaw) ||
+    (Number.isFinite(recover) && recover > 0 && recover <= (fireOk ? fire : 100));
+  return {
+    buckets: bucketsOk ? null : "alerts.anomaly.windowBucketsRange",
+    fire: fireOk ? null : "alerts.anomaly.windowFireRange",
+    recover: recoverOk ? null : "alerts.anomaly.windowRecoverRange",
+  };
+};
+
 /** A stored per-day budget below 1 is surfaced as alerts/week. */
 export const budgetFieldsFromPerDay = (
   perDay: number | null,
@@ -336,5 +395,6 @@ export const anomalyDetectionConfigDefaults = (
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
   sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "percentile",
   threshold: cfg?.threshold == null || cfg.threshold === "" ? 97 : Number(cfg.threshold),
+  band_width: isBlankNumber(cfg?.band_width) ? "" : Number(cfg?.band_width),
   ...budgetFieldsFromPerDay(anomalyBudgetPerDay(cfg)),
 });

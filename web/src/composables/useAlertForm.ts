@@ -109,6 +109,7 @@ import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/Add
 import {
   anomalyBudgetPerDay,
   anomalyIntervalSeconds,
+  anomalyWindowShareErrors,
   type AnomalyIntervalUnit,
   type AnomalyStoredIntervals,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
@@ -268,6 +269,28 @@ export const anomalyIntervalPayload = (
   return { histogram_interval, schedule_interval, detection_window_seconds };
 };
 
+const numberOrNull = (v: unknown): number | null =>
+  v === "" || v === null || v === undefined ? null : Number(v);
+
+/** Band width and delivery-policy fields; a blank input goes out as null, which the server reads as its default. */
+export const anomalyBandPayload = (
+  c: {
+    band_width?: unknown;
+    alert_direction?: string | null;
+    alert_window_buckets?: unknown;
+    alert_window_fire_pct?: unknown;
+    alert_window_recover_pct?: unknown;
+  },
+  budgetMode: boolean,
+) => ({
+  // The server rejects a band width beside a budget: the override would leave the budget controller inert.
+  band_width: budgetMode ? null : numberOrNull(c.band_width),
+  alert_direction: c.alert_direction ?? "both",
+  alert_window_buckets: numberOrNull(c.alert_window_buckets),
+  alert_window_fire_pct: numberOrNull(c.alert_window_fire_pct),
+  alert_window_recover_pct: numberOrNull(c.alert_window_recover_pct),
+});
+
 export const defaultAnomalyConfig = () => ({
   name: "",
   description: "",
@@ -290,6 +313,13 @@ export const defaultAnomalyConfig = () => ({
   threshold: 97,
   // Set only when the backend stored a budget; undefined/null = percentile mode.
   alert_budget_per_day: undefined as number | undefined,
+  // Null means auto: k comes from the percentile.
+  band_width: null as number | string | null,
+  alert_direction: "both" as "both" | "above" | "below",
+  alert_window_buckets: 1 as number | string | null,
+  alert_window_fire_pct: 100 as number | string | null,
+  // Null means recover at the fire share.
+  alert_window_recover_pct: null as number | string | null,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -583,18 +613,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...filterLines.map((l: string, i: number) => (i === 0 ? l.replace(/^\s+AND /, "  ") : l)),
         ].join("\n")
       : "";
-    const autoSeasonality = c.training_window_days >= 7 ? "week" : "day";
-    const seasonalSelect =
-      autoSeasonality === "week"
-        ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
-        : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
-    const seasonalGroup = autoSeasonality === "week" ? ", hour, dow" : ", hour";
     return [
       `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
-      `       ${fn} AS value${seasonalSelect}`,
+      `       ${fn} AS value`,
       `FROM ${stream}`,
       where,
-      `GROUP BY time_bucket${seasonalGroup}`,
+      `GROUP BY time_bucket`,
       `ORDER BY time_bucket`,
     ]
       .filter(Boolean)
@@ -1926,6 +1950,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
     }
 
+    if (Object.values(anomalyWindowShareErrors(anomalyConfig.value)).some((e) => e !== null)) {
+      activeTab.value = "anomaly-alerting";
+      toast({
+        variant: "error",
+        message: t("alerts.messages.fixHighlightedFields"),
+      });
+      return;
+    }
+
     if (
       anomalyConfig.value.alert_enabled &&
       anomalyConfig.value.alert_destination_ids.length === 0
@@ -2014,6 +2047,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...(budgetPerDay !== null
             ? { alert_budget_per_day: budgetPerDay }
             : { threshold: c.threshold }),
+          ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
         },
       };
