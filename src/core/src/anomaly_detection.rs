@@ -1396,27 +1396,58 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
     anyhow::bail!("Anomaly detection is an enterprise feature")
 }
 
-/// Run detection now; `claim_lost: true` in the reply means another run holds the lease.
+/// Run detection now; `claim_lost` or `ineligible` in the reply means nothing was scored.
 pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
     let db = get_orm_client_ro().await;
 
-    // Fetch config
+    // Fetched first so an unknown id answers 404 before any claim is attempted.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
-    // Check if trained
-    if !config.is_trained {
-        anyhow::bail!("Model must be trained before running detection");
-    }
-
     // The scheduled job run now: scores past the cursor, writes rows, gates delivery itself.
     #[cfg(feature = "enterprise")]
     {
-        let result =
+        use config::meta::self_reporting::usage::RunOutcome;
+
+        use crate::alerts::scheduler::handlers::{AnomalyRunRecord, anomaly_run_status};
+
+        let start_us = now_micros();
+        let run =
             o2_enterprise::enterprise::anomaly_detection::scheduler::run_detection_now(anomaly_id)
-                .await?;
+                .await;
+        let end_us = now_micros();
+        let (result, outcome) = match run {
+            Ok(run) => run,
+            Err(e) => {
+                let record = AnomalyRunRecord {
+                    status: RunOutcome::Error,
+                    error: Some(e.to_string()),
+                    success_response: None,
+                    gate_passed: false,
+                    start_us,
+                    end_us,
+                };
+                record_manual_anomaly_run(org_id, &config.name, anomaly_id, &record).await;
+                return Err(e);
+            }
+        };
+        // A lost claim or an ineligible row never ran, so the history keeps the real last run.
+        if !outcome.claim_lost && !outcome.ineligible {
+            let record = AnomalyRunRecord {
+                status: anomaly_run_status(&outcome),
+                error: None,
+                success_response: Some(
+                    serde_json::json!({ "anomalies_found": outcome.anomaly_count }).to_string(),
+                ),
+                gate_passed: outcome.gate_passed,
+                start_us,
+                end_us,
+            };
+            record_manual_anomaly_run(org_id, &config.name, anomaly_id, &record).await;
+        }
 
         log::info!(
             "[anomaly_detection {}] manual detection complete: points_scored={}, anomalies_found={}",
@@ -1430,18 +1461,19 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
             .iter()
             .filter(|p| p.is_anomaly)
             .collect();
-        // A lost claim means another run holds the config, which is not "no anomalies".
-        let claim_lost = result.model_loaded_from
-            == o2_enterprise::enterprise::anomaly_detection::scheduler::CLAIM_LOST_SOURCE;
-        let message = if claim_lost {
+        // Neither a lost claim nor an ineligible row is "no anomalies": nothing was judged.
+        let message = if outcome.claim_lost {
             "Detection already running; try again shortly"
+        } else if outcome.ineligible {
+            result.model_loaded_from.as_str()
         } else {
             "Detection completed"
         };
 
         Ok(serde_json::json!({
             "message": message,
-            "claim_lost": claim_lost,
+            "claim_lost": outcome.claim_lost,
+            "ineligible": outcome.ineligible,
             "anomaly_id": anomaly_id,
             "anomalies_found": result.anomaly_count,
             "points_scored": result.data_points_processed,
@@ -1557,6 +1589,50 @@ pub async fn recover_detection_triggers_on_startup() {
                 }
             }
         }
+    }
+}
+
+/// Status and data only: the scheduler owns `next_run_at`, and a manual run must not move it.
+#[cfg(feature = "enterprise")]
+async fn record_manual_anomaly_run(
+    org_id: &str,
+    config_name: &str,
+    anomaly_id: &str,
+    record: &crate::alerts::scheduler::handlers::AnomalyRunRecord,
+) {
+    let mut trigger = match crate::db::scheduler::get(
+        org_id,
+        TriggerModule::AnomalyDetection,
+        anomaly_id,
+    )
+    .await
+    {
+        Ok(trigger) => trigger,
+        Err(e) => {
+            log::warn!("[anomaly_detection {anomaly_id}] no trigger to record the manual run: {e}");
+            return;
+        }
+    };
+    let next_run_at = trigger.next_run_at;
+    crate::alerts::scheduler::handlers::record_anomaly_run(
+        &mut trigger,
+        config_name,
+        record,
+        next_run_at,
+    );
+    if let Err(e) = crate::db::scheduler::update_status(
+        org_id,
+        TriggerModule::AnomalyDetection,
+        anomaly_id,
+        trigger.status,
+        trigger.retries,
+        Some(&trigger.data),
+        false,
+        "",
+    )
+    .await
+    {
+        log::warn!("[anomaly_detection {anomaly_id}] failed to record the manual run: {e}");
     }
 }
 
@@ -1784,8 +1860,8 @@ fn validate_band_settings(
     {
         anyhow::bail!("alert_window_buckets must be at least 1");
     }
-    // An unparseable interval is the interval rule's to report, not this one's.
-    if let Some(buckets) = settings.alert_window_buckets
+    // One bucket looks back nowhere, so it passes at any resolution.
+    if let Some(buckets) = settings.alert_window_buckets.filter(|n| *n > 1)
         && let Ok(histogram_secs) = parse_interval(settings.histogram_interval)
         && i64::from(buckets).saturating_mul(histogram_secs) > MAX_ALERT_WINDOW_SECONDS
     {
@@ -2693,7 +2769,6 @@ fn declared_value_column(query_mode: &str, detection_function: &str) -> Option<S
 
 /// Parse search results into time-series data points.
 ///
-/// Extracts `timestamp` and `value` from each hit.
 ///
 /// `value_column` is the config-declared column carrying the metric; `None` keeps the
 /// legacy name fallback.
@@ -6274,6 +6349,8 @@ mod tests {
                 ("1h", 25, false),
                 ("1d", 1, true),
                 ("1d", 2, false),
+                ("13d", 1, true),
+                ("13d", 2, false),
                 ("junk", 288, true),
             ] {
                 let s = BandSettings {

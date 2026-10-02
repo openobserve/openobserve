@@ -64,6 +64,16 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+/// One anomaly detection run as the trigger history records it, scheduled or manual.
+pub(crate) struct AnomalyRunRecord {
+    pub(crate) status: RunOutcome,
+    pub(crate) error: Option<String>,
+    pub(crate) success_response: Option<String>,
+    pub(crate) gate_passed: bool,
+    pub(crate) start_us: i64,
+    pub(crate) end_us: i64,
+}
+
 /// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
 #[must_use]
 async fn persist_alert_run_state(
@@ -1380,18 +1390,8 @@ async fn handle_anomaly_detection_triggers(
             )
             .await
             {
-                // As scheduled alerts: the condition met is Firing even when cooldown silenced it.
                 Ok(run) => (
-                    if run.claim_lost || run.ineligible {
-                        // Another run held the lease, or the row is no longer runnable.
-                        RunOutcome::Skipped
-                    } else if run.notify_failed {
-                        RunOutcome::NotifyFailed
-                    } else if run.gate_passed {
-                        RunOutcome::Firing
-                    } else {
-                        RunOutcome::Normal
-                    },
+                    anomaly_run_status(&run),
                     None,
                     Some(serde_json::json!({ "anomalies_found": run.anomaly_count }).to_string()),
                     run.gate_passed,
@@ -1417,38 +1417,17 @@ async fn handle_anomaly_detection_triggers(
     };
     let run_end_us = now_micros();
 
-    // Publish trigger run record to the triggers stream (same as alerts).
     let interval_us = parse_detection_interval_to_micros(&config.schedule_interval);
     let next_run = now_micros() + interval_us;
-    usage_reporting::publish_triggers_usage(TriggerData {
-        _timestamp: run_start_us,
-        org: trigger.org.clone(),
-        module: TriggerDataType::AnomalyDetection,
-        key: format!("{}/{}", config.name, anomaly_id),
-        next_run_at: next_run,
-        is_realtime: false,
-        is_silenced: false,
+    let record = AnomalyRunRecord {
         status: trigger_status.clone(),
-        start_time: run_start_us,
-        end_time: run_end_us,
-        retries: trigger.retries,
         error: trigger_error,
         success_response: trigger_success_response,
-        evaluation_took_in_secs: Some((run_end_us - run_start_us) as f64 / 1_000_000.0),
-        ..Default::default()
-    });
-
-    // Persist last_satisfied_at in trigger.data (mirrors alerts pattern).
-    // trigger.start_time (set by the OSS scheduler pull SQL) is already last_triggered_at.
-    // Satisfied means the alert condition was met, the same rule that records Firing.
-    if gate_passed {
-        use config::meta::triggers::ScheduledTriggerData;
-        let mut td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap_or_default();
-        td.last_satisfied_at = Some(run_end_us);
-        trigger.data = td.to_json_string();
-    }
-    // An errored run and an empty one leave the config row identical.
-    record_anomaly_outcome(&mut trigger, &trigger_status, run_end_us);
+        gate_passed,
+        start_us: run_start_us,
+        end_us: run_end_us,
+    };
+    record_anomaly_run(&mut trigger, &config.name, &record, next_run);
 
     // If detection succeeded and the config is trained but status is not Active
     // (e.g. stuck at Waiting after a manual retrain request that hasn't been
@@ -1500,6 +1479,55 @@ async fn handle_anomaly_detection_triggers(
 
 /// Stamp the run outcome onto the trigger, the only per-row record of it —
 /// anomaly detection writes no `alert_states` rollup the list could read.
+/// As scheduled alerts: the condition met is Firing even when cooldown silenced it.
+#[cfg(feature = "enterprise")]
+pub(crate) fn anomaly_run_status(
+    run: &o2_enterprise::enterprise::anomaly_detection::scheduler::DetectionRunOutcome,
+) -> RunOutcome {
+    if run.claim_lost || run.ineligible {
+        RunOutcome::Skipped
+    } else if run.notify_failed {
+        RunOutcome::NotifyFailed
+    } else if run.gate_passed {
+        RunOutcome::Firing
+    } else {
+        RunOutcome::Normal
+    }
+}
+
+/// Publish the run to the triggers stream and stamp the trigger's data blob, as alerts do.
+pub(crate) fn record_anomaly_run(
+    trigger: &mut db::scheduler::Trigger,
+    config_name: &str,
+    record: &AnomalyRunRecord,
+    next_run_at: i64,
+) {
+    usage_reporting::publish_triggers_usage(TriggerData {
+        _timestamp: record.start_us,
+        org: trigger.org.clone(),
+        module: TriggerDataType::AnomalyDetection,
+        key: format!("{config_name}/{}", trigger.module_key),
+        next_run_at,
+        is_realtime: false,
+        is_silenced: false,
+        status: record.status.clone(),
+        start_time: record.start_us,
+        end_time: record.end_us,
+        retries: trigger.retries,
+        error: record.error.clone(),
+        success_response: record.success_response.clone(),
+        evaluation_took_in_secs: Some((record.end_us - record.start_us) as f64 / 1_000_000.0),
+        ..Default::default()
+    });
+    // Satisfied means the alert condition was met, the same rule that records Firing.
+    if record.gate_passed {
+        let mut td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap_or_default();
+        td.last_satisfied_at = Some(record.end_us);
+        trigger.data = td.to_json_string();
+    }
+    record_anomaly_outcome(trigger, &record.status, record.end_us);
+}
+
 fn record_anomaly_outcome(trigger: &mut db::scheduler::Trigger, outcome: &RunOutcome, at: i64) {
     use config::meta::triggers::ScheduledTriggerData;
     // Skip rather than default on a parse failure: rewriting the blob would
@@ -7417,5 +7445,39 @@ mod tests {
             assert!(trigger.data.contains("\"normal\""));
             assert!(!trigger.data.contains("\"error\""));
         }
+    }
+
+    /// A lost claim and an ineligible row judged nothing, so neither can read as Normal.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn anomaly_run_status_matches_the_scheduled_mapping() {
+        use o2_enterprise::enterprise::anomaly_detection::scheduler::DetectionRunOutcome;
+        let run = |gate_passed, notify_failed, claim_lost, ineligible| DetectionRunOutcome {
+            anomaly_count: 0,
+            gate_passed,
+            notify_failed,
+            claim_lost,
+            ineligible,
+        };
+        assert_eq!(
+            anomaly_run_status(&run(true, true, true, false)),
+            RunOutcome::Skipped
+        );
+        assert_eq!(
+            anomaly_run_status(&run(true, false, false, true)),
+            RunOutcome::Skipped
+        );
+        assert_eq!(
+            anomaly_run_status(&run(true, true, false, false)),
+            RunOutcome::NotifyFailed
+        );
+        assert_eq!(
+            anomaly_run_status(&run(true, false, false, false)),
+            RunOutcome::Firing
+        );
+        assert_eq!(
+            anomaly_run_status(&run(false, false, false, false)),
+            RunOutcome::Normal
+        );
     }
 }

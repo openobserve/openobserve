@@ -45,7 +45,7 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    /// Lossless: dropping the columns returns every config to the behaviour NULL already means.
+    /// Dropping the columns returns every config to the defaults NULL means; set values are lost.
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for column in COLUMNS.into_iter().rev() {
             // Symmetric with up(): a down on a schema that never got the column must not error.
