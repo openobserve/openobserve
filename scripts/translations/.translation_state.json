@@ -19675,6 +19675,12 @@
     "inviteByEmail": "ca87b80e768f55bf",
     "inviteByEmailPlaceholder": "f728553b59c5d29d",
     "inviteEmailInvalid": "e16dabef04db970d",
+    "inviteEmailsHelp": "c262f62e42bee45f",
+    "inviteEmailsLabel": "6a2e6841d18ef045",
+    "inviteMembers": "e85663498c965cd7",
+    "inviteMembersSubtitle": "75f07e9204a159f1",
+    "inviteSearchedEmail": "8a5d5233bec48e4d",
+    "inviteSearchedEmailDesc": "44b8bd9870a75d3e",
     "lastName": "f55563b386a39dc3",
     "lockout": {
       "autoUnlock": "274abcca94693921",
@@ -19705,6 +19711,7 @@
     "save": "1509f561f2416598",
     "search": "158bb0e5675c3f2f",
     "sendInvite": "c1ad5dcf2e0576ad",
+    "sendInvites": "c57456e4427dcf0b",
     "status": "920e413c7d411b61",
     "subtitle": "d5e51d540fcb656a",
     "update": "c1c1009d3f37ec05"

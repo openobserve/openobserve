@@ -183,6 +183,11 @@ const useRoutes = () => {
       },
     },
     {
+      // A redirect record resolves before the auth guard runs, so the guard only ever sees /login.
+      path: "/signup",
+      redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
+    },
+    {
       path: "/logout",
       // vue-router drops a record with no component/children/redirect, which
       // made this deep link a 404 — the component never renders (the guard

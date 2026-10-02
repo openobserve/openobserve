@@ -287,11 +287,27 @@ export default defineComponent({
       return store.state.zoConfig.native_login_enabled;
     });
 
+    // Dex opens on its Create account tab when the request carries screen_hint=signup.
+    const withSignupHint = (url: string): string => {
+      if (router.currentRoute.value.query.mode !== "signup") return url;
+      try {
+        const target = new URL(url, window.location.origin);
+        if (target.searchParams.has("screen_hint")) return url;
+        // Appending to the raw search keeps the existing params byte-for-byte; re-serialising would re-encode them.
+        target.search = target.search
+          ? `${target.search}&screen_hint=signup`
+          : "?screen_hint=signup";
+        return target.toString();
+      } catch {
+        return url;
+      }
+    };
+
     const loginWithSSo = async () => {
       try {
         authService.get_dex_login().then((res) => {
           if (res) {
-            window.location.href = res;
+            window.location.href = withSignupHint(res);
             return;
           }
         });
@@ -497,6 +513,7 @@ export default defineComponent({
       showSSO,
       showInternalLogin,
       loginWithSSo,
+      withSignupHint,
       config,
       autoRedirectDexLogin,
       isDark,
