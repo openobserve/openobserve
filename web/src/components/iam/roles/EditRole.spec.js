@@ -6,6 +6,9 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { queryClient } from "@/composables/query/queryClient";
 
+// Every test here mounts the whole role editor, which runs ~5x slower on CI than locally — the 5s default times out.
+vi.setConfig({ testTimeout: 20000 });
+
 // Mock toast so we can assert notification calls
 const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
