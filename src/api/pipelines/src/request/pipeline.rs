@@ -225,12 +225,10 @@ pub async fn list_pipelines(
         }
     };
 
-    let load_errors = pipeline::db::realtime_load_errors(&org_id).await;
     MetaHttpResponse::json(PipelineList::from(
         pipelines,
         pipeline_triggers,
         pipeline_errors,
-        load_errors,
     ))
 }
 

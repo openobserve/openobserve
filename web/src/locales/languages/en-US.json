@@ -11583,8 +11583,6 @@
     "stateActive": "Active",
     "statePaused": "Paused",
     "stateErrored": "Errored",
-    "stateLoadFailed": "Failed to load",
-    "loadErrorTooltip": "New records reach the stream without this pipeline until it loads again: {error}",
     "summaryErrored": "Errored",
     "summaryPaused": "Paused",
     "summaryActive": "Active",
