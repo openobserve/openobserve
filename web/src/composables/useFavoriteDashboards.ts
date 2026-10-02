@@ -28,9 +28,7 @@ export interface FavoriteDashboard {
   label: I18nText;
 }
 
-// Reserved pseudo-folder id for the folder-rail "Favorites" entry. Real folder
-// ids are generated identifiers, so the dunder name cannot collide.
-export const FAVORITES_FOLDER_ID = "__favorites__";
+export { FAVORITES_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 
 const SETTING_KEY = "favorite_dashboards";
 const SETTING_CATEGORY = "ui";

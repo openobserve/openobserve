@@ -8,6 +8,7 @@ vi.mock("@/utils/date", () => ({
 }));
 
 import {
+  formatExactDuration,
   b64EncodeUnicode,
   b64DecodeUnicode,
   b64DecodeUnicodeSafe,
@@ -639,5 +640,22 @@ describe("formatUtcWindowsInTz", () => {
     expect(formatUtcWindowsInTz([], "Asia/Kolkata")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "Not/AZone")).toBe("");
+  });
+});
+
+describe("formatExactDuration", () => {
+  it("uses the largest unit that divides the interval exactly", () => {
+    expect(formatExactDuration(600)).toBe("10 minutes");
+    expect(formatExactDuration(60)).toBe("1 minute");
+    expect(formatExactDuration(7_200)).toBe("2 hours");
+    expect(formatExactDuration(86_400)).toBe("1 day");
+    expect(formatExactDuration(1_209_600)).toBe("2 weeks");
+    expect(formatExactDuration(31_536_000)).toBe("1 year");
+  });
+
+  it("keeps seconds rather than rounding a non-whole minute away", () => {
+    expect(formatExactDuration(90)).toBe("90 seconds");
+    expect(formatExactDuration(1)).toBe("1 second");
+    expect(formatExactDuration(0)).toBe("0 seconds");
   });
 });

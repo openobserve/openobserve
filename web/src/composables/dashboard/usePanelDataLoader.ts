@@ -367,6 +367,27 @@ export const usePanelDataLoader = (
 
       // Create a new AbortController for the new operation
       abortController = new AbortController();
+      // Injected-data path: the caller already fetched the PromQL results and
+      // owns the fetch lifecycle (the metrics explorer's preview queue —
+      // concurrency-capped, viewport-gated, cancellable, cached). Render those
+      // results directly instead of firing our own query_range. Skips the
+      // debounce, cache restore, visibility and variable waits — the caller
+      // already gated all of that. See MetricCard. Runs before the query check
+      // because injected callers (public dashboards) may carry no query text.
+      if (injectedPromqlData?.value != null) {
+        log("loadData: rendering injected PromQL data");
+        state.loading = false;
+        state.isOperationCancelled = false;
+        state.isPartialData = false;
+        state.data = markRaw(injectedPromqlData.value.data ?? []);
+        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
+        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
+        state.annotations = [];
+        state.errorDetail = injectedPromqlData.value.errorDetail ?? { message: "", code: "" };
+        runCount++;
+        return;
+      }
+
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -377,26 +398,6 @@ export const usePanelDataLoader = (
           queries: [],
         };
         state.resultMetaData = [];
-        return;
-      }
-
-      // Injected-data path: the caller already fetched the PromQL results and
-      // owns the fetch lifecycle (the metrics explorer's preview queue —
-      // concurrency-capped, viewport-gated, cancellable, cached). Render those
-      // results directly instead of firing our own query_range. Skips the
-      // debounce, cache restore, visibility and variable waits — the caller
-      // already gated all of that. See MetricCard.
-      if (injectedPromqlData?.value != null) {
-        log("loadData: rendering injected PromQL data");
-        state.loading = false;
-        state.isOperationCancelled = false;
-        state.isPartialData = false;
-        state.data = markRaw(injectedPromqlData.value.data ?? []);
-        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
-        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
-        state.annotations = [];
-        state.errorDetail = { message: "", code: "" };
-        runCount++;
         return;
       }
 

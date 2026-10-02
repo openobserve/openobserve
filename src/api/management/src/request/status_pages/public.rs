@@ -40,6 +40,8 @@ use infra::{
     table::{entity, status_pages as table},
 };
 
+use crate::request::public_rate_limit::{Counters, client_ip, over_budget};
+
 /// The visitor UI: one self-contained page that fetches the snapshot JSON.
 const PAGE_HTML: &str = include_str!("status_page.html");
 /// One DB read per slug per TTL; the load test showed the DB pool serializing at p50 4.7s
@@ -59,9 +61,6 @@ const AUTH_BODY_LIMIT: usize = 4096;
 const AUTH_MAX_ATTEMPTS: u32 = 5;
 const AUTH_WINDOW: Duration = Duration::from_secs(60);
 const READ_WINDOW: Duration = Duration::from_secs(60);
-/// The limiter key when no `RealIp` was resolved: one bucket still bounds Argon2 CPU per slug
-/// (R-5).
-const SHARED_IP: &str = "shared";
 
 static CACHE: LazyLock<Vec<Shard>> = LazyLock::new(|| {
     (0..CACHE_SHARDS)
@@ -73,7 +72,6 @@ static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::defa
 /// Password attempts, keyed by "{ip}|{slug}".
 static AUTH_ATTEMPTS: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
 
-type Counters = RwLock<HashMap<String, (u32, Instant)>>;
 type Shard = RwLock<HashMap<String, CacheEntry>>;
 
 /// What the cache knows about a slug; a password page's payload is never cached (R-7).
@@ -519,12 +517,6 @@ fn json_ok(body: &str, noindex: bool) -> Response {
         .unwrap_or_else(|_| not_found())
 }
 
-/// The limiter key: the ingress-resolved `RealIp`, or one shared bucket when that layer isn't
-/// installed.
-fn client_ip(ip: Option<RealIp>) -> String {
-    ip.map_or_else(|| SHARED_IP.to_owned(), |ip| ip.0.to_string())
-}
-
 /// True if this IP is over its per-minute read budget; 0 rpm disables the limiter.
 fn read_rate_limited(ip: Option<RealIp>) -> bool {
     let rpm = config::get_config().synthetics.status_page_public_rpm;
@@ -538,25 +530,6 @@ fn attempt_allowed(ip: &str, slug: &str) -> bool {
         AUTH_WINDOW,
         AUTH_MAX_ATTEMPTS,
     )
-}
-
-/// Counts one hit for `key` and reports whether the window's budget is exceeded; fails open on a
-/// poisoned lock.
-fn over_budget(counters: &Counters, key: String, window: Duration, max: u32) -> bool {
-    let Ok(mut guard) = counters.write() else {
-        return false;
-    };
-    let now = Instant::now();
-    // Opportunistic cleanup keeps the map bounded.
-    if guard.len() > 8192 {
-        guard.retain(|_, (_, at)| now.duration_since(*at) < window);
-    }
-    let e = guard.entry(key).or_insert((0, now));
-    if now.duration_since(e.1) >= window {
-        *e = (0, now);
-    }
-    e.0 = e.0.saturating_add(1);
-    e.0 > max
 }
 
 fn xml_escape(s: &str) -> String {
@@ -672,6 +645,7 @@ fn domain_not_connected() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::request::public_rate_limit::SHARED_IP;
 
     fn cache_control(resp: &Response) -> Option<&str> {
         resp.headers()

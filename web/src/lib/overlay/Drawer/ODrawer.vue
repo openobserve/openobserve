@@ -80,16 +80,22 @@ watch(
 );
 
 function handleOpenChange(v: boolean) {
+  if (!v && props.closeGuard?.() === false) return;
+  setOpen(v);
+}
+
+function setOpen(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  // A vetoed Escape must also cancel the library's own dismiss, or it closes on a second guard call.
+  if (props.persistent || props.closeGuard?.() === false) {
     e.preventDefault();
     return;
   }
-  handleOpenChange(false);
+  setOpen(false);
 }
 
 function handleInteractOutside(e: Event) {

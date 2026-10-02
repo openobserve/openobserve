@@ -616,6 +616,9 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::PublicDashboard => {
+            handle_public_dashboard_triggers(trace_id, trigger).await
+        }
     }
 }
 
@@ -3700,6 +3703,105 @@ async fn handle_query_recommendations_triggers(
     }
 
     Ok(())
+}
+
+/// Rebuild one public dashboard's snapshots, then reschedule at its cadence.
+/// If the share is gone / disabled / expired, drop the cron instead.
+async fn handle_public_dashboard_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    let conn = get_orm_client_rw().await;
+    let now = now_micros();
+    let pd_id = &trigger.module_key;
+
+    let mut new_trigger = db::scheduler::Trigger {
+        next_run_at: now,
+        is_realtime: false,
+        is_silenced: false,
+        status: db::scheduler::TriggerStatus::Waiting,
+        retries: 0,
+        ..trigger.clone()
+    };
+
+    let pd = match infra::table::public_dashboards::get(conn, pd_id).await {
+        Ok(Some(pd)) if pd.enabled && pd.visibility != 0 => pd,
+        Ok(_) => {
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::PublicDashboard,
+                pd_id,
+            )
+            .await?;
+            return Ok(());
+        }
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] public dashboard load failed: {pd_id}: {e}"
+            );
+            new_trigger.next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
+            db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
+            return Ok(());
+        }
+    };
+
+    if let Some(exp) = pd.expires_at
+        && exp <= now
+    {
+        // Expired data is not kept at rest; the row stays so the link still lists as Expired.
+        infra::table::public_dashboards::delete_snapshots(conn, pd_id).await?;
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::PublicDashboard,
+            pd_id,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    // Skipped, not dropped, so the link comes back if the org is restored.
+    if db::org_status::is_blocked(&pd.org_id) {
+        new_trigger.next_run_at = next_public_dashboard_run(
+            trigger.next_run_at,
+            i64::from(pd.rebuild_secs),
+            now_micros(),
+        );
+        db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
+        return Ok(());
+    }
+
+    if crate::public_dashboards::publisher_left(&pd).await {
+        log::info!(
+            "[SCHEDULER trace_id {trace_id}] pausing public dashboard {pd_id}: publisher left the org"
+        );
+        return crate::public_dashboards::pause_for_departed_publisher(pd).await;
+    }
+
+    if let Err(e) = crate::public_dashboards::rebuild_one(&pd).await {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] public dashboard rebuild failed: {pd_id}: {e}"
+        );
+    }
+
+    new_trigger.next_run_at = next_public_dashboard_run(
+        trigger.next_run_at,
+        i64::from(pd.rebuild_secs),
+        now_micros(),
+    );
+    db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
+    Ok(())
+}
+
+/// Fixed-rate: completion + interval lands just past a poll and waits a whole extra poll cycle.
+fn next_public_dashboard_run(scheduled_at: i64, rebuild_secs: i64, now: i64) -> i64 {
+    let interval = rebuild_secs.max(1) * 1_000_000;
+    let planned = scheduled_at + interval;
+    // An overrun skips the missed slot instead of refiring back-to-back.
+    if planned > now {
+        planned
+    } else {
+        now + interval
+    }
 }
 
 async fn handle_report_triggers(
@@ -7412,5 +7514,16 @@ mod tests {
             assert!(trigger.data.contains("\"normal\""));
             assert!(!trigger.data.contains("\"error\""));
         }
+    }
+
+    #[test]
+    fn public_dashboard_runs_at_a_fixed_rate() {
+        let s = 1_000_000;
+        // On time: exactly one interval after the previous slot, not after completion.
+        assert_eq!(next_public_dashboard_run(100 * s, 10, 103 * s), 110 * s);
+        // Overran its slot: skip it rather than refire immediately.
+        assert_eq!(next_public_dashboard_run(100 * s, 10, 115 * s), 125 * s);
+        // A zero cadence still spaces runs by a second.
+        assert_eq!(next_public_dashboard_run(100 * s, 0, 100 * s), 101 * s);
     }
 }

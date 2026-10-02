@@ -182,6 +182,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-share-btn"
           />
           <OButton
+            v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            size="icon-toolbar"
+            data-test="dashboard-publish-public-btn"
+            icon-left="public"
+            @click="showPublicLinksPanel = true"
+          >
+            <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
+          </OButton>
+          <PublicLinksPanel
+            v-if="
+              currentDashboardData.data?.dashboardId &&
+              store.state.zoConfig?.public_dashboards_enabled
+            "
+            v-model="showPublicLinksPanel"
+            :dashboard-id="currentDashboardData.data.dashboardId"
+            :dashboard-title="currentDashboardData.data?.title"
+            :variables-config="currentDashboardData.data?.variables"
+            :time-obj="currentTimeObj"
+            :current-values="variablesData"
+          />
+          <OButton
             v-if="!isFullscreen"
             v-show="store.state.printMode !== true"
             variant="outline"
@@ -365,6 +388,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
+import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -412,6 +436,7 @@ export default defineComponent({
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
+    PublicLinksPanel,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
@@ -589,6 +614,7 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
+    const showPublicLinksPanel = ref(false);
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
@@ -1895,6 +1921,7 @@ export default defineComponent({
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
+      showPublicLinksPanel,
       variablesDataUpdated,
       showDashboardSettingsDialog,
       openSettingsDialog,

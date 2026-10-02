@@ -10,6 +10,8 @@ export interface ConfirmDialogOptions {
   confirmLabel?: I18nText;
   cancelLabel?: I18nText;
   persistent?: boolean;
+  /** Shows the confirm button in red, for actions that can't be undone. */
+  destructive?: boolean;
 }
 
 interface DialogState extends ConfirmDialogOptions {

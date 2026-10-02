@@ -355,6 +355,19 @@ pub async fn get(org_id: &str, email: &str) -> Result<OrgUserRecord, errors::Err
     Ok(OrgUserRecord::from(record))
 }
 
+/// Whether `email` is a member of `org_id`; unlike `get`, a missing row is `Ok(false)`, not an
+/// error.
+pub async fn is_member(org_id: &str, email: &str) -> Result<bool, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let record = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(record.is_some())
+}
+
 pub async fn get_admin(org_id: &str) -> Result<OrgUserRecord, errors::Error> {
     let client = get_orm_client_ro().await;
     let user = Entity::find()

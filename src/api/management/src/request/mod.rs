@@ -58,6 +58,8 @@ pub mod profiling;
 pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_dashboards;
+pub mod public_rate_limit;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
 #[cfg(feature = "enterprise")]

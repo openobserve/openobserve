@@ -831,6 +831,17 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.activeFolderId).toBe("__favorites__");
     });
 
+    it("a Public links deep link falls back to the default folder when the feature is off", async () => {
+      await router.push({ path: "/dashboards", query: { folder: "__public_links__" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("default");
+      expect(wrapper.vm.showPublicLinks).toBe(false);
+    });
+
     it("restores the page from the URL and keeps it there after the landing decision's own URL sync", async () => {
       await router.push({ path: "/dashboards", query: { folder: "default", page: "3" } });
       wrapper = shallowMount(Dashboards, {

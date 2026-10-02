@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OGlyph from "@/lib/forms/EmojiPicker/OGlyph.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconToken } from "@/lib/forms/EmojiPicker/OGlyph.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 withDefaults(
   defineProps<{
@@ -31,8 +32,10 @@ withDefaults(
     token?: IconToken | null;
     /** Renders the favourites star instead of the folder fallback. */
     favorite?: boolean;
+    /** A fixed glyph for a pseudo-folder view that is neither a folder nor Favorites. */
+    icon?: IconName;
   }>(),
-  { token: null, favorite: false },
+  { token: null, favorite: false, icon: undefined },
 );
 </script>
 
@@ -40,6 +43,7 @@ withDefaults(
   <span class="flex size-4 shrink-0 items-center justify-center" data-test="folder-icon">
     <OGlyph v-if="token" :token="token" size="sm" />
     <OIcon v-else-if="favorite" name="star" size="sm" class="text-favorite" />
+    <OIcon v-else-if="icon" :name="icon" size="sm" class="text-current" />
     <OIcon v-else name="folder-outline" size="sm" class="text-current" />
   </span>
 </template>
