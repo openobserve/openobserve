@@ -1380,18 +1380,18 @@ async fn handle_anomaly_detection_triggers(
             )
             .await
             {
-                // The outcome now carries whether anything was FOUND, not merely
-                // that detection ran. This is what lets the history API stop
-                // deriving `anomaly`/`normal` from `success_response`.
-                Ok(count) => (
-                    if count > 0 {
+                // As scheduled alerts: the condition met is Firing even when cooldown silenced it.
+                Ok(run) => (
+                    if run.notify_failed {
+                        RunOutcome::NotifyFailed
+                    } else if run.gate_passed {
                         RunOutcome::Firing
                     } else {
                         RunOutcome::Normal
                     },
                     None,
-                    Some(serde_json::json!({ "anomalies_found": count }).to_string()),
-                    count,
+                    Some(serde_json::json!({ "anomalies_found": run.anomaly_count }).to_string()),
+                    run.anomaly_count,
                 ),
                 Err(e) => {
                     log::error!(
@@ -1452,9 +1452,12 @@ async fn handle_anomaly_detection_triggers(
     // processed by the training scheduler yet, or processed but status not yet
     // flipped), move it to Active so the UI reflects the real state.
     #[cfg(feature = "enterprise")]
-    // "Detection ran cleanly" is now either Firing or Normal — both mean the
-    // model executed; they differ only in whether anomalies were found.
-    if matches!(trigger_status, RunOutcome::Firing | RunOutcome::Normal) && config.is_trained {
+    // "Detection ran cleanly" is Firing, NotifyFailed or Normal: the model executed in each.
+    if matches!(
+        trigger_status,
+        RunOutcome::Firing | RunOutcome::NotifyFailed | RunOutcome::Normal
+    ) && config.is_trained
+    {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
             use infra::table::entity::anomaly_detection_config as anomaly_entity;

@@ -18,7 +18,7 @@
 use sea_orm_migration::prelude::*;
 
 const TABLE: &str = "anomaly_detection_config";
-const COLUMNS: [AnomalyConfig; 7] = [
+const COLUMNS: [AnomalyConfig; 8] = [
     AnomalyConfig::BandWidth,
     AnomalyConfig::AlertDirection,
     AnomalyConfig::AlertWindowBuckets,
@@ -26,6 +26,7 @@ const COLUMNS: [AnomalyConfig; 7] = [
     AnomalyConfig::AlertWindowRecoverPct,
     AnomalyConfig::BandGrouping,
     AnomalyConfig::BandK,
+    AnomalyConfig::DetectionLeaseUs,
 ];
 
 #[derive(DeriveMigrationName)]
@@ -68,6 +69,7 @@ enum AnomalyConfig {
     AlertWindowRecoverPct,
     BandGrouping,
     BandK,
+    DetectionLeaseUs,
 }
 
 fn column_name(column: &AnomalyConfig) -> String {
@@ -80,6 +82,7 @@ fn add_column_stmt(column: AnomalyConfig) -> TableAlterStatement {
     match column {
         AnomalyConfig::AlertDirection | AnomalyConfig::BandGrouping => def.string_len(16),
         AnomalyConfig::AlertWindowBuckets => def.integer(),
+        AnomalyConfig::DetectionLeaseUs => def.big_integer(),
         _ => def.double(),
     };
     Table::alter()
@@ -147,6 +150,10 @@ mod tests {
             &sql[6],
             r#"ALTER TABLE "anomaly_detection_config" ADD COLUMN "band_k" double precision NULL"#
         );
+        collapsed_eq!(
+            &sql[7],
+            r#"ALTER TABLE "anomaly_detection_config" ADD COLUMN "detection_lease_us" bigint NULL"#
+        );
     }
 
     #[test]
@@ -179,6 +186,10 @@ mod tests {
         collapsed_eq!(
             &sql[6],
             r#"ALTER TABLE `anomaly_detection_config` ADD COLUMN `band_k` double NULL"#
+        );
+        collapsed_eq!(
+            &sql[7],
+            r#"ALTER TABLE `anomaly_detection_config` ADD COLUMN `detection_lease_us` bigint NULL"#
         );
     }
 
@@ -213,6 +224,10 @@ mod tests {
             &sql[6],
             r#"ALTER TABLE "anomaly_detection_config" ADD COLUMN "band_k" double NULL"#
         );
+        collapsed_eq!(
+            &sql[7],
+            r#"ALTER TABLE "anomaly_detection_config" ADD COLUMN "detection_lease_us" bigint NULL"#
+        );
     }
 
     #[test]
@@ -220,10 +235,10 @@ mod tests {
         let sql = down_sql::<PostgresQueryBuilder>();
         collapsed_eq!(
             &sql[0],
-            r#"ALTER TABLE "anomaly_detection_config" DROP COLUMN "band_k""#
+            r#"ALTER TABLE "anomaly_detection_config" DROP COLUMN "detection_lease_us""#
         );
         collapsed_eq!(
-            &sql[6],
+            &sql[7],
             r#"ALTER TABLE "anomaly_detection_config" DROP COLUMN "band_width""#
         );
     }
@@ -233,10 +248,10 @@ mod tests {
         let sql = down_sql::<MysqlQueryBuilder>();
         collapsed_eq!(
             &sql[0],
-            r#"ALTER TABLE `anomaly_detection_config` DROP COLUMN `band_k`"#
+            r#"ALTER TABLE `anomaly_detection_config` DROP COLUMN `detection_lease_us`"#
         );
         collapsed_eq!(
-            &sql[6],
+            &sql[7],
             r#"ALTER TABLE `anomaly_detection_config` DROP COLUMN `band_width`"#
         );
     }
@@ -246,10 +261,10 @@ mod tests {
         let sql = down_sql::<SqliteQueryBuilder>();
         collapsed_eq!(
             &sql[0],
-            r#"ALTER TABLE "anomaly_detection_config" DROP COLUMN "band_k""#
+            r#"ALTER TABLE "anomaly_detection_config" DROP COLUMN "detection_lease_us""#
         );
         collapsed_eq!(
-            &sql[6],
+            &sql[7],
             r#"ALTER TABLE "anomaly_detection_config" DROP COLUMN "band_width""#
         );
     }
@@ -290,6 +305,7 @@ mod tests {
                 "alert_window_recover_pct",
                 "band_grouping",
                 "band_k",
+                "detection_lease_us",
             ]
         );
     }

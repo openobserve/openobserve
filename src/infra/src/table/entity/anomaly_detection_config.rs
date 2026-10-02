@@ -43,7 +43,7 @@ pub struct Model {
     pub alert_window_recover_pct: Option<f64>,
     /// Written by training: `hour_of_week`, `hour_of_day` or `global`.
     pub band_grouping: Option<String>,
-    /// Written by training and threshold recompute: the model's k.
+    /// The trained k; `band_width`, when set, overrides it for detection.
     pub band_k: Option<f64>,
     pub seasonality: String,
     pub is_trained: bool,
@@ -74,6 +74,9 @@ pub struct Model {
     /// Data-time of the delivered alert still owed a recovery message, in microseconds.
     /// NULL means none is owed — this is pending state, not a log of the last recovery sent.
     pub last_recovery_notified_at: Option<i64>,
+    /// Start of this region's in-flight detection run; NULL or expired means free.
+    #[serde(skip)]
+    pub detection_lease_us: Option<i64>,
     pub last_updated: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -147,6 +150,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            detection_lease_us: None,
             last_updated: 0,
             created_at: 1000,
             updated_at: 1000,

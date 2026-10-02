@@ -298,6 +298,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     // destinations, so a peer's fire time must not suppress a local alert.
     // last_recovery_notified_at is NOT patched, for the same reason one step later: a peer's
     // pending mark would recover an alert this region's destinations never received.
+    // detection_lease_us is NOT patched: it is this region's in-flight detection run.
 }
 
 /// D10: a replicated apply never rewinds the cursor; only an interval edit's reset (§4.2) may.
@@ -345,6 +346,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
     m.last_failed_at = None;
     m.last_alert_fired_at = None;
     m.last_recovery_notified_at = None;
+    m.detection_lease_us = None;
     // For inserts the PK must be Set (it is not auto-increment).
     // `into_active_model()` sets every field including PK as Set, which is
     // correct for INSERT — only UPDATE requires the PK to be Unchanged.
@@ -416,6 +418,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            detection_lease_us: None,
             last_updated: 0,
             created_at: 1_000_000,
             updated_at: 1_000_000,
@@ -653,6 +656,7 @@ mod tests {
             last_failed_at,
             last_alert_fired_at,
             last_recovery_notified_at,
+            detection_lease_us,
             last_updated,
             created_at,
             updated_at,
@@ -716,6 +720,8 @@ mod tests {
             // Pending state for an alert this region delivered; a peer's mark would recover
             // an alert local destinations never received, or cancel one they did.
             ("last_recovery_notified_at", Scope::RegionLocal),
+            // A peer's in-flight run must neither block nor release this region's detection.
+            ("detection_lease_us", Scope::RegionLocal),
             ("last_updated", Scope::Replicated),
             ("created_at", Scope::Immutable),
             ("updated_at", Scope::Replicated),
@@ -772,6 +778,7 @@ mod tests {
             last_failed_at: Some(1_700_000_000_000_001),
             last_alert_fired_at: Some(1_700_000_000_000_002),
             last_recovery_notified_at: Some(1_700_000_000_000_003),
+            detection_lease_us: Some(1_700_000_000_000_004),
             last_updated: 21,
             created_at: 9_999_999,
             updated_at: 22,
@@ -836,6 +843,7 @@ mod tests {
                                 | "last_failed_at"
                                 | "last_alert_fired_at"
                                 | "last_recovery_notified_at"
+                                | "detection_lease_us"
                         ),
                         "{field} was relabelled region-local; that is a replication change"
                     );
