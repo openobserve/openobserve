@@ -214,6 +214,18 @@ describe("PublicLinksPanel", () => {
     expect(guard()).toBe(true);
   });
 
+  it("closes the drawer when the edit was opened from the org-wide list", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);
+    const w = build({ editLinkId: "l1", variablesConfig: undefined });
+    await flushPromises();
+    const guard = w.findComponent({ name: "ODrawer" }).props("closeGuard") as () => boolean;
+    expect(guard()).toBe(true);
+
+    await submit(w);
+    expect(w.emitted("update:modelValue")?.at(-1)).toEqual([false]);
+  });
+
   it("pauses a live link straight from its menu", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     vi.mocked(admin.pause).mockResolvedValue({ data: link({ enabled: false }) } as never);

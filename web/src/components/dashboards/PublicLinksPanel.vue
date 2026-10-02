@@ -486,9 +486,9 @@ const open = computed({
   set: (v: boolean) => emit("update:modelValue", v),
 });
 
-// Close and Escape on the form or success view return to the link list; the drawer closes only from the list.
+// From a dashboard, leaving the form returns to its link list; from the org-wide list it closes the drawer.
 function guardClose(): boolean {
-  if (currentView.value === "list" || !links.value.length) return true;
+  if (currentView.value === "list" || !links.value.length || props.editLinkId) return true;
   editing.value = null;
   form.reset(publicLinkDefaults());
   view.value = "list";
@@ -620,7 +620,8 @@ function openForm(link: PublicLink | null) {
 function closeForm() {
   editing.value = null;
   form.reset(publicLinkDefaults());
-  if (links.value.length) view.value = "list";
+  // Opened to edit one link from the org-wide list, so leaving the form returns there.
+  if (links.value.length && !props.editLinkId) view.value = "list";
   else open.value = false;
 }
 
@@ -633,8 +634,7 @@ async function submit(value: PublicLinkForm) {
     });
     if (editing.value) {
       showPositiveNotification(t("dashboard.publicLinks.savedToast"));
-      editing.value = null;
-      view.value = "list";
+      closeForm();
     } else {
       createdLink.value = saved;
       view.value = "created";
