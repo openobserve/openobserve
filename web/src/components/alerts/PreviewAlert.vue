@@ -1271,6 +1271,12 @@ const refreshData = () => {
     props.selectedTab === "sql" ||
     (props.selectedTab === "custom" && props.isAggregationEnabled)
   ) {
+    // The editor can mount (and this watcher fire) before the user has
+    // picked a stream — result_schema 400s on a stream-less/invalid query,
+    // so wait until the form actually has one.
+    if (!props.formData.stream_name || !props.formData.stream_type) {
+      return;
+    }
     // Use result_schema API to get query structure
     fetchQuerySchema();
     return;
