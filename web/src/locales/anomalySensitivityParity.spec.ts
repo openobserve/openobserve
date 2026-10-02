@@ -113,6 +113,7 @@ const ADDED = [
   "alerts.anomaly.trainingWindowFloorHint",
   "alerts.anomaly.windowBucketsSpan",
   "alerts.anomaly.bandGroupingHourOfWeekIfData",
+  "alerts.anomaly.detectionAlreadyRunning",
 ];
 
 // Keys orphaned by retired UI; a locale still carrying one is dead copy nothing else would flag.

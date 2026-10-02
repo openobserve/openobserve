@@ -7718,6 +7718,7 @@
       "checkEvery": "すべてチェック",
       "checkEveryTooltip": "検出ジョブの実行頻度。サンプル期間より長くてもかまいません (例:5 m ごとにサンプリングし、1 時間ごとに検出を実行する)。",
       "destinationRequired": "宛先が少なくとも1つ必要です！",
+      "detectionAlreadyRunning": "検出はすでに実行中です。しばらくしてからもう一度お試しください。",
       "detectionCharts": "検出結果",
       "detectionFunctionTooltip": "各時間バケットで何を測定するかを指定します。count は到着するレコード数を監視し、avg、min、max、sum は数値フィールドを監視します。p50、p95、p99 はそのフィールドの分布を監視します — 例えば response_time_ms の p95 は、トラフィックが横ばいでも最も遅いリクエストのレイテンシが悪化していることを捉えます。",
       "detectionResolution": "検出解像度",

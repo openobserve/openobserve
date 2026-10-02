@@ -7718,6 +7718,7 @@
       "checkEvery": "Check Every",
       "checkEveryTooltip": "How often the detection job runs. Can be larger than the sample period (e.g. sample every 5m, run detection every 1h).",
       "destinationRequired": "At least one destination is required!",
+      "detectionAlreadyRunning": "Detection is already running; try again shortly.",
       "detectionCharts": "Detection results",
       "detectionFunctionTooltip": "What to measure in each time bucket. count watches how many records arrive; avg, min, max and sum watch a numeric field. p50, p95 and p99 watch that field's distribution — e.g. p95 of response_time_ms catches latency getting worse for the slowest requests even when traffic stays flat.",
       "detectionResolution": "Detection Resolution",

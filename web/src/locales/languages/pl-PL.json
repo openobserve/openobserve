@@ -7718,6 +7718,7 @@
       "checkEvery": "Sprawdzaj co",
       "checkEveryTooltip": "Jak często uruchamiane jest zadanie wykrywania. Może być większe niż okres próbkowania (np. próbkowanie co 5 min, wykrywanie co 1 godz.).",
       "destinationRequired": "Co najmniej jeden cel jest wymagany!",
+      "detectionAlreadyRunning": "Wykrywanie już trwa; spróbuj ponownie za chwilę.",
       "detectionCharts": "Wyniki wykrywania",
       "detectionFunctionTooltip": "Co mierzyć w każdym przedziale czasowym. count śledzi, ile rekordów napływa; avg, min, max i sum śledzą pole liczbowe. p50, p95 i p99 śledzą rozkład tego pola — np. p95 dla response_time_ms wychwytuje rosnące opóźnienia najwolniejszych żądań, nawet gdy ruch pozostaje stały.",
       "detectionResolution": "Rozdzielczość wykrywania",

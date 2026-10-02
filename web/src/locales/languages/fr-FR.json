@@ -7718,6 +7718,7 @@
       "checkEvery": "Vérifiez chaque",
       "checkEveryTooltip": "Fréquence d'exécution de la tâche de détection. Peut être plus longue que la période d'échantillonnage (par exemple, échantillonnage tous les 5 m, exécution de la détection toutes les 1 h).",
       "destinationRequired": "Au moins une destination est requise !",
+      "detectionAlreadyRunning": "La détection est déjà en cours ; réessayez dans un instant.",
       "detectionCharts": "Résultats de détection",
       "detectionFunctionTooltip": "Ce qu'il faut mesurer dans chaque intervalle de temps. count observe le nombre d'enregistrements qui arrivent ; avg, min, max et sum observent un champ numérique. p50, p95 et p99 observent la distribution de ce champ — par ex. le p95 de response_time_ms détecte une dégradation de la latence pour les requêtes les plus lentes même lorsque le trafic reste stable.",
       "detectionResolution": "Résolution de détection",

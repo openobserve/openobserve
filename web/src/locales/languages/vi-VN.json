@@ -7718,6 +7718,7 @@
       "checkEvery": "Kiểm tra mỗi",
       "checkEveryTooltip": "Tần suất chạy tác vụ phát hiện. Có thể lớn hơn chu kỳ lấy mẫu (ví dụ: lấy mẫu mỗi 5 phút, chạy phát hiện mỗi 1 giờ).",
       "destinationRequired": "Cần ít nhất một đích!",
+      "detectionAlreadyRunning": "Quá trình phát hiện đang chạy; hãy thử lại sau ít phút.",
       "detectionCharts": "Kết quả phát hiện",
       "detectionFunctionTooltip": "Đo lường gì trong mỗi khung thời gian. count theo dõi số bản ghi đến; avg, min, max và sum theo dõi một trường số. p50, p95 và p99 theo dõi phân bố của trường đó — ví dụ p95 của response_time_ms phát hiện độ trễ tăng lên ở những yêu cầu chậm nhất ngay cả khi lưu lượng không đổi.",
       "detectionResolution": "Độ phân giải phát hiện",

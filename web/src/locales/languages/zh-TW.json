@@ -7713,6 +7713,7 @@
       "checkEvery": "檢查頻率",
       "checkEveryTooltip": "偵測工作的執行頻率。可以大於取樣週期 (例如每 5 分鐘取樣，每 1 小時執行偵測)。",
       "destinationRequired": "至少需要一個目標！",
+      "detectionAlreadyRunning": "偵測已在執行中，請稍後再試。",
       "detectionCharts": "偵測結果",
       "detectionFunctionTooltip": "每個時間桶中要測量的內容。count 觀察有多少記錄到達；avg、min、max 和 sum 觀察某個數值欄位。p50、p95 和 p99 觀察該欄位的分布 — 例如 response_time_ms 的 p95 能捕捉到即使流量持平，最慢請求的延遲正在變差。",
       "detectionResolution": "偵測解析度",

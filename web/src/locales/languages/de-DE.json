@@ -7718,6 +7718,7 @@
       "checkEvery": "Überprüfe alle",
       "checkEveryTooltip": "Wie oft der Erkennungsjob ausgeführt wird. Kann länger als der Probenzeitraum sein (z. B. alle 5 m messen, Erkennung alle 1 Stunde ausführen).",
       "destinationRequired": "Mindestens ein Ziel ist erforderlich!",
+      "detectionAlreadyRunning": "Die Erkennung läuft bereits; versuchen Sie es in Kürze erneut.",
       "detectionCharts": "Erkennungsergebnisse",
       "detectionFunctionTooltip": "Was in jedem Zeit-Bucket gemessen werden soll. count beobachtet, wie viele Datensätze eintreffen; avg, min, max und sum beobachten ein numerisches Feld. p50, p95 und p99 beobachten die Verteilung dieses Feldes – z. B. erkennt p95 von response_time_ms eine sich verschlechternde Latenz bei den langsamsten Anfragen, selbst wenn der Datenverkehr konstant bleibt.",
       "detectionResolution": "Auflösung der Erkennung",

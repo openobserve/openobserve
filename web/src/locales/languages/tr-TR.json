@@ -7718,6 +7718,7 @@
       "checkEvery": "Her birini kontrol et",
       "checkEveryTooltip": "Algılama işinin ne sıklıkta çalıştığı. Numune periyodundan daha büyük olabilir (örn. her 5m'de bir numune, her 1 saatte bir algılama çalıştırın).",
       "destinationRequired": "En az bir hedef gereklidir!",
+      "detectionAlreadyRunning": "Algılama zaten çalışıyor; kısa süre sonra yeniden deneyin.",
       "detectionCharts": "Algılama sonuçları",
       "detectionFunctionTooltip": "Her zaman aralığında neyin ölçüleceği. count kaç kaydın geldiğini izler; avg, min, max ve sum sayısal bir alanı izler. p50, p95 ve p99 o alanın dağılımını izler — örn. response_time_ms için p95, trafik sabit kalsa bile en yavaş isteklerde gecikmenin kötüleşmesini yakalar.",
       "detectionResolution": "Algılama Çözünürlüğü",

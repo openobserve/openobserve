@@ -7718,6 +7718,7 @@
       "checkEvery": "Verifique cada",
       "checkEveryTooltip": "Com que frequência o trabalho de detecção é executado. Pode ser maior do que o período de amostragem (por exemplo, amostra a cada 5m, detecção de execução a cada 1h).",
       "destinationRequired": "Pelo menos um destino é obrigatório!",
+      "detectionAlreadyRunning": "A deteção já está em curso; tente novamente dentro de instantes.",
       "detectionCharts": "Resultados de deteção",
       "detectionFunctionTooltip": "O que medir em cada bucket de tempo. count observa quantos registros chegam; avg, min, max e sum observam um campo numérico. p50, p95 e p99 observam a distribuição desse campo — por exemplo, o p95 de response_time_ms detecta a latência piorando para as requisições mais lentas mesmo quando o tráfego permanece estável.",
       "detectionResolution": "Resolução de detecção",

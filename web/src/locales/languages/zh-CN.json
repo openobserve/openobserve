@@ -7718,6 +7718,7 @@
       "checkEvery": "检查每个",
       "checkEveryTooltip": "检测任务的运行频率。可以大于采样周期（例如，每 5 分钟采样一次，每 1 小时运行一次检测）。",
       "destinationRequired": "至少需要一个目标！",
+      "detectionAlreadyRunning": "检测已在运行中，请稍后重试。",
       "detectionCharts": "检测结果",
       "detectionFunctionTooltip": "每个时间桶中要衡量的内容。count 统计到达的记录数；avg、min、max 和 sum 衡量某个数值字段。p50、p95 和 p99 衡量该字段的分布——例如，response_time_ms 的 p95 能发现最慢请求的延迟在恶化，即使流量保持平稳。",
       "detectionResolution": "探测分辨率",

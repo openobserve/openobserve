@@ -7718,6 +7718,7 @@
       "checkEvery": "Controleer elke",
       "checkEveryTooltip": "Hoe vaak de detectieopdracht wordt uitgevoerd. Kan groter zijn dan de steekproefperiode (bijv. monster elke 5 meter, detectie elke 1 uur uitvoeren).",
       "destinationRequired": "Minstens één bestemming is vereist!",
+      "detectionAlreadyRunning": "De detectie loopt al; probeer het zo opnieuw.",
       "detectionCharts": "Detectieresultaten",
       "detectionFunctionTooltip": "Wat er per tijdsbucket gemeten moet worden. count kijkt naar hoeveel records er binnenkomen; avg, min, max en sum kijken naar een numeriek veld. p50, p95 en p99 kijken naar de verdeling van dat veld — bijvoorbeeld p95 van response_time_ms signaleert een verslechterende latency voor de traagste requests, zelfs wanneer het verkeer gelijk blijft.",
       "detectionResolution": "Resolutie van de detectie",

@@ -7718,6 +7718,7 @@
       "checkEvery": "Controlla ogni",
       "checkEveryTooltip": "Con quale frequenza viene eseguito il processo di rilevamento. Può essere superiore al periodo di campionamento (ad esempio campionamento ogni 5 m, rilevamento eseguito ogni 1 ora).",
       "destinationRequired": "È richiesta almeno una destinazione!",
+      "detectionAlreadyRunning": "Il rilevamento è già in corso; riprova tra poco.",
       "detectionCharts": "Risultati del rilevamento",
       "detectionFunctionTooltip": "Cosa misurare in ogni intervallo temporale. count osserva quanti record arrivano; avg, min, max e sum osservano un campo numerico. p50, p95 e p99 osservano la distribuzione di quel campo — ad esempio p95 di response_time_ms rileva un peggioramento della latenza per le richieste più lente anche quando il traffico rimane stabile.",
       "detectionResolution": "Risoluzione di rilevamento",
