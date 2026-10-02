@@ -54,7 +54,7 @@ const ODrawerStub = {
   ],
   emits: ["update:open", "click:primary", "click:secondary"],
   template:
-    '<div><slot name="header-right" /><span class="drawer-primary-label">{{ primaryButtonLabel }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
+    '<div><span class="drawer-primary-label">{{ primaryButtonLabel }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
 };
 const ODropdownStub = { name: "ODropdown", template: '<div><slot name="trigger" /><slot /></div>' };
 const ODropdownItemStub = {

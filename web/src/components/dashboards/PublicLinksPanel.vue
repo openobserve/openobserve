@@ -31,17 +31,6 @@
     @click:primary="onPrimary"
     @click:secondary="closeForm"
   >
-    <template #header-right>
-      <OButton
-        v-if="currentView === 'list' && !forbidden && !loadFailed"
-        variant="primary"
-        size="sm-action"
-        data-test="dashboards-public-links-panel-new-btn"
-        @click="openForm(null)"
-      >
-        {{ t("dashboard.publicLinks.newLink") }}
-      </OButton>
-    </template>
     <div
       v-if="forbidden"
       class="text-text-secondary py-2 text-sm"
@@ -242,14 +231,24 @@
           </div>
         </template>
         <template #toolbar-trailing>
-          <ORefreshButton
-            layout="inline"
-            variant="outline"
-            :last-run-at="lastUpdatedAt || null"
-            :loading="fetching"
-            data-test="dashboards-public-links-panel-refresh-btn"
-            @click="refetchLinks"
-          />
+          <div class="flex items-center gap-2">
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
+              :last-run-at="lastUpdatedAt || null"
+              :loading="fetching"
+              data-test="dashboards-public-links-panel-refresh-btn"
+              @click="refetchLinks"
+            />
+            <OButton
+              variant="primary"
+              size="sm"
+              data-test="dashboards-public-links-panel-new-btn"
+              @click="openForm(null)"
+            >
+              {{ t("dashboard.publicLinks.newLink") }}
+            </OButton>
+          </div>
         </template>
         <template #empty>
           <OEmptyState
