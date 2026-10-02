@@ -1592,7 +1592,7 @@ pub async fn recover_detection_triggers_on_startup() {
     }
 }
 
-/// Status and data only: the scheduler owns `next_run_at`, and a manual run must not move it.
+/// History row only: `scheduled_jobs` belongs to the scheduler, and a write here races its pull.
 #[cfg(feature = "enterprise")]
 async fn record_manual_anomaly_run(
     org_id: &str,
@@ -1600,39 +1600,16 @@ async fn record_manual_anomaly_run(
     anomaly_id: &str,
     record: &crate::alerts::scheduler::handlers::AnomalyRunRecord,
 ) {
-    let mut trigger = match crate::db::scheduler::get(
-        org_id,
-        TriggerModule::AnomalyDetection,
-        anomaly_id,
-    )
-    .await
-    {
-        Ok(trigger) => trigger,
+    match crate::db::scheduler::get(org_id, TriggerModule::AnomalyDetection, anomaly_id).await {
+        Ok(trigger) => crate::alerts::scheduler::handlers::publish_anomaly_run(
+            &trigger,
+            config_name,
+            record,
+            trigger.next_run_at,
+        ),
         Err(e) => {
-            log::warn!("[anomaly_detection {anomaly_id}] no trigger to record the manual run: {e}");
-            return;
+            log::warn!("[anomaly_detection {anomaly_id}] no trigger to record the manual run: {e}")
         }
-    };
-    let next_run_at = trigger.next_run_at;
-    crate::alerts::scheduler::handlers::record_anomaly_run(
-        &mut trigger,
-        config_name,
-        record,
-        next_run_at,
-    );
-    if let Err(e) = crate::db::scheduler::update_status(
-        org_id,
-        TriggerModule::AnomalyDetection,
-        anomaly_id,
-        trigger.status,
-        trigger.retries,
-        Some(&trigger.data),
-        false,
-        "",
-    )
-    .await
-    {
-        log::warn!("[anomaly_detection {anomaly_id}] failed to record the manual run: {e}");
     }
 }
 

@@ -1495,9 +1495,9 @@ pub(crate) fn anomaly_run_status(
     }
 }
 
-/// Publish the run to the triggers stream and stamp the trigger's data blob, as alerts do.
-pub(crate) fn record_anomaly_run(
-    trigger: &mut db::scheduler::Trigger,
+/// The run's alert-history row in the triggers stream; it writes nothing to `scheduled_jobs`.
+pub(crate) fn publish_anomaly_run(
+    trigger: &db::scheduler::Trigger,
     config_name: &str,
     record: &AnomalyRunRecord,
     next_run_at: i64,
@@ -1519,6 +1519,16 @@ pub(crate) fn record_anomaly_run(
         evaluation_took_in_secs: Some((record.end_us - record.start_us) as f64 / 1_000_000.0),
         ..Default::default()
     });
+}
+
+/// Publish the run's history row and stamp the trigger's data blob, as alerts do.
+fn record_anomaly_run(
+    trigger: &mut db::scheduler::Trigger,
+    config_name: &str,
+    record: &AnomalyRunRecord,
+    next_run_at: i64,
+) {
+    publish_anomaly_run(trigger, config_name, record, next_run_at);
     // Satisfied means the alert condition was met, the same rule that records Firing.
     if record.gate_passed {
         let mut td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap_or_default();
