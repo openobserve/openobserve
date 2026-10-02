@@ -4694,6 +4694,8 @@
       "unavailable": "This dashboard is currently unavailable.",
       "preparing": "Preparing this dashboard…",
       "updatedAt": "Updated {time}",
+      "nextRefreshIn": "Next refresh in {time}",
+      "refreshingNow": "Refreshing…",
       "pastMinutes": "Past {n} minute | Past {n} minutes",
       "pastHours": "Past {n} hour | Past {n} hours",
       "pastDays": "Past {n} day | Past {n} days",

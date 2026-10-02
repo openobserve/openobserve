@@ -60,15 +60,31 @@
           <PoweredByOpenObserve size="md" class="max-md:hidden" />
         </template>
         <template #actions>
-          <ODropdown v-if="presetOptions.length" side="bottom" align="end">
+          <span
+            v-if="windowLabel"
+            class="text-text-secondary text-sm whitespace-nowrap tabular-nums max-lg:hidden"
+            data-test="dashboards-public-dashboard-window"
+          >
+            {{ windowLabel }}
+          </span>
+          <div class="flex h-8 self-center max-md:hidden">
+            <OSeparator vertical />
+          </div>
+          <span
+            v-if="nextRefreshLabel"
+            class="text-text-secondary text-sm whitespace-nowrap tabular-nums"
+            data-test="dashboards-public-dashboard-next-refresh"
+          >
+            {{ nextRefreshLabel }}
+          </span>
+          <ODropdown v-if="timeEditable && presetOptions.length" side="bottom" align="end">
             <template #trigger>
               <OButton
                 variant="outline"
                 size="sm-toolbar"
                 class="h-8!"
                 icon-left="schedule"
-                :icon-right="timeEditable ? 'keyboard-arrow-down' : undefined"
-                :disabled="!timeEditable"
+                icon-right="keyboard-arrow-down"
                 data-test="dashboards-public-dashboard-preset-btn"
               >
                 {{ selectedPresetLabel }}
@@ -83,24 +99,6 @@
               {{ option.label }}
             </ODropdownItem>
           </ODropdown>
-          <span
-            v-if="windowLabel"
-            class="text-text-secondary text-sm whitespace-nowrap tabular-nums max-lg:hidden"
-            data-test="dashboards-public-dashboard-window"
-          >
-            {{ windowLabel }}
-          </span>
-          <div class="flex h-8 self-center max-md:hidden">
-            <OSeparator vertical />
-          </div>
-          <ORefreshButton
-            :last-run-at="builtAt ? builtAt / 1000 : null"
-            :loading="refreshing"
-            variant="outline"
-            layout="inline"
-            data-test="dashboards-public-dashboard-refresh-btn"
-            @click="refreshNow"
-          />
           <ThemeSwitcher bordered />
         </template>
       </OPageHeader>
@@ -170,9 +168,8 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import publicDashboardsService from "@/services/public_dashboards";
-import { formatExactDuration } from "@/utils/formatters";
+import { durationFormatter, formatExactDuration } from "@/utils/formatters";
 
 interface PresetOption {
   label: I18nText;
@@ -355,7 +352,6 @@ const load = async () => {
 
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const refreshSecs = computed(() => Number(config.value?.refresh_secs) || 0);
-const refreshing = ref(false);
 const footerNote = computed<I18nText>(() =>
   refreshSecs.value > 0
     ? t("dashboard.publicDashboard.footerNoteRefresh", {
@@ -381,14 +377,28 @@ const refresh = async () => {
 const REBUILD_GRACE_MS = 2000;
 // The first snapshot lands within seconds of publishing, so waiting a whole cadence would strand the page.
 const PREPARING_POLL_MS = 5000;
+// A late rebuild is re-checked this often, so the countdown doesn't sit at "Refreshing" for a whole cadence.
+const OVERDUE_POLL_MS = 15000;
 
-// Aim the next read just after the next rebuild is due; a stale or missing snapshot falls back to the plain cadence.
+// Date.now() isn't reactive, so the countdown reads this ticking copy.
+const nowMs = ref(Date.now());
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+const nextRefreshLabel = computed<I18nText | "">(() => {
+  if (!builtAt.value || refreshSecs.value <= 0) return "";
+  const left = Math.ceil((builtAt.value / 1000 + refreshSecs.value * 1000 - nowMs.value) / 1000);
+  return left > 0
+    ? t("dashboard.publicDashboard.nextRefreshIn", { time: raw(durationFormatter(left)) })
+    : t("dashboard.publicDashboard.refreshingNow");
+});
+
+// Aim the next read just after the next rebuild is due; an overdue one is re-checked sooner, a missing one waits a cadence.
 const nextRefreshDelay = (): number => {
   const cadenceMs = refreshSecs.value * 1000;
   if (state.value === "preparing") return Math.min(cadenceMs, PREPARING_POLL_MS);
   if (!builtAt.value) return cadenceMs;
   const due = builtAt.value / 1000 + cadenceMs + REBUILD_GRACE_MS - Date.now();
-  return due > 0 && due <= cadenceMs + REBUILD_GRACE_MS ? due : cadenceMs;
+  if (due <= 0) return Math.min(cadenceMs, OVERDUE_POLL_MS);
+  return due <= cadenceMs + REBUILD_GRACE_MS ? due : cadenceMs;
 };
 
 const scheduleRefresh = () => {
@@ -399,13 +409,6 @@ const scheduleRefresh = () => {
     if (!document.hidden) await refresh();
     scheduleRefresh();
   }, nextRefreshDelay());
-};
-
-const refreshNow = async () => {
-  refreshing.value = true;
-  await refresh();
-  refreshing.value = false;
-  scheduleRefresh();
 };
 
 // The slug is a bearer secret: keep the page out of search indexes and outgoing Referer headers.
@@ -423,12 +426,14 @@ onMounted(async () => {
     document.head.appendChild(meta);
     addedMeta.push(meta);
   }
+  clockTimer = setInterval(() => (nowMs.value = Date.now()), 1000);
   await load();
   scheduleRefresh();
 });
 
 onBeforeUnmount(() => {
   if (refreshTimer) clearTimeout(refreshTimer);
+  if (clockTimer) clearInterval(clockTimer);
   addedMeta.forEach((meta) => meta.remove());
 });
 </script>

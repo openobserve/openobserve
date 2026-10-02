@@ -20,16 +20,38 @@
     :close-guard="guardClose"
     :bleed="currentView === 'list' && !forbidden && !loadFailed"
     data-test="dashboards-public-links-panel"
-    :title="
-      dashboardTitle
-        ? t('dashboard.publicLinks.panelTitleFor', { name: raw(dashboardTitle) })
-        : t('dashboard.publicLinks.panelTitle')
-    "
+    :title="drawerTitle"
     :form-id="currentView === 'form' ? FORM_ID : undefined"
     :primary-button-label="primaryLabel"
     :secondary-button-label="currentView === 'form' ? t('common.cancel') : undefined"
     @click:secondary="closeForm"
   >
+    <template #header>
+      <div class="flex min-w-0 items-center gap-2">
+        <!-- Same tiles as OPageHeader's back button and module icon, which it offers only as page-header props. -->
+        <button
+          v-if="showBack"
+          type="button"
+          class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+          :aria-label="t('dashboard.publicLinks.backToLinks')"
+          data-test="dashboards-public-links-panel-back-btn"
+          @click="goBack"
+        >
+          <OIcon name="chevron-left" size="md" />
+          <OTooltip side="bottom" :content="t('dashboard.publicLinks.backToLinks')" />
+        </button>
+        <span
+          v-else
+          class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+          aria-hidden="true"
+        >
+          <OIcon name="public" size="md" />
+        </span>
+        <span class="text-dialog-header-text truncate text-base font-semibold">
+          {{ drawerTitle }}
+        </span>
+      </div>
+    </template>
     <div
       v-if="forbidden"
       class="text-text-secondary py-2 text-sm"
@@ -77,15 +99,6 @@
           @click="openPublicPage(createdLink)"
         >
           {{ t("dashboard.publicLinks.openPublicPage") }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="arrow-back"
-          data-test="dashboards-public-links-panel-created-back-btn"
-          @click="view = 'list'"
-        >
-          {{ t("dashboard.publicLinks.backToLinks") }}
         </OButton>
       </div>
       <div class="text-text-secondary text-xs">
@@ -166,7 +179,11 @@
       </div>
     </div>
 
-    <div v-else class="flex flex-col gap-3" data-test="dashboards-public-links-panel-list">
+    <div
+      v-else
+      class="flex h-full min-h-0 flex-col gap-3"
+      data-test="dashboards-public-links-panel-list"
+    >
       <OContent v-if="revoking" class="pt-3">
         <OBanner
           variant="error-soft"
@@ -202,13 +219,15 @@
         </OBanner>
       </OContent>
       <OTable
+        class="min-h-0 flex-1"
         :data="filteredLinks"
         :columns="columns"
         row-key="id"
         :loading="loading"
         :frame="false"
-        pagination="none"
+        pagination="client"
         :show-global-filter="false"
+        :footer-title="t('dashboard.publicLinks.panelTitle')"
         :default-columns="false"
         show-index
         :enable-column-resize="true"
@@ -545,6 +564,16 @@ const currentView = computed<PanelView>(() =>
   view.value === "list" && linksQuery.isSuccess.value && !links.value.length ? "form" : view.value,
 );
 
+const drawerTitle = computed<I18nText>(() =>
+  props.dashboardTitle
+    ? t("dashboard.publicLinks.panelTitleFor", { name: raw(props.dashboardTitle) })
+    : t("dashboard.publicLinks.panelTitle"),
+);
+
+const showBack = computed(
+  () => !forbidden.value && !loadFailed.value && currentView.value !== "list",
+);
+
 const primaryLabel = computed<I18nText | undefined>(() => {
   if (forbidden.value || loadFailed.value) return undefined;
   if (currentView.value === "form") {
@@ -624,6 +653,11 @@ function openForm(link: PublicLink | null) {
   formKey.value += 1;
   form.reset(link ? publicLinkFormFrom(link, timezone.value) : publicLinkDefaults());
   view.value = "form";
+}
+
+function goBack() {
+  if (currentView.value === "created") view.value = "list";
+  else closeForm();
 }
 
 function closeForm() {

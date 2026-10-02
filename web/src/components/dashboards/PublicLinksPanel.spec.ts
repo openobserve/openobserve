@@ -54,7 +54,7 @@ const ODrawerStub = {
   ],
   emits: ["update:open", "click:primary", "click:secondary"],
   template:
-    '<div><span class="drawer-primary-label">{{ primaryButtonLabel }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
+    '<div><slot name="header" /><span class="drawer-primary-label">{{ primaryButtonLabel }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
 };
 const ODropdownStub = { name: "ODropdown", template: '<div><slot name="trigger" /><slot /></div>' };
 const ODropdownItemStub = {
@@ -166,7 +166,7 @@ describe("PublicLinksPanel", () => {
       w.find('[data-test="dashboards-public-links-panel-created-url"] input').element,
     ).toHaveProperty("value", `${window.location.origin}/web/public/dashboards/new-slug`);
 
-    await w.find('[data-test="dashboards-public-links-panel-created-back-btn"]').trigger("click");
+    await w.find('[data-test="dashboards-public-links-panel-back-btn"]').trigger("click");
     expect(has(w, "dashboards-public-links-panel-created")).toBe(false);
   });
 
@@ -211,6 +211,20 @@ describe("PublicLinksPanel", () => {
     expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
 
     expect(guard()).toBe(true);
+  });
+
+  it("shows the globe on the list and a back button on the form that returns to it", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-back-btn")).toBe(false);
+
+    await w.find('[data-test="dashboards-public-links-panel-l1-edit-btn"]').trigger("click");
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
+    await w.find('[data-test="dashboards-public-links-panel-back-btn"]').trigger("click");
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
   });
 
   it("closes the drawer when the edit was opened from the org-wide list", async () => {

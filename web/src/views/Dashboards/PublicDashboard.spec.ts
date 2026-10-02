@@ -26,7 +26,7 @@ vi.mock("@/services/public_dashboards", () => ({
 import service from "@/services/public_dashboards";
 import PublicDashboard from "@/views/Dashboards/PublicDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 const CONFIG = {
   title: "My Dashboard",
@@ -47,6 +47,15 @@ const buildWrapper = () =>
   shallowMount(PublicDashboard, { global: { plugins: [i18n], provide: { store } } });
 
 const has = (w: any, id: string) => w.find(`[data-test="${id}"]`).exists();
+const find = (w: any, id: string) => w.find(`[data-test="${id}"]`);
+const mountWithActions = () =>
+  shallowMount(PublicDashboard, {
+    global: {
+      plugins: [i18n],
+      provide: { store },
+      stubs: { OPageHeader: { template: "<div><slot name='actions' /></div>" } },
+    },
+  });
 const grid = (w: any) => w.findComponent(RenderDashboardCharts);
 
 describe("PublicDashboard viewer", () => {
@@ -75,17 +84,18 @@ describe("PublicDashboard viewer", () => {
     expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
   });
 
-  it("re-reads config and snapshot every refresh_secs", async () => {
+  it("re-checks every 15 seconds while the rebuild is overdue", async () => {
     vi.useFakeTimers();
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({
       status: 200,
       data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
     });
-    buildWrapper();
+    const w = mountWithActions();
     await flushPromises();
     expect(service.getData).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(30_000);
+    expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Refreshing…");
+    await vi.advanceTimersByTimeAsync(15_000);
     expect(service.getConfig).toHaveBeenCalledTimes(2);
     expect(service.getData).toHaveBeenCalledTimes(2);
   });
@@ -187,24 +197,45 @@ describe("PublicDashboard viewer", () => {
     expect(w.text()).toContain("currently unavailable");
   });
 
-  it("shows the snapshot age on the refresh button", async () => {
+  it("counts down to the next refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_020_000);
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({
       status: 200,
       data: {
-        built_at: 1_700_000_000_000_000,
+        built_at: 1_800_000_000_000_000,
         panels: { p1: { state: { state: "ok" }, data: [] } },
       },
     });
-    const w = shallowMount(PublicDashboard, {
-      global: {
-        plugins: [i18n],
-        provide: { store },
-        stubs: { OPageHeader: { template: "<div><slot name='actions' /></div>" } },
-      },
-    });
+    const w = mountWithActions();
     await flushPromises();
-    expect(w.findComponent(ORefreshButton).props("lastRunAt")).toBe(1_700_000_000_000);
+    expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 10s");
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 7s");
+  });
+
+  it("offers the time range picker only when viewers can switch", async () => {
+    (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
+    (service.getData as any).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
+    });
+    const editable = mountWithActions();
+    await flushPromises();
+    expect(editable.findComponent(ODropdown).exists()).toBe(true);
+
+    (service.getConfig as any).mockResolvedValue({
+      data: {
+        ...CONFIG,
+        available_presets: [3600],
+        time_range: { editable: false, default_range_secs: 3600, allowed_presets_secs: [3600] },
+      },
+      status: 200,
+    });
+    const fixed = mountWithActions();
+    await flushPromises();
+    expect(fixed.findComponent(ODropdown).exists()).toBe(false);
   });
 
   it("passes frozen variables to the grid as a read-only row", async () => {
