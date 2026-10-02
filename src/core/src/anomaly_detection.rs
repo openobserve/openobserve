@@ -122,7 +122,7 @@ const SUPPORTED_FILTER_OPERATORS: [&str; 30] = [
     "re_not_match",
 ];
 
-/// Hour-of-week slots need at least 21 days (three weeks), plus one spare week.
+/// The trainer fetches at least 21 days; 28 adds a spare week.
 const DEFAULT_TRAINING_WINDOW_DAYS: i32 = 28;
 
 /// Stored only because the `rcf_*` columns are NOT NULL; nothing reads them since the band model.
@@ -158,7 +158,7 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_window_seconds: i64,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
-    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
     #[serde(
         default,
         alias = "threshold",
@@ -178,7 +178,7 @@ pub struct CreateAnomalyConfigRequest {
     pub rcf_tree_size: Option<i32>,
     #[schema(deprecated)]
     pub rcf_shingle_size: Option<i32>,
-    /// Manual band half-width k in sigmas, 1 to 10; absent derives k from the percentile.
+    /// Manual band half-width k in sigmas, 1 to 10; absent uses the trained k (3 to 6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_width: Option<f64>,
     /// `both`, `above` or `below`; absent means both.
@@ -240,7 +240,7 @@ pub struct UpdateAnomalyConfigRequest {
     pub schedule_interval: Option<String>,
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
-    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
     #[serde(
         default,
         alias = "threshold",
@@ -248,7 +248,7 @@ pub struct UpdateAnomalyConfigRequest {
     )]
     pub percentile: Option<f64>,
     /// Double-option like `priority`: `None` leaves the stored budget, `Some(None)` clears it
-    /// (back to percentile mode), `Some(Some(b))` sets it. A plain Option could never clear.
+    /// (back to the trained k), `Some(Some(b))` sets it. A plain Option could never clear.
     #[serde(
         default,
         deserialize_with = "double_option",
@@ -840,9 +840,6 @@ pub async fn update_config(
     // so a request against a missing config still answers 404 rather than 400.
     req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
 
-    // Remember the pre-update threshold so we can detect an actual change below and, if so,
-    // recompute the trained model's cutoff in place without a retrain.
-    let previous_threshold = existing.threshold;
     let previous = existing.clone();
     // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
     // folder move or tag edit cannot reset the counter on dozens of configs at once.
@@ -873,14 +870,6 @@ pub async fn update_config(
     // Track whether we need to reset (delete + push) an existing trigger after save.
     // Used when schedule_interval changes so next_run_at reflects the new cadence.
     let mut reset_trigger_after_save = false;
-    // Track whether the threshold (percentile) actually changed, so we recompute the trained
-    // model's baked cutoff in place after the DB save — no retrain required. Only read behind
-    // the enterprise cfg below; in an OSS build it is assigned but unused (no recompute path).
-    #[cfg_attr(
-        not(feature = "enterprise"),
-        allow(unused_assignments, unused_variables)
-    )]
-    let mut new_threshold: Option<i32> = None;
     if let Some(enabled) = req.enabled {
         active_model.enabled = Set(enabled);
 
@@ -966,11 +955,7 @@ pub async fn update_config(
         active_model.detection_window_seconds = Set(detection_window_seconds);
     }
     if let Some(percentile) = req.percentile {
-        let clamped = clamped_threshold(percentile);
-        active_model.threshold = Set(clamped);
-        if clamped != previous_threshold {
-            new_threshold = Some(clamped);
-        }
+        active_model.threshold = Set(clamped_threshold(percentile));
     }
     if let Some(budget) = req.alert_budget_per_day {
         active_model.alert_budget_per_day = Set(budget);
@@ -1045,7 +1030,7 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let mut updated = active_model.update(db).await?;
+    let updated = active_model.update(db).await?;
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.
@@ -1054,69 +1039,6 @@ pub async fn update_config(
         .await;
     #[cfg(feature = "enterprise")]
     invalidate_value_column_cache(org_id, anomaly_id);
-
-    // If the threshold (percentile) changed on a trained config, recompute the model's baked
-    // cutoff in place from its persisted training-score distribution — no retrain needed. This
-    // runs AFTER invalidate_config so the fresh re-cache inside recompute wins. If the model is
-    // legacy (no sidecar) or recompute fails, fall back to forcing a one-time retrain so the
-    // change is never silently dropped. Training/detection (and thus the model + sidecar) live
-    // only on the scheduler node, so this recompute happens where the model is; other
-    // super-cluster regions hold no model and only sync the config row for API reads.
-    // Skip while a (re)train is in flight (status == Training): the running trainer already
-    // reads `config.threshold` live and will bake the new percentile into the model it is about
-    // to produce, so recomputing the outgoing model would be wasted work and the fallback would
-    // clobber the in-progress retrain.
-    #[cfg(feature = "enterprise")]
-    if let Some(threshold) = new_threshold
-        && updated.is_trained
-        && updated.current_model_version > 0
-        && updated.status
-            != o2_enterprise::enterprise::anomaly_detection::types::Status::Training.to_i32()
-    {
-        let recomputed =
-            o2_enterprise::enterprise::anomaly_detection::threshold::recompute_threshold(
-                org_id,
-                &updated.anomaly_id,
-                updated.current_model_version,
-                threshold as f64,
-            )
-            .await;
-        match recomputed {
-            Ok(true) => {
-                log::info!(
-                    "[anomaly_detection {}] threshold recomputed in place (no retrain)",
-                    updated.anomaly_id
-                );
-            }
-            Ok(false) | Err(_) => {
-                if let Err(e) = recomputed.as_ref() {
-                    log::warn!(
-                        "[anomaly_detection {}] threshold recompute failed ({e}); forcing retrain",
-                        updated.anomaly_id
-                    );
-                } else {
-                    log::info!(
-                        "[anomaly_detection {}] no training-score sidecar; forcing one-time retrain to apply new threshold",
-                        updated.anomaly_id
-                    );
-                }
-                if let Err(e) = force_retrain_for_threshold(org_id, &updated.anomaly_id).await {
-                    log::warn!(
-                        "[anomaly_detection {}] failed to force retrain after threshold change: {e}",
-                        updated.anomaly_id
-                    );
-                }
-            }
-        }
-        // Recompute or the retrain fallback rewrote the row, so the broadcast must carry it fresh.
-        match anomaly_config_table::get_by_id(db, org_id, anomaly_id).await {
-            Ok(Some(fresh)) => updated = fresh,
-            Ok(None) => {}
-            Err(e) => log::warn!(
-                "[anomaly_detection {anomaly_id}] failed to re-read the config after the threshold change: {e}"
-            ),
-        }
-    }
 
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -1416,51 +1338,6 @@ pub async fn clone_config(
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
     Ok(val)
-}
-
-/// Force a one-time retrain so a threshold change takes effect on a config whose model cannot
-/// be recomputed in place (legacy model with no training-score sidecar, or a recompute error).
-///
-/// Marks the config `Waiting` + `is_trained = false` — either condition makes the enterprise
-/// training scheduler pick it up on its next tick — and nudges the scheduler so it fires
-/// promptly. After that first retrain the training-score sidecar is persisted and all future
-/// threshold changes are recomputed in place with no retrain.
-#[cfg(feature = "enterprise")]
-async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = get_orm_client_rw().await;
-
-    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
-
-    // Precedes the queue-reset writes below: a disabled config must not be left mid-transition.
-    ensure_trainable(&config)?;
-
-    // Don't clobber an in-flight (re)train: a training run already bakes the latest
-    // `config.threshold`, so the new percentile will land in the model it produces. Resetting
-    // status/is_trained here would interrupt it for no benefit.
-    if config.status
-        == o2_enterprise::enterprise::anomaly_detection::types::Status::Training.to_i32()
-    {
-        log::info!(
-            "[anomaly_detection {anomaly_id}] retrain already in progress; new threshold will be applied by it"
-        );
-        return Ok(());
-    }
-
-    let mut active = config.into_active_model();
-    // Status 0 = Waiting; is_trained = false — both route the config into the retrain queue.
-    active.status = Set(0i32);
-    active.is_trained = Set(false);
-    active.updated_at = Set(Utc::now().timestamp_micros());
-    active.update(db).await?;
-
-    // Nudge the training scheduler so the retrain fires promptly rather than on its next
-    // periodic sweep.
-    o2_enterprise::enterprise::anomaly_detection::scheduler::trigger_training(anomaly_id).await?;
-
-    Ok(())
 }
 
 /// Cancel an in-progress training run.
@@ -3096,7 +2973,7 @@ fn anomaly_alert_message(
             match (ctx.max_deviation_percent, ctx.worst_expected) {
                 (Some(dev), Some(expected)) => format!(
                     "data volume dropped in window {window} | worst value: {worst:.2}, \
-                     {dev:.1}% below its hour-of-week median ~{expected:.2}"
+                     {dev:.1}% below its learned median ~{expected:.2}"
                 ),
                 _ => format!("data volume dropped in window {window} | worst value: {worst:.2}"),
             }
@@ -5112,10 +4989,6 @@ mod tests {
             assert!(!initial_training_allowed(true, true));
             assert!(!initial_training_allowed(false, true));
         }
-
-        // Wiring the guard into train_model / force_retrain_for_threshold / ENT
-        // trigger_training is a KNOWN GAP no unit test here can hold; the
-        // implementation-phase diff review owns it.
     }
 
     // ── G4: a denominator-free error count is not a detection target ─────────
@@ -6142,7 +6015,7 @@ mod tests {
             c.max_deviation_percent = Some(76.1);
             let msg = anomaly_alert_message(&c, LINK);
             assert!(
-                msg.contains("worst value: 43.00, 76.1% below its hour-of-week median ~180.00"),
+                msg.contains("worst value: 43.00, 76.1% below its learned median ~180.00"),
                 "{msg}"
             );
             assert!(

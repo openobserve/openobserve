@@ -142,7 +142,7 @@ pub struct AnomalyAlertFields {
     pub training_window_days: Option<i32>,
     /// 0 = never retrain automatically; otherwise days between retrains
     pub retrain_interval_days: Option<i32>,
-    /// Percentile threshold (50.0–99.9), default 97.0; also accepts `threshold` as an integer.
+    /// Legacy percentile; no longer selects the trained k outside budget mode. Alias `threshold`.
     #[serde(
         default,
         alias = "threshold",
@@ -163,7 +163,7 @@ pub struct AnomalyAlertFields {
     pub rcf_tree_size: Option<i32>,
     #[schema(deprecated)]
     pub rcf_shingle_size: Option<i32>,
-    /// Manual band half-width k in sigmas, 1 to 10; absent derives k from the percentile.
+    /// Manual band half-width k in sigmas, 1 to 10; absent uses the trained k (Auto, 3 to 6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_width: Option<f64>,
     /// `both`, `above` or `below`; absent means both.
@@ -360,7 +360,7 @@ pub struct UpdateAnomalyAlertFields {
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
-    /// Also accepts the name `threshold`, matching the create body.
+    /// Legacy percentile; no longer selects the trained k outside budget mode. Alias `threshold`.
     #[serde(
         default,
         alias = "threshold",
@@ -368,7 +368,7 @@ pub struct UpdateAnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
-    /// Absent leaves the stored budget; `null` clears it back to percentile mode.
+    /// Absent leaves the stored budget; `null` clears it, back to the trained k.
     #[serde(
         default,
         deserialize_with = "double_option",

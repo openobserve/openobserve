@@ -26,8 +26,7 @@ pub struct Model {
     pub training_window_days: i32,
     pub retrain_interval_days: i32,
     pub threshold: i32,
-    /// Alert budget (delivered alerts/day). NULL = percentile mode, exactly the pre-budget
-    /// behaviour.
+    /// Alert budget (delivered alerts/day); NULL means no budget: k is the trained p99, in 3 to 6.
     pub alert_budget_per_day: Option<f64>,
     /// Seconds; NULL means the shipped one-day default, which is what pre-column rows mean.
     pub level_half_width_seconds: Option<i64>,
@@ -41,9 +40,9 @@ pub struct Model {
     pub alert_window_fire_pct: Option<f64>,
     /// Percent of the window out of band below which it recovers; NULL means the fire percent.
     pub alert_window_recover_pct: Option<f64>,
-    /// Written by training: `hour_of_week`, `hour_of_day` or `global`.
+    /// Written by training: `weekend_hour` or `global`; rows not yet retrained keep older values.
     pub band_grouping: Option<String>,
-    /// The trained k; `band_width`, when set, overrides it for detection.
+    /// The model's k: trained p99 in 3 to 6, unless a budget moved it; `band_width` overrides it.
     pub band_k: Option<f64>,
     pub seasonality: String,
     pub is_trained: bool,
