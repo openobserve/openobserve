@@ -150,6 +150,113 @@ describe("OTooltip", () => {
     });
   });
 
+  // ── Overflow-only and anchored tooltips ────────────────────────────────────
+  describe("overflow-only", () => {
+    // jsdom has no layout, so a test sets the two widths the cut-off check compares.
+    const setWidths = (el: Element, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    };
+    const settle = async () => {
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+    };
+    const mountChild = () =>
+      mount(
+        {
+          render: () =>
+            h("span", { "data-testid": "t" }, [
+              h(OTooltip, { overflowOnly: true, delay: 10 }),
+              "payment-service-production-eu-west",
+            ]),
+        },
+        { attachTo: document.body },
+      );
+
+    it("opens in child mode with the parent's own text when the parent is cut", async () => {
+      const wrapper = mountChild();
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      setWidths(trigger, 310, 200);
+
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle();
+
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent).toContain(
+        "payment-service-production-eu-west",
+      );
+      wrapper.unmount();
+    });
+
+    it("stays closed in child mode when the parent's text fits", async () => {
+      const wrapper = mountChild();
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      setWidths(trigger, 200, 200);
+
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle();
+
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("opens in wrapper mode only when the wrapped trigger is cut", async () => {
+      const mountWrapper = (cut: boolean) => {
+        const wrapper = mount(OTooltip, {
+          props: { overflowOnly: true, delay: 10 },
+          slots: { default: () => h("button", { "data-testid": "t" }, "Long name") },
+          attachTo: document.body,
+        });
+        const trigger = wrapper.find('[data-testid="t"]').element;
+        setWidths(trigger, cut ? 310 : 200, 200);
+        return { wrapper, trigger };
+      };
+
+      const fits = mountWrapper(false);
+      fits.trigger.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+      await settle();
+      expect(fits.trigger.getAttribute("data-state")).toBe("closed");
+      fits.wrapper.unmount();
+
+      const cut = mountWrapper(true);
+      cut.trigger.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+      await settle();
+      expect(cut.trigger.getAttribute("data-state")).not.toBe("closed");
+      cut.wrapper.unmount();
+    });
+
+    it("marks the element it belongs to, in both modes", () => {
+      const child = mountChild();
+      expect(child.find('[data-testid="t"]').attributes("data-o-tooltip-trigger")).toBe("");
+      child.unmount();
+
+      const wrapped = mount(OTooltip, {
+        props: { content: "Hello" },
+        slots: { default: () => h("button", { "data-testid": "w" }, "Hover") },
+      });
+      expect(wrapped.find('[data-testid="w"]').attributes("data-o-tooltip-trigger")).toBe("");
+      wrapped.unmount();
+    });
+
+    it("positions one shared tooltip on the given anchor and follows `open`", async () => {
+      const anchor = document.createElement("div");
+      document.body.appendChild(anchor);
+      const wrapper = mount(OTooltip, {
+        props: { anchor, open: true, content: "Full cell value" },
+        attachTo: document.body,
+      });
+      await nextTick();
+      expect(document.body.textContent).toContain("Full cell value");
+
+      await wrapper.setProps({ open: false });
+      // reka removes a closed bubble a few ticks after `open` turns false.
+      for (let i = 0; i < 4; i++) await nextTick();
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')).toBeNull();
+
+      wrapper.unmount();
+      anchor.remove();
+    });
+  });
+
   // ── Content wrapper layout ─────────────────────────────────────────────────
   //
   // The content wrapper used to be `inline-flex items-center gap-1.5`

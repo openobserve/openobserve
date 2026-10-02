@@ -78,6 +78,19 @@ export interface OTableCellActionsContext {
 export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
   Symbol("OTableCellActions");
 
+// ─── Cut-off cell tooltip context ────────────────────────────────
+/** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
+export interface OTableOverflowTooltipContext {
+  enter: (cell: HTMLElement) => void;
+  leave: () => void;
+}
+
+export const OTableOverflowTooltipKey: InjectionKey<OTableOverflowTooltipContext> =
+  Symbol("OTableOverflowTooltip");
+
+/** Marks an element inside a cell that clips its own text (slot wrapper, copy value). */
+export const TABLE_CELL_CLIP_ATTR = "data-o2-cell-clip";
+
 // ─── Shared column size constants ────────────────────────────────
 /**
  * Fixed width (px) of the auto-rendered selection-checkbox column. Imported by
@@ -179,6 +192,8 @@ export interface OTableColumnMeta {
    * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
    */
   fillRemaining?: boolean;
+  /** `false` keeps this column out of the table's cut-off tooltip; set it on columns that hold secrets. */
+  cellOverflowTooltip?: boolean;
   /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
   formattable?: boolean;
   /** Arbitrary metadata for custom cell renderers */
@@ -456,6 +471,8 @@ export interface OTableProps<TData = any> {
   showHeader?: boolean;
   /** Wrap cell content */
   wrap?: boolean;
+  /** Show the shared full-text tooltip on cut body cells (default true); turn off where Wrap or row expansion is the reveal. */
+  cellOverflowTooltip?: boolean;
   /**
    * When true, cells render their natural width and the table scrolls
    * horizontally if the total content overflows the container. Switches

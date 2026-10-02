@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import type { TooltipProps, TooltipSlots } from "./OTooltip.types";
+import {
+  TOOLTIP_TRIGGER_ATTR,
+  type TooltipEmits,
+  type TooltipProps,
+  type TooltipSlots,
+} from "./OTooltip.types";
 import {
   TooltipProvider,
   TooltipRoot,
@@ -8,8 +13,18 @@ import {
   TooltipContent,
   TooltipArrow,
 } from "reka-ui";
-import { ref, computed, onMounted, onUnmounted, onDeactivated, useAttrs, useSlots } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  onDeactivated,
+  useAttrs,
+  useSlots,
+  type ComponentPublicInstance,
+} from "vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import { isElementTruncated, readElementText } from "./useIsTruncated";
 
 // Both modes render a fragment (provider + portalled content, or the child-mode
 // anchor pair), so Vue has no single root to fall attributes onto: anything a
@@ -35,12 +50,42 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   // tooltip could never open: hovering left the trigger at data-state="closed"
   // forever. Child mode was unaffected because it drives `open` itself.
   open: undefined,
+  overflowOnly: false,
+  anchor: undefined,
 });
+
+const emit = defineEmits<TooltipEmits>();
 
 defineSlots<TooltipSlots>();
 
 const slots = useSlots();
 const hasDefaultSlot = computed(() => !!slots.default);
+const isAnchored = computed(() => props.anchor !== undefined);
+
+// Captured when an overflow-only tooltip opens, so the bubble shows exactly the cut text.
+const overflowText = ref("");
+const contentText = computed(() => props.content ?? overflowText.value);
+
+// ─── Wrapper mode, overflow-only: controlled so a fitting trigger never opens ──
+const wrapperTriggerRef = ref<ComponentPublicInstance | null>(null);
+const wrapperOpen = ref(false);
+const wrapperRootOpen = computed(() => {
+  if (props.open !== undefined) return { open: props.disabled ? false : props.open };
+  if (props.overflowOnly) return { open: props.disabled ? false : wrapperOpen.value };
+  return {};
+});
+function onWrapperOpenChange(next: boolean) {
+  emit("update:open", next);
+  if (props.open !== undefined || !props.overflowOnly) return;
+  if (!next) {
+    wrapperOpen.value = false;
+    return;
+  }
+  const el = wrapperTriggerRef.value?.$el as Element | undefined;
+  if (!el || !isElementTruncated(el)) return;
+  overflowText.value = readElementText(el);
+  wrapperOpen.value = true;
+}
 
 const attrs = useAttrs();
 
@@ -89,8 +134,17 @@ const onContentLeave = () => {
   childOpen.value = false;
 };
 
+const childRootOpen = computed(() => {
+  if (props.disabled) return false;
+  return isAnchored.value ? !!props.open && !!props.anchor : childOpen.value;
+});
+function onChildOpenChange(next: boolean) {
+  if (isAnchored.value) emit("update:open", next);
+  else childOpen.value = next;
+}
+
 onMounted(() => {
-  if (!hasDefaultSlot.value && childAnchorRef.value) {
+  if (!hasDefaultSlot.value && !isAnchored.value && childAnchorRef.value) {
     // Prefer the nearest previous visible sibling — the actual trigger element (e.g. the
     // ToggleGroupItem button). Walking up instead when the parent is display:contents would
     // land on the group container, causing all items in the group to share one hover target.
@@ -110,15 +164,21 @@ onMounted(() => {
     }
     parentEl.value = candidate;
     if (parentEl.value) {
+      parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, "");
       // Open after `props.delay` ms of hover (matching wrapper mode); leaving
       // before then cancels the pending open so a quick pass-over shows nothing.
       // Mount the reka tree (if not already) and open it. Deferring the mount to
       // here — the first hover, after the delay — is what keeps un-hovered rows
       // cheap.
       const activateAndOpen = () => {
+        childShowTimer = null;
+        if (props.overflowOnly) {
+          // Measured now, not at mount: width and text may have changed since.
+          if (!parentEl.value || !isElementTruncated(parentEl.value)) return;
+          overflowText.value = readElementText(parentEl.value);
+        }
         childActivated.value = true;
         childOpen.value = true;
-        childShowTimer = null;
       };
       const show = () => {
         if (props.disabled) return;
@@ -151,6 +211,7 @@ onMounted(() => {
       cleanupFn = () => {
         parentEl.value?.removeEventListener("mouseenter", show);
         parentEl.value?.removeEventListener("mouseleave", hide);
+        parentEl.value?.removeAttribute(TOOLTIP_TRIGGER_ATTR);
       };
     }
   }
@@ -222,10 +283,11 @@ const contentClasses = computed(() => [
     <TooltipRoot
       :delay-duration="delay"
       :disable-hoverable-content="!hoverable"
-      v-bind="open !== undefined ? { open: disabled ? false : open } : {}"
+      v-bind="wrapperRootOpen"
       :disabled="disabled"
+      @update:open="onWrapperOpenChange"
     >
-      <TooltipTrigger as-child>
+      <TooltipTrigger ref="wrapperTriggerRef" as-child data-o-tooltip-trigger="">
         <slot />
       </TooltipTrigger>
       <TooltipPortal>
@@ -240,7 +302,7 @@ const contentClasses = computed(() => [
           :class="contentClasses"
         >
           <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
-            <slot name="content">{{ content }}</slot>
+            <slot name="content">{{ contentText }}</slot>
             <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
           </span>
           <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />
@@ -253,12 +315,8 @@ const contentClasses = computed(() => [
        The reka tree is mounted lazily (v-if) on first hover — see childActivated
        — so un-hovered rows in a long/virtualized table cost next to nothing. -->
   <template v-else>
-    <TooltipProvider v-if="childActivated">
-      <TooltipRoot
-        :delay-duration="0"
-        :open="disabled ? false : childOpen"
-        @update:open="childOpen = $event"
-      >
+    <TooltipProvider v-if="childActivated || isAnchored">
+      <TooltipRoot :delay-duration="0" :open="childRootOpen" @update:open="onChildOpenChange">
         <!-- Hidden trigger span; reference overrides positioning anchor to parentEl -->
         <!-- NOTE: `style="display:none"` here is a FUNCTIONAL CONTRACT, not
              decoration — do NOT convert it to `class="hidden"`. The anchor
@@ -268,7 +326,7 @@ const contentClasses = computed(() => [
              tooltip to a zero-size hidden element, so it never opens on hover. -->
         <TooltipTrigger
           as="span"
-          :reference="parentEl ?? undefined"
+          :reference="(isAnchored ? anchor : parentEl) ?? undefined"
           style="display: none"
           aria-hidden="true"
         />
@@ -286,7 +344,7 @@ const contentClasses = computed(() => [
             @mouseleave="onContentLeave"
           >
             <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
-              <slot name="content">{{ content }}</slot>
+              <slot name="content">{{ contentText }}</slot>
               <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
             </span>
             <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />

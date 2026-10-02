@@ -1,5 +1,19 @@
 import { ref, onMounted, onBeforeUnmount, type Ref } from "vue";
 
+/** True when `el` is cutting its content off: wider than its box, or taller than it under `line-clamp`. */
+export function isElementTruncated(el: Element | null | undefined): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.scrollWidth > el.clientWidth) return true;
+  // Only a clamped box may be taller than itself; elsewhere glyph overflow would read as "cut".
+  const clamp = getComputedStyle(el).getPropertyValue("-webkit-line-clamp");
+  return clamp !== "" && clamp !== "none" && el.scrollHeight > el.clientHeight;
+}
+
+/** Full visible text of an element, capped so a huge value cannot flood a tooltip. */
+export function readElementText(el: Element, maxLength = 2000): string {
+  return (el.textContent ?? "").trim().slice(0, maxLength);
+}
+
 /**
  * Composable that tracks whether an element's content is being clipped by
  * CSS truncation (`overflow-hidden` + `text-ellipsis`/`whitespace-nowrap`),
@@ -11,7 +25,7 @@ export function useIsTruncated(elRef: Ref<HTMLElement | null>) {
 
   function update() {
     const el = elRef.value;
-    isTruncated.value = !!el && el.scrollWidth > el.clientWidth;
+    isTruncated.value = isElementTruncated(el);
   }
 
   let resizeObserver: ResizeObserver | null = null;

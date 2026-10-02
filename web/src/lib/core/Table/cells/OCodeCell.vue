@@ -18,8 +18,10 @@ const props = withDefaults(
     /** Show the hover copy button. Default true. */
     copy?: boolean;
     emptyLabel?: I18nText;
+    /** Hover text in place of the value; `false` for secrets, which must never show on hover. */
+    tooltip?: I18nText | false;
   }>(),
-  { copy: true, emptyLabel: raw("—") },
+  { copy: true, emptyLabel: raw("—"), tooltip: undefined },
 );
 
 const text = computed(() => {
@@ -47,7 +49,11 @@ const { t } = useI18nTyped();
 <template>
   <span v-if="text === null" class="text-text-muted text-xs">{{ emptyLabel }}</span>
   <span v-else class="group/code inline-flex max-w-full min-w-0 items-center gap-1">
-    <span class="min-w-0 truncate font-mono text-xs" :title="text">{{ text }}</span>
+    <span
+      class="min-w-0 truncate font-mono text-xs"
+      :title="tooltip === false ? undefined : (tooltip ?? text)"
+      >{{ text }}</span
+    >
     <button
       v-if="copy"
       type="button"

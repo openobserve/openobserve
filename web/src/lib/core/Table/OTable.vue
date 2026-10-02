@@ -13,13 +13,18 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { TOOLTIP_TRIGGER_ATTR } from "@/lib/overlay/Tooltip/OTooltip.types";
+import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
 import {
   TABLE_CHECKBOX_COL_SIZE,
+  TABLE_CELL_CLIP_ATTR,
   OTableCellActionsKey,
+  OTableOverflowTooltipKey,
   ROW_RAIL_TONE_CLASS,
   ROW_TONE_CLASS,
   type OTableProps,
@@ -82,6 +87,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   striped: false,
   stickyHeader: true,
   wrap: false,
+  cellOverflowTooltip: true,
   rowKey: "id",
   rowHeight: undefined,
   showGlobalFilter: true,
@@ -325,6 +331,52 @@ provide(OTableCellActionsKey, {
   setActiveCell,
   enabled: computed(() => !!slots["cell-hover-actions"]),
 });
+
+// ── Cut-off cell tooltip ────────────────────────────────────────
+// One tooltip for the whole table, measured only on hover, so cells carry no per-cell cost.
+const OVERFLOW_TOOLTIP_DELAY_MS = 700;
+const OWN_TOOLTIP_SELECTOR = `[${TOOLTIP_TRIGGER_ATTR}], [title]:not([title=""])`;
+const overflowAnchor = shallowRef<HTMLElement | null>(null);
+const overflowText = ref("");
+let overflowTimer: ReturnType<typeof setTimeout> | null = null;
+
+function hideCellOverflow(): void {
+  if (overflowTimer) {
+    clearTimeout(overflowTimer);
+    overflowTimer = null;
+  }
+  overflowAnchor.value = null;
+}
+// A cell that already carries its own tooltip or title keeps it, so the user never sees two.
+function hasOwnTooltip(target: HTMLElement, cell: HTMLElement): boolean {
+  const owner = target.closest(OWN_TOOLTIP_SELECTOR);
+  return (!!owner && cell.contains(owner)) || !!target.querySelector(OWN_TOOLTIP_SELECTOR);
+}
+function showCellOverflow(cell: HTMLElement): void {
+  overflowTimer = null;
+  if (!cell.isConnected) return;
+  const candidates = [cell, ...cell.querySelectorAll<HTMLElement>(`[${TABLE_CELL_CLIP_ATTR}]`)];
+  const target = candidates.find((el) => isElementTruncated(el));
+  if (!target || hasOwnTooltip(target, cell)) return;
+  overflowText.value = readElementText(target);
+  overflowAnchor.value = target;
+}
+function enterCell(cell: HTMLElement): void {
+  hideCellOverflow();
+  if (!props.cellOverflowTooltip) return;
+  overflowTimer = setTimeout(() => showCellOverflow(cell), OVERFLOW_TOOLTIP_DELAY_MS);
+}
+function onOverflowTooltipOpenChange(open: boolean): void {
+  if (!open) hideCellOverflow();
+}
+watch(
+  () => props.cellOverflowTooltip,
+  (on) => {
+    if (!on) hideCellOverflow();
+  },
+);
+onBeforeUnmount(hideCellOverflow);
+provide(OTableOverflowTooltipKey, { enter: enterCell, leave: hideCellOverflow });
 
 // TanStack memoises the core row model on the DATA ARRAY'S IDENTITY. Callers
 // that stream results mutate their array in place (logs pushes each partition's
@@ -1157,6 +1209,8 @@ const showStreaming = computed(() => props.streaming && displayRows.value.length
 
 // ── Scroll event handler ────────────────────────────────────────
 function handleScroll(event: Event) {
+  // Virtual rows are recycled on scroll, so the hovered cell may now show another row.
+  hideCellOverflow();
   const el = event.target as HTMLElement;
   if (!el) return;
   emit("scroll", { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
@@ -1759,6 +1813,13 @@ defineExpose({
       </OTablePagination>
     </div>
     <!-- /bordered wrapper -->
+    <OTooltip
+      v-if="cellOverflowTooltip"
+      :anchor="overflowAnchor"
+      :open="!!overflowAnchor"
+      :content="raw(overflowText)"
+      @update:open="onOverflowTooltipOpenChange"
+    />
   </div>
 </template>
 

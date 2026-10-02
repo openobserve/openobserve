@@ -448,7 +448,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.url,
-        meta: { align: "left" },
+        // A webhook URL is its own secret: anyone holding it can post to the channel.
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "template",

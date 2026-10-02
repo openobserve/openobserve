@@ -765,6 +765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="eventsTableColumns"
                 row-key="__rowId"
                 :wrap="eventsWrap"
+                :cell-overflow-tooltip="false"
                 :default-columns="false"
                 :row-height="28"
                 :show-global-filter="false"
