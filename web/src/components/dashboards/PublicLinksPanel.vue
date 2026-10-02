@@ -17,6 +17,7 @@
   <ODrawer
     v-model:open="open"
     :width="74"
+    :bleed="currentView === 'list' && !forbidden && !loadFailed"
     data-test="dashboards-public-links-panel"
     :title="
       dashboardTitle
@@ -162,39 +163,40 @@
     </div>
 
     <div v-else class="flex flex-col gap-3" data-test="dashboards-public-links-panel-list">
-      <OBanner
-        v-if="revoking"
-        variant="error-soft"
-        inline-actions
-        data-test="dashboards-public-links-panel-revoke-confirm"
-        :content="
-          t('dashboard.publicLinks.revokeConfirm', {
-            name: revoking.name ? raw(revoking.name) : t('dashboard.publicLinks.untitled'),
-          })
-        "
-      >
-        <template #actions>
-          <div class="flex gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="dashboards-public-links-panel-revoke-cancel-btn"
-              @click="revoking = null"
-            >
-              {{ t("common.cancel") }}
-            </OButton>
-            <OButton
-              variant="destructive"
-              size="sm-action"
-              :loading="revokePending"
-              data-test="dashboards-public-links-panel-revoke-confirm-btn"
-              @click="confirmRevoke"
-            >
-              {{ t("dashboard.publicDashboard.revoke") }}
-            </OButton>
-          </div>
-        </template>
-      </OBanner>
+      <OContent v-if="revoking" class="pt-3">
+        <OBanner
+          variant="error-soft"
+          inline-actions
+          data-test="dashboards-public-links-panel-revoke-confirm"
+          :content="
+            t('dashboard.publicLinks.revokeConfirm', {
+              name: revoking.name ? raw(revoking.name) : t('dashboard.publicLinks.untitled'),
+            })
+          "
+        >
+          <template #actions>
+            <div class="flex gap-2">
+              <OButton
+                variant="outline"
+                size="sm-action"
+                data-test="dashboards-public-links-panel-revoke-cancel-btn"
+                @click="revoking = null"
+              >
+                {{ t("common.cancel") }}
+              </OButton>
+              <OButton
+                variant="destructive"
+                size="sm-action"
+                :loading="revokePending"
+                data-test="dashboards-public-links-panel-revoke-confirm-btn"
+                @click="confirmRevoke"
+              >
+                {{ t("dashboard.publicDashboard.revoke") }}
+              </OButton>
+            </div>
+          </template>
+        </OBanner>
+      </OContent>
       <OTable
         :data="links"
         :columns="columns"
@@ -315,6 +317,7 @@ import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
