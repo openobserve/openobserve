@@ -15,6 +15,7 @@
 
 import { formatInTimeZone } from "date-fns-tz";
 import type { I18nText, TranslateFn } from "@/types/i18n";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { PublicLink } from "@/services/public_dashboards_admin";
 import { todayIn } from "./PublicLinkForm.schema";
 
@@ -44,4 +45,48 @@ export function publicLinkExpiry(
   const days = Math.round((Date.parse(end) - Date.parse(todayIn(timezone))) / 86_400_000);
   if (days <= 0) return { text: t("dashboard.publicLinks.expiresToday"), soon: true };
   return { text: t("dashboard.publicLinks.expiresInDays", { n: days }, days), soon: false };
+}
+
+export function defaultRange(link: PublicLink): number {
+  return link.time_range.default_range_secs ?? link.time_range.allowed_presets_secs[0] ?? 0;
+}
+
+/** The columns every public link table shows, so the share panel and the org-wide list match. */
+export function publicLinkColumns(t: TranslateFn): OTableColumnDef[] {
+  const col = (id: string, header: I18nText, size: number, accessorKey?: string) => ({
+    id,
+    header,
+    accessorKey,
+    sortable: accessorKey !== undefined,
+    resizable: true,
+    hideable: true,
+    size,
+    meta: { align: "left" as const },
+  });
+  return [
+    {
+      id: "name",
+      header: t("dashboard.publicLinks.name"),
+      accessorKey: "name",
+      sortable: true,
+      resizable: true,
+      size: 200,
+      minSize: 140,
+      meta: { align: "left", flex: true },
+    },
+    col("status", t("dashboard.publicLinks.status"), 110, "status"),
+    col("ranges", t("dashboard.publicLinks.timeRanges"), 110),
+    col("refresh", t("dashboard.publicLinks.refresh"), 100, "rebuild_secs"),
+    col("expires", t("dashboard.publicLinks.expires"), 110, "expires_at"),
+    col("updated", t("dashboard.publicLinks.updated"), 120, "last_rebuilt_at"),
+    col("published_by", t("dashboard.publicLinks.publishedBy"), 160, "published_by"),
+    {
+      id: "actions",
+      header: t("dashboard.actions"),
+      isAction: true,
+      sortable: false,
+      size: 150,
+      meta: { align: "center", actionCount: 5 },
+    },
+  ];
 }

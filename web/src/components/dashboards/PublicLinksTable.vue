@@ -96,50 +96,14 @@
         />
       </template>
       <template #cell-ranges="{ row }">
-        <span
-          v-if="!row.time_range.editable"
-          class="text-text-body text-sm"
-          :data-test="`dashboards-public-links-${row.id}-ranges`"
-        >
-          {{ t("dashboard.publicLinks.fixedRange", { range: raw(shortRange(defaultRange(row))) }) }}
-        </span>
-        <span
-          v-else
-          class="text-text-body text-sm"
-          :data-test="`dashboards-public-links-${row.id}-ranges`"
-        >
-          <template v-for="(secs, i) in row.time_range.allowed_presets_secs" :key="secs">
-            <span v-if="i > 0" class="text-text-secondary">{{ raw(" · ") }}</span>
-            <span :class="secs === defaultRange(row) ? 'font-semibold' : ''">{{
-              raw(shortRange(secs))
-            }}</span>
-          </template>
-        </span>
+        <PublicLinkRangesCell :link="row" :data-test="`dashboards-public-links-${row.id}-ranges`" />
       </template>
       <template #cell-refresh="{ row }">
         <span class="text-text-body text-sm">{{ formatExactDuration(row.rebuild_secs) }}</span>
       </template>
       <template #cell-expires="{ row }">
-        <span
-          v-if="!row.expires_at"
-          class="text-text-secondary text-sm"
-          :data-test="`dashboards-public-links-${row.id}-expires`"
-        >
-          {{ t("dashboard.publicLinks.never") }}
-        </span>
-        <span
-          v-else-if="expiryNote(row)"
-          class="text-sm"
-          :class="expiryNote(row)?.soon ? 'text-status-warning-text' : 'text-text-body'"
-          :data-test="`dashboards-public-links-${row.id}-expires`"
-        >
-          {{ expiryNote(row)?.text }}
-        </span>
-        <OTimeCell
-          v-else
-          :value="row.expires_at"
-          unit="us"
-          mode="date"
+        <PublicLinkExpiresCell
+          :link="row"
           :timezone="timezone"
           :data-test="`dashboards-public-links-${row.id}-expires`"
         />
@@ -155,7 +119,7 @@
         <div class="flex items-center justify-end gap-0.5" @click.stop>
           <OButton
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon-sm"
             icon-left="content-copy"
             class="max-md:hidden"
             :data-test="`dashboards-public-links-${row.id}-copy-btn`"
@@ -165,7 +129,7 @@
           </OButton>
           <OButton
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon-sm"
             icon-left="open-in-new"
             class="max-md:hidden"
             :data-test="`dashboards-public-links-${row.id}-open-btn`"
@@ -176,7 +140,7 @@
           <OButton
             v-if="hasDashboard(row)"
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon-sm"
             icon-left="edit"
             class="max-md:hidden"
             :data-test="`dashboards-public-links-${row.id}-edit-btn`"
@@ -187,7 +151,7 @@
           <OButton
             v-if="canPause(row)"
             :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-            size="icon-xs-sq"
+            size="icon-sm"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
             class="max-md:hidden"
             :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
@@ -205,7 +169,7 @@
               <OButton
                 icon-left="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="icon-sm"
                 :title="t('dashboard.moreActions')"
                 :data-test="`dashboards-public-links-${row.id}-menu-btn`"
               />
@@ -309,7 +273,6 @@ import { formatExactDuration } from "@/utils/formatters";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -328,7 +291,9 @@ import {
   setPublicLinkPausedMutation,
 } from "@/services/public_dashboards.queries";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
-import { publicLinkExpiry, publicLinkUrl, shortRange, type ExpiryNote } from "./publicLinkDisplay";
+import { publicLinkColumns, publicLinkUrl } from "./publicLinkDisplay";
+import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
+import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 
 type StatusFilter = "live" | "paused" | "attention" | "expired" | "all";
 
@@ -437,85 +402,7 @@ const filtered = computed(
   () => links.value.length > 0 && (!!searchQuery.value.trim() || statusFilter.value !== "all"),
 );
 
-const columns: OTableColumnDef[] = [
-  {
-    id: "name",
-    header: t("dashboard.publicLinks.name"),
-    accessorKey: "name",
-    sortable: true,
-    resizable: true,
-    size: 200,
-    minSize: 160,
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "status",
-    header: t("dashboard.publicLinks.status"),
-    accessorKey: "status",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "ranges",
-    header: t("dashboard.publicLinks.timeRanges"),
-    sortable: false,
-    resizable: true,
-    hideable: true,
-    size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "refresh",
-    header: t("dashboard.publicLinks.refresh"),
-    accessorKey: "rebuild_secs",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: 110,
-    meta: { align: "left" },
-  },
-  {
-    id: "expires",
-    header: t("dashboard.publicLinks.expires"),
-    accessorKey: "expires_at",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "updated",
-    header: t("dashboard.publicLinks.updated"),
-    accessorKey: "last_rebuilt_at",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "published_by",
-    header: t("dashboard.publicLinks.publishedBy"),
-    accessorKey: "published_by",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: 170,
-    meta: { align: "left" },
-  },
-  {
-    id: "actions",
-    header: t("dashboard.actions"),
-    isAction: true,
-    sortable: false,
-    size: 150,
-    meta: { align: "center", actionCount: 5 },
-  },
-];
+const columns = publicLinkColumns(t);
 
 function hasDashboard(link: PublicLink): boolean {
   return link.status !== "dashboard_deleted";
@@ -525,20 +412,12 @@ function canPause(link: PublicLink): boolean {
   return link.status !== "expired" && link.status !== "dashboard_deleted";
 }
 
-function defaultRange(link: PublicLink): number {
-  return link.time_range.default_range_secs ?? link.time_range.allowed_presets_secs[0] ?? 0;
-}
-
 function dashboardText(link: PublicLink): I18nText {
   if (!link.dashboard_title) return t("dashboard.publicLinks.dashboardMissing");
   return t("dashboard.publicLinks.dashboardInFolder", {
     dashboard: raw(link.dashboard_title),
     folder: raw(link.folder_name ?? link.folder_id ?? "default"),
   });
-}
-
-function expiryNote(link: PublicLink): ExpiryNote | null {
-  return publicLinkExpiry(link, timezone.value, t);
 }
 
 function serverMessage(e: unknown): I18nText {

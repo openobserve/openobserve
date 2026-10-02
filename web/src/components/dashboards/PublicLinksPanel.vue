@@ -206,40 +206,44 @@
         pagination="none"
         :show-global-filter="false"
         :default-columns="false"
+        show-index
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="public-links-panel"
         data-test="dashboards-public-links-panel-table"
       >
         <template #cell-name="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <span class="text-text-body truncate text-sm">
-              {{ row.name || t("dashboard.publicLinks.untitled") }}
-            </span>
-            <span
-              v-if="expiryNote(row)"
-              class="text-xs"
-              :class="expiryNote(row)?.soon ? 'text-status-warning-text' : 'text-text-secondary'"
-              :data-test="`dashboards-public-links-panel-${row.id}-expiry`"
-            >
-              {{ expiryNote(row)?.text }}
-            </span>
-          </div>
+          <span class="text-text-body truncate text-sm">
+            {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
+          </span>
         </template>
         <template #cell-status="{ row }">
           <OTag type="publicLinkStatus" :value="row.status" />
         </template>
         <template #cell-ranges="{ row }">
-          <span class="text-text-body text-sm">{{ rangesText(row) }}</span>
+          <PublicLinkRangesCell :link="row" />
         </template>
         <template #cell-refresh="{ row }">
           <span class="text-text-body text-sm">{{ formatExactDuration(row.rebuild_secs) }}</span>
         </template>
+        <template #cell-expires="{ row }">
+          <PublicLinkExpiresCell
+            :link="row"
+            :timezone="timezone"
+            :data-test="`dashboards-public-links-panel-${row.id}-expiry`"
+          />
+        </template>
         <template #cell-updated="{ row }">
-          <OTimeCell :value="row.last_rebuilt_at" unit="us" />
+          <OTimeCell :value="row.last_rebuilt_at" unit="us" :timezone="timezone" />
+        </template>
+        <template #cell-published_by="{ row }">
+          <OUserCell :value="row.published_by" />
         </template>
         <template #cell-actions="{ row }">
           <div class="flex items-center justify-end gap-0.5" @click.stop>
             <OButton
               variant="ghost"
-              size="icon-xs-sq"
+              size="icon-sm"
               icon-left="content-copy"
               class="max-md:hidden"
               :data-test="`dashboards-public-links-panel-${row.id}-copy-btn`"
@@ -249,7 +253,7 @@
             </OButton>
             <OButton
               variant="ghost"
-              size="icon-xs-sq"
+              size="icon-sm"
               icon-left="open-in-new"
               class="max-md:hidden"
               :data-test="`dashboards-public-links-panel-${row.id}-open-btn`"
@@ -259,7 +263,7 @@
             </OButton>
             <OButton
               variant="ghost"
-              size="icon-xs-sq"
+              size="icon-sm"
               icon-left="edit"
               class="max-md:hidden"
               :data-test="`dashboards-public-links-panel-${row.id}-edit-btn`"
@@ -270,7 +274,7 @@
             <OButton
               v-if="canPause(row)"
               :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-              size="icon-xs-sq"
+              size="icon-sm"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               class="max-md:hidden"
               :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
@@ -288,7 +292,7 @@
                 <OButton
                   icon-left="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="icon-sm"
                   :title="t('dashboard.moreActions')"
                   :data-test="`dashboards-public-links-panel-${row.id}-menu-btn`"
                 />
@@ -371,7 +375,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
+import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import type { PublicLink } from "@/services/public_dashboards_admin";
@@ -390,12 +396,7 @@ import {
   toPublicLinkConfig,
   type PublicLinkForm,
 } from "./PublicLinkForm.schema";
-import {
-  publicLinkExpiry,
-  publicLinkUrl as publicUrl,
-  shortRange,
-  type ExpiryNote,
-} from "./publicLinkDisplay";
+import { publicLinkColumns, publicLinkUrl as publicUrl, shortRange } from "./publicLinkDisplay";
 
 type VariableValues = { values?: Array<{ name: string; value: unknown }> };
 type PanelView = "list" | "form" | "created";
@@ -508,62 +509,10 @@ const variableSeed = computed(() => ({
       }, {}),
 }));
 
-const columns: OTableColumnDef[] = [
-  {
-    id: "name",
-    header: t("dashboard.publicLinks.name"),
-    accessorKey: "name",
-    size: 200,
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "status",
-    header: t("dashboard.publicLinks.status"),
-    accessorKey: "status",
-    size: 130,
-    meta: { align: "left" },
-  },
-  {
-    id: "ranges",
-    header: t("dashboard.publicLinks.timeRanges"),
-    size: 130,
-    meta: { align: "left" },
-  },
-  {
-    id: "refresh",
-    header: t("dashboard.publicLinks.refresh"),
-    accessorKey: "rebuild_secs",
-    size: 110,
-    meta: { align: "left" },
-  },
-  {
-    id: "updated",
-    header: t("dashboard.publicLinks.updated"),
-    accessorKey: "last_rebuilt_at",
-    size: 110,
-    meta: { align: "left" },
-  },
-  {
-    id: "actions",
-    header: t("dashboard.actions"),
-    isAction: true,
-    pinned: "right",
-    sortable: false,
-    size: 150,
-    meta: { align: "center", actionCount: 5 },
-  },
-];
+const columns = publicLinkColumns(t);
 
 function presetLabel(secs: number): I18nText {
   return t("dashboard.publicDashboard.past", { range: raw(shortRange(secs)) });
-}
-
-function rangesText(link: PublicLink): I18nText {
-  return raw(link.time_range.allowed_presets_secs.map(shortRange).join(" · "));
-}
-
-function expiryNote(link: PublicLink): ExpiryNote | null {
-  return publicLinkExpiry(link, timezone.value, t);
 }
 
 // Expired and orphaned links can't be resumed, so they offer no pause toggle.
