@@ -28,7 +28,6 @@
     :form-id="currentView === 'form' ? FORM_ID : undefined"
     :primary-button-label="primaryLabel"
     :secondary-button-label="currentView === 'form' ? t('common.cancel') : undefined"
-    @click:primary="onPrimary"
     @click:secondary="closeForm"
   >
     <div
@@ -78,6 +77,15 @@
           @click="openPublicPage(createdLink)"
         >
           {{ t("dashboard.publicLinks.openPublicPage") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          icon-left="arrow-back"
+          data-test="dashboards-public-links-panel-created-back-btn"
+          @click="view = 'list'"
+        >
+          {{ t("dashboard.publicLinks.backToLinks") }}
         </OButton>
       </div>
       <div class="text-text-secondary text-xs">
@@ -544,7 +552,6 @@ const primaryLabel = computed<I18nText | undefined>(() => {
       ? t("dashboard.publicLinks.saveChanges")
       : t("dashboard.publicLinks.createLink");
   }
-  if (currentView.value === "created") return t("dashboard.publicLinks.backToLinks");
   return undefined;
 });
 
@@ -615,10 +622,6 @@ function closeForm() {
   form.reset(publicLinkDefaults());
   if (links.value.length) view.value = "list";
   else open.value = false;
-}
-
-function onPrimary() {
-  if (currentView.value === "created") view.value = "list";
 }
 
 async function submit(value: PublicLinkForm) {

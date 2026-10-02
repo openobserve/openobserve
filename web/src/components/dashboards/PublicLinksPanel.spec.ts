@@ -166,6 +166,9 @@ describe("PublicLinksPanel", () => {
     expect(
       w.find('[data-test="dashboards-public-links-panel-created-url"] input').element,
     ).toHaveProperty("value", `${window.location.origin}/web/public/dashboards/new-slug`);
+
+    await w.find('[data-test="dashboards-public-links-panel-created-back-btn"]').trigger("click");
+    expect(has(w, "dashboards-public-links-panel-created")).toBe(false);
   });
 
   it("starts every opening with a clean form, even after a failed attempt", async () => {
