@@ -1279,6 +1279,8 @@ describe("anomalyWindowShareErrors", () => {
     expect(at(1440, 1, "m")).toBeNull();
     expect(at(1441, 1, "m")).toBe("alerts.anomaly.windowBucketsSpan");
     expect(at(2, 1, "d")).toBe("alerts.anomaly.windowBucketsSpan");
+    // One bucket looks back nowhere, so even a 13-day resolution stays valid, as when blank.
+    expect(at(1, 13, "d")).toBeNull();
     // An unparsable resolution leaves the span to the server.
     expect(at(100, 0, "x")).toBeNull();
   });

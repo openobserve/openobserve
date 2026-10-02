@@ -1837,6 +1837,12 @@ describe("AlertList - trigger", () => {
     ]);
   });
 
+  it("warns with the server's reason when the detector may not run", async () => {
+    const message = "Anomaly detection config is not enabled";
+    const calls = await triggerWith({ claim_lost: false, ineligible: true, message });
+    expect(calls).toEqual([{ variant: "warning", message }]);
+  });
+
   it("warns instead of claiming success when a detection run already holds the claim", async () => {
     const calls = await triggerWith({ claim_lost: true, message: "already running" });
     expect(calls).toEqual([

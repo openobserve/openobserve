@@ -370,10 +370,11 @@ export const anomalyWindowShareErrors = (
     Number(cfg?.histogram_interval_value),
     String(cfg?.histogram_interval_unit),
   );
-  // Mirrors the server rule: buckets × resolution must fit in 24h.
+  // Mirrors the server rule: N > 1 buckets × resolution must fit in 24h; one looks back nowhere.
   const spanOk =
     !bucketsOk ||
     isBlankNumber(buckets) ||
+    Number(buckets) <= 1 ||
     interval === null ||
     Number(buckets) * interval <= 86400;
   const recover = Number(recoverRaw);
