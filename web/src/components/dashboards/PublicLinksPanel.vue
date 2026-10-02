@@ -101,29 +101,20 @@
           :placeholder="t('dashboard.publicLinks.namePlaceholder')"
           data-test="dashboards-public-links-panel-name-input"
         />
-        <OFormSwitch
-          name="timeEditable"
-          :label="t('dashboard.publicDashboard.allowTimeRangeSwitch')"
-          data-test="dashboards-public-links-panel-time-editable-toggle"
-        />
         <OFormSelect
-          v-if="timeEditable"
           name="presets"
           :options="presetOptions"
           multiple
           required
           :label="t('dashboard.publicDashboard.availableRanges')"
+          :help-text="t('dashboard.publicLinks.presetsHelp')"
           data-test="dashboards-public-links-panel-presets-select"
         />
         <OFormSelect
           name="defaultPreset"
-          :options="timeEditable ? selectedPresetOptions : presetOptions"
+          :options="selectedPresetOptions"
           required
-          :label="
-            timeEditable
-              ? t('dashboard.publicDashboard.defaultRange')
-              : t('dashboard.publicDashboard.timeRange')
-          "
+          :label="t('dashboard.publicDashboard.defaultRange')"
           data-test="dashboards-public-links-panel-default-select"
         />
         <OFormInput
@@ -419,7 +410,6 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -564,7 +554,6 @@ const form = useOForm<PublicLinkForm>({
   schema: makePublicLinkSchema(t, minRebuildSecs.value, today.value),
   onSubmit: (value) => submit(value),
 });
-const timeEditable = form.useStore((s) => s.values.timeEditable);
 const selectedPresets = form.useStore((s) => s.values.presets);
 
 const presetOptions = computed<PresetOption[]>(() =>

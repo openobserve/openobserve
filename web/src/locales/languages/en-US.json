@@ -6078,7 +6078,8 @@
       "summaryAll": "All",
       "revokeTitle": "Revoke and delete \"{name}\"?",
       "revokeMessage": "Anyone using this link loses access immediately. This can't be undone; publishing again creates a new link.",
-      "frozenVariablesNote": "The public link always loads the dashboard with the values selected here. Viewers can see them but can't change them."
+      "frozenVariablesNote": "The public link always loads the dashboard with the values selected here. Viewers can see them but can't change them.",
+      "presetsHelp": "Pick one to fix the link to that range, or several to let viewers switch between them."
     }
   },
   "panel": {

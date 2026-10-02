@@ -57,9 +57,10 @@ describe("PublicLinkForm schema", () => {
     expect(r.error?.issues[0].path).toEqual(["defaultPreset"]);
   });
 
-  it("ignores the ranges list when the time range is locked", () => {
-    const value = { ...named(), timeEditable: false, presets: [], defaultPreset: 900 };
-    expect(schema.safeParse(value).success).toBe(true);
+  it("needs at least one time range", () => {
+    const r = schema.safeParse({ ...named(), presets: [] });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0].path).toEqual(["presets"]);
   });
 });
 
@@ -73,9 +74,9 @@ describe("PublicLinkForm payload", () => {
     expect(todayIn("Asia/Kolkata", new Date("2026-09-25T20:00:00Z"))).toBe("2026-09-26");
   });
 
-  it("sends a locked range as its only preset, with numbers and a trimmed name", () => {
+  it("fixes the link to a single range, with numbers and a trimmed name", () => {
     const cfg = toPublicLinkConfig(
-      { ...publicLinkDefaults(), name: "  NOC  ", timeEditable: false, defaultPreset: 900 },
+      { ...publicLinkDefaults(), name: "  NOC  ", presets: [900], defaultPreset: 900 },
       { env: "prod" },
       "UTC",
     );
@@ -87,6 +88,29 @@ describe("PublicLinkForm payload", () => {
       rebuild_secs: 60,
       expires_at: null,
     });
+  });
+
+  it("lets viewers switch only when several ranges are picked", () => {
+    const cfg = toPublicLinkConfig(
+      { ...publicLinkDefaults(), name: "x", presets: [86400, 3600], defaultPreset: 3600 },
+      {},
+      "UTC",
+    );
+    expect(cfg.time_range).toEqual({
+      editable: true,
+      default_range_secs: 3600,
+      allowed_presets_secs: [3600, 86400],
+    });
+  });
+
+  it("edits a fixed link as its one range", () => {
+    const link = {
+      name: "a",
+      rebuild_secs: 60,
+      expires_at: null,
+      time_range: { editable: false, default_range_secs: 900, allowed_presets_secs: [900] },
+    } as unknown as PublicLink;
+    expect(publicLinkFormFrom(link, "UTC").presets).toEqual([900]);
   });
 
   it("round-trips a link's expiry through the edit form", () => {

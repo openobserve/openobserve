@@ -28,7 +28,6 @@ export const makePublicLinkSchema = (t: TranslateFn, minRebuildSecs: number, tod
         .trim()
         .min(1, t("dashboard.publicLinks.nameRequired"))
         .max(256, t("dashboard.publicLinks.nameTooLong")),
-      timeEditable: z.boolean(),
       presets: z.array(z.number()),
       defaultPreset: z.number(),
       // OFormInput emits a string even for type="number".
@@ -44,7 +43,6 @@ export const makePublicLinkSchema = (t: TranslateFn, minRebuildSecs: number, tod
         .refine((v) => v === "" || v >= today, t("dashboard.publicLinks.expiresInPast")),
     })
     .superRefine((v, ctx) => {
-      if (!v.timeEditable) return;
       if (!v.presets.length) {
         ctx.addIssue({
           code: "custom",
@@ -64,7 +62,6 @@ export type PublicLinkForm = z.infer<ReturnType<typeof makePublicLinkSchema>>;
 
 export const publicLinkDefaults = (): PublicLinkForm => ({
   name: "",
-  timeEditable: true,
   presets: [3600, 86400],
   defaultPreset: 3600,
   rebuildSecs: "60",
@@ -73,12 +70,12 @@ export const publicLinkDefaults = (): PublicLinkForm => ({
 
 /** Pre-fill the form from an existing link, showing its expiry as a date in the author's timezone. */
 export const publicLinkFormFrom = (link: PublicLink, timezone: string): PublicLinkForm => {
-  const presets = link.time_range.allowed_presets_secs ?? [];
+  const allowed = link.time_range.allowed_presets_secs ?? [];
+  const defaultPreset = link.time_range.default_range_secs ?? allowed[0] ?? 3600;
   return {
     name: link.name,
-    timeEditable: link.time_range.editable,
-    presets: presets.length ? presets : [3600, 86400],
-    defaultPreset: link.time_range.default_range_secs ?? presets[0] ?? 3600,
+    presets: link.time_range.editable && allowed.length ? allowed : [defaultPreset],
+    defaultPreset,
     rebuildSecs: String(link.rebuild_secs),
     expires: link.expires_at
       ? formatInTimeZone(link.expires_at / 1000, timezone, "yyyy-MM-dd")
@@ -99,15 +96,13 @@ export const toPublicLinkConfig = (
   frozenVariables: Record<string, unknown>,
   timezone: string,
 ): PublicLinkConfig => {
-  // A locked time range is one preset that is also the default.
-  const presets = value.timeEditable
-    ? value.presets.slice().sort((a, b) => a - b)
-    : [value.defaultPreset];
+  const presets = value.presets.slice().sort((a, b) => a - b);
   return {
     name: value.name.trim(),
     visibility: "public",
     time_range: {
-      editable: value.timeEditable,
+      // One range means the link is fixed to it; several let viewers switch.
+      editable: presets.length > 1,
       default_range_secs: value.defaultPreset,
       allowed_presets_secs: presets,
     },
