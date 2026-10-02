@@ -1454,6 +1454,22 @@ describe("anomalyWindowShareErrors", () => {
     expect(errors({ alert_window_fire_pct: n }).fire).toBe("alerts.anomaly.windowFireRange");
   });
 
+  it("rejects a window longer than 24h of buckets", () => {
+    const at = (buckets: number, value: number, unit: string) =>
+      errors({
+        alert_window_buckets: buckets,
+        histogram_interval_value: value,
+        histogram_interval_unit: unit,
+      }).buckets;
+    expect(at(288, 5, "m")).toBeNull();
+    expect(at(24, 1, "h")).toBeNull();
+    expect(at(25, 1, "h")).toBe("alerts.anomaly.windowBucketsSpan");
+    expect(at(289, 5, "m")).toBe("alerts.anomaly.windowBucketsRange");
+    expect(at(2, 1, "d")).toBe("alerts.anomaly.windowBucketsSpan");
+    // An unparsable resolution leaves the span to the server.
+    expect(at(100, 0, "x")).toBeNull();
+  });
+
   it("rejects a recover share above fire, or of zero", () => {
     expect(errors({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }).recover).toBe(
       "alerts.anomaly.windowRecoverRange",
@@ -1468,27 +1484,16 @@ describe("anomalyWindowShareErrors", () => {
 
 // Mirrors absence.rs slot_resolution_for: (span + 1h) / cycle >= 3, and an hourly-or-finer bucket.
 describe("anomalyBandGrouping", () => {
-  it.each([
-    [21, 300],
-    [20, 300],
-    [3, 3600],
-    [1, 300],
-    [0, 60],
-    [NaN, 300],
-  ])(
-    "%s days at %ss buckets groups by hour of week: the trainer reads at least 21 days",
-    (days, interval) => {
-      expect(anomalyBandGrouping(days, interval)).toBe("hour_of_week");
-    },
-  );
-
-  it("is global for any bucket coarser than 1h, whatever the window", () => {
-    expect(anomalyBandGrouping(1, 3601)).toBe("global");
-    expect(anomalyBandGrouping(60, 3601)).toBe("global");
-    expect(anomalyBandGrouping(60, 86400)).toBe("global");
+  it.each([60, 300, 3600])("groups %ss buckets by hour of week", (interval) => {
+    expect(anomalyBandGrouping(interval)).toBe("hour_of_week");
   });
 
-  it("judges by the floored span alone when the interval is not yet valid", () => {
-    expect(anomalyBandGrouping(5, null)).toBe("hour_of_week");
+  it("is global for any bucket coarser than 1h", () => {
+    expect(anomalyBandGrouping(3601)).toBe("global");
+    expect(anomalyBandGrouping(86400)).toBe("global");
+  });
+
+  it("assumes hour of week while the interval is not yet valid", () => {
+    expect(anomalyBandGrouping(null)).toBe("hour_of_week");
   });
 });

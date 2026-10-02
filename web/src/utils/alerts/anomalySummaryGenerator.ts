@@ -74,7 +74,6 @@ export function generateAnomalySummary(
     const seasonality = t(
       ANOMALY_BAND_GROUPING_KEYS[
         anomalyBandGrouping(
-          Number(config.training_window_days || 28),
           anomalyIntervalSeconds(
             Number(config.histogram_interval_value),
             String(config.histogram_interval_unit),

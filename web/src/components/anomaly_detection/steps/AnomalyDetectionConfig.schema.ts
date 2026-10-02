@@ -130,23 +130,9 @@ export const ANOMALY_BAND_GROUPING_KEYS: Record<AnomalyBandGrouping, string> = {
 /** The trainer fetches at least this many days of history, whatever the configured window. */
 export const ANOMALY_MIN_TRAINING_DAYS = 21;
 
-/** The grouping the trainer picks (absence.rs `slot_resolution_for`): an hourly bucket, and 3 whole cycles in the span plus 1h. */
-export const anomalyBandGrouping = (
-  trainingDays: number,
-  intervalSeconds: number | null,
-): AnomalyBandGrouping => {
-  if (intervalSeconds !== null && intervalSeconds > 3600) return "global";
-  // Assumes the stream retains the floor; the UI cannot see retention.
-  const days = Math.max(
-    Number.isFinite(trainingDays) ? trainingDays : 0,
-    ANOMALY_MIN_TRAINING_DAYS,
-  );
-  const spanHours = days * 24;
-  const fills = (cycleHours: number) => Math.floor((spanHours + 1) / cycleHours) >= 3;
-  if (fills(168)) return "hour_of_week";
-  if (fills(24)) return "hour_of_day";
-  return "global";
-};
+/** The grouping the trainer picks (absence.rs `slot_resolution_for`): its 21-day floor always fills hour-of-week slots, unless a bucket is coarser than 1h. */
+export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
+  intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "hour_of_week";
 
 /** A window narrower than one schedule gap plus one bucket deterministically skips buckets (spec §4.3). */
 export const lookBackWindowFloorSeconds = (
@@ -349,12 +335,22 @@ export const anomalyWindowShareErrors = (
     (Number.isInteger(Number(buckets)) && Number(buckets) >= 1 && Number(buckets) <= 288);
   const fire = isBlankNumber(fireRaw) ? 100 : Number(fireRaw);
   const fireOk = Number.isFinite(fire) && fire > 0 && fire <= 100;
+  const interval = anomalyIntervalSeconds(
+    Number(cfg?.histogram_interval_value),
+    String(cfg?.histogram_interval_unit),
+  );
+  // Mirrors the server rule: buckets × resolution must fit in 24h.
+  const spanOk = !bucketsOk || isBlankNumber(buckets) || interval === null || Number(buckets) * interval <= 86400;
   const recover = Number(recoverRaw);
   const recoverOk =
     isBlankNumber(recoverRaw) ||
     (Number.isFinite(recover) && recover > 0 && recover <= (fireOk ? fire : 100));
   return {
-    buckets: bucketsOk ? null : "alerts.anomaly.windowBucketsRange",
+    buckets: !bucketsOk
+      ? "alerts.anomaly.windowBucketsRange"
+      : spanOk
+        ? null
+        : "alerts.anomaly.windowBucketsSpan",
     fire: fireOk ? null : "alerts.anomaly.windowFireRange",
     recover: recoverOk ? null : "alerts.anomaly.windowRecoverRange",
   };

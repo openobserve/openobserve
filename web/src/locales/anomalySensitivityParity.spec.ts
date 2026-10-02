@@ -112,6 +112,7 @@ const ADDED = [
   "alerts.anomaly.summaryBandWidthManual",
   "alerts.anomaly.bandCaption",
   "alerts.anomaly.trainingWindowFloorHint",
+  "alerts.anomaly.windowBucketsSpan",
 ];
 
 // Keys orphaned by retired UI; a locale still carrying one is dead copy nothing else would flag.

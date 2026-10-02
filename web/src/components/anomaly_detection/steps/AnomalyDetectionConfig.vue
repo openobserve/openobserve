@@ -913,7 +913,6 @@ export default defineComponent({
 
     const bandGroupingLabel = computed(() => {
       const grouping = anomalyBandGrouping(
-        Number(trainingWindowDays.value),
         anomalyIntervalSeconds(
           Number(histogramIntervalValue.value),
           String(histogramIntervalUnit.value),
