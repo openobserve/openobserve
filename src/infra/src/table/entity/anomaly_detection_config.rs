@@ -31,6 +31,20 @@ pub struct Model {
     pub alert_budget_per_day: Option<f64>,
     /// Seconds; NULL means the shipped one-day default, which is what pre-column rows mean.
     pub level_half_width_seconds: Option<i64>,
+    /// Manual band width k in sigmas; NULL means k from the trained model.
+    pub band_width: Option<f64>,
+    /// `both`, `above` or `below`; NULL means both.
+    pub alert_direction: Option<String>,
+    /// Window-share length in buckets; NULL means 1.
+    pub alert_window_buckets: Option<i32>,
+    /// Percent of the window out of band that fires; NULL means 100.
+    pub alert_window_fire_pct: Option<f64>,
+    /// Percent of the window out of band below which it recovers; NULL means the fire percent.
+    pub alert_window_recover_pct: Option<f64>,
+    /// Written by training: `hour_of_week`, `hour_of_day` or `global`.
+    pub band_grouping: Option<String>,
+    /// Written by training and threshold recompute: the model's k.
+    pub band_k: Option<f64>,
     pub seasonality: String,
     pub is_trained: bool,
     pub training_started_at: Option<i64>,
@@ -105,6 +119,13 @@ mod tests {
             threshold: 95,
             alert_budget_per_day: None,
             level_half_width_seconds: None,
+            band_width: None,
+            alert_direction: None,
+            alert_window_buckets: None,
+            alert_window_fire_pct: None,
+            alert_window_recover_pct: None,
+            band_grouping: None,
+            band_k: None,
             seasonality: "none".to_string(),
             is_trained: false,
             training_started_at: None,
