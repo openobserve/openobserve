@@ -149,6 +149,12 @@ function onChildOpenChange(next: boolean) {
   else childOpen.value = next;
 }
 
+// getComputedStyle forces a style recalc on every mount, so only ask when a class or inline style can set display:contents.
+function mayBeDisplayContents(el: Element): boolean {
+  if ((el as HTMLElement).style?.display === "contents") return true;
+  return [...el.classList].some((c) => c === "contents" || c.endsWith(":contents"));
+}
+
 onMounted(() => {
   if (!hasDefaultSlot.value && !isAnchored.value && childAnchorRef.value) {
     // Prefer the nearest previous visible sibling — the actual trigger element (e.g. the
@@ -164,7 +170,11 @@ onMounted(() => {
       // Fallback: walk up past display:contents ancestors — they have no layout box
       // and getBoundingClientRect() returns all-zeros, sending the tooltip to (0,0).
       candidate = childAnchorRef.value.parentElement;
-      while (candidate && window.getComputedStyle(candidate).display === "contents") {
+      while (
+        candidate &&
+        mayBeDisplayContents(candidate) &&
+        window.getComputedStyle(candidate).display === "contents"
+      ) {
         candidate = candidate.parentElement;
       }
     }

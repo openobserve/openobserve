@@ -150,6 +150,37 @@ describe("OTooltip", () => {
     });
   });
 
+  // ── Child-mode anchoring ───────────────────────────────────────────────────
+  describe("child-mode anchoring", () => {
+    it("skips a display:contents parent and attaches to the nearest box", () => {
+      const wrapper = mount({
+        render: () =>
+          h("div", { "data-testid": "box" }, [
+            h("span", { "data-testid": "wrapper", style: "display: contents" }, [
+              h(OTooltip, { content: "Hello" }),
+            ]),
+          ]),
+      });
+
+      expect(wrapper.find('[data-testid="box"]').attributes("data-o-tooltip-trigger")).toBe("");
+      expect(
+        wrapper.find('[data-testid="wrapper"]').attributes("data-o-tooltip-trigger"),
+      ).toBeUndefined();
+    });
+
+    it("attaches to a plain parent without asking for its computed style", () => {
+      const spy = vi.spyOn(window, "getComputedStyle");
+      const wrapper = mount({
+        render: () => h("span", { "data-testid": "plain" }, [h(OTooltip, { content: "Hello" })]),
+      });
+      const plain = wrapper.find('[data-testid="plain"]').element;
+
+      expect(plain.getAttribute("data-o-tooltip-trigger")).toBe("");
+      expect(spy.mock.calls.some(([el]) => el === plain)).toBe(false);
+      spy.mockRestore();
+    });
+  });
+
   // ── Overflow-only and anchored tooltips ────────────────────────────────────
   describe("overflow-only", () => {
     // jsdom has no layout, so a test sets the two widths the cut-off check compares.

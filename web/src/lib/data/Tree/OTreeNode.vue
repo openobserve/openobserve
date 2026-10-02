@@ -5,6 +5,7 @@
 
 import { computed, inject } from "vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { TREE_CONTEXT_KEY } from "./OTree.context";
 import type { TreeNode, TreeNodeKey } from "./OTree.types";
@@ -176,12 +177,12 @@ function onTickChange(newVal: CheckboxModelValue) {
       />
 
       <!-- Label -->
-      <span
-        class="text-text-body truncate text-sm leading-snug"
+      <OTruncatedText
+        class="text-text-body text-sm leading-snug"
         :class="isDisabled ? 'opacity-50' : ''"
       >
         {{ node.label }}
-      </span>
+      </OTruncatedText>
     </div>
 
     <!-- Children (recursive) — animated expand/collapse ──────────── -->

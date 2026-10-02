@@ -21,6 +21,7 @@ import type { I18nText } from "@/types/i18n";
 import { computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone, StatTrend } from "./OStatStrip.types";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -171,9 +172,11 @@ const trendClass = computed(() =>
         >
           <slot name="value">{{ displayValue }}</slot>
         </span>
-        <span v-if="label" class="text-text-secondary truncate text-xs font-medium max-lg:hidden">{{
-          label
-        }}</span>
+        <OTruncatedText
+          v-if="label"
+          class="text-text-secondary text-xs font-medium max-lg:hidden"
+          >{{ label }}</OTruncatedText
+        >
         <span v-if="trend" class="text-2xs shrink-0 font-semibold max-lg:hidden" :class="trendClass"
           >{{ trendArrow }} {{ trend.label }}</span
         >
@@ -191,9 +194,9 @@ const trendClass = computed(() =>
         >
           <OTooltip :content="subTooltip || sub" />
         </OIcon>
-        <span v-else-if="sub" class="text-text-label text-2xs min-w-0 truncate max-lg:hidden">{{
+        <OTruncatedText v-else-if="sub" class="text-text-label text-2xs max-lg:hidden">{{
           sub
-        }}</span>
+        }}</OTruncatedText>
       </div>
       <span
         v-if="icon || slots.icon"
