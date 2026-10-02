@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "Oturum tekrarı mevcut değil",
     "loadingSessionReplay": "Oturum tekrarı yükleniyor…",
+    "sessionReplaySeekBehindWindow": "Bu an, oturumun yüklenmiş olan bölümünden önce. Oynatmak için oturumu bu olaydan yeniden açın.",
+    "sessionReplayTruncated": "Bu oturum tamamen yüklenemeyecek kadar uzun. İlk {count} segment gösteriliyor.",
+    "sessionReplayLoadingPercent": "%{percent} yükleniyor",
+    "sessionReplayFullyLoaded": "Tamamen yüklendi",
+    "sessionReplayLoadFailedChip": "Yükleme başarısız · Yeniden dene",
+    "sessionReplayLoadFailed": "Oturum tekrarı yüklenemedi.",
+    "sessionReplayLoadFailedRange": "{from} – {to} yüklenemedi",
+    "sessionReplayRetrying": "Yeniden deneniyor ({attempt}/{total})…",
+    "sessionReplayNextPart": "Oturumun sonraki bölümü yükleniyor…",
+    "sessionReplayResumesOnItsOwn": "Oynatma kendiliğinden devam eder",
+    "sessionReplayLoadingUpTo": "{time} zamanına kadar yükleniyor…",
+    "sessionReplaySinglePageHint": "Bu oturumda tek sayfa var, bu nedenle {time} öncesindeki her şeyin önce yüklenmesi gerekiyor",
+    "sessionReplayNotLoadedYet": "henüz yüklenmedi",
+    "sessionReplayTruncatedTooltip": "Kullanılamıyor: 50.000 segment sınırı aşıldı",
+    "sessionReplaySkippedParts": "· {n} bölüm yüklenemedi | · {n} bölüm yüklenemedi",
+    "sessionReplayGapTooltip": "Bu bölüm yüklenemedi",
+    "sessionReplayRetry": "Yeniden dene",
+    "sessionReplayLiveBadge": "Canlı",
+    "sessionReplayLateRows": "Daha önceki etkinlik, tekrar yüklendikten sonra geldi. Dahil etmek için yeniden yükleyin.",
+    "sessionReplayReload": "Yeniden yükle",
     "seek": "Atla",
     "sessionMetricsAria": "Oturum metrikleri özeti",
     "frustration": "{count} Hayal kırıklığı | {count} Hayal kırıklığı",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "Kuruluş düzeyinde, özel sentetik aracılarınızın işleri çekmek için kullandığı o2syn_ token'ları",
     "serviceAccountsName": "Hizmet Hesapları Adı",
     "basicUsers": "Kullanıcılar",
-    "organizationMembers": "Organizasyon Üyeleri",
     "invitations": "Davetiyeler",
     "quota": "Kontenjanlar",
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "Organizasyon üyesi başarıyla güncellendi."
     },
     "user": {
-      "organizationMembers": "Organizasyon Üyeleri",
       "delete": "Sil",
       "failedToLoadCustomRoles": "Özel roller yüklenemedi.",
       "pleaseWaitLoadingUsers": "Kullanıcılar yüklenirken lütfen bekleyin...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "Fonksiyonlar getiriliyor...",
     "associateFunction": "Fonksiyon İlişkilendir",
     "noFunctionsFound": "Fonksiyon bulunamadı",
-    "streamsUnit": "{count} Stream | {count} Stream",
     "deleteAssociatedAlertsPipelinesBatch": "Seçili akışlarla ilişkili tüm Pipeline'ları ve Alert'leri sil",
     "allFieldsCount": "Tüm Alanlar ({count})",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "Çalıştırma listesini göster"
     },
     "history": {
-      "button": "Çalıştırmalar",
       "title": "İş Akışı Geçmişi",
       "started": "Başladı",
       "ended": "Bitti",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "Bu işlem, iş oluşturulduktan sonra geri alınamaz veya iptal edilemez.",
     "areYouSureProceed": "Devam etmek istediğinize emin misiniz?",
     "clearFilters": "Filtreleri Temizle",
-    "backfillJobLabel": "{count} Geri Doldurma İşi | {count} Geri Doldurma İşi",
     "chunksUnit": "parçalar",
     "never": "Asla",
     "jobTooltipLabel": "İş",
@@ -3348,7 +3363,6 @@
     "functionName": "Fonksiyon Adı",
     "remoteDestination": "Uzak Hedef",
     "failedToLoadPipeline": "Pipeline yüklenemedi",
-    "header": "Boru hatları",
     "subtitle": "Uçuşta verileri dönüştürün, zenginleştirin ve yönlendirin",
     "deleteNode": "Sil",
     "addPipeline": "Boru Hattı Ekle",
@@ -3639,7 +3653,40 @@
     "dataSource": "Veri Kaynağı",
     "uploadFile": "Dosya Yükle",
     "fromUrl": "URL'den",
-    "addFunction": "Fonksiyon Ekle"
+    "addFunction": "Fonksiyon Ekle",
+    "import": {
+      "title": "Fonksiyon İçe Aktar",
+      "outputMessages": "Çıktı Mesajları",
+      "errorValidations": "Hata Doğrulamaları",
+      "results": "İçe Aktarma Sonuçları",
+      "nameLabel": "Fonksiyon Adı",
+      "nameRequired": "Fonksiyon - {index}: ad gerekli",
+      "nameExists": "Fonksiyon - {index}: \"{name}\" zaten mevcut",
+      "nameInvalid": "Fonksiyon - {index}: \"{name}\" geçerli bir fonksiyon adı değil. Harf, sayı ve alt çizgi kullanın; harf veya alt çizgi ile başlayın.",
+      "duplicateName": "Fonksiyon - {index}: \"{name}\" bu dosyada birden fazla kez geçiyor",
+      "bodyRequired": "Fonksiyon - {index}: fonksiyon gövdesi gerekli",
+      "transTypeInvalid": "Fonksiyon - {index}: tür, VRL için 0 veya JavaScript için 1 olmalıdır",
+      "paramsInvalid": "Fonksiyon - {index}: params bir dize olmalıdır",
+      "transTypeLabel": "Dil",
+      "transTypePlaceholder": "Bir dil seçin",
+      "paramsLabel": "Parametreler",
+      "paramsHint": "Virgülle ayrılmış argüman adları. Varsayılan olarak “row”.",
+      "overrideExisting": "Bunun yerine mevcut fonksiyonu değiştir",
+      "nameInputRequired": "Bir fonksiyon adı girin",
+      "nameInputInvalid": "Harf, sayı ve alt çizgi kullanın; harf veya alt çizgi ile başlayın",
+      "nameInputDuplicate": "Bu dosyadaki başka bir fonksiyon zaten bu adı kullanıyor",
+      "nameInputExists": "Bu ad bu organizasyonda zaten alınmış",
+      "overrideAffects": "Geçersiz kılma şu boru hatlarını da değiştirir: {pipelines}",
+      "createSuccess": "Fonksiyon - {index}: \"{name}\" içe aktarıldı",
+      "overridden": "Fonksiyon - {index}: \"{name}\" geçersiz kılındı",
+      "createFailed": "Fonksiyon - {index}: \"{name}\" başarısız oldu - {reason}",
+      "rejectedBody": "Tanımı düzeltin ve yeniden içe aktarın.",
+      "rejectedLanguage": "Fonksiyon - {index}: \"{name}\" reddedildi. JavaScript fonksiyonuysa dili ayarlayın — dili olmayan bir tanım VRL olarak okunur.",
+      "jsonStringEmpty": "JSON dizesi boş",
+      "invalidJsonFormat": "Geçersiz JSON biçimi",
+      "importSuccess": "{count} fonksiyon içe aktarıldı | {count} fonksiyon içe aktarıldı",
+      "nothingToImport": "İçe aktarılacak fonksiyon bulunamadı. Dosyanın geçerli JSON olduğunu kontrol edin."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Boyutları analiz ediyor...",
@@ -5427,7 +5474,6 @@
       "dynamicVariables": "Dinamik Değişkenler"
     },
     "dashboards": {
-      "selected": "{count} seçili",
       "failedToLoadFolder": "Seçili klasör için panolar yüklenemedi.",
       "pleaseWait": "Lütfen bekleyin...",
       "copySuffix": "{title} - Kopya",
@@ -6783,7 +6829,6 @@
     "reloadAlertsTooltip": "Alertleri Yeniden Yükle",
     "triggerDetection": "Tetikleme Algılama",
     "retrain": "Yeniden Eğit",
-    "selectedLabel": "seçili",
     "resume": "Devam Et",
     "deleteAlertTitle": "Alert Sil",
     "deleteAlertMessage": "Bu alerti silmek istediğinizden emin misiniz?",
@@ -7407,7 +7452,6 @@
       "noCondition": "Koşulsuz",
       "noHistoryAvailable": "Bu uyarı için değerlendirme geçmişi mevcut değil",
       "tryExpandingTimeRange": "Zaman aralığını genişletmeyi deneyin",
-      "results": "Sonuçlar",
       "ifCondition": "eğer {condition}"
     },
     "historyTable": {
@@ -7879,8 +7923,6 @@
     "prebuiltDestination": "Hazır {type} hedefi",
     "errorValidations": "Hata Doğrulamaları",
     "outputMessagesLabel": "Çıktı Mesajları",
-    "incidentSingular": "Olay",
-    "incidentPlural": "Olaylar",
     "confirmDeleteTemplates": "{count} şablonu silmek istediğinize emin misiniz? | {count} şablonu silmek istediğinize emin misiniz?",
     "lastOutcome": "Son Sonuç",
     "priority": "Öncelik",
@@ -8235,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "Şablonu Dışa Aktar",
-    "selected": "seçili",
     "deleteTemplateTitle": "Şablonu Sil",
     "deleteTemplateMessage": "Şablonu silmek istediğinize emin misiniz?",
     "deleteTemplatesTitle": "Şablonları Sil",
@@ -8489,7 +8530,6 @@
     "deleteDestinationTitle": "Hedefi Sil",
     "deleteDestinationMessage": "Hedefi silmek istediğinize emin misiniz?",
     "deleteDestinationsTitle": "Hedefleri Sil",
-    "selected": "seçili",
     "organizationLabel": "Kuruluş",
     "defaultPlaceholder": "ör. default",
     "streamNameLabel": "Akış Adı",
@@ -9297,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "Hassas alanlar için şifreleme anahtarları",
-      "selected": "{count} seçildi",
       "delete": "Sil",
       "deleteCipherKeyTitle": "Şifreleme Anahtarını Sil",
       "deleteCipherKeyMessage": "Şifreleme Anahtarını silmek istediğinizden emin misiniz?",
@@ -9892,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "Akış",
-      "sessions": "oturumları",
       "failedToLoad": "Oturumlar yüklenemedi",
       "retry": "Tekrar dene",
       "tokenTooltip": "Giriş: {input} · Çıktı: {output} · Toplam: {total}",
@@ -10004,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "Hiçbir akış algılanmadı",
       "tabLabel": "Hizmet Kataloğu",
-      "footerTitle": "HİZMETLER",
       "filterPlaceholder": "Hizmet adına göre filtrele...",
       "columns": {
         "serviceName": "Hizmet",
@@ -10573,7 +10610,6 @@
     "create_regex_pattern_field": "Regex kullanarak düzenle/bırak",
     "import": "İthalat",
     "import_title": "İçe Aktar Deseni",
-    "bottom_header": "{count} Desen | {count} Desen",
     "filter_by_tag": "Etikete göre filtrele",
     "refresh": "Yenile",
     "loading_patterns": "Desenler yükleniyor...",
@@ -10629,7 +10665,6 @@
     "get_history": "Geçmişi Al",
     "executed_at": "İdam Edildi",
     "sql_query": "SQL Sorgu",
-    "results": "Sonuçlar",
     "delayMessage": "Arama Geçmişi şu şekilde gecikebilir"
   },
   "correlation": {
@@ -10772,7 +10807,6 @@
     "function_definition": "Fonksiyon Tanımı",
     "more_details": "Daha fazla detay",
     "query_function": "Sorgu/Fonksiyon",
-    "results": "Sonuçlar",
     "max_limit": "Maksimum Limit",
     "cancel_job_title": "Planlanmış Aramayı İptal Et",
     "cancel_job_message": "Bu planlanmış aramayı iptal etmek istediğinizden emin misiniz?",
@@ -10879,9 +10913,6 @@
     "testBtn": "Testi",
     "importBtn": "İthalat",
     "newModel": "Yeni Model",
-    "modelsCount": "{count} Modeller",
-    "exportSelected": "Dışa Aktar ({count})",
-    "deleteSelected": "Sil ({count})",
     "importTitle": "İthalat Modeli Fiyatlandırması",
     "errorValidations": "Hata Doğrulamaları",
     "outputMessages": "Çıkış Mesajları",
@@ -11399,11 +11430,6 @@
         "trace": "İzler",
         "session": "Oturumlar"
       },
-      "scopeNoun": {
-        "span": "span'ler",
-        "trace": "izler",
-        "session": "oturumlar"
-      },
       "inQueueFilter": {
         "label": "Kuyrukta",
         "notEnqueued": "Kuyrukta: Sıraya Alınmadı",
@@ -11418,6 +11444,7 @@
         "type": "Tip",
         "kind": "Tür",
         "span": "Span",
+        "trace": "İz",
         "session": "Oturum",
         "topic": "Konu",
         "traces": "İzler",
@@ -11448,16 +11475,12 @@
         "sectionTitle": "Kuyruğa Ekle",
         "manageQueues": "Kuyrukları Yönet"
       },
-      "bulkAdd": "Kuyruğa {count} Ekle",
-      "selectedCount": "{selected} / {total} seçildi",
-      "footerTitle": "Sağlıksız {scope}",
       "addSuccess": "{queue} kuyruğuna eklendi — satır Discovery'de kalır, durumu kuyrukta tutulur.",
       "addError": "Öğeler kuyruğa eklenemedi",
       "openQueue": "Kuyruğu Aç",
       "queuesError": "Kuyruklar yüklenemedi"
     },
     "queues": {
-      "listTitle": "Kuyruklar",
       "searchPlaceholder": "Kuyrukları Ara...",
       "newButton": "Yeni Kuyruk",
       "loadError": "Kuyruklar yüklenemedi",
@@ -11516,7 +11539,6 @@
         "targetDataset": "Hedef Veri Seti",
         "noTargetDataset": "Hedef Veri Seti Yok",
         "searchPlaceholder": "Öğeleri Ara...",
-        "footerTitle": "Öğeler",
         "allItems": "Tümü",
         "inTrace": "İz içinde {traceId}",
         "reviewAgain": "Tekrar İncele",
@@ -11941,7 +11963,6 @@
       "clearBaseline": "Temel hattı temizle"
     },
     "datasets": {
-      "listTitle": "Veri Setleri",
       "searchPlaceholder": "Veri Setlerinde Ara...",
       "newButton": "Yeni Veri Seti",
       "loadError": "Veri setleri yüklenemedi",
@@ -11985,7 +12006,6 @@
         "fallbackTitle": "Veri Seti",
         "meta": "{count} öğe · {updated} güncellendi",
         "loadError": "Veri seti yüklenemedi",
-        "footerTitle": "Öğeler",
         "tabs": {
           "items": "Öğeler",
           "experiments": "Deneyler"
@@ -12122,8 +12142,6 @@
       "summaryAgents": "Etkilenen ajanlar",
       "failuresTitle": "Hata sınıflandırması",
       "failuresHint": "Ajan başına türe göre gruplandırılmış hatalar",
-      "footerLoops": "Döngüler",
-      "footerFailures": "Arıza sınıfları",
       "noLoops": "Bu aralıkta döngü davranışı algılanmadı",
       "noFailures": "Bu aralıkta ajan hatası yok",
       "noLoopsForAgent": "Bu aralıkta {agent} için döngü davranışı yok — ajanı değiştirin veya zaman aralığını genişletin",
@@ -12190,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "Uzak Görevler",
       "searchPlaceholder": "Görev ara",
       "newButton": "Yeni Görev",
       "loadError": "Uzak görevler yüklenemedi",
@@ -12838,7 +12855,6 @@
         "title": "Değerlendirme skorları",
         "hint": "Puanlar ve gerekçeler _llm_scores'ten gelir. Daha fazla inceleme için değerlendirici izini açmak üzere bir çalıştırma seçin.",
         "filterLabel": "Değerlendirme skorlarını filtrele",
-        "footerTitle": "Değerlendirme Skorları",
         "noThresholdHint": "Sağlıksız skorları sınıflandırmak ve vurgulamak için bu Skor Yapılandırmasında bir sağlıklı eşik belirleyin.",
         "noReasoning": "Gerekçe kaydedilmedi",
         "unknownAgent": "Bilinmeyen ajan",
@@ -12863,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "Puan Yapılandırmalarına Genel Bakış",
         "searchPlaceholder": "Yapılandırmaları filtrele...",
         "relativeTime": {
           "daysAgo": "{day}g önce",
@@ -12991,7 +13006,6 @@
         "updatedLabel": "Güncellendi"
       },
       "createTitle": "Yeni Puan Yapılandırması",
-      "listTitle": "Puan Yapılandırmaları",
       "searchPlaceholder": "Yapılandırmaları ara",
       "newButton": "Yeni puan yapılandırması",
       "columns": {
@@ -13068,9 +13082,6 @@
         "errors": {
           "title": "Doğrulama Hataları"
         }
-      },
-      "export": {
-        "bulkButton": "Dışa Aktar"
       }
     },
     "scorer": {
@@ -13088,8 +13099,9 @@
         "requestTemplateSection": "İstek Şablonu",
         "variablesSuffix": "değişken",
         "outputSchemaSection": "Çıktı Şeması",
-        "usedByIntro": "Pipeline'larında bu puanlayıcıya başvuran işler.",
-        "usedByEmpty": "Henüz hiçbir iş bu puanlayıcıya başvurmuyor.",
+        "usedByIntro": "Bu puanlayıcıya referans veren işler ve deneyler.",
+        "usedByEmpty": "Henüz bu puanlayıcıya referans veren iş veya deney yok.",
+        "usedByExperiment": "Deney",
         "versionsIntro": "Sürümler, puanlayıcı yapılandırmasının değişmez anlık görüntüleridir. Etkin sürüm, işlerin bugün çalıştırdığı sürümdür.",
         "lastUpdated": "Son güncelleme",
         "metadataSection": "Meta Veri",
@@ -13123,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "Puanlayıcılar",
       "searchPlaceholder": "Puanlayıcıları ara",
       "newButton": "Yeni puanlayıcı",
       "usedByJob": "{count} iş | {count} iş",
@@ -13164,9 +13175,6 @@
           "nameConflict": "Skorlayıcı {index}: \"{name}\" adı bu kuruluşta zaten mevcut",
           "duplicateName": "Skorlayıcı {index}: \"{name}\" adı bu içe aktarmada birden fazla kez kullanılıyor"
         }
-      },
-      "export": {
-        "bulkButton": "Dışa Aktar"
       },
       "backTo": "Skorlar sayfasına geri dön",
       "badgeRemote": "Uzaktan",
@@ -13356,11 +13364,9 @@
           "recentEmpty": "Seçili pencerede başarısız çalıştırma yok."
         }
       },
-      "listTitle": "Değerlendirme İşleri",
       "searchPlaceholder": "İşleri ara",
       "newButton": "Yeni iş",
       "scorerCount": "{count} skorlayıcı | {count} skorlayıcı",
-      "deleteBulkButton": "Sil",
       "deleteBulkTitle": "Değerlendirme işlerini sil",
       "deleteBulkConfirm": "{count} değerlendirme işini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
       "deletedBulk": "{count} değerlendirme işi silindi",
@@ -14340,10 +14346,6 @@
       "passed": "Başarılı",
       "warning": "Uyarı"
     },
-    "footer": {
-      "browserTests": "Tarayıcı Testleri",
-      "checks": "Kontroller"
-    },
     "journey": {
       "extract": {
         "action": "Alt teste çıkar",
@@ -14726,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "Konum Ekle",
-      "bottomHeader": "konumlar",
       "bulkDeleteConfirmMessage": "{count} konumu silmek istediğinizden emin misiniz?",
       "bulkDeleteConfirmTitle": "Konumları Sil",
       "bulkDeleteFailed": "Konumlar silinemedi",
@@ -14787,7 +14788,6 @@
       "regionPlaceholder": "ör. us-east-1",
       "regionRequired": "Bölge gerekli",
       "searchPlaceholder": "Konumları ara…",
-      "selectedCount": "{selected} / {total} konum seçildi",
       "title": "Konumlar",
       "publicTitle": "Genel konumlar",
       "privateTitle": "Özel konumlar",
@@ -15041,8 +15041,7 @@
       "detailOrigin": "Köken",
       "detailFirstParty": "Birinci taraf",
       "detailThirdParty": "Üçüncü taraf",
-      "detailStackTrace": "Yığın izi",
-      "footerEvents": "Olaylar"
+      "detailStackTrace": "Yığın izi"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15242,7 +15241,6 @@
       "bulkTriggerSuccess": "{count} kontrol tetiklendi. | {count} kontrol tetiklendi.",
       "bulkTriggerToast": "{count} kontrol tetikleniyor… | {count} kontrol tetikleniyor…",
       "check": "Kontrol",
-      "checksFooterTitle": "Kontroller",
       "checksCount": "{count} kontrol",
       "delete": "Sil",
       "duplicate": "Çoğalt",
@@ -15270,7 +15268,6 @@
       "pausing": "Duraklatılıyor…",
       "response": "Yanıt",
       "scheduledAt": "Planlanan Zaman",
-      "selectedCount": "{selected} / {total} seçildi",
       "status": "Durum",
       "statusDegraded": "⚠ Bozuldu",
       "statusDown": "✗ Kapalı",
@@ -15453,7 +15450,6 @@
     "editTitle": "Durum sayfasını düzenle",
     "back": "Durum sayfaları",
     "loadFailed": "Durum sayfası yüklenemedi",
-    "footerTitle": "durum sayfaları",
     "searchPlaceholder": "Durum sayfalarında ara",
     "copyUrl": "URL'yi kopyala",
     "publicUrl": "Herkese açık URL",
@@ -15848,7 +15844,8 @@
       "oncallAck": "Onayla",
       "oncallEscalate": "Yükselt",
       "oncallSnooze": "Ertele",
-      "oncallResolve": "Çöz"
+      "oncallResolve": "Çöz",
+      "functionsImport": "Fonksiyonu içe aktar"
     }
   },
   "components": {
@@ -15963,7 +15960,9 @@
         "resetColumnWidths": "Sütun genişliklerini sıfırla"
       },
       "removeColumnAria": "Sütunu kaldır",
-      "formatColumnAria": "Sütunu biçimlendir"
+      "formatColumnAria": "Sütunu biçimlendir",
+      "selectedOfTotal": "{total} öğeden {selected} tanesi seçildi",
+      "selectedCount": "{selected} öğe seçildi"
     },
     "predefinedThemes": {
       "title": "Tema",
@@ -16460,7 +16459,10 @@
       "enrichmentReloadStarted": "Zenginleştirme tablosu yeniden yükleme başlatıldı. Arka planda işleniyor...",
       "enrichmentJobStarted": "Zenginleştirme tablosu işi başlatıldı. Arka planda işleniyor...",
       "enrichmentCreationFailed": "Zenginleştirme Tablosu oluşturma başarısız oldu",
-      "functionDeletionAssociatedPipelines": "Fonksiyon silme başarısız oldu çünkü pipeline'larla ilişkili. İlişkili pipeline'ları görmek için görüntüle düğmesine tıklayın."
+      "functionDeletionAssociatedPipelines": "Fonksiyon silme başarısız oldu çünkü pipeline'larla ilişkili. İlişkili pipeline'ları görmek için görüntüle düğmesine tıklayın.",
+      "successfullyExportedFunctions": "{count} fonksiyon başarıyla dışa aktarıldı | {count} fonksiyon başarıyla dışa aktarıldı",
+      "errorExportingFunctions": "Fonksiyonlar dışa aktarılırken hata oluştu. Lütfen tekrar deneyin.",
+      "functionsMissingFromExport": "{names} artık listede değil ve dışa aktarmaya dahil edilmedi | {names} artık listede değil ve dışa aktarmaya dahil edilmedi"
     },
     "recommended": {
       "failedToImportDashboard": "Pano içe aktarılamadı: {error}",
@@ -16915,7 +16917,6 @@
     },
     "move": "Taşı",
     "moveTitle": "{count} SLO'yu başka bir klasöre taşı",
-    "moveSelected": "{count} seçileni taşı",
     "exportTitle": "SLO Dışa Aktar | {count} SLO Dışa Aktar",
     "exportSubtitle": "Tanımı gözden geçirin, ardından OpenObserve sağlayıcısı için JSON veya Terraform olarak indirin.",
     "exportFailed": "SLO tanımı okunamadı. Lütfen tekrar deneyin.",
@@ -17680,7 +17681,6 @@
       "otherRow": "Diğer tüm sorgular",
       "truncatedText": "Bu ifade tamamen saklanamayacak kadar uzun olduğundan kısaltılmış gösteriliyor.",
       "stmtClass": {
-        "query": "Sorgular",
         "queryHint": "Yalnızca gerçek SQL — SELECT, INSERT, UPDATE ve DELETE.",
         "all": "Sorgular + bağlantı ek yükü",
         "allHint": "Ayrıca sürücünüzün sorgular arasında gönderdiği kayıt işlemlerini sayar: BEGIN ve COMMIT, SET ve havuzlanmış bağlantıyı canlı tutan kontroller.",
@@ -18281,7 +18281,6 @@
       "disclosureShort": "Her satır gerçek bir tamamlanmış çağrıdır.",
       "disclosureDetail": "Çağrıyı yapan uygulama tarafından gönderdiğiniz izlerden ölçülür. Burada yalnızca tamamlanmış çağrılar vardır — hâlâ çalışan veya takılıp geri dönmeyen bir sorgu ölçüm üretmemiştir.",
       "counts": {
-        "complete": "Bu penceredeki tüm {count} veritabanı çağrısı gösteriliyor, en yavaştan başlayarak.",
         "truncated": "Bu penceredeki en yavaş {count} çağrı — burada gösterilenden daha fazlası çalıştı.",
         "filtered": "{total} çağrıdan {count} tanesi gösteriliyor."
       },
@@ -18625,7 +18624,6 @@
         "unknown": "Durum bildirilmedi"
       },
       "counts": {
-        "complete": "{count} oturum gösteriliyor.",
         "capped": "Aynı anda okuyabildiğimizden daha fazla oturum örneklendi. Elimizdeki {count} oturum bunlar.",
         "filtered": "{total} oturumdan {count} tanesi gösteriliyor."
       },
@@ -18742,8 +18740,7 @@
         "lastVacuum": "Son vakum",
         "lastAutovacuum": "Son autovacuum",
         "lastAnalyze": "Son analiz"
-      },
-      "countLine": "{count} tablo"
+      }
     },
     "recommendations": {
       "title": "Öneriler",
@@ -19088,7 +19085,6 @@
     "acknowledge": "Onayla",
     "acknowledgeHint": "Sahiplen. Bu eskalasyonu durdurur.",
     "actions": "Eylemler",
-    "selectedCount": "{count} seçili",
     "bulkAckDone": "{count} çağrı onaylandı",
     "bulkAckPartial": "{count} çağrı onaylanamadı",
     "resolveCause": "Neydi?",

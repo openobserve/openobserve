@@ -32,6 +32,9 @@ vi.mock("@/services/iam", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
@@ -258,6 +261,28 @@ describe("AddRole", () => {
   });
 
   describe("role creation behavior", () => {
+    it("tracks role_created once the role is created", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+      await getNameInput(wrapper).setValue("test_role");
+      await submitForm(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledWith("role_created");
+    });
+
+    it("does not track role_created when creation fails", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockRejectedValue({ response: { status: 400, data: {} } });
+      vi.mocked(analytics.track).mockClear();
+
+      await getNameInput(wrapper).setValue("test_role");
+      await submitForm(wrapper);
+
+      expect(createRole).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("emits update:open(false) + added:role and shows success toast on success", async () => {
       const { createRole } = await import("@/services/iam");
       vi.mocked(createRole).mockResolvedValue({ data: {} } as any);

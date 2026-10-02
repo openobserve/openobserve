@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { useMutation } from "@tanstack/vue-query";
 import { createRoleMutation } from "@/services/iam.queries";
+import analytics from "@/services/product_analytics";
 import { useOrgId } from "@/composables/query/useOrgId";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -133,6 +134,7 @@ const saveRole = async (value: AddRoleForm) => {
   try {
     // The mutation declares the scope it drops; this component never names a cache.
     await createRoleMutation_.mutateAsync(name);
+    analytics.track("role_created");
     emits("update:open", false);
     emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({

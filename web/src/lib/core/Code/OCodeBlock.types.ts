@@ -64,7 +64,7 @@ export interface CodeBlockProps {
 }
 
 export interface CodeBlockEmits {
-  /** Fired after the raw code is copied to the clipboard. */
+  /** Fired only after the raw code was copied to the clipboard successfully. */
   (e: "copy"): void;
 }
 

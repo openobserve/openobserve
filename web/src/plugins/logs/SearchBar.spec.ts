@@ -91,10 +91,9 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
-    identify: vi.fn(),
     page: vi.fn(),
   },
 }));

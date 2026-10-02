@@ -126,7 +126,6 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     pagination="client"
     :page-size="20"
     :page-size-options="[20, 50, 100, 250, 500]"
-    :footer-title="t('iam.roles')"
     sorting="client"
     selection="multiple"
     row-key="role_name"
@@ -246,10 +245,8 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       />
     </template>
 
-    <template #bottom>
-      <span class="text-xs font-normal max-md:hidden">{{ data.length }} {{ t("iam.roles") }}</span>
+    <template #selection-actions>
       <OButton
-        v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"
         variant="outline-destructive"
         size="sm"

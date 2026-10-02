@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "Geen sessieherhaling beschikbaar",
     "loadingSessionReplay": "Sessieherhaling laden…",
+    "sessionReplaySeekBehindWindow": "Dit moment ligt vóór het geladen deel van de sessie. Open de sessie opnieuw vanaf deze gebeurtenis om dit af te spelen.",
+    "sessionReplayTruncated": "Deze sessie is te lang om volledig te laden. De eerste {count} segmenten worden weergegeven.",
+    "sessionReplayLoadingPercent": "Laden {percent}%",
+    "sessionReplayFullyLoaded": "Volledig geladen",
+    "sessionReplayLoadFailedChip": "Laden mislukt · Opnieuw proberen",
+    "sessionReplayLoadFailed": "De sessie-replay kon niet worden geladen.",
+    "sessionReplayLoadFailedRange": "Laden van {from} – {to} mislukt",
+    "sessionReplayRetrying": "Opnieuw proberen ({attempt} van {total})…",
+    "sessionReplayNextPart": "Het volgende deel van de sessie laden…",
+    "sessionReplayResumesOnItsOwn": "Afspelen wordt automatisch hervat",
+    "sessionReplayLoadingUpTo": "Laden tot {time}…",
+    "sessionReplaySinglePageHint": "Deze sessie heeft één pagina, dus alles vóór {time} moet eerst geladen worden",
+    "sessionReplayNotLoadedYet": "nog niet geladen",
+    "sessionReplayTruncatedTooltip": "Niet beschikbaar: voorbij de limiet van 50.000 segmenten",
+    "sessionReplaySkippedParts": "· {n} deel kon niet worden geladen | · {n} delen konden niet worden geladen",
+    "sessionReplayGapTooltip": "Dit deel kon niet worden geladen",
+    "sessionReplayRetry": "Opnieuw proberen",
+    "sessionReplayLiveBadge": "Live",
+    "sessionReplayLateRows": "Eerdere activiteit kwam binnen nadat de replay was geladen. Herlaad om deze op te nemen.",
+    "sessionReplayReload": "Herladen",
     "seek": "Zoeken",
     "sessionMetricsAria": "Samenvatting sessiemetriek",
     "frustration": "{count} frustratie | {count} frustraties",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "Organisatieniveau o2syn_ tokens die je privé-synthetics-agents gebruiken om taken op te halen.",
     "serviceAccountsName": "Naam van serviceaccounts",
     "basicUsers": "Gebruikers",
-    "organizationMembers": "Organisatieleden",
     "invitations": "Uitnodigingen",
     "quota": "Quota",
     "externalUserWarningTitle": "Waarschuwing voor externe gebruikers",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "Organisatielid succesvol bijgewerkt."
     },
     "user": {
-      "organizationMembers": "Organisatieleden",
       "delete": "Verwijderen",
       "failedToLoadCustomRoles": "Fout bij het laden van aangepaste rollen.",
       "pleaseWaitLoadingUsers": "Even wachten, gebruikers worden geladen...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "Functies ophalen...",
     "associateFunction": "Functie koppelen",
     "noFunctionsFound": "Geen functies gevonden",
-    "streamsUnit": "{count} Stream | {count} Streams",
     "deleteAssociatedAlertsPipelinesBatch": "Verwijder alle pipelines en waarschuwingen die zijn gekoppeld aan de geselecteerde streams",
     "allFieldsCount": "Alle velden ({count})",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "Toon lijst met runs"
     },
     "history": {
-      "button": "Uitvoeringen",
       "title": "Workflowgeschiedenis",
       "started": "Gestart",
       "ended": "Beëindigd",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "Deze actie kan NIET ongedaan worden gemaakt of worden geannuleerd zodra de taak is gemaakt.",
     "areYouSureProceed": "Weet u zeker dat u wilt doorgaan?",
     "clearFilters": "Filters wissen",
-    "backfillJobLabel": "{count} backfill-taak | {count} backfill-taken",
     "chunksUnit": "chunks",
     "never": "Nooit",
     "jobTooltipLabel": "Taak",
@@ -3348,7 +3363,6 @@
     "functionName": "Functienaam",
     "remoteDestination": "Externe bestemming",
     "failedToLoadPipeline": "Pipeline laden mislukt",
-    "header": "Pijpleidingen",
     "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht",
     "deleteNode": "Verwijderen",
     "addPipeline": "Pipeline toevoegen",
@@ -3639,7 +3653,40 @@
     "dataSource": "Gegevensbron",
     "uploadFile": "Bestand uploaden",
     "fromUrl": "Van URL",
-    "addFunction": "Functie toevoegen"
+    "addFunction": "Functie toevoegen",
+    "import": {
+      "title": "Functie importeren",
+      "outputMessages": "Uitvoerberichten",
+      "errorValidations": "Foutvalidaties",
+      "results": "Importresultaten",
+      "nameLabel": "Functienaam",
+      "nameRequired": "Functie - {index}: naam is vereist",
+      "nameExists": "Functie - {index}: \"{name}\" bestaat al",
+      "nameInvalid": "Functie - {index}: \"{name}\" is geen geldige functienaam. Gebruik letters, cijfers en underscores, beginnend met een letter of underscore.",
+      "duplicateName": "Functie - {index}: \"{name}\" komt meer dan eens voor in dit bestand",
+      "bodyRequired": "Functie - {index}: functiebody is vereist",
+      "transTypeInvalid": "Functie - {index}: type moet 0 zijn voor VRL of 1 voor JavaScript",
+      "paramsInvalid": "Functie - {index}: params moet een string zijn",
+      "transTypeLabel": "taal",
+      "transTypePlaceholder": "Kies een taal",
+      "paramsLabel": "Parameters",
+      "paramsHint": "Door komma's gescheiden argumentnamen. Standaard “row”.",
+      "overrideExisting": "De bestaande functie in plaats daarvan vervangen",
+      "nameInputRequired": "Voer een functienaam in",
+      "nameInputInvalid": "Gebruik letters, cijfers en underscores, beginnend met een letter of underscore",
+      "nameInputDuplicate": "Een andere functie in dit bestand gebruikt deze naam al",
+      "nameInputExists": "Deze naam is al in gebruik binnen deze organisatie",
+      "overrideAffects": "Overschrijven wijzigt ook deze pijpleidingen: {pipelines}",
+      "createSuccess": "Functie - {index}: \"{name}\" geïmporteerd",
+      "overridden": "Functie - {index}: \"{name}\" overschreven",
+      "createFailed": "Functie - {index}: \"{name}\" mislukt - {reason}",
+      "rejectedBody": "Corrigeer de definitie en importeer opnieuw.",
+      "rejectedLanguage": "Functie - {index}: \"{name}\" is afgewezen. Als het een JavaScript-functie is, stel de taal in — een definitie zonder taal wordt gelezen als VRL.",
+      "jsonStringEmpty": "JSON-string is leeg",
+      "invalidJsonFormat": "Ongeldige JSON-indeling",
+      "importSuccess": "{count} functie geïmporteerd | {count} functies geïmporteerd",
+      "nothingToImport": "Geen functies gevonden om te importeren. Controleer of het bestand geldige JSON is."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Dimensies analyseren...",
@@ -5427,7 +5474,6 @@
       "dynamicVariables": "Dynamische variabelen"
     },
     "dashboards": {
-      "selected": "{count} geselecteerd",
       "failedToLoadFolder": "Dashboards laden voor geselecteerde map mislukt.",
       "pleaseWait": "Even wachten...",
       "copySuffix": "{title} - Kopie",
@@ -6783,7 +6829,6 @@
     "reloadAlertsTooltip": "Waarschuwingen opnieuw laden",
     "triggerDetection": "Triggerdetectie",
     "retrain": "Opnieuw trainen",
-    "selectedLabel": "geselecteerd",
     "resume": "Hervatten",
     "deleteAlertTitle": "Waarschuwing verwijderen",
     "deleteAlertMessage": "Weet u zeker dat u deze waarschuwing wilt verwijderen?",
@@ -7407,7 +7452,6 @@
       "noCondition": "Geen voorwaarde",
       "noHistoryAvailable": "Geen evaluatiegeschiedenis beschikbaar voor deze waarschuwing",
       "tryExpandingTimeRange": "Probeer het tijdsbereik uit te breiden",
-      "results": "Resultaten",
       "ifCondition": "als {condition}"
     },
     "historyTable": {
@@ -7879,8 +7923,6 @@
     "prebuiltDestination": "Kant-en-klare {type} bestemming",
     "errorValidations": "Foutvalidaties",
     "outputMessagesLabel": "Uitvoerberichten",
-    "incidentSingular": "Incident",
-    "incidentPlural": "Incidenten",
     "confirmDeleteTemplates": "Weet je zeker dat je {count} sjabloon wilt verwijderen? | Weet je zeker dat je {count} sjablonen wilt verwijderen?",
     "lastOutcome": "Laatste resultaat",
     "priority": "Prioriteit",
@@ -8235,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "Template exporteren",
-    "selected": "geselecteerd",
     "deleteTemplateTitle": "Template verwijderen",
     "deleteTemplateMessage": "Weet je zeker dat je het template wilt verwijderen?",
     "deleteTemplatesTitle": "Templates verwijderen",
@@ -8489,7 +8530,6 @@
     "deleteDestinationTitle": "Bestemming verwijderen",
     "deleteDestinationMessage": "Weet je zeker dat je deze bestemming wilt verwijderen?",
     "deleteDestinationsTitle": "Bestemmingen verwijderen",
-    "selected": "geselecteerd",
     "organizationLabel": "Organisatie",
     "defaultPlaceholder": "bijv. default",
     "streamNameLabel": "Streamnaam",
@@ -9297,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "Versleutelingssleutels voor gevoelige velden",
-      "selected": "{count} geselecteerd",
       "delete": "Verwijderen",
       "deleteCipherKeyTitle": "Cipher Key verwijderen",
       "deleteCipherKeyMessage": "Weet u zeker dat u de Cipher Key wilt verwijderen?",
@@ -9892,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "Stream",
-      "sessions": "sessies",
       "failedToLoad": "Laden van sessies is mislukt",
       "retry": "Probeer het opnieuw",
       "tokenTooltip": "Invoer: {input} · Uitgang: {output} · Totaal: {total}",
@@ -10004,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "Geen streams gedetecteerd",
       "tabLabel": "Servicecatalogus",
-      "footerTitle": "Diensten",
       "filterPlaceholder": "Filteren op servicenaam...",
       "columns": {
         "serviceName": "Service",
@@ -10573,7 +10610,6 @@
     "create_regex_pattern_field": "Redigeren/verwijderen met Regex",
     "import": "Importeren",
     "import_title": "Patroon importeren",
-    "bottom_header": "{count} patroon | {count} patronen",
     "filter_by_tag": "Filteren op tag",
     "refresh": "Vernieuwen",
     "loading_patterns": "Patronen worden geladen...",
@@ -10629,7 +10665,6 @@
     "get_history": "Geschiedenis ophalen",
     "executed_at": "Uitgevoerd op",
     "sql_query": "SQL-zoekopdracht",
-    "results": "Resultaten",
     "delayMessage": "De zoekgeschiedenis kan worden vertraagd door"
   },
   "correlation": {
@@ -10772,7 +10807,6 @@
     "function_definition": "Definitie van de functie",
     "more_details": "Meer details",
     "query_function": "Query/functie",
-    "results": "Resultaten",
     "max_limit": "Maximale limiet",
     "cancel_job_title": "Geplande zoekopdracht annuleren",
     "cancel_job_message": "Weet je zeker dat je deze geplande zoekopdracht wilt annuleren?",
@@ -10879,9 +10913,6 @@
     "testBtn": "Test",
     "importBtn": "Importeren",
     "newModel": "Nieuw model",
-    "modelsCount": "{count} Modellen",
-    "exportSelected": "Exporteren ({count})",
-    "deleteSelected": "Verwijderen ({count})",
     "importTitle": "Prijzen van importmodellen",
     "errorValidations": "Validaties van fouten",
     "outputMessages": "Berichten uitvoeren",
@@ -11399,11 +11430,6 @@
         "trace": "Traces",
         "session": "Sessies"
       },
-      "scopeNoun": {
-        "span": "spans",
-        "trace": "traces",
-        "session": "sessies"
-      },
       "inQueueFilter": {
         "label": "In wachtrij",
         "notEnqueued": "In wachtrij: Niet in de wachtrij",
@@ -11418,6 +11444,7 @@
         "type": "Type",
         "kind": "Soort",
         "span": "Span",
+        "trace": "Trace",
         "session": "Sessie",
         "topic": "Onderwerp",
         "traces": "Traces",
@@ -11448,16 +11475,12 @@
         "sectionTitle": "Toevoegen aan wachtrij",
         "manageQueues": "Wachtrijen beheren"
       },
-      "bulkAdd": "Voeg {count} toe aan wachtrij",
-      "selectedCount": "{selected} van {total} geselecteerd",
-      "footerTitle": "Ongezond {scope}",
       "addSuccess": "Toegevoegd aan {queue} — de rij blijft in Discovery, de status bevindt zich in de wachtrij.",
       "addError": "Kan items niet aan de wachtrij toevoegen",
       "openQueue": "Wachtrij openen",
       "queuesError": "Laden van wachtrijen mislukt"
     },
     "queues": {
-      "listTitle": "Wachtrijen",
       "searchPlaceholder": "Zoek wachtrijen...",
       "newButton": "Nieuwe wachtrij",
       "loadError": "Laden van wachtrijen mislukt",
@@ -11516,7 +11539,6 @@
         "targetDataset": "Doeldataset",
         "noTargetDataset": "Geen doeldataset",
         "searchPlaceholder": "Items zoeken...",
-        "footerTitle": "Items",
         "allItems": "Alles",
         "inTrace": "In trace {traceId}",
         "reviewAgain": "Opnieuw beoordelen",
@@ -11941,7 +11963,6 @@
       "clearBaseline": "Basislijn wissen"
     },
     "datasets": {
-      "listTitle": "Datasets",
       "searchPlaceholder": "Zoek datasets...",
       "newButton": "Nieuwe dataset",
       "loadError": "Kan datasets niet laden",
@@ -11985,7 +12006,6 @@
         "fallbackTitle": "Dataset",
         "meta": "{count} items · bijgewerkt {updated}",
         "loadError": "Dataset laden mislukt",
-        "footerTitle": "Items",
         "tabs": {
           "items": "Items",
           "experiments": "Experimenten"
@@ -12122,8 +12142,6 @@
       "summaryAgents": "Getroffen agents",
       "failuresTitle": "Fouttaxonomie",
       "failuresHint": "Fouten gegroepeerd per soort, per agent",
-      "footerLoops": "Lussen",
-      "footerFailures": "Foutklassen",
       "noLoops": "Geen lusgedrag gedetecteerd in dit bereik",
       "noFailures": "Geen agentfouten in dit bereik",
       "noLoopsForAgent": "Geen lusgedrag voor {agent} in dit bereik — wissel van agent of verbreed het tijdsbereik",
@@ -12190,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "Remote taken",
       "searchPlaceholder": "Zoek taken",
       "newButton": "Nieuwe taak",
       "loadError": "Externe taken konden niet worden geladen",
@@ -12838,7 +12855,6 @@
         "title": "Evaluatiescores",
         "hint": "Scores en redeneringen komen van _llm_scores. Selecteer een run om de evaluatortrace te openen voor verder onderzoek.",
         "filterLabel": "Filter evaluatiescores",
-        "footerTitle": "Evaluatiescores",
         "noThresholdHint": "Stel een gezonde drempel in op deze Scoreconfiguratie om ongezonde scores te classificeren en te markeren.",
         "noReasoning": "Geen onderbouwing vastgelegd",
         "unknownAgent": "Onbekende agent",
@@ -12863,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "Overzicht van Score Configs",
         "searchPlaceholder": "Filterconfiguraties...",
         "relativeTime": {
           "daysAgo": "{day}d geleden",
@@ -12991,7 +13006,6 @@
         "updatedLabel": "Bijgewerkt"
       },
       "createTitle": "Nieuwe scoreconfiguratie",
-      "listTitle": "Scoreconfiguraties",
       "searchPlaceholder": "Configuraties zoeken",
       "newButton": "Nieuwe scoreconfiguratie",
       "columns": {
@@ -13068,9 +13082,6 @@
         "errors": {
           "title": "Validatiefouten"
         }
-      },
-      "export": {
-        "bulkButton": "Exporteren"
       }
     },
     "scorer": {
@@ -13088,8 +13099,9 @@
         "requestTemplateSection": "Verzoeksjabloon",
         "variablesSuffix": "variabelen",
         "outputSchemaSection": "Uitvoerschema",
-        "usedByIntro": "Taken die in hun pipeline naar deze scorer verwijzen.",
-        "usedByEmpty": "Nog geen taken verwijzen naar deze scorer.",
+        "usedByIntro": "Taken en experimenten die naar deze scorer verwijzen.",
+        "usedByEmpty": "Er zijn nog geen taken of experimenten die naar deze scorer verwijzen.",
+        "usedByExperiment": "Experiment",
         "versionsIntro": "Versies zijn onveranderlijke momentopnamen van de scorerconfiguratie. De actieve versie is wat taken vandaag uitvoeren.",
         "lastUpdated": "Laatst bijgewerkt",
         "metadataSection": "Metadata",
@@ -13123,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "Scorers",
       "searchPlaceholder": "Scorers zoeken",
       "newButton": "Nieuwe scorer",
       "usedByJob": "{count} taak | {count} taken",
@@ -13164,9 +13175,6 @@
           "nameConflict": "Scorer {index}: naam \"{name}\" bestaat al in deze organisatie",
           "duplicateName": "Scorer {index}: naam \"{name}\" wordt meer dan één keer gebruikt in deze import"
         }
-      },
-      "export": {
-        "bulkButton": "Exporteren"
       },
       "backTo": "Terug naar Scorers",
       "badgeRemote": "Op afstand",
@@ -13356,11 +13364,9 @@
           "recentEmpty": "Geen mislukte uitvoeringen in het geselecteerde venster."
         }
       },
-      "listTitle": "Evaluatietaken",
       "searchPlaceholder": "Taken zoeken",
       "newButton": "Nieuwe taak",
       "scorerCount": "{count} scorer | {count} scorers",
-      "deleteBulkButton": "Verwijderen",
       "deleteBulkTitle": "Eval-taken verwijderen",
       "deleteBulkConfirm": "Weet u zeker dat u {count} eval-taken wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
       "deletedBulk": "{count} eval-taken verwijderd",
@@ -14340,10 +14346,6 @@
       "passed": "Geslaagd",
       "warning": "Waarschuwing"
     },
-    "footer": {
-      "browserTests": "Browsertests",
-      "checks": "Controles"
-    },
     "journey": {
       "extract": {
         "action": "Extraheren naar subtest",
@@ -14726,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "Locatie toevoegen",
-      "bottomHeader": "locaties",
       "bulkDeleteConfirmMessage": "Weet u zeker dat u {count} locaties wilt verwijderen?",
       "bulkDeleteConfirmTitle": "Locaties verwijderen",
       "bulkDeleteFailed": "Locaties verwijderen mislukt",
@@ -14787,7 +14788,6 @@
       "regionPlaceholder": "bijv. us-east-1",
       "regionRequired": "Regio is vereist",
       "searchPlaceholder": "Locaties zoeken…",
-      "selectedCount": "{selected} van {total} locaties geselecteerd",
       "title": "Locaties",
       "publicTitle": "Openbare locaties",
       "privateTitle": "Privélocaties",
@@ -15041,8 +15041,7 @@
       "detailOrigin": "Oorsprong",
       "detailFirstParty": "Eerste partij",
       "detailThirdParty": "Derde partij",
-      "detailStackTrace": "Stacktrace",
-      "footerEvents": "Gebeurtenissen"
+      "detailStackTrace": "Stacktrace"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15242,7 +15241,6 @@
       "bulkTriggerSuccess": "{count} check getriggerd. | {count} checks getriggerd.",
       "bulkTriggerToast": "{count} check triggeren… | {count} checks triggeren…",
       "check": "Controle",
-      "checksFooterTitle": "Controles",
       "checksCount": "{count} controles",
       "delete": "Verwijderen",
       "duplicate": "Dupliceren",
@@ -15270,7 +15268,6 @@
       "pausing": "Bezig met pauzeren…",
       "response": "Reactie",
       "scheduledAt": "Gepland om",
-      "selectedCount": "{selected} van {total} geselecteerd",
       "status": "Status",
       "statusDegraded": "⚠ Gedegradeerd",
       "statusDown": "✗ Offline",
@@ -15453,7 +15450,6 @@
     "editTitle": "Statuspagina bewerken",
     "back": "Statuspagina's",
     "loadFailed": "Kan statuspagina niet laden",
-    "footerTitle": "statuspagina's",
     "searchPlaceholder": "Zoek statuspagina's",
     "copyUrl": "URL kopiëren",
     "publicUrl": "Openbare URL",
@@ -15848,7 +15844,8 @@
       "oncallAck": "Bevestigen",
       "oncallEscalate": "Escaleren",
       "oncallSnooze": "Snoozen",
-      "oncallResolve": "Oplossen"
+      "oncallResolve": "Oplossen",
+      "functionsImport": "Functie importeren"
     }
   },
   "components": {
@@ -15963,7 +15960,9 @@
         "resetColumnWidths": "Kolombreedtes herstellen"
       },
       "removeColumnAria": "Kolom verwijderen",
-      "formatColumnAria": "Kolom opmaken"
+      "formatColumnAria": "Kolom opmaken",
+      "selectedOfTotal": "{selected} van {total} geselecteerd",
+      "selectedCount": "{selected} geselecteerd"
     },
     "predefinedThemes": {
       "title": "Thema",
@@ -16460,7 +16459,10 @@
       "enrichmentReloadStarted": "Herladen van verrijkingstabel gestart. Verwerking op de achtergrond...",
       "enrichmentJobStarted": "Taak voor verrijkingstabel gestart. Verwerking op de achtergrond...",
       "enrichmentCreationFailed": "Aanmaken van verrijkingstabel mislukt",
-      "functionDeletionAssociatedPipelines": "Verwijdering van functie mislukt omdat deze is gekoppeld aan pijplijnen. Klik op de bekijk-knop om bijbehorende pijplijnen te krijgen."
+      "functionDeletionAssociatedPipelines": "Verwijdering van functie mislukt omdat deze is gekoppeld aan pijplijnen. Klik op de bekijk-knop om bijbehorende pijplijnen te krijgen.",
+      "successfullyExportedFunctions": "{count} functie geëxporteerd | {count} functies geëxporteerd",
+      "errorExportingFunctions": "Fout bij het exporteren van functies. Probeer het opnieuw.",
+      "functionsMissingFromExport": "{names} staat niet meer in de lijst en is buiten de export gelaten | {names} staan niet meer in de lijst en zijn buiten de export gelaten"
     },
     "recommended": {
       "failedToImportDashboard": "Kan dashboard niet importeren: {error}",
@@ -16915,7 +16917,6 @@
     },
     "move": "Verplaatsen",
     "moveTitle": "Verplaats {count} SLO(s) naar een andere map",
-    "moveSelected": "Verplaats {count} geselecteerde",
     "exportTitle": "Exporteer SLO | Exporteer {count} SLO's",
     "exportSubtitle": "Bekijk de definitie en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider.",
     "exportFailed": "De SLO-definitie kon niet worden gelezen. Probeer het opnieuw.",
@@ -17680,7 +17681,6 @@
       "otherRow": "Alle andere query's",
       "truncatedText": "Dit statement was te lang om volledig op te slaan, dus het wordt afgekort weergegeven.",
       "stmtClass": {
-        "query": "Query's",
         "queryHint": "Alleen echte SQL — SELECT, INSERT, UPDATE en DELETE.",
         "all": "Query's + verbindingsoverhead",
         "allHint": "Telt ook de administratie die je driver tussen query's verstuurt: BEGIN en COMMIT, SET, en de controles die een gepoolde verbinding in leven houden.",
@@ -18281,7 +18281,6 @@
       "disclosureShort": "Elke rij is een echte voltooide aanroep",
       "disclosureDetail": "Gemeten door de applicatie die de aanroep deed, op basis van de traces die je verzendt. Alleen aanroepen die zijn voltooid staan hier — een query die nog draait, of een die bleef hangen en nooit terugkwam, leverde geen meting op.",
       "counts": {
-        "complete": "Toont alle {count} database-aanroepen in dit venster, langzaamste eerst.",
         "truncated": "De {count} langzaamste aanroepen in dit venster — er draaiden er meer dan hier worden getoond.",
         "filtered": "Toont {count} van {total} aanroepen."
       },
@@ -18625,7 +18624,6 @@
         "unknown": "Status niet gerapporteerd"
       },
       "counts": {
-        "complete": "{count} sessies weergegeven.",
         "capped": "Er zijn meer sessies gesampled dan we in één keer konden lezen. Dit zijn de {count} die we hebben.",
         "filtered": "{count} van {total} sessies weergegeven."
       },
@@ -18742,8 +18740,7 @@
         "lastVacuum": "Laatste vacuum",
         "lastAutovacuum": "Laatste autovacuum",
         "lastAnalyze": "Laatste analyse"
-      },
-      "countLine": "{count} tabellen"
+      }
     },
     "recommendations": {
       "title": "Aanbevelingen",
@@ -19088,7 +19085,6 @@
     "acknowledge": "Bevestigen",
     "acknowledgeHint": "Neem de verantwoordelijkheid. Dit stopt de escalatie.",
     "actions": "Acties",
-    "selectedCount": "{count} geselecteerd",
     "bulkAckDone": "{count} oproepen bevestigd",
     "bulkAckPartial": "{count} oproepen konden niet worden bevestigd",
     "resolveCause": "Wat was de oorzaak?",

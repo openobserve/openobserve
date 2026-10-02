@@ -303,39 +303,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdown>
               </template>
 
-              <!-- Table footer: pagination + bulk actions -->
-              <template #bottom>
-                <div class="flex h-12 w-full items-center justify-between">
-                  <!-- Left: count + action buttons grouped together -->
-                  <div class="flex items-center gap-2">
-                    <div
-                      class="flex items-center text-xs font-normal whitespace-nowrap max-md:hidden"
-                    >
-                      {{ resultTotal }} {{ t("reports.header") }}
-                    </div>
-                    <OButton
-                      v-if="selectedReports.length > 0"
-                      data-test="report-list-move-reports-btn"
-                      icon-left="drive-file-move"
-                      variant="outline"
-                      size="sm-action"
-                      @click="moveMultipleReports"
-                    >
-                      {{ t("common.move") }}
-                    </OButton>
-                    <OButton
-                      v-if="selectedReports.length > 0"
-                      data-test="report-list-delete-reports-btn"
-                      icon-left="delete"
-                      variant="outline-destructive"
-                      size="sm-action"
-                      :loading="bulkDeleteLoading"
-                      @click="openBulkDeleteDialog"
-                    >
-                      {{ t("common.delete") }}
-                    </OButton>
-                  </div>
-                </div>
+              <template #selection-actions>
+                <OButton
+                  data-test="report-list-move-reports-btn"
+                  icon-left="drive-file-move"
+                  variant="outline"
+                  size="sm"
+                  @click="moveMultipleReports"
+                >
+                  {{ t("common.move") }}
+                </OButton>
+                <OButton
+                  data-test="report-list-delete-reports-btn"
+                  icon-left="delete"
+                  variant="outline-destructive"
+                  size="sm"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                >
+                  {{ t("common.delete") }}
+                </OButton>
               </template>
             </OTable>
           </div>
@@ -496,8 +483,6 @@ const tabs = reactive([
   { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
   { label: t("reports.cached"), value: "cached", icon: "database" },
 ]);
-
-const resultTotal = ref<number>(0);
 
 const deleteDialog = ref({
   show: false,
@@ -669,7 +654,6 @@ const invalidateFolderCache = (_folderId?: string, siblingsOnly = false) => {
 
 const filterReports = () => {
   reportsTableRows.value = [...(staticReportsList.value as any[])];
-  resultTotal.value = reportsTableRows.value.length;
 };
 
 onBeforeMount(async () => {
@@ -778,13 +762,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value || searchAcrossFolders.value) return reportsTableRows.value ?? [];
   return filterData(reportsTableRows.value ?? [], filterQuery.value);
 });
-watch(
-  visibleRows,
-  (rows) => {
-    resultTotal.value = rows.length;
-  },
-  { immediate: true },
-);
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 const createNewReport = () => {

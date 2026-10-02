@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "没有可用的会话回放",
     "loadingSessionReplay": "正在加载会话回放…",
+    "sessionReplaySeekBehindWindow": "该时刻早于已加载的会话部分。请从此事件重新打开会话以进行播放。",
+    "sessionReplayTruncated": "此会话过长，无法完整加载。仅显示前 {count} 个片段。",
+    "sessionReplayLoadingPercent": "正在加载 {percent}%",
+    "sessionReplayFullyLoaded": "已完全加载",
+    "sessionReplayLoadFailedChip": "加载失败 · 重试",
+    "sessionReplayLoadFailed": "无法加载会话回放。",
+    "sessionReplayLoadFailedRange": "无法加载 {from} – {to}",
+    "sessionReplayRetrying": "正在重试（第 {attempt} 次，共 {total} 次）…",
+    "sessionReplayNextPart": "正在加载会话的下一部分…",
+    "sessionReplayResumesOnItsOwn": "播放将自动恢复",
+    "sessionReplayLoadingUpTo": "正在加载至 {time}…",
+    "sessionReplaySinglePageHint": "此会话只有一个页面，因此必须先加载 {time} 之前的所有内容",
+    "sessionReplayNotLoadedYet": "尚未加载",
+    "sessionReplayTruncatedTooltip": "不可用：已超出 50,000 个片段的限制",
+    "sessionReplaySkippedParts": "· {n} 个部分无法加载 | · {n} 个部分无法加载",
+    "sessionReplayGapTooltip": "此部分无法加载",
+    "sessionReplayRetry": "重试",
+    "sessionReplayLiveBadge": "实时",
+    "sessionReplayLateRows": "较早的活动在回放加载后才到达。请重新加载以包含它。",
+    "sessionReplayReload": "重新加载",
     "seek": "定位",
     "sessionMetricsAria": "会话指标摘要",
     "frustration": "{count} 次挫败 | {count} 次挫败",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "组织级 o2syn_ 令牌，您的私有合成代理使用它们来拉取作业",
     "serviceAccountsName": "服务账户名称",
     "basicUsers": "用户",
-    "organizationMembers": "组织成员",
     "invitations": "邀请",
     "quota": "配额",
     "externalUserWarningTitle": "外部用户警告",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "组织成员更新成功。"
     },
     "user": {
-      "organizationMembers": "组织成员",
       "delete": "删除",
       "failedToLoadCustomRoles": "加载自定义角色失败。",
       "pleaseWaitLoadingUsers": "正在加载用户，请稍候...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "正在获取函数...",
     "associateFunction": "关联函数",
     "noFunctionsFound": "未找到函数",
-    "streamsUnit": "{count} 个 Stream | {count} 个 Stream",
     "deleteAssociatedAlertsPipelinesBatch": "删除所选数据流关联的所有流水线和告警",
     "allFieldsCount": "所有字段（{count}）",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "显示运行列表"
     },
     "history": {
-      "button": "运行",
       "title": "工作流历史",
       "started": "已开始",
       "ended": "已结束",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "一旦作业创建，此操作无法撤销或取消。",
     "areYouSureProceed": "您确定要继续吗？",
     "clearFilters": "清除过滤器",
-    "backfillJobLabel": "{count} 个回填作业 | {count} 个回填作业",
     "chunksUnit": "分块",
     "never": "从不",
     "jobTooltipLabel": "作业",
@@ -3348,7 +3363,6 @@
     "functionName": "函数名称",
     "remoteDestination": "远程目标",
     "failedToLoadPipeline": "加载流水线失败",
-    "header": "流水线",
     "subtitle": "在飞行中转换、丰富和路由数据",
     "deleteNode": "删除",
     "addPipeline": "添加流水线",
@@ -3639,7 +3653,40 @@
     "dataSource": "数据源",
     "uploadFile": "上传文件",
     "fromUrl": "来自 URL",
-    "addFunction": "添加函数"
+    "addFunction": "添加函数",
+    "import": {
+      "title": "导入函数",
+      "outputMessages": "输出消息",
+      "errorValidations": "错误校验",
+      "results": "导入结果",
+      "nameLabel": "函数名称",
+      "nameRequired": "函数 - {index}：名称不能为空",
+      "nameExists": "函数 - {index}：\"{name}\" 已存在",
+      "nameInvalid": "函数 - {index}：\"{name}\" 不是有效的函数名称。请使用字母、数字和下划线，并以字母或下划线开头。",
+      "duplicateName": "函数 - {index}：\"{name}\" 在此文件中出现了多次。",
+      "bodyRequired": "函数 - {index}：函数体不能为空",
+      "transTypeInvalid": "函数 - {index}：类型必须为 0（VRL）或 1（JavaScript）",
+      "paramsInvalid": "函数 - {index}：params 必须是字符串",
+      "transTypeLabel": "语言",
+      "transTypePlaceholder": "选择语言",
+      "paramsLabel": "参数",
+      "paramsHint": "以逗号分隔的参数名称。默认为“row”。",
+      "overrideExisting": "改为替换现有函数",
+      "nameInputRequired": "输入函数名称",
+      "nameInputInvalid": "请使用字母、数字和下划线，并以字母或下划线开头",
+      "nameInputDuplicate": "此文件中已有另一个函数使用了该名称",
+      "nameInputExists": "该名称在当前组织中已被占用",
+      "overrideAffects": "覆盖也会更改以下流水线：{pipelines}",
+      "createSuccess": "函数 - {index}：\"{name}\" 已导入",
+      "overridden": "函数 - {index}：\"{name}\" 已覆盖",
+      "createFailed": "函数 - {index}：\"{name}\" 失败 - {reason}",
+      "rejectedBody": "请修正定义后重新导入。",
+      "rejectedLanguage": "函数 - {index}：\"{name}\" 已被拒绝。如果是 JavaScript 函数，请设置语言——未指定语言的定义会被当作 VRL 读取。",
+      "jsonStringEmpty": "JSON 字符串为空",
+      "invalidJsonFormat": "JSON 格式无效",
+      "importSuccess": "已导入 {count} 个函数 | 已导入 {count} 个函数",
+      "nothingToImport": "未找到可导入的函数。请检查该文件是否为有效的 JSON。"
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "正在分析维度...",
@@ -5427,7 +5474,6 @@
       "dynamicVariables": "动态变量"
     },
     "dashboards": {
-      "selected": "已选 {count}",
       "failedToLoadFolder": "加载所选文件夹的仪表盘失败。",
       "pleaseWait": "请稍候...",
       "copySuffix": "{title} - 副本",
@@ -6783,7 +6829,6 @@
     "reloadAlertsTooltip": "重新加载告警",
     "triggerDetection": "触发检测",
     "retrain": "重新训练",
-    "selectedLabel": "已选择",
     "resume": "恢复",
     "deleteAlertTitle": "删除告警",
     "deleteAlertMessage": "确定要删除此告警吗？",
@@ -7407,7 +7452,6 @@
       "noCondition": "无条件",
       "noHistoryAvailable": "此告警没有可用的评估历史",
       "tryExpandingTimeRange": "尝试扩大时间范围",
-      "results": "结果",
       "ifCondition": "如果 {condition}"
     },
     "historyTable": {
@@ -7879,8 +7923,6 @@
     "prebuiltDestination": "预置 {type} 目标",
     "errorValidations": "错误校验",
     "outputMessagesLabel": "输出消息",
-    "incidentSingular": "事件",
-    "incidentPlural": "事件",
     "confirmDeleteTemplates": "确定要删除 {count} 个模板吗？ | 确定要删除 {count} 个模板吗？",
     "lastOutcome": "上次结果",
     "priority": "优先级",
@@ -8235,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "导出模板",
-    "selected": "已选择",
     "deleteTemplateTitle": "删除模板",
     "deleteTemplateMessage": "确定要删除模板吗？",
     "deleteTemplatesTitle": "删除模板",
@@ -8489,7 +8530,6 @@
     "deleteDestinationTitle": "删除目标",
     "deleteDestinationMessage": "您确定要删除目标吗？",
     "deleteDestinationsTitle": "删除目标",
-    "selected": "已选择",
     "organizationLabel": "组织",
     "defaultPlaceholder": "例如：default",
     "streamNameLabel": "流名称",
@@ -9297,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "敏感字段的加密密钥",
-      "selected": "已选择 {count} 项",
       "delete": "删除",
       "deleteCipherKeyTitle": "删除加密密钥",
       "deleteCipherKeyMessage": "确定要删除加密密钥吗？",
@@ -9892,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "数据流",
-      "sessions": "会话",
       "failedToLoad": "加载会话失败",
       "retry": "重试",
       "tokenTooltip": "输入：{input} · 输出：{output} · 总计：{total}",
@@ -10004,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "未检测到数据流",
       "tabLabel": "服务目录",
-      "footerTitle": "服务",
       "filterPlaceholder": "按服务名称筛选...",
       "columns": {
         "serviceName": "服务",
@@ -10573,7 +10610,6 @@
     "create_regex_pattern_field": "使用正则表达式编辑/删除",
     "import": "导入",
     "import_title": "导入模式",
-    "bottom_header": "{count} 个模式 | {count} 个模式",
     "filter_by_tag": "按标签筛选",
     "refresh": "刷新",
     "loading_patterns": "正在加载模式...",
@@ -10629,7 +10665,6 @@
     "get_history": "获取历史记录",
     "executed_at": "执行于",
     "sql_query": "SQL 查询",
-    "results": "结果",
     "delayMessage": "搜索历史记录可能会延迟"
   },
   "correlation": {
@@ -10772,7 +10807,6 @@
     "function_definition": "函数定义",
     "more_details": "更多详情",
     "query_function": "查询/函数",
-    "results": "结果",
     "max_limit": "最大限额",
     "cancel_job_title": "取消预定搜索",
     "cancel_job_message": "您确定要取消此预定搜索吗？",
@@ -10879,9 +10913,6 @@
     "testBtn": "测试",
     "importBtn": "导入",
     "newModel": "新模型",
-    "modelsCount": "{count} 个模型",
-    "exportSelected": "导出 ({count})",
-    "deleteSelected": "删除 ({count})",
     "importTitle": "导入模型定价",
     "errorValidations": "错误验证",
     "outputMessages": "输出消息",
@@ -11399,11 +11430,6 @@
         "trace": "追踪",
         "session": "会话"
       },
-      "scopeNoun": {
-        "span": "Span",
-        "trace": "追踪",
-        "session": "会话"
-      },
       "inQueueFilter": {
         "label": "在队列中",
         "notEnqueued": "在队列中：未入队",
@@ -11418,6 +11444,7 @@
         "type": "类型",
         "kind": "种类",
         "span": "Span",
+        "trace": "追踪",
         "session": "会话",
         "topic": "主题",
         "traces": "追踪",
@@ -11448,16 +11475,12 @@
         "sectionTitle": "添加到队列",
         "manageQueues": "管理队列"
       },
-      "bulkAdd": "将 {count} 添加到队列",
-      "selectedCount": "已选择 {selected} 个（共 {total} 个）",
-      "footerTitle": "不健康 {scope}",
       "addSuccess": "已添加到 {queue} — 该行保留在 Discovery 中，其状态存储在队列中。",
       "addError": "无法将项目添加到队列",
       "openQueue": "打开队列",
       "queuesError": "加载队列失败"
     },
     "queues": {
-      "listTitle": "队列",
       "searchPlaceholder": "搜索队列...",
       "newButton": "新建队列",
       "loadError": "加载队列失败",
@@ -11516,7 +11539,6 @@
         "targetDataset": "目标数据集",
         "noTargetDataset": "无目标数据集",
         "searchPlaceholder": "搜索项目...",
-        "footerTitle": "项目",
         "allItems": "全部",
         "inTrace": "在追踪 {traceId} 中",
         "reviewAgain": "重新审核",
@@ -11941,7 +11963,6 @@
       "clearBaseline": "清除基线"
     },
     "datasets": {
-      "listTitle": "数据集",
       "searchPlaceholder": "搜索数据集...",
       "newButton": "新建数据集",
       "loadError": "加载数据集失败",
@@ -11985,7 +12006,6 @@
         "fallbackTitle": "数据集",
         "meta": "{count} 个条目 · 更新于 {updated}",
         "loadError": "加载数据集失败",
-        "footerTitle": "条目",
         "tabs": {
           "items": "条目",
           "experiments": "实验"
@@ -12122,8 +12142,6 @@
       "summaryAgents": "受影响的智能体",
       "failuresTitle": "失败分类",
       "failuresHint": "按种类分组的错误，按智能体",
-      "footerLoops": "循环",
-      "footerFailures": "故障类别",
       "noLoops": "在此范围内未检测到循环行为",
       "noFailures": "在此范围内没有智能体失败",
       "noLoopsForAgent": "在此范围内，{agent} 没有循环行为——请切换智能体或扩大时间范围",
@@ -12190,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "远程任务",
       "searchPlaceholder": "搜索任务",
       "newButton": "新建任务",
       "loadError": "无法加载远程任务",
@@ -12838,7 +12855,6 @@
         "title": "评估评分",
         "hint": "评分和推理来自 _llm_scores。选择一次运行以打开其评估器追踪进行进一步调查。",
         "filterLabel": "筛选评估评分",
-        "footerTitle": "评估评分",
         "noThresholdHint": "在此评分配置上设置健康阈值，以分类和突出显示不健康的评分。",
         "noReasoning": "未记录推理",
         "unknownAgent": "未知智能体",
@@ -12863,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "分数配置概述",
         "searchPlaceholder": "筛选配置...",
         "relativeTime": {
           "daysAgo": "{day} 天前",
@@ -12991,7 +13006,6 @@
         "updatedLabel": "更新于"
       },
       "createTitle": "新建分数配置",
-      "listTitle": "评分配置",
       "searchPlaceholder": "搜索配置",
       "newButton": "新建评分配置",
       "columns": {
@@ -13068,9 +13082,6 @@
         "errors": {
           "title": "验证错误"
         }
-      },
-      "export": {
-        "bulkButton": "导出"
       }
     },
     "scorer": {
@@ -13088,8 +13099,9 @@
         "requestTemplateSection": "请求模板",
         "variablesSuffix": "变量",
         "outputSchemaSection": "输出架构",
-        "usedByIntro": "在其流水线中引用此评分器的任务。",
-        "usedByEmpty": "尚无任务引用此评分器。",
+        "usedByIntro": "引用此评分器的作业和实验。",
+        "usedByEmpty": "尚无作业或实验引用此评分器。",
+        "usedByExperiment": "实验",
         "versionsIntro": "版本是评分器配置的不可变快照。活动版本是任务当前运行的版本。",
         "lastUpdated": "最后更新",
         "metadataSection": "元数据",
@@ -13123,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "评分器",
       "searchPlaceholder": "搜索评分器",
       "newButton": "新建评分器",
       "usedByJob": "{count} 个作业 | {count} 个作业",
@@ -13164,9 +13175,6 @@
           "nameConflict": "评分器 {index}: 名称 \"{name}\" 已存在于当前组织",
           "duplicateName": "评分器 {index}: 名称 \"{name}\" 在此导入中使用了多次"
         }
-      },
-      "export": {
-        "bulkButton": "导出"
       },
       "backTo": "返回评分器",
       "badgeRemote": "远程评分器",
@@ -13356,11 +13364,9 @@
           "recentEmpty": "在所选窗口内无失败的运行。"
         }
       },
-      "listTitle": "评估任务",
       "searchPlaceholder": "搜索任务",
       "newButton": "新建任务",
       "scorerCount": "{count} 个评分器 | {count} 个评分器",
-      "deleteBulkButton": "删除",
       "deleteBulkTitle": "删除评估任务",
       "deleteBulkConfirm": "确定要删除 {count} 个评估任务吗？此操作不可撤销。",
       "deletedBulk": "{count} 个评估任务已删除",
@@ -14340,10 +14346,6 @@
       "passed": "通过",
       "warning": "警告"
     },
-    "footer": {
-      "browserTests": "浏览器测试",
-      "checks": "检查"
-    },
     "journey": {
       "extract": {
         "action": "提取为子测试",
@@ -14726,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "添加位置",
-      "bottomHeader": "位置",
       "bulkDeleteConfirmMessage": "您确定要删除 {count} 个位置吗？",
       "bulkDeleteConfirmTitle": "删除位置",
       "bulkDeleteFailed": "删除位置失败",
@@ -14787,7 +14788,6 @@
       "regionPlaceholder": "例如：us-east-1",
       "regionRequired": "区域是必填的",
       "searchPlaceholder": "搜索位置…",
-      "selectedCount": "已选择 {total} 个位置中的 {selected} 个",
       "title": "地点",
       "publicTitle": "公共位置",
       "privateTitle": "私有位置",
@@ -15041,8 +15041,7 @@
       "detailOrigin": "来源",
       "detailFirstParty": "第一方",
       "detailThirdParty": "第三方",
-      "detailStackTrace": "堆栈跟踪",
-      "footerEvents": "事件"
+      "detailStackTrace": "堆栈跟踪"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15242,7 +15241,6 @@
       "bulkTriggerSuccess": "已触发 {count} 项检查。 | 已触发 {count} 项检查。",
       "bulkTriggerToast": "正在触发 {count} 项检查… | 正在触发 {count} 项检查…",
       "check": "检查",
-      "checksFooterTitle": "检查",
       "checksCount": "{count} 个检查",
       "delete": "删除",
       "duplicate": "复制",
@@ -15270,7 +15268,6 @@
       "pausing": "正在暂停…",
       "response": "响应",
       "scheduledAt": "计划时间",
-      "selectedCount": "已选 {selected}/{total}",
       "status": "状态",
       "statusDegraded": "⚠ 降级",
       "statusDown": "✗ 宕机",
@@ -15453,7 +15450,6 @@
     "editTitle": "编辑状态页",
     "back": "状态页",
     "loadFailed": "加载状态页失败",
-    "footerTitle": "状态页",
     "searchPlaceholder": "搜索状态页",
     "copyUrl": "复制 URL",
     "publicUrl": "公开 URL",
@@ -15848,7 +15844,8 @@
       "oncallAck": "确认",
       "oncallEscalate": "升级",
       "oncallSnooze": "暂停",
-      "oncallResolve": "解决"
+      "oncallResolve": "解决",
+      "functionsImport": "导入函数"
     }
   },
   "components": {
@@ -15963,7 +15960,9 @@
         "resetColumnWidths": "重置列宽"
       },
       "removeColumnAria": "移除列",
-      "formatColumnAria": "格式化列"
+      "formatColumnAria": "格式化列",
+      "selectedOfTotal": "已选择 {selected}/{total}",
+      "selectedCount": "已选择 {selected}"
     },
     "predefinedThemes": {
       "title": "主题",
@@ -16460,7 +16459,10 @@
       "enrichmentReloadStarted": "富化表重新加载已启动。正在后台处理...",
       "enrichmentJobStarted": "富化表任务已启动。正在后台处理...",
       "enrichmentCreationFailed": "富化表创建失败",
-      "functionDeletionAssociatedPipelines": "函数删除失败，因为它与流水线关联。点击查看按钮以获取关联的流水线。"
+      "functionDeletionAssociatedPipelines": "函数删除失败，因为它与流水线关联。点击查看按钮以获取关联的流水线。",
+      "successfullyExportedFunctions": "已成功导出 {count} 个函数 | 已成功导出 {count} 个函数",
+      "errorExportingFunctions": "导出函数时出错。请重试。",
+      "functionsMissingFromExport": "{names} 已不在列表中，未包含在导出中 | {names} 已不在列表中，未包含在导出中"
     },
     "recommended": {
       "failedToImportDashboard": "导入仪表盘失败：{error}",
@@ -16915,7 +16917,6 @@
     },
     "move": "移动",
     "moveTitle": "将 {count} 个 SLO 移动到另一个文件夹",
-    "moveSelected": "移动选定的 {count} 个",
     "exportTitle": "导出 SLO | 导出 {count} 个 SLO",
     "exportSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform 格式。",
     "exportFailed": "无法读取 SLO 定义。请重试。",
@@ -17680,7 +17681,6 @@
       "otherRow": "所有其他查询",
       "truncatedText": "该语句过长，无法完整存储，因此显示为截断形式。",
       "stmtClass": {
-        "query": "查询",
         "queryHint": "仅限真实 SQL——SELECT、INSERT、UPDATE 和 DELETE。",
         "all": "查询 + 连接开销",
         "allHint": "同时计入驱动程序在查询之间发送的簿记信息：BEGIN 和 COMMIT、SET，以及保持连接池存活的检查。",
@@ -18281,7 +18281,6 @@
       "disclosureShort": "每一行代表一个实际完成的调用",
       "disclosureDetail": "由发起调用的应用程序根据您发送的追踪进行测量。这里只包含已完成的调用——仍在运行或挂起且未返回的查询不会产生测量结果。",
       "counts": {
-        "complete": "显示此窗口中的所有 {count} 个数据库调用，按最慢优先排序。",
         "truncated": "此窗口中最慢的 {count} 个调用——实际运行的调用比此处显示的更多。",
         "filtered": "显示 {count} 个调用，共 {total} 个。"
       },
@@ -18625,7 +18624,6 @@
         "unknown": "未报告状态"
       },
       "counts": {
-        "complete": "显示 {count} 个会话。",
         "capped": "我们无法一次读取所有采样到的会话。以下是我们拥有的 {count} 个。",
         "filtered": "显示共 {total} 个会话中的 {count} 个。"
       },
@@ -18742,8 +18740,7 @@
         "lastVacuum": "上次清理",
         "lastAutovacuum": "上次自动清理",
         "lastAnalyze": "上次分析"
-      },
-      "countLine": "{count} 个表"
+      }
     },
     "recommendations": {
       "title": "建议",
@@ -19088,7 +19085,6 @@
     "acknowledge": "确认",
     "acknowledgeHint": "接管此通知。这将停止升级。",
     "actions": "操作",
-    "selectedCount": "已选择 {count} 项",
     "bulkAckDone": "已确认 {count} 条告警通知",
     "bulkAckPartial": "{count} 条无法确认",
     "resolveCause": "原因是什么？",

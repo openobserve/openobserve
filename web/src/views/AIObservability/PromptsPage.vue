@@ -44,7 +44,6 @@
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-prompt-list"
-        :footer-title="t('aiObservability.nav.prompts')"
         class="h-full w-full"
         data-test="prompt-table"
         @row-click="(row) => openDetail(row)"
@@ -333,7 +332,10 @@ const orgId = computed(() =>
   String(store.state.selectedOrganization?.identifier ?? route.query.org_identifier ?? ""),
 );
 const promptQuery = useQuery(() => ({
-  ...llmPromptsQuery(orgId.value),
+  ...llmPromptsQuery(
+    orgId.value,
+    folderScope.value === "current" ? activeFolderId.value : undefined,
+  ),
   enabled: Boolean(orgId.value),
 }));
 const settingsQuery = useQuery(() => ({

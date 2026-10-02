@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import savedViews from "@/services/saved_views";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -286,6 +289,35 @@ describe("saved_views service", () => {
       await expect(savedViews.getViewDetail("org123", "some-view-id")).rejects.toThrow(
         "Server error",
       );
+    });
+  });
+
+  describe("product analytics", () => {
+    it.each([
+      ["post", "post", ["org", { name: "v" }], "saved_view_created"],
+      ["put", "put", ["org", "id1", { name: "v" }], "saved_view_updated"],
+      ["delete", "delete", ["org", "id1"], "saved_view_deleted", { count: 1 }],
+    ])("%s tracks its event once the request resolves", async (fn, method, args, event, props?) => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance[method].mockResolvedValue(response);
+
+      await expect((savedViews as any)[fn](...(args as any[]))).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      if (props) expect(analytics.track).toHaveBeenCalledWith(event, props);
+      else expect(analytics.track).toHaveBeenCalledWith(event);
+    });
+
+    it.each([
+      ["post", "post", ["org", { name: "v" }]],
+      ["put", "put", ["org", "id1", { name: "v" }]],
+      ["delete", "delete", ["org", "id1"]],
+    ])("%s does not track when the request rejects", async (fn, method, args) => {
+      mockHttpInstance[method].mockRejectedValue(new Error("boom"));
+
+      await expect((savedViews as any)[fn](...(args as any[]))).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

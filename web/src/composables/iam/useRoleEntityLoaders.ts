@@ -125,6 +125,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       eval_job: getEvalJobs,
       annotation_queue: getAnnotationQueues,
       dataset: getDatasets,
+      pfolder: getPromptFolders,
       prompt: getPrompts,
       logs_pattern: getLogsPatternStreams,
       logs_insights: getLogsInsightsStreams,
@@ -699,10 +700,27 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     });
   };
 
-  const getPrompts = async () => {
-    const prompts = await llmPromptsService.list(store.state.selectedOrganization.identifier);
+  const getPromptFolders = async () => {
+    const folders: any = await commonService.list_Folders(
+      store.state.selectedOrganization.identifier,
+      "prompts",
+    );
 
-    updateResourceEntities("prompt", ["entityId"], prompts, false, "name");
+    if (!folders.data.list.find((folder: any) => folder.folderId === "default")) {
+      folders.data.list.unshift({ folderId: "default", name: "default" });
+    }
+
+    updateResourceEntities("pfolder", ["folderId"], [...folders.data.list], true, "name", "prompt");
+    return true;
+  };
+
+  const getPrompts = async (resource: Entity | Resource) => {
+    // Plain prompt ids, no folder prefix — matches the objects set_ownership writes.
+    const prompts = await llmPromptsService.list(store.state.selectedOrganization.identifier, {
+      folderId: resource.name,
+    });
+
+    updateEntityEntities(resource, ["entityId"], prompts, false, "name");
 
     return new Promise((resolve) => {
       resolve(true);
@@ -750,6 +768,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getEvalJobs,
     getAnnotationQueues,
     getDatasets,
+    getPromptFolders,
     getPrompts,
   };
 };

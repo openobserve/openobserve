@@ -734,65 +734,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
 
-              <template #bottom>
-                <div class="flex h-12 w-full items-center justify-between gap-1">
-                  <div class="flex min-w-25 items-center text-xs font-normal">
-                    <template v-if="selectedAlerts.length > 0"
-                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
-                      {{ t("alerts.selectedLabel") }}</template
-                    >
-                    <span v-else class="max-md:hidden"
-                      >{{ resultTotal }} {{ t("alerts.header") }}</span
-                    >
-                  </div>
-
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-move-across-folders-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="drive-file-move"
-                    @click="moveMultipleAlerts"
-                    >{{ t("common.move") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-export-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="download"
-                    @click="multipleExportAlert"
-                    >{{ t("common.export") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-pause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="pause"
-                    @click="bulkToggleAlerts('pause')"
-                    >{{ t("alerts.pause") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-unpause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="play-arrow"
-                    @click="bulkToggleAlerts('resume')"
-                    >{{ t("alerts.resume") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-delete-alerts-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    icon-left="delete"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                    >{{ t("common.delete") }}</OButton
-                  >
-                </div>
+              <template #selection-actions>
+                <OButton
+                  data-test="alert-list-move-across-folders-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="drive-file-move"
+                  @click="moveMultipleAlerts"
+                  >{{ t("common.move") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-export-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="download"
+                  @click="multipleExportAlert"
+                  >{{ t("common.export") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-pause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="pause"
+                  @click="bulkToggleAlerts('pause')"
+                  >{{ t("alerts.pause") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-unpause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="play-arrow"
+                  @click="bulkToggleAlerts('resume')"
+                  >{{ t("alerts.resume") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-delete-alerts-btn"
+                  variant="outline-destructive"
+                  size="sm"
+                  icon-left="delete"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                  >{{ t("common.delete") }}</OButton
+                >
               </template>
             </OTable>
           </div>
@@ -971,7 +954,7 @@ import sloService from "@/services/slos";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
 import { getImageURL, getUUID, verifyOrganizationStatus } from "@/utils/zincutils";
@@ -2368,14 +2351,12 @@ export default defineComponent({
           });
         }
         addAlert();
-        if (config.enableAnalytics == "true") {
-          segment.track("Button Click", {
-            button: action,
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Alerts",
-          });
-        }
+        analytics.track("Button Click", {
+          button: action,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Alerts",
+        });
         track("Button Click", {
           button: action,
           page: "Add Alert",
@@ -2479,10 +2460,6 @@ export default defineComponent({
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
-    const resultTotal = computed(function () {
-      return displayedAlerts.value?.length;
-    });
-
     // No timezone suffix in this table, unlike the other lists.
     const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
@@ -2506,9 +2483,32 @@ export default defineComponent({
       toBeCloneAlertName.value = row.name;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonedIsComposite.value = row.alert_type === "Composite";
-      toBeClonestreamName.value = "";
-      toBeClonestreamType.value = "";
+      // Pre-fill from the original alert's row — composite rows carry no
+      // single stream, and a row that genuinely has none renders it as the
+      // "--" placeholder (both the list table's own convention and the one
+      // anomaly rows fall back to), which must not get selected as if it
+      // were a real stream type/name.
+      toBeClonestreamType.value =
+        toBeClonedIsComposite.value || !row.stream_type || row.stream_type === "--"
+          ? ""
+          : row.stream_type;
+      toBeClonestreamName.value =
+        toBeClonedIsComposite.value || !row.stream_name || row.stream_name === "--"
+          ? ""
+          : row.stream_name;
       showForm.value = true;
+      // Load the stream-name options for the pre-filled stream type so the
+      // dialog's dropdown reflects it instead of showing an empty list. A
+      // failed load must not abort the clone itself — the dialog still opens,
+      // just with an empty stream-name list the user has to fill by hand —
+      // so the alert-to-clone fetch below always runs regardless.
+      if (toBeClonestreamType.value) {
+        try {
+          await updateStreams(false);
+        } catch {
+          // handled above: dialog stays open with an empty stream-name list
+        }
+      }
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
       if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
         toBeClonedAlert.value = await getAlertById(row.alert_id);
@@ -2884,15 +2884,13 @@ export default defineComponent({
             message: err?.data?.message || t("alerts.messages.deleteAlertFailed"),
           });
         });
-      if (config.enableAnalytics == "true") {
-        segment.track("Button Click", {
-          button: "Delete Alert",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          alert_name: selectedDelete.value.name,
-          page: "Alerts",
-        });
-      }
+      analytics.track("Button Click", {
+        button: "Delete Alert",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        alert_name: selectedDelete.value.name,
+        page: "Alerts",
+      });
     };
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
@@ -3724,7 +3722,6 @@ export default defineComponent({
       selectedDelete,
       updateStreams,
       updateStreamName,
-      resultTotal,
       refreshList,
       pageSize,
       pageSizeOptions,

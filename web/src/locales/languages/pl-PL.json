@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "Brak odtwarzania sesji",
     "loadingSessionReplay": "Ładowanie odtwarzania sesji…",
+    "sessionReplaySeekBehindWindow": "Ten moment znajduje się przed wczytaną częścią sesji. Otwórz ponownie sesję od tego zdarzenia, aby go odtworzyć.",
+    "sessionReplayTruncated": "Ta sesja jest zbyt długa, aby załadować ją w całości. Wyświetlanych jest pierwszych {count} segmentów.",
+    "sessionReplayLoadingPercent": "Ładowanie {percent}%",
+    "sessionReplayFullyLoaded": "Załadowano w całości",
+    "sessionReplayLoadFailedChip": "Ładowanie nie powiodło się · Ponów",
+    "sessionReplayLoadFailed": "Nie udało się załadować odtwarzania sesji.",
+    "sessionReplayLoadFailedRange": "Nie udało się załadować {from} – {to}",
+    "sessionReplayRetrying": "Ponawianie ({attempt} z {total})…",
+    "sessionReplayNextPart": "Ładowanie kolejnej części sesji…",
+    "sessionReplayResumesOnItsOwn": "Odtwarzanie wznowi się automatycznie",
+    "sessionReplayLoadingUpTo": "Ładowanie do {time}…",
+    "sessionReplaySinglePageHint": "Ta sesja ma jedną stronę, więc wszystko przed {time} musi zostać załadowane najpierw",
+    "sessionReplayNotLoadedYet": "jeszcze nie załadowano",
+    "sessionReplayTruncatedTooltip": "Niedostępne: przekroczono limit 50 000 segmentów",
+    "sessionReplaySkippedParts": "· nie udało się załadować {n} części | · nie udało się załadować {n} części",
+    "sessionReplayGapTooltip": "Nie udało się załadować tej części",
+    "sessionReplayRetry": "Ponów",
+    "sessionReplayLiveBadge": "Na żywo",
+    "sessionReplayLateRows": "Wcześniejsza aktywność pojawiła się po załadowaniu odtwarzania. Odśwież, aby ją uwzględnić.",
+    "sessionReplayReload": "Odśwież",
     "seek": "Przewiń",
     "sessionMetricsAria": "Podsumowanie metryk sesji",
     "frustration": "{count} frustracja | {count} frustracje",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "Tokeny o2syn_ na poziomie organizacji używane przez Twoich prywatnych agentów syntetycznych do pobierania zadań",
     "serviceAccountsName": "Nazwa konta serwisowego",
     "basicUsers": "Użytkownicy",
-    "organizationMembers": "Członkowie organizacji",
     "invitations": "Zaproszenia",
     "quota": "Limity",
     "externalUserWarningTitle": "Ostrzeżenie o użytkowniku zewnętrznym",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "Członek organizacji zaktualizowany pomyślnie."
     },
     "user": {
-      "organizationMembers": "Członkowie organizacji",
       "delete": "Usuń",
       "failedToLoadCustomRoles": "Nie udało się załadować niestandardowych ról.",
       "pleaseWaitLoadingUsers": "Proszę czekać podczas ładowania użytkowników...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "Pobieranie funkcji...",
     "associateFunction": "Przypisz funkcję",
     "noFunctionsFound": "Nie znaleziono funkcji",
-    "streamsUnit": "{count} strumień | {count} strumienie",
     "deleteAssociatedAlertsPipelinesBatch": "Usuń wszystkie potoki i alerty powiązane z wybranymi strumieniami",
     "allFieldsCount": "Wszystkie pola ({count})",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "Pokaż listę uruchomień"
     },
     "history": {
-      "button": "Uruchomienia",
       "title": "Historia przepływów pracy",
       "started": "Rozpoczęty",
       "ended": "Zakończony",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "Tej operacji NIE MOŻNA cofnąć ani anulować po utworzeniu zadania.",
     "areYouSureProceed": "Czy na pewno chcesz kontynuować?",
     "clearFilters": "Wyczyść filtry",
-    "backfillJobLabel": "{count} zadanie backfillu | {count} zadania backfillu",
     "chunksUnit": "fragmenty",
     "never": "Nigdy",
     "jobTooltipLabel": "Zadanie",
@@ -3348,7 +3363,6 @@
     "functionName": "Nazwa funkcji",
     "remoteDestination": "Zdalne miejsce docelowe",
     "failedToLoadPipeline": "Nie udało się załadować potoku",
-    "header": "Potoki",
     "subtitle": "Transformuj, wzbogacaj i kieruj dane w locie",
     "deleteNode": "Usuń",
     "addPipeline": "Nowy potok",
@@ -3639,7 +3653,40 @@
     "dataSource": "Źródło danych",
     "uploadFile": "Prześlij plik",
     "fromUrl": "Z URL",
-    "addFunction": "Dodaj funkcję"
+    "addFunction": "Dodaj funkcję",
+    "import": {
+      "title": "Importuj funkcję",
+      "outputMessages": "Komunikaty wyjściowe",
+      "errorValidations": "Błędy walidacji",
+      "results": "Wyniki importu",
+      "nameLabel": "Nazwa funkcji",
+      "nameRequired": "Funkcja - {index}: nazwa jest wymagana",
+      "nameExists": "Funkcja - {index}: „{name}” już istnieje",
+      "nameInvalid": "Funkcja - {index}: „{name}” nie jest prawidłową nazwą funkcji. Użyj liter, cyfr i podkreśleń, zaczynając od litery lub podkreślenia.",
+      "duplicateName": "Funkcja - {index}: „{name}” występuje w tym pliku więcej niż raz",
+      "bodyRequired": "Funkcja - {index}: treść funkcji jest wymagana",
+      "transTypeInvalid": "Funkcja - {index}: typ musi mieć wartość 0 dla VRL lub 1 dla JavaScript",
+      "paramsInvalid": "Funkcja - {index}: parametry muszą być ciągiem znaków",
+      "transTypeLabel": "Język",
+      "transTypePlaceholder": "Wybierz język",
+      "paramsLabel": "Parametry",
+      "paramsHint": "Nazwy argumentów rozdzielone przecinkami. Domyślnie „row”.",
+      "overrideExisting": "Zamiast tego zastąp istniejącą funkcję",
+      "nameInputRequired": "Wprowadź nazwę funkcji",
+      "nameInputInvalid": "Użyj liter, cyfr i podkreśleń, zaczynając od litery lub podkreślenia",
+      "nameInputDuplicate": "Inna funkcja w tym pliku już używa tej nazwy",
+      "nameInputExists": "Ta nazwa jest już zajęta w tej organizacji",
+      "overrideAffects": "Zastąpienie zmieni także te potoki: {pipelines}",
+      "createSuccess": "Funkcja - {index}: zaimportowano „{name}”",
+      "overridden": "Funkcja - {index}: zastąpiono „{name}”",
+      "createFailed": "Funkcja - {index}: „{name}” nie powiodło się - {reason}",
+      "rejectedBody": "Popraw definicję i zaimportuj ponownie.",
+      "rejectedLanguage": "Funkcja - {index}: „{name}” została odrzucona. Jeśli to funkcja JavaScript, ustaw język — definicja bez języka jest odczytywana jako VRL.",
+      "jsonStringEmpty": "Ciąg JSON jest pusty",
+      "invalidJsonFormat": "Nieprawidłowy format JSON",
+      "importSuccess": "Zaimportowano {count} funkcję | Zaimportowano {count} funkcji",
+      "nothingToImport": "Nie znaleziono funkcji do zaimportowania. Sprawdź, czy plik jest prawidłowym JSON-em."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Analizowanie wymiarów...",
@@ -5427,7 +5474,6 @@
       "dynamicVariables": "Dynamiczne zmienne"
     },
     "dashboards": {
-      "selected": "Wybrano {count}",
       "failedToLoadFolder": "Nie udało się załadować pulpitów dla wybranego folderu.",
       "pleaseWait": "Proszę czekać...",
       "copySuffix": "{title} - Kopia",
@@ -6783,7 +6829,6 @@
     "reloadAlertsTooltip": "Odśwież alerty",
     "triggerDetection": "Wykrywanie wyzwalaczy",
     "retrain": "Przeszkol ponownie",
-    "selectedLabel": "wybrano",
     "resume": "Wznów",
     "deleteAlertTitle": "Usuń alert",
     "deleteAlertMessage": "Czy na pewno chcesz usunąć ten alert?",
@@ -7407,7 +7452,6 @@
       "noCondition": "Brak warunku",
       "noHistoryAvailable": "Brak historii oceny dla tego alertu",
       "tryExpandingTimeRange": "Spróbuj rozszerzyć zakres czasu",
-      "results": "Wyniki",
       "ifCondition": "jeśli {condition}"
     },
     "historyTable": {
@@ -7879,8 +7923,6 @@
     "prebuiltDestination": "Wbudowany cel {type}",
     "errorValidations": "Walidacje błędów",
     "outputMessagesLabel": "Komunikaty wyjściowe",
-    "incidentSingular": "Incydent",
-    "incidentPlural": "Incydenty",
     "confirmDeleteTemplates": "Czy na pewno chcesz usunąć {count} szablon? | Czy na pewno chcesz usunąć {count} szablonów?",
     "lastOutcome": "Ostatni wynik",
     "priority": "Priorytet",
@@ -8235,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "Eksportuj szablon",
-    "selected": "Wybrane",
     "deleteTemplateTitle": "Usuń szablon",
     "deleteTemplateMessage": "Czy na pewno chcesz usunąć szablon?",
     "deleteTemplatesTitle": "Usuń szablony",
@@ -8489,7 +8530,6 @@
     "deleteDestinationTitle": "Usuń cel",
     "deleteDestinationMessage": "Czy na pewno chcesz usunąć cel?",
     "deleteDestinationsTitle": "Usuń cele",
-    "selected": "wybrane",
     "organizationLabel": "Organizacja",
     "defaultPlaceholder": "np. default",
     "streamNameLabel": "Nazwa strumienia",
@@ -9297,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "Klucze szyfrowania dla pól wrażliwych",
-      "selected": "{count} wybrano",
       "delete": "Usuń",
       "deleteCipherKeyTitle": "Usuń klucz szyfrowania",
       "deleteCipherKeyMessage": "Czy na pewno chcesz usunąć klucz szyfrowania?",
@@ -9892,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "Strumień",
-      "sessions": "sesje",
       "failedToLoad": "Nie udało się załadować sesji",
       "retry": "Ponów",
       "tokenTooltip": "Wejście: {input} · Wyjście: {output} · Łącznie: {total}",
@@ -10004,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "Nie wykryto strumieni",
       "tabLabel": "Katalog usług",
-      "footerTitle": "Usługi",
       "filterPlaceholder": "Filtruj według nazwy usługi...",
       "columns": {
         "serviceName": "Usługa",
@@ -10573,7 +10610,6 @@
     "create_regex_pattern_field": "Redaguj / Usuń za pomocą regex",
     "import": "Importuj",
     "import_title": "Importuj wzorzec",
-    "bottom_header": "{count} wzorzec | {count} wzorce",
     "filter_by_tag": "Filtruj według tagu",
     "refresh": "Odśwież",
     "loading_patterns": "Ładowanie wzorców...",
@@ -10629,7 +10665,6 @@
     "get_history": "Pobierz historię",
     "executed_at": "Wykonano o",
     "sql_query": "Zapytanie SQL",
-    "results": "Wyniki",
     "delayMessage": "Historia wyszukiwania może być opóźniona o"
   },
   "correlation": {
@@ -10772,7 +10807,6 @@
     "function_definition": "Definicja funkcji",
     "more_details": "Więcej szczegółów",
     "query_function": "Zapytanie / Funkcja",
-    "results": "Wyniki",
     "max_limit": "Maksymalny limit",
     "cancel_job_title": "Anuluj zaplanowane wyszukiwanie",
     "cancel_job_message": "Czy na pewno chcesz anulować to zaplanowane wyszukiwanie?",
@@ -10879,9 +10913,6 @@
     "testBtn": "Test",
     "importBtn": "Importuj",
     "newModel": "Nowy model",
-    "modelsCount": "{count} modeli",
-    "exportSelected": "Eksportuj ({count})",
-    "deleteSelected": "Usuń ({count})",
     "importTitle": "Importuj cennik modeli",
     "errorValidations": "Walidacje błędów",
     "outputMessages": "Komunikaty wyjściowe",
@@ -11399,11 +11430,6 @@
         "trace": "Ślady",
         "session": "Sesje"
       },
-      "scopeNoun": {
-        "span": "spany",
-        "trace": "ślady",
-        "session": "sesje"
-      },
       "inQueueFilter": {
         "label": "W kolejce",
         "notEnqueued": "W kolejce: Niezakolejkowany",
@@ -11418,6 +11444,7 @@
         "type": "Typ",
         "kind": "Rodzaj",
         "span": "Span",
+        "trace": "Trace",
         "session": "Sesja",
         "topic": "Temat",
         "traces": "Ślady",
@@ -11448,16 +11475,12 @@
         "sectionTitle": "Dodaj do kolejki",
         "manageQueues": "Zarządzaj kolejkami"
       },
-      "bulkAdd": "Dodaj {count} do kolejki",
-      "selectedCount": "{selected} z {total} wybranych",
-      "footerTitle": "Niezdrowy {scope}",
       "addSuccess": "Dodano do {queue} — wiersz pozostaje w Discovery, a jego stan znajduje się w kolejce.",
       "addError": "Nie udało się dodać elementów do kolejki",
       "openQueue": "Otwórz kolejkę",
       "queuesError": "Nie udało się wczytać kolejek"
     },
     "queues": {
-      "listTitle": "Kolejki",
       "searchPlaceholder": "Szukaj kolejek...",
       "newButton": "Nowa kolejka",
       "loadError": "Nie udało się wczytać kolejek",
@@ -11516,7 +11539,6 @@
         "targetDataset": "Docelowy zbiór danych",
         "noTargetDataset": "Brak docelowego zbioru danych",
         "searchPlaceholder": "Szukaj elementów...",
-        "footerTitle": "Elementy",
         "allItems": "Wszystkie",
         "inTrace": "W śladzie {traceId}",
         "reviewAgain": "Przeglądnij ponownie",
@@ -11941,7 +11963,6 @@
       "clearBaseline": "Wyczyść linię bazową"
     },
     "datasets": {
-      "listTitle": "Zbiory danych",
       "searchPlaceholder": "Szukaj zbiorów danych...",
       "newButton": "Nowy zbiór danych",
       "loadError": "Nie udało się załadować zbiorów danych",
@@ -11985,7 +12006,6 @@
         "fallbackTitle": "Zbiór danych",
         "meta": "{count} elementów · zaktualizowano {updated}",
         "loadError": "Nie udało się załadować zbioru danych",
-        "footerTitle": "Elementy",
         "tabs": {
           "items": "Elementy",
           "experiments": "Eksperymenty"
@@ -12122,8 +12142,6 @@
       "summaryAgents": "Dotknięci agenci",
       "failuresTitle": "Taksonomia błędów",
       "failuresHint": "Błędy pogrupowane według rodzaju, na agenta",
-      "footerLoops": "Pętle",
-      "footerFailures": "Klasy awarii",
       "noLoops": "Nie wykryto zapętlonego zachowania w tym zakresie",
       "noFailures": "Brak awarii agenta w tym zakresie",
       "noLoopsForAgent": "Brak zachowań zapętlających dla {agent} w tym zakresie — przełącz agenta lub rozszerz zakres czasu",
@@ -12190,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "Zadania zdalne",
       "searchPlaceholder": "Szukaj zadań",
       "newButton": "Nowe zadanie",
       "loadError": "Nie udało się załadować zadań zdalnych",
@@ -12838,7 +12855,6 @@
         "title": "Oceny",
         "hint": "Wyniki i uzasadnienie pochodzą z _llm_scores. Wybierz uruchomienie, aby otworzyć jego trace ewaluatora w celu dalszego zbadania.",
         "filterLabel": "Filtruj oceny",
-        "footerTitle": "Oceny",
         "noThresholdHint": "Ustaw próg zdrowia w tej konfiguracji oceny, aby klasyfikować i wyróżniać niezdrowe wyniki.",
         "noReasoning": "Nie zapisano uzasadnienia",
         "unknownAgent": "Nieznany agent",
@@ -12863,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "Przegląd konfiguracji ocen",
         "searchPlaceholder": "Filtruj konfiguracje…",
         "relativeTime": {
           "daysAgo": "{day} dni temu",
@@ -12991,7 +13006,6 @@
         "updatedLabel": "Zaktualizowano"
       },
       "createTitle": "Nowa konfiguracja wyników",
-      "listTitle": "Konfiguracje wyników",
       "searchPlaceholder": "Konfiguracje wyszukiwania",
       "newButton": "Nowa konfiguracja wyników",
       "columns": {
@@ -13068,9 +13082,6 @@
         "errors": {
           "title": "Błędy walidacji"
         }
-      },
-      "export": {
-        "bulkButton": "Eksportuj"
       }
     },
     "scorer": {
@@ -13088,8 +13099,9 @@
         "requestTemplateSection": "Szablon żądania",
         "variablesSuffix": "zmienne",
         "outputSchemaSection": "Schemat wyjściowy",
-        "usedByIntro": "Zadania korzystające z tego skorera w swoim potoku.",
-        "usedByEmpty": "Żadne zadania jeszcze nie odnoszą się do tego skorera.",
+        "usedByIntro": "Zadania i eksperymenty, które odwołują się do tego scorera.",
+        "usedByEmpty": "Żadne zadania ani eksperymenty nie odwołują się jeszcze do tego scorera.",
+        "usedByExperiment": "Eksperyment",
         "versionsIntro": "Wersje są niezmiennymi migawkami konfiguracji skorera. Aktywna wersja to ta, którą zadania uruchamiają dzisiaj.",
         "lastUpdated": "Ostatnia aktualizacja",
         "metadataSection": "Metadane",
@@ -13123,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "Scorery",
       "searchPlaceholder": "Szukaj scorerów",
       "newButton": "Nowy scorer",
       "usedByJob": "{count} zadanie | {count} zadań",
@@ -13164,9 +13175,6 @@
           "nameConflict": "Scorer {index}: nazwa \"{name}\" już istnieje w tej organizacji",
           "duplicateName": "Scorer {index}: nazwa \"{name}\" występuje więcej niż raz w tym imporcie"
         }
-      },
-      "export": {
-        "bulkButton": "Eksportuj"
       },
       "backTo": "Powrót do scorerów",
       "badgeRemote": "Zdalny",
@@ -13356,11 +13364,9 @@
           "recentEmpty": "Brak nieudanych uruchomień w wybranym oknie."
         }
       },
-      "listTitle": "Zadania oceny",
       "searchPlaceholder": "Szukaj zadań",
       "newButton": "Nowe zadanie",
       "scorerCount": "{count} moduł oceniający | {count} modułów oceniających",
-      "deleteBulkButton": "Usuń",
       "deleteBulkTitle": "Usuń zadania oceny",
       "deleteBulkConfirm": "Czy na pewno chcesz usunąć {count} zadań oceny? Tej czynności nie można cofnąć.",
       "deletedBulk": "Usunięto {count} zadań oceny",
@@ -14340,10 +14346,6 @@
       "passed": "Zaliczony",
       "warning": "Ostrzeżenie"
     },
-    "footer": {
-      "browserTests": "Testy przeglądarki",
-      "checks": "Kontrole"
-    },
     "journey": {
       "extract": {
         "action": "Wyodrębnij do subtestu",
@@ -14726,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "Dodaj lokalizację",
-      "bottomHeader": "lokalizacje",
       "bulkDeleteConfirmMessage": "Czy na pewno chcesz usunąć {count} lokalizacji?",
       "bulkDeleteConfirmTitle": "Usuń lokalizacje",
       "bulkDeleteFailed": "Nie udało się usunąć lokalizacji",
@@ -14787,7 +14788,6 @@
       "regionPlaceholder": "np. us-east-1",
       "regionRequired": "Region jest wymagany",
       "searchPlaceholder": "Szukaj lokalizacji…",
-      "selectedCount": "Wybrano {selected} z {total} lokalizacji",
       "title": "Lokalizacje",
       "publicTitle": "Lokalizacje publiczne",
       "privateTitle": "Lokalizacje prywatne",
@@ -15041,8 +15041,7 @@
       "detailOrigin": "Pochodzenie",
       "detailFirstParty": "Pierwsza strona",
       "detailThirdParty": "Strona trzecia",
-      "detailStackTrace": "Stos wywołań",
-      "footerEvents": "Zdarzenia"
+      "detailStackTrace": "Stos wywołań"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15242,7 +15241,6 @@
       "bulkTriggerSuccess": "Wyzwolono {count} kontrolę. | Wyzwolono {count} kontroli.",
       "bulkTriggerToast": "Wyzwalanie {count} kontroli… | Wyzwalanie {count} kontroli…",
       "check": "Kontrola",
-      "checksFooterTitle": "Kontrole",
       "checksCount": "{count} kontroli",
       "delete": "Usuń",
       "duplicate": "Duplikuj",
@@ -15270,7 +15268,6 @@
       "pausing": "Wstrzymywanie…",
       "response": "Odpowiedź",
       "scheduledAt": "Zaplanowane na",
-      "selectedCount": "Wybrano {selected} z {total}",
       "status": "Status",
       "statusDegraded": "⚠ Degradacja",
       "statusDown": "✗ Nieosiągalny",
@@ -15453,7 +15450,6 @@
     "editTitle": "Edytuj stronę statusu",
     "back": "Strony statusu",
     "loadFailed": "Nie udało się załadować strony statusu",
-    "footerTitle": "strony statusu",
     "searchPlaceholder": "Szukaj stron statusu",
     "copyUrl": "Kopiuj URL",
     "publicUrl": "Publiczny URL",
@@ -15848,7 +15844,8 @@
       "oncallAck": "Potwierdź",
       "oncallEscalate": "Eskaluj",
       "oncallSnooze": "Odłóż",
-      "oncallResolve": "Rozwiąż"
+      "oncallResolve": "Rozwiąż",
+      "functionsImport": "Importuj funkcję"
     }
   },
   "components": {
@@ -15963,7 +15960,9 @@
         "resetColumnWidths": "Resetuj szerokości kolumn"
       },
       "removeColumnAria": "Usuń kolumnę",
-      "formatColumnAria": "Formatuj kolumnę"
+      "formatColumnAria": "Formatuj kolumnę",
+      "selectedOfTotal": "Wybrano {selected} z {total}",
+      "selectedCount": "Wybrano {selected}"
     },
     "predefinedThemes": {
       "title": "Motyw",
@@ -16460,7 +16459,10 @@
       "enrichmentReloadStarted": "Rozpoczęto przeładowanie tabeli wzbogacania. Przetwarzanie w tle...",
       "enrichmentJobStarted": "Rozpoczęto zadanie tabeli wzbogacania. Przetwarzanie w tle...",
       "enrichmentCreationFailed": "Tworzenie tabeli wzbogacania nie powiodło się",
-      "functionDeletionAssociatedPipelines": "Usunięcie funkcji nie powiodło się, ponieważ jest ona powiązana z potokami. Kliknij przycisk Zobacz, aby wyświetlić powiązane potoki."
+      "functionDeletionAssociatedPipelines": "Usunięcie funkcji nie powiodło się, ponieważ jest ona powiązana z potokami. Kliknij przycisk Zobacz, aby wyświetlić powiązane potoki.",
+      "successfullyExportedFunctions": "Pomyślnie wyeksportowano {count} funkcję | Pomyślnie wyeksportowano {count} funkcji",
+      "errorExportingFunctions": "Błąd podczas eksportowania funkcji. Spróbuj ponownie.",
+      "functionsMissingFromExport": "{names} nie znajduje się już na liście i zostało pominięte w eksporcie | {names} nie znajdują się już na liście i zostały pominięte w eksporcie"
     },
     "recommended": {
       "failedToImportDashboard": "Nie udało się zaimportować pulpitu: {error}",
@@ -16915,7 +16917,6 @@
     },
     "move": "Przenieś",
     "moveTitle": "Przenieś {count} SLO do innego folderu",
-    "moveSelected": "Przenieś {count} zaznaczonych",
     "exportTitle": "Eksportuj SLO | Eksportuj {count} SLO",
     "exportSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve.",
     "exportFailed": "Nie można odczytać definicji SLO. Spróbuj ponownie.",
@@ -17680,7 +17681,6 @@
       "otherRow": "Wszystkie pozostałe zapytania",
       "truncatedText": "Ta instrukcja była zbyt długa, aby zapisać ją w całości, więc jest pokazana w skrócie.",
       "stmtClass": {
-        "query": "Zapytania",
         "queryHint": "Tylko prawdziwy SQL — SELECT, INSERT, UPDATE i DELETE.",
         "all": "Zapytania + narzut połączeń",
         "allHint": "Liczy również narzut, który sterownik wysyła między zapytaniami: BEGIN i COMMIT, SET oraz testy, które utrzymują połączenie z puli przy życiu.",
@@ -18281,7 +18281,6 @@
       "disclosureShort": "Każdy wiersz to jedno rzeczywiste zakończone wywołanie",
       "disclosureDetail": "Zmierzone przez aplikację, która wykonała wywołanie, na podstawie wysyłanych przez Ciebie śladów. Są tu tylko wywołania zakończone — zapytanie wciąż działające lub takie, które zawisło i nigdy nie wróciło, nie wygenerowało pomiaru.",
       "counts": {
-        "complete": "Pokazuję wszystkie {count} wywołań baz danych w tym oknie, od najwolniejszych.",
         "truncated": "{count} najwolniejszych wywołań w tym oknie — wykonano ich więcej, niż pokazano.",
         "filtered": "Wyświetlanie {count} z {total} wywołań."
       },
@@ -18625,7 +18624,6 @@
         "unknown": "Stan niezgłoszony"
       },
       "counts": {
-        "complete": "Wyświetlanie {count} sesji.",
         "capped": "Próbkowano więcej sesji, niż mogliśmy odczytać naraz. To {count}, które mamy.",
         "filtered": "Wyświetlanie {count} z {total} sesji."
       },
@@ -18742,8 +18740,7 @@
         "lastVacuum": "Ostatnie vacuum",
         "lastAutovacuum": "Ostatni autovacuum",
         "lastAnalyze": "Ostatnia analiza"
-      },
-      "countLine": "{count} tabel"
+      }
     },
     "recommendations": {
       "title": "Zalecenia",
@@ -19088,7 +19085,6 @@
     "acknowledge": "Potwierdź",
     "acknowledgeHint": "Przejmij odpowiedzialność. To zatrzymuje eskalację.",
     "actions": "Akcje",
-    "selectedCount": "Wybrano: {count}",
     "bulkAckDone": "Potwierdzono {count} powiadomień",
     "bulkAckPartial": "Nie udało się potwierdzić {count} powiadomień",
     "resolveCause": "Co to było?",

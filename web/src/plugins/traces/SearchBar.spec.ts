@@ -27,7 +27,7 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (k: string) => k }),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 

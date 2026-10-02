@@ -487,6 +487,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { isSessionLive } from "@/utils/rum/sessionReplayLive";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
@@ -1389,10 +1390,8 @@ const previousWindowTotals = ref<WindowTotals | null>(null);
 const frustrationCluster = ref<SessionInsight | null>(null);
 const errorCluster = ref<SessionInsight | null>(null);
 
-// A session with ≤1 event or under 10s of activity counts as a bounce; a
-// session whose last replay event is within the last 5 minutes is still live.
+// A session with ≤1 event or under 10s of activity counts as a bounce.
 const BOUNCE_MAX_MS = 10_000;
-const ACTIVE_WINDOW_MS = 5 * 60_000;
 
 // Heuristic bucketing of the UA device/os family into the segment values.
 const classifyDevice = (family?: string, os?: string): DeviceSegment => {
@@ -1427,7 +1426,7 @@ const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
-    is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
+    is_active: isSessionLive(row.end_time, Date.now()),
     device_type: classifyDevice(row.device_family, row.os),
     platform: classifySource(row.source),
   })),

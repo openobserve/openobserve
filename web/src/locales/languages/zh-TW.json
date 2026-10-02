@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "沒有可用的工作階段重播",
     "loadingSessionReplay": "正在載入工作階段重播…",
+    "sessionReplaySeekBehindWindow": "此時刻早於已載入的工作階段部分。請從此事件重新開啟工作階段以播放。",
+    "sessionReplayTruncated": "此工作階段太長，無法完整載入。僅顯示前 {count} 個區段。",
+    "sessionReplayLoadingPercent": "正在載入 {percent}%",
+    "sessionReplayFullyLoaded": "已完整載入",
+    "sessionReplayLoadFailedChip": "載入失敗 · 重試",
+    "sessionReplayLoadFailed": "無法載入工作階段重播。",
+    "sessionReplayLoadFailedRange": "無法載入 {from} – {to}",
+    "sessionReplayRetrying": "正在重試（第 {attempt} 次，共 {total} 次）…",
+    "sessionReplayNextPart": "正在載入工作階段的下一部分…",
+    "sessionReplayResumesOnItsOwn": "播放會自行恢復",
+    "sessionReplayLoadingUpTo": "正在載入至 {time}…",
+    "sessionReplaySinglePageHint": "此工作階段只有一個頁面，因此必須先載入 {time} 之前的所有內容",
+    "sessionReplayNotLoadedYet": "尚未載入",
+    "sessionReplayTruncatedTooltip": "無法提供：已超過 50,000 個區段的上限",
+    "sessionReplaySkippedParts": "· {n} 個部分無法載入 | · {n} 個部分無法載入",
+    "sessionReplayGapTooltip": "此部分無法載入",
+    "sessionReplayRetry": "重試",
+    "sessionReplayLiveBadge": "即時",
+    "sessionReplayLateRows": "較早的活動在重播載入後才送達。請重新載入以納入。",
+    "sessionReplayReload": "重新載入",
     "seek": "跳轉",
     "sessionMetricsAria": "工作階段指標摘要",
     "frustration": "{count} 次挫折 | {count} 次挫折",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "您的私有合成代理用來拉取工作的組織層級 o2syn_ 權杖",
     "serviceAccountsName": "服務帳戶名稱",
     "basicUsers": "使用者",
-    "organizationMembers": "組織成員",
     "invitations": "邀請",
     "quota": "配額",
     "externalUserWarningTitle": "外部使用者警告",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "組織成員更新成功。"
     },
     "user": {
-      "organizationMembers": "組織成員",
       "delete": "刪除",
       "failedToLoadCustomRoles": "載入自訂角色失敗。",
       "pleaseWaitLoadingUsers": "載入使用者中，請稍候...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "正在取得函式...",
     "associateFunction": "關聯函式",
     "noFunctionsFound": "找不到任何函式",
-    "streamsUnit": "{count} 個串流 | {count} 個串流",
     "deleteAssociatedAlertsPipelinesBatch": "刪除與所選串流關聯的所有管線與警示",
     "allFieldsCount": "所有欄位 ({count})",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "顯示執行清單"
     },
     "history": {
-      "button": "執行記錄",
       "title": "工作流程歷史",
       "started": "開始時間",
       "ended": "結束時間",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "一旦任務建立，此操作就無法復原或取消。",
     "areYouSureProceed": "您確定要繼續嗎？",
     "clearFilters": "清除篩選條件",
-    "backfillJobLabel": "{count} 個回填任務 | {count} 個回填任務",
     "chunksUnit": "區塊",
     "never": "永不",
     "jobTooltipLabel": "任務",
@@ -3348,7 +3363,6 @@
     "functionName": "函式名稱",
     "remoteDestination": "遠端目標",
     "failedToLoadPipeline": "無法載入管線",
-    "header": "管線",
     "subtitle": "在傳輸過程中轉換、擴充與路由資料",
     "deleteNode": "刪除",
     "addPipeline": "新增管線",
@@ -3639,7 +3653,40 @@
     "dataSource": "資料來源",
     "uploadFile": "上傳檔案",
     "fromUrl": "從 URL",
-    "addFunction": "新增函式"
+    "addFunction": "新增函式",
+    "import": {
+      "title": "匯入函式",
+      "outputMessages": "輸出訊息",
+      "errorValidations": "錯誤驗證",
+      "results": "匯入結果",
+      "nameLabel": "函式名稱",
+      "nameRequired": "函式 - {index}：名稱為必填",
+      "nameExists": "函式 - {index}：「{name}」已存在",
+      "nameInvalid": "函式 - {index}：「{name}」不是有效的函式名稱。請使用字母、數字與底線，並以字母或底線開頭。",
+      "duplicateName": "函式 - {index}：「{name}」在此檔案中出現超過一次",
+      "bodyRequired": "函式 - {index}：函式主體為必填",
+      "transTypeInvalid": "函式 - {index}：類型必須為 0（VRL）或 1（JavaScript）",
+      "paramsInvalid": "函式 - {index}：params 必須是字串",
+      "transTypeLabel": "語言",
+      "transTypePlaceholder": "選擇語言",
+      "paramsLabel": "參數",
+      "paramsHint": "以逗號分隔的引數名稱。預設為「row」。",
+      "overrideExisting": "改為取代現有函式",
+      "nameInputRequired": "輸入函式名稱",
+      "nameInputInvalid": "請使用字母、數字與底線，並以字母或底線開頭",
+      "nameInputDuplicate": "此檔案中已有另一個函式使用此名稱",
+      "nameInputExists": "此名稱已在此組織中使用",
+      "overrideAffects": "覆寫也會變更這些管線：{pipelines}",
+      "createSuccess": "函式 - {index}：「{name}」已匯入",
+      "overridden": "函式 - {index}：「{name}」已覆寫",
+      "createFailed": "函式 - {index}：「{name}」失敗 - {reason}",
+      "rejectedBody": "請修正定義後重新匯入。",
+      "rejectedLanguage": "函式 - {index}：「{name}」已遭拒絕。若為 JavaScript 函式，請設定語言 — 未設定語言的定義會以 VRL 讀取。",
+      "jsonStringEmpty": "JSON 字串為空",
+      "invalidJsonFormat": "JSON 格式無效",
+      "importSuccess": "已匯入 {count} 個函式 | 已匯入 {count} 個函式",
+      "nothingToImport": "找不到可匯入的函式。請確認檔案為有效的 JSON。"
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "正在分析維度...",
@@ -5422,7 +5469,6 @@
       "dynamicVariables": "動態變數"
     },
     "dashboards": {
-      "selected": "已選取 {count} 個",
       "failedToLoadFolder": "無法載入所選取資料夾的儀表板。",
       "pleaseWait": "請稍候...",
       "copySuffix": "{title} - 複本",
@@ -6778,7 +6824,6 @@
     "reloadAlertsTooltip": "重新載入警示",
     "triggerDetection": "觸發偵測",
     "retrain": "重新訓練",
-    "selectedLabel": "已選取",
     "resume": "繼續",
     "deleteAlertTitle": "刪除警示",
     "deleteAlertMessage": "您確定要刪除此警示嗎？",
@@ -7402,7 +7447,6 @@
       "noCondition": "無條件",
       "noHistoryAvailable": "此警示無可用的評估歷史紀錄",
       "tryExpandingTimeRange": "嘗試擴大時間範圍",
-      "results": "結果",
       "ifCondition": "如果 {condition}"
     },
     "historyTable": {
@@ -7874,8 +7918,6 @@
     "prebuiltDestination": "預建的 {type} 目標",
     "errorValidations": "錯誤驗證",
     "outputMessagesLabel": "輸出訊息",
-    "incidentSingular": "事件",
-    "incidentPlural": "事件",
     "confirmDeleteTemplates": "您確定要刪除 {count} 個範本嗎？ | 您確定要刪除 {count} 個範本嗎？",
     "lastOutcome": "上次結果",
     "priority": "優先順序",
@@ -8230,7 +8272,6 @@
   },
   "alert_templates": {
     "exportTemplate": "匯出範本",
-    "selected": "已選取",
     "deleteTemplateTitle": "刪除範本",
     "deleteTemplateMessage": "您確定要刪除範本嗎？",
     "deleteTemplatesTitle": "刪除範本",
@@ -8484,7 +8525,6 @@
     "deleteDestinationTitle": "刪除目標",
     "deleteDestinationMessage": "確定要刪除此目標嗎？",
     "deleteDestinationsTitle": "刪除目標",
-    "selected": "已選取",
     "organizationLabel": "組織",
     "defaultPlaceholder": "例如：default",
     "streamNameLabel": "串流名稱",
@@ -9292,7 +9332,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "敏感欄位的加密金鑰",
-      "selected": "已選取 {count} 個",
       "delete": "刪除",
       "deleteCipherKeyTitle": "刪除加密金鑰",
       "deleteCipherKeyMessage": "您確定要刪除加密金鑰嗎？",
@@ -9887,7 +9926,6 @@
     },
     "sessionsList": {
       "streamLabel": "串流",
-      "sessions": "工作階段",
       "failedToLoad": "載入工作階段失敗",
       "retry": "重試",
       "tokenTooltip": "輸入：{input} · 輸出：{output} · 總計：{total}",
@@ -9999,7 +10037,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "未偵測到串流",
       "tabLabel": "服務目錄",
-      "footerTitle": "服務",
       "filterPlaceholder": "依服務名稱篩選...",
       "columns": {
         "serviceName": "服務",
@@ -10568,7 +10605,6 @@
     "create_regex_pattern_field": "使用正規表示式遮蔽/丟棄",
     "import": "匯入",
     "import_title": "匯入模式",
-    "bottom_header": "{count} 模式 | {count} 模式",
     "filter_by_tag": "依標籤篩選",
     "refresh": "重新整理",
     "loading_patterns": "正在載入模式...",
@@ -10624,7 +10660,6 @@
     "get_history": "取得歷史紀錄",
     "executed_at": "執行於",
     "sql_query": "SQL 查詢",
-    "results": "結果",
     "delayMessage": "搜尋歷史紀錄可能延遲"
   },
   "correlation": {
@@ -10767,7 +10802,6 @@
     "function_definition": "函式定義",
     "more_details": "更多詳細資訊",
     "query_function": "查詢 / 函式",
-    "results": "結果",
     "max_limit": "最大限制",
     "cancel_job_title": "取消排程搜尋",
     "cancel_job_message": "確定要取消此排程搜尋嗎？",
@@ -10874,9 +10908,6 @@
     "testBtn": "測試",
     "importBtn": "匯入",
     "newModel": "新增模型",
-    "modelsCount": "{count} 個模型",
-    "exportSelected": "匯出 ({count})",
-    "deleteSelected": "刪除 ({count})",
     "importTitle": "匯入模型定價",
     "errorValidations": "錯誤驗證",
     "outputMessages": "輸出訊息",
@@ -11394,11 +11425,6 @@
         "trace": "Traces",
         "session": "Sessions"
       },
-      "scopeNoun": {
-        "span": "spans",
-        "trace": "traces",
-        "session": "sessions"
-      },
       "inQueueFilter": {
         "label": "在佇列中",
         "notEnqueued": "佇列中：未加入佇列",
@@ -11413,6 +11439,7 @@
         "type": "類型",
         "kind": "種類",
         "span": "Span",
+        "trace": "追蹤",
         "session": "工作階段",
         "topic": "主題",
         "traces": "追蹤",
@@ -11443,16 +11470,12 @@
         "sectionTitle": "加入佇列",
         "manageQueues": "管理佇列"
       },
-      "bulkAdd": "將 {count} 加入佇列",
-      "selectedCount": "已選取 {selected} / {total}",
-      "footerTitle": "不健康 {scope}",
       "addSuccess": "已加入至 {queue} — 該列仍保留在「探索」中，其狀態存在於佇列中。",
       "addError": "無法將項目加入佇列",
       "openQueue": "開啟佇列",
       "queuesError": "無法載入佇列"
     },
     "queues": {
-      "listTitle": "佇列",
       "searchPlaceholder": "搜尋佇列...",
       "newButton": "新增佇列",
       "loadError": "無法載入佇列",
@@ -11511,7 +11534,6 @@
         "targetDataset": "目標資料集",
         "noTargetDataset": "無目標資料集",
         "searchPlaceholder": "搜尋項目...",
-        "footerTitle": "項目",
         "allItems": "全部",
         "inTrace": "在追蹤 {traceId} 中",
         "reviewAgain": "重新審核",
@@ -11936,7 +11958,6 @@
       "clearBaseline": "清除基準"
     },
     "datasets": {
-      "listTitle": "資料集",
       "searchPlaceholder": "搜尋資料集...",
       "newButton": "新增資料集",
       "loadError": "載入資料集失敗",
@@ -11980,7 +12001,6 @@
         "fallbackTitle": "資料集",
         "meta": "{count} 個項目 · 已更新 {updated}",
         "loadError": "載入資料集失敗",
-        "footerTitle": "項目",
         "tabs": {
           "items": "項目",
           "experiments": "實驗"
@@ -12117,8 +12137,6 @@
       "summaryAgents": "受影響的代理",
       "failuresTitle": "失敗分類",
       "failuresHint": "按類型分組的錯誤，每個代理",
-      "footerLoops": "迴圈",
-      "footerFailures": "失敗類別",
       "noLoops": "在此範圍內未偵測到迴圈行為",
       "noFailures": "在此範圍內無代理失敗",
       "noLoopsForAgent": "在此範圍內沒有 {agent} 的迴圈行為 — 請切換代理或擴大時間範圍",
@@ -12185,7 +12203,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "遠端任務",
       "searchPlaceholder": "搜尋任務",
       "newButton": "新增任務",
       "loadError": "無法載入遠端任務",
@@ -12833,7 +12850,6 @@
         "title": "評估分數",
         "hint": "分數和推理來自 _llm_scores。選擇一個執行以開啟其評估器追蹤進行進一步調查。",
         "filterLabel": "篩選評估分數",
-        "footerTitle": "評估分數",
         "noThresholdHint": "在此分數設定上設定健康臨界值，以分類並標記不健康的分數。",
         "noReasoning": "無記錄的推理",
         "unknownAgent": "未知代理",
@@ -12858,7 +12874,6 @@
         }
       },
       "overview": {
-        "title": "評分設定總覽",
         "searchPlaceholder": "篩選設定…",
         "relativeTime": {
           "daysAgo": "{day} 天前",
@@ -12986,7 +13001,6 @@
         "updatedLabel": "更新時間"
       },
       "createTitle": "新增分數設定",
-      "listTitle": "評分設定",
       "searchPlaceholder": "搜尋設定",
       "newButton": "新增評分設定",
       "columns": {
@@ -13063,9 +13077,6 @@
         "errors": {
           "title": "驗證錯誤"
         }
-      },
-      "export": {
-        "bulkButton": "匯出"
       }
     },
     "scorer": {
@@ -13083,8 +13094,9 @@
         "requestTemplateSection": "請求範本",
         "variablesSuffix": "個變數",
         "outputSchemaSection": "輸出結構描述",
-        "usedByIntro": "在其管線中參照此評分器的作業。",
-        "usedByEmpty": "尚無作業參照此評分器。",
+        "usedByIntro": "參照此評分器的工作與實驗。",
+        "usedByEmpty": "尚無工作或實驗參照此評分器。",
+        "usedByExperiment": "實驗",
         "versionsIntro": "版本是評分器設定的不可變更快照。使用中版本即為作業今日執行的版本。",
         "lastUpdated": "上次更新",
         "metadataSection": "中繼資料",
@@ -13118,7 +13130,6 @@
           }
         }
       },
-      "listTitle": "評分器",
       "searchPlaceholder": "搜尋評分器",
       "newButton": "新增評分器",
       "usedByJob": "{count} 個工作 | {count} 個工作",
@@ -13159,9 +13170,6 @@
           "nameConflict": "Scorer {index}: 名稱 \"{name}\" 已存在於此組織",
           "duplicateName": "Scorer {index}: 名稱 \"{name}\" 在此匯入中重複使用"
         }
-      },
-      "export": {
-        "bulkButton": "匯出"
       },
       "backTo": "返回評分器",
       "badgeRemote": "遠端",
@@ -13351,11 +13359,9 @@
           "recentEmpty": "選定時段內無失敗的執行記錄。"
         }
       },
-      "listTitle": "評估作業",
       "searchPlaceholder": "搜尋作業",
       "newButton": "新增作業",
       "scorerCount": "{count} 個評分器 | {count} 個評分器",
-      "deleteBulkButton": "刪除",
       "deleteBulkTitle": "刪除評估任務",
       "deleteBulkConfirm": "您確定要刪除 {count} 個評估任務嗎？此動作無法復原。",
       "deletedBulk": "已刪除 {count} 個評估任務",
@@ -14335,10 +14341,6 @@
       "passed": "通過",
       "warning": "警告"
     },
-    "footer": {
-      "browserTests": "瀏覽器測試",
-      "checks": "檢查"
-    },
     "journey": {
       "extract": {
         "action": "擷取為子測試",
@@ -14721,7 +14723,6 @@
     },
     "locations": {
       "addLocation": "新增位置",
-      "bottomHeader": "位置",
       "bulkDeleteConfirmMessage": "您確定要刪除 {count} 個位置嗎？",
       "bulkDeleteConfirmTitle": "刪除位置",
       "bulkDeleteFailed": "刪除位置失敗",
@@ -14782,7 +14783,6 @@
       "regionPlaceholder": "例如：us-east-1",
       "regionRequired": "需要區域",
       "searchPlaceholder": "搜尋位置…",
-      "selectedCount": "已選擇 {selected} 個位置（共 {total} 個）",
       "title": "位置",
       "publicTitle": "公開位置",
       "privateTitle": "私人位置",
@@ -15036,8 +15036,7 @@
       "detailOrigin": "來源",
       "detailFirstParty": "第一方",
       "detailThirdParty": "第三方",
-      "detailStackTrace": "堆疊追蹤",
-      "footerEvents": "事件"
+      "detailStackTrace": "堆疊追蹤"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15237,7 +15236,6 @@
       "bulkTriggerSuccess": "已觸發 {count} 個檢查。 | 已觸發 {count} 個檢查。",
       "bulkTriggerToast": "正在觸發 {count} 個檢查… | 正在觸發 {count} 個檢查…",
       "check": "檢查",
-      "checksFooterTitle": "檢查",
       "checksCount": "{count} 個檢查",
       "delete": "刪除",
       "duplicate": "複製",
@@ -15265,7 +15263,6 @@
       "pausing": "正在暫停…",
       "response": "回應",
       "scheduledAt": "排程時間",
-      "selectedCount": "已選取 {selected} / {total}",
       "status": "狀態",
       "statusDegraded": "⚠ 降級",
       "statusDown": "✗ 停機",
@@ -15448,7 +15445,6 @@
     "editTitle": "編輯狀態頁面",
     "back": "狀態頁面",
     "loadFailed": "無法載入狀態頁面",
-    "footerTitle": "狀態頁面",
     "searchPlaceholder": "搜尋狀態頁面",
     "copyUrl": "複製 URL",
     "publicUrl": "公開 URL",
@@ -15843,7 +15839,8 @@
       "oncallAck": "確認",
       "oncallEscalate": "升級",
       "oncallSnooze": "延後",
-      "oncallResolve": "解決"
+      "oncallResolve": "解決",
+      "functionsImport": "匯入函式"
     }
   },
   "components": {
@@ -15958,7 +15955,9 @@
         "resetColumnWidths": "重設欄位寬度"
       },
       "removeColumnAria": "移除欄位",
-      "formatColumnAria": "格式化欄位"
+      "formatColumnAria": "格式化欄位",
+      "selectedOfTotal": "已選取 {selected} 個，共 {total} 個",
+      "selectedCount": "已選取 {selected} 個"
     },
     "predefinedThemes": {
       "title": "主題",
@@ -16455,7 +16454,10 @@
       "enrichmentReloadStarted": "擴充表重新載入已開始。正在背景處理中...",
       "enrichmentJobStarted": "擴充表作業已開始。正在背景處理中...",
       "enrichmentCreationFailed": "建立擴充表失敗",
-      "functionDeletionAssociatedPipelines": "函式刪除失敗，因為它與管線相關聯。請按一下檢視按鈕以取得相關聯的管線。"
+      "functionDeletionAssociatedPipelines": "函式刪除失敗，因為它與管線相關聯。請按一下檢視按鈕以取得相關聯的管線。",
+      "successfullyExportedFunctions": "成功匯出 {count} 個函式 | 成功匯出 {count} 個函式",
+      "errorExportingFunctions": "匯出函式時發生錯誤。請再試一次。",
+      "functionsMissingFromExport": "{names} 已不在清單中，因此未納入匯出 | {names} 已不在清單中，因此未納入匯出"
     },
     "recommended": {
       "failedToImportDashboard": "匯入儀表板失敗：{error}",
@@ -16910,7 +16912,6 @@
     },
     "move": "移動",
     "moveTitle": "將 {count} 個 SLO 移動到另一個資料夾",
-    "moveSelected": "移動 {count} 個已選項目",
     "exportTitle": "匯出 SLO | 匯出 {count} 個 SLO",
     "exportSubtitle": "檢閱定義，然後以 JSON 或 Terraform 格式下載，用於 OpenObserve provider。",
     "exportFailed": "無法讀取 SLO 定義。請再試一次。",
@@ -17675,7 +17676,6 @@
       "otherRow": "所有其他查詢",
       "truncatedText": "此陳述式過長，無法完整儲存，因此以截斷方式顯示。",
       "stmtClass": {
-        "query": "查詢",
         "queryHint": "僅限實際 SQL — SELECT、INSERT、UPDATE 和 DELETE。",
         "all": "查詢 + 連線負擔",
         "allHint": "也計算驅動程式在查詢之間傳送的維護作業：BEGIN 和 COMMIT、SET，以及維持連線集區存活的檢查。",
@@ -18276,7 +18276,6 @@
       "disclosureShort": "每一列都是一個真實的已完成呼叫",
       "disclosureDetail": "由發出呼叫的應用程式，根據您傳送的追蹤資料進行測量。這裡僅列出已完成的呼叫——仍在執行或卡住且從未回傳的查詢不會產生測量。",
       "counts": {
-        "complete": "顯示此時間範圍內所有 {count} 筆資料庫呼叫，最慢的優先。",
         "truncated": "此時間範圍內最慢的 {count} 筆呼叫——實際執行的數量多於此處顯示。",
         "filtered": "顯示 {count} 筆（共 {total} 筆）呼叫。"
       },
@@ -18620,7 +18619,6 @@
         "unknown": "未回報狀態"
       },
       "counts": {
-        "complete": "顯示 {count} 個工作階段。",
         "capped": "取樣到的工作階段超過我們一次能讀取的數量。這是我們擁有的 {count} 個。",
         "filtered": "顯示 {count} / {total} 個工作階段。"
       },
@@ -18737,8 +18735,7 @@
         "lastVacuum": "上次清理",
         "lastAutovacuum": "上次自動清理",
         "lastAnalyze": "上次分析"
-      },
-      "countLine": "{count} 個資料表"
+      }
     },
     "recommendations": {
       "title": "建議",
@@ -19083,7 +19080,6 @@
     "acknowledge": "確認",
     "acknowledgeHint": "接手處理。這會停止升級。",
     "actions": "操作",
-    "selectedCount": "已選取 {count} 個",
     "bulkAckDone": "已確認 {count} 筆呼叫",
     "bulkAckPartial": "有 {count} 筆無法確認",
     "resolveCause": "原因是什麼？",

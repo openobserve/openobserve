@@ -636,6 +636,145 @@ describe("Billing Component", () => {
     });
   });
 
+  describe("fetchBillingInfo — billing info TypeError/401 regression", () => {
+    it("does not throw and keeps the provider when the response has no customer_id", async () => {
+      // Reproduces the production TypeError: the real /billing/info response
+      // for an org with no active plan omits customer_id entirely.
+      (BillingService.list_subscription as any).mockResolvedValue({
+        data: { provider: "stripe" },
+      });
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      // Previously this threw inside the try block, which reset the
+      // provider to "" and hid the Invoice tab even though the fetch had
+      // actually succeeded.
+      expect(testWrapper.vm.billingProvider).toBe("stripe");
+      expect(testWrapper.vm.isPaidUser).toBe(false);
+      expect(testWrapper.vm.showInvoiceTab).toBe(true);
+
+      testWrapper.unmount();
+    });
+
+    it("treats a non-empty customer_id as a paid user", async () => {
+      (BillingService.list_subscription as any).mockResolvedValue({
+        data: { provider: "stripe", customer_id: "cus_123" },
+      });
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(testWrapper.vm.isPaidUser).toBe(true);
+
+      testWrapper.unmount();
+    });
+
+    it("does not log a 401 as an error — it's an expected session-expiry race already handled globally", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const unauthorizedError: any = new Error("Request failed with status code 401");
+      unauthorizedError.response = { status: 401 };
+      (BillingService.list_subscription as any).mockRejectedValue(unauthorizedError);
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(testWrapper.vm.billingProvider).toBe("");
+
+      consoleErrorSpy.mockRestore();
+      testWrapper.unmount();
+    });
+
+    it("still logs non-401 billing errors", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      (BillingService.list_subscription as any).mockRejectedValue(new Error("Network error"));
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to fetch billing info:",
+        expect.any(Error),
+      );
+
+      consoleErrorSpy.mockRestore();
+      testWrapper.unmount();
+    });
+  });
+
   describe("Daily-view date range", () => {
     it("exposes usageStreamEnabled from org settings", () => {
       store.state.organizationData.organizationSettings.usage_stream_enabled = true;

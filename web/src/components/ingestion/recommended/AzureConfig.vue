@@ -220,7 +220,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import { generateARMTemplateURL, azureIntegrations } from "@/utils/azureIntegrations";
 import CopyContent from "@/components/CopyContent.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const SCRIPT_URL =
@@ -311,7 +311,7 @@ export default defineComponent({
       const url = generateARMTemplateURL(activityLogsIntegration, endpointUrl, accessKey);
       window.open(url, "_blank", "noopener,noreferrer");
 
-      segment.track("Azure Activity Logs Deploy Started", {
+      analytics.track("Azure Activity Logs Deploy Started", {
         integration_id: "activity-logs",
       });
 

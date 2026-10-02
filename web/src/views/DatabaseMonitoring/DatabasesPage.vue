@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="defaultColumnVisibility"
         :persist-columns="true"
         table-id="dbm-databases"
-        :footer-title="t('dbm.databases.summary.databases')"
         :enable-column-resize="true"
         :toolbar-bordered="false"
         :get-row-style="rowStyle"

@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "Нет доступного воспроизведения сеанса",
     "loadingSessionReplay": "Загрузка воспроизведения сеанса…",
+    "sessionReplaySeekBehindWindow": "Этот момент находится до загруженной части сессии. Откройте сессию заново с этого события, чтобы воспроизвести её.",
+    "sessionReplayTruncated": "Эта сессия слишком длинная для полной загрузки. Показаны первые {count} сегментов.",
+    "sessionReplayLoadingPercent": "Загрузка {percent}%",
+    "sessionReplayFullyLoaded": "Загружено полностью",
+    "sessionReplayLoadFailedChip": "Ошибка загрузки · Повторить",
+    "sessionReplayLoadFailed": "Не удалось загрузить запись сессии.",
+    "sessionReplayLoadFailedRange": "Не удалось загрузить {from} – {to}",
+    "sessionReplayRetrying": "Повторная попытка ({attempt} из {total})…",
+    "sessionReplayNextPart": "Загрузка следующей части сессии…",
+    "sessionReplayResumesOnItsOwn": "Воспроизведение возобновится автоматически",
+    "sessionReplayLoadingUpTo": "Загрузка до {time}…",
+    "sessionReplaySinglePageHint": "В этой сессии одна страница, поэтому сначала нужно загрузить всё до {time}",
+    "sessionReplayNotLoadedYet": "ещё не загружено",
+    "sessionReplayTruncatedTooltip": "Недоступно: превышен лимит в 50 000 сегментов",
+    "sessionReplaySkippedParts": "· {n} часть не загрузилась | · {n} частей не загрузилось",
+    "sessionReplayGapTooltip": "Эту часть не удалось загрузить",
+    "sessionReplayRetry": "Повторить",
+    "sessionReplayLiveBadge": "В реальном времени",
+    "sessionReplayLateRows": "Более ранняя активность появилась после загрузки записи. Перезагрузите, чтобы включить её.",
+    "sessionReplayReload": "Перезагрузить",
     "seek": "Перейти",
     "sessionMetricsAria": "Сводка метрик сеанса",
     "frustration": "{count} фрустрация | {count} фрустраций",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "Токены o2syn_ уровня организации, которые ваши частные синтетические агенты используют для получения задач",
     "serviceAccountsName": "Название сервисной учетной записи",
     "basicUsers": "Пользователи",
-    "organizationMembers": "Участники организации",
     "invitations": "Приглашения",
     "quota": "Квоты",
     "externalUserWarningTitle": "Предупреждение о внешнем пользователе",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "Участник организации успешно обновлен."
     },
     "user": {
-      "organizationMembers": "Участники организации",
       "delete": "Удалить",
       "failedToLoadCustomRoles": "Не удалось загрузить пользовательские роли.",
       "pleaseWaitLoadingUsers": "Пожалуйста, подождите, загрузка пользователей...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "Загрузка функций...",
     "associateFunction": "Связать функцию",
     "noFunctionsFound": "Функции не найдены",
-    "streamsUnit": "{count} поток | {count} потоков",
     "deleteAssociatedAlertsPipelinesBatch": "Удалить все конвейеры и оповещения, связанные с выбранными потоками",
     "allFieldsCount": "Все поля ({count})",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "Показать список запусков"
     },
     "history": {
-      "button": "Запуски",
       "title": "История рабочих процессов",
       "started": "Начато",
       "ended": "Завершено",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "Это действие НЕЛЬЗЯ отменить или прекратить после создания задачи.",
     "areYouSureProceed": "Вы уверены, что хотите продолжить?",
     "clearFilters": "Очистить фильтры",
-    "backfillJobLabel": "{count} задача обратного заполнения | {count} задачи обратного заполнения",
     "chunksUnit": "чанки",
     "never": "Никогда",
     "jobTooltipLabel": "Задача",
@@ -3348,7 +3363,6 @@
     "functionName": "Имя функции",
     "remoteDestination": "Удаленное назначение",
     "failedToLoadPipeline": "Не удалось загрузить конвейер",
-    "header": "Конвейеры",
     "subtitle": "Трансформируйте, обогащайте и маршрутизируйте данные в процессе",
     "deleteNode": "Удалить",
     "addPipeline": "Новый конвейер",
@@ -3639,7 +3653,40 @@
     "dataSource": "Источник данных",
     "uploadFile": "Загрузить файл",
     "fromUrl": "Из URL",
-    "addFunction": "Добавить функцию"
+    "addFunction": "Добавить функцию",
+    "import": {
+      "title": "Импорт функции",
+      "outputMessages": "Выходные сообщения",
+      "errorValidations": "Ошибки валидации",
+      "results": "Результаты импорта",
+      "nameLabel": "Имя функции",
+      "nameRequired": "Функция - {index}: требуется имя",
+      "nameExists": "Функция - {index}: \"{name}\" уже существует",
+      "nameInvalid": "Функция - {index}: \"{name}\" — недопустимое имя функции. Используйте буквы, цифры и подчёркивания, начиная с буквы или подчёркивания.",
+      "duplicateName": "Функция - {index}: \"{name}\" встречается в этом файле более одного раза",
+      "bodyRequired": "Функция - {index}: требуется тело функции",
+      "transTypeInvalid": "Функция - {index}: тип должен быть 0 для VRL или 1 для JavaScript",
+      "paramsInvalid": "Функция - {index}: параметр params должен быть строкой",
+      "transTypeLabel": "Язык",
+      "transTypePlaceholder": "Выберите язык",
+      "paramsLabel": "Параметры",
+      "paramsHint": "Имена аргументов через запятую. По умолчанию — «row».",
+      "overrideExisting": "Вместо этого заменить существующую функцию",
+      "nameInputRequired": "Введите имя функции",
+      "nameInputInvalid": "Используйте буквы, цифры и подчёркивания, начиная с буквы или подчёркивания",
+      "nameInputDuplicate": "Другая функция в этом файле уже использует это имя",
+      "nameInputExists": "Это имя уже занято в этой организации",
+      "overrideAffects": "Переопределение также изменит эти конвейеры: {pipelines}",
+      "createSuccess": "Функция - {index}: \"{name}\" импортирована",
+      "overridden": "Функция - {index}: \"{name}\" переопределена",
+      "createFailed": "Функция - {index}: \"{name}\" — ошибка: {reason}",
+      "rejectedBody": "Исправьте определение и импортируйте снова.",
+      "rejectedLanguage": "Функция - {index}: \"{name}\" отклонена. Если это функция JavaScript, укажите язык — определение без языка читается как VRL.",
+      "jsonStringEmpty": "Строка JSON пуста",
+      "invalidJsonFormat": "Недопустимый формат JSON",
+      "importSuccess": "Импортирована {count} функция | Импортировано {count} функций",
+      "nothingToImport": "Не найдено функций для импорта. Проверьте, что файл содержит корректный JSON."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Анализ измерений...",
@@ -5427,7 +5474,6 @@
       "dynamicVariables": "Динамические переменные"
     },
     "dashboards": {
-      "selected": "Выбрано {count}",
       "failedToLoadFolder": "Не удалось загрузить дашборды для выбранной папки.",
       "pleaseWait": "Пожалуйста, подождите...",
       "copySuffix": "{title} - Копия",
@@ -6783,7 +6829,6 @@
     "reloadAlertsTooltip": "Перезагрузить оповещения",
     "triggerDetection": "Обнаружение триггера",
     "retrain": "Переобучить",
-    "selectedLabel": "выбрано",
     "resume": "Возобновить",
     "deleteAlertTitle": "Удалить оповещение",
     "deleteAlertMessage": "Вы уверены, что хотите удалить это оповещение?",
@@ -7407,7 +7452,6 @@
       "noCondition": "Нет условия",
       "noHistoryAvailable": "История оценок для этого оповещения недоступна",
       "tryExpandingTimeRange": "Попробуйте расширить временной диапазон",
-      "results": "Результаты",
       "ifCondition": "если {condition}"
     },
     "historyTable": {
@@ -7879,8 +7923,6 @@
     "prebuiltDestination": "Готовый получатель {type}",
     "errorValidations": "Ошибки валидации",
     "outputMessagesLabel": "Выходные сообщения",
-    "incidentSingular": "Инцидент",
-    "incidentPlural": "Инциденты",
     "confirmDeleteTemplates": "Вы уверены, что хотите удалить {count} шаблон? | Вы уверены, что хотите удалить {count} шаблонов?",
     "lastOutcome": "Последний результат",
     "priority": "Приоритет",
@@ -8235,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "Экспорт шаблона",
-    "selected": "выбрано",
     "deleteTemplateTitle": "Удалить шаблон",
     "deleteTemplateMessage": "Вы уверены, что хотите удалить шаблон?",
     "deleteTemplatesTitle": "Удалить шаблоны",
@@ -8489,7 +8530,6 @@
     "deleteDestinationTitle": "Удалить получателя",
     "deleteDestinationMessage": "Вы уверены, что хотите удалить получателя?",
     "deleteDestinationsTitle": "Удалить получателей",
-    "selected": "выбрано",
     "organizationLabel": "Организация",
     "defaultPlaceholder": "например, default",
     "streamNameLabel": "Имя потока",
@@ -9297,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "Ключи шифрования для конфиденциальных полей",
-      "selected": "Выбрано: {count}",
       "delete": "Удалить",
       "deleteCipherKeyTitle": "Удалить ключ шифрования",
       "deleteCipherKeyMessage": "Вы уверены, что хотите удалить ключ шифрования?",
@@ -9892,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "Поток",
-      "sessions": "сессии",
       "failedToLoad": "Не удалось загрузить сессии",
       "retry": "Повторить",
       "tokenTooltip": "Ввод: {input} · Вывод: {output} · Всего: {total}",
@@ -10004,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "Потоки не обнаружены",
       "tabLabel": "Каталог сервисов",
-      "footerTitle": "Сервисы",
       "filterPlaceholder": "Фильтр по имени сервиса...",
       "columns": {
         "serviceName": "Сервис",
@@ -10573,7 +10610,6 @@
     "create_regex_pattern_field": "Редактировать / Удалить с помощью regex",
     "import": "Импорт",
     "import_title": "Импорт шаблона",
-    "bottom_header": "{count} шаблон | {count} шаблонов",
     "filter_by_tag": "Фильтр по тегу",
     "refresh": "Обновить",
     "loading_patterns": "Загрузка шаблонов...",
@@ -10629,7 +10665,6 @@
     "get_history": "Получить историю",
     "executed_at": "Выполнено в",
     "sql_query": "SQL-запрос",
-    "results": "Результаты",
     "delayMessage": "История поиска может быть с задержкой на"
   },
   "correlation": {
@@ -10772,7 +10807,6 @@
     "function_definition": "Определение функции",
     "more_details": "Подробнее",
     "query_function": "Запрос / Функция",
-    "results": "Результаты",
     "max_limit": "Максимальный лимит",
     "cancel_job_title": "Отменить запланированный поиск",
     "cancel_job_message": "Вы уверены, что хотите отменить этот запланированный поиск?",
@@ -10879,9 +10913,6 @@
     "testBtn": "Тест",
     "importBtn": "Импорт",
     "newModel": "Новая модель",
-    "modelsCount": "{count} Моделей",
-    "exportSelected": "Экспорт ({count})",
-    "deleteSelected": "Удалить ({count})",
     "importTitle": "Импорт цен на модели",
     "errorValidations": "Проверка ошибок",
     "outputMessages": "Сообщения вывода",
@@ -11399,11 +11430,6 @@
         "trace": "Трейсы",
         "session": "Сессии"
       },
-      "scopeNoun": {
-        "span": "спаны",
-        "trace": "трейсы",
-        "session": "сессии"
-      },
       "inQueueFilter": {
         "label": "В очереди",
         "notEnqueued": "В очереди: Не добавлен",
@@ -11418,6 +11444,7 @@
         "type": "Тип",
         "kind": "Вид",
         "span": "Спан",
+        "trace": "Трейс",
         "session": "Сессия",
         "topic": "Топик",
         "traces": "Трейсы",
@@ -11448,16 +11475,12 @@
         "sectionTitle": "Добавить в очередь",
         "manageQueues": "Управление очередями"
       },
-      "bulkAdd": "Добавить {count} в очередь",
-      "selectedCount": "Выбрано {selected} из {total}",
-      "footerTitle": "Нездоровый {scope}",
       "addSuccess": "Добавлено в {queue} — строка остается в Discovery, её состояние хранится в очереди.",
       "addError": "Не удалось добавить элементы в очередь",
       "openQueue": "Открыть очередь",
       "queuesError": "Не удалось загрузить очереди"
     },
     "queues": {
-      "listTitle": "Очереди",
       "searchPlaceholder": "Поиск очередей...",
       "newButton": "Новая очередь",
       "loadError": "Не удалось загрузить очереди",
@@ -11516,7 +11539,6 @@
         "targetDataset": "Целевой датасет",
         "noTargetDataset": "Нет целевого датасета",
         "searchPlaceholder": "Поиск элементов...",
-        "footerTitle": "Элементы",
         "allItems": "Все",
         "inTrace": "В трейсе {traceId}",
         "reviewAgain": "Проверить снова",
@@ -11941,7 +11963,6 @@
       "clearBaseline": "Очистить базовый уровень"
     },
     "datasets": {
-      "listTitle": "Датасеты",
       "searchPlaceholder": "Поиск датасетов...",
       "newButton": "Новый датасет",
       "loadError": "Не удалось загрузить датасеты",
@@ -11985,7 +12006,6 @@
         "fallbackTitle": "Датасет",
         "meta": "{count} элементов · обновлено {updated}",
         "loadError": "Не удалось загрузить датасет",
-        "footerTitle": "Элементы",
         "tabs": {
           "items": "Элементы",
           "experiments": "Эксперименты"
@@ -12122,8 +12142,6 @@
       "summaryAgents": "Затронутые агенты",
       "failuresTitle": "Таксономия сбоев",
       "failuresHint": "Ошибки, сгруппированные по типу, для каждого агента",
-      "footerLoops": "Циклы",
-      "footerFailures": "Классы сбоев",
       "noLoops": "В этом диапазоне не обнаружено зацикленного поведения",
       "noFailures": "В этом диапазоне нет сбоев агентов",
       "noLoopsForAgent": "Нет зацикливания для {agent} в этом диапазоне — смените агента или расширьте временной диапазон",
@@ -12190,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "Удаленные задачи",
       "searchPlaceholder": "Поиск задач",
       "newButton": "Новая задача",
       "loadError": "Не удалось загрузить удаленные задачи",
@@ -12838,7 +12855,6 @@
         "title": "Оценки",
         "hint": "Оценки и обоснование берутся из _llm_scores. Выберите запуск, чтобы открыть его оценочный трейс для дальнейшего исследования.",
         "filterLabel": "Фильтровать оценки",
-        "footerTitle": "Оценки",
         "noThresholdHint": "Установите порог здоровья в этой конфигурации оценок, чтобы классифицировать и выделять нездоровые оценки.",
         "noReasoning": "Обоснование не записано",
         "unknownAgent": "Неизвестный агент",
@@ -12863,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "Обзор конфигураций оценок",
         "searchPlaceholder": "Фильтр конфигураций…",
         "relativeTime": {
           "daysAgo": "{day} дн. назад",
@@ -12991,7 +13006,6 @@
         "updatedLabel": "Обновлено"
       },
       "createTitle": "Новая конфигурация оценки",
-      "listTitle": "Конфигурации оценок",
       "searchPlaceholder": "Поиск конфигураций",
       "newButton": "Новая конфигурация оценки",
       "columns": {
@@ -13068,9 +13082,6 @@
         "errors": {
           "title": "Ошибки проверки"
         }
-      },
-      "export": {
-        "bulkButton": "Экспортировать"
       }
     },
     "scorer": {
@@ -13088,8 +13099,9 @@
         "requestTemplateSection": "Шаблон запроса",
         "variablesSuffix": "переменные",
         "outputSchemaSection": "Схема вывода",
-        "usedByIntro": "Задания, которые ссылаются на этот скоррер в своем конвейере.",
-        "usedByEmpty": "Пока ни одно задание не ссылается на этот скоррер.",
+        "usedByIntro": "Задания и эксперименты, которые ссылаются на этот скорер.",
+        "usedByEmpty": "Пока нет заданий или экспериментов, ссылающихся на этот скорер.",
+        "usedByExperiment": "Эксперимент",
         "versionsIntro": "Версии — это неизменяемые снимки конфигурации скоррера. Активная версия — это то, что используют задания сегодня.",
         "lastUpdated": "Последнее обновление",
         "metadataSection": "Метаданные",
@@ -13123,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "Скорреры",
       "searchPlaceholder": "Поиск скорреров",
       "newButton": "Новый скоррер",
       "usedByJob": "{count} работа | {count} работ",
@@ -13164,9 +13175,6 @@
           "nameConflict": "Оценщик {index}: имя \"{name}\" уже существует в этой организации",
           "duplicateName": "Оценщик {index}: имя \"{name}\" используется в этом импорте более одного раза"
         }
-      },
-      "export": {
-        "bulkButton": "Экспорт"
       },
       "backTo": "Назад к скоррерам",
       "badgeRemote": "Удаленный",
@@ -13356,11 +13364,9 @@
           "recentEmpty": "В выбранном интервале нет сбойных запусков."
         }
       },
-      "listTitle": "Задания оценки",
       "searchPlaceholder": "Поиск заданий",
       "newButton": "Новое задание",
       "scorerCount": "{count} скоринг | {count} скорингов",
-      "deleteBulkButton": "Удалить",
       "deleteBulkTitle": "Удалить задания оценки",
       "deleteBulkConfirm": "Вы уверены, что хотите удалить {count} заданий оценки? Это действие нельзя отменить.",
       "deletedBulk": "{count} заданий оценки удалено",
@@ -14340,10 +14346,6 @@
       "passed": "Успешно",
       "warning": "Предупреждение"
     },
-    "footer": {
-      "browserTests": "Браузерные тесты",
-      "checks": "Проверки"
-    },
     "journey": {
       "extract": {
         "action": "Извлечь в субтест",
@@ -14726,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "Добавить местоположение",
-      "bottomHeader": "местоположения",
       "bulkDeleteConfirmMessage": "Вы уверены, что хотите удалить {count} местоположений?",
       "bulkDeleteConfirmTitle": "Удалить местоположения",
       "bulkDeleteFailed": "Не удалось удалить местоположения",
@@ -14787,7 +14788,6 @@
       "regionPlaceholder": "например, us-east-1",
       "regionRequired": "Регион обязателен",
       "searchPlaceholder": "Поиск локаций…",
-      "selectedCount": "Выбрано {selected} из {total} локаций",
       "title": "Локации",
       "publicTitle": "Публичные локации",
       "privateTitle": "Частные локации",
@@ -15041,8 +15041,7 @@
       "detailOrigin": "Происхождение",
       "detailFirstParty": "Первая сторона",
       "detailThirdParty": "Третья сторона",
-      "detailStackTrace": "Трассировка стека",
-      "footerEvents": "События"
+      "detailStackTrace": "Трассировка стека"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15242,7 +15241,6 @@
       "bulkTriggerSuccess": "Запущена {count} проверка. | Запущено {count} проверок.",
       "bulkTriggerToast": "Запуск {count} проверки… | Запуск {count} проверок…",
       "check": "Проверка",
-      "checksFooterTitle": "Проверки",
       "checksCount": "{count} проверок",
       "delete": "Удалить",
       "duplicate": "Дублировать",
@@ -15270,7 +15268,6 @@
       "pausing": "Приостановка…",
       "response": "Ответ",
       "scheduledAt": "Запланировано на",
-      "selectedCount": "Выбрано {selected} из {total}",
       "status": "Статус",
       "statusDegraded": "⚠ Ухудшено",
       "statusDown": "✗ Недоступно",
@@ -15453,7 +15450,6 @@
     "editTitle": "Изменить статусную страницу",
     "back": "Статусные страницы",
     "loadFailed": "Не удалось загрузить статусную страницу",
-    "footerTitle": "статусные страницы",
     "searchPlaceholder": "Поиск статусных страниц",
     "copyUrl": "Скопировать URL",
     "publicUrl": "Публичный URL",
@@ -15848,7 +15844,8 @@
       "oncallAck": "Подтвердить",
       "oncallEscalate": "Эскалировать",
       "oncallSnooze": "Отложить",
-      "oncallResolve": "Разрешить"
+      "oncallResolve": "Разрешить",
+      "functionsImport": "Импорт функции"
     }
   },
   "components": {
@@ -15963,7 +15960,9 @@
         "resetColumnWidths": "Сбросить ширину колонок"
       },
       "removeColumnAria": "Удалить колонку",
-      "formatColumnAria": "Форматировать колонку"
+      "formatColumnAria": "Форматировать колонку",
+      "selectedOfTotal": "Выбрано {selected} из {total}",
+      "selectedCount": "Выбрано {selected}"
     },
     "predefinedThemes": {
       "title": "Тема",
@@ -16460,7 +16459,10 @@
       "enrichmentReloadStarted": "Перезагрузка таблицы обогащения началась. Обработка в фоновом режиме...",
       "enrichmentJobStarted": "Задача таблицы обогащения запущена. Обработка в фоновом режиме...",
       "enrichmentCreationFailed": "Не удалось создать таблицу обогащения",
-      "functionDeletionAssociatedPipelines": "Не удалось удалить функцию, так как она связана с конвейерами. Нажмите кнопку просмотра, чтобы увидеть связанные конвейеры."
+      "functionDeletionAssociatedPipelines": "Не удалось удалить функцию, так как она связана с конвейерами. Нажмите кнопку просмотра, чтобы увидеть связанные конвейеры.",
+      "successfullyExportedFunctions": "Успешно экспортирована {count} функция | Успешно экспортировано {count} функций",
+      "errorExportingFunctions": "Ошибка экспорта функций. Попробуйте ещё раз.",
+      "functionsMissingFromExport": "{names} больше нет в списке — исключено из экспорта | {names} больше нет в списке — исключены из экспорта"
     },
     "recommended": {
       "failedToImportDashboard": "Не удалось импортировать панель мониторинга: {error}",
@@ -16915,7 +16917,6 @@
     },
     "move": "Переместить",
     "moveTitle": "Переместить {count} SLO в другую папку",
-    "moveSelected": "Переместить выбранные: {count}",
     "exportTitle": "Экспортировать SLO | Экспортировать {count} SLO",
     "exportSubtitle": "Просмотрите определение, затем скачайте его как JSON или как Terraform для провайдера OpenObserve.",
     "exportFailed": "Не удалось прочитать определение SLO. Пожалуйста, попробуйте снова.",
@@ -17680,7 +17681,6 @@
       "otherRow": "Все остальные запросы",
       "truncatedText": "Этот оператор слишком длинный, чтобы хранить его полностью, поэтому он показан сокращённо.",
       "stmtClass": {
-        "query": "Запросы",
         "queryHint": "Только настоящий SQL — SELECT, INSERT, UPDATE и DELETE.",
         "all": "Запросы + накладные расходы на соединение",
         "allHint": "Также учитывает служебные сообщения, которые ваш драйвер отправляет между запросами: BEGIN и COMMIT, SET и проверки, поддерживающие активное соединение в пуле.",
@@ -18281,7 +18281,6 @@
       "disclosureShort": "Каждая строка — это один реальный завершённый вызов",
       "disclosureDetail": "Измерено приложением, которое выполнило вызов, на основе отправляемых вами трейсов. Здесь только завершившиеся вызовы — запрос, который всё ещё выполняется или завис и не вернулся, не даёт измерения.",
       "counts": {
-        "complete": "Показаны все {count} вызовов к базе данных за этот период, сначала самые медленные.",
         "truncated": "{count} самых медленных вызовов за этот период — выполнялось больше, чем показано.",
         "filtered": "Показаны {count} из {total} вызовов."
       },
@@ -18625,7 +18624,6 @@
         "unknown": "Состояние не указано"
       },
       "counts": {
-        "complete": "Показано {count} сессий.",
         "capped": "Было отобрано больше сессий, чем мы смогли прочитать за раз. Это те {count}, которые у нас есть.",
         "filtered": "Показано {count} из {total} сессий."
       },
@@ -18742,8 +18740,7 @@
         "lastVacuum": "Последний вакуум",
         "lastAutovacuum": "Последний автовакуум",
         "lastAnalyze": "Последний анализ"
-      },
-      "countLine": "{count} таблиц"
+      }
     },
     "recommendations": {
       "title": "Рекомендации",
@@ -19088,7 +19085,6 @@
     "acknowledge": "Подтвердить",
     "acknowledgeHint": "Возьмите на себя ответственность. Это остановит эскалацию.",
     "actions": "Действия",
-    "selectedCount": "Выбрано: {count}",
     "bulkAckDone": "Подтверждено уведомлений: {count}",
     "bulkAckPartial": "Не удалось подтвердить: {count}",
     "resolveCause": "Что это было?",

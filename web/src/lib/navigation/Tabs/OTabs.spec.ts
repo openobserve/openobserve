@@ -1,5 +1,21 @@
-import { describe, it, expect } from "vitest";
-import { mount } from "@vue/test-utils";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+
+// Mutable per case, so the narrow-viewport tests can switch while every other test stays desktop.
+const mockViewport = vi.hoisted(() => ({ mdUp: true, lgUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => mockViewport.mdUp && !mockViewport.lgUp),
+      isDesktop: computed(() => mockViewport.lgUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.lgUp),
+    }),
+  };
+});
+
 import OTabs from "./OTabs.vue";
 import OTab from "./OTab.vue";
 
@@ -296,5 +312,78 @@ describe("OTabs", () => {
     await tabs[1].trigger("mousedown", { button: 0 });
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([2]);
     expect(wrapper.emitted("change")?.[0]).toEqual([2]);
+  });
+
+  // --- Revealing the active tab on mount ---
+
+  describe("a deep link to a tab the strip has scrolled out of view", () => {
+    const scrollBy = vi.fn();
+    const realRect = HTMLElement.prototype.getBoundingClientRect;
+
+    // jsdom lays nothing out, so the strip is given a window 300 wide with the active tab beyond its right edge.
+    function stubGeometry() {
+      (HTMLElement.prototype as any).scrollBy = scrollBy;
+      HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+        const active = this.getAttribute("aria-selected") === "true";
+        return { left: active ? 500 : 0, right: active ? 600 : 300 } as DOMRect;
+      };
+    }
+
+    afterEach(() => {
+      mockViewport.mdUp = true;
+      mockViewport.lgUp = true;
+      HTMLElement.prototype.getBoundingClientRect = realRect;
+      delete (HTMLElement.prototype as any).scrollBy;
+      scrollBy.mockClear();
+    });
+
+    it("scrolls it into view below lg, without animating", async () => {
+      mockViewport.lgUp = false;
+      stubGeometry();
+      mountTabs({ modelValue: "tab3" });
+      await flushPromises();
+
+      expect(scrollBy).toHaveBeenCalledWith({ left: 308, behavior: "auto" });
+    });
+
+    it("leaves the laptop strip where it is", async () => {
+      stubGeometry();
+      mountTabs({ modelValue: "tab3" });
+      await flushPromises();
+
+      expect(scrollBy).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- Focusin with no target (bug: null-guard before getAttribute) ---
+
+  describe("focusin handling", () => {
+    // The real browser case this guards: focus moves away from a tab that was
+    // unmounted/removed from the DOM in the same tick, which can deliver a
+    // focusin event whose `target` is null by the time it reaches this
+    // listener. Vue binds native events via addEventListener directly on the
+    // DOM node, so there is no other way to reach that exact listener to
+    // reproduce it — intercepting addEventListener captures the real one.
+    it("does not throw when the focusin event has no target", () => {
+      let capturedHandler: ((event: FocusEvent) => void) | null = null;
+      const originalAddEventListener = HTMLElement.prototype.addEventListener;
+      const addEventListenerSpy = vi
+        .spyOn(HTMLElement.prototype, "addEventListener")
+        .mockImplementation(function (
+          this: HTMLElement,
+          type: string,
+          listener: EventListenerOrEventListenerObject,
+          options?: boolean | AddEventListenerOptions,
+        ) {
+          if (type === "focusin") capturedHandler = listener as (event: FocusEvent) => void;
+          return originalAddEventListener.call(this, type, listener, options);
+        });
+
+      mountTabs();
+      addEventListenerSpy.mockRestore();
+
+      expect(capturedHandler).not.toBeNull();
+      expect(() => capturedHandler!({ target: null } as unknown as FocusEvent)).not.toThrow();
+    });
   });
 });

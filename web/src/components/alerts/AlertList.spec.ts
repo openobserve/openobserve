@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { http, HttpResponse } from "msw";
 // Mock aws-exports so isEnterprise / isCloud can be controlled per-test
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -1412,6 +1413,51 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     await cloneDialog.vm.$emit("click:secondary");
     await flushPromises();
     expect(wrapper.vm.showForm).toBe(false);
+  });
+
+  it("duplicateAlert pre-fills stream type and name from the source row", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(wrapper.vm.toBeClonestreamType).toBe(row.stream_type);
+    expect(wrapper.vm.toBeClonestreamName).toBe(row.stream_name);
+  });
+
+  it("duplicateAlert leaves stream type and name blank for the '--' placeholder", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = { ...wrapper.vm.filteredResults[0], stream_type: "--", stream_name: "--" };
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(wrapper.vm.toBeClonestreamType).toBe("");
+    expect(wrapper.vm.toBeClonestreamName).toBe("");
+  });
+
+  it("duplicateAlert still fetches the alert to clone when the stream list fails to load", async () => {
+    global.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/streams`,
+        () => HttpResponse.error(),
+      ),
+    );
+
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    // A failed stream-list load must not skip fetching the alert being
+    // cloned — otherwise Save would silently copy whatever alert was
+    // cloned previously instead of this one.
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(expect.anything(), row.alert_id);
   });
 
   it("clone dialog emits click:primary -> invokes submitForm", async () => {

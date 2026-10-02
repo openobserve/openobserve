@@ -13,16 +13,34 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, createRole, setRolePerms, getPerms, sweepRoles, uniq, org, rbacEnabled,
+    ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('gnt');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
-test.describe('IAM · Edit Role · grant semantics', () => {
+test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. every test in this file creates roles under one namespace and afterAll sweeps that
+    // namespace, and beforeAll/afterAll run once PER WORKER — not per file. Under
+    // `fullyParallel: true` this file's tests spread across workers, so each worker runs
+    // its own sweep and they delete each other's roles mid-test: measured as
+    // "teardown left roles behind: <this file's own prefix>". Serial pins the file to one
+    // worker, so there is exactly one setup and one teardown.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     const freshRole = async (page, tag) => {
-        const name = `${PREFIX}_gr_${tag}_${uniq()}`;
+        const name = `${NS}_gr_${tag}_${uniq()}`;
+        made.role(name);
         await createRole(page, name);
         return name;
     };
@@ -38,7 +56,6 @@ test.describe('IAM · Edit Role · grant semantics', () => {
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
         } finally {
             await page.close();
         }
@@ -47,10 +64,10 @@ test.describe('IAM · Edit Role · grant semantics', () => {
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            const removed = await sweepRoles(page);
+            const removed = (await made.cleanup(page)).roles;
             testLogger.info(`teardown removed ${removed.length} roles`);
-            const left = (await listRoles(page)).filter((r) => r.startsWith(PREFIX));
-            if (left.length) throw new Error(`teardown left roles behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }
@@ -67,7 +84,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
 
     // ---------------- the baseline contract ----------------
 
-    test('G-01 · ticking one action writes exactly that grant', async ({ page }) => {
+    test('G-01 · ticking one action writes exactly that grant', {
+        tag: ['@iam', '@iamRolesGrants', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'one');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -82,7 +101,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
             .toEqual([{ object: obj('function'), permission: 'AllowList' }]);
     });
 
-    test('G-02 · ticking All writes ONE AllowAll tuple, not six', async ({ page }) => {
+    test('G-02 · ticking All writes ONE AllowAll tuple, not six', {
+        tag: ['@iam', '@iamRolesGrants', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'all');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowAll');
@@ -98,7 +119,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         expect(stored[0].permission).toBe('AllowAll');
     });
 
-    test('G-03 · unticking All removes the AllowAll tuple, not six removals', async ({ page }) => {
+    test('G-03 · unticking All removes the AllowAll tuple, not six removals', {
+        tag: ['@iam', '@iamRolesGrants', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await freshRole(page, 'unall');
         await setRolePerms(page, name, [{ object: obj('function'), permission: 'AllowAll' }]);
 
@@ -115,7 +138,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         await expect.poll(async () => await getPerms(page, name), { timeout: 15000 }).toEqual([]);
     });
 
-    test('G-04 · a wider AllowAll locks the action columns on the rows below', async ({ page }) => {
+    test('G-04 · a wider AllowAll locks the action columns on the rows below', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
         const name = await freshRole(page, 'lock');
         // "Every Stream" covers logs/metrics/traces/index, so a grant there must
         // render the rows below as checked AND locked — access the old tree never showed.
@@ -131,7 +156,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         expect(await pm.rolesPage.isChecked(scope)).toBe(true);
     });
 
-    test('G-05 · a locked inherited checkbox cannot be unticked directly', async ({ page }) => {
+    test('G-05 · a locked inherited checkbox cannot be unticked directly', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
         const name = await freshRole(page, 'locked');
         await setRolePerms(page, name, [{ object: obj('stream'), permission: 'AllowAll' }]);
 
@@ -158,7 +185,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
 
     // ---------------- the hidden-permission map ----------------
 
-    test('G-06 · settings offers Get but not List', async ({ page }) => {
+    test('G-06 · settings offers Get but not List', {
+        tag: ['@iam', '@iamRolesGrants', '@P2', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'settings');
         await pm.rolesPage.openModule('settings');
 
@@ -174,7 +203,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         }
     });
 
-    test('G-07 · a permission hidden by the UI is not destroyed by saving an unrelated change', async ({ page }) => {
+    test('G-07 · a permission hidden by the UI is not destroyed by saving an unrelated change', {
+        tag: ['@iam', '@iamRolesGrants', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await freshRole(page, 'hidden');
         // The API accepts settings:AllowList even though the UI can neither show nor
         // revoke it. Saving something else must not quietly drop it.
@@ -198,7 +229,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
 
     // ---------------- idempotence and no-ops ----------------
 
-    test('G-08 · re-ticking an already-held grant sends nothing', async ({ page }) => {
+    test('G-08 · re-ticking an already-held grant sends nothing', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
         const name = await freshRole(page, 'idem');
         await setRolePerms(page, name, [{ object: obj('function'), permission: 'AllowList' }]);
 
@@ -221,7 +254,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         expect((await getPerms(page, name))).toHaveLength(1);
     });
 
-    test('G-09 · staging an add and then undoing it sends nothing', async ({ page }) => {
+    test('G-09 · staging an add and then undoing it sends nothing', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'netzero');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -235,7 +270,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         expect(await getPerms(page, name)).toEqual([]);
     });
 
-    test('G-10 · saving with no changes fires no PUT', async ({ page }) => {
+    test('G-10 · saving with no changes fires no PUT', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'nochange');
         const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
         expect(payload, 'a no-op save still wrote to the API').toBeNull();
@@ -243,7 +280,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
 
     // ---------------- scope boundary ----------------
 
-    test('G-11 · the org module is not offered in a non-meta org', async ({ page }) => {
+    test('G-11 · the org module is not offered in a non-meta org', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'org');
         const isMeta = org() === '_meta';
         test.skip(isMeta, 'running in the meta org, where org IS grantable');
@@ -255,7 +294,9 @@ test.describe('IAM · Edit Role · grant semantics', () => {
 
     // ---------------- presets ----------------
 
-    test('G-12 · the Read-Only preset seeds List+Get and leaves settings with Get only', async ({ page }) => {
+    test('G-12 · the Read-Only preset seeds List+Get and leaves settings with Get only', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'preset');
         await expect(pm.rolesPage.summaryEmpty).toBeVisible({ timeout: 15000 });
         await pm.rolesPage.presetCard('Read-Only').click();
@@ -279,8 +320,12 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         }
     });
 
-    test('G-13 · a role created with "start from Read-Only" is seeded, not empty', async ({ page }) => {
-        const name = `${PREFIX}_gr_startfrom_${uniq()}`;
+    test('G-13 · a role created with "start from Read-Only" is seeded, not empty', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
+        const name = `${NS}_gr_startfrom_${uniq()}`;
+        // Created through the UI, so register it by hand — the API helper never sees it.
+        made.role(name);
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.createRole(name, { startFrom: 'readonly' });
         await pm.rolesPage.waitForGrantsSettled();
@@ -295,8 +340,15 @@ test.describe('IAM · Edit Role · grant semantics', () => {
 
     // ---------------- negative / rejection ----------------
 
-    test('G-N1 · a blank role name is refused', async ({ page }) => {
-        const before = await listRoles(page);
+    test('G-N1 · a blank role name is refused', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
+        // Only THIS spec's roles. Comparing the whole org list made the assertion false
+        // the moment a neighbouring spec created a role between the two reads — it failed
+        // in the gate with `+ ui_auto_stg_st_save_...`, a role belonging to the staging
+        // spec running in another worker. Same lesson as GR-03: membership, not totals.
+        const mine = async () => (await listRoles(page)).filter((r) => r.startsWith(NS)).sort();
+        const before = await mine();
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.addRoleButton.click();
         await expect(pm.rolesPage.addRoleDialog).toBeVisible();
@@ -304,10 +356,12 @@ test.describe('IAM · Edit Role · grant semantics', () => {
         await pm.rolesPage.addRoleSave.click();
 
         await expect(pm.rolesPage.addRoleDialog).toBeVisible();
-        expect(await listRoles(page)).toEqual(before);
+        expect(await mine(), 'a blank name created a role').toEqual(before);
     });
 
-    test('G-N2 · a duplicate role name is refused and the original keeps its grants', async ({ page }) => {
+    test('G-N2 · a duplicate role name is refused and the original keeps its grants', {
+        tag: ['@iam', '@iamRolesGrants', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await freshRole(page, 'dup');
         await setRolePerms(page, name, [{ object: obj('function'), permission: 'AllowList' }]);
 
@@ -332,9 +386,14 @@ test.describe('IAM · Edit Role · grant semantics', () => {
     // Decide which behaviour is intended — UI validation, or normalize-on-submit like
     // the API — then rewrite this against that. The UI's own name validation has no
     // coverage today either way.
-    test.fixme('G-N3 · a role name with punctuation is normalized, and the editor targets the stored name', async ({ page }) => {
-        const raw = `${PREFIX}_gr.norm-${Date.now()}`;
+    test.fixme('G-N3 · a role name with punctuation is normalized, and the editor targets the stored name', {
+        tag: ['@iam', '@iamRolesGrants', '@P2', '@all']
+    }, async ({ page }) => {
+        const raw = `${NS}_gr.norm-${Date.now()}`;
         const normalized = raw.replace(/[^A-Za-z0-9_]/g, '_');
+        // Register the NORMALIZED name: that is the role the backend actually stores, so
+        // tracking `raw` would delete nothing and leak the real one.
+        made.role(normalized);
 
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.createRole(raw);

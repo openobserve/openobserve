@@ -186,8 +186,8 @@ Colour only earns attention if most of the screen stays quiet:
     tile is a label with a number stuck to it;
   - _almost always zero_ — "New this week" on a list that gains an item a quarter;
   - _derivable from its neighbours_ — "In use" beside "Unused" and "Total";
-  - _already in the footer_ — `footerTitle` renders "N Dashboards" under every
-    table, so a Total tile alone is not a reason to have a strip.
+  - _already in the footer_ — the pager prints "x – y of N" under every table,
+    so a Total tile alone is not a reason to have a strip.
     A page whose only candidates fail these gets **no strip** — keep the per-row
     signals (relative recency, a state rail, a count column) and stop. Dashboards,
     Service Accounts and Roles all ended up here: pages where a strip added pixels

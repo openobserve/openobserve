@@ -77,6 +77,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
   const tool = sharedToolIcons();
   return {
     provider: {
+      id: "mariaDB",
       name: "MariaDB",
       tagline: t("ingestion.setupCard.mariadbTagline"),
       // No MariaDB mark ships with the app yet; MySQL's is the honest stand-in

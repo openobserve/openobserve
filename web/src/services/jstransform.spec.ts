@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import jstransform from "@/services/jstransform";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -739,6 +742,95 @@ describe("jstransform service", () => {
       await expect(
         jstransform.test("org123", { function: ".bad = syntax(", events: [] }),
       ).rejects.toThrow("Function execution error");
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks function_created once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(jstransform.create("org123", { name: "fn" })).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("function_created");
+    });
+
+    it("does not track function_created when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(jstransform.create("org123", { name: "fn" })).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    const cases: Array<[string, string, () => Promise<any>, string, Record<string, any>?]> = [
+      ["update", "put", () => jstransform.update("o", { name: "fn" }), "function_updated"],
+      ["delete", "delete", () => jstransform.delete("o", "fn"), "function_deleted", { count: 1 }],
+      [
+        "bulkDelete",
+        "delete",
+        () => jstransform.bulkDelete("o", { ids: ["a", "b"] }),
+        "function_deleted",
+        { count: 2 },
+      ],
+      [
+        "test",
+        "post",
+        () => jstransform.test("o", { function: ".", events: [] } as any),
+        "function_tested",
+      ],
+      [
+        "create_enrichment_table",
+        "post",
+        () => jstransform.create_enrichment_table("o", "t", new FormData(), true),
+        "enrichment_table_uploaded",
+        { source: "file", append: true, reload: false },
+      ],
+      [
+        "create_enrichment_table_from_url",
+        "post",
+        () => jstransform.create_enrichment_table_from_url("o", "t", "https://x", false),
+        "enrichment_table_uploaded",
+        { source: "url", append: false, reload: false },
+      ],
+      [
+        "create_enrichment_table_from_url (reload)",
+        "post",
+        () => jstransform.create_enrichment_table_from_url("o", "t", "", false, false, true),
+        "enrichment_table_uploaded",
+        { source: "url", append: false, reload: true },
+      ],
+    ];
+
+    it.each(cases)(
+      "%s tracks its event once the request resolves",
+      async (_n, verb, call, event, props) => {
+        const response = { data: { successful: ["a", "b"], unsuccessful: [] } };
+        mockHttpInstance[verb].mockResolvedValue(response);
+
+        await expect(call()).resolves.toBe(response);
+
+        expect(analytics.track).toHaveBeenCalledTimes(1);
+        if (props) expect(analytics.track).toHaveBeenCalledWith(event, props);
+        else expect(analytics.track).toHaveBeenCalledWith(event);
+      },
+    );
+
+    it.each(cases)("%s does not track when the request rejects", async (_n, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("bulkDelete does not track when the server deleted nothing", async () => {
+      mockHttpInstance.delete.mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } });
+
+      await jstransform.bulkDelete("o", { ids: ["a"] });
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

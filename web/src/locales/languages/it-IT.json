@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "Nessuna sessione replay disponibile",
     "loadingSessionReplay": "Caricamento sessione replay…",
+    "sessionReplaySeekBehindWindow": "Questo momento precede la parte caricata della sessione. Riapri la sessione da questo evento per riprodurlo.",
+    "sessionReplayTruncated": "Questa sessione è troppo lunga per essere caricata completamente. Vengono mostrati i primi {count} segmenti.",
+    "sessionReplayLoadingPercent": "Caricamento {percent}%",
+    "sessionReplayFullyLoaded": "Caricamento completo",
+    "sessionReplayLoadFailedChip": "Caricamento non riuscito · Riprova",
+    "sessionReplayLoadFailed": "Impossibile caricare la riproduzione della sessione.",
+    "sessionReplayLoadFailedRange": "Impossibile caricare {from} – {to}",
+    "sessionReplayRetrying": "Nuovo tentativo ({attempt} di {total})…",
+    "sessionReplayNextPart": "Caricamento della parte successiva della sessione…",
+    "sessionReplayResumesOnItsOwn": "La riproduzione riprende automaticamente",
+    "sessionReplayLoadingUpTo": "Caricamento fino a {time}…",
+    "sessionReplaySinglePageHint": "Questa sessione ha una sola pagina, quindi tutto ciò che precede {time} deve essere caricato prima",
+    "sessionReplayNotLoadedYet": "non ancora caricato",
+    "sessionReplayTruncatedTooltip": "Non disponibile: oltre il limite di 50.000 segmenti",
+    "sessionReplaySkippedParts": "· Impossibile caricare {n} parte | · Impossibile caricare {n} parti",
+    "sessionReplayGapTooltip": "Impossibile caricare questa parte",
+    "sessionReplayRetry": "Riprova",
+    "sessionReplayLiveBadge": "Live",
+    "sessionReplayLateRows": "Un'attività precedente è arrivata dopo il caricamento della riproduzione. Ricarica per includerla.",
+    "sessionReplayReload": "Ricarica",
     "seek": "Cerca",
     "sessionMetricsAria": "Riepilogo metriche sessione",
     "frustration": "{count} frustrazione | {count} frustrazioni",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "Token o2syn_ a livello di organizzazione che i tuoi agenti sintetici privati usano per prelevare i job",
     "serviceAccountsName": "Nome degli account di servizio",
     "basicUsers": "Utenti",
-    "organizationMembers": "Membri dell'Organizzazione",
     "invitations": "Inviti",
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "Membro dell'organizzazione aggiornato con successo."
     },
     "user": {
-      "organizationMembers": "Membri dell'organizzazione",
       "delete": "Elimina",
       "failedToLoadCustomRoles": "Caricamento dei ruoli personalizzati fallito.",
       "pleaseWaitLoadingUsers": "Attendi il caricamento degli utenti...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "Caricamento funzioni...",
     "associateFunction": "Associa funzione",
     "noFunctionsFound": "Nessuna funzione trovata",
-    "streamsUnit": "{count} flusso | {count} flussi",
     "deleteAssociatedAlertsPipelinesBatch": "Elimina tutte le pipeline e gli avvisi associati ai flussi selezionati",
     "allFieldsCount": "Tutti i campi ({count})",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "Mostra elenco esecuzioni"
     },
     "history": {
-      "button": "Esecuzioni",
       "title": "Cronologia del flusso di lavoro",
       "started": "Iniziato",
       "ended": "Terminato",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "Questa azione NON può essere annullata o cancellata una volta che il job viene creato.",
     "areYouSureProceed": "Sei sicuro di voler procedere?",
     "clearFilters": "Cancella filtri",
-    "backfillJobLabel": "{count} job di backfill | {count} job di backfill",
     "chunksUnit": "chunk",
     "never": "Mai",
     "jobTooltipLabel": "Job",
@@ -3348,7 +3363,6 @@
     "functionName": "Nome funzione",
     "remoteDestination": "Destinazione remota",
     "failedToLoadPipeline": "Errore nel caricamento della pipeline",
-    "header": "Pipeline",
     "subtitle": "Trasforma, arricchisci e instrada i dati in volo",
     "deleteNode": "Elimina",
     "addPipeline": "Aggiungi pipeline",
@@ -3639,7 +3653,40 @@
     "dataSource": "Fonte dati",
     "uploadFile": "Carica file",
     "fromUrl": "Dall'URL",
-    "addFunction": "Aggiungi funzione"
+    "addFunction": "Aggiungi funzione",
+    "import": {
+      "title": "Importa funzione",
+      "outputMessages": "Messaggi di output",
+      "errorValidations": "Validazioni degli errori",
+      "results": "Risultati dell'importazione",
+      "nameLabel": "Nome funzione",
+      "nameRequired": "Funzione - {index}: il nome è obbligatorio",
+      "nameExists": "Funzione - {index}: \"{name}\" esiste già",
+      "nameInvalid": "Funzione - {index}: \"{name}\" non è un nome di funzione valido. Usa lettere, numeri e trattini bassi, iniziando con una lettera o un trattino basso.",
+      "duplicateName": "Funzione - {index}: \"{name}\" compare più di una volta in questo file",
+      "bodyRequired": "Funzione - {index}: il corpo della funzione è obbligatorio",
+      "transTypeInvalid": "Funzione - {index}: il tipo deve essere 0 per VRL o 1 per JavaScript",
+      "paramsInvalid": "Funzione - {index}: params deve essere una stringa",
+      "transTypeLabel": "Lingua",
+      "transTypePlaceholder": "Scegli una lingua",
+      "paramsLabel": "Parametri",
+      "paramsHint": "Nomi degli argomenti separati da virgola. Il valore predefinito è “row”.",
+      "overrideExisting": "Sostituisci invece la funzione esistente",
+      "nameInputRequired": "Inserisci un nome di funzione",
+      "nameInputInvalid": "Usa lettere, numeri e trattini bassi, iniziando con una lettera o un trattino basso",
+      "nameInputDuplicate": "Un'altra funzione in questo file usa già questo nome",
+      "nameInputExists": "Questo nome è già utilizzato in questa organizzazione",
+      "overrideAffects": "La sovrascrittura modifica anche queste pipeline: {pipelines}",
+      "createSuccess": "Funzione - {index}: \"{name}\" importata",
+      "overridden": "Funzione - {index}: \"{name}\" sovrascritta",
+      "createFailed": "Funzione - {index}: \"{name}\" non riuscita - {reason}",
+      "rejectedBody": "Correggi la definizione e importa di nuovo.",
+      "rejectedLanguage": "Funzione - {index}: \"{name}\" è stata rifiutata. Se è una funzione JavaScript, imposta la lingua — una definizione senza lingua viene letta come VRL.",
+      "jsonStringEmpty": "La stringa JSON è vuota",
+      "invalidJsonFormat": "Formato JSON non valido",
+      "importSuccess": "Importata {count} funzione | Importate {count} funzioni",
+      "nothingToImport": "Nessuna funzione trovata da importare. Verifica che il file sia un JSON valido."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Analisi delle dimensioni...",
@@ -5427,7 +5474,6 @@
       "dynamicVariables": "Variabili dinamiche"
     },
     "dashboards": {
-      "selected": "{count} selezionati",
       "failedToLoadFolder": "Impossibile caricare le dashboard per la cartella selezionata.",
       "pleaseWait": "Attendere prego...",
       "copySuffix": "{title} - Copia",
@@ -6783,7 +6829,6 @@
     "reloadAlertsTooltip": "Ricarica alert",
     "triggerDetection": "Rilevamento trigger",
     "retrain": "Ri-allena",
-    "selectedLabel": "selezionato",
     "resume": "Riprendi",
     "deleteAlertTitle": "Elimina alert",
     "deleteAlertMessage": "Sei sicuro di voler eliminare questo alert?",
@@ -7407,7 +7452,6 @@
       "noCondition": "Nessuna condizione",
       "noHistoryAvailable": "Nessuna cronologia delle valutazioni disponibile per questo avviso",
       "tryExpandingTimeRange": "Prova ad espandere l'intervallo di tempo",
-      "results": "Risultati",
       "ifCondition": "se {condition}"
     },
     "historyTable": {
@@ -7879,8 +7923,6 @@
     "prebuiltDestination": "Destinazione preconfigurata {type}",
     "errorValidations": "Validazioni degli errori",
     "outputMessagesLabel": "Messaggi di output",
-    "incidentSingular": "Incidente",
-    "incidentPlural": "Incidenti",
     "confirmDeleteTemplates": "Vuoi davvero eliminare {count} modello? | Vuoi davvero eliminare {count} modelli?",
     "lastOutcome": "Ultimo risultato",
     "priority": "Priorità",
@@ -8235,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "Esporta template",
-    "selected": "selezionati",
     "deleteTemplateTitle": "Elimina template",
     "deleteTemplateMessage": "Sei sicuro di voler eliminare il template?",
     "deleteTemplatesTitle": "Elimina i template",
@@ -8489,7 +8530,6 @@
     "deleteDestinationTitle": "Elimina destinazione",
     "deleteDestinationMessage": "Sei sicuro di voler eliminare la destinazione?",
     "deleteDestinationsTitle": "Elimina destinazioni",
-    "selected": "selezionati",
     "organizationLabel": "Organizzazione",
     "defaultPlaceholder": "es. default",
     "streamNameLabel": "Nome dello stream",
@@ -9297,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "Chiavi di crittografia per campi sensibili",
-      "selected": "{count} selezionati",
       "delete": "Elimina",
       "deleteCipherKeyTitle": "Elimina chiave crittografica",
       "deleteCipherKeyMessage": "Sei sicuro di voler eliminare la chiave crittografica?",
@@ -9892,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "Stream",
-      "sessions": "sessioni",
       "failedToLoad": "Caricamento delle sessioni non riuscito",
       "retry": "Riprova",
       "tokenTooltip": "Ingresso: {input} · Uscita: {output} · Totale: {total}",
@@ -10004,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "Nessuno stream rilevato",
       "tabLabel": "Catalogo dei servizi",
-      "footerTitle": "Servizi",
       "filterPlaceholder": "Filtra per nome del servizio...",
       "columns": {
         "serviceName": "Servizio",
@@ -10573,7 +10610,6 @@
     "create_regex_pattern_field": "Redazione/Elimina utilizzando Regex",
     "import": "Importa",
     "import_title": "Importa pattern",
-    "bottom_header": "{count} Pattern | {count} Pattern",
     "filter_by_tag": "Filtra per tag",
     "refresh": "Aggiorna",
     "loading_patterns": "Caricamento dei pattern...",
@@ -10629,7 +10665,6 @@
     "get_history": "Ottieni la cronologia",
     "executed_at": "Eseguito a",
     "sql_query": "Query SQL",
-    "results": "Risultati",
     "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata"
   },
   "correlation": {
@@ -10772,7 +10807,6 @@
     "function_definition": "Definizione della funzione",
     "more_details": "Maggiori dettagli",
     "query_function": "Query/Funzione",
-    "results": "Risultati",
     "max_limit": "Limite massimo",
     "cancel_job_title": "Annulla ricerca pianificata",
     "cancel_job_message": "Sei sicuro di voler annullare questa ricerca pianificata?",
@@ -10879,9 +10913,6 @@
     "testBtn": "Test",
     "importBtn": "Importa",
     "newModel": "Nuovo modello",
-    "modelsCount": "{count} Modelli",
-    "exportSelected": "Esporta ({count})",
-    "deleteSelected": "Elimina ({count})",
     "importTitle": "Prezzi dei modelli di importazione",
     "errorValidations": "Convalide degli errori",
     "outputMessages": "Messaggi di output",
@@ -11399,11 +11430,6 @@
         "trace": "Tracce",
         "session": "Sessioni"
       },
-      "scopeNoun": {
-        "span": "span",
-        "trace": "tracce",
-        "session": "sessioni"
-      },
       "inQueueFilter": {
         "label": "In coda",
         "notEnqueued": "In coda: Non in coda",
@@ -11418,6 +11444,7 @@
         "type": "Tipo",
         "kind": "Tipologia",
         "span": "Span",
+        "trace": "Traccia",
         "session": "Sessione",
         "topic": "Argomento",
         "traces": "Tracce",
@@ -11448,16 +11475,12 @@
         "sectionTitle": "Aggiungi alla coda",
         "manageQueues": "Gestisci code"
       },
-      "bulkAdd": "Aggiungi {count} alla coda",
-      "selectedCount": "{selected} di {total} selezionati",
-      "footerTitle": "Non sano {scope}",
       "addSuccess": "Aggiunto a {queue} — la riga rimane in Discovery, il suo stato vive nella coda.",
       "addError": "Impossibile aggiungere elementi alla coda",
       "openQueue": "Apri coda",
       "queuesError": "Impossibile caricare le code"
     },
     "queues": {
-      "listTitle": "Code",
       "searchPlaceholder": "Cerca code...",
       "newButton": "Nuova coda",
       "loadError": "Impossibile caricare le code",
@@ -11516,7 +11539,6 @@
         "targetDataset": "Dataset di destinazione",
         "noTargetDataset": "Nessun dataset di destinazione",
         "searchPlaceholder": "Cerca elementi...",
-        "footerTitle": "Elementi",
         "allItems": "Tutti",
         "inTrace": "Nella traccia {traceId}",
         "reviewAgain": "Rivedi",
@@ -11941,7 +11963,6 @@
       "clearBaseline": "Cancella baseline"
     },
     "datasets": {
-      "listTitle": "Dataset",
       "searchPlaceholder": "Cerca dataset...",
       "newButton": "Nuovo dataset",
       "loadError": "Impossibile caricare i dataset",
@@ -11985,7 +12006,6 @@
         "fallbackTitle": "Dataset",
         "meta": "{count} elementi · aggiornato {updated}",
         "loadError": "Impossibile caricare il dataset",
-        "footerTitle": "Elementi",
         "tabs": {
           "items": "Elementi",
           "experiments": "Esperimenti"
@@ -12122,8 +12142,6 @@
       "summaryAgents": "Agenti interessati",
       "failuresTitle": "Tassonomia degli errori",
       "failuresHint": "Errori raggruppati per tipo, per agente",
-      "footerLoops": "Loop",
-      "footerFailures": "Classi di guasto",
       "noLoops": "Nessun comportamento in loop rilevato in questo intervallo",
       "noFailures": "Nessun errore agente in questo intervallo",
       "noLoopsForAgent": "Nessun comportamento di loop per {agent} in questo intervallo — cambia agente o amplia l'intervallo di tempo",
@@ -12190,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "Attività remote",
       "searchPlaceholder": "Cerca task",
       "newButton": "Nuovo task",
       "loadError": "Impossibile caricare i task remoti",
@@ -12838,7 +12855,6 @@
         "title": "Punteggi di valutazione",
         "hint": "I punteggi e il ragionamento provengono da _llm_scores. Seleziona una esecuzione per aprire la sua traccia di valutazione per ulteriori indagini.",
         "filterLabel": "Filtra punteggi di valutazione",
-        "footerTitle": "Punteggi di valutazione",
         "noThresholdHint": "Imposta una soglia di healthy su questa configurazione del punteggio per classificare ed evidenziare i punteggi non healthy.",
         "noReasoning": "Nessuna motivazione registrata",
         "unknownAgent": "Agente sconosciuto",
@@ -12863,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "Panoramica delle configurazioni delle partiture",
         "searchPlaceholder": "Configurazioni dei filtri...",
         "relativeTime": {
           "daysAgo": "{day} g fa",
@@ -12991,7 +13006,6 @@
         "updatedLabel": "Aggiornato"
       },
       "createTitle": "Nuova configurazione punteggio",
-      "listTitle": "Configurazioni punteggio",
       "searchPlaceholder": "Cerca configurazioni",
       "newButton": "Nuova configurazione punteggio",
       "columns": {
@@ -13068,9 +13082,6 @@
         "errors": {
           "title": "Errori di validazione"
         }
-      },
-      "export": {
-        "bulkButton": "Esporta"
       }
     },
     "scorer": {
@@ -13088,8 +13099,9 @@
         "requestTemplateSection": "Template di richiesta",
         "variablesSuffix": "variabili",
         "outputSchemaSection": "Schema di output",
-        "usedByIntro": "Processi che fanno riferimento a questo scorer nella loro pipeline.",
-        "usedByEmpty": "Nessun processo fa ancora riferimento a questo scorer.",
+        "usedByIntro": "Job ed esperimenti che fanno riferimento a questo scorer.",
+        "usedByEmpty": "Nessun job o esperimento fa ancora riferimento a questo scorer.",
+        "usedByExperiment": "Esperimento",
         "versionsIntro": "Le versioni sono istantanee immutabili della configurazione dello scorer. La versione attiva è quella che i processi eseguono oggi.",
         "lastUpdated": "Ultimo aggiornamento",
         "metadataSection": "Metadati",
@@ -13123,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "Scorer",
       "searchPlaceholder": "Cerca scorer",
       "newButton": "Nuovo scorer",
       "usedByJob": "{count} lavoro | {count} lavori",
@@ -13164,9 +13175,6 @@
           "nameConflict": "Scorer {index}: il nome \"{name}\" esiste già in questa org",
           "duplicateName": "Scorer {index}: il nome \"{name}\" viene usato più di una volta in questa importazione"
         }
-      },
-      "export": {
-        "bulkButton": "Esporta"
       },
       "backTo": "Torna a Scorers",
       "badgeRemote": "Telecomando",
@@ -13356,11 +13364,9 @@
           "recentEmpty": "Nessuna esecuzione non riuscita nella finestra selezionata."
         }
       },
-      "listTitle": "Processi di valutazione",
       "searchPlaceholder": "Cerca processi",
       "newButton": "Nuovo processo",
       "scorerCount": "{count} valutatore | {count} valutatori",
-      "deleteBulkButton": "Elimina",
       "deleteBulkTitle": "Elimina job di valutazione",
       "deleteBulkConfirm": "Sei sicuro di voler eliminare {count} job di valutazione? Questa azione non può essere annullata.",
       "deletedBulk": "{count} job di valutazione eliminati",
@@ -14340,10 +14346,6 @@
       "passed": "Superato",
       "warning": "Avviso"
     },
-    "footer": {
-      "browserTests": "Test browser",
-      "checks": "Controlli"
-    },
     "journey": {
       "extract": {
         "action": "Estrai in subtest",
@@ -14726,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "Aggiungi posizione",
-      "bottomHeader": "posizioni",
       "bulkDeleteConfirmMessage": "Sei sicuro di voler eliminare {count} posizioni?",
       "bulkDeleteConfirmTitle": "Elimina posizioni",
       "bulkDeleteFailed": "Eliminazione posizioni fallita",
@@ -14787,7 +14788,6 @@
       "regionPlaceholder": "es. us-east-1",
       "regionRequired": "La regione è obbligatoria",
       "searchPlaceholder": "Cerca località…",
-      "selectedCount": "{selected} di {total} località selezionate",
       "title": "Sedi",
       "publicTitle": "Posizioni pubbliche",
       "privateTitle": "Località private",
@@ -15041,8 +15041,7 @@
       "detailOrigin": "Origine",
       "detailFirstParty": "Prima parte",
       "detailThirdParty": "Terza parte",
-      "detailStackTrace": "Traccia dello stack",
-      "footerEvents": "Eventi"
+      "detailStackTrace": "Traccia dello stack"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15242,7 +15241,6 @@
       "bulkTriggerSuccess": "{count} controllo avviato. | {count} controlli avviati.",
       "bulkTriggerToast": "Avviando {count} controllo… | Avviando {count} controlli…",
       "check": "Controllo",
-      "checksFooterTitle": "Controlli",
       "checksCount": "{count} controlli",
       "delete": "Elimina",
       "duplicate": "Duplica",
@@ -15270,7 +15268,6 @@
       "pausing": "Messa in pausa in corso…",
       "response": "Risposta",
       "scheduledAt": "Pianificato il",
-      "selectedCount": "{selected} di {total} selezionati",
       "status": "Stato",
       "statusDegraded": "⚠ Degradato",
       "statusDown": "✗ Giù",
@@ -15453,7 +15450,6 @@
     "editTitle": "Modifica pagina di stato",
     "back": "Pagine di stato",
     "loadFailed": "Impossibile caricare la pagina di stato",
-    "footerTitle": "Pagine di stato",
     "searchPlaceholder": "Cerca pagine di stato",
     "copyUrl": "Copia URL",
     "publicUrl": "URL pubblico",
@@ -15848,7 +15844,8 @@
       "oncallAck": "Conferma",
       "oncallEscalate": "Inoltra",
       "oncallSnooze": "Posticipa",
-      "oncallResolve": "Risolvi"
+      "oncallResolve": "Risolvi",
+      "functionsImport": "Importa funzione"
     }
   },
   "components": {
@@ -15963,7 +15960,9 @@
         "resetColumnWidths": "Ripristina larghezze colonne"
       },
       "removeColumnAria": "Rimuovi colonna",
-      "formatColumnAria": "Formatta colonna"
+      "formatColumnAria": "Formatta colonna",
+      "selectedOfTotal": "{selected} di {total} selezionati",
+      "selectedCount": "{selected} selezionati"
     },
     "predefinedThemes": {
       "title": "Tema",
@@ -16460,7 +16459,10 @@
       "enrichmentReloadStarted": "Ricaricamento tabella di arricchimento avviato. Elaborazione in background...",
       "enrichmentJobStarted": "Processo tabella di arricchimento avviato. Elaborazione in background...",
       "enrichmentCreationFailed": "Creazione tabella di arricchimento non riuscita",
-      "functionDeletionAssociatedPipelines": "Eliminazione funzione non riuscita perché associata a pipeline. Fai clic sul pulsante Visualizza per ottenere le pipeline associate."
+      "functionDeletionAssociatedPipelines": "Eliminazione funzione non riuscita perché associata a pipeline. Fai clic sul pulsante Visualizza per ottenere le pipeline associate.",
+      "successfullyExportedFunctions": "Esportata correttamente {count} funzione | Esportate correttamente {count} funzioni",
+      "errorExportingFunctions": "Errore durante l'esportazione delle funzioni. Riprova.",
+      "functionsMissingFromExport": "{names} non è più nell'elenco ed è stata esclusa dall'esportazione | {names} non sono più nell'elenco e sono state escluse dall'esportazione"
     },
     "recommended": {
       "failedToImportDashboard": "Importazione dashboard non riuscita: {error}",
@@ -16915,7 +16917,6 @@
     },
     "move": "Sposta",
     "moveTitle": "Sposta {count} SLO in un'altra cartella",
-    "moveSelected": "Sposta {count} selezionati",
     "exportTitle": "Esporta SLO | Esporta {count} SLO",
     "exportSubtitle": "Rivedi la definizione, quindi scaricala come JSON o come Terraform per il provider OpenObserve.",
     "exportFailed": "Impossibile leggere la definizione SLO. Riprova.",
@@ -17680,7 +17681,6 @@
       "otherRow": "Tutte le altre query",
       "truncatedText": "Questa istruzione era troppo lunga per essere memorizzata per intero, quindi viene mostrata troncata.",
       "stmtClass": {
-        "query": "Query",
         "queryHint": "Solo SQL reale — SELECT, INSERT, UPDATE e DELETE.",
         "all": "Query + overhead di connessione",
         "allHint": "Conta anche la contabilità che il tuo driver invia tra le query: BEGIN e COMMIT, SET, e i controlli che mantengono viva una connessione in pool.",
@@ -18281,7 +18281,6 @@
       "disclosureShort": "Ogni riga è una chiamata reale completata.",
       "disclosureDetail": "Misurato dall'applicazione che ha effettuato la chiamata, dalle tracce che invii. Solo le chiamate completate sono qui — una query ancora in esecuzione, o una che si è bloccata e non è più tornata, non ha prodotto alcuna misurazione.",
       "counts": {
-        "complete": "Mostrando tutte le {count} chiamate al database in questa finestra, dalla più lenta.",
         "truncated": "Le {count} chiamate più lente in questa finestra — ne sono state eseguite più di quante mostrate qui.",
         "filtered": "Mostrando {count} di {total} chiamate."
       },
@@ -18625,7 +18624,6 @@
         "unknown": "Stato non segnalato"
       },
       "counts": {
-        "complete": "Mostrando {count} sessioni.",
         "capped": "Sono state campionate più sessioni di quante potessimo leggerne in una volta. Queste sono le {count} che abbiamo.",
         "filtered": "Mostrando {count} di {total} sessioni."
       },
@@ -18742,8 +18740,7 @@
         "lastVacuum": "Ultimo vacuum",
         "lastAutovacuum": "Ultimo autovacuum",
         "lastAnalyze": "Ultima analisi"
-      },
-      "countLine": "{count} tabelle"
+      }
     },
     "recommendations": {
       "title": "Raccomandazioni",
@@ -19088,7 +19085,6 @@
     "acknowledge": "Prendi in carico",
     "acknowledgeHint": "Assumiti la responsabilità. Questo interrompe l'escalation.",
     "actions": "Azioni",
-    "selectedCount": "{count} selezionati",
     "bulkAckDone": "Notifiche prese in carico: {count}",
     "bulkAckPartial": "Notifiche non prese in carico: {count}",
     "resolveCause": "Qual è stata la causa?",

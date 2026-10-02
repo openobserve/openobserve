@@ -75,7 +75,6 @@ const OTableStub = {
       <slot name="toolbar" />
       <slot name="toolbar-trailing" />
       <slot name="empty" />
-      <slot name="bottom" />
       <template v-for="row in data" :key="row.id">
         <div :data-test="'row-' + row.id" @click="$emit('row-click', row)">
           <slot name="cell-status" :row="row" />

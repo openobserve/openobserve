@@ -129,8 +129,9 @@ const onCopy = () => {
   copyToClipboard(props.code, t, {
     successMessage: props.copyMessage ?? t("common.copySuccess"),
     errorMessage: t("common.copyContentError"),
+  }).then((copied) => {
+    if (copied) emit("copy");
   });
-  emit("copy");
 };
 </script>
 

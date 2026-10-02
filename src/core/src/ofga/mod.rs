@@ -73,6 +73,7 @@ struct PendingMigrations {
     workflow_folders: bool,
     synthetic_environments: bool,
     prompts: bool,
+    prompt_folders: bool,
     public_dashboards: bool,
 }
 
@@ -362,6 +363,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         }
                     }
                 }
+                if pending.prompt_folders {
+                    match migrations::migrate_prompt_folders().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Prompt folders migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[OFGA:Local] Error migrating prompt folders to openfga: {e}"
+                            );
+                        }
+                    }
+                }
                 if pending.report_folders {
                     match migrations::migrate_report_folders().await {
                         Ok(_) => {
@@ -519,6 +532,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.prompts {
         keys.extend(["prompts", "prompt_labels"]);
     }
+    if pending.prompt_folders {
+        keys.push("prompt_folders");
+    }
     if pending.public_dashboards {
         keys.push("public_dashboards");
     }
@@ -561,6 +577,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
+    let v0_0_52 = version_compare::Version::from("0.0.52").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -672,6 +689,10 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         pending.prompts = true;
     }
     if existing_model_version < v0_0_51 {
+        log::info!("[OFGA:Local] prompt folders permissions migration needed");
+        pending.prompt_folders = true;
+    }
+    if existing_model_version < v0_0_52 {
         log::info!("[OFGA:Local] public dashboards permissions migration needed");
         pending.public_dashboards = true;
     }
@@ -684,9 +705,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn public_dashboards_back_fill_runs_once_across_0_0_51() {
-        assert!(pending_migrations("0.0.51", "0.0.50").public_dashboards);
-        assert!(!pending_migrations("0.0.51", "0.0.51").public_dashboards);
+    fn public_dashboards_back_fill_runs_once_across_0_0_52() {
+        assert!(pending_migrations("0.0.52", "0.0.51").public_dashboards);
+        assert!(!pending_migrations("0.0.52", "0.0.52").public_dashboards);
         let pending = PendingMigrations {
             public_dashboards: true,
             ..Default::default()

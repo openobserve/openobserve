@@ -49,7 +49,8 @@
     <!-- The two facts a responder needs before anything else ride the title,
          rather than sitting in a metadata grid below the fold. -->
     <template #title-trail>
-      <template v-if="response">
+      <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
+      <template v-if="response && lgUp">
         <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
         <OTag type="oncallResponseState" :value="response.state" size="sm" />
         <!-- How long it has been ringing, beside the word "ringing". The two
@@ -98,7 +99,7 @@
         </OButton>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canAcknowledge">
+        <ODropdown v-if="canAcknowledge && lgUp">
           <template #trigger>
             <OButton
               variant="outline"
@@ -124,7 +125,7 @@
              them had a button. A disabled button that does not say why is a
              dead end — the ladder's own explanation for why there is nobody
              left to escalate to belongs right where the button went grey. -->
-        <span class="inline-flex">
+        <span v-if="lgUp" class="inline-flex">
           <OButton
             variant="outline"
             size="sm-action"
@@ -139,6 +140,7 @@
         </span>
 
         <OButton
+          v-if="lgUp"
           variant="outline"
           size="sm-action"
           data-test="oncall-response-handoff-btn"
@@ -155,7 +157,7 @@
            something larger routinely arrives after it was closed. Hidden once
            an incident exists, because the rail links to it from then on. -->
       <OButton
-        v-if="response && !response.incident_id"
+        v-if="response && !response.incident_id && lgUp"
         variant="outline"
         size="sm-action"
         data-test="oncall-response-promote-btn"
@@ -190,6 +192,59 @@
           {{ t("oncall.resolve") }}
         </OButton>
       </template>
+
+      <!-- Below lg the row holds claiming and closing; the verbs used less often share one menu so the header stays two rows. -->
+      <ODropdown v-if="response && !lgUp && hasMoreActions" side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="icon-toolbar"
+            icon-left="more-vert"
+            :loading="snoozing || escalatingNow"
+            :aria-label="t('oncall.moreActions')"
+            data-test="oncall-response-more-btn"
+          />
+        </template>
+        <ODropdownGroup v-if="canAcknowledge" :label="t('oncall.snoozeFor')">
+          <ODropdownItem
+            v-for="opt in snoozeOptions"
+            :key="opt.minutes"
+            :data-test="`oncall-response-snooze-${opt.minutes}-menu`"
+            @select="snoozeRecord(opt.minutes)"
+          >
+            {{ raw(opt.label) }}
+          </ODropdownItem>
+        </ODropdownGroup>
+        <ODropdownSeparator v-if="canAcknowledge" />
+        <ODropdownItem
+          v-if="isOpenState"
+          :disabled="escalation?.exhausted"
+          data-test="oncall-response-escalate-btn-menu"
+          @select="escalateNow"
+        >
+          <span class="flex max-w-56 flex-col">
+            <span>{{ t("oncall.escalate") }}</span>
+            <!-- Touch has no tooltip, so the reason the verb is greyed out rides on the item itself. -->
+            <span v-if="escalation?.exhausted" class="text-xs whitespace-normal">
+              {{ t("oncall.ladderExhausted") }}
+            </span>
+          </span>
+        </ODropdownItem>
+        <ODropdownItem
+          v-if="isOpenState"
+          data-test="oncall-response-handoff-btn-menu"
+          @select="showHandoff = true"
+        >
+          {{ t("oncall.handoff") }}
+        </ODropdownItem>
+        <ODropdownItem
+          v-if="!response.incident_id"
+          data-test="oncall-response-promote-btn-menu"
+          @select="promoteOpen = true"
+        >
+          {{ t("oncall.promote") }}
+        </ODropdownItem>
+      </ODropdown>
     </template>
 
     <template v-if="response">
@@ -198,6 +253,29 @@
            the scroller — without it the activity thread was clipped at the
            fold with no way to reach the rest. -->
       <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div
+          v-if="!lgUp"
+          class="mb-3 flex flex-wrap items-center gap-2"
+          data-test="oncall-response-meta"
+        >
+          <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
+          <OTag type="oncallResponseState" :value="response.state" size="sm" />
+          <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
+            {{ elapsedLabel }}
+          </span>
+          <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
+            {{ t("oncall.snoozed") }}
+          </OTag>
+          <OTag
+            v-if="isImpacted"
+            variant="info-outline"
+            size="sm"
+            data-test="oncall-response-liaison-tag"
+          >
+            {{ t("oncall.liaisonTag") }}
+          </OTag>
+        </div>
+
         <!-- The one sentence this screen exists to say when it is true:
              nobody has seen this page, and here is why. -->
         <OnCallReachAlarm
@@ -586,6 +664,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -608,7 +687,9 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
@@ -623,6 +704,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
@@ -686,6 +768,7 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 const { t } = useI18nTyped();
+const { lgUp } = useBreakpoint();
 const nowMicros = useOnCallClock();
 const store = useStore();
 const route = useRoute();
@@ -883,6 +966,9 @@ const isOpenState = computed(() => !!response.value && isUnresolved(response.val
 /// Only an escalating page can be claimed. Once it is owned, Acknowledge and
 /// Snooze are gone and Resolve becomes the primary action.
 const canAcknowledge = computed(() => !!response.value && isEscalating(response.value.state));
+
+/// Whether the compact header's menu has anything in it: a closed page already tied to an incident has no verb left.
+const hasMoreActions = computed(() => isOpenState.value || !response.value?.incident_id);
 
 /// Where the team-name link in the subtitle goes — same target and tab
 /// OnCallAboutPage's own team row links to, so the two agree on what
@@ -1145,6 +1231,7 @@ async function resolveRecord() {
       cause: resolveCause.value || undefined,
       causeNote: resolveNote.value.trim() || undefined,
     });
+    analytics.track("oncall_page_resolved", { cause: resolveCause.value || "none", count: 1 });
     toast({ variant: "success", message: t("oncall.resolved") });
     await fetchResponse();
   } catch (err: any) {
@@ -1161,6 +1248,7 @@ async function acknowledgeRecord() {
   acking.value = true;
   try {
     await ackWrite.mutateAsync(responseId.value);
+    analytics.track("oncall_page_acknowledged", { count: 1 });
     toast({ variant: "success", message: t("oncall.acknowledged") });
     await fetchResponse();
   } catch (err: any) {

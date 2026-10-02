@@ -103,6 +103,7 @@
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
+      "dashboard-panel-unsaved-changes.spec.js",
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboardPagination.spec.js"
@@ -221,7 +222,8 @@
       "js-transform-type.spec.js",
       "row-expansion.spec.js",
       "enrichment-table-url.spec.js",
-      "functions-form-validation.spec.js"
+      "functions-form-validation.spec.js",
+      "functions-import-export.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -376,7 +378,8 @@
       "metrics-table-column-order.spec.js",
       "metrics-promql-builder.spec.js",
       "metrics-share-deep-link.spec.js",
-      "metrics-explorer-share-visualize.spec.js"
+      "metrics-explorer-share-visualize.spec.js",
+      "metrics-explorer-stream-cache.spec.js"
     ],
     "disabled": [],
     "paths": [

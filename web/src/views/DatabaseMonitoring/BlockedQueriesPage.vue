@@ -349,16 +349,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #bottom>
-          <!-- The conclusion the table cannot state: everything leads back to
-               one session, and here is the way to it. Rendered inside the
-               pagination bar's actions area, so it sits level with the page
-               controls instead of adding a second bordered row. -->
-          <div
-            v-if="samples.length && footerLine"
-            class="text-text-secondary flex w-full min-w-0 shrink-0 items-center gap-2"
-            data-test="dbm-blocked-footer"
-          >
+        <!-- The conclusion the table cannot state: everything leads back to one session, and here is the way to it. -->
+        <template v-if="samples.length && footerLine" #footer-note>
+          <div class="flex w-full min-w-0 items-center gap-2" data-test="dbm-blocked-footer">
             <OIcon
               :name="perspective === 'blocking' ? 'check-circle' : 'info-outline'"
               class="size-3.5 shrink-0"

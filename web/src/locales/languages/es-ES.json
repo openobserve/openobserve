@@ -1350,6 +1350,26 @@
   "rum": {
     "noSessionReplay": "No hay repetición de sesión disponible",
     "loadingSessionReplay": "Cargando repetición de sesión…",
+    "sessionReplaySeekBehindWindow": "Este momento es anterior a la parte de la sesión que está cargada. Vuelve a abrir la sesión desde este evento para reproducirlo.",
+    "sessionReplayTruncated": "Esta sesión es demasiado larga para cargarla por completo. Se muestran los primeros {count} segmentos.",
+    "sessionReplayLoadingPercent": "Cargando {percent}%",
+    "sessionReplayFullyLoaded": "Cargado por completo",
+    "sessionReplayLoadFailedChip": "Error de carga · Reintentar",
+    "sessionReplayLoadFailed": "No se pudo cargar la repetición de sesión.",
+    "sessionReplayLoadFailedRange": "No se pudo cargar {from} – {to}",
+    "sessionReplayRetrying": "Reintentando ({attempt} de {total})…",
+    "sessionReplayNextPart": "Cargando la siguiente parte de la sesión…",
+    "sessionReplayResumesOnItsOwn": "La reproducción se reanuda automáticamente",
+    "sessionReplayLoadingUpTo": "Cargando hasta {time}…",
+    "sessionReplaySinglePageHint": "Esta sesión tiene una sola página, por lo que todo lo anterior a {time} debe cargarse primero",
+    "sessionReplayNotLoadedYet": "aún no cargado",
+    "sessionReplayTruncatedTooltip": "No disponible: supera el límite de 50.000 segmentos",
+    "sessionReplaySkippedParts": "· {n} parte no se pudo cargar | · {n} partes no se pudieron cargar",
+    "sessionReplayGapTooltip": "Esta parte no se pudo cargar",
+    "sessionReplayRetry": "Reintentar",
+    "sessionReplayLiveBadge": "En vivo",
+    "sessionReplayLateRows": "Llegó actividad anterior después de que se cargara la repetición. Vuelve a cargar para incluirla.",
+    "sessionReplayReload": "Recargar",
     "seek": "Buscar",
     "sessionMetricsAria": "Resumen de métricas de sesión",
     "frustration": "{count} Frustración | {count} Frustraciones",
@@ -2168,7 +2188,6 @@
     "syntheticsTokensDesc": "Tokens o2syn_ a nivel de organización que tus agentes sintéticos privados utilizan para extraer trabajos",
     "serviceAccountsName": "Nombre de las cuentas de servicio",
     "basicUsers": "Usuarios",
-    "organizationMembers": "Miembros de la Organización",
     "invitations": "Invitaciones",
     "quota": "Cuotas",
     "externalUserWarningTitle": "Advertencia de usuario externo",
@@ -2451,7 +2470,6 @@
       "memberUpdatedSuccessfully": "Miembro de la organización actualizado exitosamente."
     },
     "user": {
-      "organizationMembers": "Miembros de la organización",
       "delete": "Eliminar",
       "failedToLoadCustomRoles": "Error al cargar los roles personalizados.",
       "pleaseWaitLoadingUsers": "Espere mientras se cargan los usuarios...",
@@ -2657,7 +2675,6 @@
     "fetchingFunctions": "Obteniendo funciones...",
     "associateFunction": "Asociar función",
     "noFunctionsFound": "No se encontraron funciones",
-    "streamsUnit": "{count} flujo | {count} flujos",
     "deleteAssociatedAlertsPipelinesBatch": "Eliminar todos los pipelines y alertas asociados con los flujos seleccionados",
     "allFieldsCount": "Todos los campos ({count})",
     "performanceFieldsDialog": {
@@ -2770,7 +2787,6 @@
       "showList": "Mostrar lista de ejecuciones"
     },
     "history": {
-      "button": "Ejecuciones",
       "title": "Historial de flujo de trabajo",
       "started": "Iniciado",
       "ended": "Finalizado",
@@ -3329,7 +3345,6 @@
     "actionCannotBeUndone": "Esta acción NO se puede deshacer ni cancelar una vez que se cree el trabajo.",
     "areYouSureProceed": "¿Está seguro de que desea continuar?",
     "clearFilters": "Limpiar filtros",
-    "backfillJobLabel": "{count} Trabajo de backfill | {count} Trabajos de backfill",
     "chunksUnit": "fragmentos",
     "never": "Nunca",
     "jobTooltipLabel": "Trabajo",
@@ -3348,7 +3363,6 @@
     "functionName": "Nombre de la función",
     "remoteDestination": "Destino remoto",
     "failedToLoadPipeline": "No se pudo cargar el pipeline",
-    "header": "Tuberías",
     "subtitle": "Transforme, enriquezca y dirija los datos durante el vuelo",
     "deleteNode": "Eliminar",
     "addPipeline": "Agregar canalización",
@@ -3639,7 +3653,40 @@
     "dataSource": "Fuente de datos",
     "uploadFile": "Cargar archivo",
     "fromUrl": "Desde URL",
-    "addFunction": "Añadir función"
+    "addFunction": "Añadir función",
+    "import": {
+      "title": "Importar función",
+      "outputMessages": "Mensajes de salida",
+      "errorValidations": "Validaciones de errores",
+      "results": "Resultados de importación",
+      "nameLabel": "Nombre de la función",
+      "nameRequired": "Función - {index}: el nombre es obligatorio",
+      "nameExists": "Función - {index}: \"{name}\" ya existe",
+      "nameInvalid": "Función - {index}: \"{name}\" no es un nombre de función válido. Use letras, números y guiones bajos, comenzando con una letra o un guion bajo.",
+      "duplicateName": "Función - {index}: \"{name}\" aparece más de una vez en este archivo",
+      "bodyRequired": "Función - {index}: el cuerpo de la función es obligatorio",
+      "transTypeInvalid": "Función - {index}: el tipo debe ser 0 para VRL o 1 para JavaScript",
+      "paramsInvalid": "Función - {index}: params debe ser una cadena",
+      "transTypeLabel": "Idioma",
+      "transTypePlaceholder": "Elige un idioma",
+      "paramsLabel": "Parámetros",
+      "paramsHint": "Nombres de argumentos separados por comas. Por defecto, “row”.",
+      "overrideExisting": "Reemplazar la función existente en su lugar",
+      "nameInputRequired": "Introduce un nombre de función",
+      "nameInputInvalid": "Use letras, números y guiones bajos, comenzando con una letra o un guion bajo",
+      "nameInputDuplicate": "Otra función de este archivo ya usa este nombre",
+      "nameInputExists": "Este nombre ya está en uso en esta organización",
+      "overrideAffects": "La anulación también modifica estas tuberías: {pipelines}",
+      "createSuccess": "Función - {index}: \"{name}\" importada",
+      "overridden": "Función - {index}: \"{name}\" anulada",
+      "createFailed": "Función - {index}: \"{name}\" falló - {reason}",
+      "rejectedBody": "Corrige la definición e importa de nuevo.",
+      "rejectedLanguage": "Función - {index}: \"{name}\" fue rechazada. Si es una función de JavaScript, establece el idioma — una definición sin idioma se interpreta como VRL.",
+      "jsonStringEmpty": "La cadena JSON está vacía",
+      "invalidJsonFormat": "Formato JSON no válido",
+      "importSuccess": "Se importó {count} función | Se importaron {count} funciones",
+      "nothingToImport": "No se encontraron funciones para importar. Comprueba que el archivo sea JSON válido."
+    }
   },
   "latencyInsights": {
     "analyzingDimensions": "Analizando las dimensiones...",
@@ -5427,7 +5474,6 @@
       "dynamicVariables": "Variables dinámicas"
     },
     "dashboards": {
-      "selected": "{count} seleccionado(s)",
       "failedToLoadFolder": "Error al cargar los Dashboards para la carpeta seleccionada.",
       "pleaseWait": "Espere por favor...",
       "copySuffix": "{title} - Copia",
@@ -6783,7 +6829,6 @@
     "reloadAlertsTooltip": "Recargar alertas",
     "triggerDetection": "Detección de activación",
     "retrain": "Reentrenar",
-    "selectedLabel": "seleccionados",
     "resume": "Reanudar",
     "deleteAlertTitle": "Eliminar alerta",
     "deleteAlertMessage": "¿Está seguro de que desea eliminar esta alerta?",
@@ -7407,7 +7452,6 @@
       "noCondition": "Sin condición",
       "noHistoryAvailable": "No hay ningún historial de evaluación disponible para esta alerta",
       "tryExpandingTimeRange": "Intente expandir el rango de tiempo",
-      "results": "Resultados",
       "ifCondition": "si {condition}"
     },
     "historyTable": {
@@ -7879,8 +7923,6 @@
     "prebuiltDestination": "Destino predefinido de {type}",
     "errorValidations": "Validaciones de errores",
     "outputMessagesLabel": "Mensajes de salida",
-    "incidentSingular": "Incidente",
-    "incidentPlural": "Incidentes",
     "confirmDeleteTemplates": "¿Está seguro de que desea eliminar {count} plantilla? | ¿Está seguro de que desea eliminar {count} plantillas?",
     "lastOutcome": "Último resultado",
     "priority": "Prioridad",
@@ -8235,7 +8277,6 @@
   },
   "alert_templates": {
     "exportTemplate": "Exportar plantilla",
-    "selected": "Seleccionados",
     "deleteTemplateTitle": "Eliminar plantilla",
     "deleteTemplateMessage": "¿Estás seguro de que quieres eliminar la plantilla?",
     "deleteTemplatesTitle": "Eliminar plantillas",
@@ -8489,7 +8530,6 @@
     "deleteDestinationTitle": "Eliminar destino",
     "deleteDestinationMessage": "¿Seguro que quieres eliminar el destino?",
     "deleteDestinationsTitle": "Eliminar destinos",
-    "selected": "seleccionados",
     "organizationLabel": "Organización",
     "defaultPlaceholder": "p. ej., default",
     "streamNameLabel": "Nombre del stream",
@@ -9297,7 +9337,6 @@
     },
     "cipherKeysPage": {
       "subtitle": "Claves de cifrado para campos sensibles",
-      "selected": "{count} seleccionado",
       "delete": "Eliminar",
       "deleteCipherKeyTitle": "Eliminar clave de cifrado",
       "deleteCipherKeyMessage": "¿Está seguro de que desea eliminar la clave de cifrado?",
@@ -9892,7 +9931,6 @@
     },
     "sessionsList": {
       "streamLabel": "Stream",
-      "sessions": "sesiones",
       "failedToLoad": "No se pudieron cargar las sesiones",
       "retry": "Reintentar",
       "tokenTooltip": "Entrada: {input} · Salida: {output} · Total: {total}",
@@ -10004,7 +10042,6 @@
     "servicesCatalog": {
       "noStreamsDetected": "No se detectaron flujos",
       "tabLabel": "Catálogo de servicios",
-      "footerTitle": "Servicios",
       "filterPlaceholder": "Filtrar por nombre de servicio...",
       "columns": {
         "serviceName": "Servicio",
@@ -10573,7 +10610,6 @@
     "create_regex_pattern_field": "Redactar/eliminar usando Regex",
     "import": "Importar",
     "import_title": "Patrón de importación",
-    "bottom_header": "{count} Patrón | {count} Patrones",
     "filter_by_tag": "Filtrar por etiqueta",
     "refresh": "Refrescar",
     "loading_patterns": "Cargando patrones...",
@@ -10629,7 +10665,6 @@
     "get_history": "Obtenga el historial",
     "executed_at": "Ejecutado en",
     "sql_query": "Consulta SQL",
-    "results": "Resultados",
     "delayMessage": "Es posible que el historial de búsqueda se retrase un"
   },
   "correlation": {
@@ -10772,7 +10807,6 @@
     "function_definition": "Definición de función",
     "more_details": "Más detalles",
     "query_function": "Consulta//Función",
-    "results": "Resultados",
     "max_limit": "Límite máximo",
     "cancel_job_title": "Cancelar búsqueda programada",
     "cancel_job_message": "¿Está seguro de que desea cancelar esta búsqueda programada?",
@@ -10879,9 +10913,6 @@
     "testBtn": "Prueba",
     "importBtn": "Importar",
     "newModel": "Nuevo modelo",
-    "modelsCount": "{count} Modelos",
-    "exportSelected": "Exportar ({count})",
-    "deleteSelected": "Eliminar ({count})",
     "importTitle": "Precios del modelo de importación",
     "errorValidations": "Validaciones de errores",
     "outputMessages": "Mensajes de salida",
@@ -11399,11 +11430,6 @@
         "trace": "Trazas",
         "session": "Sesiones"
       },
-      "scopeNoun": {
-        "span": "spans",
-        "trace": "trazas",
-        "session": "sesiones"
-      },
       "inQueueFilter": {
         "label": "En cola",
         "notEnqueued": "En cola: No encolado",
@@ -11418,6 +11444,7 @@
         "type": "Tipo",
         "kind": "Clase",
         "span": "Span",
+        "trace": "Traza",
         "session": "Sesión",
         "topic": "Tema",
         "traces": "Trazas",
@@ -11448,16 +11475,12 @@
         "sectionTitle": "Agregar a la cola",
         "manageQueues": "Gestionar colas"
       },
-      "bulkAdd": "Agregar {count} a la cola",
-      "selectedCount": "{selected} de {total} seleccionados",
-      "footerTitle": "{scope} no saludable",
       "addSuccess": "Agregado a {queue} — la fila permanece en Discovery, su estado reside en la cola.",
       "addError": "No se pudieron agregar elementos a la cola",
       "openQueue": "Abrir cola",
       "queuesError": "No se pudieron cargar las colas"
     },
     "queues": {
-      "listTitle": "Colas",
       "searchPlaceholder": "Buscar colas...",
       "newButton": "Nueva cola",
       "loadError": "No se pudieron cargar las colas",
@@ -11516,7 +11539,6 @@
         "targetDataset": "Dataset de destino",
         "noTargetDataset": "Sin dataset de destino",
         "searchPlaceholder": "Buscar elementos...",
-        "footerTitle": "Elementos",
         "allItems": "Todos",
         "inTrace": "En la traza {traceId}",
         "reviewAgain": "Revisar de nuevo",
@@ -11941,7 +11963,6 @@
       "clearBaseline": "Borrar la línea base"
     },
     "datasets": {
-      "listTitle": "Conjuntos de datos",
       "searchPlaceholder": "Buscar conjuntos de datos...",
       "newButton": "Nuevo conjunto de datos",
       "loadError": "No se pudieron cargar los conjuntos de datos",
@@ -11985,7 +12006,6 @@
         "fallbackTitle": "Conjunto de datos",
         "meta": "{count} elementos · actualizado {updated}",
         "loadError": "No se pudo cargar el conjunto de datos",
-        "footerTitle": "Elementos",
         "tabs": {
           "items": "Elementos",
           "experiments": "Experimentos"
@@ -12122,8 +12142,6 @@
       "summaryAgents": "Agentes afectados",
       "failuresTitle": "Taxonomía de fallos",
       "failuresHint": "Errores agrupados por tipo, por agente",
-      "footerLoops": "Bucles",
-      "footerFailures": "Clases de fallos",
       "noLoops": "No se detectó comportamiento de bucle en este rango",
       "noFailures": "No hay fallos de agente en este rango",
       "noLoopsForAgent": "No hay comportamiento de bucle para {agent} en este rango: cambia de agente o amplía el rango de tiempo",
@@ -12190,7 +12208,6 @@
       }
     },
     "remoteTasks": {
-      "listTitle": "Tareas remotas",
       "searchPlaceholder": "Buscar tareas",
       "newButton": "Nueva tarea",
       "loadError": "No se pudieron cargar las tareas remotas",
@@ -12838,7 +12855,6 @@
         "title": "Puntuaciones de evaluación",
         "hint": "Las puntuaciones y el razonamiento provienen de _llm_scores. Selecciona una ejecución para abrir su traza del evaluador para investigar más a fondo.",
         "filterLabel": "Filtrar puntuaciones de evaluación",
-        "footerTitle": "Puntuaciones de evaluación",
         "noThresholdHint": "Establezca un umbral saludable en esta configuración de puntuación para clasificar y resaltar puntuaciones no saludables.",
         "noReasoning": "No se registró razonamiento",
         "unknownAgent": "Agente desconocido",
@@ -12863,7 +12879,6 @@
         }
       },
       "overview": {
-        "title": "Descripción general de las configuraciones de puntuación",
         "searchPlaceholder": "Configuraciones de filtro...",
         "relativeTime": {
           "daysAgo": "hace {day}d",
@@ -12991,7 +13006,6 @@
         "updatedLabel": "Actualizado"
       },
       "createTitle": "Nueva configuración de puntuación",
-      "listTitle": "Configuraciones de puntuación",
       "searchPlaceholder": "Buscar configuraciones",
       "newButton": "Nueva configuración de puntuación",
       "columns": {
@@ -13068,9 +13082,6 @@
         "errors": {
           "title": "Errores de validación"
         }
-      },
-      "export": {
-        "bulkButton": "Exportar"
       }
     },
     "scorer": {
@@ -13088,8 +13099,9 @@
         "requestTemplateSection": "Plantilla de solicitud",
         "variablesSuffix": "variables",
         "outputSchemaSection": "Esquema de salida",
-        "usedByIntro": "Trabajos que hacen referencia a este evaluador en su pipeline.",
-        "usedByEmpty": "Aún ningún trabajo hace referencia a este evaluador.",
+        "usedByIntro": "Trabajos y experimentos que hacen referencia a este evaluador.",
+        "usedByEmpty": "Ningún trabajo ni experimento hace referencia a este evaluador todavía.",
+        "usedByExperiment": "Experimento",
         "versionsIntro": "Las versiones son instantáneas inmutables de la configuración del evaluador. La versión activa es la que ejecutan los trabajos hoy.",
         "lastUpdated": "Última actualización",
         "metadataSection": "Metadatos",
@@ -13123,7 +13135,6 @@
           }
         }
       },
-      "listTitle": "Evaluadores",
       "searchPlaceholder": "Buscar evaluadores",
       "newButton": "Nuevo evaluador",
       "usedByJob": "{count} trabajo | {count} trabajos",
@@ -13164,9 +13175,6 @@
           "nameConflict": "Puntuador {index}: el nombre \"{name}\" ya existe en esta organización",
           "duplicateName": "Puntuador {index}: el nombre \"{name}\" se usa más de una vez en esta importación"
         }
-      },
-      "export": {
-        "bulkButton": "Exportar"
       },
       "backTo": "Volver a Goleadores",
       "badgeRemote": "Remoto",
@@ -13356,11 +13364,9 @@
           "recentEmpty": "No hay ejecuciones fallidas en la ventana seleccionada."
         }
       },
-      "listTitle": "Trabajos de evaluación",
       "searchPlaceholder": "Buscar trabajos",
       "newButton": "Nuevo trabajo",
       "scorerCount": "{count} puntuador | {count} puntuadores",
-      "deleteBulkButton": "Eliminar",
       "deleteBulkTitle": "Eliminar trabajos de evaluación",
       "deleteBulkConfirm": "¿Estás seguro de que deseas eliminar {count} trabajos de evaluación? Esta acción no se puede deshacer.",
       "deletedBulk": "{count} trabajos de evaluación eliminados",
@@ -14340,10 +14346,6 @@
       "passed": "Aprobado",
       "warning": "Advertencia"
     },
-    "footer": {
-      "browserTests": "Pruebas de navegador",
-      "checks": "Verificaciones"
-    },
     "journey": {
       "extract": {
         "action": "Extraer a subtest",
@@ -14726,7 +14728,6 @@
     },
     "locations": {
       "addLocation": "Agregar ubicación",
-      "bottomHeader": "ubicaciones",
       "bulkDeleteConfirmMessage": "¿Estás seguro de que deseas eliminar {count} ubicaciones?",
       "bulkDeleteConfirmTitle": "Eliminar ubicaciones",
       "bulkDeleteFailed": "Error al eliminar ubicaciones",
@@ -14787,7 +14788,6 @@
       "regionPlaceholder": "ej. us-east-1",
       "regionRequired": "La región es obligatoria",
       "searchPlaceholder": "Buscar ubicaciones…",
-      "selectedCount": "{selected} de {total} ubicaciones seleccionadas",
       "title": "Ubicaciones",
       "publicTitle": "Ubicaciones públicas",
       "privateTitle": "Ubicaciones privadas",
@@ -15041,8 +15041,7 @@
       "detailOrigin": "Origen",
       "detailFirstParty": "Primera parte",
       "detailThirdParty": "Tercera parte",
-      "detailStackTrace": "Traza de pila",
-      "footerEvents": "Eventos"
+      "detailStackTrace": "Traza de pila"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -15242,7 +15241,6 @@
       "bulkTriggerSuccess": "Activada {count} verificación. | Activadas {count} verificaciones.",
       "bulkTriggerToast": "Activando {count} verificación… | Activando {count} verificaciones…",
       "check": "Verificación",
-      "checksFooterTitle": "Verificaciones",
       "checksCount": "{count} comprobaciones",
       "delete": "Eliminar",
       "duplicate": "Duplicar",
@@ -15270,7 +15268,6 @@
       "pausing": "Pausando…",
       "response": "Respuesta",
       "scheduledAt": "Programado en",
-      "selectedCount": "{selected} de {total} seleccionados",
       "status": "Estado",
       "statusDegraded": "⚠ Degradado",
       "statusDown": "✗ Caído",
@@ -15453,7 +15450,6 @@
     "editTitle": "Editar página de estado",
     "back": "Páginas de estado",
     "loadFailed": "No se pudo cargar la página de estado",
-    "footerTitle": "páginas de estado",
     "searchPlaceholder": "Buscar páginas de estado",
     "copyUrl": "Copiar URL",
     "publicUrl": "URL pública",
@@ -15848,7 +15844,8 @@
       "oncallAck": "Reconocer",
       "oncallEscalate": "Escalar",
       "oncallSnooze": "Posponer",
-      "oncallResolve": "Resolver"
+      "oncallResolve": "Resolver",
+      "functionsImport": "Importar función"
     }
   },
   "components": {
@@ -15963,7 +15960,9 @@
         "resetColumnWidths": "Restablecer anchos de columna"
       },
       "removeColumnAria": "Eliminar columna",
-      "formatColumnAria": "Formatear columna"
+      "formatColumnAria": "Formatear columna",
+      "selectedOfTotal": "{selected} de {total} seleccionados",
+      "selectedCount": "{selected} seleccionados"
     },
     "predefinedThemes": {
       "title": "Tema",
@@ -16460,7 +16459,10 @@
       "enrichmentReloadStarted": "Recarga de tabla de enriquecimiento iniciada. Procesando en segundo plano...",
       "enrichmentJobStarted": "Trabajo de tabla de enriquecimiento iniciado. Procesando en segundo plano...",
       "enrichmentCreationFailed": "Falló la creación de la tabla de enriquecimiento",
-      "functionDeletionAssociatedPipelines": "La eliminación de la función falló porque está asociada con pipelines. Haga clic en el botón Ver para ver los pipelines asociados."
+      "functionDeletionAssociatedPipelines": "La eliminación de la función falló porque está asociada con pipelines. Haga clic en el botón Ver para ver los pipelines asociados.",
+      "successfullyExportedFunctions": "Se exportó {count} función correctamente | Se exportaron {count} funciones correctamente",
+      "errorExportingFunctions": "Error al exportar las funciones. Inténtalo de nuevo.",
+      "functionsMissingFromExport": "{names} ya no está en la lista y quedó fuera de la exportación | {names} ya no están en la lista y quedaron fuera de la exportación"
     },
     "recommended": {
       "failedToImportDashboard": "Error al importar el Dashboard: {error}",
@@ -16915,7 +16917,6 @@
     },
     "move": "Mover",
     "moveTitle": "Mover {count} SLO(s) a otra carpeta",
-    "moveSelected": "Mover {count} seleccionados",
     "exportTitle": "Exportar SLO | Exportar {count} SLOs",
     "exportSubtitle": "Revise la definición, luego descárguela como JSON o como Terraform para el proveedor de OpenObserve.",
     "exportFailed": "No se pudo leer la definición del SLO. Inténtelo de nuevo.",
@@ -17680,7 +17681,6 @@
       "otherRow": "Todas las demás consultas",
       "truncatedText": "Esta sentencia era demasiado larga para almacenarla completa, por lo que se muestra truncada.",
       "stmtClass": {
-        "query": "Consultas",
         "queryHint": "Solo SQL real — SELECT, INSERT, UPDATE y DELETE.",
         "all": "Consultas + sobrecarga de conexión",
         "allHint": "También cuenta el trabajo de contabilidad que su controlador envía entre consultas: BEGIN y COMMIT, SET y las comprobaciones que mantienen viva una conexión agrupada.",
@@ -18281,7 +18281,6 @@
       "disclosureShort": "Cada fila es una llamada real completada",
       "disclosureDetail": "Medido por la aplicación que realizó la llamada, a partir de las trazas que envías. Solo están aquí las llamadas que finalizaron: una consulta que aún se ejecuta, o una que se colgó y nunca volvió, no produjo ninguna medición.",
       "counts": {
-        "complete": "Mostrando todas las {count} llamadas a base de datos en esta ventana, las más lentas primero.",
         "truncated": "Las {count} llamadas más lentas en esta ventana — se ejecutaron más de las que se muestran aquí.",
         "filtered": "Mostrando {count} de {total} llamadas."
       },
@@ -18625,7 +18624,6 @@
         "unknown": "Estado no reportado"
       },
       "counts": {
-        "complete": "Mostrando {count} sesiones.",
         "capped": "Se muestrearon más sesiones de las que pudimos leer a la vez. Estas son las {count} que tenemos.",
         "filtered": "Mostrando {count} de {total} sesiones."
       },
@@ -18742,8 +18740,7 @@
         "lastVacuum": "Último vacuum",
         "lastAutovacuum": "Último autovacuum",
         "lastAnalyze": "Último análisis"
-      },
-      "countLine": "{count} tablas"
+      }
     },
     "recommendations": {
       "title": "Recomendaciones",
@@ -19088,7 +19085,6 @@
     "acknowledge": "Reconocer",
     "acknowledgeHint": "Hazte cargo. Esto detiene la escalada.",
     "actions": "Acciones",
-    "selectedCount": "{count} seleccionados",
     "bulkAckDone": "Se reconocieron {count} avisos",
     "bulkAckPartial": "{count} no se pudieron reconocer",
     "resolveCause": "¿Cuál fue la causa?",
