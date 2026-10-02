@@ -2084,8 +2084,7 @@ async fn build_and_run_anomaly_update(
         detection_window_seconds: fields.detection_window_seconds,
         training_window_days: fields.training_window_days,
         percentile: fields.percentile,
-        // Set-only mapping: this endpoint's partial semantics cannot express "clear".
-        alert_budget_per_day: fields.alert_budget_per_day.map(Some),
+        alert_budget_per_day: fields.alert_budget_per_day,
         level_half_width_seconds: fields.level_half_width_seconds.map(Some),
         band_width: fields.band_width,
         alert_direction: fields.alert_direction,
@@ -3543,7 +3542,9 @@ pub async fn trigger_alert(
                 )
                 .await
                 {
-                    Ok(_) => MetaHttpResponse::ok("Detection triggered"),
+                    // The core reply carries `claim_lost`, so an in-flight run is not shown as
+                    // fresh.
+                    Ok(result) => MetaHttpResponse::json(result),
                     Err(e) => {
                         let msg = e.to_string().to_lowercase();
                         if msg.contains("not found") {

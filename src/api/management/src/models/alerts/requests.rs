@@ -368,9 +368,14 @@ pub struct UpdateAnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
-    /// Set-only through this endpoint: clearing a budget goes through the direct anomaly API.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alert_budget_per_day: Option<f64>,
+    /// Absent leaves the stored budget; `null` clears it back to percentile mode.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_budget_per_day: Option<Option<f64>>,
     /// Accepted and stored, but ignored by the band model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(deprecated)]
@@ -905,6 +910,25 @@ mod tests {
         assert_eq!(fields.alert_window_buckets, Some(Some(5)));
         assert_eq!(fields.alert_window_fire_pct, Some(Some(80.0)));
         assert_eq!(fields.alert_window_recover_pct, Some(None));
+    }
+
+    #[test]
+    fn test_update_alert_budget_keeps_absent_and_null_apart() {
+        let parse = |body: serde_json::Value| {
+            serde_json::from_value::<UpdateAlertRequestBody>(body)
+                .unwrap()
+                .anomaly_fields()
+                .alert_budget_per_day
+        };
+        assert_eq!(parse(serde_json::json!({ "anomaly_config": {} })), None);
+        assert_eq!(
+            parse(serde_json::json!({ "anomaly_config": { "alert_budget_per_day": null } })),
+            Some(None)
+        );
+        assert_eq!(
+            parse(serde_json::json!({ "anomaly_config": { "alert_budget_per_day": 2.5 } })),
+            Some(Some(2.5))
+        );
     }
 
     #[test]
