@@ -169,7 +169,7 @@ pub struct AnomalyAlertFields {
     /// `both`, `above` or `below`; absent means both.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_direction: Option<String>,
-    /// Window-share length in buckets, 1 to 288; absent means 1.
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; absent means 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_window_buckets: Option<i32>,
     /// Percent of the window out of band that fires; absent means 100.
@@ -396,7 +396,7 @@ pub struct UpdateAnomalyAlertFields {
     )]
     #[schema(value_type = Option<String>)]
     pub alert_direction: Option<Option<String>>,
-    /// Window-share length in buckets, 1 to 288; `null` clears to 1.
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; `null` clears to 1.
     #[serde(
         default,
         deserialize_with = "double_option",

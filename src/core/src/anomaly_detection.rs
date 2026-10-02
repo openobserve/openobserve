@@ -136,9 +136,6 @@ const BAND_WIDTH_RANGE: std::ops::RangeInclusive<f64> = 1.0..=10.0;
 /// The values the delivery gate's `AlertDirection::from_column` names; NULL also means both.
 const ALERT_DIRECTIONS: [&str; 3] = ["both", "above", "below"];
 
-/// One day of 5-minute buckets.
-const ALERT_WINDOW_BUCKETS_RANGE: std::ops::RangeInclusive<i32> = 1..=288;
-
 /// Each window bucket is re-fetched as look-back on every run, so the window is capped in time.
 const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
 
@@ -187,7 +184,7 @@ pub struct CreateAnomalyConfigRequest {
     /// `both`, `above` or `below`; absent means both.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_direction: Option<String>,
-    /// Window-share length in buckets, 1 to 288; absent means 1.
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; absent means 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_window_buckets: Option<i32>,
     /// Percent of the window out of band that fires; absent means 100.
@@ -283,7 +280,7 @@ pub struct UpdateAnomalyConfigRequest {
     )]
     #[schema(value_type = Option<String>)]
     pub alert_direction: Option<Option<String>>,
-    /// Window-share length in buckets, 1 to 288; `null` clears to 1.
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; `null` clears to 1.
     #[serde(
         default,
         deserialize_with = "double_option",
@@ -1904,13 +1901,9 @@ fn validate_band_settings(
         );
     }
     if let Some(buckets) = settings.alert_window_buckets
-        && !ALERT_WINDOW_BUCKETS_RANGE.contains(&buckets)
+        && buckets < 1
     {
-        anyhow::bail!(
-            "alert_window_buckets must be between {} and {}",
-            ALERT_WINDOW_BUCKETS_RANGE.start(),
-            ALERT_WINDOW_BUCKETS_RANGE.end()
-        );
+        anyhow::bail!("alert_window_buckets must be at least 1");
     }
     // An unparseable interval is the interval rule's to report, not this one's.
     if let Some(buckets) = settings.alert_window_buckets
@@ -6382,14 +6375,8 @@ mod tests {
         }
 
         #[test]
-        fn window_buckets_are_one_to_a_day_of_five_minute_buckets() {
-            for (n, ok) in [
-                (0, false),
-                (1, true),
-                (288, true),
-                (289, false),
-                (-1, false),
-            ] {
+        fn window_buckets_are_at_least_one() {
+            for (n, ok) in [(0, false), (1, true), (288, true), (-1, false)] {
                 let s = BandSettings {
                     alert_window_buckets: Some(n),
                     ..defaults()
@@ -6402,6 +6389,10 @@ mod tests {
         fn the_window_spans_at_most_a_day_of_histogram_buckets() {
             for (interval, n, ok) in [
                 ("5m", 288, true),
+                ("5m", 289, false),
+                ("1m", 720, true),
+                ("1m", 1440, true),
+                ("1m", 1441, false),
                 ("1h", 24, true),
                 ("1h", 25, false),
                 ("1d", 1, true),
