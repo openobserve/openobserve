@@ -729,6 +729,7 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.openDetail(name);
 
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+        await pm.anomalyDetectionPage.openDetectorInternals();
         for (const key of ['metric', 'score', 'deviation']) {
           await expect(pm.anomalyDetectionPage.getChartPanelLocator(key)).toBeVisible();
         }
@@ -740,6 +741,7 @@ test.describe('Anomaly Detection', () => {
         const name = await ownAnomaly(page, 'range');
         await pm.anomalyDetectionPage.openDetail(name);
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+        await pm.anomalyDetectionPage.openDetectorInternals();
 
         // One picker for all three: separate pickers would let the panels
         // silently disagree about which window they are showing. Starting at
@@ -752,6 +754,7 @@ test.describe('Anomaly Detection', () => {
           await expect(
             pm.anomalyDetectionPage.getChartRangeItemLocator(range),
           ).toHaveAttribute('data-state', 'on');
+          await pm.anomalyDetectionPage.revealChartPanels();
           await panelQueries;
         }
       });
@@ -761,6 +764,7 @@ test.describe('Anomaly Detection', () => {
       }, async ({ page }) => {
         const name = await ownAnomaly(page, 'emptychart');
         await pm.anomalyDetectionPage.openDetail(name);
+        await pm.anomalyDetectionPage.openDetectorInternals();
 
         // A freshly created anomaly has not trained, so each panel is either a
         // rendered chart or the explicit unavailable state — never neither.
@@ -939,6 +943,7 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.searchAnomaly(firingName);
       await pm.anomalyDetectionPage.openDetail(firingName);
       await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+      await pm.anomalyDetectionPage.openDetectorInternals();
       for (const key of ['metric', 'score', 'deviation']) {
         await expect(pm.anomalyDetectionPage.getChartPanelLocator(key)).toBeVisible();
       }

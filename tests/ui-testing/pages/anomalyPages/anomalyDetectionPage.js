@@ -125,9 +125,17 @@ class AnomalyDetectionPage {
             filterOperator: (idx) => `[data-test="anomaly-filter-operator-${idx}"]`,
             filterValue: (idx) => `[data-test="anomaly-filter-value-${idx}"]`,
             chartRangeItem: (v) => `[data-test="alerts-anomalydetectionchart-range-${v}"]`,
+            chartInternals: '[data-test="alerts-anomalydetectionchart-internals"]',
             chartPanel: (key) => `[data-test="alerts-anomalydetectionchart-${key}"]`,
-            chartPanelBody: (key) => `[data-test="alerts-anomalydetectionchart-${key}-panel"]`,
-            chartPanelEmpty: (key) => `[data-test="alerts-anomalydetectionchart-${key}-empty"]`,
+            // The metric chart is the band chart, not a dashboard panel, and has a no-rows state of its own.
+            chartPanelBody: (key) =>
+                key === 'metric'
+                    ? '[data-test="alerts-anomalydetectionchart-metric-chart"]'
+                    : `[data-test="alerts-anomalydetectionchart-${key}-panel"]`,
+            chartPanelEmpty: (key) =>
+                key === 'metric'
+                    ? '[data-test="alerts-anomalydetectionchart-metric-empty"], [data-test="alerts-anomalydetectionchart-metric-nodata"]'
+                    : `[data-test="alerts-anomalydetectionchart-${key}-empty"]`,
         };
     }
 
@@ -867,6 +875,21 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.chartPanelEmpty(key));
     }
 
+    /** Score and deviation sit in a collapsed "Detector internals" section that mounts them only when open. */
+    async openDetectorInternals() {
+        const trigger = this.page.locator(this.selectors.chartInternals).getByRole('button').first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    }
+
+    /** Dashboard panels query only once scrolled into view, so an off-screen panel never re-queries on its own. */
+    async revealChartPanels() {
+        for (const key of ['metric', 'score', 'deviation']) {
+            await this.getChartPanelLocator(key).scrollIntoViewIfNeeded();
+        }
+    }
+
     async selectChartRange(value) {
         const range = this.page.locator(this.selectors.detectionChartsRange);
         await range.waitFor({ state: 'visible', timeout: 15000 });
@@ -890,7 +913,8 @@ class AnomalyDetectionPage {
         const expectedUs = rangeMs * 1000;
         const projections = [
             ['metric', 'actual_value'],
-            ['score', 'threshold_value'],
+            // Not threshold_value: the metric query projects it too.
+            ['score', 'score_value'],
             ['deviation', 'deviation_percent'],
         ];
         return Promise.all(
