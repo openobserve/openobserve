@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
 import type { VNode } from "vue";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
 import {
   Comment,
   Fragment,
@@ -352,7 +353,7 @@ function onCellActionsLeave() {
 const overflowTooltipCtx = inject(OTableOverflowTooltipKey, null);
 function onCellEnter(event: MouseEvent) {
   if (!isAction.value && meta.value?.cellOverflowTooltip !== false && cellEl.value) {
-    overflowTooltipCtx?.enter(cellEl.value);
+    overflowTooltipCtx?.enter(cellEl.value, cellActionsSide);
   }
   onCellActionsEnter(event);
 }
@@ -392,6 +393,14 @@ const hasCellActionsContent = computed(() => {
     }),
   );
 });
+
+// Read when the table's cut-off tooltip opens, so it can take the side this toolbar leaves free.
+function cellActionsSide(): TooltipSide | null {
+  if (!hasCellActions.value || !isCellActionActive.value || !hasCellActionsContent.value) {
+    return null;
+  }
+  return cellActionsBelow.value ? "bottom" : "top";
+}
 
 // Fixed coordinates don't follow a scrolling row, so drop the toolbar instead of
 // letting it hang over unrelated content.

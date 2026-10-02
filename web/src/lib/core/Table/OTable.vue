@@ -18,7 +18,12 @@ import { useTableColumnPersistence } from "./composables/useTableColumnPersisten
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { TOOLTIP_TRIGGER_ATTR } from "@/lib/overlay/Tooltip/OTooltip.types";
+import {
+  TOOLTIP_OFF_ATTR,
+  TOOLTIP_TRIGGER_ATTR,
+  TOOLTIP_TRIGGER_OVERFLOW,
+  type TooltipSide,
+} from "@/lib/overlay/Tooltip/OTooltip.types";
 import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
 import {
   TABLE_CHECKBOX_COL_SIZE,
@@ -336,8 +341,10 @@ provide(OTableCellActionsKey, {
 // One tooltip for the whole table, measured only on hover, so cells carry no per-cell cost.
 const OVERFLOW_TOOLTIP_DELAY_MS = 700;
 const OWN_TOOLTIP_SELECTOR = `[${TOOLTIP_TRIGGER_ATTR}], [title]:not([title=""])`;
+const TOOLTIP_OFF_SELECTOR = `[${TOOLTIP_OFF_ATTR}]`;
 const overflowAnchor = shallowRef<HTMLElement | null>(null);
 const overflowText = ref("");
+const overflowSide = ref<TooltipSide>("top");
 let overflowTimer: ReturnType<typeof setTimeout> | null = null;
 
 function hideCellOverflow(): void {
@@ -347,24 +354,40 @@ function hideCellOverflow(): void {
   }
   overflowAnchor.value = null;
 }
-// A cell that already carries its own tooltip or title keeps it, so the user never sees two.
-function hasOwnTooltip(target: HTMLElement, cell: HTMLElement): boolean {
-  const owner = target.closest(OWN_TOOLTIP_SELECTOR);
-  return (!!owner && cell.contains(owner)) || !!target.querySelector(OWN_TOOLTIP_SELECTOR);
+// An overflow-only tooltip only shows while its own element is cut; any other owner always shows.
+function ownTooltipShows(el: Element): boolean {
+  return (
+    el.getAttribute(TOOLTIP_TRIGGER_ATTR) !== TOOLTIP_TRIGGER_OVERFLOW || isElementTruncated(el)
+  );
 }
-function showCellOverflow(cell: HTMLElement): void {
+// A cell that already shows its own tooltip keeps it (never two bubbles), and one marked off never gets one.
+function hasOwnTooltip(target: HTMLElement, cell: HTMLElement): boolean {
+  const off = target.closest(TOOLTIP_OFF_SELECTOR);
+  if ((off && cell.contains(off)) || target.querySelector(TOOLTIP_OFF_SELECTOR)) return true;
+  for (let el: Element | null = target; el && cell.contains(el); el = el.parentElement) {
+    if (el.matches(OWN_TOOLTIP_SELECTOR) && ownTooltipShows(el)) return true;
+  }
+  // A text-less owner inside the cell (an icon button's "Copy") describes itself, not the cut text.
+  return [...target.querySelectorAll(OWN_TOOLTIP_SELECTOR)].some(
+    (el) => (el.textContent ?? "").trim() !== "" && ownTooltipShows(el),
+  );
+}
+function showCellOverflow(cell: HTMLElement, toolbarSide?: () => TooltipSide | null): void {
   overflowTimer = null;
   if (!cell.isConnected) return;
   const candidates = [cell, ...cell.querySelectorAll<HTMLElement>(`[${TABLE_CELL_CLIP_ATTR}]`)];
   const target = candidates.find((el) => isElementTruncated(el));
   if (!target || hasOwnTooltip(target, cell)) return;
-  overflowText.value = readElementText(target);
+  const text = readElementText(target);
+  if (!text) return;
+  overflowText.value = text;
+  overflowSide.value = toolbarSide?.() === "top" ? "bottom" : "top";
   overflowAnchor.value = target;
 }
-function enterCell(cell: HTMLElement): void {
+function enterCell(cell: HTMLElement, toolbarSide?: () => TooltipSide | null): void {
   hideCellOverflow();
   if (!props.cellOverflowTooltip) return;
-  overflowTimer = setTimeout(() => showCellOverflow(cell), OVERFLOW_TOOLTIP_DELAY_MS);
+  overflowTimer = setTimeout(() => showCellOverflow(cell, toolbarSide), OVERFLOW_TOOLTIP_DELAY_MS);
 }
 function onOverflowTooltipOpenChange(open: boolean): void {
   if (!open) hideCellOverflow();
@@ -1816,6 +1839,7 @@ defineExpose({
     <OTooltip
       v-if="cellOverflowTooltip"
       :anchor="overflowAnchor"
+      :side="overflowSide"
       :open="!!overflowAnchor"
       :content="raw(overflowText)"
       @update:open="onOverflowTooltipOpenChange"

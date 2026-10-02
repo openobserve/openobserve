@@ -31,7 +31,12 @@ const tooltipContent = computed(() => (props.tooltip === false ? undefined : pro
 </script>
 
 <template>
-  <component :is="as" :class="classes" data-test="o-truncated-text">
+  <component
+    :is="as"
+    :class="classes"
+    data-test="o-truncated-text"
+    :data-o-tooltip-off="tooltip === false ? '' : undefined"
+  >
     <!-- First child on purpose: with no element before it, the tooltip attaches to this root. -->
     <OTooltip v-if="tooltip !== false" overflow-only :content="tooltipContent" />
     <slot />

@@ -224,9 +224,30 @@ describe("OTooltip", () => {
       cut.wrapper.unmount();
     });
 
-    it("marks the element it belongs to, in both modes", () => {
+    it("stays closed in child mode when the cut element has no text, such as an icon", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h("span", { "data-testid": "t" }, [
+              h(OTooltip, { overflowOnly: true, delay: 10 }),
+              h("i", { class: "icon" }),
+            ]),
+        },
+        { attachTo: document.body },
+      );
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      setWidths(trigger, 310, 200);
+
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle();
+
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("marks the element it belongs to in both modes, flagging overflow-only ones", () => {
       const child = mountChild();
-      expect(child.find('[data-testid="t"]').attributes("data-o-tooltip-trigger")).toBe("");
+      expect(child.find('[data-testid="t"]').attributes("data-o-tooltip-trigger")).toBe("overflow");
       child.unmount();
 
       const wrapped = mount(OTooltip, {

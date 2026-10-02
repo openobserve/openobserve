@@ -5,6 +5,7 @@ import type { I18nText } from "@/types/i18n";
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
 
 // ─── Row rail / row tone ─────────────────────────────────────────
 /**
@@ -81,7 +82,8 @@ export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
 // ─── Cut-off cell tooltip context ────────────────────────────────
 /** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
 export interface OTableOverflowTooltipContext {
-  enter: (cell: HTMLElement) => void;
+  /** `toolbarSide` reports where the cell's hover toolbar sits, so the tooltip opens on the other side. */
+  enter: (cell: HTMLElement, toolbarSide?: () => TooltipSide | null) => void;
   leave: () => void;
 }
 

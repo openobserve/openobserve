@@ -103,4 +103,14 @@ describe("OTruncatedText", () => {
     wrapper = mount(OTruncatedText, { props: { tooltip: false }, slots: { default: "x" } });
     expect(wrapper.findComponent(OTooltip).exists()).toBe(false);
   });
+
+  it("should mark itself off when tooltip is false, so a surrounding table never shows its text", () => {
+    wrapper = mount(OTruncatedText, { props: { tooltip: false }, slots: { default: "x" } });
+    expect(wrapper.attributes("data-o-tooltip-off")).toBe("");
+  });
+
+  it("should carry no off marker when it has a tooltip", () => {
+    wrapper = mount(OTruncatedText, { slots: { default: "x" } });
+    expect(wrapper.attributes("data-o-tooltip-off")).toBeUndefined();
+  });
 });

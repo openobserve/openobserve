@@ -1181,6 +1181,90 @@ describe("OTable", () => {
       expect(bubbles()).toHaveLength(0);
     });
 
+    it("still shows cut text when the cell's only other title is a text-less copy button", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span>{{ row.name }}</span><button title="Copy"></button>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("never shows text from inside an element marked off, as a secret is", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span data-o-tooltip-off="">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("shows the cut wrapper's text when an overflow-only tooltip inside it is not cut itself", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span data-o-tooltip-trigger="overflow">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("opens nothing when the cut cell has no text, such as an icon", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<i class="icon"></i>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("opens below the cell when the cell's hover toolbar sits above it", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: { "cell-hover-actions": `<span class="hover-act">A</span>` },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(document.querySelector(".hover-act")).not.toBeNull();
+      expect(bubbles()[0]?.getAttribute("data-side")).toBe("bottom");
+    });
+
+    it("opens above the cell when there is no hover toolbar", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.getAttribute("data-side")).toBe("top");
+    });
+
     it("closes the tooltip when the pointer leaves the cell", async () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(1), columns: makeColumns() },

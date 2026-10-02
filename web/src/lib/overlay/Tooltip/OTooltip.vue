@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   TOOLTIP_TRIGGER_ATTR,
+  TOOLTIP_TRIGGER_OVERFLOW,
   type TooltipEmits,
   type TooltipProps,
   type TooltipSlots,
@@ -65,6 +66,10 @@ const isAnchored = computed(() => props.anchor !== undefined);
 // Captured when an overflow-only tooltip opens, so the bubble shows exactly the cut text.
 const overflowText = ref("");
 const contentText = computed(() => props.content ?? overflowText.value);
+// A cut element with no text of its own (an icon) would otherwise open an empty bubble.
+const hasNothingToShow = () =>
+  props.content === undefined && !slots.content && overflowText.value === "";
+const triggerMarker = computed(() => (props.overflowOnly ? TOOLTIP_TRIGGER_OVERFLOW : ""));
 
 // ─── Wrapper mode, overflow-only: controlled so a fitting trigger never opens ──
 const wrapperTriggerRef = ref<ComponentPublicInstance | null>(null);
@@ -84,6 +89,7 @@ function onWrapperOpenChange(next: boolean) {
   const el = wrapperTriggerRef.value?.$el as Element | undefined;
   if (!el || !isElementTruncated(el)) return;
   overflowText.value = readElementText(el);
+  if (hasNothingToShow()) return;
   wrapperOpen.value = true;
 }
 
@@ -164,7 +170,7 @@ onMounted(() => {
     }
     parentEl.value = candidate;
     if (parentEl.value) {
-      parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, "");
+      parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, triggerMarker.value);
       // Open after `props.delay` ms of hover (matching wrapper mode); leaving
       // before then cancels the pending open so a quick pass-over shows nothing.
       // Mount the reka tree (if not already) and open it. Deferring the mount to
@@ -176,6 +182,7 @@ onMounted(() => {
           // Measured now, not at mount: width and text may have changed since.
           if (!parentEl.value || !isElementTruncated(parentEl.value)) return;
           overflowText.value = readElementText(parentEl.value);
+          if (hasNothingToShow()) return;
         }
         childActivated.value = true;
         childOpen.value = true;
@@ -287,7 +294,7 @@ const contentClasses = computed(() => [
       :disabled="disabled"
       @update:open="onWrapperOpenChange"
     >
-      <TooltipTrigger ref="wrapperTriggerRef" as-child data-o-tooltip-trigger="">
+      <TooltipTrigger ref="wrapperTriggerRef" as-child :data-o-tooltip-trigger="triggerMarker">
         <slot />
       </TooltipTrigger>
       <TooltipPortal>
