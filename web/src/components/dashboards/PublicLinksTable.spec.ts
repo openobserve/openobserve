@@ -287,7 +287,7 @@ describe("PublicLinksTable", () => {
     await find(w, "dashboards-public-links-l3-revoke-menu").trigger("click");
     await flushPromises();
     expect(confirm).toHaveBeenLastCalledWith(
-      expect.objectContaining({ title: 'Revoke and delete "Orphan"?' }),
+      expect.objectContaining({ title: 'Revoke and delete "Orphan"?', destructive: true }),
     );
     expect(admin.revoke).toHaveBeenCalledWith("default", "dash-1", "l3");
     expect(notify.positive).toHaveBeenCalledWith("Public link revoked and deleted");

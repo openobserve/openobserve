@@ -30,6 +30,8 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     revoke: vi.fn(),
   },
 }));
+const confirm = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useConfirmDialog", () => ({ useConfirmDialog: () => ({ confirm }) }));
 const notify = vi.hoisted(() => ({ error: vi.fn(), positive: vi.fn() }));
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
@@ -270,19 +272,26 @@ describe("PublicLinksPanel", () => {
     expect(notify.positive).toHaveBeenCalled();
   });
 
-  it("revokes only after the inline confirmation", async () => {
+  it("revokes only after the confirmation dialog", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     vi.mocked(admin.revoke).mockResolvedValue({ data: {} } as never);
     const w = build();
     await flushPromises();
-    await w.find('[data-test="dashboards-public-links-panel-l1-revoke-menu"]').trigger("click");
+    const revoke = w.find('[data-test="dashboards-public-links-panel-l1-revoke-menu"]');
+
+    confirm.mockResolvedValueOnce(false);
+    await revoke.trigger("click");
     await flushPromises();
     expect(admin.revoke).not.toHaveBeenCalled();
-    expect(has(w, "dashboards-public-links-panel-revoke-confirm")).toBe(true);
 
-    await w.find('[data-test="dashboards-public-links-panel-revoke-confirm-btn"]').trigger("click");
+    confirm.mockResolvedValueOnce(true);
+    await revoke.trigger("click");
     await flushPromises();
+    expect(confirm).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Revoke and delete "NOC wall"?', destructive: true }),
+    );
     expect(admin.revoke).toHaveBeenCalledWith("default", "dash-1", "l1");
+    expect(notify.positive).toHaveBeenCalled();
   });
 
   it("edits a link in place and keeps its frozen values without the pickers", async () => {

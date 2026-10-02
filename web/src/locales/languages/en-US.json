@@ -6108,7 +6108,6 @@
       "resumedToast": "Link resumed",
       "savedToast": "Link settings saved",
       "actionFailed": "Failed to update the link",
-      "revokeConfirm": "Revoke and delete \"{name}\"? Anyone using this link loses access. This can't be undone.",
       "expiresHelp": "The link stops at the end of this day. Leave empty to never expire.",
       "expiresInPast": "Pick today or a later date",
       "expiresToday": "Expires today",
@@ -6124,7 +6123,7 @@
       "search": "Search public links",
       "summaryAll": "All",
       "revokeTitle": "Revoke and delete \"{name}\"?",
-      "revokeMessage": "Anyone using this link loses access immediately. This can't be undone; publishing again creates a new link.",
+      "revokeMessage": "Anyone using this link loses access immediately. This can't be undone. Publishing again creates a new link.",
       "frozenVariablesNote": "The public link always loads the dashboard with the values selected here. Viewers can see them but can't change them."
     }
   },

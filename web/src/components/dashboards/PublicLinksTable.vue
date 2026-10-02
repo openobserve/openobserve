@@ -487,6 +487,7 @@ async function revokeLink(link: PublicLink) {
     message: t("dashboard.publicLinks.revokeMessage"),
     confirmLabel: t("dashboard.publicDashboard.revoke"),
     cancelLabel: t("common.cancel"),
+    destructive: true,
   });
   if (!ok) return;
   try {

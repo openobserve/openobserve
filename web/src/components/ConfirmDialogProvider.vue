@@ -8,6 +8,7 @@
     size="sm"
     :title="currentDialog.title"
     :primary-button-label="currentDialog.confirmLabel || t('common.ok')"
+    :primary-button-variant="currentDialog.destructive ? 'destructive' : 'primary'"
     :secondary-button-label="currentDialog.cancelLabel || t('common.cancel')"
     :persistent="currentDialog.persistent ?? true"
     @click:primary="handleConfirm"

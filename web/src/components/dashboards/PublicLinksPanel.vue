@@ -184,40 +184,6 @@
       class="flex h-full min-h-0 flex-col gap-3"
       data-test="dashboards-public-links-panel-list"
     >
-      <OContent v-if="revoking" class="pt-3">
-        <OBanner
-          variant="error-soft"
-          inline-actions
-          data-test="dashboards-public-links-panel-revoke-confirm"
-          :content="
-            t('dashboard.publicLinks.revokeConfirm', {
-              name: revoking.name ? raw(revoking.name) : t('dashboard.publicLinks.untitled'),
-            })
-          "
-        >
-          <template #actions>
-            <div class="flex gap-2">
-              <OButton
-                variant="outline"
-                size="sm-action"
-                data-test="dashboards-public-links-panel-revoke-cancel-btn"
-                @click="revoking = null"
-              >
-                {{ t("common.cancel") }}
-              </OButton>
-              <OButton
-                variant="destructive"
-                size="sm-action"
-                :loading="revokePending"
-                data-test="dashboards-public-links-panel-revoke-confirm-btn"
-                @click="confirmRevoke"
-              >
-                {{ t("dashboard.publicDashboard.revoke") }}
-              </OButton>
-            </div>
-          </template>
-        </OBanner>
-      </OContent>
       <OTable
         class="min-h-0 flex-1"
         :data="filteredLinks"
@@ -405,7 +371,7 @@
                 icon-left="delete"
                 variant="destructive"
                 :data-test="`dashboards-public-links-panel-${row.id}-revoke-menu`"
-                @select="revoking = row"
+                @select="revokeLink(row)"
               >
                 {{ t("dashboard.publicDashboard.revoke") }}
               </ODropdownItem>
@@ -423,6 +389,7 @@ import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOrgId } from "@/composables/query";
 import { copyToClipboard } from "@/utils/clipboard";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -439,7 +406,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -501,6 +467,7 @@ const emit = defineEmits<{ "update:modelValue": [boolean] }>();
 const store = useStore();
 const { t } = useI18nTyped();
 const { showErrorNotification, showPositiveNotification } = useNotifications();
+const { confirm } = useConfirmDialog();
 const orgId = useOrgId();
 
 const open = computed({
@@ -549,12 +516,10 @@ const filteredLinks = computed(() => {
 const saveMutation = useMutation(() => savePublicLinkMutation(orgId.value));
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
-const revokePending = revokeMutation.isPending;
 
 const view = ref<PanelView>("list");
 const editing = ref<PublicLink | null>(null);
 const createdLink = ref<PublicLink | null>(null);
-const revoking = ref<PublicLink | null>(null);
 // Remounts the variable pickers so each form opens on its own seed.
 const formKey = ref(0);
 const liveVariables = ref<VariableValues | null>(null);
@@ -648,7 +613,6 @@ function frozenVariables(): Record<string, unknown> {
 
 function openForm(link: PublicLink | null) {
   editing.value = link;
-  revoking.value = null;
   liveVariables.value = null;
   formKey.value += 1;
   form.reset(link ? publicLinkFormFrom(link, timezone.value) : publicLinkDefaults());
@@ -698,12 +662,20 @@ async function setPaused(link: PublicLink, paused: boolean) {
   }
 }
 
-async function confirmRevoke() {
-  if (!revoking.value) return;
+async function revokeLink(link: PublicLink) {
+  const ok = await confirm({
+    title: t("dashboard.publicLinks.revokeTitle", {
+      name: link.name ? raw(link.name) : t("dashboard.publicLinks.untitled"),
+    }),
+    message: t("dashboard.publicLinks.revokeMessage"),
+    confirmLabel: t("dashboard.publicDashboard.revoke"),
+    cancelLabel: t("common.cancel"),
+    destructive: true,
+  });
+  if (!ok) return;
   try {
-    await revokeMutation.mutateAsync(revoking.value);
+    await revokeMutation.mutateAsync(link);
     showPositiveNotification(t("dashboard.publicDashboard.revokedToast"));
-    revoking.value = null;
   } catch (e: unknown) {
     showErrorNotification(serverMessage(e) || t("dashboard.publicDashboard.revokeFailed"));
   }
@@ -732,7 +704,6 @@ watch(
       view.value = "list";
       editing.value = null;
       createdLink.value = null;
-      revoking.value = null;
       // A dashboard with no links opens straight on the form, so errors from an earlier attempt must not carry over.
       form.reset(publicLinkDefaults());
     }
