@@ -256,9 +256,14 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
         );
         billingProvider.value = res.data?.provider || "";
-        isPaidUser.value = res.data?.customer_id.length > 0;
-      } catch (e) {
-        console.error("Failed to fetch billing info:", e);
+        isPaidUser.value = (res.data?.customer_id?.length ?? 0) > 0;
+      } catch (e: any) {
+        // A 401 here is already handled globally (http.ts logs the user out
+        // and reloads) — logging it too just adds noise for an expected
+        // session-expiry race, not a real failure.
+        if (e?.response?.status !== 401) {
+          console.error("Failed to fetch billing info:", e);
+        }
         billingProvider.value = "";
       } finally {
         billingInfoLoaded.value = true;
