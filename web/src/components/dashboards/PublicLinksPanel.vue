@@ -198,7 +198,7 @@
         </OBanner>
       </OContent>
       <OTable
-        :data="links"
+        :data="filteredLinks"
         :columns="columns"
         row-key="id"
         :loading="loading"
@@ -212,6 +212,42 @@
         table-id="public-links-panel"
         data-test="dashboards-public-links-panel-table"
       >
+        <template #toolbar>
+          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="min-w-0 flex-1 max-md:min-w-40">
+              <OInput
+                v-model="searchQuery"
+                :placeholder="t('dashboard.publicLinks.search')"
+                clearable
+                class="w-full"
+                data-test="dashboards-public-links-panel-search"
+              >
+                <template #icon-left>
+                  <OIcon name="search" size="sm" />
+                </template>
+              </OInput>
+            </div>
+          </div>
+        </template>
+        <template #toolbar-trailing>
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="lastUpdatedAt || null"
+            :loading="fetching"
+            data-test="dashboards-public-links-panel-refresh-btn"
+            @click="refetchLinks"
+          />
+        </template>
+        <template #empty>
+          <OEmptyState
+            v-if="searchQuery.trim()"
+            preset="no-search-results"
+            filtered
+            data-test="dashboards-public-links-panel-no-match"
+            @action="(id?: string) => (id === 'clear-filters' ? (searchQuery = '') : undefined)"
+          />
+        </template>
         <template #cell-name="{ row }">
           <span class="text-text-body truncate text-sm">
             {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
@@ -368,6 +404,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -454,6 +492,16 @@ const forbidden = computed(
 );
 const loadFailed = computed(() => !!linksQuery.error.value && !forbidden.value);
 const refetchLinks = () => linksQuery.refetch();
+const fetching = linksQuery.isFetching;
+const lastUpdatedAt = linksQuery.dataUpdatedAt;
+const searchQuery = ref("");
+const filteredLinks = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) return links.value;
+  return links.value.filter((link) =>
+    [link.name, link.published_by].some((v) => v.toLowerCase().includes(q)),
+  );
+});
 
 const saveMutation = useMutation(() => savePublicLinkMutation(orgId.value));
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
