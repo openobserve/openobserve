@@ -23,15 +23,13 @@ describe("isIgnoredNoise", () => {
   });
 
   it("ignores a cancelled full-configuration fetch", () => {
-    expect(
-      isIgnoredNoise("Failed to load the full configuration: CancelledError: canceled"),
-    ).toBe(true);
+    expect(isIgnoredNoise("Failed to load the full configuration: CancelledError: canceled")).toBe(
+      true,
+    );
   });
 
   it("ignores a cancelled organization settings fetch", () => {
-    expect(isIgnoredNoise("Error in getOrganizationSettings: CancelledError: canceled")).toBe(
-      true,
-    );
+    expect(isIgnoredNoise("Error in getOrganizationSettings: CancelledError: canceled")).toBe(true);
   });
 
   it("ignores a cancelled config fetch on the login page", () => {
@@ -49,9 +47,9 @@ describe("isIgnoredNoise", () => {
   });
 
   it("does not ignore an unrelated error", () => {
-    expect(isIgnoredNoise("TypeError: Cannot read properties of undefined (reading 'length')")).toBe(
-      false,
-    );
+    expect(
+      isIgnoredNoise("TypeError: Cannot read properties of undefined (reading 'length')"),
+    ).toBe(false);
   });
 
   it("does not ignore a real billing cancellation message", () => {

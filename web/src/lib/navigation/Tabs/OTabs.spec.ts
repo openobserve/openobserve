@@ -383,9 +383,7 @@ describe("OTabs", () => {
       addEventListenerSpy.mockRestore();
 
       expect(capturedHandler).not.toBeNull();
-      expect(() =>
-        capturedHandler!({ target: null } as unknown as FocusEvent),
-      ).not.toThrow();
+      expect(() => capturedHandler!({ target: null } as unknown as FocusEvent)).not.toThrow();
     });
   });
 });

@@ -39,7 +39,5 @@ export const IGNORED_NOISE_PATTERNS: RegExp[] = [
 /** Whether a captured error/log message+stack is known noise, not a real bug. */
 export function isIgnoredNoise(message: string | undefined, stack?: string | undefined): boolean {
   const haystacks = [message || "", stack || ""];
-  return IGNORED_NOISE_PATTERNS.some((pattern) =>
-    haystacks.some((text) => pattern.test(text)),
-  );
+  return IGNORED_NOISE_PATTERNS.some((pattern) => haystacks.some((text) => pattern.test(text)));
 }
