@@ -226,6 +226,26 @@ describe("PublicLinksPanel", () => {
     expect(w.emitted("update:modelValue")?.at(-1)).toEqual([false]);
   });
 
+  it("opens the requested link's form every time, after editing another one", async () => {
+    vi.mocked(admin.list).mockResolvedValue({
+      data: { list: [link(), link({ id: "l2", name: "Second" })] },
+    } as never);
+    const w = build({ editLinkId: "l1", variablesConfig: undefined });
+    await flushPromises();
+    const nameValue = () =>
+      (
+        w.find('[data-test="dashboards-public-links-panel-name-input"] input')
+          .element as HTMLInputElement
+      ).value;
+    expect(nameValue()).toBe("NOC wall");
+
+    await w.setProps({ modelValue: false });
+    await w.setProps({ modelValue: true, editLinkId: "l2" });
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
+    expect(nameValue()).toBe("Second");
+  });
+
   it("pauses a live link straight from its menu", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     vi.mocked(admin.pause).mockResolvedValue({ data: link({ enabled: false }) } as never);

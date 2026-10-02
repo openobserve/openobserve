@@ -677,21 +677,34 @@ function openPublicPage(link: PublicLink) {
 }
 
 // Each opening starts on the list; an edit request jumps to that link's form once links load.
-watch(open, (isOpen) => {
-  if (!isOpen) return;
-  view.value = "list";
-  editing.value = null;
-  createdLink.value = null;
-  revoking.value = null;
-  // A dashboard with no links opens straight on the form, so errors from an earlier attempt must not carry over.
-  form.reset(publicLinkDefaults());
-});
+// The link to open once the list has it; set on every opening so a stale view can't skip it.
+const pendingEditId = ref<string | null>(null);
+
 watch(
-  () => [open.value, props.editLinkId, links.value] as const,
-  ([isOpen, editId, list]) => {
-    if (!isOpen || !editId || view.value !== "list") return;
+  () => [open.value, props.editLinkId] as const,
+  ([isOpen, editId], previous) => {
+    if (!isOpen) return;
+    // Opening resets the panel; a new editLinkId while open only switches the link.
+    if (!previous?.[0]) {
+      view.value = "list";
+      editing.value = null;
+      createdLink.value = null;
+      revoking.value = null;
+      // A dashboard with no links opens straight on the form, so errors from an earlier attempt must not carry over.
+      form.reset(publicLinkDefaults());
+    }
+    pendingEditId.value = editId ?? null;
+  },
+  { immediate: true },
+);
+watch(
+  () => [pendingEditId.value, links.value] as const,
+  ([editId, list]) => {
+    if (!editId) return;
     const link = list.find((l) => l.id === editId);
-    if (link) openForm(link);
+    if (!link) return;
+    pendingEditId.value = null;
+    openForm(link);
   },
   { immediate: true },
 );
