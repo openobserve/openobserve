@@ -21,7 +21,7 @@
  * Provides unified text processing for both visual styling and search highlighting.
  *
  * Features:
- * - Extracts keywords from SQL query patterns (match_all, fuzzy_match_all)
+ * - Extracts keywords from SQL query patterns (match_all, fuzzy_match_all, str_match, re_match)
  * - Applies semantic colors to different text types (IPs, URLs, timestamps, etc.)
  * - Highlights matching keywords with background color
  * - Handles HTML escaping and safe rendering
@@ -49,6 +49,62 @@ export interface TextSegment {
 }
 
 /**
+ * Bounds that keep re_match highlighting from stalling the UI. JS regexes
+ * backtrack (Rust's do not), so a pattern that is cheap on the server can be
+ * catastrophic here; patterns or texts beyond these limits are not highlighted.
+ */
+const MAX_REGEX_PATTERN_LENGTH = 256;
+const MAX_REGEX_TEXT_LENGTH = 2048;
+const MAX_REGEX_MATCHES = 100;
+const MAX_REGEX_WILDCARDS = 2;
+
+/**
+ * Matches two-argument filter functions with a string-literal second argument:
+ * - str_match(field, 'value') / match_field(field, 'value')
+ * - str_match_ignore_case(field, 'value') / match_field_ignore_case(field, 'value')
+ * - re_match(field, 'pattern')
+ * Group 1 is the function name, group 2 a single-quoted literal ('' escapes a
+ * quote), group 3 a double-quoted literal.
+ */
+const FIELD_FILTER_REGEX =
+  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match)\s*\(\s*[^,()]+?\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")\s*\)/gi;
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Compiles a Rust-regex pattern (as passed to re_match) into a global JS RegExp.
+ * Leading inline flags such as (?i) become JS flags. Returns null for anything
+ * JS cannot compile or that risks catastrophic backtracking: a quantified group
+ * like (a+)+ or more than two .* / .+ wildcards.
+ */
+function compileHighlightRegex(pattern: string): RegExp | null {
+  if (!pattern || pattern.length > MAX_REGEX_PATTERN_LENGTH) return null;
+
+  let source = pattern;
+  let flags = "g";
+  const inlineFlags = /^\(\?([a-zA-Z]+)\)/.exec(source);
+  if (inlineFlags) {
+    for (const flag of inlineFlags[1]) {
+      if (flag !== "i" && flag !== "m" && flag !== "s") return null;
+      if (!flags.includes(flag)) flags += flag;
+    }
+    source = source.slice(inlineFlags[0].length);
+  }
+
+  if (/(^|[^\\])\)[*+{]/.test(source)) return null;
+  if ((source.match(/(^|[^\\])\.[*+]/g) || []).length > MAX_REGEX_WILDCARDS) return null;
+
+  try {
+    return new RegExp(source, flags);
+  } catch {
+    return null;
+  }
+}
+
+let cachedPatternQuery: string | null = null;
+let cachedPatterns: RegExp[] = [];
+
+/**
  * Composable for text highlighting and semantic colorization
  */
 export function useTextHighlighter() {
@@ -60,6 +116,10 @@ export function useTextHighlighter() {
    * - match_all('keyword')
    * - fuzzy_match('keyword', 2)
    * - fuzzy_match_all('keyword', 2)
+   * - match_all_raw('keyword') / match_all_raw_ignore_case('keyword')
+   * - str_match_ignore_case(field, 'keyword') / match_field_ignore_case(field, 'keyword')
+   * Keywords are highlighted case-insensitively; case-sensitive and regex
+   * filters are returned by extractHighlightPatterns instead.
    *
    * @param queryString - The SQL query string to parse
    * @returns Array of extracted keywords
@@ -67,9 +127,9 @@ export function useTextHighlighter() {
   function extractKeywords(queryString: string): string[] {
     if (!queryString?.trim()) return [];
 
-    // Regex to support match_all, fuzzy_match, and fuzzy_match_all SQL functions
+    // Regex to support match_all, match_all_raw(_ignore_case), fuzzy_match, and fuzzy_match_all SQL functions
     const regex =
-      /\b(?:match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
+      /\b(?:match_all_raw_ignore_case|match_all_raw|match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
     const result: string[] = [];
     let match: RegExpExecArray | null;
 
@@ -83,22 +143,121 @@ export function useTextHighlighter() {
       }
     }
 
+    for (const filter of queryString.matchAll(FIELD_FILTER_REGEX)) {
+      if (!filter[1].toLowerCase().endsWith("_ignore_case")) continue;
+      const keyword = (filter[2]?.replace(/''/g, "'") ?? filter[3] ?? "").trim();
+      if (keyword) {
+        result.push(keyword);
+      }
+    }
+
     return Array.from(new Set(result));
   }
 
   /**
-   * Splits text by highlight keywords and marks matched parts
+   * Extracts highlight patterns from filters that cannot be expressed as
+   * case-insensitive keywords:
+   * - str_match(field, 'value') / match_field(field, 'value') — case-sensitive literal
+   * - re_match(field, 'pattern') — regex; re_not_match is skipped since its
+   *   rows by definition do not contain a match
+   * Patterns JS cannot compile, or that risk catastrophic backtracking, are
+   * skipped silently.
+   *
+   * @param queryString - The SQL query string to parse
+   * @returns Array of global RegExps to highlight
+   */
+  function extractHighlightPatterns(queryString: string): RegExp[] {
+    if (!queryString?.trim()) return [];
+    if (queryString === cachedPatternQuery) return cachedPatterns;
+
+    const patterns: RegExp[] = [];
+    const seen = new Set<string>();
+
+    for (const filter of queryString.matchAll(FIELD_FILTER_REGEX)) {
+      const name = filter[1].toLowerCase();
+      if (name.endsWith("_ignore_case")) continue;
+
+      const value = filter[2]?.replace(/''/g, "'") ?? filter[3] ?? "";
+      const regex =
+        name === "re_match"
+          ? compileHighlightRegex(value)
+          : value.trim()
+            ? new RegExp(escapeRegExp(value.trim()), "g")
+            : null;
+
+      if (regex && !seen.has(`${regex.source}/${regex.flags}`)) {
+        seen.add(`${regex.source}/${regex.flags}`);
+        patterns.push(regex);
+      }
+    }
+
+    cachedPatternQuery = queryString;
+    cachedPatterns = patterns;
+    return patterns;
+  }
+
+  /**
+   * Collects the [start, end) ranges a global regex matches in text. Zero-length
+   * matches are skipped and at most MAX_REGEX_MATCHES ranges are collected.
+   */
+  function collectMatchRanges(text: string, regex: RegExp, ranges: Array<[number, number]>) {
+    regex.lastIndex = 0;
+    let count = 0;
+    let match: RegExpExecArray | null;
+
+    while (count < MAX_REGEX_MATCHES && (match = regex.exec(text)) !== null) {
+      if (match[0].length === 0) {
+        regex.lastIndex++;
+        continue;
+      }
+      ranges.push([match.index, match.index + match[0].length]);
+      count++;
+    }
+    regex.lastIndex = 0;
+  }
+
+  /**
+   * Splits text by highlight keywords and patterns and marks matched parts
    *
    * @param text - Text to process
-   * @param keywords - Array of keywords to highlight
+   * @param keywords - Array of keywords to highlight (case-insensitive)
+   * @param patterns - Global RegExps to highlight, from extractHighlightPatterns
    * @returns Array of text parts with highlight flags
    */
   function splitTextByKeywords(
     text: string,
     keywords: string[],
+    patterns: RegExp[] = [],
   ): Array<{ text: string; isHighlighted: boolean }> {
-    if (!keywords.length || !text) {
+    if ((!keywords.length && !patterns.length) || !text) {
       return [{ text, isHighlighted: false }];
+    }
+
+    if (patterns.length) {
+      const ranges: Array<[number, number]> = [];
+      if (keywords.length) {
+        collectMatchRanges(text, new RegExp(keywords.map(escapeRegExp).join("|"), "gi"), ranges);
+      }
+      if (text.length <= MAX_REGEX_TEXT_LENGTH) {
+        for (const pattern of patterns) collectMatchRanges(text, pattern, ranges);
+      }
+      ranges.sort((a, b) => a[0] - b[0]);
+
+      const result: Array<{ text: string; isHighlighted: boolean }> = [];
+      let cursor = 0;
+      for (const [start, end] of ranges) {
+        if (end <= cursor) continue;
+        const from = Math.max(start, cursor);
+        if (from > cursor) result.push({ text: text.slice(cursor, from), isHighlighted: false });
+        if (result.length && result[result.length - 1].isHighlighted) {
+          result[result.length - 1].text += text.slice(from, end);
+        } else {
+          result.push({ text: text.slice(from, end), isHighlighted: true });
+        }
+        cursor = end;
+      }
+      if (cursor < text.length) result.push({ text: text.slice(cursor), isHighlighted: false });
+      return result;
     }
 
     // Create regex pattern from keywords (escape special characters)
@@ -352,6 +511,7 @@ export function useTextHighlighter() {
    * @param keywords - Keywords to highlight
    * @param colors - Color theme object
    * @param showQuotes - Whether to add quotes around values
+   * @param patterns - Highlight patterns from extractHighlightPatterns
    * @returns HTML string with applied styling
    */
   function processTextSegments(
@@ -359,6 +519,7 @@ export function useTextHighlighter() {
     keywords: string[],
     colors: any,
     showQuotes: boolean = false,
+    patterns: RegExp[] = [],
   ): string {
     let result = "";
 
@@ -376,7 +537,7 @@ export function useTextHighlighter() {
         }
 
         // For regular tokens, split by keywords and apply semantic colors
-        const parts = splitTextByKeywords(segment.content, keywords);
+        const parts = splitTextByKeywords(segment.content, keywords, patterns);
         return parts
           .map((part) => {
             const content = escapeHtml(part.text);
@@ -424,14 +585,16 @@ export function useTextHighlighter() {
 
     const textStr = String(text);
     const keywords = extractKeywords(queryString);
+    const patterns = extractHighlightPatterns(queryString);
     const segments = smartTokenize(textStr);
 
-    return processTextSegments(segments, keywords, colors, showQuotes);
+    return processTextSegments(segments, keywords, colors, showQuotes, patterns);
   }
 
   return {
     processTextWithHighlights,
     extractKeywords,
+    extractHighlightPatterns,
     splitTextByKeywords,
     getSingleSemanticColor,
     getSemanticCSSClass,

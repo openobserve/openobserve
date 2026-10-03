@@ -158,6 +158,126 @@ describe("useTextHighlighter", () => {
     });
   });
 
+  describe("field filter functions", () => {
+    const highlighted = (parts: Array<{ text: string; isHighlighted: boolean }>) =>
+      parts.filter((part) => part.isHighlighted).map((part) => part.text);
+
+    const highlight = (text: string, query: string) =>
+      highlighted(
+        textHighlighter.splitTextByKeywords(
+          text,
+          textHighlighter.extractKeywords(query),
+          textHighlighter.extractHighlightPatterns(query),
+        ),
+      );
+
+    it("should extract str_match_ignore_case and match_field_ignore_case as keywords", () => {
+      expect(
+        textHighlighter.extractKeywords(
+          "str_match_ignore_case(log, 'Error') AND match_field_ignore_case(\"msg\", 'Timeout')",
+        ),
+      ).toEqual(["Error", "Timeout"]);
+    });
+
+    it("should extract match_all_raw and match_all_raw_ignore_case as keywords", () => {
+      expect(
+        textHighlighter.extractKeywords(
+          "match_all_raw('alpha') OR match_all_raw_ignore_case('beta')",
+        ),
+      ).toEqual(["alpha", "beta"]);
+    });
+
+    it("should highlight str_match_ignore_case terms case-insensitively", () => {
+      expect(highlight("ERROR: disk", "str_match_ignore_case(log, 'error')")).toEqual(["ERROR"]);
+    });
+
+    it("should highlight str_match and match_field terms case-sensitively", () => {
+      expect(highlight("Error error", "str_match(log, 'error')")).toEqual(["error"]);
+      expect(highlight("Error error", "match_field(log, 'Error')")).toEqual(["Error"]);
+      expect(textHighlighter.extractKeywords("str_match(log, 'error')")).toEqual([]);
+    });
+
+    it("should unescape doubled quotes in string literals", () => {
+      expect(highlight("it's here", "str_match(log, 'it''s')")).toEqual(["it's"]);
+    });
+
+    it("should highlight re_match regex matches", () => {
+      expect(highlight("code=500 code=404", "re_match(log, 'code=5\\d\\d')")).toEqual(["code=500"]);
+    });
+
+    it("should map a leading (?i) flag to a case-insensitive regex", () => {
+      expect(highlight("WARN warn", "re_match(log, '(?i)warn')")).toEqual(["WARN", "warn"]);
+    });
+
+    it("should not highlight re_not_match patterns", () => {
+      expect(textHighlighter.extractHighlightPatterns("re_not_match(log, 'error')")).toEqual([]);
+      expect(highlight("error", "re_not_match(log, 'error')")).toEqual([]);
+    });
+
+    it("should skip invalid regexes silently", () => {
+      expect(textHighlighter.extractHighlightPatterns("re_match(log, 'foo(')")).toEqual([]);
+      expect(textHighlighter.extractHighlightPatterns("re_match(log, '(?x)foo')")).toEqual([]);
+      expect(highlight("foo(", "re_match(log, 'foo(')")).toEqual([]);
+    });
+
+    it("should skip patterns prone to catastrophic backtracking", () => {
+      expect(textHighlighter.extractHighlightPatterns("re_match(log, '(a+)+$')")).toEqual([]);
+      expect(textHighlighter.extractHighlightPatterns("re_match(log, '.*a.*b.*c')")).toEqual([]);
+      expect(
+        textHighlighter.extractHighlightPatterns(`re_match(log, '${"a".repeat(300)}')`),
+      ).toEqual([]);
+    });
+
+    it("should ignore zero-length regex matches without hanging", () => {
+      const parts = textHighlighter.splitTextByKeywords(
+        "bbb",
+        [],
+        textHighlighter.extractHighlightPatterns("re_match(log, 'a*')"),
+      );
+      expect(parts).toEqual([{ text: "bbb", isHighlighted: false }]);
+      expect(highlight("bbaab", "re_match(log, 'a*')")).toEqual(["aa"]);
+    });
+
+    it("should cap the number of regex matches per text", () => {
+      const parts = textHighlighter.splitTextByKeywords(
+        "x".repeat(150),
+        [],
+        textHighlighter.extractHighlightPatterns("re_match(log, 'x')"),
+      );
+      expect(parts).toEqual([
+        { text: "x".repeat(100), isHighlighted: true },
+        { text: "x".repeat(50), isHighlighted: false },
+      ]);
+    });
+
+    it("should merge keyword and pattern matches", () => {
+      expect(highlight("alpha-beta-gamma", "match_all('alpha') AND re_match(log, 'be.a')")).toEqual(
+        ["alpha", "beta"],
+      );
+      expect(highlight("abcdef", "match_all('abcd') AND re_match(log, 'cdef')")).toEqual([
+        "abcdef",
+      ]);
+    });
+
+    it("should highlight str_match terms in processTextWithHighlights", () => {
+      const result = textHighlighter.processTextWithHighlights(
+        "request failed",
+        "SELECT * FROM t WHERE str_match(log, 'failed')",
+        { stringValue: "#047857" },
+      );
+      expect(result).toContain('<span class="log-highlighted">failed</span>');
+    });
+
+    it("should leave match_all splitting unchanged", () => {
+      expect(textHighlighter.extractHighlightPatterns("match_all('error')")).toEqual([]);
+      expect(textHighlighter.splitTextByKeywords("an Error occurred", ["error"], [])).toEqual([
+        { text: "an ", isHighlighted: false },
+        { text: "Error", isHighlighted: true },
+        { text: " occurred", isHighlighted: false },
+      ]);
+    });
+  });
+
   describe("escapeHtml", () => {
     it("should escape HTML entities", () => {
       const result = escapeHtml('<script>alert("xss")</script>');

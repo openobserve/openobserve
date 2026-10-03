@@ -1223,15 +1223,34 @@ pub async fn handle_otlp_request(
                 log::error!(
                     "[TRACES] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
                 );
+                use config::meta::self_reporting::redaction::FailPosture;
+                let rejection = config::meta::self_reporting::redaction::fail_closed_rejection(
+                    config::get_config().common.sdr_fail_closed,
+                    org_id,
+                    StreamType::Traces,
+                    json_data_by_stream.keys().map(String::as_str),
+                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Traces,
                     json_data_by_stream
                         .iter()
                         .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
-                    config::meta::self_reporting::redaction::FailPosture::Open,
+                    if rejection.is_some() {
+                        FailPosture::Closed
+                    } else {
+                        FailPosture::Open
+                    },
                 )
                 .await;
+                if let Some(reason) = rejection {
+                    log::error!("[TRACES] {reason}");
+                    return Ok(otlp_rejection_response(
+                        req_type,
+                        http::StatusCode::SERVICE_UNAVAILABLE,
+                        reason,
+                    ));
+                }
             }
         }
     }
@@ -1551,15 +1570,33 @@ pub async fn ingest_json(
                 log::error!(
                     "[TRACES] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
                 );
+                use config::meta::self_reporting::redaction::FailPosture;
+                let rejection = config::meta::self_reporting::redaction::fail_closed_rejection(
+                    config::get_config().common.sdr_fail_closed,
+                    org_id,
+                    StreamType::Traces,
+                    json_data_by_stream.keys().map(String::as_str),
+                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Traces,
                     json_data_by_stream
                         .iter()
                         .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
-                    config::meta::self_reporting::redaction::FailPosture::Open,
+                    if rejection.is_some() {
+                        FailPosture::Closed
+                    } else {
+                        FailPosture::Open
+                    },
                 )
                 .await;
+                if let Some(reason) = rejection {
+                    log::error!("[TRACES] {reason}");
+                    return Ok(MetaHttpResponse::error_with_header(
+                        http::StatusCode::SERVICE_UNAVAILABLE,
+                        reason,
+                    ));
+                }
             }
         }
     }

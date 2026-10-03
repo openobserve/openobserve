@@ -23,6 +23,10 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
+// Streams the mocked searchState reports as selected; a plain (non-reactive)
+// object, so tests that change it remount the component.
+const mockStreams = vi.hoisted(() => ({ selected: ["stream1"] }));
+
 // Mock dependencies
 vi.mock("@/composables/useLogs/searchState", () => ({
   searchState: () => ({
@@ -34,7 +38,7 @@ vi.mock("@/composables/useLogs/searchState", () => ({
             { name: "kubernetes_container_name", isSchemaField: true, streams: ["stream1"] },
             { name: "kubernetes_container_hash", isSchemaField: true, streams: ["stream1"] },
           ],
-          selectedStream: ["stream1"],
+          selectedStream: [...mockStreams.selected],
           selectedFields: ["_timestamp"],
         },
       },
@@ -455,6 +459,58 @@ describe("DetailTable Component", () => {
     await searchButton.trigger("click");
 
     expect(spy).toHaveBeenCalledWith(wrapper.vm.rowData, 10);
+  });
+
+  describe("search around with multiple streams selected", () => {
+    beforeEach(async () => {
+      wrapper.unmount();
+      mockStreams.selected = ["stream1", "stream2"];
+      wrapper = mount(DetailTable, {
+        attachTo: "#app",
+        props: defaultProps,
+        global: globalMountOptions,
+      });
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      mockStreams.selected = ["stream1"];
+    });
+
+    it("should offer search around when the hit carries its stream name", async () => {
+      wrapper.vm.rowData = { _timestamp: 1700000000000000, _stream_name: "stream2" };
+      wrapper.vm.tab = "table";
+      await nextTick();
+
+      expect(wrapper.vm.canSearchAroundStream).toBe(true);
+      expect(wrapper.find('[data-test="logs-detail-table-search-around-btn"]').isVisible()).toBe(
+        true,
+      );
+    });
+
+    it("should hide search around when the hit has no stream name", async () => {
+      wrapper.vm.rowData = { _timestamp: 1700000000000000 };
+      wrapper.vm.tab = "table";
+      await nextTick();
+
+      expect(wrapper.vm.canSearchAroundStream).toBe(false);
+      expect(wrapper.find('[data-test="logs-detail-table-search-around-btn"]').isVisible()).toBe(
+        false,
+      );
+    });
+
+    it("should emit the hit, including its stream name, as the search around body", async () => {
+      const hit = { _timestamp: 1700000000000000, _stream_name: "stream2" };
+      wrapper.vm.rowData = hit;
+      wrapper.vm.tab = "table";
+      await nextTick();
+
+      await wrapper.find('[data-test="logs-detail-table-search-around-btn"]').trigger("click");
+
+      expect(wrapper.emitted()["search:timeboxed"][0]).toEqual([
+        { key: 1700000000000000, size: 10, body: hit },
+      ]);
+    });
   });
 
   it("should update selectedRelativeValue when record size changed", async () => {

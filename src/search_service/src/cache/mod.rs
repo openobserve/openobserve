@@ -1226,8 +1226,22 @@ pub async fn apply_regex_to_response(
     let sql = match crate::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Error parsing sql: {e}");
-            return Ok(());
+            log::error!("[trace_id {trace_id}] SDR patterns application: error parsing sql: {e}");
+            let at_ingestion =
+                infra::table::re_pattern_stream_map::ApplyPolicy::AtIngestion.to_string();
+            return redaction_skipped(
+                config::get_config().common.sdr_fail_closed,
+                || {
+                    all_streams.split(',').any(|stream| {
+                        pattern_manager
+                            .get_associations(org_id, stream_type, stream.trim())
+                            .iter()
+                            .any(|a| a.apply_at != at_ingestion)
+                    })
+                },
+                all_streams,
+                &e.to_string(),
+            );
         }
     };
 
@@ -1259,9 +1273,38 @@ pub async fn apply_regex_to_response(
     ret
 }
 
+/// Under `ZO_SDR_FAIL_CLOSED`, hits a search-time pattern applies to are never returned unredacted.
+#[cfg(any(feature = "vectorscan", test))]
+fn redaction_skipped(
+    fail_closed: bool,
+    has_search_patterns: impl FnOnce() -> bool,
+    all_streams: &str,
+    reason: &str,
+) -> Result<(), infra::errors::Error> {
+    if fail_closed && has_search_patterns() {
+        return Err(infra::errors::Error::Message(format!(
+            "sensitive-data redaction could not run for {all_streams}: {reason}; refusing to return unredacted hits (ZO_SDR_FAIL_CLOSED)"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_redaction_skipped_fails_open_by_default() {
+        assert!(redaction_skipped(false, || true, "app_logs", "parse error").is_ok());
+    }
+
+    #[test]
+    fn test_redaction_skipped_fails_closed_only_with_search_patterns() {
+        let err = redaction_skipped(true, || true, "app_logs", "parse error")
+            .expect_err("a stream with search-time patterns must not return unredacted hits");
+        assert!(err.to_string().contains("app_logs"), "{err}");
+        assert!(redaction_skipped(true, || false, "app_logs", "parse error").is_ok());
+    }
 
     #[test]
     fn test_apply_vrl_to_response_preserves_hits_on_compile_failure() {

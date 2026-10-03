@@ -442,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="
             streamType !== 'enrichment_tables' &&
-            searchObj.data.stream.selectedStream.length <= 1 &&
+            canSearchAroundStream &&
             hasAggregationQuery == false
           "
           class="flex items-center gap-2 max-md:order-last max-md:basis-full max-md:justify-center"
@@ -517,7 +517,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
-import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
+import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -768,6 +768,13 @@ export default defineComponent({
       let parsedSQL = fnParsedSQL();
       return hasAggregation(parsedSQL?.columns);
     });
+
+    // Search around runs on one stream: with several selected, the hit's
+    // _stream_name says which one.
+    const canSearchAroundStream = computed(
+      () =>
+        searchObj.data.stream.selectedStream.length <= 1 || !!rowData.value?.[STREAM_NAME_FIELD],
+    );
 
     // Compute status color for the top border
     const statusColor = computed(() => {
@@ -1123,6 +1130,7 @@ export default defineComponent({
       isTracesStreamsLoading,
       showViewTraceBtn,
       hasAggregationQuery,
+      canSearchAroundStream,
       sendToAiChat,
       addSearchTerm,
       closeTable,

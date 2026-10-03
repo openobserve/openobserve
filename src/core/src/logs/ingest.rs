@@ -137,7 +137,7 @@ pub async fn ingest(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
-    // A scanner outage must never fail ingestion; the evidence row says it failed open.
+    // A scanner outage fails ingestion only under ZO_SDR_FAIL_CLOSED; the evidence row says which.
     #[cfg(feature = "vectorscan")]
     let pattern_manager = match get_pattern_manager().await {
         Ok(manager) => Some(manager),
@@ -651,6 +651,18 @@ pub async fn ingest(
 
     #[cfg(feature = "vectorscan")]
     if pattern_manager.is_none() {
+        use config::meta::self_reporting::redaction::FailPosture;
+        let rejection = config::meta::self_reporting::redaction::fail_closed_rejection(
+            cfg.common.sdr_fail_closed,
+            org_id,
+            StreamType::Logs,
+            json_data_by_stream.keys().map(String::as_str),
+        );
+        let posture = if rejection.is_some() {
+            FailPosture::Closed
+        } else {
+            FailPosture::Open
+        };
         // One row per destination stream: a pipeline fans a request out to several.
         for (stream, data) in json_data_by_stream.iter() {
             if !should_apply_sdr(org_id, stream) {
@@ -663,13 +675,17 @@ pub async fn ingest(
                     stream,
                     StreamType::Logs,
                 ),
-                config::meta::self_reporting::redaction::FailPosture::Open,
+                posture,
                 records.len() as u64,
                 config::meta::self_reporting::redaction::DataWindow::from_timestamps(
                     records.iter().map(|(ts, _)| *ts),
                 ),
             )
             .await;
+        }
+        if let Some(reason) = rejection {
+            log::error!("[LOGS:JSON] {reason}");
+            return Err(Error::ResourceError(reason));
         }
     }
 

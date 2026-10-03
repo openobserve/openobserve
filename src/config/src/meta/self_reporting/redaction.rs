@@ -523,6 +523,23 @@ pub fn is_self_reporting_stream(org_id: &str, stream_name: &str, stream_type: St
     }
 }
 
+/// `ZO_SDR_FAIL_CLOSED`: why a batch the scanner could not see is refused; `None` stores it open.
+pub fn fail_closed_rejection<'a>(
+    fail_closed: bool,
+    org_id: &str,
+    stream_type: StreamType,
+    mut streams: impl Iterator<Item = &'a str>,
+) -> Option<String> {
+    if !fail_closed {
+        return None;
+    }
+    // Unscanned, we cannot know a stream's patterns, so every scannable stream is refused.
+    let stream = streams.find(|stream| !is_self_reporting_stream(org_id, stream, stream_type))?;
+    Some(format!(
+        "sensitive-data redaction is unavailable; refusing to store unredacted data for {org_id}/{stream_type}/{stream} (ZO_SDR_FAIL_CLOSED)"
+    ))
+}
+
 /// Identity of the pattern set in effect, for callers that cannot yet supply per-pattern policies.
 pub fn pattern_set_hash(pattern_bodies: &[String]) -> String {
     let rules: Vec<PatternRule> = pattern_bodies
@@ -573,6 +590,36 @@ fn sorted_labels<I: IntoIterator<Item = String>>(labels: I) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fail_open_never_refuses_an_unscanned_batch() {
+        let streams = ["app_logs", REDACTION_EVIDENCE_STREAM];
+        assert_eq!(
+            fail_closed_rejection(false, "acme", StreamType::Logs, streams.into_iter()),
+            None
+        );
+    }
+
+    #[test]
+    fn fail_closed_refuses_an_unscanned_customer_stream() {
+        let streams = [REDACTION_EVIDENCE_STREAM, "app_logs"];
+        let err = fail_closed_rejection(true, "acme", StreamType::Logs, streams.into_iter())
+            .expect("a customer stream must be refused");
+        assert!(err.contains("acme/logs/app_logs"), "{err}");
+        assert!(
+            fail_closed_rejection(true, "acme", StreamType::Traces, ["default"].into_iter())
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn fail_closed_still_writes_self_reporting_streams() {
+        let streams = [REDACTION_EVIDENCE_STREAM, USAGE_STREAM];
+        assert_eq!(
+            fail_closed_rejection(true, "acme", StreamType::Logs, streams.into_iter()),
+            None
+        );
+    }
+
     #[test]
     fn a_customer_stream_named_like_a_meta_only_one_is_not_exempt() {
         for stream in [

@@ -64,8 +64,13 @@ export function useLogsHighlighter(t: TranslateFn) {
     },
   );
 
-  const { processTextWithHighlights, extractKeywords, splitTextByKeywords, isFTSColumn } =
-    useTextHighlighter();
+  const {
+    processTextWithHighlights,
+    extractKeywords,
+    extractHighlightPatterns,
+    splitTextByKeywords,
+    isFTSColumn,
+  } = useTextHighlighter();
 
   /**
    * Process hits array in chunks to avoid blocking the main thread
@@ -421,7 +426,7 @@ export function useLogsHighlighter(t: TranslateFn) {
     if (!text || !queryString) return escapeHtml(text);
 
     const keywords = extractKeywords(queryString);
-    const parts = splitTextByKeywords(text, keywords);
+    const parts = splitTextByKeywords(text, keywords, extractHighlightPatterns(queryString));
 
     return parts
       .map((part) => {
@@ -492,7 +497,11 @@ export function useLogsHighlighter(t: TranslateFn) {
     showQuotes: boolean = false,
   ): string {
     const keywords = extractKeywords(queryString);
-    const highlightParts = splitTextByKeywords(text, keywords);
+    const highlightParts = splitTextByKeywords(
+      text,
+      keywords,
+      extractHighlightPatterns(queryString),
+    );
 
     let result = "";
 
