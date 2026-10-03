@@ -52,6 +52,9 @@ const org = process.env.ORGNAME || 'default';
 const vrl = (name, body) => ({ name, function: body, params: 'row', transType: 0 });
 
 const pipelinePayload = (name, functionName, sourceStream) => {
+  // Shaped like a file the EXPORT produces, not like a POST /pipelines body: the
+  // import screen reads and validates `source.stream_name` / `source.stream_type`
+  // and the top-level copies, which the API would otherwise fill in itself.
   const edge = (id, source, target) => ({
     id,
     source,
@@ -69,7 +72,12 @@ const pipelinePayload = (name, functionName, sourceStream) => {
     org,
     name,
     description: 'rbac bundling fixture',
-    source: { source_type: 'realtime' },
+    source: {
+      source_type: 'realtime',
+      org_id: org,
+      stream_name: sourceStream,
+      stream_type: 'logs',
+    },
     paused_at: null,
     nodes: [
       {
@@ -97,6 +105,9 @@ const pipelinePayload = (name, functionName, sourceStream) => {
       },
     ],
     edges: [edge('e1', 'in1', 'fn1'), edge('e2', 'fn1', 'out1')],
+    type: 'realtime',
+    stream_name: sourceStream,
+    stream_type: 'logs',
   };
 };
 
@@ -144,10 +155,21 @@ test.describe(
 
         await createMember(page, partialUser, 'user');
         await createRole(page, partialRole);
+        // The shape matters, and it is not obvious. AllowList on `_all_` is what
+        // permits the list CALL; AllowGet scoped to one object is what makes
+        // O2_OPENFGA_LIST_ONLY_PERMITTED filter the result down to it. Granting
+        // only the per-object Get — the first thing I tried — answers GET
+        // /functions with a blanket 403 rather than a filtered list, and the whole
+        // premise of this file collapses.
+        //
+        // AllowPost is on `_all_` so the resolver's create is a permission hit: a
+        // 400 back from it can then only have come from the name being taken,
+        // which is the behaviour under test.
         await setRolePerms(
           page,
           partialRole,
           [
+            { object: `function:_all_${org}`, permission: 'AllowList' },
             { object: `function:${visibleFn}`, permission: 'AllowGet' },
             { object: `function:_all_${org}`, permission: 'AllowPost' },
             { object: `pipeline:_all_${org}`, permission: 'AllowAll' },
