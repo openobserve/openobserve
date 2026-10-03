@@ -10651,6 +10651,17 @@
       "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Error Rate"
+      },
+      "insights": {
+        "title": "Insights",
+        "signals": {
+          "rate": "request rate",
+          "errors": "error ratio",
+          "p95": "p95 latency"
+        },
+        "scoreAbove": "+{percent}% score above threshold",
+        "viewTraces": "Traces",
+        "viewCharts": "Charts"
       }
     },
     "spansTab": "Spans",
