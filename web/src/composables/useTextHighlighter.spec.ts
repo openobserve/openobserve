@@ -235,39 +235,46 @@ describe("useTextHighlighter", () => {
       ).toEqual([]);
     });
 
-    it("should allow patterns with a single unbounded quantifier", () => {
-      expect(highlight("xa*a*y", "re_match(log, '[a*]+')")).toEqual(["a*a*"]);
-      expect(
-        textHighlighter.extractHighlightPatterns(
-          "re_match(log, '\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d+')",
-        ),
-      ).toHaveLength(1);
-      expect(
-        textHighlighter.extractHighlightPatterns("re_match(log, 'https?://\\S+')"),
-      ).toHaveLength(1);
+    const accepts = (pattern: string) =>
+      textHighlighter.extractHighlightPatterns(`re_match(log, '${pattern}')`).length === 1;
+
+    it("should reject stacked, optional-chain and overlapping quantifiers", () => {
+      for (const pattern of [
+        "a+a?a?a?a?a?a?a?!",
+        "a+a?a?!",
+        "\\w+\\d+!",
+        "\\w+\\s\\w+!",
+        ".*.*!",
+        "a*?a*?!",
+        "a?a?a?a?a?a?a?a?aaaaaaaa!",
+        "(a|aa)?(a|aa)?(a|aa)?(a|aa)?!",
+        "(a|ab)+!",
+        "\\d{1,3}(\\.\\d{1,3}){3}",
+        "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d+x",
+        "a{0,16}a{0,4}!",
+      ]) {
+        expect(accepts(pattern), pattern).toBe(false);
+      }
     });
 
-    it("should highlight adversarial text quickly with any accepted pattern", () => {
-      const accepted = [
-        "re_match(log, '\\w*!')",
-        "re_match(log, '[a*]+!')",
-        "re_match(log, '(?i)a.*b')",
-        "re_match(log, '\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d+x')",
-        "str_match(log, 'aaaa!')",
-      ];
-      for (const text of ["a".repeat(2048), "a".repeat(500), "1.".repeat(250)]) {
-        for (const query of accepted) {
-          expect(textHighlighter.extractHighlightPatterns(query)).toHaveLength(1);
-          const startedAt = performance.now();
-          textHighlighter.splitTextByKeywords(
-            text,
-            [],
-            textHighlighter.extractHighlightPatterns(query),
-          );
-          textHighlighter.processTextWithHighlights(text, query, {});
-          expect(performance.now() - startedAt).toBeLessThan(1000);
-        }
+    it("should accept common single-quantifier and bounded patterns", () => {
+      for (const pattern of [
+        "^ERROR",
+        "ERROR.*timeout",
+        "https?://\\S+",
+        "colou?r",
+        "[a*]+",
+        "\\w+!",
+        "\\s+$",
+        "(foo|bar)baz",
+        "(?i)warn",
+        "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
+        "a{0,8}a{0,8}!",
+        "(a|aa)(a|aa)(a|aa)(a|aa)(a|aa)(a|aa)!",
+      ]) {
+        expect(accepts(pattern), pattern).toBe(true);
       }
+      expect(highlight("xa*a*y", "re_match(log, '[a*]+')")).toEqual(["a*a*"]);
     });
 
     it("should apply re_match anchors to the whole value, not each token", () => {

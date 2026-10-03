@@ -137,7 +137,7 @@ pub async fn ingest(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
-    // A scanner outage fails ingestion only under ZO_SDR_FAIL_CLOSED; the evidence row says which.
+    // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
     let pattern_manager = match get_pattern_manager().await {
         Ok(manager) => Some(manager),
@@ -160,6 +160,14 @@ pub async fn ingest(
     };
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
+    }
+    // Refused here, before any pipeline runs: a remote-stream destination writes inside it.
+    #[cfg(feature = "vectorscan")]
+    if let Some(reason) =
+        crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &[(&stream_name, 0)])
+            .await
+    {
+        return Err(Error::ResourceError(reason));
     }
     let dbm_gate = cfg.db_monitoring.enabled && is_dbm_server_stream(&stream_name);
 
@@ -649,20 +657,22 @@ pub async fn ingest(
     drop(original_options);
     drop(user_defined_schema_map);
 
+    // Pipeline destinations, which the check before the pipelines could not see.
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &streams).await
+        {
+            return Err(Error::ResourceError(reason));
+        }
+    }
+
     #[cfg(feature = "vectorscan")]
     if pattern_manager.is_none() {
-        use config::meta::self_reporting::redaction::FailPosture;
-        let rejection = config::meta::self_reporting::redaction::fail_closed_rejection(
-            cfg.common.sdr_fail_closed,
-            org_id,
-            StreamType::Logs,
-            json_data_by_stream.keys().map(String::as_str),
-        );
-        let posture = if rejection.is_some() {
-            FailPosture::Closed
-        } else {
-            FailPosture::Open
-        };
         // One row per destination stream: a pipeline fans a request out to several.
         for (stream, data) in json_data_by_stream.iter() {
             if !should_apply_sdr(org_id, stream) {
@@ -675,17 +685,13 @@ pub async fn ingest(
                     stream,
                     StreamType::Logs,
                 ),
-                posture,
+                config::meta::self_reporting::redaction::FailPosture::Open,
                 records.len() as u64,
                 config::meta::self_reporting::redaction::DataWindow::from_timestamps(
                     records.iter().map(|(ts, _)| *ts),
                 ),
             )
             .await;
-        }
-        if let Some(reason) = rejection {
-            log::error!("[LOGS:JSON] {reason}");
-            return Err(Error::ResourceError(reason));
         }
     }
 

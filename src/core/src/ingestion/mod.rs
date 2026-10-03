@@ -543,6 +543,66 @@ pub fn schema_records_to_entries(
         .collect()
 }
 
+/// The streams a write cannot scan: every one while the pattern manager is down, else the
+/// streams with a pattern association that failed to build.
+#[cfg(any(feature = "vectorscan", test))]
+fn unscannable_streams<'a>(
+    streams: &[(&'a str, u64)],
+    manager_up: bool,
+    unbuilt: impl Fn(&str) -> bool,
+) -> Vec<(&'a str, u64)> {
+    streams
+        .iter()
+        .copied()
+        .filter(|(stream, _)| !manager_up || unbuilt(stream))
+        .collect()
+}
+
+/// `ZO_SDR_FAIL_CLOSED`: why a write of `streams` (name, records) must be refused before any
+/// pipeline runs or anything is written, because redaction cannot run for one of them.
+#[cfg(feature = "vectorscan")]
+pub async fn sdr_fail_closed_refusal(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+) -> Option<String> {
+    use config::meta::self_reporting::redaction::{
+        DataWindow, EvidenceScope, FailPosture, fail_closed_rejection, is_self_reporting_stream,
+    };
+    if !config::get_config().common.sdr_fail_closed {
+        return None;
+    }
+    let unscannable = match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(mgr) => unscannable_streams(streams, true, |stream| {
+            mgr.has_unbuilt_patterns(org_id, stream_type, stream)
+        }),
+        Err(e) => {
+            log::error!("[SDR] pattern manager unavailable for org {org_id}: {e}");
+            unscannable_streams(streams, false, |_| true)
+        }
+    };
+    let reason = fail_closed_rejection(
+        true,
+        org_id,
+        stream_type,
+        unscannable.iter().map(|(stream, _)| *stream),
+    )?;
+    for (stream, records) in unscannable
+        .iter()
+        .filter(|(stream, _)| !is_self_reporting_stream(org_id, stream, stream_type))
+    {
+        crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+            &EvidenceScope::new(org_id, stream, stream_type),
+            FailPosture::Closed,
+            *records,
+            DataWindow::default(),
+        )
+        .await;
+    }
+    log::error!("[SDR] {reason}");
+    Some(reason)
+}
+
 /// Only a server fault is 500: a batch the client must fix is 400 and an overload is 503.
 pub fn write_error_status(e: &Error) -> http::StatusCode {
     match e {
@@ -829,6 +889,25 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_unscannable_streams_is_every_stream_while_the_manager_is_down() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, false, |_| false),
+            vec![("app", 3), ("audit", 1)]
+        );
+    }
+
+    #[test]
+    fn test_unscannable_streams_is_only_unbuilt_streams_once_the_manager_is_up() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, true, |stream| stream == "audit"),
+            vec![("audit", 1)]
+        );
+        assert!(unscannable_streams(&streams, true, |_| false).is_empty());
+    }
 
     #[test]
     fn test_format_partition_key() {

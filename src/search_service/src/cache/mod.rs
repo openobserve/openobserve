@@ -1221,6 +1221,16 @@ pub async fn apply_regex_to_response(
 
     let start = std::time::Instant::now();
     let pattern_manager = get_pattern_manager().await?;
+    redaction_skipped(
+        config::get_config().common.sdr_fail_closed,
+        || {
+            all_streams.split(',').any(|stream| {
+                pattern_manager.has_unbuilt_patterns(org_id, stream_type, stream.trim())
+            })
+        },
+        all_streams,
+        "a configured pattern failed to build",
+    )?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
     let sql = match crate::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {

@@ -58,8 +58,13 @@ const MAX_REGEX_TEXT_LENGTH = 512;
 const MAX_REGEX_MATCHES = 100;
 /** A {n,m} repeat wider than this counts as unbounded. */
 const MAX_BOUNDED_REPEAT = 16;
-/** Cap on the product of bounded-repeat widths ({n,m}, ?), which multiply backtracking. */
-const MAX_BOUNDED_VARIANTS = 128;
+/**
+ * Caps on the product of variable-width choices ({n,m}, ?, |), which multiply
+ * backtracking: alongside an unbounded quantifier only one binary choice is
+ * allowed (https?://\S+), without one the product may reach 81 (four \d{1,3}).
+ */
+const MAX_VARIANTS_WITH_UNBOUNDED = 2;
+const MAX_VARIANTS = 81;
 
 /** Escaped str_match literals: linear to match, so exempt from MAX_REGEX_TEXT_LENGTH. */
 const literalPatterns = new WeakSet<RegExp>();
@@ -78,22 +83,27 @@ const FIELD_FILTER_REGEX =
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * Whether a regex source risks super-linear backtracking: it has a quantified
- * group such as (a+)+ or (x)*, more than one unbounded quantifier (*, +,
- * {n,} or a wide {n,m}), or narrow repeats ({n,m}, ?) whose widths multiply
- * past MAX_BOUNDED_VARIANTS. Escaped characters and character classes are
- * skipped, so [a*]+ has one quantifier. What passes is at worst quadratic in
- * the text length times that bounded factor.
+ * Whether a regex source risks super-linear backtracking. Rejected: a
+ * quantified group such as (a+)+ or (x)*; more than one unbounded quantifier
+ * (*, +, {n,} or a {n,m} wider than MAX_BOUNDED_REPEAT); or variable-width
+ * choices ({n,m}, ?, |) whose widths multiply past MAX_VARIANTS_WITH_UNBOUNDED
+ * when an unbounded quantifier is present, else past MAX_VARIANTS. Escaped
+ * characters and character classes are skipped, so [a*]+ has one quantifier.
+ * What passes stays near-quadratic with a small constant on a
+ * MAX_REGEX_TEXT_LENGTH text (well under 1 ms per field, measured in Node 24).
  */
 function isBacktrackingRisk(source: string): boolean {
   let unbounded = 0;
   let variants = 1;
   let inClass = false;
+  // Previous token: a quantifier makes a following ? lazy; "(" makes it a group modifier.
+  let previous: "quantifier" | "open" | "other" = "other";
 
   for (let i = 0; i < source.length; i++) {
     const char = source[i];
     if (char === "\\") {
       i++;
+      previous = "other";
       continue;
     }
     if (inClass) {
@@ -102,25 +112,39 @@ function isBacktrackingRisk(source: string): boolean {
     }
     if (char === "[") {
       inClass = true;
+      previous = "other";
       continue;
     }
 
     const next = source[i + 1];
     if (char === ")" && (next === "*" || next === "+" || next === "{")) return true;
 
+    let isQuantifier = false;
     if (char === "*" || char === "+") {
       unbounded++;
-    } else if (char === "?" && source[i - 1] !== "(" && !"*+?}".includes(source[i - 1])) {
+      isQuantifier = true;
+    } else if (char === "?") {
+      if (previous === "other") variants *= 2;
+      isQuantifier = previous !== "open";
+    } else if (char === "|") {
       variants *= 2;
     } else if (char === "{") {
       const repeat = /^\{(\d+)(,(\d*))?\}/.exec(source.slice(i));
-      if (repeat?.[2]) {
-        const width = Number(repeat[3]) - Number(repeat[1]) + 1;
-        if (repeat[3] === "" || Number(repeat[3]) > MAX_BOUNDED_REPEAT) unbounded++;
-        else variants *= Math.max(width, 1);
+      if (repeat) {
+        isQuantifier = true;
+        if (repeat[2] && (repeat[3] === "" || Number(repeat[3]) > MAX_BOUNDED_REPEAT)) {
+          unbounded++;
+        } else if (repeat[2]) {
+          variants *= Math.max(Number(repeat[3]) - Number(repeat[1]) + 1, 1);
+        }
+        i += repeat[0].length - 1;
       }
     }
-    if (unbounded > 1 || variants > MAX_BOUNDED_VARIANTS) return true;
+    previous = isQuantifier ? "quantifier" : char === "(" ? "open" : "other";
+
+    if (unbounded > 1 || variants > (unbounded ? MAX_VARIANTS_WITH_UNBOUNDED : MAX_VARIANTS)) {
+      return true;
+    }
   }
 
   return false;

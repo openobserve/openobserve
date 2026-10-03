@@ -152,6 +152,18 @@ pub async fn handle_request(
         .map(|name| format_stream_name(name.to_string()))
         .unwrap_or_else(|| "default".to_string());
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
+    // Refused before the pipelines run: a remote-stream destination writes inside them.
+    #[cfg(feature = "vectorscan")]
+    if let Some(reason) =
+        crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &[(&stream_name, 0)])
+            .await
+    {
+        return Ok(otlp_rejection_response(
+            req_type,
+            StatusCode::SERVICE_UNAVAILABLE,
+            reason,
+        ));
+    }
 
     let cfg = get_config();
     let log_ingestion_errors = ingestion_log_enabled().await;
@@ -730,7 +742,24 @@ pub async fn handle_request(
         return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
-    // A pattern-manager failure fails the request only under ZO_SDR_FAIL_CLOSED.
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &streams).await
+        {
+            return Ok(otlp_rejection_response(
+                req_type,
+                StatusCode::SERVICE_UNAVAILABLE,
+                reason,
+            ));
+        }
+    }
+
+    // A pattern-manager failure must not fail the request; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
     {
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
@@ -761,34 +790,15 @@ pub async fn handle_request(
                 log::error!(
                     "[LOGS:OTLP] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
                 );
-                use config::meta::self_reporting::redaction::FailPosture;
-                let rejection = config::meta::self_reporting::redaction::fail_closed_rejection(
-                    cfg.common.sdr_fail_closed,
-                    org_id,
-                    StreamType::Logs,
-                    json_data_by_stream.keys().map(String::as_str),
-                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Logs,
                     json_data_by_stream
                         .iter()
                         .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
-                    if rejection.is_some() {
-                        FailPosture::Closed
-                    } else {
-                        FailPosture::Open
-                    },
+                    config::meta::self_reporting::redaction::FailPosture::Open,
                 )
                 .await;
-                if let Some(reason) = rejection {
-                    log::error!("[LOGS:OTLP] {reason}");
-                    return Ok(otlp_rejection_response(
-                        req_type,
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        reason,
-                    ));
-                }
             }
         }
     }

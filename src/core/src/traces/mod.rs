@@ -697,6 +697,21 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
+    // Refused before the pipelines run: a remote-stream destination writes inside them.
+    #[cfg(feature = "vectorscan")]
+    if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        org_id,
+        StreamType::Traces,
+        &[(&traces_stream_name, 0)],
+    )
+    .await
+    {
+        return Ok(otlp_rejection_response(
+            req_type,
+            http::StatusCode::SERVICE_UNAVAILABLE,
+            reason,
+        ));
+    }
 
     let now = now_micros();
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
@@ -1191,6 +1206,23 @@ pub async fn handle_otlp_request(
         );
     }
 
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Traces, &streams).await
+        {
+            return Ok(otlp_rejection_response(
+                req_type,
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                reason,
+            ));
+        }
+    }
+
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
@@ -1223,34 +1255,15 @@ pub async fn handle_otlp_request(
                 log::error!(
                     "[TRACES] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
                 );
-                use config::meta::self_reporting::redaction::FailPosture;
-                let rejection = config::meta::self_reporting::redaction::fail_closed_rejection(
-                    config::get_config().common.sdr_fail_closed,
-                    org_id,
-                    StreamType::Traces,
-                    json_data_by_stream.keys().map(String::as_str),
-                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Traces,
                     json_data_by_stream
                         .iter()
                         .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
-                    if rejection.is_some() {
-                        FailPosture::Closed
-                    } else {
-                        FailPosture::Open
-                    },
+                    config::meta::self_reporting::redaction::FailPosture::Open,
                 )
                 .await;
-                if let Some(reason) = rejection {
-                    log::error!("[TRACES] {reason}");
-                    return Ok(otlp_rejection_response(
-                        req_type,
-                        http::StatusCode::SERVICE_UNAVAILABLE,
-                        reason,
-                    ));
-                }
             }
         }
     }
@@ -1538,6 +1551,22 @@ pub async fn ingest_json(
         );
     }
 
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Traces, &streams).await
+        {
+            return Ok(MetaHttpResponse::error_with_header(
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                reason,
+            ));
+        }
+    }
+
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
@@ -1570,33 +1599,15 @@ pub async fn ingest_json(
                 log::error!(
                     "[TRACES] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
                 );
-                use config::meta::self_reporting::redaction::FailPosture;
-                let rejection = config::meta::self_reporting::redaction::fail_closed_rejection(
-                    config::get_config().common.sdr_fail_closed,
-                    org_id,
-                    StreamType::Traces,
-                    json_data_by_stream.keys().map(String::as_str),
-                );
                 crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                     org_id,
                     StreamType::Traces,
                     json_data_by_stream
                         .iter()
                         .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
-                    if rejection.is_some() {
-                        FailPosture::Closed
-                    } else {
-                        FailPosture::Open
-                    },
+                    config::meta::self_reporting::redaction::FailPosture::Open,
                 )
                 .await;
-                if let Some(reason) = rejection {
-                    log::error!("[TRACES] {reason}");
-                    return Ok(MetaHttpResponse::error_with_header(
-                        http::StatusCode::SERVICE_UNAVAILABLE,
-                        reason,
-                    ));
-                }
             }
         }
     }
