@@ -504,6 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { pipelinesQuery } from "@/services/pipelines.queries";
+import { functionsQuery } from "@/services/jstransform.queries";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, watch, onMounted, nextTick } from "vue";
@@ -1187,54 +1188,110 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
-const exportPipeline = (row: any) => {
-  const pipelineToBeExported = row.name;
+// The names a pipeline's function nodes call, deduped and in node order.
+const functionNamesIn = (pipeline: any): string[] => {
+  const names = (pipeline?.nodes ?? [])
+    .filter((node: any) => node?.data?.node_type === "function")
+    .map((node: any) => node?.data?.name)
+    .filter((name: any) => typeof name === "string" && name !== "");
+  return Array.from(new Set<string>(names));
+};
 
-  const pipelineJson = JSON.stringify(row, null, 2);
-  // Create a Blob from the JSON string
-  const blob = new Blob([pipelineJson], { type: "application/json" });
+// The same four keys the Functions export writes (FunctionList.vue exportPayload).
+// `streams` is a deprecated association whose names mean nothing in another org,
+// and `numArgs` is derived from `params`, so neither travels.
+const bundledFunctionPayload = (fn: any) => ({
+  name: fn.name,
+  function: fn.function,
+  params: fn.params,
+  transType: fn.transType,
+});
 
-  // Create an object URL for the Blob
+/**
+ * Attaches a `functions` key to every pipeline that calls one, so the import can
+ * recreate them in the target org instead of making the user remap each node.
+ *
+ * Mutates nothing: the rows belong to the pipelines cache. An older server ignores
+ * the extra key on the way back in - `Pipeline` does not set `deny_unknown_fields`.
+ *
+ * Returns the names that could not be bundled: under enterprise RBAC the list is
+ * filtered per user, so a node can name a function this user cannot read.
+ */
+const bundleFunctions = async (pipelines: any[]) => {
+  const wanted = Array.from(new Set<string>(pipelines.flatMap(functionNamesIn)));
+  if (!wanted.length) return { pipelines, missing: [] as string[] };
+
+  // GET /functions already returns every body, so one read covers the whole file.
+  let available: any[] = [];
+  try {
+    available = await queryClient.fetchQuery(
+      functionsQuery(store.state.selectedOrganization.identifier),
+    );
+  } catch {
+    // The pipeline itself is still worth exporting; the import falls back to remap.
+    return { pipelines, missing: wanted };
+  }
+
+  const byName = new Map<string, any>(
+    (available ?? []).map((fn: any) => [fn.name, bundledFunctionPayload(fn)]),
+  );
+
+  const bundled = pipelines.map((pipeline: any) => {
+    const functions = functionNamesIn(pipeline)
+      .map((name) => byName.get(name))
+      .filter(Boolean);
+    return functions.length ? { ...pipeline, functions } : pipeline;
+  });
+
+  return { pipelines: bundled, missing: wanted.filter((name) => !byName.has(name)) };
+};
+
+const downloadJson = (payload: unknown, filename: string) => {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-
-  // Create an anchor element to trigger the download
   const link = document.createElement("a");
   link.href = url;
-
-  // Set the filename of the download
-  link.download = `${pipelineToBeExported}.json`;
-
-  // Trigger the download by simulating a click
+  link.download = filename;
   link.click();
-
-  // Clean up the URL object after download
   URL.revokeObjectURL(url);
 };
 
-const exportBulkPipelines = () => {
-  // Create an array of selected pipelines without modifying their structure
-  const pipelinesToExport = selectedPipelines.value;
+// Names a node calls but the file cannot carry. Said out loud, because the import
+// will stop on them and the user is the only one who can grant the read.
+const warnAboutMissingFunctions = (missing: string[]) => {
+  if (!missing.length) return;
+  toast({
+    message: t("toastMessages.pipeline.functionsNotBundled", {
+      count: missing.length,
+      names: missing.join(", "),
+    }),
+    variant: "warning",
+  });
+};
 
-  const exportJson = JSON.stringify(pipelinesToExport, null, 2);
-  const blob = new Blob([exportJson], { type: "application/json" });
+const exportPipeline = async (row: any) => {
+  const { pipelines, missing } = await bundleFunctions([row]);
+  downloadJson(pipelines[0], `${row.name}.json`);
+  warnAboutMissingFunctions(missing);
+};
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
+const exportBulkPipelines = async () => {
+  // Stays an array of pipelines, each carrying its own `functions` key, so the
+  // import loop keeps its shape.
+  const selected = selectedPipelines.value;
+  const { pipelines, missing } = await bundleFunctions(selected);
+
   const date = new Date().toISOString().split("T")[0];
-  link.download = `pipelines_export_${date}.json`;
-
-  link.click();
-
-  URL.revokeObjectURL(url);
+  downloadJson(pipelines, `pipelines_export_${date}.json`);
 
   selectedPipelineIds.value = [];
   toast({
     message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
-      count: pipelinesToExport.length,
+      count: selected.length,
     }),
     variant: "success",
   });
+  warnAboutMissingFunctions(missing);
 };
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
 const handleResumePipeline = () => {

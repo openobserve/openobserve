@@ -11,6 +11,11 @@ the screens encode:
   body that is not byte-identical to the one that was sent;
 - JS bodies must not be normalised that way, or importing one would corrupt it.
 
+Phase 2 bundles the functions a pipeline calls into the pipeline's export file
+and recreates them on import, which adds two more server behaviours the screen
+depends on: a pipeline naming a function the org does not have is refused, and a
+copy name (`parse_nginx_1`) is a name the server will actually accept.
+
 These run against the API alone, so they fail loudly if the server moves even
 when the UI tests are not running.
 """
@@ -312,3 +317,91 @@ def _pipeline_using_function(pipeline_name: str, function_name: str) -> dict:
         ],
         "edges": [edge(input_id, fn_id), edge(fn_id, output_id)],
     }
+
+
+# ----- what pipeline function bundling leans on (Phase 2) -----
+
+
+def test_pipeline_create_is_refused_when_the_function_does_not_exist(
+    client: OpenObserveClient,
+):
+    """A pipeline naming a function the org does not have is refused.
+
+    This is why the import resolves and creates a pipeline's bundled functions
+    *before* it posts the pipeline: with the order reversed, every import into a
+    fresh org would fail here.
+    """
+    pipeline_name = unique_name("pytest_bundle_missing_pl")
+    missing = unique_name("pytest_bundle_ghost")
+    pipeline_id = None
+    try:
+        resp = client.post("pipelines", json=_pipeline_using_function(pipeline_name, missing))
+        if resp.status_code == 200:
+            pipeline_id = resp.json().get("id")
+        assert resp.status_code == 400, (
+            "a pipeline calling a function that does not exist should be refused; "
+            f"got {resp.status_code} {resp.text}"
+        )
+    finally:
+        if pipeline_id:
+            client.delete(f"pipelines/{pipeline_id}")
+
+
+def test_pipeline_create_is_refused_when_the_function_is_javascript(
+    client: OpenObserveClient,
+):
+    """A function node cannot call a JS function.
+
+    A bundled JS function is created happily and the pipeline is then refused, so
+    the import leaves a function behind and reports the pipeline as failed. The
+    function has no dependents, so it can be deleted; what matters is that this
+    is the server's rule and not something the screen can paper over.
+    """
+    fn_name = unique_name("pytest_bundle_js")
+    pipeline_name = unique_name("pytest_bundle_js_pl")
+    pipeline_id = None
+    try:
+        created = client.post("functions", json=js_payload(fn_name))
+        assert created.status_code == 200, f"js function setup failed: {created.text}"
+
+        resp = client.post("pipelines", json=_pipeline_using_function(pipeline_name, fn_name))
+        if resp.status_code == 200:
+            pipeline_id = resp.json().get("id")
+        assert resp.status_code == 400, (
+            "a function node calling a JS function should be refused; "
+            f"got {resp.status_code} {resp.text}"
+        )
+    finally:
+        if pipeline_id:
+            client.delete(f"pipelines/{pipeline_id}")
+        client.delete(f"functions/{fn_name}")
+
+
+def test_a_copy_suffix_is_a_name_the_server_accepts(client: OpenObserveClient):
+    """`<name>_1` is a usable function name, and a copy is an independent function.
+
+    The import answers a name taken by different logic by creating a copy under
+    the first free `_N`. The name rule it keeps to is the Add form's, which is
+    client-side — this pins that the server agrees, and that the original is
+    untouched by the copy.
+    """
+    base = unique_name("pytest_bundle_copy")
+    copy = f"{base}_1"
+    try:
+        original = client.post("functions", json=vrl_payload(base, body=".original = true"))
+        assert original.status_code == 200, f"original setup failed: {original.text}"
+
+        resp = client.post("functions", json=vrl_payload(copy, body=".copied = true"))
+        assert resp.status_code == 200, (
+            f"a `_1` copy name should be accepted; got {resp.status_code} {resp.text}"
+        )
+
+        stored_copy = fetch_function(client, copy)
+        stored_original = fetch_function(client, base)
+        assert stored_copy is not None and stored_original is not None
+        assert ".copied = true" in stored_copy["function"]
+        # Never overwritten: this is what keeps every other pipeline unchanged.
+        assert ".original = true" in stored_original["function"]
+    finally:
+        client.delete(f"functions/{copy}")
+        client.delete(f"functions/{base}")
