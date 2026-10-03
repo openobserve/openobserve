@@ -553,6 +553,63 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.tableRendererData).toEqual({ rows: [], columns: [] });
     });
 
+    it("shows No Data for a custom_chart with no rows instead of an error", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, type: "custom_chart" },
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("clears a stale custom_chart error when switching to another chart type", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "Error executing code", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, type: "custom_chart" },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(true);
+
+      await wrapper.setProps({ panelSchema: { ...defaultProps.panelSchema, type: "bar" } });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+    });
+
     // Guard must not over-trigger: with rows present the table keeps serving
     // the converted data (unchanged fall-through behaviour).
     // mockReturnValueOnce only overrides THIS mount, so the real-ref shape can't
