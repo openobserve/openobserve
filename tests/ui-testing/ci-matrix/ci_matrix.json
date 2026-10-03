@@ -401,7 +401,8 @@
       "pipeline-backfill.spec.js",
       "pipeline-history.spec.js",
       "scheduled-pipeline-query-builder.spec.js",
-      "pipelines-form-validation.spec.js"
+      "pipelines-form-validation.spec.js",
+      "pipeline-function-bundling.spec.js"
     ],
     "disabled": [
       {

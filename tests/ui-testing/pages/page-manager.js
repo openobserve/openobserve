@@ -134,6 +134,7 @@ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationP
 const FunctionsPage = require("./functionsPages/functionsPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
 const FunctionsImportExportPage = require("./functionsPages/functionsImportExportPage.js");
+const PipelineImportExportPage = require("./pipelinesPages/pipelineImportExportPage.js");
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
@@ -280,6 +281,7 @@ class PageManager {
     this.functionsPage = new FunctionsPage(page);
     this.functionsFormValidation = new FunctionsFormValidationPage(page);
     this.functionsImportExport = new FunctionsImportExportPage(page);
+    this.pipelineImportExport = new PipelineImportExportPage(page);
 
     // ===== CIPHER KEYS PAGE OBJECTS =====
     this.cipherKeysFormValidation = new CipherKeysFormValidationPage(page);

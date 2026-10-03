@@ -51,6 +51,8 @@ vi.mock("@/services/jstransform", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), {
     default: {
       list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
   });
 });
@@ -213,6 +215,9 @@ describe("ImportPipeline.vue", () => {
     } as any);
     vi.mocked(jstransform.list).mockResolvedValue({
       data: { list: [] },
+    } as any);
+    vi.mocked(jstransform.create).mockResolvedValue({
+      data: {},
     } as any);
   });
 
@@ -417,6 +422,10 @@ describe("ImportPipeline.vue", () => {
       "validateNodesForOrg",
       "validateRemoteDestination",
       "createPipeline",
+      "resolveBundledFunctions",
+      "bundledFunctionsByName",
+      "sameFunctionLogic",
+      "normaliseFunctionBody",
       "getFunctions",
       "getAlertDestinations",
       "getScheduledPipelines",
@@ -980,7 +989,7 @@ describe("ImportPipeline.vue", () => {
     it("calls jstransform.list with the selected organization identifier", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(jstransform.list).toHaveBeenCalledWith(1, 100, "created_at", true, "", "default");
+      expect(jstransform.list).toHaveBeenCalledWith(1, 100000, "created_at", true, "", "default");
     });
   });
 
@@ -1085,6 +1094,285 @@ describe("ImportPipeline.vue", () => {
   // -----------------------------------------------------------------------
   // 22. Store integration
   // -----------------------------------------------------------------------
+
+  // -----------------------------------------------------------------------
+  // 22. Bundled functions (Phase 2)
+  // -----------------------------------------------------------------------
+
+  describe("bundled functions", () => {
+    const BODY = ".a = 1";
+
+    // One function node calling one bundled function - the shape a Phase 2
+    // export produces.
+    const bundledPipeline = (overrides: Record<string, any> = {}) => ({
+      name: "my-pipeline",
+      org: "default",
+      stream_name: "logs-stream",
+      stream_type: "logs",
+      source: {
+        stream_name: "logs-stream",
+        stream_type: "logs",
+        source_type: "realtime",
+        org_id: "default",
+      },
+      nodes: [
+        {
+          id: "n1",
+          io_type: "default",
+          data: { node_type: "function", name: "parse_nginx" },
+        },
+      ],
+      edges: [],
+      functions: [{ name: "parse_nginx", function: BODY, params: "row", transType: 0 }],
+      ...overrides,
+    });
+
+    const withExistingFunctions = (list: Record<string, any>[]) => {
+      vi.mocked(jstransform.list).mockResolvedValue({ data: { list } } as any);
+    };
+
+    const mountReady = async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      return wrapper;
+    };
+
+    const postedPipeline = (nth = 0) =>
+      (vi.mocked(pipelinesService.createPipeline).mock.calls[nth]?.[0] as any)?.data;
+
+    it("creates a bundled function when the name is free", async () => {
+      await mountReady();
+
+      const input = bundledPipeline();
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(true);
+
+      expect(jstransform.create).toHaveBeenCalledWith("default", {
+        name: "parse_nginx",
+        function: BODY,
+        params: "row",
+        transType: 0,
+      });
+      // Nothing to rename, so the node keeps the name it was exported with.
+      expect(input.nodes[0].data.name).toBe("parse_nginx");
+    });
+
+    it("reuses an existing function with the same logic and writes nothing", async () => {
+      withExistingFunctions([
+        { name: "parse_nginx", function: BODY, params: "row", transType: 0 },
+      ]);
+      await mountReady();
+
+      expect(await wrapper.vm.createPipeline(bundledPipeline(), 1)).toBe(true);
+      expect(jstransform.create).not.toHaveBeenCalled();
+    });
+
+    it("treats a body that differs only by the server's trailing dot as the same logic", async () => {
+      // save_function appends " \n ." to a VRL body without a return, so an export
+      // taken after the write differs from the file it came from by that alone.
+      withExistingFunctions([
+        { name: "parse_nginx", function: `${BODY} \n .`, params: "row", transType: 0 },
+      ]);
+      await mountReady();
+
+      expect(await wrapper.vm.createPipeline(bundledPipeline(), 1)).toBe(true);
+      expect(jstransform.create).not.toHaveBeenCalled();
+    });
+
+    it("omitted params match the server's `row` default", async () => {
+      withExistingFunctions([{ name: "parse_nginx", function: BODY, transType: 0 }]);
+      await mountReady();
+
+      expect(await wrapper.vm.createPipeline(bundledPipeline(), 1)).toBe(true);
+      expect(jstransform.create).not.toHaveBeenCalled();
+    });
+
+    it("creates a copy when the name is taken by different logic, and repoints the node", async () => {
+      withExistingFunctions([
+        { name: "parse_nginx", function: ".b = 2", params: "row", transType: 0 },
+      ]);
+      await mountReady();
+
+      const input = bundledPipeline();
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(true);
+
+      expect(jstransform.create).toHaveBeenCalledTimes(1);
+      expect(jstransform.create).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ name: "parse_nginx_1", function: BODY }),
+      );
+      // The rewrite has to land before the pipeline is posted, or the pipeline
+      // runs the logic it was not exported with.
+      expect(postedPipeline().nodes[0].data.name).toBe("parse_nginx_1");
+    });
+
+    it("never overwrites the existing function", async () => {
+      withExistingFunctions([
+        { name: "parse_nginx", function: ".b = 2", params: "row", transType: 0 },
+      ]);
+      await mountReady();
+
+      await wrapper.vm.createPipeline(bundledPipeline(), 1);
+      expect(jstransform.update).not.toHaveBeenCalled();
+    });
+
+    it("reuses the copy on a re-import instead of creating a second one", async () => {
+      withExistingFunctions([
+        { name: "parse_nginx", function: ".b = 2", params: "row", transType: 0 },
+      ]);
+      await mountReady();
+
+      await wrapper.vm.createPipeline(bundledPipeline(), 1);
+      const second = bundledPipeline();
+      await wrapper.vm.createPipeline(second, 2);
+
+      // _1 already carries this logic, so no _2 appears.
+      expect(jstransform.create).toHaveBeenCalledTimes(1);
+      expect(second.nodes[0].data.name).toBe("parse_nginx_1");
+    });
+
+    it("creates a shared function once across two pipelines in one file", async () => {
+      await mountReady();
+
+      await wrapper.vm.createPipeline(bundledPipeline({ name: "p1" }), 1);
+      await wrapper.vm.createPipeline(bundledPipeline({ name: "p2" }), 2);
+
+      expect(jstransform.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("walks to the next suffix when the server answers 400 already exist", async () => {
+      // Enterprise RBAC filters the list, so a name this user cannot read looks
+      // free here and is taken on the server.
+      vi.mocked(jstransform.create)
+        .mockRejectedValueOnce({
+          response: { data: { message: "Function already exist" } },
+        })
+        .mockResolvedValueOnce({ data: {} } as any);
+      await mountReady();
+
+      const input = bundledPipeline();
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(true);
+
+      expect(jstransform.create).toHaveBeenNthCalledWith(
+        1,
+        "default",
+        expect.objectContaining({ name: "parse_nginx" }),
+      );
+      expect(jstransform.create).toHaveBeenNthCalledWith(
+        2,
+        "default",
+        expect.objectContaining({ name: "parse_nginx_1" }),
+      );
+      expect(postedPipeline().nodes[0].data.name).toBe("parse_nginx_1");
+    });
+
+    it("abandons the pipeline when a function cannot be created", async () => {
+      vi.mocked(jstransform.create).mockRejectedValue({
+        response: { data: { message: "function compilation error" } },
+      });
+      await mountReady();
+
+      expect(await wrapper.vm.createPipeline(bundledPipeline(), 1)).toBe(false);
+      // Nothing is created against logic that could not be resolved.
+      expect(pipelinesService.createPipeline).not.toHaveBeenCalled();
+      expect(JSON.stringify(wrapper.vm.pipelineCreators)).toContain("function compilation error");
+    });
+
+    it("reports the two-bodies clash as prose, not a pushed object", async () => {
+      // The error list renders an object only when the template has a branch for
+      // its `field`; everything else falls through to `{{ errorMessage }}` and the
+      // viewer is shown the JSON. There is nothing to fix up inline here, so this
+      // one has to be a plain string.
+      await mountReady();
+
+      await wrapper.vm.validatePipelineInputs(
+        bundledPipeline({
+          functions: [
+            { name: "parse_nginx", function: BODY, params: "row", transType: 0 },
+            { name: "parse_nginx", function: ".b = 2", params: "row", transType: 0 },
+          ],
+        }),
+        1,
+      );
+
+      const pushed = wrapper.vm.pipelineErrorsToDisplay.flat();
+      const conflict = pushed.find(
+        (entry: any) => typeof entry === "string" && entry.includes("two different bodies"),
+      );
+      expect(conflict, `expected a string error; got ${JSON.stringify(pushed)}`).toBeTruthy();
+    });
+
+    it("rejects a file carrying two different bodies under one name", async () => {
+      await mountReady();
+
+      const input = bundledPipeline({
+        functions: [
+          { name: "parse_nginx", function: BODY, params: "row", transType: 0 },
+          { name: "parse_nginx", function: ".b = 2", params: "row", transType: 0 },
+        ],
+      });
+
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(false);
+      expect(jstransform.create).not.toHaveBeenCalled();
+      expect(pipelinesService.createPipeline).not.toHaveBeenCalled();
+    });
+
+    it("leaves a bundled function the nodes never call alone", async () => {
+      await mountReady();
+
+      const input = bundledPipeline({
+        functions: [
+          { name: "parse_nginx", function: BODY, params: "row", transType: 0 },
+          { name: "unused_fn", function: ".c = 3", params: "row", transType: 0 },
+        ],
+      });
+      await wrapper.vm.createPipeline(input, 1);
+
+      expect(jstransform.create).toHaveBeenCalledTimes(1);
+      expect(jstransform.create).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ name: "parse_nginx" }),
+      );
+    });
+
+    it("accepts a bundled name in validation without it existing in the org", async () => {
+      await mountReady();
+
+      await wrapper.vm.validatePipelineInputs(bundledPipeline(), 1);
+      expect(JSON.stringify(wrapper.vm.pipelineErrorsToDisplay)).not.toContain(
+        "function_name_0",
+      );
+    });
+
+    it("still demands a remap for a file that bundles nothing", async () => {
+      await mountReady();
+
+      const old = bundledPipeline();
+      delete (old as any).functions;
+
+      expect(await wrapper.vm.validatePipelineInputs(old, 1)).toBe(false);
+      expect(JSON.stringify(wrapper.vm.pipelineErrorsToDisplay)).toContain("function_name_0");
+      expect(jstransform.create).not.toHaveBeenCalled();
+    });
+
+    it("normalises only one trailing dot line, and leaves a JS body alone", async () => {
+      await mountReady();
+
+      expect(wrapper.vm.normaliseFunctionBody(".a = 1 \n .")).toBe(".a = 1");
+      expect(wrapper.vm.normaliseFunctionBody(".a = 1")).toBe(".a = 1");
+      expect(wrapper.vm.normaliseFunctionBody("return row.a;")).toBe("return row.a;");
+    });
+
+    it("compares transType, so a VRL and a JS body of the same text differ", async () => {
+      await mountReady();
+
+      expect(
+        wrapper.vm.sameFunctionLogic(
+          { function: BODY, params: "row", transType: 0 },
+          { function: BODY, params: "row", transType: 1 },
+        ),
+      ).toBe(false);
+    });
+  });
 
   describe("Store integration", () => {
     it("exposes store on vm", () => {
