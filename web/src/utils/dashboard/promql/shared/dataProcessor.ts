@@ -24,14 +24,18 @@ import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
  * @param searchQueryData - Array of PromQL API responses (one per query)
  * @param panelSchema - Panel configuration schema
  * @param store - Vuex store instance
+ * @param shift - time-shift alignment from alignShiftedPromQLResults: the panel
+ *   query index and name suffix of each expanded result
  * @returns Processed data array ready for chart-specific conversion
  */
 export async function processPromQLData(
   searchQueryData: PromQLResponse[],
   panelSchema: any,
   store: any,
+  shift: { parentQueryIndex?: number[]; nameSuffixes?: string[] } = {},
 ): Promise<ProcessedPromQLData[]> {
   const result: ProcessedPromQLData[] = [];
+  const queryIndexOf = (index: number) => shift.parentQueryIndex?.[index] ?? index;
 
   // Apply series limit
   const seriesLimit = panelSchema.config?.promql_series_limit || 100;
@@ -45,8 +49,8 @@ export async function processPromQLData(
       metrics: ((queryData?.data?.result || queryData?.result) ?? [])
         .map((metric: any) => metric?.metric)
         .filter(Boolean),
-      template: panelSchema.queries?.[index]?.config?.promql_legend,
-      fallback: panelSchema.queries?.[index]?.config?.promql_legend_fallback,
+      template: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend,
+      fallback: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend_fallback,
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
@@ -67,7 +71,9 @@ export async function processPromQLData(
     }
 
     const series = resultData.map((metric: any) => {
-      const seriesName = seriesNames.get(metric.metric) ?? "";
+      const suffix = shift.nameSuffixes?.[index];
+      const baseName = seriesNames.get(metric.metric) ?? "";
+      const seriesName = suffix ? `${baseName} (${suffix})` : baseName;
 
       // Extract values (matrix has values[], vector has value)
       const values = metric.values || (metric.value ? [metric.value] : []);
@@ -89,8 +95,8 @@ export async function processPromQLData(
     result.push({
       timestamps: formattedTimestamps,
       series,
-      queryIndex: index,
-      queryConfig: panelSchema.queries[index]?.config || {},
+      queryIndex: queryIndexOf(index),
+      queryConfig: panelSchema.queries[queryIndexOf(index)]?.config || {},
     });
   });
 

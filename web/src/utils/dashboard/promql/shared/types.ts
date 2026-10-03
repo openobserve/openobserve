@@ -102,6 +102,10 @@ export interface ConversionContext {
   hoveredSeriesState: any;
   annotations: any;
   metadata?: any;
+  /** Panel query index of each expanded (time-shifted) result; see alignShiftedPromQLResults. */
+  parentQueryIndex?: number[];
+  /** periodAsStr per expanded result, "" for a current-period one. */
+  nameSuffixes?: string[];
 }
 
 /**

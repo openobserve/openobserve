@@ -81,6 +81,81 @@ const getMarkLineData = (panelSchema: any) => {
   );
 };
 
+const labelSetKey = (metric: Record<string, string> = {}) =>
+  JSON.stringify(Object.entries(metric).sort(([a], [b]) => a.localeCompare(b)));
+
+/**
+ * Prepares time-shifted ("compare to a previous period") results for either
+ * converter path. The executor appends one entry per (range query, offset)
+ * after the primaries and tags each with `timeRangeGap` (ms) and
+ * `panelQueryIndex`. For every shifted entry this:
+ *  - moves the samples forward by the offset and snaps them onto the current
+ *    step grid, so an offset that is not a multiple of the step (35s vs 1d)
+ *    does not double the x values;
+ *  - keeps only series whose label set matches a primary series, re-using the
+ *    primary's metric object so naming treats them as the same series. With no
+ *    primary series at all, the shifted series are kept as they are.
+ *
+ * Returns the panel query index and the name suffix (periodAsStr, "" for a
+ * primary) of every expanded index; legend templates and query config must be
+ * read through `parentQueryIndex`, never through the raw index.
+ */
+export const alignShiftedPromQLResults = (
+  data: any[],
+  metadata: any,
+  resultMetaData?: any,
+): { data: any[]; parentQueryIndex: number[]; nameSuffixes: string[] } => {
+  const metas = metadata?.queries ?? [];
+  const gapMsOf = (i: number) => Number(metas[i]?.timeRangeGap?.seconds) || 0;
+  const parentQueryIndex = data.map((_, i) => metas[i]?.panelQueryIndex ?? i);
+  const nameSuffixes = data.map((_, i) =>
+    gapMsOf(i) ? (metas[i]?.timeRangeGap?.periodAsStr ?? "") : "",
+  );
+
+  const primaryAt = new Map<number, number>();
+  data.forEach((_, i) => {
+    if (!gapMsOf(i) && !primaryAt.has(parentQueryIndex[i])) primaryAt.set(parentQueryIndex[i], i);
+  });
+
+  const aligned = data.map((entry, i) => {
+    const gapMs = gapMsOf(i);
+    if (!gapMs || !Array.isArray(entry?.result)) return entry;
+
+    const p = primaryAt.get(parentQueryIndex[i]);
+    const primarySeries: any[] = (p === undefined ? undefined : data[p]?.result) ?? [];
+    const primaryByLabels = new Map(primarySeries.map((m: any) => [labelSetKey(m?.metric), m]));
+
+    // Units: timeRangeGap ms, sample timestamps s, metadata times and step µs.
+    const gapS = gapMs / 1000;
+    const stepS =
+      Number(resultMetaData?.[i]?.[0]?.step ?? resultMetaData?.[p ?? -1]?.[0]?.step) / 1e6;
+    const anchorS =
+      primarySeries.find((m: any) => m?.values?.length)?.values[0][0] ??
+      Number(metas[i]?.startTime) / 1e6 + gapS;
+    const snap = (ts: number) =>
+      stepS > 0 && Number.isFinite(anchorS)
+        ? anchorS + Math.round((ts + gapS - anchorS) / stepS) * stepS
+        : ts + gapS;
+
+    const result = entry.result
+      .map((m: any) => {
+        const primary = primaryByLabels.get(labelSetKey(m?.metric));
+        if (primarySeries.length && !primary) return null;
+        return {
+          ...m,
+          metric: primary?.metric ?? m.metric,
+          ...(m.values && { values: m.values.map(([ts, v]: [number, string]) => [snap(ts), v]) }),
+          ...(m.value && { value: [snap(m.value[0]), m.value[1]] }),
+        };
+      })
+      .filter(Boolean);
+
+    return { ...entry, result };
+  });
+
+  return { data: aligned, parentQueryIndex, nameSuffixes };
+};
+
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
  *
@@ -108,16 +183,20 @@ export const convertPromQLData = async (
 
   await importMoment();
 
-  // if no data than return it
-  if (
-    !Array.isArray(searchQueryData) ||
-    searchQueryData.length === 0 ||
-    !searchQueryData[0] ||
-    !panelSchema
-  ) {
+  // if no data than return it. Any expanded result counts: with a time shift
+  // the current period can be empty while a previous one has data.
+  if (!Array.isArray(searchQueryData) || !searchQueryData.some(Boolean) || !panelSchema) {
     // console.timeEnd("convertPromQLData");
     return { options: null };
   }
+
+  const alignment = alignShiftedPromQLResults(searchQueryData, metadata, resultMetaData);
+  searchQueryData = alignment.data;
+  const { parentQueryIndex, nameSuffixes } = alignment;
+  const nameOf = (names: Map<any, string>, metric: any, index: number) => {
+    const name = names.get(metric) ?? "";
+    return nameSuffixes[index] ? `${name} (${nameSuffixes[index]})` : name;
+  };
 
   // ========== NEW MODULAR CHART SYSTEM ==========
   // Delegate to new modular converter for newly supported chart types
@@ -142,6 +221,8 @@ export const convertPromQLData = async (
         hoveredSeriesState,
         annotations,
         metadata,
+        parentQueryIndex,
+        nameSuffixes,
       });
 
       // Apply annotations if present (only for ECharts-based charts)
@@ -175,21 +256,40 @@ export const convertPromQLData = async (
     }
   });
 
-  // For multiple queries (multi y-axis equivalent), divide the limit equally
-  const numberOfQueries = searchQueryData.filter((q: any) => q.result?.length > 0).length;
+  // For multiple queries (multi y-axis equivalent), divide the limit equally.
+  // A shifted window is not a query of its own.
+  const numberOfQueries = searchQueryData.filter(
+    (q: any, i: number) => !nameSuffixes[i] && q?.result?.length > 0,
+  ).length;
   const limitPerQuery = numberOfQueries > 1 ? Math.floor(maxSeries / numberOfQueries) : maxSeries;
 
   // Limit number of series to limitPerQuery per query
-  const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
-    if (!queryData || !queryData.result) {
-      return queryData;
-    }
-    const remainingSeries = queryData.result.slice(0, limitPerQuery);
-    return {
-      ...queryData,
-      result: remainingSeries,
-    };
-  });
+  const primaryMetrics = (data: any[]) =>
+    new Set(
+      data.flatMap((q: any, i: number) =>
+        (nameSuffixes[i] ? [] : (q?.result ?? [])).map((m: any) => m.metric),
+      ),
+    );
+  const allPrimaryMetrics = primaryMetrics(searchQueryData);
+  const limitedPrimaries = searchQueryData.map((queryData: any, i: number) =>
+    nameSuffixes[i] || !queryData?.result
+      ? queryData
+      : { ...queryData, result: queryData.result.slice(0, limitPerQuery) },
+  );
+  const keptPrimaryMetrics = primaryMetrics(limitedPrimaries);
+  // A shifted series shares its primary's metric object, so it goes when its primary does.
+  const limitedSearchQueryData = limitedPrimaries.map((queryData: any, i: number) =>
+    !nameSuffixes[i] || !queryData?.result
+      ? queryData
+      : {
+          ...queryData,
+          result: queryData.result
+            .filter(
+              (m: any) => !allPrimaryMetrics.has(m.metric) || keptPrimaryMetrics.has(m.metric),
+            )
+            .slice(0, limitPerQuery),
+        },
+  );
 
   // Add warning if total number of series exceeds limit
   // Check if series limiting info is available from data loader (PromQL streaming)
@@ -665,8 +765,8 @@ export const convertPromQLData = async (
   const seriesNames = buildPromqlSeriesNames(
     (limitedSearchQueryData ?? []).map((it: any, index: number) => ({
       metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
-      template: panelSchema.queries?.[index]?.config?.promql_legend,
-      fallback: panelSchema.queries?.[index]?.config?.promql_legend_fallback,
+      template: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend,
+      fallback: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend_fallback,
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
@@ -692,7 +792,7 @@ export const convertPromQLData = async (
                 seriesDataObj[value[0]] = value[1];
               });
 
-              const seriesName = seriesNames.get(metric.metric) ?? "";
+              const seriesName = nameOf(seriesNames, metric.metric, index);
 
               const resolvedSeriesColor = (() => {
                 try {
@@ -714,7 +814,8 @@ export const convertPromQLData = async (
               return {
                 name: seriesName,
                 // Position among the rendered queries; exemplar markers take the colour of their query's first series.
-                _queryIndex: index,
+                // A shifted series is never a query's first series.
+                ...(nameSuffixes[index] ? {} : { _queryIndex: index }),
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",
@@ -772,7 +873,7 @@ export const convertPromQLData = async (
             const seriesObj = it?.result?.map((metric: any) => {
               const values = [metric.value];
 
-              const seriesName = seriesNames.get(metric.metric) ?? "";
+              const seriesName = nameOf(seriesNames, metric.metric, index);
 
               const resolvedVectorColor = (() => {
                 try {
@@ -852,12 +953,12 @@ export const convertPromQLData = async (
           const latestValue = values[values.length - 1]?.[1];
           gaugeIndex++;
 
-          const seriesName = seriesNames.get(metric.metric) ?? "";
+          const seriesName = nameOf(seriesNames, metric.metric, index);
 
           return {
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            min: panelSchema?.queries[index]?.config?.min || 0,
-            max: panelSchema?.queries[index]?.config?.max || 100,
+            min: panelSchema?.queries[parentQueryIndex[index]]?.config?.min || 0,
+            max: panelSchema?.queries[parentQueryIndex[index]]?.config?.max || 100,
             //which grid will be used
             gridIndex: gaugeIndex - 1,
             // radius, progress and axisline width will be calculated based on grid width and height

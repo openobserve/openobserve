@@ -163,6 +163,8 @@ import store from "@/test/unit/helpers/store";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
 
 describe("PanelSchemaRenderer", () => {
   let wrapper: any;
@@ -2438,6 +2440,99 @@ describe("PanelSchemaRenderer", () => {
       });
       await flushPromises();
       expect(wrapper.vm.metricCopiedIdx).toBe(1);
+    });
+  });
+
+  // A time shift appends shifted streams after the primaries: [A, B, A', B'].
+  describe("hidden PromQL queries with time-shifted results", () => {
+    const PAGE_KEY = "time-shift-hidden-queries";
+    const entry = (name: string) => ({ resultType: "matrix", result: [{ metric: { q: name } }] });
+    const metaEntry = (panelQueryIndex: number, gapMs = 0) => ({
+      panelQueryIndex,
+      timeRangeGap: { seconds: gapMs, periodAsStr: gapMs ? "1 day ago" : "" },
+    });
+
+    const mountWithHidden = async (hiddenQueries: number[]) => {
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: ref([entry("A"), entry("B"), entry("A1d"), entry("B1d")]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [metaEntry(0), metaEntry(1), metaEntry(0, 86_400_000), metaEntry(1, 86_400_000)],
+        }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 2 }], [{ step: 3 }], [{ step: 4 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      const w = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-ts",
+            type: "line",
+            queryType: "promql",
+            queries: [
+              { query: "a", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+              { query: "b", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+            ],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: PAGE_KEY,
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      getPanelDataForPageKey(PAGE_KEY).layout.hiddenQueries = hiddenQueries;
+      await flushPromises();
+      return w;
+    };
+
+    const lastConversion = () => {
+      const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
+      return { data: call[1], resultMetaData: (call[5] as any)?.value, metadata: call[6] };
+    };
+
+    afterEach(() => {
+      getPanelDataForPageKey(PAGE_KEY).layout.hiddenQueries = [];
+    });
+
+    it("hiding query B also hides B's shifted results, keeping data and metadata aligned", async () => {
+      wrapper = await mountWithHidden([1]);
+
+      const { data, metadata, resultMetaData } = lastConversion();
+      expect(data.map((d: any) => d.result[0].metric.q)).toEqual(["A", "A1d"]);
+      expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([0, 0]);
+      expect(metadata.queries[1].timeRangeGap.seconds).toBe(86_400_000);
+      expect(resultMetaData.map((r: any) => r[0].step)).toEqual([1, 3]);
+    });
+
+    it("hiding query A keeps B and B's shifted results", async () => {
+      wrapper = await mountWithHidden([0]);
+
+      const { data, metadata } = lastConversion();
+      expect(data.map((d: any) => d.result[0].metric.q)).toEqual(["B", "B1d"]);
+      expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([1, 1]);
     });
   });
 });

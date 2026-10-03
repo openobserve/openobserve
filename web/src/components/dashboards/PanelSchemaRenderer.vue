@@ -804,6 +804,15 @@ export default defineComponent({
       t,
     );
 
+    // PromQL time shift appends shifted results after the primaries ([A, B, A', B']),
+    // so a result's array index is not its panel query index: read it from metadata.
+    const isHiddenAt = (index: number) =>
+      hiddenQueries.value.includes(
+        panelSchema.value?.queryType === "promql"
+          ? (metadata.value?.queries?.[index]?.panelQueryIndex ?? index)
+          : index,
+      );
+
     // Filter data based on hiddenQueries for PromQL panels
     const filteredData = computed(() => {
       // If no data, return as is
@@ -817,11 +826,26 @@ export default defineComponent({
       }
 
       // Filter out hidden queries by index (works for both SQL and PromQL)
-      const filtered = data.value.filter(
-        (_: any, index: number) => !hiddenQueries.value.includes(index),
-      );
+      const filtered = data.value.filter((_: any, index: number) => !isHiddenAt(index));
 
       return filtered;
+    });
+
+    // PromQL: metadata.queries and resultMetaData stay index-aligned with filteredData.
+    const filtersPromQLMeta = () =>
+      panelSchema.value?.queryType === "promql" && hiddenQueries.value?.length > 0;
+    const filteredMetadata = computed(() => {
+      const queries = metadata.value?.queries;
+      if (!filtersPromQLMeta() || !Array.isArray(queries)) return metadata.value;
+      return {
+        ...metadata.value,
+        queries: queries.filter((_: any, index: number) => !isHiddenAt(index)),
+      };
+    });
+    const filteredResultMetaData = computed(() => {
+      const rmd = resultMetaData.value;
+      if (!filtersPromQLMeta() || !Array.isArray(rmd)) return rmd;
+      return rmd.filter((_: any, index: number) => !isHiddenAt(index));
     });
 
     // Keep metric sparkline hits index-aligned with filteredData (same filter).
@@ -1236,8 +1260,8 @@ export default defineComponent({
             store,
             chartPanelRef,
             hoveredSeriesState,
-            resultMetaData,
-            metadata.value,
+            filteredResultMetaData,
+            filteredMetadata.value,
             chartPanelStyle.value,
             annotations,
             loading.value,
