@@ -46,6 +46,19 @@ vi.mock("@/services/stream", async (importOriginal) => {
 });
 
 // ---------------------------------------------------------------------------
+// Mock anomaly detection service (config list feeds the insights strip's Charts links)
+// ---------------------------------------------------------------------------
+const mockAnomalyList = vi.fn().mockResolvedValue({ data: [] });
+vi.mock("@/services/anomaly_detection", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: (...args: any[]) => mockAnomalyList(...args),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Shared reactive searchObj
 // ---------------------------------------------------------------------------
 const now = Date.now();
@@ -314,6 +327,7 @@ const mockServices: ServiceRow[] = [
 function mountServicesCatalog(
   options: {
     storeOverrides?: Record<string, any>;
+    stubs?: Record<string, any>;
   } = {},
 ) {
   const mockStore = options.storeOverrides
@@ -396,6 +410,7 @@ function mountServicesCatalog(
           emits: ["close", "view-traces"],
         },
         OIcon: false,
+        ...options.stubs,
       },
     },
   });
@@ -1534,7 +1549,7 @@ describe("ServicesCatalog", () => {
   // P99 latency warning threshold
   // -----------------------------------------------------------------------
   describe("P99 warning threshold", () => {
-    it("should have P99_WARN_NS set to 1 second (1,000,000,000 ns)", async () => {
+    it("should have P99_WARN_US set to 1 second (1,000,000 µs)", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
         if (callbacks?.complete) {
           callbacks.complete(null, {});
@@ -1544,7 +1559,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.P99_WARN_NS).toBe(1_000_000_000);
+      expect(wrapper.vm.P99_WARN_US).toBe(1_000_000);
     });
   });
 
@@ -2226,6 +2241,413 @@ describe("ServicesCatalog", () => {
           false,
         );
       });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Request-scoped RED
+  // -----------------------------------------------------------------------
+  describe("request-scoped RED", () => {
+    const KIND_PRED = "CAST(span_kind AS VARCHAR) IN ('2','5')";
+    const ROOT_ARM =
+      "(CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
+    const INFER_ARM =
+      "(NULLIF(infer_service_name, '') IS NOT NULL AND CAST(span_kind AS VARCHAR) IN ('3','4'))";
+
+    function schemaWith(...names: string[]) {
+      return { data: { schema: names.map((name) => ({ name })) } };
+    }
+
+    function decodedSqls(): string[] {
+      return mockFetchQueryDataWithHttpStream.mock.calls.map((call: any[]) =>
+        atob(call[0].queryReq.query.sql.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "=")),
+      );
+    }
+
+    function selectItem(sql: string, alias: string): string {
+      const line = sql.split("\n").find((l) => new RegExp(`\\bAS ${alias},?$`).test(l.trim()));
+      if (!line) throw new Error(`no select item aliased ${alias}`);
+      return line;
+    }
+
+    async function loadWithSchema(schema: any): Promise<string> {
+      mockStreamSchema.mockResolvedValueOnce(schema);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const sqls = decodedSqls();
+      expect(sqls).toHaveLength(1);
+      return sqls[0];
+    }
+
+    afterEach(() => {
+      mockSearchObj.organizationIdentifier = "test-org";
+    });
+
+    it("scopes plain-branch requests to server, consumer and root spans without a WHERE", async () => {
+      const sql = await loadWithSchema(schemaWith("reference_parent_span_id"));
+      const requests = selectItem(sql, "total_requests");
+      expect(requests).toContain("COUNT(*) FILTER (WHERE");
+      expect(requests).toContain(KIND_PRED);
+      expect(requests).toContain(ROOT_ARM);
+      expect(sql.replace(/FILTER \(WHERE/g, "")).not.toContain("WHERE");
+    });
+
+    it("omits the root arm when the schema lacks reference_parent_span_id", async () => {
+      const sql = await loadWithSchema(schemaWith("service_name"));
+      expect(selectItem(sql, "total_requests")).toContain(KIND_PRED);
+      expect(sql).not.toContain("reference_parent_span_id");
+    });
+
+    it("omits the root arm when the schema fetch fails", async () => {
+      mockStreamSchema.mockRejectedValueOnce(new Error("schema unavailable"));
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const sqls = decodedSqls();
+      expect(sqls).toHaveLength(1);
+      expect(selectItem(sqls[0], "total_requests")).toContain(KIND_PRED);
+      expect(sqls[0]).not.toContain("reference_parent_span_id");
+    });
+
+    it("keeps the CLIENT/PRODUCER infer arm in the infer branch", async () => {
+      const sql = await loadWithSchema(
+        schemaWith("infer_service_name", "reference_parent_span_id"),
+      );
+      const requests = selectItem(sql, "total_requests");
+      expect(requests).toContain(INFER_ARM);
+      expect(requests).toContain(KIND_PRED);
+      expect(requests).toContain(ROOT_ARM);
+      expect(selectItem(sql, "error_count")).toContain(INFER_ARM);
+      expect(sql.split("GROUP BY")[1]).toContain(
+        "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+      );
+      expect(sql.replace(/FILTER \(WHERE/g, "")).not.toContain("WHERE");
+    });
+
+    it("computes errors, avg, max and percentiles over request spans only", async () => {
+      const sql = await loadWithSchema(schemaWith("reference_parent_span_id"));
+      const errors = selectItem(sql, "error_count");
+      expect(errors).toContain("COUNT(*) FILTER (WHERE");
+      expect(errors).toContain(KIND_PRED);
+      expect(errors).toContain("span_status = 'ERROR'");
+      for (const alias of [
+        "avg_duration_ns",
+        "max_duration_ns",
+        "p50_latency_ns",
+        "p95_latency_ns",
+        "p99_latency_ns",
+      ]) {
+        const item = selectItem(sql, alias);
+        expect(item).toContain("CASE WHEN");
+        expect(item).toContain(KIND_PRED);
+        expect(item).toContain(ROOT_ARM);
+        expect(item).toContain("THEN duration END");
+      }
+      expect(selectItem(sql, "avg_duration_ns")).toMatch(/^\s*AVG\(CASE WHEN/);
+      expect(selectItem(sql, "max_duration_ns")).toMatch(/^\s*MAX\(CASE WHEN/);
+    });
+
+    it("still renders a service with zero request spans, at 0 requests and 0% errors", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: {
+            results: {
+              hits: [
+                {
+                  service_name: "nightly-cron",
+                  total_requests: 0,
+                  error_count: 0,
+                  error_rate: 0,
+                  avg_duration_ns: null,
+                  max_duration_ns: null,
+                  p50_latency_ns: null,
+                  p95_latency_ns: null,
+                  p99_latency_ns: null,
+                },
+              ],
+            },
+          },
+        });
+        callbacks.complete(null, {});
+      });
+      const sql = await loadWithSchema(schemaWith("reference_parent_span_id"));
+      expect(selectItem(sql, "error_rate")).toMatch(
+        /^\s*CASE WHEN COUNT\(\*\) FILTER .* = 0 THEN 0/,
+      );
+
+      const row = wrapper.vm.services.find((s: any) => s.service_name === "nightly-cron");
+      expect(row).toMatchObject({
+        total_requests: 0,
+        error_count: 0,
+        error_rate: 0,
+        p99_latency_ns: 0,
+        status: "healthy",
+      });
+      expect(wrapper.find('[data-test="services-catalog-requests-nightly-cron"]').text()).toBe("0");
+    });
+
+    it("discards a schema fetched for a stream that is no longer selected", async () => {
+      let release!: (value: any) => void;
+      mockStreamSchema.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+
+      wrapper.vm.streamFilter = "production";
+      await flushPromises();
+      release(schemaWith("infer_service_name", "reference_parent_span_id"));
+      await flushPromises();
+
+      const sqls = decodedSqls();
+      expect(sqls).toHaveLength(1);
+      expect(sqls[0]).toContain('FROM "production"');
+      expect(sqls[0]).not.toContain("infer_service_name");
+      expect(sqls[0]).not.toContain("reference_parent_span_id");
+    });
+
+    it("discards a schema fetched for an organization that is no longer selected", async () => {
+      let release!: (value: any) => void;
+      mockStreamSchema.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      mockSearchObj.organizationIdentifier = "other-org";
+      const reload = wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+      release(schemaWith("infer_service_name", "reference_parent_span_id"));
+      await reload;
+      await flushPromises();
+
+      const sqls = decodedSqls();
+      expect(sqls).toHaveLength(1);
+      expect(sqls[0]).not.toContain("infer_service_name");
+      expect(mockStreamSchema).toHaveBeenLastCalledWith("other-org", "default", "traces");
+    });
+
+    it("labels latency tooltips in µs and warns on a P99 above 1 s", async () => {
+      const latencyRow = (name: string, p99: number) => ({
+        id: name,
+        service_name: name,
+        status: "healthy",
+        total_requests: 10,
+        error_count: 0,
+        error_rate: 0,
+        avg_duration_ns: 1000,
+        max_duration_ns: p99,
+        p50_latency_ns: 1000,
+        p95_latency_ns: p99,
+        p99_latency_ns: p99,
+      });
+      wrapper = mountServicesCatalog({
+        stubs: {
+          OTable: {
+            template: `<div><div v-for="row in data" :key="row.id" :data-test="'latency-row-' + row.service_name"><slot name="cell-p99_latency_ns" :row="row" /></div></div>`,
+            props: ["data", "columns", "loading"],
+          },
+          ServiceCatalogBarCell: {
+            template: `<span data-test="latency-cell" :data-tooltip="tooltip" :data-variant="variant" />`,
+            props: ["value", "max", "label", "tooltip", "variant"],
+          },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.services = [latencyRow("slow", 1_500_000), latencyRow("fast", 900_000)];
+      wrapper.vm.isLoading = false;
+      await flushPromises();
+
+      const cell = (name: string) =>
+        wrapper.find(`[data-test="latency-row-${name}"] [data-test="latency-cell"]`);
+      expect(cell("slow").attributes("data-variant")).toBe("warning");
+      expect(cell("fast").attributes("data-variant")).toBe("default");
+      expect(cell("slow").attributes("data-tooltip")).toBe(`${(1_500_000).toLocaleString()} µs`);
+    });
+
+    it("explains the request definition in the Requests header tooltip", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const requestsColumn = wrapper.vm.tableColumns.find((c: any) => c.id === "total_requests");
+      expect(requestsColumn.meta.headerTooltip).toBe("Server and consumer spans, plus root spans");
+    });
+  });
+
+  describe("RED insights strip", () => {
+    const T = 1_700_000_000_000_000;
+    const FIVE_MIN_US = 300_000_000;
+    const MANAGED_TAGS = ["auto:red-insights", "red:p95"];
+
+    function anomalyRow(overrides: Record<string, any> = {}) {
+      return {
+        _timestamp: T,
+        anomaly_id: "A1",
+        anomaly_name: "RED p95 · default · checkout",
+        stream_name: "default",
+        deviation_percent: 42.5,
+        ...overrides,
+      };
+    }
+
+    function anomaliesSchema(...names: string[]) {
+      return {
+        data: {
+          schema: ["anomaly_name", "is_anomaly", "stream_type", ...names].map((name) => ({ name })),
+        },
+      };
+    }
+
+    function stubSchemas(anomalies: () => Promise<any>) {
+      mockStreamSchema.mockImplementation((_org: string, stream: string) =>
+        stream === "_anomalies" ? anomalies() : Promise.resolve({ data: { schema: [] } }),
+      );
+    }
+
+    function anomalyCalls(): any[] {
+      return mockSearchFn.mock.calls.filter((call: any[]) =>
+        call[0]?.query?.query?.sql?.includes('"_anomalies"'),
+      );
+    }
+
+    async function mountEnabled(): Promise<void> {
+      wrapper = mountServicesCatalog({
+        storeOverrides: {
+          organizationData: {
+            organizationSettings: { red_insights_enabled: true },
+            streams: {},
+          },
+        },
+      });
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      stubSchemas(() => Promise.resolve(anomaliesSchema("is_absence", "direction")));
+      mockSearchFn.mockResolvedValue({ data: { hits: [anomalyRow()] } });
+      mockAnomalyList.mockResolvedValue({
+        data: [{ anomaly_id: "A1", folder_id: "red-folder", tags: MANAGED_TAGS }],
+      });
+    });
+
+    afterEach(() => {
+      mockStreamSchema.mockReset();
+      mockStreamSchema.mockResolvedValue({ data: { schema: [] } });
+      mockSearchFn.mockReset();
+      mockSearchFn.mockResolvedValue({ data: {} });
+      mockAnomalyList.mockReset();
+      mockAnomalyList.mockResolvedValue({ data: [] });
+      mockSearchObj.data.datetime.type = "relative";
+    });
+
+    it("does not query _anomalies when the setting is off", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      expect(anomalyCalls()).toHaveLength(0);
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
+    });
+
+    it("queries managed anomalies over the catalog time range, keeping below-direction rate ones", async () => {
+      mockSearchObj.data.datetime.type = "absolute";
+      await mountEnabled();
+      const calls = anomalyCalls();
+      expect(calls).toHaveLength(1);
+      const { sql, start_time, end_time } = calls[0][0].query.query;
+      expect(sql).toContain("stream_type = 'traces'");
+      expect(sql).toContain("anomaly_name LIKE 'RED %'");
+      expect(sql).toContain("is_anomaly = true");
+      expect(sql).toContain("(is_absence IS NULL OR is_absence = false)");
+      expect(sql).toContain("(anomaly_name LIKE 'RED rate %' OR direction = 'above')");
+      const catalogQuery = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.query;
+      expect([start_time, end_time]).toEqual([catalogQuery.start_time, catalogQuery.end_time]);
+    });
+
+    it("leaves out filters on columns the _anomalies stream has never written", async () => {
+      stubSchemas(() => Promise.resolve(anomaliesSchema()));
+      await mountEnabled();
+      const { sql } = anomalyCalls()[0][0].query.query;
+      expect(sql).not.toContain("is_absence");
+      expect(sql).not.toContain("direction");
+      expect(sql).toContain("anomaly_name LIKE 'RED rate %'");
+    });
+
+    it("renders each anomaly once with its traces and Charts links", async () => {
+      mockSearchFn.mockResolvedValue({ data: { hits: [anomalyRow(), anomalyRow()] } });
+      await mountEnabled();
+      const strip = wrapper.find('[data-test="services-catalog-insights"]');
+      expect(strip.exists()).toBe(true);
+      const entries = wrapper.findAll('[data-test^="services-catalog-insight-entry-"]');
+      expect(entries).toHaveLength(1);
+      expect(entries[0].text()).toContain("checkout");
+      expect(entries[0].text()).toContain("p95");
+      expect(entries[0].text()).toContain("42.5%");
+
+      await wrapper.find('[data-test="services-catalog-insight-traces-0"]').trigger("click");
+      expect(wrapper.emitted("view-traces")?.[0]?.[0]).toEqual({
+        serviceName: "checkout",
+        stream: "default",
+        mode: "traces",
+        timeRange: { startTime: T, endTime: T + FIVE_MIN_US },
+      });
+
+      await wrapper.find('[data-test="services-catalog-insight-charts-0"]').trigger("click");
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "alertDetail",
+        params: { alert_id: "A1" },
+        query: { org_identifier: "test-org", folder: "red-folder" },
+      });
+    });
+
+    it("links traces on the detector's stream, not the catalog's", async () => {
+      mockSearchFn.mockResolvedValue({
+        data: {
+          hits: [
+            anomalyRow({
+              anomaly_name: "RED rate · team∕edge · api∕v1",
+              stream_name: "team/edge",
+            }),
+          ],
+        },
+      });
+      await mountEnabled();
+      await wrapper.find('[data-test="services-catalog-insight-traces-0"]').trigger("click");
+      expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
+        serviceName: "api/v1",
+        stream: "team/edge",
+      });
+    });
+
+    it("omits the Charts link but keeps the strip when the config list is forbidden", async () => {
+      mockAnomalyList.mockRejectedValue({ response: { status: 403 } });
+      await mountEnabled();
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="services-catalog-insight-traces-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="services-catalog-insight-charts-0"]').exists()).toBe(false);
+    });
+
+    it("is hidden when there are no anomalies", async () => {
+      mockSearchFn.mockResolvedValue({ data: { hits: [] } });
+      await mountEnabled();
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
+    });
+
+    it("is hidden when the _anomalies search is forbidden", async () => {
+      mockSearchFn.mockRejectedValue({ response: { status: 403 } });
+      await mountEnabled();
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
+    });
+
+    it("is hidden, without a search, when the _anomalies stream does not exist", async () => {
+      stubSchemas(() => Promise.reject({ response: { status: 404 } }));
+      await mountEnabled();
+      expect(anomalyCalls()).toHaveLength(0);
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
     });
   });
 });

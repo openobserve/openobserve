@@ -45,6 +45,7 @@ vi.mock("@/services/organizations", async (importOriginal) => {
   });
 });
 
+import config from "@/aws-exports";
 import organizations from "@/services/organizations";
 const mockPostOrganizationSettings = organizations.post_organization_settings as any;
 
@@ -349,6 +350,54 @@ describe("OrganizationSettings", () => {
       await wrapper.vm.saveOrgSettings(validValue);
 
       expect(mockStore.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("RED insights setting", () => {
+    afterEach(() => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+    });
+
+    it("hides the switch outside enterprise and does not post the field", async () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="settings-red-insights"]').exists()).toBe(false);
+
+      await getForm(wrapper).vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(mockPostOrganizationSettings.mock.calls[0][1]).not.toHaveProperty(
+        "red_insights_enabled",
+      );
+    });
+
+    it("shows the switch in enterprise, seeded from the store, and posts the field", async () => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "trace_id",
+        span_id_field_name: "span_id",
+        red_insights_enabled: true,
+      };
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="settings-red-insights-btn"]').exists()).toBe(true);
+      const form = getForm(wrapper);
+      expect(form.vm.form.state.values.redInsightsEnabled).toBe(true);
+
+      form.vm.form.setFieldValue("redInsightsEnabled", false);
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(mockPostOrganizationSettings).toHaveBeenCalledWith(
+        "test-org-123",
+        expect.objectContaining({ red_insights_enabled: false }),
+      );
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        expect.objectContaining({ red_insights_enabled: false }),
+      );
     });
   });
 

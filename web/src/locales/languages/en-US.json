@@ -9629,6 +9629,8 @@
     "spanIdFieldName": "Span ID Field Name",
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
     "usageStreamEnabledLabel": "Enable Usage Stream",
+    "redInsightsEnabledLabel": "Enable automatic RED insights for traces",
+    "redInsightsEnabledHelp": "Creates rate, error and p95 latency anomaly detectors for the busiest services, in the \"RED insights\" alert folder. Only admins see that folder until it is shared.",
     "claimParserFunction": "SSO Claim Parser",
     "claimParserFunctionDescription": "Select a function ({product1} or {product2}) to parse and transform SSO/LDAP claims into organization and role assignments",
     "claimParserFunctionLabel": "Select Function",
@@ -10624,6 +10626,7 @@
         "serviceName": "Service",
         "status": "Status",
         "requests": "Requests",
+        "requestsTooltip": "Server and consumer spans, plus root spans",
         "errorRate": "Error Rate",
         "errors": "Errors",
         "avgDuration": "Avg Duration",
@@ -10650,6 +10653,17 @@
       "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Error Rate"
+      },
+      "insights": {
+        "title": "Insights",
+        "signals": {
+          "rate": "request rate",
+          "errors": "error ratio",
+          "p95": "p95 latency"
+        },
+        "scoreAbove": "+{percent}% score above threshold",
+        "viewTraces": "Traces",
+        "viewCharts": "Charts"
       }
     },
     "spansTab": "Spans",
