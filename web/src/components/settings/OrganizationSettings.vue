@@ -66,6 +66,17 @@
         />
       </div>
 
+      <div v-if="showRedInsights" data-test="settings-red-insights" class="o2-input">
+        <OFormSwitch
+          data-test="settings-red-insights-btn"
+          name="redInsightsEnabled"
+          :label="t('settings.redInsightsEnabledLabel')"
+          class="mt-2"
+        >
+          <template #tooltip>{{ t("settings.redInsightsEnabledHelp") }}</template>
+        </OFormSwitch>
+      </div>
+
       <!-- Cross-Linking Configuration -->
       <template v-if="store.state.zoConfig?.enable_cross_linking">
         <OSeparator class="mt-6 mb-4" />
@@ -145,6 +156,7 @@ const formDirty = ref(false);
 // ignores the field outside cloud — so the section renders under both conditions.
 const { isMetaOrg } = useIsMetaOrg();
 const showDomainOrgMappings = computed(() => config.isCloud === "true" && isMetaOrg.value);
+const showRedInsights = config.isEnterprise == "true";
 const domainOrgMappings = ref<DomainOrgMapping[]>(
   store.state?.organizationData?.organizationSettings?.domain_org_mappings || [],
 );
@@ -158,6 +170,7 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     spanIdFieldName: s?.span_id_field_name ?? "",
     toggleIngestionLogs: s?.toggle_ingestion_logs ?? false,
     usageStreamEnabled: s?.usage_stream_enabled ?? false,
+    redInsightsEnabled: s?.red_insights_enabled ?? false,
   };
 });
 
@@ -197,6 +210,10 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
     if (showDomainOrgMappings.value) {
       payload.domain_org_mappings = domainOrgMappings.value;
     }
+    // Same rule for the enterprise-only switch: a hidden field must not overwrite the stored one.
+    if (showRedInsights) {
+      payload.red_insights_enabled = value.redInsightsEnabled;
+    }
 
     const crossLinksChanged =
       JSON.stringify(crossLinks.value) !==
@@ -213,6 +230,7 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       cross_links: crossLinks.value,
       usage_stream_enabled: value.usageStreamEnabled,
       ...(showDomainOrgMappings.value ? { domain_org_mappings: domainOrgMappings.value } : {}),
+      ...(showRedInsights ? { red_insights_enabled: value.redInsightsEnabled } : {}),
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);
