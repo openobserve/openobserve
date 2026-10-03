@@ -121,6 +121,22 @@ describe("createScopedList (F55)", () => {
     expect(mockToast).not.toHaveBeenCalled();
   });
 
+  it("returning to a loaded app supersedes another app's load still in flight", async () => {
+    await list.load("org", "a");
+    const release = hold(() => rows("b", "late"));
+    const b = list.load("org", "b");
+    expect(await list.load("org", "a")).toBe(true);
+    expect(list.loading.value).toBe(false);
+    release();
+    expect(await b).toBe(false);
+    expect(list.items.value.map((i) => i.app)).toEqual(["a", "a"]);
+    expect(list.status("org", "a")).toBe("ready");
+    expect(list.status("org", "b")).toBe("loading");
+    expect(list.loading.value).toBe(false);
+    expect(await list.load("org", "b")).toBe(true);
+    expect(list.items.value.map((i) => i.app)).toEqual(["b", "b"]);
+  });
+
   it("a failure toasts once, reads failed until a retry, and ensure retries only when asked", async () => {
     fetchList.mockRejectedValueOnce(failure(503));
     expect(await list.ensure("org", "web")).toBe("failed");

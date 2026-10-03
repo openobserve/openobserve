@@ -31,7 +31,13 @@ import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock
 import { isEntityId } from "@/utils/rum/productAnalyticsModel";
 
 const rule = { t: "view" as const, op: "eq" as const, value: "/web/logs" };
-const draft = (name: string, id?: string) => ({ id, app: "web", name, rules: [rule] });
+const draft = (name: string, id?: string, version?: number) => ({
+  id,
+  version,
+  app: "web",
+  name,
+  rules: [rule],
+});
 const savedEvent = async (
   ne: ReturnType<typeof useNamedEvents>,
   ...args: Parameters<ReturnType<typeof useNamedEvents>["save"]>
@@ -79,10 +85,10 @@ describe("useNamedEvents (AC-44)", () => {
     expect(ne.permission.value).toBe("write");
   });
 
-  it("updates in place with the stored version, then deletes", async () => {
+  it("updates in place with the draft's version, then deletes", async () => {
     const ne = useNamedEvents();
     const saved = await savedEvent(ne, "org", "web", draft("Logs"));
-    await ne.save("org", "web", draft("Logs page", saved.id));
+    await ne.save("org", "web", draft("Logs page", saved.id, saved.version));
     expect(api.service.updateEvent).toHaveBeenCalledWith("org", "web", saved.id, {
       name: "Logs page",
       rules: [rule],
@@ -172,14 +178,19 @@ describe("useNamedEvents (AC-44)", () => {
 
     api.touch("events", saved.id, { name: "Logs (theirs)" });
     const lists = api.service.listEvents.mock.calls.length;
-    await expect(ne.save("org", "web", draft("Logs (mine)", saved.id))).rejects.toBeTruthy();
+    const stale = draft("Logs (mine)", saved.id, saved.version);
+    await expect(ne.save("org", "web", stale)).rejects.toBeTruthy();
     expect(mockToast).toHaveBeenLastCalledWith({
       variant: "error",
       message: "Someone else changed this named event; it was reloaded",
     });
     expect(api.service.listEvents.mock.calls.length).toBe(lists + 1);
     expect(ne.events.value[0]).toMatchObject({ name: "Logs (theirs)", version: 2 });
-    await ne.save("org", "web", draft("Logs (mine)", saved.id));
+    // The reloaded list does not lend its version to the stale draft: saving it again conflicts again.
+    const again = await ne.save("org", "web", stale).catch((e) => e);
+    expect(again?.response?.data?.code).toBe("version_conflict");
+    expect(ne.events.value[0]).toMatchObject({ name: "Logs (theirs)", version: 2 });
+    await ne.save("org", "web", draft("Logs (mine)", saved.id, 2));
     expect(ne.events.value[0]).toMatchObject({ name: "Logs (mine)", version: 3 });
   });
 

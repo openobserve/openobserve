@@ -34,7 +34,11 @@ import { ANALYTICS_SUBTABS, type AnalyticsSubTab } from "@/utils/rum/productAnal
 
 export type NamedEventsPermission = ScopedListPermission;
 export type NamedEventsStatus = ScopedListStatus;
-export type NamedEventDraft = Pick<NamedEvent, "app" | "name" | "rules"> & { id?: string };
+export type NamedEventDraft = Pick<NamedEvent, "app" | "name" | "rules"> & {
+  id?: string;
+  /** The version the editor opened the event at; sent with an update. */
+  version?: number;
+};
 export type FunnelUsage = { id: string; name: string };
 export type NamedEventSaveResult = { kind: "saved"; event: NamedEvent } | { kind: "forbidden" };
 export type BulkRemoval = { gone: string[]; inUse: { id: string; funnels: FunnelUsage[] }[] };
@@ -130,8 +134,8 @@ export default function useNamedEvents() {
     const body = parseNamedEventDraft({ app, name: draft.name, rules: draft.rules }, app);
     if (!body) return refuse(gt("rum.analytics.events.invalid"));
     const payload = { name: body.name, rules: body.rules };
-    // The edit counter of the list this editor saw; a newer one on the server is a version_conflict.
-    const version = events.value.find((e) => e.id === draft.id)?.version ?? 1;
+    // The edit counter the editor opened with, not the list's: a conflict reloads the list, and a repeat save must conflict again.
+    const version = draft.version ?? 1;
     let row: unknown;
     try {
       row = draft.id

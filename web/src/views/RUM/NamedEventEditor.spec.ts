@@ -168,7 +168,7 @@ describe("NamedEventEditor (AC-44)", () => {
     expect(created()).toEqual(["Opened logs", "Opened traces"]);
   });
 
-  it("edits load the event, send the listed version, and a conflict reloads, toasts and keeps the editor", async () => {
+  it("edits load the event, send the opened version, and a conflict reloads, toasts and keeps the editor; saving again conflicts again", async () => {
     const [ev] = seed(1);
     await mountAt(PA_ROUTES.eventEdit, { id: ev.id });
     expect(q("rum-analytics-event-editor")?.textContent).toContain("Edit named event");
@@ -181,13 +181,19 @@ describe("NamedEventEditor (AC-44)", () => {
       message: "Someone else changed this named event; it was reloaded",
     });
     expect(editorOpen()).toBe(true);
+    toastMock.mockClear();
     await submitForm();
-    expect(router.currentRoute.value.name).toBe(PA_ROUTES.events);
+    expect(toastMock).toHaveBeenLastCalledWith({
+      variant: "error",
+      message: "Someone else changed this named event; it was reloaded",
+    });
+    expect(editorOpen()).toBe(true);
+    expect(input("rum-analytics-named-events-name")?.value).toBe("Event 0 (mine)");
     expect(api.bodies("updateEvent").map((b) => [b.name, b.version])).toEqual([
       ["Event 0 (mine)", 1],
-      ["Event 0 (mine)", 2],
+      ["Event 0 (mine)", 1],
     ]);
-    expect(useNamedEvents().events.value.map((e) => e.name)).toEqual(["Event 0 (mine)"]);
+    expect(useNamedEvents().events.value.map((e) => e.name)).toEqual(["Event 0 (theirs)"]);
   });
 
   it("an id this app does not have toasts and returns to the list", async () => {

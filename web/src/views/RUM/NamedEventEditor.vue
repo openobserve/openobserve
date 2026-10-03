@@ -185,6 +185,8 @@ const runner = useAnalyticsSearch();
 const handoff = readNamedEventHandoff(router.options.history.state);
 
 const editingId = ref<string | null>(props.id ?? null);
+// The version of the event the form was filled from; a save is an edit of that version only.
+let openedVersion: number | undefined;
 // The id (or NEW) whose values the form holds; the form shows only once it matches the route.
 const formFor = ref<string | null>(null);
 const pageOptions = ref<string[]>([]);
@@ -275,6 +277,7 @@ const fillForm = (): boolean => {
     return false;
   }
   form.reset(namedEventDefaults(ev));
+  openedVersion = ev.version;
   return true;
 };
 
@@ -307,6 +310,7 @@ async function submit(value: NamedEventForm) {
   try {
     const res = await ne.save(org(), app.value, {
       id: editingId.value ?? undefined,
+      version: openedVersion,
       app: app.value,
       name: value.name.trim(),
       rules: toRules(value.rules),

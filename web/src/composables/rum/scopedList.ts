@@ -124,7 +124,15 @@ export function createScopedList<T extends { name: string }>(
     const target = `${org}|${app}`;
     if (!app) return false;
     shown.value = target;
-    if (!force && current(target)) return true;
+    if (!force && current(target)) {
+      // A load still in flight for another app must not land over the rows already shown.
+      if (inflight && inflight.target !== target) {
+        loadSeq++;
+        inflight = null;
+        loading.value = false;
+      }
+      return true;
+    }
     if (!force && inflight?.target === target) {
       await inflight.run;
       return current(target);
