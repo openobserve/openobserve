@@ -120,8 +120,15 @@ export class RolesPage {
 
     // ================= locator factories =================
 
-    startFrom(option) {
-        return this.page.locator(`[data-test="add-role-start-from-${option}-radio"]`);
+    startFromOption(option) {
+        return this.page.locator(
+            `[data-test="add-role-start-from-select-option"][data-test-value="${option}"]`,
+        );
+    }
+
+    async selectStartFrom(option) {
+        await this.page.locator('[data-test="add-role-start-from-select-trigger"]').click();
+        await this.startFromOption(option).click();
     }
 
     /** Creates a role and lands on its editor (AppRoles pushes straight in, like groups). */
@@ -129,7 +136,7 @@ export class RolesPage {
         await this.addRoleButton.click();
         await expect(this.addRoleDialog).toBeVisible();
         await this.roleNameInput.fill(name);
-        if (startFrom) await this.startFrom(startFrom).click();
+        if (startFrom) await this.selectStartFrom(startFrom);
         await this.addRoleSave.click();
         await expect(this.addRoleDialog).toBeHidden({ timeout: 15000 });
     }

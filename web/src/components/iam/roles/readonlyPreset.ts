@@ -26,6 +26,7 @@ const HIDDEN_READONLY_PERMS: Record<string, string[]> = {
   logs_pattern: ["AllowList"],
   logs_insights: ["AllowList"],
   logs_cache: ["AllowList", "AllowGet"],
+  rum_analytics: ["AllowList", "AllowGet"],
 };
 
 // Same permission-object format EditRole saves: `<resource>:_all_<org>` for a
