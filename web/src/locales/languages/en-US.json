@@ -10481,6 +10481,7 @@
     "previousMatch": "Previous match",
     "nextMatch": "Next match",
     "searchInSpans": "Search in spans",
+    "criticalPath": "Critical path",
     "spansTableView": "Spans Table View",
     "comingSoon": "Coming soon...",
     "fetchingTrace": "Fetching your trace.",

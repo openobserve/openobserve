@@ -441,6 +441,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex items-center gap-2 space-x-2 pe-[0.325rem]">
+            <OSwitch
+              v-if="activeTab === 'waterfall'"
+              :model-value="showCriticalPath"
+              :label="t('traces.criticalPath')"
+              size="sm"
+              data-test="trace-details-critical-path-toggle"
+              @update:model-value="setShowCriticalPath"
+            />
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
@@ -612,6 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :selectedSpanId="selectedSpanId"
                         :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
+                        :showCriticalPath="showCriticalPath"
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
                         @select-span-event="onSelectSpanEvent"
@@ -957,6 +966,11 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
+import {
+  computeCriticalPathForRoots,
+  type CriticalPathNode,
+  type CriticalPathSection,
+} from "@/utils/traces/criticalPath";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -966,6 +980,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -1038,6 +1053,7 @@ const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
 
 const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
 const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
+const LS_TRACE_CRITICAL_PATH_KEY = "o2_trace_critical_path";
 
 const isKnownTraceTab = (value: string): value is TraceTabValue =>
   TRACE_TAB_DEFS.some((tab) => tab.value === value);
@@ -1080,6 +1096,14 @@ function loadTraceActiveTab(): TraceTabValue {
     // Ignore — fall through to the default tab.
   }
   return DEFAULT_TRACE_TAB;
+}
+
+function loadTraceCriticalPath(): boolean {
+  try {
+    return localStorage.getItem(LS_TRACE_CRITICAL_PATH_KEY) === "true";
+  } catch {
+    return false;
+  }
 }
 
 export default defineComponent({
@@ -1180,6 +1204,7 @@ export default defineComponent({
     OTooltip,
     OSearchInput,
     OSelect,
+    OSwitch,
     ManualEvaluationDialog,
     TraceAnnotateMenu,
     AddToDatasetDrawer,
@@ -1195,6 +1220,7 @@ export default defineComponent({
     const spanMap: any = ref({});
     const activeTab = ref<string>(loadTraceActiveTab());
     const tabOrder = ref<TraceTabValue[]>(loadTraceTabOrder());
+    const showCriticalPath = ref(loadTraceCriticalPath());
     const sidebarActiveTab = ref("attributes");
 
     const { searchObj, getUrlQueryParams, navigateToCorrelatedLogs } = useTraces();
@@ -1910,6 +1936,15 @@ export default defineComponent({
       },
     );
 
+    const setShowCriticalPath = (value: unknown) => {
+      showCriticalPath.value = value === true;
+      try {
+        localStorage.setItem(LS_TRACE_CRITICAL_PATH_KEY, String(showCriticalPath.value));
+      } catch {
+        // Storage unavailable — the toggle still applies for this session.
+      }
+    };
+
     const updateActiveTab = (value: boolean | AcceptableValue | AcceptableValue[]) => {
       const tab = String(value);
       activeTab.value = tab;
@@ -2400,6 +2435,8 @@ export default defineComponent({
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
       traceTree.value[0].style.color = getOrSetServiceColor(traceTree.value[0].resolvedIdentity);
 
+      assignCriticalSections(Object.values(formattedSpanMap));
+
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
       });
@@ -2610,6 +2647,25 @@ export default defineComponent({
         genAiCost: cost,
         resolvedIdentity: resolveSpanIdentity(span),
       };
+    };
+
+    const toCriticalPathNode = (span: any): CriticalPathNode => ({
+      spanId: span.spanId,
+      startTimeUs: span.startTimeUs,
+      endTimeUs: span.endTimeUs,
+      children: span.spans.map(toCriticalPathNode),
+    });
+
+    const assignCriticalSections = (spans: any[]) => {
+      const sectionsBySpan = new Map<string, CriticalPathSection[]>();
+      computeCriticalPathForRoots(traceTree.value.map(toCriticalPathNode)).forEach((section) => {
+        const sections = sectionsBySpan.get(section.spanId) ?? [];
+        sections.push(section);
+        sectionsBySpan.set(section.spanId, sections);
+      });
+      spans.forEach((span) => {
+        span.criticalSections = sectionsBySpan.get(span.spanId) ?? [];
+      });
     };
 
     const convertTime = (time: number) => {
@@ -3016,6 +3072,8 @@ export default defineComponent({
       router,
       t,
       raw,
+      showCriticalPath,
+      setShowCriticalPath,
       // Exposed for the template `v-if` gating the LLM Observability
       // surfaces (Thread tab toggle + ThreadView body) behind
       // `config.showLLMUI`.

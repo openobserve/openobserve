@@ -127,6 +127,7 @@ describe("TraceDetails", () => {
     // switches tabs would otherwise leak its selection into every later test.
     localStorage.removeItem("o2_trace_active_tab");
     localStorage.removeItem("o2_trace_tab_order");
+    localStorage.removeItem("o2_trace_critical_path");
 
     // Mock router query params
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
@@ -246,6 +247,7 @@ describe("TraceDetails", () => {
               "hoveredSpanId",
               "isSidebarOpen",
               "scrollContainer",
+              "showCriticalPath",
             ],
             emits: [
               "toggle-collapse",
@@ -568,6 +570,67 @@ describe("TraceDetails", () => {
   //   expect(wrapper.vm.leftWidth).toBe(300); // 250 + (150 - 100)
   // });
   // });
+
+  describe("Critical path", () => {
+    const toggle = () => wrapper.find('[data-test="trace-details-critical-path-toggle-btn"]');
+    const treeShowsCriticalPath = () =>
+      wrapper.findComponent('[data-test="trace-details-tree"]').props("showCriticalPath");
+
+    async function openTab(tab: string) {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+    }
+
+    it("shows the toggle only on the Waterfall tab", async () => {
+      await openTab("waterfall");
+      expect(toggle().exists()).toBe(true);
+
+      await openTab("flame-graph");
+      expect(toggle().exists()).toBe(false);
+
+      await openTab("spans");
+      expect(toggle().exists()).toBe(false);
+    });
+
+    it("is off by default and flips the waterfall overlay when toggled", async () => {
+      await openTab("waterfall");
+      expect(toggle().attributes("aria-checked")).toBe("false");
+      expect(treeShowsCriticalPath()).toBe(false);
+
+      await toggle().trigger("click");
+      await flushPromises();
+
+      expect(toggle().attributes("aria-checked")).toBe("true");
+      expect(treeShowsCriticalPath()).toBe(true);
+    });
+
+    it("persists the toggle across remounts", async () => {
+      await openTab("waterfall");
+      await toggle().trigger("click");
+      await flushPromises();
+      expect(localStorage.getItem("o2_trace_critical_path")).toBe("true");
+
+      await remount();
+      await openTab("waterfall");
+
+      expect(toggle().attributes("aria-checked")).toBe("true");
+      expect(treeShowsCriticalPath()).toBe(true);
+    });
+
+    it("stores each span's critical sections on its waterfall row", () => {
+      const rows = wrapper.vm.spanPositionList;
+      expect(rows.length).toBe(tracesMockData.tracesDetails.traceSpans.hits.length);
+      rows.forEach((row: any) => {
+        expect(row.criticalSections.length).toBeGreaterThan(0);
+        row.criticalSections.forEach((section: any) => expect(section.spanId).toBe(row.spanId));
+      });
+      // The deepest span of the mock's single chain is critical for its whole length.
+      const leaf = rows.find((row: any) => !row.spans.length);
+      expect(leaf.criticalSections).toEqual([
+        { spanId: leaf.spanId, sectionStartUs: leaf.startTimeUs, sectionEndUs: leaf.endTimeUs },
+      ]);
+    });
+  });
 
   describe("Data processing", () => {
     it("should process span data correctly", () => {
