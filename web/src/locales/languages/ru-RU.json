@@ -13253,6 +13253,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Почему",
+      "noReasoning": "Для этой оценки не зафиксировано рассуждений.",
       "scoredAt": "Оценено {time}",
       "moreCount": "+{count} ещё",
       "allScores": "Все оценки ({count})"
@@ -13678,7 +13679,18 @@
         "usedByIntro": "Задания и эксперименты, которые ссылаются на этот скорер.",
         "usedByEmpty": "Пока нет заданий или экспериментов, ссылающихся на этот скорер.",
         "usedByExperiment": "Эксперимент",
-        "versionsIntro": "Версии — это неизменяемые снимки конфигурации скоррера. Активная версия — это то, что используют задания сегодня.",
+        "versions": {
+          "empty": "Для этого скорера не найдено версий.",
+          "template": "Шаблон",
+          "fields": {
+            "description": "Описание",
+            "variables": "Переменные",
+            "params": "Параметры",
+            "producesScoreConfig": "Конфигурация оценки",
+            "referenceBased": "На основе эталона",
+            "outputSchema": "Схема вывода"
+          }
+        },
         "lastUpdated": "Последнее обновление",
         "metadataSection": "Метаданные",
         "createdLabel": "Создано",
