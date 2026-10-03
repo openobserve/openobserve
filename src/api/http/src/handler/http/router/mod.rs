@@ -23,7 +23,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
-use config::get_config;
+use config::{get_config, meta::user::UserRole};
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
@@ -49,10 +49,14 @@ use {
     audit::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
+    o2_enterprise::enterprise::{
+        common::{
+            auditor::{AuditMessage, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
+        license::features_enabled,
     },
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
@@ -273,27 +277,48 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     };
 
     // Validate authentication using extracted data
-    match oo_validator(&req_data, &auth_info).await {
-        Ok(result) => {
-            // Insert user_id into request headers for downstream handlers
-            parts.headers.insert(
-                header::HeaderName::from_static("user_id"),
-                header::HeaderValue::from_str(&result.user_email)
-                    .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-            );
+    let result = match oo_validator(&req_data, &auth_info).await {
+        Ok(result) => result,
+        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+    };
 
-            // Handle Prometheus POST hack - add content-type if missing
-            if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
-                parts.headers.insert(
-                    header::CONTENT_TYPE,
-                    header::HeaderValue::from_static("application/x-www-form-urlencoded"),
-                );
-            }
-
-            next.run(Request::from_parts(parts, body)).await
-        }
-        Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+    // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
+    #[cfg(feature = "enterprise")]
+    if let Some(fs) = auth_info.feature
+        && !features_enabled(fs)
+    {
+        let missing: Vec<&str> = fs
+            .iter()
+            .filter(|f| !features_enabled(std::slice::from_ref(f)))
+            .map(|f| (*f).into())
+            .collect();
+        return MetaHttpResponse::forbidden(format!(
+            "features {missing:?} are not included in your license"
+        ));
     }
+
+    // Insert user_id into request headers for downstream handlers
+    parts.headers.insert(
+        header::HeaderName::from_static("user_id"),
+        header::HeaderValue::from_str(&result.user_email)
+            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+    );
+    let role = result.user_role.unwrap_or(UserRole::User);
+    parts.headers.insert(
+        header::HeaderName::from_static("user_role"),
+        header::HeaderValue::from_str(&role.to_string())
+            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+    );
+
+    // Handle Prometheus POST hack - add content-type if missing
+    if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
+        parts.headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+    }
+
+    next.run(Request::from_parts(parts, body)).await
 }
 
 /// Authentication middleware for AWS routes
