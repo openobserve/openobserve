@@ -9321,6 +9321,38 @@
     "add": "Add",
     "runQuery": "Run query",
     "explorer": {
+      "detail": {
+        "loading": "Loading metric details...",
+        "notFound": "Metric not found",
+        "notFoundDesc": "{name} is not in this organization's metric list.",
+        "close": "Back to metrics",
+        "openInVisualize": "Open in Visualize",
+        "tabBreakdown": "Breakdown",
+        "tabRelated": "Related",
+        "breakdown": {
+          "label": "Label",
+          "topValues": "Top values",
+          "distinct": "Distinct values",
+          "samples": "{count} sample | {count} samples",
+          "distinctMany": "{count}+",
+          "addToFilter": "Add to filter",
+          "addToFilterAria": "Add {label} = {value} to the filters",
+          "exclude": "Exclude",
+          "excludeAria": "Exclude {label} = {value}",
+          "noLabels": "No labels to break this metric down by",
+          "selectHint": "Select a label to chart this metric by it.",
+          "chartTitle": "By {label}",
+          "topk": "top {count}"
+        },
+        "related": {
+          "empty": "No related metrics",
+          "name": "Metric",
+          "type": "Type",
+          "unit": "Unit",
+          "sharedLabels": "Shared labels",
+          "noSharedLabels": "None"
+        }
+      },
       "variants": {
         "stddev": "Std dev",
         "rateOfCount": "Rate of count",
@@ -9406,6 +9438,8 @@
         "favoriteRemoveTooltip": "Remove from favorites",
         "openAria": "Open {name} in the editor",
         "openTooltip": "Open in editor",
+        "detailsAria": "Open details for {name}",
+        "detailsTooltip": "Details",
         "unsupported": "Unsupported type (v1)",
         "noPreview": "No preview — open in editor",
         "queryFailedAria": "{name} query failed: {error}",

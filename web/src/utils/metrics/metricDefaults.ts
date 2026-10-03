@@ -1417,6 +1417,103 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Breakdown — one chart of the card's measure, grouped by one label            */
+/* -------------------------------------------------------------------------- */
+
+/** At most this many labels are offered: each one costs the server a scan. */
+export const BREAKDOWN_LABEL_LIMIT = 15;
+
+/** Labels a breakdown never groups by — the same set `resolveTopkLabel` skips. */
+const NON_BREAKDOWN_LABELS = new Set(["le", "quantile"]);
+
+/** Card kinds with no measure worth splitting: `_created` timestamps and `other`. */
+export function supportsBreakdown(cardKind: string): boolean {
+  return cardKind !== CARD_KIND.TIMESTAMP && cardKind !== CARD_KIND.OTHER;
+}
+
+/**
+ * The labels the Breakdown tab offers, alphabetical and capped.
+ *
+ * @param labels the card's own label names
+ * @param alsoOn a second operand's label names (a mean pair's `_count`); a label
+ *   missing from either operand would split one side of the ratio only
+ */
+export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[]): string[] {
+  if (!Array.isArray(labels)) return [];
+  const other = alsoOn ? new Set(alsoOn) : null;
+  return labels
+    .filter(
+      (l) =>
+        typeof l === "string" &&
+        !l.startsWith("_") &&
+        !NON_BREAKDOWN_LABELS.has(l) &&
+        (!other || other.has(l)),
+    )
+    .sort()
+    .slice(0, BREAKDOWN_LABEL_LIMIT);
+}
+
+/**
+ * The card's measure grouped by one label, as one PromQL expression.
+ *
+ * The classic histogram charts a p90 line rather than its default heatmap: a
+ * heatmap per label value is unreadable. A summary charts its median, selected
+ * through `buildSelector` so the extra matcher is validated and ordered like any
+ * other.
+ *
+ * @returns the expression, or `null` for a kind with no breakdown or a label
+ *   name that is not a valid PromQL identifier
+ */
+export function buildBreakdownQuery(
+  cardKind: string,
+  ctx: {
+    metricName: string;
+    filters?: FiltersArg;
+    rateWindow?: string;
+    applyNanGuard?: boolean;
+  },
+  label: string,
+  opts?: { topk?: number },
+): string | null {
+  if (!supportsBreakdown(cardKind) || !LABEL_NAME_RE.test(label)) return null;
+
+  const { metricName, filters } = ctx;
+  const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
+  const guarded = !!ctx.applyNanGuard && RATE_FREE_KINDS.includes(cardKind);
+  const guard = guarded ? withNanGuard : (selector: string) => selector;
+  const sel = buildSelector(metricName, filters);
+  const countSel = () => buildSelector(`${baseNameOf(metricName)}_count`, filters);
+
+  let expr: string;
+  switch (cardKind) {
+    case CARD_KIND.GAUGE:
+      expr = `avg by (${label}) (${guard(sel)})`;
+      break;
+    case CARD_KIND.COUNTER_RATE:
+      expr = `sum by (${label}) (rate(${sel}[${w}]))`;
+      break;
+    case CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS:
+      expr = `histogram_quantile(0.9, sum by (le, ${label}) (rate(${sel}[${w}])))`;
+      break;
+    case CARD_KIND.MEAN_PAIR:
+      expr = `sum by (${label}) (rate(${sel}[${w}])) / sum by (${label}) (rate(${countSel()}[${w}]))`;
+      break;
+    case CARD_KIND.SUMMARY_QUANTILES:
+      expr = `avg by (${label}) (${guard(buildSelector(metricName, filters, { quantile: "0.5" }))})`;
+      break;
+    case CARD_KIND.INFO:
+      expr = `count by (${label}) (${sel})`;
+      break;
+    case CARD_KIND.EXP_HISTOGRAM_FALLBACK:
+      expr = `sum by (${label}) (rate(${countSel()}[${w}]))`;
+      break;
+    default:
+      return null;
+  }
+  return opts?.topk ? `topk(${opts.topk}, ${expr})` : expr;
+}
+
 /** Footer label shown on the card — explorer UI only, never written to a panel. */
 const FOOTER_LABEL = {
   [CARD_KIND.COUNTER_RATE]: "sum(rate)",

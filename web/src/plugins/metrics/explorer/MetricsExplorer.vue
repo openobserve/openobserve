@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
          narrowed to the metrics you ♥'d, so the body is identical bar the facet
          panel (Explore only): the right column is the search row + grid. -->
-    <div v-if="isGridMode" class="flex min-h-0 flex-1 max-md:flex-col">
+    <div v-if="isGridMode && !detailOpen" class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Facet panel — EXPLORE only. It is an editing control (filter by
            prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
            just the grid (with the Views rail), no facets. -->
@@ -520,6 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @refresh="grid.refreshCard"
                 @select="onSelect"
                 @configure="onConfigure"
+                @open-detail="openDetail"
                 @toggle-favorite="grid.toggleFavorite($event.name)"
                 @zoom="onCardZoom"
               />
@@ -544,6 +545,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
       </div>
     </div>
+
+    <!-- The metric detail view — in place of the grid (and its facet panel),
+         keyed by the URL's `metric`. The grid stays mounted-out and paused; the
+         filter row above stays, because the page's filters apply here too. -->
+    <MetricDetailView
+      v-else-if="detailOpen"
+      :key="detailMetric ?? ''"
+      :card="detailCard"
+      :metric-name="detailMetric ?? ''"
+      :loading="detailLoading"
+      :tab="detailTab"
+      :breakdown-label="breakdownLabel"
+      :overview="detailOverview"
+      :is-favorite="!!detailMetric && grid.favorites.value.includes(detailMetric)"
+      :all-cards="grid.cards.value"
+      :labels-by-stream="grid.labelsByStream.value"
+      :prefix-of="grid.prefixOf"
+      :family-of="grid.familyOf"
+      :filters="grid.labelFilters.value"
+      :time-range="grid.timeRange.value"
+      :rate-window="detailCard ? grid.rateWindowFor(detailCard) : ''"
+      :nan-guard="!!(detailMetric && grid.previews.value[detailMetric]?.nanGuardApplied)"
+      :color="detailColor"
+      :run-query="runDetailPreview"
+      :cancel-queries="cancelDetailPreviews"
+      @close="closeDetail"
+      @open-visualize="onDetailOpenVisualize"
+      @toggle-favorite="detailMetric && grid.toggleFavorite(detailMetric)"
+      @update:tab="onDetailTab"
+      @update:breakdown-label="onBreakdownLabel"
+      @open-related="onOpenRelated"
+      @add-filter="onBreakdownAddFilter"
+    />
 
     <!-- VISUALIZE mode — the query-driven workspace. Mounts the constrained
          pageType="metrics" PanelEditor (same engine as the metrics editor route),
@@ -616,6 +650,7 @@ import AddToDashboard from "../AddToDashboard.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
+import MetricDetailView from "./MetricDetailView.vue";
 
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
@@ -633,6 +668,7 @@ import {
   EXPLORER_FILTER_PARAM_KEYS,
   explorerFiltersToQuery,
   queryToExplorerFilters,
+  type DetailTab,
 } from "@/utils/metrics/explorerUrlState";
 import {
   queryParamsToSelectedDate,
@@ -690,6 +726,7 @@ export default defineComponent({
     PrefixFilterPanel,
     LabelFilterBar,
     FunctionConfigDialog,
+    MetricDetailView,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -807,13 +844,21 @@ export default defineComponent({
     // Explore and Workspace share the grid + facet body (Workspace adds a views
     // rail); only Visualize swaps to the query workspace.
     const isGridMode = computed(() => mode.value === "explore" || mode.value === "workspace");
+
+    // The metric detail view: driven by the URL's `metric`, not by a mode, so the
+    // grid's mode survives it and closing returns to whichever grid was showing.
+    const detailMetric = ref<string | null>(null);
+    const detailTab = ref<DetailTab | null>(null);
+    const breakdownLabel = ref<string | null>(null);
+    const detailOpen = computed(() => isGridMode.value && !!detailMetric.value);
+
     const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
       // `paused` in sync, but it runs after the DOM has begun tearing the grid
       // down — and the teardown's own "card visible" events would already have
       // fired a query each. Setting it here closes that window.
-      grid.paused.value = v === "visualize";
+      grid.paused.value = v === "visualize" || !!detailMetric.value;
       mode.value = v;
     };
 
@@ -841,12 +886,12 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Pause the grid whenever it is not on screen (Visualize). The grid sweeps
-    // its slice whenever the slice changes — and switching modes changes it (the
-    // pinned-only narrowing flips). Unpaused, that sweep re-queries every card
-    // for a grid the user just navigated away from.
+    // Pause the grid whenever it is not on screen (Visualize, or the detail view
+    // in its place). The grid sweeps its slice whenever the slice changes — and
+    // switching modes changes it (the pinned-only narrowing flips). Unpaused,
+    // that sweep re-queries every card for a grid the user just navigated away from.
     watch(
-      isGridMode,
+      () => isGridMode.value && !detailMetric.value,
       (on) => {
         grid.paused.value = !on;
       },
@@ -1277,6 +1322,113 @@ export default defineComponent({
       setMode("visualize");
     };
 
+    /* ---------------------------------------------------- detail view */
+
+    const detailCard = computed(() =>
+      detailMetric.value
+        ? (grid.cards.value.find((c) => c.name === detailMetric.value) ?? null)
+        : null,
+    );
+
+    // Stream loading omits schemas, and Breakdown and Related both need the
+    // label sets — so entering the view waits for them.
+    const detailSchemasPending = ref(false);
+    let detailSchemaGeneration = 0;
+    watch(
+      detailMetric,
+      async (name) => {
+        if (!name) return;
+        const generation = ++detailSchemaGeneration;
+        detailSchemasPending.value = true;
+        try {
+          await grid.ensureSchemas();
+        } finally {
+          if (generation === detailSchemaGeneration) detailSchemasPending.value = false;
+        }
+      },
+      { immediate: true },
+    );
+    const detailLoading = computed(() => grid.loading.value || detailSchemasPending.value);
+
+    /** The card's current query, its ⚙ override and any NaN-guard / widening included. */
+    const detailOverview = computed(() => {
+      const card = detailCard.value;
+      if (!card) return { queries: [], chartType: "line", unit: "", bucketUnit: null };
+      const preview = grid.previews.value[card.name];
+      const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
+        applyNanGuard: preview?.nanGuardApplied,
+        rateWindow: preview?.widenedRateWindow ?? undefined,
+      });
+      const chartType = resolved?.chartType ?? card.chartType;
+      const previewable = !card.unsupported && resolved?.variant?.previewable !== false;
+      return {
+        queries: previewable ? (resolved?.queries ?? []) : [],
+        chartType,
+        unit: resolved?.unit ?? card.unit,
+        bucketUnit: chartType === "heatmap" ? (defaults?.bucketUnit ?? null) : null,
+      };
+    });
+
+    const detailColor = computed(() => {
+      const index = visibleCards.value.findIndex((c) => c.name === detailMetric.value);
+      return cardColorForIndex(Math.max(0, index), isDark.value);
+    });
+
+    const runDetailPreview = (expr: string) =>
+      detailCard.value ? grid.runDetailQuery(expr, detailCard.value) : Promise.resolve(null);
+    const cancelDetailPreviews = (exprs: string[]) => {
+      if (detailCard.value) grid.cancelDetailQueries(exprs, detailCard.value);
+    };
+
+    const showDetail = (name: string) => {
+      // Paused synchronously, before the grid unmounts — see `setMode`.
+      grid.paused.value = true;
+      detailMetric.value = name;
+      detailTab.value = null;
+      breakdownLabel.value = null;
+    };
+
+    const openDetail = (card: MetricCardModel) => {
+      showDetail(card.name);
+      track("metrics_explorer_detail_opened", { card_kind: card.cardKind });
+    };
+
+    const closeDetail = () => {
+      detailMetric.value = null;
+      detailTab.value = null;
+      breakdownLabel.value = null;
+    };
+
+    const onDetailTab = (tab: string | number) => {
+      if (tab === "breakdown" || tab === "related") detailTab.value = tab;
+    };
+
+    const onBreakdownLabel = (label: string | null) => {
+      breakdownLabel.value = label;
+      if (label)
+        track("metrics_explorer_breakdown_label_selected", {
+          card_kind: detailCard.value?.cardKind,
+        });
+    };
+
+    const onOpenRelated = (name: string) => {
+      track("metrics_explorer_related_opened", { card_kind: detailCard.value?.cardKind });
+      showDetail(name);
+    };
+
+    const onBreakdownAddFilter = async (filter: LabelFilter) => {
+      track("metrics_explorer_breakdown_filter_added", { operator: filter.operator ?? "=" });
+      await onAddLabelFilter(filter);
+    };
+
+    /** "Open in Visualize": the same drill-in as the card's ✎. */
+    const onDetailOpenVisualize = () => {
+      const card = detailCard.value;
+      if (!card) return;
+      closeDetail();
+      onSelect(card);
+    };
+
     /* --------------------------------------------------------------- URL */
 
     // Restore synchronously, before children mount: the picker reads
@@ -1295,6 +1447,11 @@ export default defineComponent({
       if (f.sortBy) grid.sortBy.value = f.sortBy;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
+      if (f.metric) {
+        detailMetric.value = f.metric;
+        detailTab.value = f.tab ?? null;
+        breakdownLabel.value = f.breakdownLabel ?? null;
+      }
 
       // Rehydrate the built chart on refresh / a shared Visualize link: decode
       // the URL blob into a seed so MetricsVisualize opens on it (its own mount
@@ -1339,6 +1496,9 @@ export default defineComponent({
         sortBy: grid.sortBy.value,
         viewMode: grid.viewMode.value,
         mode: mode.value,
+        metric: detailMetric.value,
+        tab: detailTab.value,
+        breakdownLabel: breakdownLabel.value,
       });
       const time: any = selectedDateToQueryParams(selectedDate.value);
       // The default window is recoverable from its absence, like the filters.
@@ -1405,7 +1565,11 @@ export default defineComponent({
       // `explore` serializes to an ABSENT key, so compare against "" — not
       // `undefined` vs "explore", which would read as a change on every sync.
       const modeChanged = String(query.mode ?? "") !== String(route.query.mode ?? "");
-      const navigate = modeChanged ? router.push : router.replace;
+      // Opening the detail view, opening a related metric and closing the view
+      // are navigations too: each gets its own Back step. Its tab and breakdown
+      // label are not — they replace.
+      const metricChanged = String(query.metric ?? "") !== String(route.query.metric ?? "");
+      const navigate = modeChanged || metricChanged ? router.push : router.replace;
       navigate.call(router, { query }).catch(() => {});
     };
 
@@ -1423,6 +1587,9 @@ export default defineComponent({
         grid.sortBy.value,
         grid.viewMode.value,
         mode.value,
+        detailMetric.value,
+        detailTab.value,
+        breakdownLabel.value,
         selectedDate.value,
         refreshInterval.value,
       ],
@@ -1445,6 +1612,15 @@ export default defineComponent({
       debouncedSyncVisualizeUrl,
     );
 
+    /** Applies the detail-view keys; absence clears them, which is how Back closes it. */
+    const applyDetailKeys = (f: ReturnType<typeof queryToExplorerFilters>) => {
+      // Before the grid unmounts, for the same reason `setMode` pauses first.
+      if (f.metric) grid.paused.value = true;
+      detailMetric.value = f.metric ?? null;
+      detailTab.value = f.tab ?? null;
+      breakdownLabel.value = f.breakdownLabel ?? null;
+    };
+
     // URL -> state, for the navigations the mount-time apply cannot see:
     // clicking sidebar "Metrics" while filtered (a bare URL must CLEAR the
     // filters), and back/forward between two /metrics?… entries. Unlike the
@@ -1453,62 +1629,61 @@ export default defineComponent({
     // against what the current state serializes to: our own router.replace
     // round-trips through this watcher, and re-applying identical state would
     // fire the filter watchers (page reset, slice sweep) for nothing.
-    watch(
-      () => route.query,
-      () => {
-        // Leaving the page fires this once with the next route's query.
-        if (route.name !== "metrics") return;
+    const onRouteQueryChange = () => {
+      // Leaving the page fires this once with the next route's query.
+      if (route.name !== "metrics") return;
 
-        const incoming: Record<string, string> = {};
-        for (const key of MANAGED_PARAM_KEYS) {
-          const v = (route.query as Record<string, any>)[key];
-          if (v != null) incoming[key] = String(v);
-        }
-        const current: Record<string, string> = {};
-        for (const [key, v] of Object.entries(managedFromState())) {
-          current[key] = String(v);
-        }
-        if (isEqual(incoming, current)) return;
+      const incoming: Record<string, string> = {};
+      for (const key of MANAGED_PARAM_KEYS) {
+        const v = (route.query as Record<string, any>)[key];
+        if (v != null) incoming[key] = String(v);
+      }
+      const current: Record<string, string> = {};
+      for (const [key, v] of Object.entries(managedFromState())) {
+        current[key] = String(v);
+      }
+      if (isEqual(incoming, current)) return;
 
-        // A MODE-only change (Explore <-> Visualize <-> Workspace) is not grid
-        // state: switching tabs must not re-apply the filters. Re-assigning them
-        // hands the grid brand-new Set/array identities, and its watchers answer
-        // an identical-but-new value by re-querying EVERY card — ~40 requests just
-        // for clicking a card's Open. Sync the mode and leave the grid alone.
-        const withoutMode = (o: Record<string, string>) => {
-          const { mode: _m, ...rest } = o;
-          return rest;
-        };
-        if (isEqual(withoutMode(incoming), withoutMode(current))) {
-          mode.value = (incoming.mode as "explore" | "visualize" | "workspace") ?? "explore";
-          return;
-        }
+      // A change limited to the MODE (Explore <-> Visualize <-> Workspace) or
+      // the detail view (metric / tab / breakdown_label) is not grid state:
+      // it must not re-apply the filters. Re-assigning them hands the grid
+      // brand-new Set/array identities, and its watchers answer an
+      // identical-but-new value by re-querying EVERY card — ~40 requests just
+      // for clicking a card's Open, or for pressing Back out of the detail
+      // view. Sync those keys and leave the grid alone.
+      const withoutPageKeys = (o: Record<string, string>) => {
+        const { mode: _m, metric: _x, tab: _t, breakdown_label: _b, ...rest } = o;
+        return rest;
+      };
+      const q = route.query as Record<string, any>;
+      const f = queryToExplorerFilters(q);
+      if (isEqual(withoutPageKeys(incoming), withoutPageKeys(current))) {
+        mode.value = (incoming.mode as "explore" | "visualize" | "workspace") ?? "explore";
+        applyDetailKeys(f);
+        return;
+      }
 
-        const q = route.query as Record<string, any>;
-        const f = queryToExplorerFilters(q);
-        grid.searchTerm.value = f.searchTerm ?? "";
-        grid.selectedPrefixes.value = f.selectedPrefixes ?? new Set();
-        grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
-        grid.selectedTypes.value = f.selectedTypes ?? new Set();
-        grid.labelFilters.value = f.labelFilters ?? [];
-        grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
-        grid.sortBy.value = f.sortBy ?? "a-z";
-        grid.viewMode.value = f.viewMode ?? "grid";
-        // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
-        mode.value = f.mode ?? "explore";
-        if (f.labelFilters?.length) grid.ensureSchemas();
+      grid.searchTerm.value = f.searchTerm ?? "";
+      grid.selectedPrefixes.value = f.selectedPrefixes ?? new Set();
+      grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
+      grid.selectedTypes.value = f.selectedTypes ?? new Set();
+      grid.labelFilters.value = f.labelFilters ?? [];
+      grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
+      grid.sortBy.value = f.sortBy ?? "a-z";
+      grid.viewMode.value = f.viewMode ?? "grid";
+      // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
+      mode.value = f.mode ?? "explore";
+      applyDetailKeys(f);
+      if (f.labelFilters?.length) grid.ensureSchemas();
 
-        selectedDate.value =
-          q.period || (q.from && q.to) ? queryParamsToSelectedDate(q) : defaultSelectedDate();
-        refreshInterval.value =
-          q.refresh != null
-            ? refreshLabelToInterval(
-                q.refresh,
-                store.state?.zoConfig?.min_auto_refresh_interval || 0,
-              )
-            : 0;
-      },
-    );
+      selectedDate.value =
+        q.period || (q.from && q.to) ? queryParamsToSelectedDate(q) : defaultSelectedDate();
+      refreshInterval.value =
+        q.refresh != null
+          ? refreshLabelToInterval(q.refresh, store.state?.zoConfig?.min_auto_refresh_interval || 0)
+          : 0;
+    };
+    watch(() => route.query, onRouteQueryChange);
 
     /* ------------------------------------------------------------- time */
 
@@ -1577,7 +1752,8 @@ export default defineComponent({
       // whole slice where it stands.
       await Promise.all([
         requestOnScreen({ skipCache: true }),
-        grid.sweepSlice({ skipCache: true }),
+        // Not while the detail view covers the grid: it is paused.
+        detailOpen.value ? undefined : grid.sweepSlice({ skipCache: true }),
       ]);
     };
 
@@ -1671,7 +1847,7 @@ export default defineComponent({
           // An auto-refresh tick sweeps too, but without `skipCache` — it picks
           // up cards the user has not reached yet and leaves the known-empty ones
           // alone, so a tick cannot reshuffle the grid under the cursor.
-          grid.sweepSlice({ skipCache: manual }),
+          detailOpen.value ? undefined : grid.sweepSlice({ skipCache: manual }),
         ]);
       } finally {
         refreshing.value = false;
@@ -1890,6 +2066,24 @@ export default defineComponent({
       convertPanels,
       convertDialogOpen,
       onSelect,
+      detailMetric,
+      detailTab,
+      breakdownLabel,
+      detailOpen,
+      detailCard,
+      detailLoading,
+      detailOverview,
+      detailColor,
+      runDetailPreview,
+      cancelDetailPreviews,
+      openDetail,
+      closeDetail,
+      onDetailTab,
+      onBreakdownLabel,
+      onOpenRelated,
+      onBreakdownAddFilter,
+      onDetailOpenVisualize,
+      onRouteQueryChange,
       visualizeSeed,
       visualizeRef,
       visualizeDateTime,

@@ -1899,6 +1899,44 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
   };
 
+  /** The metric detail view's queries: dialog-grade priority, their own owner. */
+  const DETAIL_OWNER = "\u0000detail";
+
+  /**
+   * Runs one query for the metric detail view — copied from `runDialogQuery`,
+   * under its own owner so closing the view never aborts a card's preview or a
+   * dialog tile sharing the same query. The card's step keeps the cache shared.
+   */
+  const runDetailQuery = (expr: string, card: MetricCard) => {
+    const step = dialogStepFor(card);
+    return queue.run(
+      previewCacheKey(expr, step),
+      PRIORITY.DIALOG,
+      (signal) => streamQuery(expr, step, signal),
+      DETAIL_OWNER,
+    );
+  };
+
+  /** Detail view closed, or its chart replaced: drop what it still has running. */
+  const cancelDetailQueries = (exprs: string[], card: MetricCard) => {
+    const step = dialogStepFor(card);
+    for (const expr of exprs) {
+      queue.cancel(previewCacheKey(expr, step), DETAIL_OWNER);
+    }
+  };
+
+  /**
+   * The concrete rate window the card charts with — the widened one when the
+   * card needed it — so a breakdown of the card measures over the same window.
+   */
+  const rateWindowFor = (card: MetricCard): string =>
+    previews.value[card.name]?.widenedRateWindow ??
+    computeRateWindow(rangeSeconds.value, pointsFor(card), scrapeIntervalSeconds.value);
+
+  /** The family map the cards were built from (`buildMetricFamilies`). */
+  const familyByName = computed(() => new Map(cards.value.map((c) => [c.name, c.familyName])));
+  const familyOf = (name: string) => familyByName.value.get(name) ?? name;
+
   /* ------------------------------------------------------ label filtering */
 
   const labelNames = ref<string[]>([]);
@@ -2386,6 +2424,15 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     effectiveVariant,
     runDialogQuery,
     cancelDialogQueries,
+    runDetailQuery,
+    cancelDetailQueries,
+    rateWindowFor,
+
+    // the detail view's Related tab
+    labelsByStream,
+    prefixAssignment,
+    prefixOf,
+    familyOf,
 
     // lifecycle
     loadStreams,

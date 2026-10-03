@@ -147,4 +147,59 @@ describe("explorerUrlState", () => {
     });
     expect(out).toEqual({});
   });
+
+  describe("metric detail view keys", () => {
+    it("owns metric, tab and breakdown_label — and never stream", () => {
+      // `stream` is an editor key: a /metrics URL carrying it redirects to the
+      // editor, so the detail view must never claim it.
+      expect(EXPLORER_FILTER_PARAM_KEYS).toEqual(
+        expect.arrayContaining(["metric", "tab", "breakdown_label"]),
+      );
+      expect(EXPLORER_FILTER_PARAM_KEYS).not.toContain("stream");
+    });
+
+    it("round-trips metric, tab and breakdown_label", () => {
+      const query = explorerFiltersToQuery({
+        ...defaults(),
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdownLabel: "route",
+      });
+      expect(query).toEqual({
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdown_label: "route",
+      });
+      expect(queryToExplorerFilters(query)).toEqual({
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdownLabel: "route",
+      });
+    });
+
+    it("never emits stream, whatever the detail state", () => {
+      const query = explorerFiltersToQuery({
+        ...defaults(),
+        mode: "workspace",
+        metric: "node_load1",
+        tab: "related",
+      });
+      expect(query).not.toHaveProperty("stream");
+      expect(Object.keys(query).sort()).toEqual(["metric", "mode", "tab"]);
+    });
+
+    it("writes tab and breakdown_label only alongside a metric", () => {
+      // Without a metric there is no detail view for them to describe.
+      expect(
+        explorerFiltersToQuery({ ...defaults(), tab: "related", breakdownLabel: "route" }),
+      ).toEqual({});
+      expect(queryToExplorerFilters({ tab: "related", breakdown_label: "route" })).toEqual({});
+    });
+
+    it("drops an unknown tab and a malformed label name", () => {
+      expect(
+        queryToExplorerFilters({ metric: "up", tab: "bogus", breakdown_label: "1bad" }),
+      ).toEqual({ metric: "up" });
+    });
+  });
 });

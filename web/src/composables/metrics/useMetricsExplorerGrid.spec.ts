@@ -177,6 +177,20 @@ vi.mock("@/services/metrics", () => ({
   default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn() },
 }));
 
+// Every queue the composable creates, so a test can spy on the grid's scheduler.
+const { createdQueues } = vi.hoisted(() => ({ createdQueues: [] as any[] }));
+vi.mock("./useMetricsPreviewQueue", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    createPreviewQueue: (...args: any[]) => {
+      const queue = actual.createPreviewQueue(...args);
+      createdQueues.push(queue);
+      return queue;
+    },
+  };
+});
+
 vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<any>()),
   generateTraceContext: () => ({ traceId: "trace-1", traceparent: "" }),
@@ -190,6 +204,7 @@ import useMetricsExplorerGrid, {
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
 import i18nInstance from "@/locales";
+import { PRIORITY } from "./useMetricsPreviewQueue";
 const t = (i18nInstance.global as any).t;
 
 const SERIES = {
@@ -1794,6 +1809,59 @@ describe("useMetricsExplorerGrid", () => {
       expect(keys).toHaveLength(3);
       expect(keys.every((k: string) => k.startsWith("exemplars|"))).toBe(true);
       grid.toggleExemplars(card);
+    });
+  });
+
+  describe("the metric detail view", () => {
+    it("runs a detail query at DIALOG priority on the card's own step, under its own owner", async () => {
+      const grid = await setup();
+      const queue = createdQueues.at(-1);
+      const run = vi.spyOn(queue, "run");
+      const card = cardNamed(grid, "http_requests_total");
+
+      const pending = grid.runDetailQuery("sum(up)", card);
+      const call = run.mock.calls.at(-1)!;
+      // Same key the card and the ⚙ dialog would use: the step is the card's.
+      expect(call[0]).toContain("|sum(up)|");
+      expect(call[1]).toBe(PRIORITY.DIALOG);
+      const owner = call[3];
+      expect(owner).toBeTruthy();
+      expect(owner).not.toBe(card.name);
+
+      // The dialog's owner is a different one: closing one never aborts the other.
+      grid.runDialogQuery("sum(up)", card).catch(() => {});
+      expect(run.mock.calls.at(-1)![3]).not.toBe(owner);
+
+      pending.catch(() => {});
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("cancels its own queries by the same key and owner it ran them under", async () => {
+      const grid = await setup();
+      const queue = createdQueues.at(-1);
+      const run = vi.spyOn(queue, "run");
+      const cancel = vi.spyOn(queue, "cancel");
+      const card = cardNamed(grid, "http_requests_total");
+
+      grid.runDetailQuery("sum(up)", card).catch(() => {});
+      const [key, , , owner] = run.mock.calls.at(-1)!;
+
+      grid.cancelDetailQueries(["sum(up)"], card);
+      expect(cancel).toHaveBeenCalledWith(key, owner);
+    });
+
+    it("exposes what the detail view ranks and filters with", async () => {
+      const grid = await setup();
+      await grid.ensureSchemas();
+
+      expect(grid.labelsByStream.value).toEqual(expect.any(Object));
+      expect(grid.prefixOf("http_requests_total")).toEqual(expect.any(String));
+      expect(grid.prefixAssignment.value.groupOf).toBeInstanceOf(Map);
+      // The family map: a histogram's members share one family.
+      expect(grid.familyOf("lat_seconds_bucket")).toBe(grid.familyOf("lat_seconds_count"));
+      expect(grid.familyOf("http_requests_total")).not.toBe(grid.familyOf("lat_seconds_bucket"));
+      // A concrete window for the breakdown query, sized like the card's own.
+      expect(grid.rateWindowFor(cardNamed(grid, "http_requests_total"))).toMatch(/^\d+[smh]/);
     });
   });
 });

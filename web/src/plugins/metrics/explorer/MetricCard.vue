@@ -43,11 +43,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-1.5">
         <!-- Matches the dashboard panel title's classes (PanelContainer's
              dashboard-panel-header): same size, weight, tracking and token. -->
-        <span
-          class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
-          :title="card.name"
-          >{{ card.name }}</span
+        <!-- The title opens the metric's detail view (as does the Details
+             action below). The chart body does not: it owns drag-to-zoom,
+             exemplar markers and right-click Create alert. -->
+        <OButton
+          variant="ghost"
+          size="chip"
+          class="min-w-0"
+          :aria-label="t('metrics.explorer.card.detailsAria', { name: card.name })"
+          :data-test="`metrics-explorer-card-title-${card.name}`"
+          @click="$emit('open-detail', card)"
         >
+          <span
+            class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+            :title="card.name"
+            >{{ card.name }}</span
+          >
+        </OButton>
         <!-- Badge text is never the sole carrier of meaning — the card's aria
              label spells the type out too. -->
         <OTag
@@ -126,6 +138,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('configure', card)"
           >
             <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
+          </OButton>
+
+          <!-- Details — the metric's detail view (Breakdown / Related). -->
+          <OButton
+            variant="ghost"
+            size="icon"
+            icon-left="query-stats"
+            :aria-label="t('metrics.explorer.card.detailsAria', { name: card.name })"
+            :data-test="`metrics-explorer-card-details-${card.name}`"
+            @click="$emit('open-detail', card)"
+          >
+            <OTooltip :content="t('metrics.explorer.card.detailsTooltip')" />
           </OButton>
 
           <!-- The drill-in. The ONLY thing that navigates; the chart and card are
@@ -558,37 +582,12 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { BADGE_LABEL_KEYS, cardColorForIndex } from "@/utils/metrics/metricPalette";
+import { BADGE_LABEL_KEYS, UNIT_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
-
-/** Human-facing unit text for the card footer. */
-const UNIT_LABELS: Record<string, string> = {
-  seconds: "s",
-  milliseconds: "ms",
-  microseconds: "µs",
-  nanoseconds: "ns",
-  bytes: "bytes",
-  "bytes-per-sec": "bytes/s",
-  "count-per-sec": "c/s",
-  "ms-per-sec": "ms/s",
-  "us-per-sec": "µs/s",
-  "ns-per-sec": "ns/s",
-  bits: "bits",
-  "bits-per-sec": "bits/s",
-  percent: "%",
-  "percent-1": "%",
-  celsius: "°C",
-  volts: "V",
-  amperes: "A",
-  joules: "J",
-  watts: "W",
-  short: "",
-  none: "",
-};
 
 export default defineComponent({
   name: "MetricCard",
@@ -633,6 +632,8 @@ export default defineComponent({
     "toggle-exemplars",
     "retry-exemplars",
     "select",
+    // The metric's detail view, from the Details action or the title.
+    "open-detail",
     "configure",
     "toggle-favorite",
     "visible",

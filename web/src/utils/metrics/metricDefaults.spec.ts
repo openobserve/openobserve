@@ -16,8 +16,12 @@
 import { describe, it, expect } from "vitest";
 import {
   CARD_KIND,
+  BREAKDOWN_LABEL_LIMIT,
   baseNameOf,
+  breakdownLabelsOf,
+  buildBreakdownQuery,
   buildSelector,
+  supportsBreakdown,
   computePercentileWindow,
   computeRateWindow,
   computeStepSeconds,
@@ -844,5 +848,157 @@ describe("units the chart actually needs (found in review)", () => {
     expect(
       getMetricDefaults("network_ingress_total", "counter", "By", { rateWindow: W }).unit,
     ).toBe("bytes-per-sec");
+  });
+});
+
+describe("buildBreakdownQuery", () => {
+  const ctx = (metricName: string, extra: Record<string, any> = {}) => ({
+    metricName,
+    rateWindow: W,
+    ...extra,
+  });
+
+  it("gauge: averages by the label", () => {
+    expect(buildBreakdownQuery(CARD_KIND.GAUGE, ctx("node_load1"), "instance")).toBe(
+      'avg by (instance) ({__name__="node_load1"})',
+    );
+  });
+
+  it("gauge: keeps the NaN guard when the card needed it", () => {
+    expect(
+      buildBreakdownQuery(CARD_KIND.GAUGE, ctx("node_load1", { applyNanGuard: true }), "instance"),
+    ).toBe('avg by (instance) (({__name__="node_load1"} and {__name__="node_load1"} > -Inf))');
+  });
+
+  it("counter: sums the rate by the label", () => {
+    expect(buildBreakdownQuery(CARD_KIND.COUNTER_RATE, ctx("http_requests_total"), "route")).toBe(
+      'sum by (route) (rate({__name__="http_requests_total"}[4m]))',
+    );
+  });
+
+  it("classic histogram: a p90 line by the label, keeping le in the grouping", () => {
+    expect(
+      buildBreakdownQuery(CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS, ctx("lat_seconds_bucket"), "route"),
+    ).toBe(
+      'histogram_quantile(0.9, sum by (le, route) (rate({__name__="lat_seconds_bucket"}[4m])))',
+    );
+  });
+
+  it("mean pair: divides sum by count, both grouped by the label", () => {
+    expect(buildBreakdownQuery(CARD_KIND.MEAN_PAIR, ctx("lat_seconds_sum"), "route")).toBe(
+      'sum by (route) (rate({__name__="lat_seconds_sum"}[4m])) / ' +
+        'sum by (route) (rate({__name__="lat_seconds_count"}[4m]))',
+    );
+  });
+
+  it("summary: averages the median through buildSelector, never by appending to sel", () => {
+    expect(
+      buildBreakdownQuery(
+        CARD_KIND.SUMMARY_QUANTILES,
+        ctx("rpc_seconds", { filters: [{ label: "job", value: "api" }] }),
+        "route",
+      ),
+    ).toBe('avg by (route) ({__name__="rpc_seconds",job="api",quantile="0.5"})');
+  });
+
+  it("summary: NaN-guards the quantile selector like sel", () => {
+    expect(
+      buildBreakdownQuery(
+        CARD_KIND.SUMMARY_QUANTILES,
+        ctx("rpc_seconds", { applyNanGuard: true }),
+        "route",
+      ),
+    ).toBe(
+      'avg by (route) (({__name__="rpc_seconds",quantile="0.5"} and ' +
+        '{__name__="rpc_seconds",quantile="0.5"} > -Inf))',
+    );
+  });
+
+  it("info: counts series by the label", () => {
+    expect(buildBreakdownQuery(CARD_KIND.INFO, ctx("target_info"), "version")).toBe(
+      'count by (version) ({__name__="target_info"})',
+    );
+  });
+
+  it("exponential-histogram fallback: rates the count stream by the label", () => {
+    expect(
+      buildBreakdownQuery(CARD_KIND.EXP_HISTOGRAM_FALLBACK, ctx("req_size_bucket"), "route"),
+    ).toBe('sum by (route) (rate({__name__="req_size_count"}[4m]))');
+  });
+
+  it("carries the active filters into the selector", () => {
+    expect(
+      buildBreakdownQuery(
+        CARD_KIND.COUNTER_RATE,
+        ctx("http_requests_total", { filters: [{ label: "status", value: "500" }] }),
+        "route",
+      ),
+    ).toBe('sum by (route) (rate({__name__="http_requests_total",status="500"}[4m]))');
+  });
+
+  it("wraps the query in topk when a limit is given", () => {
+    expect(
+      buildBreakdownQuery(CARD_KIND.COUNTER_RATE, ctx("http_requests_total"), "instance", {
+        topk: 10,
+      }),
+    ).toBe('topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))');
+  });
+
+  it("has no breakdown for timestamp and other", () => {
+    expect(buildBreakdownQuery(CARD_KIND.TIMESTAMP, ctx("x_created"), "route")).toBeNull();
+    expect(buildBreakdownQuery(CARD_KIND.OTHER, ctx("x_bucket"), "route")).toBeNull();
+  });
+
+  it("refuses a label name that is not a valid PromQL identifier", () => {
+    expect(buildBreakdownQuery(CARD_KIND.GAUGE, ctx("up"), "1bad")).toBeNull();
+    expect(buildBreakdownQuery(CARD_KIND.GAUGE, ctx("up"), "a) or vector(1")).toBeNull();
+  });
+});
+
+describe("supportsBreakdown", () => {
+  it("offers the tab for every charted kind", () => {
+    for (const kind of [
+      CARD_KIND.GAUGE,
+      CARD_KIND.COUNTER_RATE,
+      CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
+      CARD_KIND.MEAN_PAIR,
+      CARD_KIND.SUMMARY_QUANTILES,
+      CARD_KIND.INFO,
+      CARD_KIND.EXP_HISTOGRAM_FALLBACK,
+    ]) {
+      expect(supportsBreakdown(kind)).toBe(true);
+    }
+  });
+
+  it("hides the tab for timestamp and other", () => {
+    expect(supportsBreakdown(CARD_KIND.TIMESTAMP)).toBe(false);
+    expect(supportsBreakdown(CARD_KIND.OTHER)).toBe(false);
+  });
+});
+
+describe("breakdownLabelsOf", () => {
+  it("drops le, quantile and internal labels, sorted alphabetically", () => {
+    expect(
+      breakdownLabelsOf(["route", "le", "quantile", "_ts", "__name__", "method", "instance"]),
+    ).toEqual(["instance", "method", "route"]);
+  });
+
+  it("keeps only labels present on both operand streams", () => {
+    expect(breakdownLabelsOf(["route", "method", "pod"], ["pod", "route"])).toEqual([
+      "pod",
+      "route",
+    ]);
+  });
+
+  it("caps the list, because each label costs the server one scan", () => {
+    const many = Array.from({ length: 30 }, (_, i) => `l${String(i).padStart(2, "0")}`);
+    const out = breakdownLabelsOf(many);
+    expect(out).toHaveLength(BREAKDOWN_LABEL_LIMIT);
+    expect(BREAKDOWN_LABEL_LIMIT).toBe(15);
+    expect(out[0]).toBe("l00");
+  });
+
+  it("returns nothing when the labels are unknown", () => {
+    expect(breakdownLabelsOf(undefined)).toEqual([]);
   });
 });

@@ -81,6 +81,13 @@ const grid = vi.hoisted(() => {
     effectiveVariant: vi.fn(() => ({ defaults: { variants: [] }, resolved: { queries: [] } })),
     runDialogQuery: vi.fn(),
     cancelDialogQueries: vi.fn(),
+    runDetailQuery: vi.fn(),
+    cancelDetailQueries: vi.fn(),
+    rateWindowFor: vi.fn(() => "4m"),
+    labelsByStream: { value: {} },
+    prefixAssignment: { value: { groupOf: new Map() } },
+    prefixOf: vi.fn(() => "misc"),
+    familyOf: vi.fn((name: string) => name),
     loadStreams: vi.fn(async () => {}),
     setTimeRange: vi.fn(),
     setRefreshInterval: vi.fn(),
@@ -135,6 +142,7 @@ vi.mock("@tanstack/vue-virtual", () => ({
 }));
 
 import MetricsExplorer from "./MetricsExplorer.vue";
+import analytics from "@/services/product_analytics";
 
 const CARD = { name: "http_requests_total", unsupported: false, cardKind: "counterRate" };
 
@@ -158,6 +166,7 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
         PrefixFilterPanel: true,
         LabelFilterBar: true,
         FunctionConfigDialog: true,
+        MetricDetailView: true,
         OButton: true,
         OIcon: true,
         OCheckbox: true,
@@ -960,6 +969,208 @@ describe("MetricsExplorer wiring", () => {
 
         expect(blobWrites()).toHaveLength(0);
       });
+    });
+  });
+
+  /**
+   * The metric detail view is driven by the URL's `metric` key, not by a mode:
+   * the grid underneath keeps its mode, and is paused while the view is open.
+   */
+  describe("the metric detail view", () => {
+    const DETAIL = '[data-test="metrics-explorer-scroll"]';
+    const detailView = (wrapper: any) => wrapper.findComponent({ name: "MetricDetailView" });
+
+    beforeEach(() => {
+      grid.cards.value = [CARD];
+      grid.paused.value = false;
+      // Earlier tests leave grid state behind (a z-a sort, say); the fast-path
+      // tests need a URL that differs from the state ONLY in the detail keys.
+      grid.searchTerm.value = "";
+      grid.selectedPrefixes.value = new Set();
+      grid.selectedSuffixes.value = new Set();
+      grid.selectedTypes.value = new Set();
+      grid.labelFilters.value = [];
+      grid.hideEmptyPanels.value = true;
+      grid.sortBy.value = "a-z";
+      grid.viewMode.value = "grid";
+    });
+    afterEach(() => {
+      grid.cards.value = [];
+    });
+
+    it("opens from a card: pushes a history entry, pauses the grid, loads the schemas", async () => {
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+
+      (wrapper.vm as any).openDetail(CARD);
+      // Paused synchronously, before the grid unmounts and its cards report in.
+      expect(grid.paused.value).toBe(true);
+      await wrapper.vm.$nextTick();
+
+      expect(routerState.push).toHaveBeenCalled();
+      expect(routerState.push.mock.calls.at(-1)[0].query.metric).toBe(CARD.name);
+      expect(grid.ensureSchemas).toHaveBeenCalled();
+      expect(wrapper.find(DETAIL).exists()).toBe(false);
+      expect(detailView(wrapper).exists()).toBe(true);
+      // The mode is untouched — closing returns to whichever grid was showing.
+      expect((wrapper.vm as any).mode).toBe("explore");
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_detail_opened",
+        expect.objectContaining({ card_kind: CARD.cardKind }),
+      );
+    });
+
+    it("keeps the grid paused when the mode changes underneath an open view", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(grid.paused.value).toBe(true);
+    });
+
+    it("REPLACES the entry on a tab or breakdown-label change", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+      routerState.replace.mockClear();
+
+      (wrapper.vm as any).onDetailTab("related");
+      await wrapper.vm.$nextTick();
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        tab: "related",
+      });
+
+      routerState.query = { metric: CARD.name, tab: "related" };
+      (wrapper.vm as any).onDetailTab("breakdown");
+      (wrapper.vm as any).onBreakdownLabel("route");
+      await wrapper.vm.$nextTick();
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        tab: "breakdown",
+        breakdown_label: "route",
+      });
+      expect(routerState.push).not.toHaveBeenCalled();
+    });
+
+    it("restores a deep link: metric, tab and breakdown label", () => {
+      routerState.query = {
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdown_label: "route",
+      };
+      const wrapper = mountExplorer();
+
+      const view = detailView(wrapper);
+      expect(view.exists()).toBe(true);
+      expect(view.props("metricName")).toBe("http_requests_total");
+      expect(view.props("tab")).toBe("breakdown");
+      expect(view.props("breakdownLabel")).toBe("route");
+      expect(grid.paused.value).toBe(true);
+    });
+
+    it("a metric-only URL change takes the fast path — no filter re-apply, no grid re-query", async () => {
+      const wrapper = mountExplorer();
+      const prefixes = grid.selectedPrefixes.value;
+      const labels = grid.labelFilters.value;
+      grid.requestPreview.mockClear();
+
+      routerState.query = { metric: CARD.name, tab: "related" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+
+      expect(detailView(wrapper).props("tab")).toBe("related");
+      // Identical identities: the grid's watchers never saw a "new" filter.
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.labelFilters.value).toBe(labels);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+    });
+
+    it("Back closes the view on the fast path, so returning re-queries no card", async () => {
+      routerState.query = { metric: CARD.name, tab: "related" };
+      const wrapper = mountExplorer();
+      const prefixes = grid.selectedPrefixes.value;
+      grid.requestPreview.mockClear();
+
+      routerState.query = {};
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+
+      expect(detailView(wrapper).exists()).toBe(false);
+      expect(wrapper.find(DETAIL).exists()).toBe(true);
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+      expect(grid.paused.value).toBe(false);
+    });
+
+    it("opening a related metric pushes, and Back returns to the first metric's Related tab", async () => {
+      routerState.query = { metric: CARD.name, tab: "related" };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+
+      (wrapper.vm as any).onOpenRelated("http_responses_total");
+      await wrapper.vm.$nextTick();
+      expect(routerState.push.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: "http_responses_total",
+      });
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_related_opened",
+        expect.any(Object),
+      );
+
+      // Back: the router restores the first metric's entry.
+      routerState.query = { metric: "http_responses_total" };
+      routerState.query = { metric: CARD.name, tab: "related" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("metricName")).toBe(CARD.name);
+      expect(detailView(wrapper).props("tab")).toBe("related");
+    });
+
+    it("closing pushes the bare grid URL and unpauses the grid", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+
+      (wrapper.vm as any).closeDetail();
+      await wrapper.vm.$nextTick();
+
+      expect(routerState.push.mock.calls.at(-1)[0].query.metric).toBeUndefined();
+      expect(grid.paused.value).toBe(false);
+    });
+
+    it("a filter added from Breakdown goes through onAddLabelFilter and is tracked", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+
+      await (wrapper.vm as any).onBreakdownAddFilter({
+        label: "status",
+        operator: "=",
+        value: "500",
+      });
+      expect(grid.addLabelFilter).toHaveBeenCalledWith({
+        label: "status",
+        operator: "=",
+        value: "500",
+      });
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_breakdown_filter_added",
+        expect.objectContaining({ operator: "=" }),
+      );
+    });
+
+    it("hands the detail view the grid's detail-query plumbing", () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const view = detailView(wrapper);
+
+      view.props("runQuery")("sum(up)");
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD);
+      view.props("cancelQueries")(["sum(up)"]);
+      expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"], CARD);
     });
   });
 

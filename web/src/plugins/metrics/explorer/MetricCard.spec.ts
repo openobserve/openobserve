@@ -164,6 +164,32 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(wrapper.classes()).not.toContain("cursor-pointer");
     });
 
+    it("opens the detail view from the Details button", async () => {
+      wrapper = createWrapper();
+      await wrapper
+        .find('[data-test="metrics-explorer-card-details-node_cpu_seconds_total"]')
+        .trigger("click");
+      expect(wrapper.emitted("open-detail")).toEqual([[CARD]]);
+      // ✎ keeps opening Visualize; Details is a separate entry.
+      expect(wrapper.emitted("select")).toBeFalsy();
+    });
+
+    it("opens the detail view from the card title", async () => {
+      wrapper = createWrapper();
+      await wrapper
+        .find('[data-test="metrics-explorer-card-title-node_cpu_seconds_total"]')
+        .trigger("click");
+      expect(wrapper.emitted("open-detail")).toEqual([[CARD]]);
+    });
+
+    it("does NOT open the detail view from the card body", async () => {
+      // The chart body already owns drag-to-zoom, exemplar markers and the
+      // right-click Create alert.
+      wrapper = createWrapper();
+      await wrapper.trigger("click");
+      expect(wrapper.emitted("open-detail")).toBeFalsy();
+    });
+
     it("emits configure from the settings button", async () => {
       wrapper = createWrapper();
       await wrapper
