@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(segment, segmentIndex) in criticalSegments"
             :key="segmentIndex"
-            class="bg-status-error-text rounded-default absolute top-0 h-full"
+            class="bg-accent rounded-default absolute top-0 h-full"
             :style="{ left: segment.left + '%', width: segment.width + '%' }"
             data-test="span-critical-section"
           />

@@ -2355,6 +2355,39 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
     w.unmount();
   });
 
+  it("anchors the fallback window on the trace start so sibling spans share one call", async () => {
+    const traceStartUs = SPAN_START_US - 5_000_000;
+    const w = await mountWith(
+      { _stream: "other" },
+      { baseTracePosition: { ...mockBaseTracePosition, startTimeUs: traceStartUs } },
+    );
+    await w.setProps({
+      span: {
+        ...mockSpan,
+        _stream: "other",
+        span_id: "sibling",
+        start_time: mockSpan.start_time + 2_000_000_000,
+      },
+    });
+    await flushPromises();
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual([traceStartUs - HOUR_US, traceStartUs + HOUR_US]);
+    w.unmount();
+  });
+
+  it("anchors the fallback window on the span start when the trace start is absent", async () => {
+    const spanStartNs = mockSpan.start_time + 7_000_000_000;
+    const w = await mountWith(
+      { _stream: "other", start_time: spanStartNs },
+      { baseTracePosition: undefined },
+    );
+    const q = mockSearch.mock.calls[0][0].query.query;
+    const spanStartUs = Math.floor(spanStartNs / 1_000);
+    expect([q.start_time, q.end_time]).toEqual([spanStartUs - HOUR_US, spanStartUs + HOUR_US]);
+    w.unmount();
+  });
+
   it.each([
     [500, "< p50", "default-soft"],
     [1000, "p50–p75", "default-soft"],

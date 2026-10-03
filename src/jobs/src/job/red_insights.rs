@@ -61,21 +61,28 @@ pub async fn run() {
 }
 
 async fn reconcile_if_needed(org_id: &str) -> anyhow::Result<()> {
-    if !db::organization::get_org_setting_red_insights_enabled(org_id).await?
-        && managed_configs(org_id).await?.is_empty()
-    {
-        return Ok(());
-    }
+    let prefetched = if db::organization::get_org_setting_red_insights_enabled(org_id).await? {
+        None
+    } else {
+        let configs = managed_configs(org_id).await?;
+        if configs.is_empty() {
+            return Ok(());
+        }
+        Some(configs)
+    };
     let locker = infra::dist_lock::lock(&format!("red_insights/{org_id}"), 0).await?;
-    let result = reconcile(org_id).await;
+    let result = reconcile(org_id, prefetched).await;
     if let Err(e) = infra::dist_lock::unlock(&locker).await {
         log::warn!("[RED insights] org {org_id}: failed to release the lock: {e}");
     }
     result
 }
 
-async fn reconcile(org_id: &str) -> anyhow::Result<()> {
-    let configs = managed_configs(org_id).await?;
+async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> anyhow::Result<()> {
+    let configs = match prefetched {
+        Some(configs) => configs,
+        None => managed_configs(org_id).await?,
+    };
     if !db::organization::get_org_setting_red_insights_enabled(org_id).await? {
         for config in &configs {
             delete(org_id, config_str(config, "anomaly_id")).await;

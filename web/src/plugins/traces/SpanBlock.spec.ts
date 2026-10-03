@@ -1157,6 +1157,14 @@ describe("SpanBlock critical path", () => {
     expect(segments[1].attributes("style")).toContain("width: 50%");
   });
 
+  it("colours the overlay with the accent token, not the error one", async () => {
+    await mountBlock(criticalSpan, true);
+
+    const classes = wrapper.find('[data-test="span-critical-section"]').classes();
+    expect(classes).toContain("bg-accent");
+    expect(classes).not.toContain("bg-status-error-text");
+  });
+
   it("draws no overlay when the critical path toggle is off", async () => {
     await mountBlock(criticalSpan, false);
 

@@ -1919,10 +1919,13 @@ export default defineComponent({
         startTime = Number(saved.start_time);
         endTime = Number(saved.end_time);
       } else {
-        const spanStartUs = Math.floor(Number(props.span?.start_time) / 1_000);
-        if (!Number.isFinite(spanStartUs)) return null;
-        startTime = spanStartUs - OPERATION_STATS_FALLBACK_WINDOW_US;
-        endTime = spanStartUs + OPERATION_STATS_FALLBACK_WINDOW_US;
+        // Anchoring on the trace start lets every span of the trace share one cached window.
+        const anchorUs =
+          Number(props.baseTracePosition?.startTimeUs) ||
+          Math.floor(Number(props.span?.start_time) / 1_000);
+        if (!Number.isFinite(anchorUs)) return null;
+        startTime = anchorUs - OPERATION_STATS_FALLBACK_WINDOW_US;
+        endTime = anchorUs + OPERATION_STATS_FALLBACK_WINDOW_US;
       }
       const org = String(store.state.selectedOrganization?.identifier ?? "");
       const key = JSON.stringify([org, stream, service, operation, startTime, endTime]);
