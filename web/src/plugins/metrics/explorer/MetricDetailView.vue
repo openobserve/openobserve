@@ -104,7 +104,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OPageHeader>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <OContent class="py-3">
+        <OContent class="flex flex-col gap-3 py-3">
+          <!-- The engine ignores a matcher on a label the metric lacks, so the
+               chart below is unfiltered by these — say so rather than imply it. -->
+          <OBanner
+            v-if="inapplicableFilters.length"
+            variant="info"
+            icon="info"
+            dense
+            :content="
+              t(
+                'metrics.explorer.detail.filtersNotApplied',
+                { filters: inapplicableFiltersText },
+                inapplicableFilters.length,
+              )
+            "
+            data-test="metrics-detail-filters-not-applied"
+          />
           <section
             class="border-border-default rounded-surface relative h-60 border"
             data-test="metrics-detail-overview"
@@ -243,6 +259,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { parseSearchError } from "@/utils/query/searchError";
 import { supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
@@ -288,6 +305,7 @@ export default defineComponent({
     OSkeleton,
     OSpinner,
     OTooltip,
+    OBanner,
   },
   props: {
     /** `null` while loading, or when the URL names a metric that does not exist. */
@@ -313,6 +331,13 @@ export default defineComponent({
     prefixOf: { type: Function as PropType<(name: string) => string>, required: true },
     familyOf: { type: Function as PropType<(name: string) => string>, required: true },
     filters: { type: Array as PropType<LabelFilter[]>, required: true },
+    /** The active filters this metric cannot apply: its chart ignores them. */
+    inapplicableFilters: { type: Array as PropType<LabelFilter[]>, default: () => [] },
+    /** Whether a metric can apply every active filter — Related offers only those. */
+    isLabelEligible: {
+      type: Function as PropType<(card: MetricCardModel) => boolean>,
+      default: () => true,
+    },
     timeRange: {
       type: Object as PropType<{ start_time: number; end_time: number }>,
       required: true,
@@ -336,6 +361,12 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     const unitLabel = computed(() => raw(UNIT_LABELS[props.card?.unit ?? ""] ?? ""));
+
+    const inapplicableFiltersText = computed(() =>
+      props.inapplicableFilters
+        .map((f) => `${f.label}${f.operator ?? "="}"${f.value}"`)
+        .join(", "),
+    );
 
     const breakdownSupported = computed(
       () => !!props.card && supportsBreakdown(props.card.cardKind),
@@ -419,7 +450,11 @@ export default defineComponent({
     const related = computed<RelatedRow[]>(() => {
       const card = props.card;
       if (!card) return [];
-      const byName = new Map(props.allCards.map((c) => [c.name, c]));
+      // A metric the filters do not apply to is hidden from the grid; it is no
+      // nearer a neighbour here.
+      const byName = new Map(
+        props.allCards.filter((c) => props.isLabelEligible(c)).map((c) => [c.name, c]),
+      );
       const candidates = relatedCandidates(card.name, [...byName.keys()], props.prefixOf);
       return rankRelatedMetrics(card.name, candidates, props.labelsByStream, props.familyOf)
         .slice(0, RELATED_LIMIT)
@@ -450,6 +485,7 @@ export default defineComponent({
       raw,
       t,
       unitLabel,
+      inapplicableFiltersText,
       breakdownSupported,
       activeTab,
       overviewState,

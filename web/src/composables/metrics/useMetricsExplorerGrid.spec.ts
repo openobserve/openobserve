@@ -1413,6 +1413,33 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain("lat_seconds_bucket");
     });
   });
+  describe("the detail view reads eligibility per filter", () => {
+    it("names the filters a card cannot apply, and exposes the predicate", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+      const le = { label: "le", value: "0.5", operator: "=" };
+      const pod = { label: "pod", value: "a", operator: "=" };
+      await grid.addLabelFilter(le);
+      await grid.addLabelFilter(pod);
+
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
+      expect(grid.isLabelEligible(card)).toBe(false);
+
+      grid.removeLabelFilter(pod);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([]);
+      expect(grid.isLabelEligible(card)).toBe(true);
+    });
+  });
+
   describe("an org switch must not deadlock the deferred loads", () => {
     it("does not strand schemaLoading at true forever", async () => {
       // `ensureSchemas` early-returns while `schemaLoading` is true, and its

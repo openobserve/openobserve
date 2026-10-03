@@ -9327,6 +9327,7 @@
         "notFoundDesc": "{name} is not in this organization's metric list.",
         "close": "Back to metrics",
         "openInVisualize": "Open in Visualize",
+        "filtersNotApplied": "Filter {filters} does not apply to this metric; showing all its series | Filters {filters} do not apply to this metric; showing all its series",
         "tabBreakdown": "Breakdown",
         "tabRelated": "Related",
         "breakdown": {

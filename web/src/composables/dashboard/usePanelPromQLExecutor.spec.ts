@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
 import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
+import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
 
 // ─── module mocks ─────────────────────────────────────────────────────────────
 
@@ -656,6 +657,26 @@ describe("time shift (compare to a previous period)", () => {
     expect(payloads).toHaveLength(1);
     expect(payloads[0].queryReq.query_type).toBe("instant");
     expect(panelSchema.value.queries[0].config.time_shift).toEqual([{ offSet: "1d" }]);
+  });
+
+  it("keeps a truncated primary's series-limit warning when a shifted stream finishes later", async () => {
+    const processor = (stats: any) => ({ processChunk: vi.fn(), getStats: vi.fn(() => stats) });
+    (createPromQLChunkProcessor as any)
+      .mockReturnValueOnce(
+        processor({ totalMetricsReceived: 150, uniqueSeriesSeen: 150, metricsStored: 100 }),
+      )
+      .mockReturnValueOnce(
+        processor({ totalMetricsReceived: 40, uniqueSeriesSeen: 40, metricsStored: 40 }),
+      );
+    const { state, handlers } = await run([
+      { query: "a", config: { time_shift: [{ offSet: "1d" }] } },
+    ]);
+
+    handlers[0].complete({}, {});
+    handlers[1].complete({}, {});
+
+    const { uniqueSeriesSeen, metricsStored } = state.metadata.seriesLimiting;
+    expect(uniqueSeriesSeen).toBeGreaterThan(metricsStored);
   });
 
   it("finishes loading only after every expanded stream completes", async () => {

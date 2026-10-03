@@ -229,6 +229,15 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-breakdown-topk"]').text()).toContain("top 10");
     });
 
+    it("ignores a deep-linked label the table does not offer", async () => {
+      // `le` is never a breakdown label, so it has no row and no topk guard.
+      wrapper = mountBreakdown({ selectedLabel: "le" });
+      await flushPromises();
+
+      expect(runQuery).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="metrics-breakdown-chart"]').exists()).toBe(false);
+    });
+
     it("renders exactly one chart", async () => {
       wrapper = mountBreakdown({ selectedLabel: "route" });
       await flushPromises();

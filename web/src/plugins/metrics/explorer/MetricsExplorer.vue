@@ -110,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-compact="isMobile"
           @trigger="onRefreshTick"
         />
-        <!-- Visualize runs its query with an explicit Run, the one action that
-             writes query history; the grid modes refresh instead. -->
+        <!-- Visualize adds an explicit Run, the one action that writes query
+             history; Refresh re-runs the chart without recording it. -->
         <template v-if="mode === 'visualize'">
           <QueryHistoryDrawer @load="onHistoryLoad" />
           <OButton
@@ -126,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
         <OButton
-          v-else
           variant="primary"
           size="sm-toolbar"
           icon-left="refresh"
@@ -401,7 +400,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OToggleGroup>
 
-          <ExplorerSavedViews :state="viewState" @apply="onApplyView" @saved="onViewSaved" />
+          <ExplorerSavedViews
+            v-model:active-view-id="activeViewId"
+            :state="viewState"
+            @apply="onApplyView"
+            @saved="onViewSaved"
+          />
 
           <!-- Convert to dashboard: each favourite becomes a panel. FAVOURITES
                only, where they are what's on screen. -->
@@ -579,6 +583,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :prefix-of="grid.prefixOf"
       :family-of="grid.familyOf"
       :filters="grid.labelFilters.value"
+      :inapplicable-filters="detailCard ? grid.inapplicableLabelFilters(detailCard) : []"
+      :is-label-eligible="grid.isLabelEligible"
       :time-range="grid.timeRange.value"
       :rate-window="detailCard ? grid.rateWindowFor(detailCard) : ''"
       :nan-guard="!!(detailMetric && grid.previews.value[detailMetric]?.nanGuardApplied)"
@@ -881,6 +887,8 @@ export default defineComponent({
       // `paused` in sync, but it runs after the DOM has begun tearing the grid
       // down — and the teardown's own "card visible" events would already have
       // fired a query each. Setting it here closes that window.
+      // Visualize has no detail view; one left set would reopen on the way back.
+      if (v === "visualize") closeDetail();
       grid.paused.value = v === "visualize" || !!detailMetric.value;
       mode.value = v;
     };
@@ -1371,7 +1379,11 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const detailLoading = computed(() => grid.loading.value || detailSchemasPending.value);
+    // Only the FIRST stream load: a manual refresh reloads the streams too, and
+    // must not swap the open view for a spinner (remounting it).
+    const detailLoading = computed(
+      () => (grid.loading.value && !grid.cards.value.length) || detailSchemasPending.value,
+    );
 
     /** The card's current query, its ⚙ override and any NaN-guard / widening included. */
     const detailOverview = computed(() => {
@@ -1470,7 +1482,7 @@ export default defineComponent({
       if (f.sortBy) grid.sortBy.value = f.sortBy;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
-      if (f.metric) {
+      if (f.metric && f.mode !== "visualize") {
         detailMetric.value = f.metric;
         detailTab.value = f.tab ?? null;
         breakdownLabel.value = f.breakdownLabel ?? null;
@@ -1519,7 +1531,8 @@ export default defineComponent({
         sortBy: grid.sortBy.value,
         viewMode: grid.viewMode.value,
         mode: mode.value,
-        metric: detailMetric.value,
+        // Visualize has no detail view; without `metric` its tab keys drop too.
+        metric: mode.value === "visualize" ? null : detailMetric.value,
         tab: detailTab.value,
         breakdownLabel: breakdownLabel.value,
       });
@@ -1534,6 +1547,8 @@ export default defineComponent({
 
     // The menu saves this slice, allow-listed again on its side.
     const viewState = computed(() => managedFromState());
+    // Here, not in the menu: it unmounts under the detail view and Visualize.
+    const activeViewId = ref<string | null>(null);
 
     // Applying is a navigation: the route watcher below applies the state.
     const onApplyView = (query: ExplorerViewState) => {
@@ -1656,11 +1671,13 @@ export default defineComponent({
 
     /** Applies the detail-view keys; absence clears them, which is how Back closes it. */
     const applyDetailKeys = (f: ReturnType<typeof queryToExplorerFilters>) => {
+      // Visualize has no detail view: its keys in a Visualize URL are ignored.
+      const detail: Partial<typeof f> = f.mode === "visualize" ? {} : f;
       // Before the grid unmounts, for the same reason `setMode` pauses first.
-      if (f.metric) grid.paused.value = true;
-      detailMetric.value = f.metric ?? null;
-      detailTab.value = f.tab ?? null;
-      breakdownLabel.value = f.breakdownLabel ?? null;
+      if (detail.metric) grid.paused.value = true;
+      detailMetric.value = detail.metric ?? null;
+      detailTab.value = detail.tab ?? null;
+      breakdownLabel.value = detail.breakdownLabel ?? null;
     };
 
     // URL -> state, for the navigations the mount-time apply cannot see:
@@ -2170,6 +2187,7 @@ export default defineComponent({
       onRefresh,
       refreshing,
       viewState,
+      activeViewId,
       onApplyView,
       onViewSaved,
       onVisualizeRun,

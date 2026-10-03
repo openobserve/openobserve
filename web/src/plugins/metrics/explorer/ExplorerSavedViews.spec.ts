@@ -51,9 +51,12 @@ const GRID_STATE = {
   refresh: "30s",
 };
 
-const mountViews = (state: Record<string, unknown> = GRID_STATE) =>
+const mountViews = (
+  state: Record<string, unknown> = GRID_STATE,
+  extraProps: Record<string, unknown> = {},
+) =>
   mount(ExplorerSavedViews, {
-    props: { state },
+    props: { state, ...extraProps },
     global: {
       plugins: [store],
       stubs: {
@@ -135,6 +138,21 @@ describe("ExplorerSavedViews", () => {
 
     expect(api.getViewDetail).toHaveBeenCalledWith("default", "m1");
     expect(wrapper.emitted("apply")?.[0]).toEqual([{ sort: "z-a", prefix: "node" }]);
+  });
+
+  it("takes the active view from its parent, so it survives a remount", async () => {
+    api.getViewDetail.mockResolvedValue({
+      data: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: {} } },
+    });
+    const remounted = mountViews(GRID_STATE, { activeViewId: "m1" });
+    await flushPromises();
+    expect(remounted.find('[data-test="metrics-explorer-views-update"]').exists()).toBe(true);
+
+    const fresh = mountViews();
+    await flushPromises();
+    await fresh.find('[data-test="metrics-explorer-view-m1"]').trigger("click");
+    await flushPromises();
+    expect(fresh.emitted("update:activeViewId")?.at(-1)).toEqual(["m1"]);
   });
 
   it("updates and deletes the applied view", async () => {

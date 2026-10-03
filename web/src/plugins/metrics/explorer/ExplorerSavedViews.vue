@@ -161,7 +161,9 @@ const views = computed<ViewSummary[]>(() =>
   ),
 );
 
-const activeViewId = ref<string | null>(null);
+// Owned by the parent: this menu unmounts with the grid (detail view, Visualize),
+// and Update/Delete must still target the applied view when it comes back.
+const activeViewId = defineModel<string | null>("activeViewId", { default: null });
 const activeView = computed(() => views.value.find((v) => v.view_id === activeViewId.value));
 
 const saveDialogOpen = ref(false);

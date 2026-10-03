@@ -39,7 +39,7 @@ export async function processPromQLData(
 
   // Apply series limit
   const seriesLimit = panelSchema.config?.promql_series_limit || 100;
-  const limitedData = applySeriesLimit(searchQueryData, seriesLimit);
+  const limitedData = applySeriesLimit(searchQueryData, seriesLimit, queryIndexOf, shift.nameSuffixes);
 
   // Named through the same builder the line/bar path uses, so a panel flipped
   // from Line to Stacked keeps its legend, its tooltip and its per-series colour
@@ -152,33 +152,48 @@ function formatTimestamps(
 }
 
 /**
- * Limit number of series per query to prevent performance issues
+ * Limit number of series per query to prevent performance issues. A time-shifted
+ * result is not limited on its own: alignShiftedPromQLResults gives each shifted
+ * series its primary's metric object, so a shifted series is kept only when that
+ * primary survives the limit (one with no primary series at all is kept as is).
  *
  * @param data - Array of PromQL responses
  * @param limit - Maximum number of series to keep per query
+ * @param queryIndexOf - panel query index of each expanded result
+ * @param nameSuffixes - shift suffix of each expanded result ("" for a primary)
  * @returns Limited data array
  */
-function applySeriesLimit(data: PromQLResponse[], limit: number): PromQLResponse[] {
-  return data.map((queryData) => {
+function applySeriesLimit(
+  data: PromQLResponse[],
+  limit: number,
+  queryIndexOf: (index: number) => number = (index) => index,
+  nameSuffixes: string[] = [],
+): PromQLResponse[] {
+  const resultOf = (queryData: PromQLResponse) => queryData?.data?.result || queryData?.result;
+  const withResult = (queryData: PromQLResponse, result: any[]): PromQLResponse => {
     // Handle both standard PromQL format and OpenObserve format
-    if (queryData?.data?.result) {
-      // Standard PromQL format
-      return {
-        ...queryData,
-        data: {
-          ...queryData.data,
-          result: queryData.data.result.slice(0, limit),
-        },
-      };
-    } else if (queryData?.result) {
-      // OpenObserve format
-      return {
-        ...queryData,
-        result: queryData.result.slice(0, limit),
-      };
-    }
+    if (queryData?.data?.result) return { ...queryData, data: { ...queryData.data, result } };
+    return { ...queryData, result };
+  };
 
-    return queryData;
+  const limited = data.map((queryData, index) => {
+    const result = resultOf(queryData);
+    return !result || nameSuffixes[index] ? queryData : withResult(queryData, result.slice(0, limit));
+  });
+
+  const kept = new Map<number, Set<any>>();
+  limited.forEach((queryData, index) => {
+    const result = resultOf(queryData);
+    if (nameSuffixes[index] || !result?.length || kept.has(queryIndexOf(index))) return;
+    kept.set(queryIndexOf(index), new Set(result.map((m: any) => m?.metric)));
+  });
+
+  return limited.map((queryData, index) => {
+    const result = resultOf(queryData);
+    if (!result || !nameSuffixes[index]) return queryData;
+    const primaries = kept.get(queryIndexOf(index));
+    const survivors = primaries ? result.filter((m: any) => primaries.has(m?.metric)) : result;
+    return withResult(queryData, survivors.slice(0, limit));
   });
 }
 

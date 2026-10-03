@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-h-0 flex-col gap-3" data-test="metrics-breakdown">
     <section
-      v-if="selectedLabel"
+      v-if="activeLabel"
       class="border-border-default rounded-surface flex flex-col border"
       data-test="metrics-breakdown-chart"
     >
       <div class="flex items-center gap-2 px-3 pt-2">
         <span class="text-text-heading truncate text-sm font-medium">
-          {{ t("metrics.explorer.detail.breakdown.chartTitle", { label: selectedLabel }) }}
+          {{ t("metrics.explorer.detail.breakdown.chartTitle", { label: activeLabel }) }}
         </span>
         <OTag
           v-if="topkApplied"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-if="column.id === 'label'"
             class="font-mono text-xs"
-            :class="row.original.label === selectedLabel ? 'text-text-heading font-semibold' : ''"
+            :class="row.original.label === activeLabel ? 'text-text-heading font-semibold' : ''"
             >{{ row.original.label }}</span
           >
 
@@ -273,6 +273,13 @@ export default defineComponent({
       return breakdownLabelsOf(own, alsoOn);
     });
 
+    /** The selected label, if the table offers it: a deep link can name any label. */
+    const activeLabel = computed(() =>
+      props.selectedLabel && labels.value.includes(props.selectedLabel)
+        ? props.selectedLabel
+        : null,
+    );
+
     /**
      * Filters the values stream can answer. PromQL ignores a matcher on a label
      * the stream lacks; SQL would reject the column, so it is left out here too.
@@ -370,7 +377,7 @@ export default defineComponent({
         : raw(String(row.distinct));
 
     const rowClass = (row: BreakdownRow) =>
-      row.label === props.selectedLabel ? "bg-accent/10 cursor-pointer" : "cursor-pointer";
+      row.label === activeLabel.value ? "bg-accent/10 cursor-pointer" : "cursor-pointer";
 
     const addFilter = (label: string, value: string, operator: "=" | "!=") =>
       emit("add-filter", { label: raw(label), operator, value });
@@ -378,13 +385,13 @@ export default defineComponent({
     /* ----------------------------------------------------------- chart */
 
     const selectedRow = computed(
-      () => rows.value.find((row) => row.label === props.selectedLabel) ?? null,
+      () => rows.value.find((row) => row.label === activeLabel.value) ?? null,
     );
     const topkApplied = computed(() => !!selectedRow.value?.more);
 
     /** Built once the table has answered: only it knows whether to cap at top 10. */
     const chartExpr = computed(() => {
-      if (!props.selectedLabel || !tableLoaded.value) return null;
+      if (!activeLabel.value || !tableLoaded.value) return null;
       return buildBreakdownQuery(
         props.card.cardKind,
         {
@@ -393,13 +400,13 @@ export default defineComponent({
           rateWindow: props.rateWindow,
           applyNanGuard: props.nanGuard,
         },
-        props.selectedLabel,
+        activeLabel.value,
         topkApplied.value ? { topk: TOPK } : undefined,
       );
     });
 
     const chartQueries = computed(() => [
-      { expr: chart.value.expr, legendTemplate: `{${props.selectedLabel ?? ""}}` },
+      { expr: chart.value.expr, legendTemplate: `{${activeLabel.value ?? ""}}` },
     ]);
     const o2Unit = computed(() => toO2Unit(props.card.unit));
 
@@ -465,6 +472,7 @@ export default defineComponent({
       t,
       TOPK,
       labels,
+      activeLabel,
       rows,
       columns,
       tableLoading,

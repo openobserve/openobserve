@@ -113,6 +113,9 @@ export const usePanelPromQLExecutor = (ctx: {
       const queryResults: any[] = [];
       const queryMetadata: any[] = [];
       const completedQueries = new Set<number>(); // Track completed streams
+      // Chunk statistics of every completed stream, merged into one warning so
+      // a later-finishing stream cannot hide an earlier stream's truncation.
+      const streamStats: { totalMetricsReceived: number; uniqueSeriesSeen: number; metricsStored: number }[] = [];
 
       // Each range query with time_shift offsets expands into 1 + N streams. The
       // shifted ones are appended after EVERY primary, so index i < queries.length
@@ -339,6 +342,15 @@ export const usePanelPromQLExecutor = (ctx: {
 
                 // Get statistics from chunk processor
                 const stats = chunkProcessor.getStats();
+                streamStats[queryIndex] = {
+                  totalMetricsReceived: stats.totalMetricsReceived,
+                  uniqueSeriesSeen: stats.uniqueSeriesSeen ?? stats.metricsStored,
+                  metricsStored: stats.metricsStored,
+                };
+                // Summed: a stream that dropped series has uniqueSeriesSeen above
+                // metricsStored, so the totals keep that gap.
+                const sumOf = (key: keyof (typeof streamStats)[number]) =>
+                  streamStats.reduce((total, s) => total + (s?.[key] ?? 0), 0);
 
                 // Final update with complete results
                 state.data = markRaw([...queryResults]);
@@ -346,9 +358,9 @@ export const usePanelPromQLExecutor = (ctx: {
                   queries: queryMetadata,
                   // Add series limiting information for warning message
                   seriesLimiting: {
-                    totalMetricsReceived: stats.totalMetricsReceived,
-                    uniqueSeriesSeen: stats.uniqueSeriesSeen,
-                    metricsStored: stats.metricsStored,
+                    totalMetricsReceived: sumOf("totalMetricsReceived"),
+                    uniqueSeriesSeen: sumOf("uniqueSeriesSeen"),
+                    metricsStored: sumOf("metricsStored"),
                     maxSeries,
                   },
                 };

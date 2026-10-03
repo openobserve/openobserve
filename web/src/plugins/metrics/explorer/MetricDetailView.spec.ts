@@ -172,6 +172,25 @@ describe("MetricDetailView", () => {
     });
   });
 
+  describe("filters this metric cannot apply", () => {
+    const JOB = { label: "job", operator: "=", value: "api" };
+    const ROUTE = { label: "route", operator: "!=", value: "/health" };
+    const NOTICE = '[data-test="metrics-detail-filters-not-applied"]';
+
+    it("names each filter that does not apply, since the chart shows every series", () => {
+      wrapper = mountView({ filters: [JOB, ROUTE], inapplicableFilters: [JOB] });
+      const notice = wrapper.find(NOTICE);
+      expect(notice.exists()).toBe(true);
+      expect(notice.text()).toContain('job="api"');
+      expect(notice.text()).not.toContain("route");
+    });
+
+    it("says nothing when every filter applies", () => {
+      wrapper = mountView({ filters: [JOB], inapplicableFilters: [] });
+      expect(wrapper.find(NOTICE).exists()).toBe(false);
+    });
+  });
+
   describe("tabs", () => {
     it("offers Breakdown and Related, Breakdown first", () => {
       wrapper = mountView();
@@ -204,6 +223,18 @@ describe("MetricDetailView", () => {
       expect(names).not.toContain("node_load1");
       // Ranked lists, no charts: nothing was queried for them.
       expect(runQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it("ranks only metrics the active filters apply to", () => {
+      wrapper = mountView({
+        tab: "related",
+        isLabelEligible: (c: any) => c.name !== "http_server_active_requests",
+      });
+      const names = wrapper
+        .findAll('[data-test^="related-row-"]')
+        .map((row) => row.attributes("data-test")!.replace("related-row-", ""));
+      expect(names).toHaveLength(12);
+      expect(names).not.toContain("http_server_active_requests");
     });
 
     it("opens a related metric's detail view on click", async () => {

@@ -89,6 +89,8 @@ const grid = vi.hoisted(() => {
     prefixOf: vi.fn(() => "misc"),
     familyOf: vi.fn((name: string) => name),
     loadStreams: vi.fn(async () => {}),
+    isLabelEligible: vi.fn(() => true),
+    inapplicableLabelFilters: vi.fn(() => []),
     setTimeRange: vi.fn(),
     setRefreshInterval: vi.fn(),
     onOrgChange: vi.fn(),
@@ -223,8 +225,8 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
           template: '<div data-test="metrics-explorer-visualize">visualize</div>',
         },
         ExplorerSavedViews: {
-          props: ["state"],
-          emits: ["apply", "saved"],
+          props: ["state", "activeViewId"],
+          emits: ["apply", "saved", "update:activeViewId"],
           template: '<div data-test="metrics-explorer-views" />',
         },
         QueryHistoryDrawer: {
@@ -1184,6 +1186,62 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
+    it("hands the detail view the filters its metric cannot apply, and the eligibility rule", () => {
+      const JOB = { label: "job", operator: "=", value: "api" };
+      grid.inapplicableLabelFilters.mockReturnValue([JOB]);
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const view = detailView(wrapper);
+
+      expect(grid.inapplicableLabelFilters).toHaveBeenCalledWith(CARD);
+      expect(view.props("inapplicableFilters")).toEqual([JOB]);
+      expect(view.props("isLabelEligible")).toBe(grid.isLabelEligible);
+      grid.inapplicableLabelFilters.mockReturnValue([]);
+    });
+
+    it("a manual refresh's stream reload does not put the open view back on a spinner", async () => {
+      // loadStreams(true) flips grid.loading while the cards are still there.
+      grid.loading.value = true;
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      await flushPromises();
+      expect((wrapper.vm as any).detailLoading).toBe(false);
+      grid.loading.value = false;
+    });
+
+    it("waits on the first stream load, when there are no cards yet", async () => {
+      grid.loading.value = true;
+      grid.cards.value = [];
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      await flushPromises();
+      expect((wrapper.vm as any).detailLoading).toBe(true);
+      grid.loading.value = false;
+    });
+
+    it("a Visualize URL carries no detail view into a later switch to Explore", async () => {
+      routerState.query = { mode: "visualize", metric: CARD.name, tab: "related" };
+      const wrapper = mountExplorer();
+      expect((wrapper.vm as any).detailMetric).toBeNull();
+      expect((wrapper.vm as any).viewState).not.toHaveProperty("metric");
+
+      (wrapper.vm as any).setMode("explore");
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).exists()).toBe(false);
+    });
+
+    it("entering Visualize from an open view clears it, in state and in the URL", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect((wrapper.vm as any).viewState).not.toHaveProperty("metric");
+
+      (wrapper.vm as any).setMode("explore");
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).exists()).toBe(false);
+    });
+
     it("hands the detail view the grid's detail-query plumbing", () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
@@ -1274,6 +1332,20 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
+    it("keeps the applied view across the detail view, so Update/Delete still target it", async () => {
+      const wrapper = mountExplorer();
+      wrapper.findComponent(VIEWS).vm.$emit("update:activeViewId", "m1");
+      await wrapper.vm.$nextTick();
+
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(false);
+      (wrapper.vm as any).closeDetail();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.findComponent(VIEWS).props("activeViewId")).toBe("m1");
+    });
+
     it("tracks a saved view", async () => {
       const wrapper = mountExplorer();
       wrapper.findComponent(VIEWS).vm.$emit("saved", "created");
@@ -1339,6 +1411,19 @@ describe("MetricsExplorer wiring", () => {
       (wrapper.vm as any).onRefreshTick();
       expect(visualizeOnUserRun).toHaveBeenCalledTimes(2);
       expect(visualizeRunQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it("Visualize keeps the Refresh button beside Run; Refresh re-runs without recording", async () => {
+      const wrapper = withButtons();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(RUN).exists()).toBe(true);
+      const refresh = wrapper.find('[data-test="metrics-explorer-refresh"]');
+      expect(refresh.exists()).toBe(true);
+      await refresh.trigger("click");
+      expect(visualizeRunQuery).toHaveBeenCalledTimes(1);
+      expect(visualizeOnUserRun).not.toHaveBeenCalled();
     });
 
     it("the run shortcut in Explore refreshes the grid and records nothing", async () => {

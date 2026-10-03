@@ -563,9 +563,16 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * card would quietly render unfiltered data. Narrowing the grid — rather than
    * charting a lie — is what makes the chips safe.
    */
-  const isLabelEligible = (card: MetricCard): boolean => {
-    if (labelFilters.value.length === 0) return true;
-    if (!membershipKnown.value) return true;
+  const isLabelEligible = (card: MetricCard): boolean =>
+    inapplicableLabelFilters(card).length === 0;
+
+  /**
+   * The active filters this card cannot apply — the ones `isLabelEligible`
+   * fails on. The detail view names them, since it charts such a card anyway.
+   */
+  const inapplicableLabelFilters = (card: MetricCard): LabelFilter[] => {
+    if (labelFilters.value.length === 0) return [];
+    if (!membershipKnown.value) return [];
 
     // The streams the EFFECTIVE variant reads — not the card kind's default ones.
     // A ⚙ override changes the operands: a histogram switched to "Rate of count"
@@ -575,13 +582,14 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the card would chart unfiltered data under an active filter chip. That is
     // the exact lie this whole eligibility rule exists to prevent.
     const operands = operandStreamsOfVariant(card);
-    return labelFilters.value.every((filter) =>
-      operands.every((stream) => {
-        const labels = labelsByStream.value[stream];
-        // A stream we have no schema for (e.g. a `_count` sibling that is not in
-        // the list) cannot be proven to carry the label.
-        return !!labels && labels.includes(filter.label);
-      }),
+    return labelFilters.value.filter(
+      (filter) =>
+        !operands.every((stream) => {
+          const labels = labelsByStream.value[stream];
+          // A stream we have no schema for (e.g. a `_count` sibling that is not in
+          // the list) cannot be proven to carry the label.
+          return !!labels && labels.includes(filter.label);
+        }),
     );
   };
 
@@ -2400,6 +2408,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     addLabelFilter,
     removeLabelFilter,
     ensureSchemas,
+    isLabelEligible,
+    inapplicableLabelFilters,
 
     // local state
     overrides,
