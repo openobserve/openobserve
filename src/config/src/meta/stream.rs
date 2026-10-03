@@ -351,6 +351,16 @@ impl FileMeta {
     pub fn is_empty(&self) -> bool {
         self.records == 0 && self.original_size == 0
     }
+
+    /// Whether every record lies in the inclusive `time_range`.
+    pub fn within(&self, time_range: (i64, i64)) -> bool {
+        self.min_ts >= time_range.0 && self.max_ts <= time_range.1
+    }
+
+    /// Whether some record may lie in the inclusive `time_range`.
+    pub fn overlaps(&self, time_range: (i64, i64)) -> bool {
+        self.max_ts >= time_range.0 && self.min_ts <= time_range.1
+    }
 }
 
 impl MemorySize for FileMeta {
@@ -2573,5 +2583,22 @@ mod tests {
                 .mindex_size,
             0.0
         );
+    }
+
+    #[test]
+    fn test_file_meta_within_and_overlaps() {
+        let meta = FileMeta {
+            min_ts: 10,
+            max_ts: 20,
+            ..Default::default()
+        };
+        assert!(meta.within((10, 20)));
+        assert!(meta.within((0, 100)));
+        assert!(!meta.within((11, 20)));
+        assert!(!meta.within((10, 19)));
+        assert!(meta.overlaps((20, 30)));
+        assert!(meta.overlaps((0, 10)));
+        assert!(!meta.overlaps((21, 30)));
+        assert!(!meta.overlaps((0, 9)));
     }
 }

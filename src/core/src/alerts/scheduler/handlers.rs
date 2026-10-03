@@ -6078,31 +6078,37 @@ async fn initiate_stream_deletion(
     end_time: i64,
 ) -> Result<String, anyhow::Error> {
     use chrono::TimeZone;
-    use config::meta::stream::StreamType;
+    use config::{meta::stream::StreamType, utils::time::day_micros};
 
-    // Convert microseconds to formatted time range strings
-    let time_range_start = {
-        let ts = Utc
-            .timestamp_micros(start_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
+    // the job deletes whole hours (logs) or days: the pre-check must see that range
+    let (granularity, format) = if stream.stream_type == StreamType::Logs {
+        (hour_micros(1), "%Y-%m-%dT%H:00:00Z")
+    } else {
+        (day_micros(1), "%Y-%m-%d")
     };
-    let time_range_end = {
-        let ts = Utc
-            .timestamp_micros(end_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
+    let start_time = start_time - start_time % granularity;
+    let end_time = end_time - end_time % granularity;
+    let time_range_start = Utc
+        .timestamp_micros(start_time)
+        .single()
+        .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?
+        .format(format)
+        .to_string();
+    let time_range_end = Utc
+        .timestamp_micros(end_time)
+        .single()
+        .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?
+        .format(format)
+        .to_string();
+
+    // a merged day cannot be deleted by the hour; the backfill must fail rather than refill twice
+    search_service::file_list::check_delete_range(
+        org_id,
+        stream.stream_type,
+        &stream.stream_name,
+        (start_time, end_time - 1),
+    )
+    .await?;
 
     // Create deletion job using existing retention service
     let (key, _created) = crate::db::compact::retention::delete_stream(

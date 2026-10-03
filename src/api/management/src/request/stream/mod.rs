@@ -753,6 +753,24 @@ pub async fn delete_stream_data_by_time_range(
                 .into_response();
         }
     };
+    // a merged day cannot be deleted by the hour; the job would skip it, so refuse here
+    if let Err(e) = search_service::file_list::check_delete_range(
+        &org_id,
+        stream_type,
+        &stream_name,
+        (start, end - 1),
+    )
+    .await
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST,
+                e.to_string(),
+            )),
+        )
+            .into_response();
+    }
     let time_range = TimeRange::new(start, end);
     let job_id = match stream_service::delete_stream_data_by_time_range(
         &org_id,
