@@ -17,6 +17,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
+use config::utils::str::mask_license_key;
 use db::license;
 use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
@@ -101,16 +102,35 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
     Ok(())
 }
 
-#[inline]
-fn redact(license: &str) -> String {
-    format!(
-        "{}*****{}",
-        &license[0..3],
-        &license[license.len() - 3..license.len()]
-    )
+// license admins need the instance id to request a license, unless it doubles as the grpc token
+fn viewer_license_fields(
+    is_root: bool,
+    is_license_admin: bool,
+    internal_grpc_token: &str,
+    redact_key: bool,
+    key: Option<String>,
+    mut license: Option<License>,
+) -> (Option<String>, Option<License>, String) {
+    if !is_root && let Some(license) = license.as_mut() {
+        license.installation_id.clear();
+        license.validator_auth.clear();
+    }
+    let key = if redact_key || !is_root {
+        key.map(|v| mask_license_key(&v))
+    } else {
+        key
+    };
+    let instance_id = config::get_instance_id();
+    let is_grpc_token = internal_grpc_token.is_empty() || internal_grpc_token == instance_id;
+    let installation_id = if is_root || (is_license_admin && !is_grpc_token) {
+        instance_id
+    } else {
+        String::new()
+    };
+    (key, license, installation_id)
 }
 
-pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> Response {
+pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
     // we want anyone to be able to see the license info, so we bypass
@@ -120,16 +140,24 @@ pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> Response {
         None => (None, None),
     };
 
-    let key = if o2_cfg.common.redact_license_key {
-        key.map(|v| redact(&v))
-    } else {
-        key
-    };
+    let is_root = db::user::is_root_user(&email.user_id);
+    let is_license_admin = is_root
+        || check_license_permission(&email.user_id, "PUT")
+            .await
+            .is_ok();
+    let (key, license, installation_id) = viewer_license_fields(
+        is_root,
+        is_license_admin,
+        &config::get_config().grpc.internal_grpc_token,
+        o2_cfg.common.redact_license_key,
+        key,
+        license,
+    );
 
     let res = LicenseResponse {
         key,
         license,
-        installation_id: config::get_instance_id(),
+        installation_id,
         expired: license_expired().await,
         ingestion_exceeded: ingestion_limit_exceeded_count(),
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
@@ -176,5 +204,127 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
     match license::update().await {
         Ok(_) => (StatusCode::OK, Json("")).into_response(),
         Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::{base64, json};
+
+    use super::*;
+
+    const INSTANCE_ID: &str = "license-instance-7f3a";
+    const VALIDATOR_AUTH: &str = "dmFsaWRhdG9yOnMzY3JldA-auth";
+
+    fn stored_license() -> (String, License) {
+        let payload = json::json!({
+            "installation_id": INSTANCE_ID,
+            "license_id": "lic-1",
+            "active": true,
+            "created_at": 0,
+            "expires_at": 0,
+            "msv": "0.1.0",
+            "company": "acme",
+            "address": "",
+            "contact_name": "",
+            "contact_email": "",
+            "additional_emails": [],
+            "base_urls": [],
+            "limits": {},
+            "validator_url": "https://validator.example",
+            "validator_auth": VALIDATOR_AUTH,
+        });
+        let segment = base64::encode(&payload.to_string())
+            .replace('+', "-")
+            .replace('/', "_")
+            .replace('=', "");
+        let key = format!("eyJhbGciOiJFUzI1NiJ9.{segment}.c2lnbmF0dXJl");
+        (key, json::from_value(payload).unwrap())
+    }
+
+    fn response_json(is_root: bool, is_license_admin: bool) -> String {
+        response_json_with_token(is_root, is_license_admin, "cluster-token-distinct")
+    }
+
+    fn response_json_with_token(is_root: bool, is_license_admin: bool, grpc_token: &str) -> String {
+        config::cache_instance_id(INSTANCE_ID);
+        let (key, license) = stored_license();
+        let (key, license, installation_id) = viewer_license_fields(
+            is_root,
+            is_license_admin,
+            grpc_token,
+            false,
+            Some(key),
+            Some(license),
+        );
+        json::to_string(&LicenseResponse {
+            key,
+            license,
+            installation_id,
+            expired: false,
+            ingestion_used: 0.0,
+            ingestion_exceeded: 0,
+        })
+        .unwrap()
+    }
+
+    fn decoded_key_segments(response: &str) -> String {
+        let response: json::Value = json::from_str(response).unwrap();
+        let key = response["key"].as_str().unwrap_or_default();
+        key.split('.')
+            .filter_map(|segment| {
+                let padded = format!("{segment}{}", "=".repeat((4 - segment.len() % 4) % 4));
+                base64::decode_raw(padded.replace('-', "+").replace('_', "/")).ok()
+            })
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            .collect()
+    }
+
+    #[test]
+    fn test_installation_id_is_visible_to_root_only() {
+        let viewer = response_json(false, false);
+        let viewer_key = decoded_key_segments(&viewer);
+        for secret in [INSTANCE_ID, VALIDATOR_AUTH] {
+            assert!(!viewer.contains(secret), "{viewer}");
+            assert!(!viewer_key.contains(secret));
+        }
+        assert!(viewer.contains("lic-1"));
+
+        let root = response_json(true, true);
+        let (key, _) = stored_license();
+        assert!(root.contains(&key));
+        assert!(decoded_key_segments(&root).contains(INSTANCE_ID));
+        let root: json::Value = json::from_str(&root).unwrap();
+        assert_eq!(root["installation_id"], INSTANCE_ID);
+        assert_eq!(root["license"]["installation_id"], INSTANCE_ID);
+        assert_eq!(root["license"]["validator_auth"], VALIDATOR_AUTH);
+    }
+
+    #[test]
+    fn test_license_admins_never_get_an_installation_id_that_is_the_grpc_token() {
+        for token in ["", INSTANCE_ID] {
+            let admin = response_json_with_token(false, true, token);
+            let admin_json: json::Value = json::from_str(&admin).unwrap();
+            assert_eq!(admin_json["installation_id"], "", "token {token:?}");
+            assert!(!admin.contains(INSTANCE_ID), "{admin}");
+        }
+        let root = response_json_with_token(true, true, "");
+        let root: json::Value = json::from_str(&root).unwrap();
+        assert_eq!(root["installation_id"], INSTANCE_ID);
+    }
+
+    #[test]
+    fn test_license_admins_get_the_installation_id_but_not_the_key_secrets() {
+        let admin = response_json(false, true);
+        let admin_json: json::Value = json::from_str(&admin).unwrap();
+        assert_eq!(admin_json["installation_id"], INSTANCE_ID);
+        assert_eq!(admin_json["license"]["installation_id"], "");
+        assert!(!admin.contains(VALIDATOR_AUTH), "{admin}");
+        let admin_key = decoded_key_segments(&admin);
+        for secret in [INSTANCE_ID, VALIDATOR_AUTH] {
+            assert!(!admin_key.contains(secret));
+        }
+        let (key, _) = stored_license();
+        assert!(!admin.contains(&key));
     }
 }

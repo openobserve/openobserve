@@ -151,6 +151,7 @@ pub async fn get_stream_partition_keys(
 
 #[inline(always)]
 pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
+    pipeline::report_broken_realtime_pipelines(stream).await;
     pipeline::get_executable_pipelines(stream).await
 }
 

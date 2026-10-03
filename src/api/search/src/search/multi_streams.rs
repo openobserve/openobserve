@@ -716,7 +716,7 @@ pub async fn _search_partition_multi(
     headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<search::MultiSearchPartitionRequest>,
+    Json(mut req): Json<search::MultiSearchPartitionRequest>,
 ) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -757,6 +757,19 @@ pub async fn _search_partition_multi(
                     .into_response();
             }
             _ => {}
+        }
+    }
+
+    if let Err(e) = req.decode() {
+        return MetaHttpResponse::bad_request(e);
+    }
+
+    #[cfg(feature = "enterprise")]
+    for sql in &req.sql {
+        if let Some(res) =
+            super::check_sql_stream_permissions(sql, &org_id, user_id, stream_type, &trace_id).await
+        {
+            return res;
         }
     }
 
@@ -898,19 +911,10 @@ pub async fn around_multi(
         }
     };
     let stream_names = stream_names.split(',').collect::<Vec<&str>>();
-
-    let mut around_sqls = stream_names
-        .iter()
-        .map(|name| format!("SELECT * FROM \"{name}\" "))
-        .collect::<Vec<String>>();
-    if let Some(v) = query.get("sql") {
-        let sqls = v.split(',').collect::<Vec<&str>>();
-        for (i, sql) in sqls.into_iter().enumerate() {
-            if let Ok(sql) = base64::decode_url(sql) {
-                around_sqls[i] = sql;
-            }
-        }
-    }
+    let around_sqls = match around_multi_sqls(&stream_names, query.get("sql").map(String::as_str)) {
+        Ok(sqls) => sqls,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
 
     let around_size = query
         .get("size")
@@ -918,11 +922,29 @@ pub async fn around_multi(
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    let mut resolved_streams = Vec::with_capacity(stream_names.len());
+    for (stream_name, sql) in stream_names.iter().zip(&around_sqls) {
+        let stream_name = super::around::resolve_around_stream(stream_name, Some(sql), &query);
+        #[cfg(feature = "enterprise")]
+        if let Some(res) = crate::search::utils::check_stream_permissions(
+            &stream_name,
+            &org_id,
+            &user_email.user_id,
+            &stream_type,
+            crate::search::utils::StreamPermissionResourceType::Search,
+        )
+        .await
+        {
+            return res;
+        }
+        resolved_streams.push(stream_name);
+    }
+
     let mut multi_resp = search::Response {
         size: around_size,
         ..Default::default()
     };
-    for (i, stream_name) in stream_names.iter().enumerate() {
+    for (i, stream_name) in resolved_streams.iter().enumerate() {
         let trace_id = format!("{trace_id}-{i}");
         let search_res = super::around::around(
             &trace_id,
@@ -931,7 +953,6 @@ pub async fn around_multi(
             stream_name,
             stream_type,
             Query(query.clone()),
-            Some(around_sqls[i].clone()),
             None,
             user_id.clone(),
         )
@@ -1048,6 +1069,34 @@ fn parse_simple_multi_stream_request(
 
 const fn default_size() -> i64 {
     10
+}
+
+/// One SQL per stream: the caller's base64 entry where given, else a plain select of the stream.
+fn around_multi_sqls(
+    stream_names: &[&str],
+    sql_param: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let mut sqls = stream_names
+        .iter()
+        .map(|name| super::around::around_base_sql(name))
+        .collect::<Vec<String>>();
+    let Some(sql_param) = sql_param else {
+        return Ok(sqls);
+    };
+    let given = sql_param.split(',').collect::<Vec<&str>>();
+    if given.len() > sqls.len() {
+        return Err(format!(
+            "{} sql entries given for {} streams",
+            given.len(),
+            sqls.len()
+        ));
+    }
+    for (slot, sql) in sqls.iter_mut().zip(given) {
+        if let Ok(sql) = base64::decode_url(sql) {
+            *slot = sql;
+        }
+    }
+    Ok(sqls)
 }
 
 /// SearchStreamMulti HTTP2 streaming endpoint
@@ -2197,5 +2246,219 @@ mod tests {
             queries[0].query.query_fn.is_some(),
             "per_query_response=false should always set query_fn on requests"
         );
+    }
+
+    async fn partition_multi_partitions(
+        sql: String,
+        encoding: config::meta::search::RequestEncoding,
+        end_time: i64,
+    ) -> Vec<[i64; 2]> {
+        use axum::{
+            extract::{Path, Query},
+            http::{HeaderMap, StatusCode},
+        };
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let caller = "partition-multi@example.com";
+        join_default_org_as_admin(caller);
+        let resp = super::_search_partition_multi(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: caller.to_string(),
+            }),
+            axum::Json(MultiSearchPartitionRequest {
+                sql: vec![sql],
+                start_time: end_time - 3_600_000_000,
+                end_time,
+                encoding,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice::<config::meta::search::SearchPartitionResponse>(&body)
+            .unwrap()
+            .partitions
+    }
+
+    // Enterprise denies a caller that is not an org member before it authorizes the stream.
+    fn join_default_org_as_admin(email: &str) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("default/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Admin,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: "default".to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    #[tokio::test]
+    async fn test_search_partition_multi_decodes_base64_sql() {
+        use config::{meta::search::RequestEncoding, utils::base64};
+
+        let sql = "SELECT * FROM \"partition_multi_b64\"";
+        infra::file_list::create_table().await.unwrap();
+        infra::cluster::add_node_to_cache(config::meta::cluster::Node {
+            uuid: "partition-multi-querier".to_string(),
+            role: vec![config::meta::cluster::Role::Querier],
+            cpu_num: 1,
+            status: config::meta::cluster::NodeStatus::Online,
+            ..Default::default()
+        })
+        .await;
+        {
+            use arrow_schema::{DataType, Field, Schema};
+            use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+            let schema = Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("level", DataType::Utf8, true),
+            ]);
+            STREAM_SCHEMAS_LATEST.write().await.insert(
+                "default/logs/partition_multi_b64".to_string(),
+                SchemaCache::new(schema),
+            );
+        }
+        let end_time = Utc::now().timestamp_micros();
+        let plain =
+            partition_multi_partitions(sql.to_string(), RequestEncoding::Empty, end_time).await;
+        assert!(!plain.is_empty());
+        let encoded =
+            partition_multi_partitions(base64::encode_url(sql), RequestEncoding::Base64, end_time)
+                .await;
+        assert_eq!(encoded, plain);
+    }
+
+    #[tokio::test]
+    async fn test_around_multi_rejects_more_sqls_than_streams() {
+        use axum::{
+            extract::{Path, Query},
+            http::{HeaderMap, StatusCode},
+        };
+        use config::utils::base64;
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let sql = base64::encode_url("SELECT * FROM \"a\"");
+        let query = HashMap::from([("sql".to_string(), format!("{sql},{sql}"))]);
+        let resp = super::around_multi(
+            Path(("default".to_string(), base64::encode_url("a"))),
+            HeaderMap::new(),
+            Query(query),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn assert_unauthorized(resp: axum::response::Response) {
+        assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("Unauthorized Access"), "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_around_multi_refuses_a_caller_outside_the_org() {
+        use axum::{
+            extract::{Path, Query},
+            http::HeaderMap,
+        };
+        use config::utils::base64;
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let query = HashMap::from([(
+            "sql".to_string(),
+            base64::encode_url("SELECT * FROM \"victim\""),
+        )]);
+        let resp = super::around_multi(
+            Path(("default".to_string(), base64::encode_url("allowed"))),
+            HeaderMap::new(),
+            Query(query),
+            Headers(UserEmail {
+                user_id: "outsider@example.com".to_string(),
+            }),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_search_partition_multi_refuses_a_caller_outside_the_org() {
+        use axum::{
+            extract::{Path, Query},
+            http::HeaderMap,
+        };
+        use config::{meta::search::RequestEncoding, utils::base64};
+        use hashbrown::HashMap;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        let resp = super::_search_partition_multi(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: "outsider@example.com".to_string(),
+            }),
+            axum::Json(MultiSearchPartitionRequest {
+                sql: vec![base64::encode_url("SELECT * FROM \"victim\"")],
+                start_time: 0,
+                end_time: 1,
+                encoding: RequestEncoding::Base64,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+            }),
+        )
+        .await;
+        assert_unauthorized(resp).await;
     }
 }

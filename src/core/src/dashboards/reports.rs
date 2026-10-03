@@ -21,12 +21,14 @@ use chrono::Timelike;
 use config::{
     SMTP_CLIENT, get_chrome_launch_options, get_config,
     meta::{
+        alerts::fixed_offset,
         dashboards::{
             datetime_now,
             reports::{
-                HttpReportPayload, Report, ReportDashboard, ReportDestination,
-                ReportEmailAttachmentType, ReportEmailDetails, ReportFrequencyType,
-                ReportListFilters, ReportMediaType, ReportTimerangeType,
+                HttpReportPayload, REPORT_SECRET_HEADER, Report, ReportDashboard,
+                ReportDestination, ReportEmailAttachmentType, ReportEmailDetails,
+                ReportFrequencyType, ReportListFilters, ReportMediaType, ReportTimerangeType,
+                format_dashb_var,
             },
         },
         folder::Folder,
@@ -37,8 +39,12 @@ use cron::Schedule;
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
+    dashboards::dashboard_in_org,
 };
-use futures::{StreamExt, future::try_join_all};
+use futures::{
+    StreamExt,
+    future::{self, try_join_all},
+};
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table,
@@ -50,7 +56,10 @@ use lettre::{
 };
 use reqwest::Client;
 
-use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz, short_url};
+use crate::{
+    alerts::alert::TZ_OFFSET_RANGE_MINUTES, auth::is_ofga_unsupported, common::meta::authz::Authz,
+    short_url,
+};
 
 /// Errors that can occur when interacting with reports.
 #[derive(Debug, thiserror::Error)]
@@ -99,6 +108,15 @@ pub enum ReportError {
 
     #[error(transparent)]
     ParseCronError(#[from] cron::error::Error),
+
+    #[error("Report tz_offset must be strictly between -1440 and 1440 minutes")]
+    TzOffsetOutOfRange,
+
+    #[error("Report cron schedule '{cron}' has no future occurrence")]
+    CronHasNoFutureOccurrence { cron: String },
+
+    #[error("Report frequency interval cannot be negative")]
+    NegativeInterval,
 
     #[error(transparent)]
     DbError(anyhow::Error),
@@ -155,17 +173,7 @@ pub async fn save(
         return Err(ReportError::NameContainsForwardSlash);
     }
 
-    if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let now = chrono::Utc::now().second();
-        report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
-        // Check if the cron expression is valid
-        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
-            return Err(ReportError::ParseCronError(e));
-        }
-    } else if report.frequency.interval == 0 {
-        report.frequency.interval = 1;
-    }
+    validate_schedule(&mut report)?;
 
     match db::dashboards::reports::get(conn, org_id, folder_id, &report.name).await {
         Ok(old_report) => {
@@ -430,16 +438,7 @@ pub async fn update_by_id(
         return Err(ReportError::NameContainsForwardSlash);
     }
 
-    if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let now = chrono::Utc::now().second();
-        report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
-        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
-            return Err(ReportError::ParseCronError(e));
-        }
-    } else if report.frequency.interval == 0 {
-        report.frequency.interval = 1;
-    }
+    validate_schedule(&mut report)?;
 
     if report.dashboards.is_empty() {
         return Err(ReportError::NoDashboards);
@@ -449,6 +448,12 @@ pub async fn update_by_id(
             && d.email_attachment_type == ReportEmailAttachmentType::Inline
     }) {
         return Err(ReportError::InlineAttachmentTypeNotSupportedForPdf);
+    }
+    if ensure_dashboards_readable(org_id, &report.dashboards)
+        .await
+        .is_err()
+    {
+        return Err(ReportError::DashboardTabNotFound);
     }
 
     let (curr_folder, old_report) = get_by_id(org_id, report_id).await?;
@@ -527,6 +532,9 @@ pub enum SendReportError {
     #[error("Atleast one dashboard is required")]
     NoDashboards,
 
+    #[error("A referenced dashboard is no longer in this report's org")]
+    DashboardNotInOrg,
+
     #[error("Error contacting report server: {0}")]
     ReportServerClientError(#[from] reqwest::Error),
 
@@ -562,6 +570,7 @@ impl SendReport for Report {
         if self.dashboards.is_empty() {
             return Err(SendReportError::NoDashboards);
         }
+        ensure_dashboards_readable(&self.org_id, &self.dashboards).await?;
 
         let cfg = get_config();
         let mut recipients = vec![];
@@ -589,17 +598,17 @@ impl SendReport for Report {
                 cfg.common.report_server_url, self.org_id, self.name
             ))
             .unwrap();
-            match Client::builder()
+            let mut req = Client::builder()
                 .danger_accept_invalid_certs(cfg.common.report_server_skip_tls_verify)
                 .build()
                 .unwrap()
                 .put(url)
                 .query(&[("timezone", &self.timezone)])
-                .header("Content-Type", "application/json")
-                .json(&report_data)
-                .send()
-                .await
-            {
+                .header("Content-Type", "application/json");
+            if !cfg.report_server.secret.is_empty() {
+                req = req.header(REPORT_SECRET_HEADER, &cfg.report_server.secret);
+            }
+            match req.json(&report_data).send().await {
                 Ok(resp) => {
                     if !resp.status().is_success() {
                         return Err(SendReportError::ReportServerErrorRepsponse(
@@ -755,7 +764,10 @@ async fn generate_report(
     let tab_id = &dashboard.tabs[0];
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
-        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+        dashb_vars = format!(
+            "{dashb_vars}&{}",
+            format_dashb_var(&variable.key, &variable.value)
+        );
     }
 
     log::info!("launching browser for dashboard {dashboard_id}");
@@ -990,6 +1002,27 @@ fn sanitize_filename(filename: &str) -> String {
         .collect()
 }
 
+/// Same existence-scoped org check the dashboards GET handler uses.
+async fn ensure_dashboards_readable(
+    org_id: &str,
+    dashboards: &[ReportDashboard],
+) -> Result<(), SendReportError> {
+    let checks = dashboards
+        .iter()
+        .map(|d| dashboard_in_org(org_id, &d.dashboard));
+    let results = future::join_all(checks).await;
+    if all_dashboards_readable(&results) {
+        Ok(())
+    } else {
+        Err(SendReportError::DashboardNotInOrg)
+    }
+}
+
+/// An empty slice passes trivially; callers reject zero dashboards earlier.
+fn all_dashboards_readable(results: &[bool]) -> bool {
+    results.iter().all(|readable| *readable)
+}
+
 /// Anchors a report to the org it was addressed to, rejecting a body that names a different one.
 fn bind_to_path_org(report: &mut Report, org_id: &str) -> Result<(), ReportError> {
     if !report.org_id.is_empty() && report.org_id != org_id {
@@ -1000,8 +1033,35 @@ fn bind_to_path_org(report: &mut Report, org_id: &str) -> Result<(), ReportError
     Ok(())
 }
 
+/// Normalises a report's schedule and rejects one the scheduler could not evaluate.
+fn validate_schedule(report: &mut Report) -> Result<(), ReportError> {
+    if !TZ_OFFSET_RANGE_MINUTES.contains(&report.tz_offset) {
+        return Err(ReportError::TzOffsetOutOfRange);
+    }
+    let tz = fixed_offset(report.tz_offset).ok_or(ReportError::TzOffsetOutOfRange)?;
+    if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let now = chrono::Utc::now().second();
+        report.frequency.cron =
+            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
+        let schedule = Schedule::from_str(&report.frequency.cron)?;
+        // The scheduler reads the cron in the report's offset, so check it there.
+        if schedule.upcoming(tz).next().is_none() {
+            return Err(ReportError::CronHasNoFutureOccurrence {
+                cron: report.frequency.cron.clone(),
+            });
+        }
+    } else if report.frequency.interval < 0 {
+        return Err(ReportError::NegativeInterval);
+    } else if report.frequency.interval == 0 {
+        report.frequency.interval = 1;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use chrono::Datelike;
+
     use super::*;
 
     #[test]
@@ -1141,6 +1201,117 @@ mod tests {
         assert!(err.to_string().contains("connection refused"));
     }
 
+    fn scheduled(tz_offset: i32, cron: &str) -> Report {
+        let mut report = Report {
+            tz_offset,
+            ..Default::default()
+        };
+        report.frequency.frequency_type = ReportFrequencyType::Cron;
+        report.frequency.cron = cron.to_string();
+        report
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_full_day_tz_offset() {
+        for tz_offset in [1440, -1440, i32::MAX, i32::MIN] {
+            let err = validate_schedule(&mut scheduled(tz_offset, "0 0 * * * *"));
+            assert!(
+                matches!(err, Err(ReportError::TzOffsetOutOfRange)),
+                "{tz_offset}: {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_cron_with_no_future_occurrence() {
+        let err = validate_schedule(&mut scheduled(0, "0 0 0 1 1 * 2020"));
+        assert!(
+            matches!(err, Err(ReportError::CronHasNoFutureOccurrence { .. })),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn validate_schedule_accepts_values_at_their_bounds() {
+        for tz_offset in [-1439, 0, 1439] {
+            let mut report = scheduled(tz_offset, "0 0 * * * *");
+            assert!(validate_schedule(&mut report).is_ok(), "{tz_offset}");
+        }
+        let mut report = Report::default();
+        report.frequency.frequency_type = ReportFrequencyType::Hours;
+        report.frequency.interval = 0;
+        assert!(validate_schedule(&mut report).is_ok());
+        assert_eq!(report.frequency.interval, 1);
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_negative_interval() {
+        for frequency_type in [ReportFrequencyType::Hours, ReportFrequencyType::Months] {
+            let mut report = Report::default();
+            report.frequency.frequency_type = frequency_type;
+            report.frequency.interval = -1;
+            let err = validate_schedule(&mut report);
+            assert!(matches!(err, Err(ReportError::NegativeInterval)), "{err:?}");
+        }
+    }
+
+    #[test]
+    fn validate_schedule_checks_the_cron_in_the_report_offset() {
+        let target = chrono::Utc::now() + chrono::Duration::hours(2);
+        let cron = format!(
+            "0 {} {} {} {} * {}",
+            target.minute(),
+            target.hour(),
+            target.day(),
+            target.month(),
+            target.year()
+        );
+        assert!(
+            validate_schedule(&mut scheduled(0, &cron)).is_ok(),
+            "{cron}"
+        );
+        let err = validate_schedule(&mut scheduled(720, &cron));
+        assert!(
+            matches!(err, Err(ReportError::CronHasNoFutureOccurrence { .. })),
+            "{cron}: {err:?}"
+        );
+    }
+
+    fn report_with_schedule(tz_offset: i32, cron: &str) -> Report {
+        let mut report = scheduled(tz_offset, cron);
+        report.name = "weekly".to_string();
+        report
+    }
+
+    #[tokio::test]
+    async fn update_by_id_rejects_the_schedules_that_save_rejects() {
+        let saved = config::CONFIG.load_full();
+        let mut cfg = config::Config::init().unwrap();
+        cfg.common.report_server_url = "http://report-server.example".to_string();
+        config::CONFIG.store(std::sync::Arc::new(cfg));
+        let mut outcomes = vec![];
+        for (tz_offset, cron) in [(1440, "0 0 * * * *"), (0, "0 0 0 1 1 * 2020")] {
+            let created = save(
+                "org_a",
+                "default",
+                "",
+                report_with_schedule(tz_offset, cron),
+                true,
+            )
+            .await
+            .map_err(|e| e.to_string());
+            let updated = update_by_id("org_a", "r1", None, report_with_schedule(tz_offset, cron))
+                .await
+                .map_err(|e| e.to_string());
+            outcomes.push((created, updated));
+        }
+        config::CONFIG.store(saved);
+        for (created, updated) in outcomes {
+            assert!(created.is_err(), "{created:?}");
+            assert_eq!(created, updated);
+        }
+    }
+
     #[test]
     fn bind_to_path_org_rejects_a_foreign_org_in_the_body() {
         let mut report = Report {
@@ -1168,5 +1339,43 @@ mod tests {
         };
         assert!(bind_to_path_org(&mut report, "org_a").is_ok());
         assert_eq!(report.org_id, "org_a");
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_true_when_every_check_passed() {
+        assert!(all_dashboards_readable(&[true, true, true]));
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_false_if_any_dashboard_is_not_in_org() {
+        assert!(!all_dashboards_readable(&[true, false, true]));
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_true_for_no_dashboards() {
+        assert!(all_dashboards_readable(&[]));
+    }
+
+    /// With no DB configured, `dashboard_in_org` fails closed, so this proves the check runs.
+    #[tokio::test]
+    async fn send_subscribers_rejects_a_report_before_rendering_when_the_dashboard_check_fails() {
+        let report = Report {
+            org_id: "org_a".to_string(),
+            dashboards: vec![ReportDashboard {
+                dashboard: "some-dashboard".to_string(),
+                folder: "default".to_string(),
+                tabs: vec!["tab1".to_string()],
+                variables: vec![],
+                timerange: config::meta::dashboards::reports::ReportTimerange::default(),
+                report_type: ReportMediaType::default(),
+                email_attachment_type: ReportEmailAttachmentType::default(),
+                attachment_dimensions: None,
+            }],
+            ..Default::default()
+        };
+        assert!(matches!(
+            report.send_subscribers().await,
+            Err(SendReportError::DashboardNotInOrg)
+        ));
     }
 }

@@ -131,8 +131,7 @@ pub async fn remote_write(
     let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
-    let decoded = snap::raw::Decoder::new()
-        .decompress_vec(&body)
+    let decoded = config::utils::snappy::decode_raw_snappy(&body, cfg.limit.req_payload_limit)
         .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {e}"))?;
     let request =
         prom_decode::decode(&decoded).map_err(|e| anyhow::anyhow!("Invalid protobuf: {e}"))?;
@@ -1852,5 +1851,26 @@ mod tests {
     async fn test_get_label_values_requires_metric() {
         let result = get_label_values("default", "job".to_owned(), None, 0, 1).await;
         assert!(result.unwrap_err().to_string().contains("match[]"));
+    }
+
+    #[tokio::test]
+    async fn remote_write_rejects_a_snappy_header_declaring_more_than_the_limit() {
+        let mut n = get_config().limit.req_payload_limit as u64 + 1;
+        let mut body = Vec::new();
+        while n >= 0x80 {
+            body.push((n as u8 & 0x7f) | 0x80);
+            n >>= 7;
+        }
+        body.push(n as u8);
+        body.extend_from_slice(b"garbage");
+        let err = remote_write(
+            "default",
+            Bytes::from(body),
+            IngestUser::User("root@example.com".to_string()),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("larger than allowed"), "{err}");
     }
 }
