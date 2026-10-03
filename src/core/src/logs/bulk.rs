@@ -305,6 +305,9 @@ pub async fn ingest(
                         TRANSFORM_FAILED,
                     ])
                     .inc();
+                if is_retryable_ingest_error(&e) {
+                    return Err(e);
+                }
                 add_record_status(
                     stream_name.to_string(),
                     None,
@@ -399,11 +402,27 @@ pub fn add_record_status(
     }
 }
 
+/// Answered as a whole-request 503, which ES shippers retry; a 4xx item is dropped by them.
+fn is_retryable_ingest_error(e: &infra::errors::Error) -> bool {
+    matches!(e, infra::errors::Error::ResourceError(_))
+}
+
 #[cfg(test)]
 mod tests {
     use ingestion_common::IngestUser;
 
     use super::*;
+
+    #[test]
+    fn test_only_a_resource_error_fails_the_whole_bulk_request() {
+        use infra::errors::Error;
+        assert!(is_retryable_ingest_error(&Error::ResourceError(
+            "sensitive-data redaction is unavailable".to_string()
+        )));
+        assert!(!is_retryable_ingest_error(&Error::IngestionError(
+            "Stream name is empty".to_string()
+        )));
+    }
 
     #[test]
     fn test_add_record_status() {

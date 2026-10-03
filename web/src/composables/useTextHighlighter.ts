@@ -54,9 +54,15 @@ export interface TextSegment {
  * catastrophic here; patterns or texts beyond these limits are not highlighted.
  */
 const MAX_REGEX_PATTERN_LENGTH = 256;
-const MAX_REGEX_TEXT_LENGTH = 2048;
+const MAX_REGEX_TEXT_LENGTH = 512;
 const MAX_REGEX_MATCHES = 100;
-const MAX_REGEX_WILDCARDS = 2;
+/** A {n,m} repeat wider than this counts as unbounded. */
+const MAX_BOUNDED_REPEAT = 16;
+/** Cap on the product of bounded-repeat widths ({n,m}, ?), which multiply backtracking. */
+const MAX_BOUNDED_VARIANTS = 128;
+
+/** Escaped str_match literals: linear to match, so exempt from MAX_REGEX_TEXT_LENGTH. */
+const literalPatterns = new WeakSet<RegExp>();
 
 /**
  * Matches two-argument filter functions with a string-literal second argument:
@@ -72,10 +78,58 @@ const FIELD_FILTER_REGEX =
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
+ * Whether a regex source risks super-linear backtracking: it has a quantified
+ * group such as (a+)+ or (x)*, more than one unbounded quantifier (*, +,
+ * {n,} or a wide {n,m}), or narrow repeats ({n,m}, ?) whose widths multiply
+ * past MAX_BOUNDED_VARIANTS. Escaped characters and character classes are
+ * skipped, so [a*]+ has one quantifier. What passes is at worst quadratic in
+ * the text length times that bounded factor.
+ */
+function isBacktrackingRisk(source: string): boolean {
+  let unbounded = 0;
+  let variants = 1;
+  let inClass = false;
+
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === "\\") {
+      i++;
+      continue;
+    }
+    if (inClass) {
+      if (char === "]") inClass = false;
+      continue;
+    }
+    if (char === "[") {
+      inClass = true;
+      continue;
+    }
+
+    const next = source[i + 1];
+    if (char === ")" && (next === "*" || next === "+" || next === "{")) return true;
+
+    if (char === "*" || char === "+") {
+      unbounded++;
+    } else if (char === "?" && source[i - 1] !== "(" && !"*+?}".includes(source[i - 1])) {
+      variants *= 2;
+    } else if (char === "{") {
+      const repeat = /^\{(\d+)(,(\d*))?\}/.exec(source.slice(i));
+      if (repeat?.[2]) {
+        const width = Number(repeat[3]) - Number(repeat[1]) + 1;
+        if (repeat[3] === "" || Number(repeat[3]) > MAX_BOUNDED_REPEAT) unbounded++;
+        else variants *= Math.max(width, 1);
+      }
+    }
+    if (unbounded > 1 || variants > MAX_BOUNDED_VARIANTS) return true;
+  }
+
+  return false;
+}
+
+/**
  * Compiles a Rust-regex pattern (as passed to re_match) into a global JS RegExp.
  * Leading inline flags such as (?i) become JS flags. Returns null for anything
- * JS cannot compile or that risks catastrophic backtracking: a quantified group
- * like (a+)+ or more than two .* / .+ wildcards.
+ * JS cannot compile or that risks catastrophic backtracking (isBacktrackingRisk).
  */
 function compileHighlightRegex(pattern: string): RegExp | null {
   if (!pattern || pattern.length > MAX_REGEX_PATTERN_LENGTH) return null;
@@ -91,8 +145,7 @@ function compileHighlightRegex(pattern: string): RegExp | null {
     source = source.slice(inlineFlags[0].length);
   }
 
-  if (/(^|[^\\])\)[*+{]/.test(source)) return null;
-  if ((source.match(/(^|[^\\])\.[*+]/g) || []).length > MAX_REGEX_WILDCARDS) return null;
+  if (isBacktrackingRisk(source)) return null;
 
   try {
     return new RegExp(source, flags);
@@ -116,7 +169,6 @@ export function useTextHighlighter() {
    * - match_all('keyword')
    * - fuzzy_match('keyword', 2)
    * - fuzzy_match_all('keyword', 2)
-   * - match_all_raw('keyword') / match_all_raw_ignore_case('keyword')
    * - str_match_ignore_case(field, 'keyword') / match_field_ignore_case(field, 'keyword')
    * Keywords are highlighted case-insensitively; case-sensitive and regex
    * filters are returned by extractHighlightPatterns instead.
@@ -127,9 +179,9 @@ export function useTextHighlighter() {
   function extractKeywords(queryString: string): string[] {
     if (!queryString?.trim()) return [];
 
-    // Regex to support match_all, match_all_raw(_ignore_case), fuzzy_match, and fuzzy_match_all SQL functions
+    // Regex to support match_all, fuzzy_match, and fuzzy_match_all SQL functions
     const regex =
-      /\b(?:match_all_raw_ignore_case|match_all_raw|match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
+      /\b(?:match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
     const result: string[] = [];
     let match: RegExpExecArray | null;
 
@@ -166,6 +218,12 @@ export function useTextHighlighter() {
    * @param queryString - The SQL query string to parse
    * @returns Array of global RegExps to highlight
    */
+  function literalPattern(value: string): RegExp {
+    const regex = new RegExp(escapeRegExp(value), "g");
+    literalPatterns.add(regex);
+    return regex;
+  }
+
   function extractHighlightPatterns(queryString: string): RegExp[] {
     if (!queryString?.trim()) return [];
     if (queryString === cachedPatternQuery) return cachedPatterns;
@@ -182,7 +240,7 @@ export function useTextHighlighter() {
         name === "re_match"
           ? compileHighlightRegex(value)
           : value.trim()
-            ? new RegExp(escapeRegExp(value.trim()), "g")
+            ? literalPattern(value.trim())
             : null;
 
       if (regex && !seen.has(`${regex.source}/${regex.flags}`)) {
@@ -217,6 +275,23 @@ export function useTextHighlighter() {
   }
 
   /**
+   * Collects the [start, end) ranges the highlight patterns match in text.
+   * Patterns run on a whole field value, so anchors and spaces behave as they
+   * do on the server; compiled re_match regexes skip texts over
+   * MAX_REGEX_TEXT_LENGTH.
+   */
+  function collectPatternRanges(text: string, patterns: RegExp[]): Array<[number, number]> {
+    const ranges: Array<[number, number]> = [];
+    if (!text) return ranges;
+    for (const pattern of patterns) {
+      if (text.length <= MAX_REGEX_TEXT_LENGTH || literalPatterns.has(pattern)) {
+        collectMatchRanges(text, pattern, ranges);
+      }
+    }
+    return ranges;
+  }
+
+  /**
    * Splits text by highlight keywords and patterns and marks matched parts
    *
    * @param text - Text to process
@@ -229,17 +304,25 @@ export function useTextHighlighter() {
     keywords: string[],
     patterns: RegExp[] = [],
   ): Array<{ text: string; isHighlighted: boolean }> {
-    if ((!keywords.length && !patterns.length) || !text) {
+    return splitTextByRanges(text, keywords, collectPatternRanges(text, patterns));
+  }
+
+  /**
+   * Splits text by highlight keywords plus precomputed highlight ranges.
+   */
+  function splitTextByRanges(
+    text: string,
+    keywords: string[],
+    extraRanges: Array<[number, number]>,
+  ): Array<{ text: string; isHighlighted: boolean }> {
+    if ((!keywords.length && !extraRanges.length) || !text) {
       return [{ text, isHighlighted: false }];
     }
 
-    if (patterns.length) {
-      const ranges: Array<[number, number]> = [];
+    if (extraRanges.length) {
+      const ranges = [...extraRanges];
       if (keywords.length) {
         collectMatchRanges(text, new RegExp(keywords.map(escapeRegExp).join("|"), "gi"), ranges);
-      }
-      if (text.length <= MAX_REGEX_TEXT_LENGTH) {
-        for (const pattern of patterns) collectMatchRanges(text, pattern, ranges);
       }
       ranges.sort((a, b) => a[0] - b[0]);
 
@@ -511,7 +594,7 @@ export function useTextHighlighter() {
    * @param keywords - Keywords to highlight
    * @param colors - Color theme object
    * @param showQuotes - Whether to add quotes around values
-   * @param patterns - Highlight patterns from extractHighlightPatterns
+   * @param patternRanges - Pattern match ranges over the whole text the segments make up
    * @returns HTML string with applied styling
    */
   function processTextSegments(
@@ -519,7 +602,7 @@ export function useTextHighlighter() {
     keywords: string[],
     colors: any,
     showQuotes: boolean = false,
-    patterns: RegExp[] = [],
+    patternRanges: Array<[number, number]> = [],
   ): string {
     let result = "";
 
@@ -529,15 +612,32 @@ export function useTextHighlighter() {
     }
 
     // Process each segment individually
+    let offset = 0;
     result += segments
       .map((segment) => {
-        // For whitespace, just return as-is with no special styling
+        // Pattern ranges that fall in this segment, relative to its start
+        const start = offset;
+        const end = offset + segment.content.length;
+        offset = end;
+        const segmentRanges: Array<[number, number]> = [];
+        for (const [from, to] of patternRanges) {
+          if (from < end && to > start) {
+            segmentRanges.push([Math.max(from, start) - start, Math.min(to, end) - start]);
+          }
+        }
+
+        // For whitespace, return as-is unless a pattern match spans it
         if (segment.type === "whitespace") {
-          return segment.content;
+          if (!segmentRanges.length) return segment.content;
+          return splitTextByRanges(segment.content, [], segmentRanges)
+            .map((part) =>
+              part.isHighlighted ? `<span class="log-highlighted">${part.text}</span>` : part.text,
+            )
+            .join("");
         }
 
         // For regular tokens, split by keywords and apply semantic colors
-        const parts = splitTextByKeywords(segment.content, keywords, patterns);
+        const parts = splitTextByRanges(segment.content, keywords, segmentRanges);
         return parts
           .map((part) => {
             const content = escapeHtml(part.text);
@@ -585,10 +685,10 @@ export function useTextHighlighter() {
 
     const textStr = String(text);
     const keywords = extractKeywords(queryString);
-    const patterns = extractHighlightPatterns(queryString);
+    const patternRanges = collectPatternRanges(textStr, extractHighlightPatterns(queryString));
     const segments = smartTokenize(textStr);
 
-    return processTextSegments(segments, keywords, colors, showQuotes, patterns);
+    return processTextSegments(segments, keywords, colors, showQuotes, patternRanges);
   }
 
   return {

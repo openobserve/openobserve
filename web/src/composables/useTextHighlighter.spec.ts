@@ -179,14 +179,6 @@ describe("useTextHighlighter", () => {
       ).toEqual(["Error", "Timeout"]);
     });
 
-    it("should extract match_all_raw and match_all_raw_ignore_case as keywords", () => {
-      expect(
-        textHighlighter.extractKeywords(
-          "match_all_raw('alpha') OR match_all_raw_ignore_case('beta')",
-        ),
-      ).toEqual(["alpha", "beta"]);
-    });
-
     it("should highlight str_match_ignore_case terms case-insensitively", () => {
       expect(highlight("ERROR: disk", "str_match_ignore_case(log, 'error')")).toEqual(["ERROR"]);
     });
@@ -226,6 +218,98 @@ describe("useTextHighlighter", () => {
       expect(
         textHighlighter.extractHighlightPatterns(`re_match(log, '${"a".repeat(300)}')`),
       ).toEqual([]);
+      expect(
+        textHighlighter.extractHighlightPatterns("re_match(log, '\\w*\\w*\\w*\\w*!')"),
+      ).toEqual([]);
+      expect(textHighlighter.extractHighlightPatterns("re_match(log, '\\d+\\s*\\d+x')")).toEqual(
+        [],
+      );
+      expect(
+        textHighlighter.extractHighlightPatterns("re_match(log, '\\w{1,}\\w{0,500}!')"),
+      ).toEqual([]);
+      expect(textHighlighter.extractHighlightPatterns("re_match(log, '(\\w{0,9}){0,9}')")).toEqual(
+        [],
+      );
+      expect(
+        textHighlighter.extractHighlightPatterns("re_match(log, 'a{0,8}a{0,8}a{0,8}a{0,8}!')"),
+      ).toEqual([]);
+    });
+
+    it("should allow patterns with a single unbounded quantifier", () => {
+      expect(highlight("xa*a*y", "re_match(log, '[a*]+')")).toEqual(["a*a*"]);
+      expect(
+        textHighlighter.extractHighlightPatterns(
+          "re_match(log, '\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d+')",
+        ),
+      ).toHaveLength(1);
+      expect(
+        textHighlighter.extractHighlightPatterns("re_match(log, 'https?://\\S+')"),
+      ).toHaveLength(1);
+    });
+
+    it("should highlight adversarial text quickly with any accepted pattern", () => {
+      const accepted = [
+        "re_match(log, '\\w*!')",
+        "re_match(log, '[a*]+!')",
+        "re_match(log, '(?i)a.*b')",
+        "re_match(log, '\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d+x')",
+        "str_match(log, 'aaaa!')",
+      ];
+      for (const text of ["a".repeat(2048), "a".repeat(500), "1.".repeat(250)]) {
+        for (const query of accepted) {
+          expect(textHighlighter.extractHighlightPatterns(query)).toHaveLength(1);
+          const startedAt = performance.now();
+          textHighlighter.splitTextByKeywords(
+            text,
+            [],
+            textHighlighter.extractHighlightPatterns(query),
+          );
+          textHighlighter.processTextWithHighlights(text, query, {});
+          expect(performance.now() - startedAt).toBeLessThan(1000);
+        }
+      }
+    });
+
+    it("should apply re_match anchors to the whole value, not each token", () => {
+      expect(highlight("ERROR one ERROR two", "re_match(log, '^ERROR')")).toEqual(["ERROR"]);
+      const html = textHighlighter.processTextWithHighlights(
+        "ERROR one ERROR two",
+        "re_match(log, '^ERROR')",
+        {},
+      );
+      expect(html.match(/log-highlighted/g)).toHaveLength(1);
+      expect(html).toMatch(/^<span class="log-highlighted">ERROR<\/span>/);
+    });
+
+    it("should highlight str_match terms that contain a space", () => {
+      expect(
+        highlight("dial tcp: connection refused", "str_match(f, 'connection refused')"),
+      ).toEqual(["connection refused"]);
+      const html = textHighlighter.processTextWithHighlights(
+        "dial tcp: connection refused",
+        "str_match(f, 'connection refused')",
+        {},
+      );
+      expect(html).toContain(
+        '<span class="log-highlighted">connection</span><span class="log-highlighted"> </span><span class="log-highlighted">refused</span>',
+      );
+    });
+
+    it("should keep escaping and semantic colours around pattern matches", () => {
+      const html = textHighlighter.processTextWithHighlights(
+        "<b> 10.0.0.1 failed",
+        "str_match(f, 'failed')",
+        {},
+      );
+      expect(html).toContain("&lt;b&gt;");
+      expect(html).toContain('<span class="log-ip">10.0.0.1</span>');
+      expect(html).toContain('<span class="log-highlighted">failed</span>');
+    });
+
+    it("should apply str_match literals to values longer than the regex text limit", () => {
+      const text = `${"x ".repeat(400)}needle`;
+      expect(highlight(text, "str_match(f, 'needle')")).toEqual(["needle"]);
+      expect(highlight(text, "re_match(f, 'need.e')")).toEqual([]);
     });
 
     it("should ignore zero-length regex matches without hanging", () => {
