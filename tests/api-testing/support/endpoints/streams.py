@@ -22,6 +22,24 @@ class StreamsAPI:
     def delete(self, name: str, *, type_: str = "logs", org: str | None = None) -> requests.Response:
         return self.c.delete(f"streams/{name}?type={type_}", org=org)
 
+    def update_settings(
+        self,
+        name: str,
+        *,
+        type_: str = "logs",
+        org: str | None = None,
+        **overrides: Any,
+    ) -> requests.Response:
+        """PATCH stream settings: only the keys you pass are applied.
+
+        `UpdateStreamSettings` is entirely Option/serde-default and the server
+        applies each field only when it is `Some`, so sending a "complete"
+        document would quietly overwrite every setting the caller did not mean
+        to touch. List-valued fields take the add/remove form —
+        `update_settings(s, full_text_search_keys={"add": ["msg"]})`.
+        """
+        return self.c.put(f"streams/{name}/settings?type={type_}", json=overrides, org=org)
+
     def ingest_json(
         self,
         stream: str,
