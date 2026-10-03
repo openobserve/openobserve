@@ -517,6 +517,54 @@ export default class DashboardactionPage {
   }
 
   /**
+   * Names of the series every mounted ECharts instance under `scopeSelector`
+   * is drawing — the legend's entries. The legend is painted on the canvas, so
+   * it has no DOM text to assert on.
+   *
+   * Reads ChartRenderer's `chart` getter through the vnode tree from #app:
+   * `__vueParentComponent` is dev-only, while `_vnode` also exists in prod builds.
+   */
+  async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    return this.page.evaluate((scopeSel) => {
+      const scopes = Array.from(document.querySelectorAll(scopeSel));
+      const names = new Set();
+      const visited = new Set();
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const state = comp.setupState || {};
+          let chart = null;
+          try {
+            chart = "chart" in state ? state.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = state.chartRef;
+          if (
+            chart &&
+            typeof chart.getOption === "function" &&
+            host instanceof Element &&
+            scopes.some((scope) => scope.contains(host))
+          ) {
+            try {
+              for (const s of chart.getOption()?.series ?? []) if (s?.name) names.add(String(s.name));
+            } catch {
+              // A disposed instance throws; it draws nothing anyway.
+            }
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return [...names];
+    }, scopeSelector);
+  }
+
+  /**
    * Get a dashboard row by name for clicking
    * @param {string} dashboardName - Name of the dashboard
    * @returns {Locator} The dashboard row locator

@@ -1240,6 +1240,34 @@ export default class DashboardPanelConfigs {
     await removeBtn.click();
   }
 
+  /** The offset picker trigger of added time-shift row `index` (the 0m reference row has none). */
+  timeShiftPickerTrigger(index = 0) {
+    return this.page
+      .locator(`[data-test="dashboard-addpanel-config-time-shift-remove-${index}"]`)
+      .locator("xpath=..")
+      .locator('[data-test="date-time-btn"]');
+  }
+
+  async openTimeShiftPicker(index = 0) {
+    await this.timeShiftPickerTrigger(index).click();
+  }
+
+  /** A relative-offset cell in the open picker, e.g. (1, "d") for "1 day". */
+  timeShiftOffsetOption(amount, unit) {
+    return this.page.locator(`[data-test="date-time-relative-${amount}-${unit}-btn"]:visible`);
+  }
+
+  /** Set time-shift row `index` to a relative offset such as (1, "d"), then close the picker. */
+  async setTimeShiftOffset(index, amount, unit) {
+    await this.openTimeShiftPicker(index);
+    const option = this.timeShiftOffsetOption(amount, unit);
+    await option.click();
+    // The picker stays open after a pick.
+    await this.page.keyboard.press("Escape");
+    await option.waitFor({ state: "hidden" });
+    await expect(this.timeShiftPickerTrigger(index)).toContainText(new RegExp(`\\b${amount}\\b`));
+  }
+
   // ========== Color By Series ==========
 
   /**

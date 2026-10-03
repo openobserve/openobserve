@@ -14,9 +14,11 @@ import {
   setupTablePanelWithConfig,
   setupMetricPanelWithConfig,
   reopenPanelConfig,
+  buildPromQLPanel,
 } from "./utils/configPanelHelpers.js";
 import { verifyColorOnCanvas, applyAndWaitForRender } from "./utils/canvasHelpers.js";
 const testLogger = require('../utils/test-logger.js');
+const { TIME_SHIFT_METRIC, seedTimeShiftMetric } = require('../utils/metrics-explore-seed.js');
 
 test.describe.configure({ mode: "parallel" });
 // No file-level `retries` override: it used to pin this file to 1 retry, which both
@@ -55,6 +57,53 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying time shift count persists after save");
+    await reopenPanelConfig(page, pm);
+    await expect(pm.dashboardPanelConfigs.timeShiftRemoveButtons).toHaveCount(1);
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("time shift (PromQL): 10m offset → legend gains a '(10 Minutes ago)' series; months not offered; offset persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    // One gauge series back-filled over 40 minutes. The offset is minutes, not
+    // a day: see seedTimeShiftMetric for why.
+    await seedTimeShiftMetric(page.request);
+
+    await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", query: TIME_SHIFT_METRIC });
+    await pm.dashboardPanelConfigs.openConfigPanel();
+
+    await pm.dashboardPanelConfigs.addTimeShift();
+    await expect(pm.dashboardPanelConfigs.timeShiftRemoveButtons).toHaveCount(1);
+
+    // A calendar month is not one fixed delta, so a PromQL shift must not offer it.
+    await pm.dashboardPanelConfigs.openTimeShiftPicker(0);
+    await expect(pm.dashboardPanelConfigs.timeShiftOffsetOption(10, "m")).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.timeShiftOffsetOption(1, "M")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    await pm.dashboardPanelConfigs.setTimeShiftOffset(0, 10, "m");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Assert on the saved panel: in PromQL custom mode the editor's preview sits
+    // in a sliver under the query editor and was seen not to draw its chart.
+    await pm.dashboardPanelActions.savePanel();
+    let names = [];
+    await expect
+      .poll(async () => (names = await pm.dashboardPanelActions.getChartSeriesNames()), {
+        timeout: 30000,
+        message: "a '(10 Minutes ago)' series should be drawn next to the current one",
+      })
+      .toContainEqual(expect.stringMatching(/ \(10 Minutes ago\)$/));
+    testLogger.info("PromQL time shift series", { names });
+
+    // One seeded series → exactly one shifted copy, labelled after its current twin.
+    const shifted = names.filter((n) => n.endsWith(" (10 Minutes ago)"));
+    expect(shifted).toHaveLength(1);
+    expect(names).toContain(shifted[0].slice(0, -" (10 Minutes ago)".length));
+
     await reopenPanelConfig(page, pm);
     await expect(pm.dashboardPanelConfigs.timeShiftRemoveButtons).toHaveCount(1);
     await pm.dashboardPanelActions.savePanel();

@@ -71,6 +71,20 @@ export class MetricsExplorerPage {
         this.streamListUrlPart = '/streams?type=metrics';
         this.promqlQueryUrlPart = '/prometheus/api/v1/query_range';
 
+        // ===== DETAIL VIEW (MetricDetailView / MetricBreakdown) =====
+        // Opened by the card's Details button; driven by the URL's `metric` param.
+        this.cardDetailsPrefix = 'metrics-explorer-card-details-';
+        this.detailRoot = '[data-test="metrics-detail"]';
+        this.detailTitle = '[data-test="metrics-detail-title"]';
+        this.detailClose = '[data-test="metrics-detail-close"]';
+        this.breakdownTable = '[data-test="metrics-breakdown-table"]';
+        this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
+        this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
+        this.relatedList = '[data-test="metrics-detail-related"]';
+        this.labelChipPrefix = 'metrics-explorer-label-chip-';
+        // OTable rows / cells, scoped by the table they sit in.
+        this.tableRow = '[data-test^="o2-table-row-"]';
+
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
         this.loadErrorState = '[data-test="metrics-explorer-load-error"]';
@@ -543,6 +557,81 @@ export class MetricsExplorerPage {
             el.click();
             el.click();
         });
+    }
+
+    /* ----------------------------------------------------------- detail view */
+
+    /**
+     * Open a metric's detail view from its card. Details sits in the card's
+     * action row, which only expands on hover — so hover first, as a user does.
+     */
+    async openMetricDetails(metric) {
+        await this.cardRoot(metric).hover();
+        await this.page.locator(`[data-test="${this.cardDetailsPrefix}${metric}"]`).click();
+    }
+
+    async expectDetailOpen(metric) {
+        await expect(this.page.locator(this.detailTitle)).toHaveText(metric, { timeout: 30000 });
+        await expect.poll(() => this.getQueryParam('metric'), { timeout: 15000 }).toBe(metric);
+    }
+
+    /** Detail tabs carry no data-test of their own; OTab stamps its name on the trigger. */
+    detailTab(name) {
+        return this.page.locator(`${this.detailRoot} [role="tab"][data-otab-name="${name}"]`);
+    }
+
+    async selectDetailTab(name) {
+        await this.detailTab(name).click();
+        await expect.poll(() => this.getQueryParam('tab'), { timeout: 15000 }).toBe(name);
+    }
+
+    /** A label row of the Breakdown table, matched on its label cell exactly. */
+    breakdownRow(label) {
+        return this.page
+            .locator(`${this.breakdownTable} ${this.tableRow}`)
+            .filter({
+                has: this.page.locator('[data-test="o2-table-cell-label"]', {
+                    hasText: new RegExp(`^\\s*${label}\\s*$`),
+                }),
+            });
+    }
+
+    async selectBreakdownLabel(label) {
+        await this.breakdownRow(label).locator('[data-test="o2-table-cell-label"]').click();
+        await expect.poll(() => this.getQueryParam('breakdown_label'), { timeout: 15000 }).toBe(label);
+    }
+
+    breakdownValue(label, value) {
+        return this.page.locator(`[data-test="metrics-breakdown-value-${label}-${value}"]`);
+    }
+
+    breakdownDistinct(label) {
+        return this.page.locator(`[data-test="metrics-breakdown-distinct-${label}"]`);
+    }
+
+    /** "Add to filter" (=) on one value of the Breakdown table. */
+    async addBreakdownFilter(label, value) {
+        await this.page.locator(`[data-test="metrics-breakdown-add-${label}-${value}"]`).click();
+    }
+
+    /** The filter bar's chip for a label matcher. */
+    labelChip(label) {
+        return this.page.locator(`[data-test="${this.labelChipPrefix}${label}"]`);
+    }
+
+    /** A related metric's row, matched on its name cell exactly. */
+    relatedRow(metric) {
+        return this.page
+            .locator(`${this.relatedList} ${this.tableRow}`)
+            .filter({
+                has: this.page.locator('[data-test="o2-table-cell-name"]', {
+                    hasText: new RegExp(`^\\s*${metric}\\s*$`),
+                }),
+            });
+    }
+
+    async closeDetail() {
+        await this.page.locator(this.detailClose).click();
     }
 
     /* ------------------------------------------------------------- network */
