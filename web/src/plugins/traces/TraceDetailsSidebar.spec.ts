@@ -27,7 +27,11 @@ const {
   mockPromptResolve,
   mockSearch,
   mockSearchObj,
+  mockStreamNameList,
+  mockStreamSchema,
 } = vi.hoisted(() => ({
+  mockStreamNameList: vi.fn().mockResolvedValue({ data: { list: [] } }),
+  mockStreamSchema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
   mockNavigateToLogs: vi.fn(),
@@ -41,6 +45,13 @@ const {
 vi.mock("@/services/search", () => ({
   default: { search: mockSearch },
 }));
+
+vi.mock("@/services/stream", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/stream")>();
+  return {
+    default: { ...actual.default, nameList: mockStreamNameList, schema: mockStreamSchema },
+  };
+});
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
@@ -92,6 +103,7 @@ import useTraceDetails from "@/composables/traces/useTraceDetails";
 import config from "@/aws-exports";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
+import { queryClient } from "@/composables/query/queryClient";
 import { createStore } from "vuex";
 
 // CSS.supports is not available in jsdom but used by TenstackTable
@@ -2392,6 +2404,201 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
     await flushPromises();
     expect(mockSearch).toHaveBeenCalledTimes(1);
     expect(percentileTag(w)!.text()).toContain("> p99");
+    w.unmount();
+  });
+});
+
+describe("TraceDetailsSidebar — span to profile link", () => {
+  const SPAN = {
+    ...mockSpan,
+    start_time: 1752490492000000000,
+    end_time: 1752490493000000000,
+  };
+  const WINDOW_START = 1752490492000000 - 60_000_000;
+  const WINDOW_END = 1752490493000000 + 60_000_000;
+  const BUTTON = '[data-test="trace-details-sidebar-header-toolbar-view-profile-btn"]';
+  const FULL_SCHEMA = ["trace_id", "span_id", "service_name", "profile_type"];
+
+  let profileHits: Record<string, unknown[] | Error>;
+  let schemas: Record<string, string[]>;
+
+  const setStreams = (streams: Record<string, string[]>) => {
+    schemas = streams;
+    mockStreamNameList.mockResolvedValue({
+      data: { list: Object.keys(streams).map((name) => ({ name })) },
+    });
+  };
+
+  const profileCalls = () =>
+    mockSearch.mock.calls.filter(([arg]) => arg.page_type === "profiles").map(([arg]) => arg);
+
+  async function mountWith(spanOverrides: Record<string, unknown> = {}, props = {}) {
+    const w = mountSidebar({ span: { ...SPAN, ...spanOverrides }, ...props });
+    await flushPromises();
+    return w;
+  }
+
+  beforeEach(() => {
+    queryClient.clear();
+    mockStreamNameList.mockClear();
+    profileHits = {};
+    setStreams({});
+    mockStreamSchema.mockImplementation(async (_org: string, stream: string) => ({
+      data: { schema: (schemas[stream] ?? []).map((name) => ({ name })) },
+    }));
+    mockSearch.mockReset();
+    mockSearch.mockImplementation(async (arg: any) => {
+      if (arg.page_type !== "profiles") return { data: { hits: [] } };
+      const stream = /FROM "([^"]+)"/.exec(arg.query.query.sql)?.[1] ?? "";
+      const hits = profileHits[stream] ?? [];
+      if (hits instanceof Error) throw hits;
+      return { data: { hits } };
+    });
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    mockStreamNameList.mockResolvedValue({ data: { list: [] } });
+  });
+
+  it("lists profile streams and queries the span's ids over its window ± 60 s", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    const w = await mountWith();
+    expect(mockStreamNameList).toHaveBeenCalledWith("test-org", "profiles", false);
+    const calls = profileCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].org_identifier).toBe("test-org");
+    expect(calls[0].query.query).toMatchObject({ start_time: WINDOW_START, end_time: WINDOW_END });
+    expect(calls[0].query.query.sql).toBe(
+      "SELECT profile_type, profile_unit, service_name, COUNT(*) AS c " +
+        `FROM "prof" WHERE trace_id = '${SPAN.trace_id}' AND span_id = '${SPAN.span_id}' ` +
+        "GROUP BY profile_type, profile_unit, service_name",
+    );
+    w.unmount();
+  });
+
+  it("selects service_name only when the stream schema has it", async () => {
+    setStreams({ prof: ["trace_id", "span_id"] });
+    const w = await mountWith();
+    const sql: string = profileCalls()[0].query.query.sql;
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("GROUP BY profile_type, profile_unit");
+    w.unmount();
+  });
+
+  it("skips streams whose schema lacks trace_id or span_id without querying them", async () => {
+    setStreams({ noTrace: ["span_id"], noSpan: ["trace_id"], prof: FULL_SCHEMA });
+    const w = await mountWith();
+    const calls = profileCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].query.query.sql).toContain('FROM "prof"');
+    w.unmount();
+  });
+
+  it("shows View profile only when a stream has matching samples", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [
+      { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "api", c: 3 },
+    ];
+    const w = await mountWith();
+    expect(w.find(BUTTON).exists()).toBe(true);
+    expect(w.find(BUTTON).text()).toBe("View profile");
+    w.unmount();
+  });
+
+  it.each([
+    ["no stream has rows", () => {}],
+    [
+      "the search returns 403",
+      () =>
+        (profileHits.prof = Object.assign(new Error("forbidden"), { response: { status: 403 } })),
+    ],
+    ["listing the streams fails", () => mockStreamNameList.mockRejectedValue(new Error("boom"))],
+  ])("hides View profile when %s", async (_label, arrange) => {
+    setStreams({ prof: FULL_SCHEMA });
+    arrange();
+    const w = await mountWith();
+    expect(w.find(BUTTON).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("neither detects nor shows View profile outside standalone mode", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    const w = await mountWith({}, { parentMode: "embedded" });
+    expect(profileCalls()).toHaveLength(0);
+    expect(w.find(BUTTON).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("runs at most three profile queries at a time", async () => {
+    setStreams({ a: FULL_SCHEMA, b: FULL_SCHEMA, c: FULL_SCHEMA, d: FULL_SCHEMA, e: FULL_SCHEMA });
+    const pending: Array<() => void> = [];
+    mockSearch.mockImplementation((arg: any) => {
+      if (arg.page_type !== "profiles") return Promise.resolve({ data: { hits: [] } });
+      return new Promise((resolve) => pending.push(() => resolve({ data: { hits: [] } })));
+    });
+    const w = await mountWith();
+    expect(profileCalls()).toHaveLength(3);
+    pending.splice(0).forEach((resolve) => resolve());
+    await flushPromises();
+    expect(profileCalls()).toHaveLength(5);
+    w.unmount();
+  });
+
+  it("navigates to the first matching stream's flame graph, preferring CPU", async () => {
+    setStreams({ first: FULL_SCHEMA, second: FULL_SCHEMA });
+    profileHits.first = [
+      { profile_type: "alloc_space", profile_unit: "bytes", service_name: "worker", c: 9 },
+      { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "worker", c: 2 },
+    ];
+    profileHits.second = [
+      { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "other", c: 5 },
+    ];
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    const w = await mountWith({ trace_id: "t,1", span_id: "s=1" });
+    await w.find(BUTTON).trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "profiles",
+      query: {
+        org_identifier: "test-org",
+        stream: "first",
+        from: String(WINDOW_START),
+        to: String(WINDOW_END),
+        service_name: "worker",
+        profile_type: "cpu",
+        profile_unit: "nanoseconds",
+        filters: "trace_id=t%2C1,span_id=s%3D1",
+        view: "flame",
+      },
+    });
+    push.mockRestore();
+    w.unmount();
+  });
+
+  it("omits service_name from the navigation when the profile stream has none", async () => {
+    setStreams({ prof: ["trace_id", "span_id"] });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    const w = await mountWith();
+    await w.find(BUTTON).trigger("click");
+    expect(push.mock.calls[0][0]).toMatchObject({ name: "profiles" });
+    expect((push.mock.calls[0][0] as any).query).not.toHaveProperty("service_name");
+    push.mockRestore();
+    w.unmount();
+  });
+
+  it("detects once per span and lists the streams once", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    const w = await mountWith();
+    await w.setProps({ span: { ...SPAN, span_id: "other-span" } });
+    await flushPromises();
+    await w.setProps({ span: { ...SPAN } });
+    await flushPromises();
+    expect(profileCalls()).toHaveLength(2);
+    expect(mockStreamNameList).toHaveBeenCalledTimes(1);
+    expect(w.find(BUTTON).exists()).toBe(true);
     w.unmount();
   });
 });

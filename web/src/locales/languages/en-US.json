@@ -10421,6 +10421,7 @@
     "openInFullView": "Open in full view",
     "viewLogs": "View Logs",
     "viewLogsUnavailable": "Could not open logs for this span.",
+    "viewProfile": "View profile",
     "backToLogs": "Back to Logs",
     "openInTraces": "Open in Traces",
     "loadingStream": "Loading Stream...",
