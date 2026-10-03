@@ -28,7 +28,15 @@ pub(super) struct WriteRequest<'a> {
 pub(super) struct TimeSeries<'a> {
     pub labels: Vec<(&'a str, &'a str)>,
     pub samples: Vec<Sample>,
+    pub exemplars: Vec<Exemplar<'a>>,
     pub histograms: Vec<prometheus_rpc::Histogram>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(super) struct Exemplar<'a> {
+    pub labels: Vec<(&'a str, &'a str)>,
+    pub value: f64,
+    pub timestamp: i64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -65,20 +73,22 @@ pub(super) fn decode(body: &[u8]) -> anyhow::Result<WriteRequest<'_>> {
 fn decode_timeseries(body: &[u8]) -> anyhow::Result<TimeSeries<'_>> {
     let mut labels = Vec::new();
     let mut samples = Vec::new();
+    let mut exemplars = Vec::new();
     let mut histograms = Vec::new();
     let mut fields = Fields::new(body);
     while let Some((field, wire)) = fields.next_tag()? {
         match (field, wire) {
             (1, WIRE_LEN) => labels.push(decode_label(fields.bytes()?)?),
             (2, WIRE_LEN) => samples.push(decode_sample(fields.bytes()?)?),
+            (3, WIRE_LEN) => exemplars.push(decode_exemplar(fields.bytes()?)?),
             (4, WIRE_LEN) => histograms.push(prometheus_rpc::Histogram::decode(fields.bytes()?)?),
-            // exemplars (3) are never stored, so they are not even walked
             _ => fields.skip(wire)?,
         }
     }
     Ok(TimeSeries {
         labels,
         samples,
+        exemplars,
         histograms,
     })
 }
@@ -110,6 +120,26 @@ fn decode_sample(body: &[u8]) -> anyhow::Result<Sample> {
         }
     }
     Ok(sample)
+}
+
+fn decode_exemplar(body: &[u8]) -> anyhow::Result<Exemplar<'_>> {
+    let mut labels = Vec::new();
+    let mut value = 0.0;
+    let mut timestamp = 0;
+    let mut fields = Fields::new(body);
+    while let Some((field, wire)) = fields.next_tag()? {
+        match (field, wire) {
+            (1, WIRE_LEN) => labels.push(decode_label(fields.bytes()?)?),
+            (2, WIRE_FIXED64) => value = f64::from_bits(fields.fixed64()?),
+            (3, WIRE_VARINT) => timestamp = fields.varint()? as i64,
+            _ => fields.skip(wire)?,
+        }
+    }
+    Ok(Exemplar {
+        labels,
+        value,
+        timestamp,
+    })
 }
 
 /// A cursor over one message's fields.
@@ -280,9 +310,18 @@ mod tests {
             ]
         );
         assert_eq!(first.histograms, expected.timeseries[0].histograms);
+        assert_eq!(
+            first.exemplars,
+            vec![Exemplar {
+                labels: vec![("trace_id", "abc")],
+                value: 3.0,
+                timestamp: 7
+            }]
+        );
         let second = &decoded.timeseries[1];
         assert_eq!(second.labels, vec![("__name__", "empty_value"), ("v", "")]);
         assert!(second.samples.is_empty() && second.histograms.is_empty());
+        assert!(second.exemplars.is_empty());
         assert_eq!(decoded.metadata, expected.metadata);
     }
 
@@ -315,6 +354,62 @@ mod tests {
                 timestamp: 9
             }]
         );
+        assert!(decoded.timeseries[0].exemplars.is_empty());
+    }
+
+    #[test]
+    fn test_decode_exemplars_multiple_labels_values_and_timestamps() {
+        let expected = prometheus_rpc::WriteRequest {
+            timeseries: vec![prometheus_rpc::TimeSeries {
+                labels: vec![label("__name__", "m")],
+                samples: vec![prometheus_rpc::Sample {
+                    value: 1.0,
+                    timestamp: 1_700_000_000_000,
+                }],
+                exemplars: vec![
+                    prometheus_rpc::Exemplar {
+                        labels: vec![label("trace_id", "abc"), label("span_id", "def")],
+                        value: 2.5,
+                        timestamp: 1_700_000_000_005,
+                    },
+                    prometheus_rpc::Exemplar {
+                        labels: vec![],
+                        value: -1.0,
+                        timestamp: 1_700_000_000_010,
+                    },
+                ],
+                histograms: vec![],
+            }],
+            metadata: vec![],
+        };
+        let body = expected.encode_to_vec();
+        let decoded = decode(&body).unwrap();
+        assert_eq!(
+            decoded.timeseries[0].exemplars,
+            vec![
+                Exemplar {
+                    labels: vec![("trace_id", "abc"), ("span_id", "def")],
+                    value: 2.5,
+                    timestamp: 1_700_000_000_005
+                },
+                Exemplar {
+                    labels: vec![],
+                    value: -1.0,
+                    timestamp: 1_700_000_000_010
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_decode_rejects_truncated_exemplar() {
+        let mut exemplar = Vec::new();
+        prost::encoding::message::encode(1, &label("trace_id", "abc"), &mut exemplar);
+        let mut ts = Vec::new();
+        prost::encoding::bytes::encode(3, &exemplar[..exemplar.len() - 1].to_vec(), &mut ts);
+        let mut body = Vec::new();
+        prost::encoding::bytes::encode(1, &ts, &mut body);
+        assert!(decode(&body).is_err());
     }
 
     #[test]

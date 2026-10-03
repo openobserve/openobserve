@@ -78,6 +78,9 @@ struct RecordSink<'a> {
     json_data_by_stream: &'a mut JsonDataByStream,
 }
 
+/// Columns the fallback hash ignores, so a record carrying exemplars hashes with its siblings.
+const PENDING_HASH_EXCLUDED: &[&str] = &[VALUE_LABEL, EXEMPLARS_LABEL];
+
 /// HA replica election, run once per request at the first record that will actually be written.
 struct HaGate<'a> {
     first_line: &'a mut bool,
@@ -384,8 +387,11 @@ pub async fn remote_write(
         // every sample of a series shares its labels, so the identity is loop-invariant
         let series_hash = super::signature_of_series_labels(&label_pairs);
 
+        // like the OTLP writer, which never takes the columnar path with exemplars
+        let has_exemplars = !event.exemplars.is_empty();
         // a label the schema has not seen goes down the JSON path, which evolves the schema
-        if event.histograms.is_empty()
+        if !has_exemplars
+            && event.histograms.is_empty()
             && let Some(columnar) = columnar_streams.get_mut(&metric_name)
             && let Some(label_bytes) = columnar.resolve_columns(&label_pairs)
         {
@@ -420,10 +426,11 @@ pub async fn remote_write(
             && !matches!(user_defined_schema_map.get(&metric_name), Some(Some(_))))
         .then_some(series_hash);
 
-        // parse samples
-        let sample_total = event.samples.len();
-        let can_move_labels = event.histograms.is_empty();
-        for (sample_idx, sample) in event.samples.into_iter().enumerate() {
+        // samples buffer through a pending record so exemplars land on the last one written
+        let exemplar_records = prom_exemplar_records(&event.exemplars);
+        let mut last_record: Option<json::Map<String, json::Value>> = None;
+        let mut last_timestamp = 0;
+        for sample in event.samples.into_iter() {
             sample_count += 1;
             // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
             // writer so the two ingestion paths cannot drift apart on this.
@@ -438,19 +445,40 @@ pub async fn remote_write(
             }
 
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-            // the last sample owns the label set outright; nothing reads it afterwards
-            let value = if can_move_labels && sample_idx + 1 == sample_total {
-                build_metric_record(std::mem::take(&mut labels), sample_val, timestamp)
-            } else {
-                build_metric_record(labels.clone(), sample_val, timestamp)
-            };
-
-            // ready to be buffered for downstream processing
+            if let Some(record) = last_record.take() {
+                buffer_metric_record(
+                    &metric_name,
+                    json::Value::Object(record),
+                    last_timestamp,
+                    known_hash,
+                    &mut sink,
+                );
+            }
+            last_record = Some(build_metric_record(labels.clone(), sample_val, timestamp));
+            last_timestamp = timestamp;
+        }
+        if let Some(mut record) = last_record.take() {
+            if !exemplar_records.is_empty() {
+                attach_exemplars(&mut record, &exemplar_records);
+            }
             buffer_metric_record(
                 &metric_name,
-                json::Value::Object(value),
-                timestamp,
+                json::Value::Object(record),
+                last_timestamp,
                 known_hash,
+                &mut sink,
+            );
+        } else if !exemplar_records.is_empty() {
+            if !gate.admit().await {
+                ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                return Ok(());
+            }
+            sample_count += 1;
+            build_exemplar_only_record(
+                &metric_name,
+                std::mem::take(&mut labels),
+                known_hash,
+                &exemplar_records,
                 &mut sink,
             );
         }
@@ -1081,8 +1109,8 @@ async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [Pendi
 fn finish_identity_columns(json_data: &mut [PendingRecord]) {
     for (val_map, timestamp, known_hash) in json_data.iter_mut() {
         // a `__hash__` the handler did not compute is an input field and gets overwritten
-        let hash =
-            known_hash.unwrap_or_else(|| super::signature_without_labels(val_map, &[VALUE_LABEL]));
+        let hash = known_hash
+            .unwrap_or_else(|| super::signature_without_labels(val_map, PENDING_HASH_EXCLUDED));
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         val_map.insert(
             TIMESTAMP_COL_NAME.to_string(),
@@ -1105,6 +1133,63 @@ fn build_metric_record(
         json::Value::Number(timestamp.into()),
     );
     record
+}
+
+/// Decoded exemplars as the OTLP writer's `exemplars` entries.
+fn prom_exemplar_records(exemplars: &[prom_decode::Exemplar<'_>]) -> Vec<json::Value> {
+    exemplars
+        .iter()
+        .filter_map(|exemplar| {
+            let value = super::sanitize_metric_value(exemplar.value)?;
+            let mut rec = json::Map::with_capacity(exemplar.labels.len() + 2);
+            for (name, val) in &exemplar.labels {
+                rec.insert((*name).to_string(), json::Value::String((*val).to_string()));
+            }
+            rec.insert(
+                VALUE_LABEL.to_string(),
+                json::Number::from_f64(value).map_or(json::Value::Null, json::Value::Number),
+            );
+            rec.insert(
+                TIMESTAMP_COL_NAME.to_string(),
+                json::Value::Number(parse_i64_to_timestamp_micros(exemplar.timestamp).into()),
+            );
+            Some(json::Value::Object(rec))
+        })
+        .collect()
+}
+
+/// Stamps a series' exemplars onto its last record, where the exemplar loader reads them.
+fn attach_exemplars(record: &mut json::Map<String, json::Value>, exemplars: &[json::Value]) {
+    record.insert(
+        EXEMPLARS_LABEL.to_string(),
+        json::Value::Array(exemplars.to_vec()),
+    );
+}
+
+/// A host record for a series whose samples all dropped, so its exemplars stay queryable.
+fn build_exemplar_only_record(
+    metric_name: &str,
+    labels: json::Map<String, json::Value>,
+    known_hash: Option<u64>,
+    exemplars: &[json::Value],
+    sink: &mut RecordSink<'_>,
+) {
+    let Some(timestamp) = exemplars
+        .iter()
+        .filter_map(|v| v.get(TIMESTAMP_COL_NAME)?.as_i64())
+        .min()
+    else {
+        return;
+    };
+    let mut record = build_metric_record(labels, 0.0, timestamp);
+    attach_exemplars(&mut record, exemplars);
+    buffer_metric_record(
+        metric_name,
+        json::Value::Object(record),
+        timestamp,
+        known_hash,
+        sink,
+    );
 }
 
 fn buffer_metric_record(
@@ -1298,6 +1383,54 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn prom_exemplar_records_match_the_otlp_shape() {
+        let records = prom_exemplar_records(&[
+            prom_decode::Exemplar {
+                labels: vec![("trace_id", "abc"), ("span_id", "def")],
+                value: 2.5,
+                timestamp: 1_700_000_000_005,
+            },
+            prom_decode::Exemplar {
+                labels: vec![("trace_id", "abc")],
+                value: f64::NAN,
+                timestamp: 1_700_000_000_006,
+            },
+        ]);
+        assert_eq!(records.len(), 1);
+        let rec = records[0].as_object().unwrap();
+        assert_eq!(rec["trace_id"], json::json!("abc"));
+        assert_eq!(rec["span_id"], json::json!("def"));
+        assert_eq!(rec[VALUE_LABEL], json::json!(2.5));
+        assert_eq!(
+            rec[TIMESTAMP_COL_NAME],
+            json::json!(parse_i64_to_timestamp_micros(1_700_000_000_005))
+        );
+    }
+
+    #[test]
+    fn prom_exemplar_records_feed_the_exemplar_query_path() {
+        use config::meta::promql::value::Exemplar;
+        let records = prom_exemplar_records(&[prom_decode::Exemplar {
+            labels: vec![("trace_id", "abc"), ("span_id", "def")],
+            value: 2.5,
+            timestamp: 1_700_000_000_005,
+        }]);
+        let exemplar = Exemplar::from(records[0].as_object().unwrap());
+        assert_eq!(exemplar.value, 2.5);
+        assert_eq!(
+            exemplar.timestamp,
+            parse_i64_to_timestamp_micros(1_700_000_000_005)
+        );
+        let labels: Vec<(&str, &str)> = exemplar
+            .labels
+            .iter()
+            .map(|l| (l.name.as_str(), l.value.as_str()))
+            .collect();
+        assert!(labels.contains(&("trace_id", "abc")));
+        assert!(labels.contains(&("span_id", "def")));
+    }
 
     #[test]
     fn metadata_sql_round_trips_matcher_values() {
