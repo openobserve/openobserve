@@ -240,7 +240,7 @@ impl DbAdapter for PostgresAdapter {
         &self,
         table: &str,
         columns: &[String],
-        primary_keys: &[String],
+        _primary_keys: &[String],
         rows: &[Row],
     ) -> Result<u64, anyhow::Error> {
         if rows.is_empty() {
@@ -250,43 +250,13 @@ impl DbAdapter for PostgresAdapter {
         // Get column info for proper null type binding
         let column_infos = self.get_columns(table).await?;
 
-        let cols = columns
-            .iter()
-            .map(|c| format!("\"{}\"", c))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let placeholders = (1..=columns.len())
-            .map(|i| format!("${}", i))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let pk_cols = primary_keys
-            .iter()
-            .map(|c| format!("\"{}\"", c))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        // Build DO UPDATE SET clause
-        let updates = columns
-            .iter()
-            .filter(|c| !primary_keys.contains(c))
-            .map(|c| format!("\"{}\" = EXCLUDED.\"{}\"", c, c))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        // Use OVERRIDING SYSTEM VALUE to allow inserting into IDENTITY columns
-        let sql = if updates.is_empty() {
-            format!(
-                "INSERT INTO \"{}\" ({}) OVERRIDING SYSTEM VALUE VALUES ({}) ON CONFLICT ({}) DO NOTHING",
-                table, cols, placeholders, pk_cols
-            )
-        } else {
-            format!(
-                "INSERT INTO \"{}\" ({}) OVERRIDING SYSTEM VALUE VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}",
-                table, cols, placeholders, pk_cols, updates
-            )
-        };
+        // ON CONFLICT must name a key the target has. The source's key is not always
+        // one: SQLite keys file_list, file_list_history and file_list_dump_stats on
+        // `id`, but Postgres creates them partitioned with no primary key, and
+        // `ON CONFLICT ("id")` then fails with "no unique or exclusion constraint
+        // matching the ON CONFLICT specification".
+        let target_keys = self.get_primary_keys(table).await?;
+        let sql = build_upsert_sql(table, columns, &target_keys);
 
         let mut count = 0u64;
         for row in rows {
@@ -412,5 +382,92 @@ impl DbAdapter for PostgresAdapter {
     async fn close(&self) -> Result<(), anyhow::Error> {
         self.pool.close().await;
         Ok(())
+    }
+}
+
+/// Build the per-row INSERT for `upsert_batch`. `OVERRIDING SYSTEM VALUE` keeps the
+/// source's IDENTITY values. With no primary key on the target, rows that hit any
+/// unique constraint are skipped rather than updated.
+fn build_upsert_sql(table: &str, columns: &[String], primary_keys: &[String]) -> String {
+    let cols = columns
+        .iter()
+        .map(|c| format!("\"{}\"", c))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let placeholders = (1..=columns.len())
+        .map(|i| format!("${}", i))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let insert =
+        format!("INSERT INTO \"{table}\" ({cols}) OVERRIDING SYSTEM VALUE VALUES ({placeholders})");
+
+    if primary_keys.is_empty() {
+        return format!("{insert} ON CONFLICT DO NOTHING");
+    }
+
+    let pk_cols = primary_keys
+        .iter()
+        .map(|c| format!("\"{}\"", c))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let updates = columns
+        .iter()
+        .filter(|c| !primary_keys.contains(c))
+        .map(|c| format!("\"{}\" = EXCLUDED.\"{}\"", c, c))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    if updates.is_empty() {
+        format!("{insert} ON CONFLICT ({pk_cols}) DO NOTHING")
+    } else {
+        format!("{insert} ON CONFLICT ({pk_cols}) DO UPDATE SET {updates}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cols(names: &[&str]) -> Vec<String> {
+        names.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn upsert_updates_non_key_columns_on_key_conflict() {
+        let sql = build_upsert_sql("meta", &cols(&["id", "key1", "value"]), &cols(&["id"]));
+        assert_eq!(
+            sql,
+            "INSERT INTO \"meta\" (\"id\", \"key1\", \"value\") OVERRIDING SYSTEM VALUE \
+             VALUES ($1, $2, $3) ON CONFLICT (\"id\") DO UPDATE SET \
+             \"key1\" = EXCLUDED.\"key1\", \"value\" = EXCLUDED.\"value\""
+        );
+    }
+
+    #[test]
+    fn upsert_does_nothing_when_every_column_is_key() {
+        let sql = build_upsert_sql(
+            "org_users",
+            &cols(&["org", "email"]),
+            &cols(&["org", "email"]),
+        );
+        assert!(
+            sql.ends_with("ON CONFLICT (\"org\", \"email\") DO NOTHING"),
+            "{sql}"
+        );
+    }
+
+    #[test]
+    fn upsert_without_target_key_skips_any_unique_conflict() {
+        // Partitioned file_list in Postgres has no primary key.
+        let sql = build_upsert_sql("file_list", &cols(&["id", "stream", "date", "file"]), &[]);
+        assert_eq!(
+            sql,
+            "INSERT INTO \"file_list\" (\"id\", \"stream\", \"date\", \"file\") OVERRIDING \
+             SYSTEM VALUE VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
+        );
+        assert!(!sql.contains("ON CONFLICT ("), "{sql}");
     }
 }
