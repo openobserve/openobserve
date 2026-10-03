@@ -15,7 +15,8 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait, sea_query::Expr,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, Func, LikeExpr, SimpleExpr},
 };
 
 use super::entity::query_history::{ActiveModel, Column, Entity, Model};
@@ -141,7 +142,7 @@ pub async fn list_with<C: ConnectionTrait>(
         select = select.filter(Column::Starred.eq(starred));
     }
     if let Some(q) = q.filter(|q| !q.is_empty()) {
-        select = select.filter(Column::Query.contains(q));
+        select = select.filter(query_matches(q));
     }
     Ok(select
         .order_by_desc(Column::CreatedAt)
@@ -150,6 +151,21 @@ pub async fn list_with<C: ConnectionTrait>(
         .offset(offset)
         .all(conn)
         .await?)
+}
+
+/// Case-insensitive literal substring match, the same on every backend:
+/// `%`, `_` and `\` in `q` match only themselves.
+fn query_matches(q: &str) -> SimpleExpr {
+    let mut pattern = String::with_capacity(q.len() + 2);
+    pattern.push('%');
+    for c in q.to_lowercase().chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            pattern.push('\\');
+        }
+        pattern.push(c);
+    }
+    pattern.push('%');
+    Expr::expr(Func::lower(Expr::col(Column::Query))).like(LikeExpr::new(pattern).escape('\\'))
 }
 
 pub async fn set_starred(
@@ -405,6 +421,57 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(queries(page), vec!["rate(http_total[5m])"]);
+    }
+
+    #[tokio::test]
+    async fn test_search_is_a_case_insensitive_literal_substring() {
+        let db = db().await;
+        for (i, query) in [
+            "cpu > 50%",
+            "rate(x[50m])",
+            "a_b",
+            "axb",
+            "rate(x[5m])",
+            r"a\b",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            record_with(&db, "default", A, query, json!({}), i as i64)
+                .await
+                .unwrap();
+        }
+        let search = |q: &'static str| {
+            let db = &db;
+            async move {
+                let mut rows: Vec<String> = list_with(db, "default", A, None, Some(q), 50, 0)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|r| r.query)
+                    .collect();
+                rows.sort();
+                rows
+            }
+        };
+        assert_eq!(search("50%").await, vec!["cpu > 50%"]);
+        assert_eq!(search("a_b").await, vec!["a_b"]);
+        assert_eq!(search(r"a\b").await, vec![r"a\b"]);
+        assert_eq!(search("RATE").await, vec!["rate(x[50m])", "rate(x[5m])"]);
+    }
+
+    // Postgres LIKE is case-sensitive, so the filter must lower both sides.
+    #[test]
+    fn test_search_sql_lowers_and_escapes_on_postgres() {
+        use sea_orm::{DbBackend, QueryTrait};
+        let sql = Entity::find()
+            .filter(query_matches("50%_X"))
+            .build(DbBackend::Postgres)
+            .to_string();
+        assert!(
+            sql.contains(r#"LOWER("query") LIKE E'%50\\%\\_x%' ESCAPE E'\\'"#),
+            "{sql}"
+        );
     }
 
     #[tokio::test]

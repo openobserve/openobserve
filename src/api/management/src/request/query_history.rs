@@ -99,7 +99,7 @@ fn list_limit(limit: Option<u64>) -> u64 {
     request_body(content = QueryHistoryRequest, description = "Query and its context", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = QueryHistoryEntry),
-        (status = 400, description = "Query or context too large", content_type = "application/json", body = ()),
+        (status = 400, description = "Query empty, or query or context too large", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -112,6 +112,9 @@ pub async fn record(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<QueryHistoryRequest>,
 ) -> Response {
+    if req.query.trim().is_empty() {
+        return MetaHttpResponse::bad_request("query is empty");
+    }
     if req.query.len() > MAX_QUERY_BYTES {
         return MetaHttpResponse::bad_request("query exceeds 16 KB");
     }
@@ -388,6 +391,20 @@ mod tests {
             StatusCode::OK
         );
         assert_eq!(get("default", &a, "").await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_blank_query_is_rejected() {
+        setup().await;
+        let a = user();
+        for query in ["", "   ", "\n\t "] {
+            assert_eq!(
+                post("default", &a, query, json!({})).await.0,
+                StatusCode::BAD_REQUEST,
+                "{query:?}"
+            );
+        }
+        assert!(get("default", &a, "").await.is_empty());
     }
 
     #[tokio::test]
