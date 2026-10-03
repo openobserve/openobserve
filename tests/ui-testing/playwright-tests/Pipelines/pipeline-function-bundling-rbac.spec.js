@@ -20,10 +20,15 @@
  * would run against a backend without OpenFGA, where the restricted user sees
  * everything — and both tests would pass while proving nothing.
  *
- * Root bypasses every check, so each enforcement assertion goes through
- * `reqAs()` (no Authorization header; identity is the session cookie) or a
- * browser signed in as the restricted user. `req()` is root and builds and tears
- * down fixtures only.
+ * Root bypasses every check, so both assertions run in a browser signed in as the
+ * restricted user. `req()` is root and builds and tears down fixtures only.
+ *
+ * The premise both of these rest on -- that `GET /functions` is filtered to what
+ * the caller may read, and that a clash with an invisible name answers 400
+ * `already exist` rather than 403 -- is server behaviour with nothing visual
+ * about it, so it is pinned by pytest in the enterprise repo at
+ * `tests/api-testing/tests/rbac/functions/functions/test_import_export_rbac.py`
+ * rather than through a browser.
  */
 
 const { test, expect } = require('../baseFixtures.js');
@@ -38,7 +43,6 @@ const {
   ns,
   uniq,
   req,
-  reqAs,
   createRole,
   setRolePerms,
   makeTracker,
@@ -210,26 +214,6 @@ test.describe(
     test.beforeEach(() => {
       test.skip(!hasRbac, 'needs an enterprise build with OpenFGA');
     });
-
-    test(
-      'the function list is filtered to what the user may read',
-      { tag: ['@P0'] },
-      async ({ browser }) => {
-        // The premise the other two rest on. Without it they would be asserting
-        // against an unfiltered list and could pass for the wrong reason.
-        const { context, page } = await loginAs(browser, partialUser, MEMBER_PASSWORD);
-        try {
-          const { status, body } = await reqAs(page, 'GET', '/functions');
-          expect(status).toBeLessThan(400);
-          const names = (body?.list ?? []).map((fn) => fn.name);
-          expect(names).toContain(visibleFn);
-          expect(names).not.toContain(hiddenFn);
-        } finally {
-          await context.close();
-        }
-        testLogger.info('Test completed');
-      },
-    );
 
     test(
       'an export leaves out a function the user cannot read and names it',
