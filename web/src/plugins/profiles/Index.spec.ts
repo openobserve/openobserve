@@ -1,6 +1,6 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { nextTick } from "vue";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick, reactive } from "vue";
 import Profiles from "@/plugins/profiles/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -27,13 +27,20 @@ vi.mock("@/services/stream", () => ({
   },
 }));
 
-vi.mock("@/services/profiles", () => ({
+vi.mock("@/services/profiles", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/profiles")>()),
   default: {
     meta: mocks.meta,
     series: mocks.series,
     merge: mocks.merge,
     tagValues: mocks.tagValues,
   },
+}));
+
+const route = reactive({ name: "profiles", query: {} as Record<string, string> });
+
+vi.mock("vue-router", () => ({
+  useRoute: () => route,
 }));
 
 vi.mock("@/utils/date", () => ({
@@ -87,6 +94,9 @@ const mergeResponse = {
     took: 1,
   },
 };
+
+// The route is shared module state, so a page left mounted would re-seed on another test's route change.
+enableAutoUnmount(afterEach);
 
 describe("Profiles page", () => {
   const orgIdentifier = store.state.selectedOrganization.identifier as string;
@@ -143,6 +153,7 @@ describe("Profiles page", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    route.query = {};
     mocks.nowMs = 1_700_000_000_000;
     mocks.getConsumableRelativeTime.mockImplementation(() => {
       const end = mocks.nowMs;
@@ -404,5 +415,157 @@ describe("Profiles page", () => {
       .map((row) => row.find("td").text())
       .filter(Boolean);
     expect(namesAfter[0]).toBe("fn-c");
+  });
+
+  describe("seeded from the route", () => {
+    const FROM = 1_700_000_000_000_000;
+    const TO = 1_700_000_120_000_000;
+    const seedQuery = {
+      stream: "profiles-b",
+      from: String(FROM),
+      to: String(TO),
+      service_name: "service-b",
+      profile_type: "cpu",
+      profile_unit: "nanoseconds",
+      filters: "trace_id=t%2C1,span_id=s1",
+      view: "flame",
+    };
+    const seededFilters = [
+      { key: "trace_id", op: "=", value: "t,1" },
+      { key: "span_id", op: "=", value: "s1" },
+    ];
+    // Like the real picker, it re-emits its model on mount.
+    const emittingPicker = {
+      props: ["modelValue"],
+      emits: ["update:modelValue"],
+      mounted(this: { modelValue: object; $emit: (e: string, v: object) => void }) {
+        this.$emit("update:modelValue", { ...this.modelValue });
+      },
+      template: "<div />",
+    };
+
+    const mountSeeded = () =>
+      mount(Profiles, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { ...pageStubs, DateTimePickerDashboard: emittingPicker },
+        },
+      });
+
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    beforeEach(() => {
+      route.query = { ...seedQuery };
+      mocks.meta.mockResolvedValue({
+        data: {
+          ...profileMetaResponse.data,
+          services: ["service-a", "service-b"],
+          profile_types: [
+            { type: "alloc_space", unit: "bytes" },
+            { type: "cpu", unit: "nanoseconds" },
+          ],
+        },
+      });
+    });
+
+    it("seeds stream, service, type, filters and the flame view through the org watcher's initPage", async () => {
+      const wrapper = mountSeeded();
+      await flushPromises();
+
+      expect(
+        (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
+          .value,
+      ).toBe("profiles-b");
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-b",
+        expect.objectContaining({
+          start_time: FROM,
+          end_time: TO,
+          service_name: "service-b",
+          profile_type: "cpu",
+          profile_unit: "nanoseconds",
+          filters: seededFilters,
+        }),
+      );
+      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-filter-chip-span_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-view-flame"]').attributes("variant")).toBe(
+        "primary",
+      );
+    });
+
+    it("loads metadata for the seeded window", async () => {
+      mountSeeded();
+      await flushPromises();
+      expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-b", {
+        start_time: FROM,
+        end_time: TO,
+      });
+    });
+
+    it("loads metadata once and queries once, even with delayed responses", async () => {
+      const names = deferred<typeof streamResponse>();
+      const meta = deferred<unknown>();
+      mocks.nameList.mockReturnValueOnce(names.promise);
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      const wrapper = mountSeeded();
+      await flushPromises();
+      names.resolve(streamResponse);
+      await flushPromises();
+      meta.resolve({
+        data: {
+          ...profileMetaResponse.data,
+          services: ["service-a", "service-b"],
+          profile_types: [{ type: "cpu", unit: "nanoseconds" }],
+        },
+      });
+      await flushPromises();
+
+      expect(mocks.meta).toHaveBeenCalledTimes(1);
+      expect(mocks.series).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
+    });
+
+    it("re-seeds when the route query changes", async () => {
+      mountSeeded();
+      await flushPromises();
+      mocks.merge.mockClear();
+
+      route.query = { ...seedQuery, stream: "profiles-a", filters: "trace_id=t2,span_id=s2" };
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-a",
+        expect.objectContaining({
+          filters: [
+            { key: "trace_id", op: "=", value: "t2" },
+            { key: "span_id", op: "=", value: "s2" },
+          ],
+        }),
+      );
+    });
+
+    it("keeps the default first stream, 15-minute window and top view without params", async () => {
+      route.query = {};
+      const wrapper = mountSeeded();
+      await flushPromises();
+
+      expect(mocks.meta.mock.calls[0][1]).toBe("profiles-a");
+      expect(mocks.meta.mock.calls[0][2]).toEqual({
+        start_time: (mocks.nowMs - 15 * 60 * 1000) * 1000,
+        end_time: mocks.nowMs * 1000,
+      });
+      expect(wrapper.find('[data-test="profiles-applied-filters"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="profiles-view-top"]').attributes("variant")).toBe("primary");
+    });
   });
 });
