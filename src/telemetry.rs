@@ -398,7 +398,6 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
                     .with_http()
                     .with_http_client(
                         reqwest::Client::builder()
-                            .danger_accept_invalid_certs(true)
                             .timeout(Duration::from_secs(10))
                             .connect_timeout(Duration::from_secs(5))
                             .pool_idle_timeout(Duration::from_secs(60))
