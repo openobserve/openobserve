@@ -4,6 +4,7 @@
 import type { FileProps, FileEmits, FileSlots, FileValue } from "./OFile.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -256,7 +257,7 @@ const wrapperClasses = computed(() => [
       </svg>
 
       <!-- Selected files / placeholder -->
-      <div v-if="files.length === 0" class="text-file-placeholder min-w-0 flex-1 truncate">
+      <OTruncatedText v-if="files.length === 0" as="div" class="text-file-placeholder flex-1">
         {{
           placeholder ||
           (dropZone
@@ -265,7 +266,7 @@ const wrapperClasses = computed(() => [
               ? t("common.chooseFiles")
               : t("common.chooseAFile"))
         }}
-      </div>
+      </OTruncatedText>
 
       <div
         v-else
@@ -277,9 +278,7 @@ const wrapperClasses = computed(() => [
           class="rounded-default bg-file-chip-bg text-file-chip-text inline-flex max-w-48 shrink-0 items-center gap-1 px-2 py-0.5 text-xs"
           :data-test="`o-file-chip-${i}`"
         >
-          <span class="truncate" :title="`${file.name} (${formatSize(file.size)})`">
-            {{ file.name }}
-          </span>
+          <OTruncatedText>{{ file.name }}</OTruncatedText>
           <span class="text-3xs shrink-0 opacity-70">
             {{ formatSize(file.size) }}
           </span>

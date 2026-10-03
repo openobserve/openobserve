@@ -47,13 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              running into it. The margin is outside the overflow box, so the
              ellipsis always lands a gap short of the icons. A title that fits is
              unaffected — the spacer just absorbs 1.25rem less. -->
-        <div
-          :title="props.data.title"
-          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+        <OTruncatedText
+          as="div"
+          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
-        </div>
+        </OTruncatedText>
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
@@ -501,6 +501,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
 import { useI18nTyped } from "@/types/i18n";
@@ -576,6 +577,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    OTruncatedText,
     CreateAlertAction,
     ExemplarToggle,
     ShowLegendsPopup: defineAsyncComponent(() => {

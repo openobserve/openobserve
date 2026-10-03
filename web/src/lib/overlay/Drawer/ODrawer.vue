@@ -22,7 +22,7 @@ import {
   useAttrs,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
@@ -435,21 +435,19 @@ watch(internalOpen, (open) => {
           <template v-else>
             <!-- Below lg a subtitle longer than the panel must truncate, or it pushes the close button off screen. -->
             <div v-if="title || subTitle" class="min-w-0 shrink-0 max-lg:shrink">
-              <span
+              <OTruncatedText
                 v-if="title"
-                class="text-dialog-header-text block truncate text-base font-semibold"
+                class="text-dialog-header-text block text-base font-semibold"
                 :data-test="titleDataTest"
               >
                 {{ title }}
-                <!-- Full title on hover (styled), so a truncated title is never lost. -->
-                <OTooltip :content="title" />
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="subTitle"
-                class="text-dialog-content-text mt-0.5 block truncate text-xs opacity-70"
+                class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
               >
                 {{ subTitle }}
-              </span>
+              </OTruncatedText>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space if present -->

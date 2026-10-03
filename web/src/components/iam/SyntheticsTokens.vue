@@ -397,7 +397,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 240,
-        meta: { align: "left" },
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "status",

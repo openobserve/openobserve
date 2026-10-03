@@ -140,8 +140,9 @@ describe("OStatStrip", () => {
     it("tooltips the glyph with subTooltip, falling back to sub", () => {
       const tip = (item: Record<string, unknown>) =>
         mountCard({ sub: raw("From traces"), subIcon: "account-tree", ...item })
-          .findComponent({ name: "OTooltip" })
-          .props("content");
+          .findAllComponents({ name: "OTooltip" })
+          .find((t) => t.element.closest?.('[data-test="o-stat-card-sub-icon"]'))
+          ?.props("content");
       expect(tip({ subTooltip: raw("Measured from your traces") })).toBe(
         "Measured from your traces",
       );
