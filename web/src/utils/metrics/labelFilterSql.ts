@@ -33,8 +33,12 @@ const PREDICATE: Record<string, (column: string, literal: string) => string> = {
  */
 export function labelFiltersToSql(stream: string, filters: LabelFilter[]): string {
   const where = filters.map((filter) => {
-    const predicate = PREDICATE[filter.operator ?? "="] ?? PREDICATE["="];
-    const literal = `'${String(filter.value ?? "").replace(/'/g, "''")}'`;
+    const operator = filter.operator ?? "=";
+    const predicate = PREDICATE[operator] ?? PREDICATE["="];
+    let value = String(filter.value ?? "");
+    // PromQL regex matchers are fully anchored; re_match is a find, so anchor it.
+    if (operator === "=~" || operator === "!~") value = `^(?:${value})$`;
+    const literal = `'${value.replace(/'/g, "''")}'`;
     return predicate(`"${filter.label}"`, literal);
   });
   const base = `SELECT * FROM "${stream}"`;

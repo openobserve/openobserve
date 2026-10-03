@@ -32,14 +32,27 @@ describe("labelFiltersToSql", () => {
     ).toBe(`SELECT * FROM "http_requests_total" WHERE "status" = '500' AND "method" != 'GET'`);
   });
 
-  it("translates =~ and !~ to the regexp UDFs", () => {
+  it("translates =~ and !~ to the regexp UDFs, fully anchored like PromQL", () => {
     expect(
       labelFiltersToSql("http_requests_total", [
         { label: "code", operator: "=~", value: "5.." },
         { label: "route", operator: "!~", value: "/health.*" },
       ]),
     ).toBe(
-      `SELECT * FROM "http_requests_total" WHERE re_match("code", '5..') AND re_not_match("route", '/health.*')`,
+      `SELECT * FROM "http_requests_total" WHERE re_match("code", '^(?:5..)$') AND re_not_match("route", '^(?:/health.*)$')`,
+    );
+  });
+
+  // re_match finds, PromQL fully matches: "prod" must not match "preprod".
+  it("anchors a regex so it matches the whole value, as PromQL does", () => {
+    expect(labelFiltersToSql("m", [{ label: "env", operator: "=~", value: "prod" }])).toBe(
+      `SELECT * FROM "m" WHERE re_match("env", '^(?:prod)$')`,
+    );
+  });
+
+  it("escapes a single quote inside an anchored regex", () => {
+    expect(labelFiltersToSql("m", [{ label: "user", operator: "=~", value: "o'b.*" }])).toBe(
+      `SELECT * FROM "m" WHERE re_match("user", '^(?:o''b.*)$')`,
     );
   });
 

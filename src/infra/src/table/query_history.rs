@@ -169,17 +169,23 @@ pub async fn set_starred_with<C: ConnectionTrait>(
     id: &str,
     starred: bool,
 ) -> Result<Option<Model>, errors::Error> {
-    let res = Entity::update_many()
-        .col_expr(Column::Starred, Expr::value(starred))
+    // Look the entry up first: MySQL's rows_affected counts changed rows, so
+    // re-starring a starred entry reports 0 and cannot signal "not found".
+    let Some(entry) = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::UserEmail.eq(user_email))
         .filter(Column::Id.eq(id))
+        .one(conn)
+        .await?
+    else {
+        return Ok(None);
+    };
+    Entity::update_many()
+        .col_expr(Column::Starred, Expr::value(starred))
+        .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
-    if res.rows_affected == 0 {
-        return Ok(None);
-    }
-    Ok(Entity::find_by_id(id).one(conn).await?)
+    Ok(Some(Model { starred, ..entry }))
 }
 
 pub async fn delete(org_id: &str, user_email: &str, id: &str) -> Result<bool, errors::Error> {
@@ -431,6 +437,33 @@ mod tests {
         assert!(starred.starred);
         assert!(delete_with(&db, "default", A, &entry.id).await.unwrap());
         assert!(all(&db, A).await.is_empty());
+    }
+
+    // MySQL counts changed rows, so a no-op update reports 0; existence is a lookup.
+    #[tokio::test]
+    async fn test_starring_twice_still_returns_the_entry() {
+        let db = db().await;
+        let entry = record_with(&db, "default", A, "up", json!({}), 1)
+            .await
+            .unwrap();
+        for _ in 0..2 {
+            let starred = set_starred_with(&db, "default", A, &entry.id, true)
+                .await
+                .unwrap()
+                .expect("an existing entry is found however often it is starred");
+            assert!(starred.starred);
+        }
+        let unstarred = set_starred_with(&db, "default", A, &entry.id, false)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!unstarred.starred);
+        assert!(
+            set_starred_with(&db, "default", A, "missing", true)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
