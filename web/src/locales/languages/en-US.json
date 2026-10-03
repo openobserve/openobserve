@@ -10622,6 +10622,7 @@
         "serviceName": "Service",
         "status": "Status",
         "requests": "Requests",
+        "requestsTooltip": "Server and consumer spans, plus root spans",
         "errorRate": "Error Rate",
         "errors": "Errors",
         "avgDuration": "Avg Duration",

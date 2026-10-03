@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.p50_latency_ns"
                 :max="columnMaxes.p50_latency_ns"
                 :label="raw(formatLat(row.p50_latency_ns))"
-                :tooltip="raw(row.p50_latency_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.p50_latency_ns.toLocaleString() + ' µs')"
               />
             </template>
 
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.p95_latency_ns"
                 :max="columnMaxes.p95_latency_ns"
                 :label="raw(formatLat(row.p95_latency_ns))"
-                :tooltip="raw(row.p95_latency_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.p95_latency_ns.toLocaleString() + ' µs')"
               />
             </template>
 
@@ -383,8 +383,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.p99_latency_ns"
                 :max="columnMaxes.p99_latency_ns"
                 :label="raw(formatLat(row.p99_latency_ns))"
-                :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' ns')"
-                :variant="row.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
+                :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' µs')"
+                :variant="row.p99_latency_ns > P99_WARN_US ? 'warning' : 'default'"
               />
             </template>
 
@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.avg_duration_ns"
                 :max="columnMaxes.avg_duration_ns"
                 :label="raw(formatLat(row.avg_duration_ns))"
-                :tooltip="raw(row.avg_duration_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.avg_duration_ns.toLocaleString() + ' µs')"
               />
             </template>
 
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.max_duration_ns"
                 :max="columnMaxes.max_duration_ns"
                 :label="raw(formatLat(row.max_duration_ns))"
-                :tooltip="raw(row.max_duration_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.max_duration_ns.toLocaleString() + ' µs')"
               />
             </template>
           </OTable>
@@ -475,8 +475,8 @@ const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
 }>();
 
-// p99 > 1 second triggers the orange highlight
-const P99_WARN_NS = 1_000_000_000;
+// Latencies are in µs, so this is a p99 above 1 second.
+const P99_WARN_US = 1_000_000;
 
 // Stream filter — synced from traces page selected stream
 const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
@@ -556,17 +556,13 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
-/**
- * Tri-state cache for whether the current stream's schema contains the `infer_service_name` column.
- *
- * - `null`  — not yet checked for the current stream; triggers a schema API call on next load.
- * - `true`  — column exists; queries will use `infer_service_name` for service grouping.
- * - `false` — column absent; queries will fall back to `service_name` only.
- *
- * The value is reset to `null` whenever the stream filter changes so that the next
- * `loadServicesCatalog()` call re-validates against the new stream's schema.
- */
-const hasInferColumns = ref<boolean | null>(null);
+interface StreamSchemaFlags {
+  org: string;
+  stream: string;
+  hasInferColumns: boolean;
+  hasParentColumn: boolean;
+}
+const schemaFlags = ref<StreamSchemaFlags | null>(null);
 
 // OTable owns pagination internally; `currentPage` is retained only as the
 // "reset to page 1 on sort/filter change" signal the tests assert against.
@@ -650,7 +646,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     sortable: true,
     resizable: true,
     size: 110,
-    meta: { align: "right" },
+    meta: { align: "right", headerTooltip: t("traces.servicesCatalog.columns.requestsTooltip") },
   },
   {
     id: "error_count",
@@ -955,6 +951,76 @@ const onStreamFilterChange = (stream: SelectModelValue) => {
   emit("request:stream-change", String(stream ?? ""));
 };
 
+async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSchemaFlags> {
+  try {
+    const schemaPayload = await queryClient.fetchQuery(streamSchemaQuery(org, stream, "traces"));
+    const schemaFields: any[] = schemaPayload?.schema || schemaPayload?.fields || [];
+    const has = (name: string) => schemaFields.some((f: any) => f.name === name);
+    return {
+      org,
+      stream,
+      hasInferColumns: has("infer_service_name"),
+      hasParentColumn: has("reference_parent_span_id"),
+    };
+  } catch {
+    return { org, stream, hasInferColumns: false, hasParentColumn: false };
+  }
+}
+
+// Same request definition as the service graph (service_graph/v4/sql.rs kind_pred).
+function requestPredicate(hasParentColumn: boolean): string {
+  const kinds = "CAST(span_kind AS VARCHAR) IN ('2','5')";
+  if (!hasParentColumn) return `(${kinds})`;
+  return `(${kinds} OR (CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = '')))`;
+}
+
+// Conditional aggregation, not WHERE, so services with no request spans still get a row.
+function redAggregates(pred: string): string {
+  const requests = `COUNT(*) FILTER (WHERE ${pred})`;
+  const errors = `COUNT(*) FILTER (WHERE ${pred} AND span_status = 'ERROR')`;
+  const duration = `CASE WHEN ${pred} THEN duration END`;
+  return [
+    `${requests} AS total_requests`,
+    `${errors} AS error_count`,
+    `CASE WHEN ${requests} = 0 THEN 0 ELSE CAST(${errors} AS DOUBLE) / CAST(${requests} AS DOUBLE) * 100 END AS error_rate`,
+    `AVG(${duration}) AS avg_duration_ns`,
+    `MAX(${duration}) AS max_duration_ns`,
+    `approx_percentile_cont(${duration}, 0.5) AS p50_latency_ns`,
+    `approx_percentile_cont(${duration}, 0.95) AS p95_latency_ns`,
+    `approx_percentile_cont(${duration}, 0.99) AS p99_latency_ns`,
+  ]
+    .map((item) => `  ${item}`)
+    .join(",\n");
+}
+
+function catalogSql(streamName: string, flags: StreamSchemaFlags): string {
+  const requestPred = requestPredicate(flags.hasParentColumn);
+  if (!flags.hasInferColumns) {
+    return `SELECT
+  service_name,
+${redAggregates(requestPred)}
+FROM "${streamName}"
+GROUP BY service_name
+ORDER BY total_requests DESC`;
+  }
+  // infer_service_name is only set on CLIENT and PRODUCER spans (traces/inferred.rs).
+  const inferPred = `((NULLIF(infer_service_name, '') IS NOT NULL AND CAST(span_kind AS VARCHAR) IN ('3','4')) OR ${requestPred})`;
+  return `SELECT
+  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
+  NULLIF(infer_service_name, '') AS _infer_service_name,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END AS _infer_service_system,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END AS _infer_service_type,
+  MAX(CASE WHEN service_name IS NOT NULL AND (infer_service_name IS NULL OR infer_service_name = '') THEN 1 ELSE 0 END) AS _is_real_service,
+${redAggregates(inferPred)}
+FROM "${streamName}"
+GROUP BY
+  COALESCE(NULLIF(infer_service_name, ''), service_name),
+  NULLIF(infer_service_name, ''),
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END
+ORDER BY total_requests DESC`;
+}
+
 async function loadServicesCatalog() {
   const streamName = streamFilter.value?.replaceAll('"', "");
   if (!streamName) return;
@@ -977,58 +1043,20 @@ async function loadServicesCatalog() {
 
   const { start_time, end_time } = getTimeRange();
 
-  // Check stream schema for infer_service_name column (cache result per stream)
-  if (hasInferColumns.value === null) {
-    try {
-      const org = searchObj.organizationIdentifier;
-      const schemaPayload = await queryClient.fetchQuery(
-        streamSchemaQuery(org, streamName, "traces"),
-      );
-      const schemaFields = schemaPayload?.schema || schemaPayload?.fields || [];
-      hasInferColumns.value = schemaFields.some((f: any) => f.name === "infer_service_name");
-    } catch {
-      // If schema check fails, default to false (use service_name only)
-      hasInferColumns.value = false;
+  const org = searchObj.organizationIdentifier;
+  let flags = schemaFlags.value;
+  if (!flags || flags.org !== org || flags.stream !== streamName) {
+    flags = await fetchSchemaFlags(org, streamName);
+    // A newer load owns the catalog once the org or stream changed during the fetch.
+    if (
+      org !== searchObj.organizationIdentifier ||
+      streamName !== streamFilter.value?.replaceAll('"', "")
+    ) {
+      return;
     }
+    schemaFlags.value = flags;
   }
-
-  // Build SQL: use infer_service_name when the column exists in the schema
-  const useInfer = hasInferColumns.value;
-  const sql = useInfer
-    ? `SELECT
-  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
-  NULLIF(infer_service_name, '') AS _infer_service_name,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END AS _infer_service_system,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END AS _infer_service_type,
-  MAX(CASE WHEN service_name IS NOT NULL AND (infer_service_name IS NULL OR infer_service_name = '') THEN 1 ELSE 0 END) AS _is_real_service,
-  COUNT(*) AS total_requests,
-  SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
-  CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
-  AVG(duration) AS avg_duration_ns,
-  MAX(duration) AS max_duration_ns,
-  approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
-  approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
-  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
-FROM "${streamName}"
-GROUP BY
-  COALESCE(NULLIF(infer_service_name, ''), service_name),
-  NULLIF(infer_service_name, ''),
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END
-ORDER BY total_requests DESC`
-    : `SELECT
-  service_name,
-  COUNT(*) AS total_requests,
-  SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
-  CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
-  AVG(duration) AS avg_duration_ns,
-  MAX(duration) AS max_duration_ns,
-  approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
-  approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
-  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
-FROM "${streamName}"
-GROUP BY service_name
-ORDER BY total_requests DESC`;
+  const sql = catalogSql(streamName, flags);
 
   currentTraceId = generateTraceContext().traceId;
 
@@ -1128,7 +1156,6 @@ watch(
     if (newStream && newStream !== streamFilter.value) {
       streamFilter.value = newStream;
       localStorage.setItem("servicesCatalog_streamFilter", newStream);
-      hasInferColumns.value = null;
     }
   },
 );
