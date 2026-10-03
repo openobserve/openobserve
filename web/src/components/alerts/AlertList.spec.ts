@@ -25,6 +25,12 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+// Passthrough spy: real toasts still render, and specs can read what was raised.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, toast: vi.fn((...args: unknown[]) => actual.toast(...args)) };
+});
+
 // Mock services before importing component (follow reference style)
 vi.mock("@/services/oncall", () => ({
   default: { listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }) },
@@ -71,6 +77,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 
@@ -1808,5 +1815,38 @@ describe("AlertList - on-call owner column", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     expect(String(wrapper.vm.oncallTeamName("t_gone"))).toBe("t_gone");
+  });
+});
+
+describe("AlertList - trigger", () => {
+  const triggerWith = async (data: Record<string, unknown>) => {
+    const spy = vi.spyOn(AlertService, "trigger_alert").mockResolvedValue({ data } as any);
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    vi.mocked(toast).mockClear();
+    await wrapper.vm.triggerAlert(wrapper.vm.filteredResults[0]);
+    await flushPromises();
+    spy.mockRestore();
+    return vi.mocked(toast).mock.calls.map((call) => call[0]);
+  };
+
+  it("reports success when the run happened", async () => {
+    const calls = await triggerWith({ claim_lost: false, anomalies_found: 0 });
+    expect(calls).toEqual([
+      { variant: "success", message: i18n.global.t("alerts.alertTriggeredSuccess") },
+    ]);
+  });
+
+  it("warns with the server's reason when the detector may not run", async () => {
+    const message = "Anomaly detection config is not enabled";
+    const calls = await triggerWith({ claim_lost: false, ineligible: true, message });
+    expect(calls).toEqual([{ variant: "warning", message }]);
+  });
+
+  it("warns instead of claiming success when a detection run already holds the claim", async () => {
+    const calls = await triggerWith({ claim_lost: true, message: "already running" });
+    expect(calls).toEqual([
+      { variant: "warning", message: i18n.global.t("alerts.anomaly.detectionAlreadyRunning") },
+    ]);
   });
 });

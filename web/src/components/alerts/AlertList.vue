@@ -3082,15 +3082,22 @@ export default defineComponent({
 
     const triggerAlert = async (row: any) => {
       try {
-        await alertsService.trigger_alert(
+        const res = await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
           row.folder_name?.id,
         );
-        toast({
-          variant: "success",
-          message: t("alerts.alertTriggeredSuccess"),
-        });
+        // A lost claim or an ineligible row means nothing ran, so success would mislead.
+        toast(
+          res?.data?.claim_lost === true
+            ? { variant: "warning", message: t("alerts.anomaly.detectionAlreadyRunning") }
+            : res?.data?.ineligible === true
+              ? {
+                  variant: "warning",
+                  message: res.data.message || t("alerts.messages.triggerAlertFailed"),
+                }
+              : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
+        );
         if (row.type === "anomaly") {
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }

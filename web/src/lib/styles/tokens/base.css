@@ -261,6 +261,9 @@
      perceptibility rather than to hit 3:1. --- */
   --color-chart-gridline: rgba(0, 0, 0, 0.2);
 
+  /* Expected-range band fill; alpha lives in the token so the legend swatch matches. */
+  --color-chart-band: rgba(115, 115, 115, 0.22);
+
   /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
      dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
      empty value ECharts reads as its own "auto" default — preserving today's look. --- */
