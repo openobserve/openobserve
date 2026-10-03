@@ -271,12 +271,14 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::Dual { good, total } => {
+            let (good_type, total_type) = dual_stream_types(&slo.definition.sli_config)
+                .ok_or_else(|| anyhow::anyhow!("a dual query plan needs a dual-query source"))?;
             let good_hits = search(
                 &slo.org,
                 &good.sql,
                 good.start_micros,
                 good.end_micros,
-                stream_type,
+                good_type,
             )
             .await?;
             let total_hits = search(
@@ -284,7 +286,7 @@ async fn fetch_rows(
                 &total.sql,
                 total.start_micros,
                 total.end_micros,
-                stream_type,
+                total_type,
             )
             .await?;
             Ok((join_dual(&good_hits, &total_hits, group_by), Vec::new()))
@@ -354,8 +356,9 @@ fn sli_stream_type(sli: &SliConfig) -> StreamType {
     let raw = match sli {
         SliConfig::Count { source } => match source {
             config::meta::slo::CountSource::SingleQuery { stream_type, .. } => stream_type.as_str(),
-            // The importer fallback carries its stream inside the SQL.
-            config::meta::slo::CountSource::DualQuery { .. } => "logs",
+            // The dual arm of `fetch_rows` does not use this: it searches each side as its own
+            // type (`dual_stream_types`). The good side's is the truthful single answer.
+            config::meta::slo::CountSource::DualQuery { good, .. } => good.stream_type.as_str(),
             // PromQL only addresses metrics.
             config::meta::slo::CountSource::PromQl { .. } => "metrics",
         },
@@ -363,6 +366,24 @@ fn sli_stream_type(sli: &SliConfig) -> StreamType {
         SliConfig::Alert { .. } => "logs",
     };
     StreamType::from(raw)
+}
+
+/// The stream types a dual-query source's two scans read, as `(good, total)`.
+///
+/// Each `CountQuery` carries its own `stream_type`, because the pair exists for a
+/// numerator and denominator that do not share a stream. Reading both as logs searched a
+/// traces or metrics pair as the wrong stream type, so the search failed (or read a logs
+/// stream of the same name). `None` for every other source.
+fn dual_stream_types(sli: &SliConfig) -> Option<(StreamType, StreamType)> {
+    match sli {
+        SliConfig::Count {
+            source: config::meta::slo::CountSource::DualQuery { good, total },
+        } => Some((
+            StreamType::from(good.stream_type.as_str()),
+            StreamType::from(total.stream_type.as_str()),
+        )),
+        _ => None,
+    }
 }
 
 /// One PromQL series in a neutral shape — labels plus `(micros, value)`
@@ -1177,7 +1198,7 @@ mod alert_ledger_tests {
 /// conversion exists; `PromSeries`/`promql_rows` below are the specification.
 #[cfg(test)]
 mod promql_rows_tests {
-    use config::meta::slo::{CountSource, SliConfig};
+    use config::meta::slo::{CountQuery, CountSource, SliConfig};
 
     use super::*;
 
@@ -1386,6 +1407,42 @@ mod promql_rows_tests {
             },
         };
         assert_eq!(sli_stream_type(&sli), StreamType::Metrics);
+    }
+
+    fn count_query(stream_type: &str) -> CountQuery {
+        CountQuery {
+            stream: "requests".into(),
+            stream_type: stream_type.into(),
+            sql: "SELECT 1".into(),
+        }
+    }
+
+    /// Each side of a dual-query source must be searched as its own stream type
+    /// (#14242). Both used to be read as logs, so a traces pair failed its search on
+    /// every pass and the SLO never measured.
+    #[test]
+    fn a_dual_source_reads_each_sides_own_stream_type() {
+        let sli = SliConfig::Count {
+            source: CountSource::DualQuery {
+                good: count_query("traces"),
+                total: count_query("metrics"),
+            },
+        };
+        assert_eq!(
+            dual_stream_types(&sli),
+            Some((StreamType::Traces, StreamType::Metrics))
+        );
+    }
+
+    #[test]
+    fn only_a_dual_source_has_dual_stream_types() {
+        let sli = SliConfig::Count {
+            source: CountSource::PromQl {
+                good: "g".into(),
+                total: "t".into(),
+            },
+        };
+        assert_eq!(dual_stream_types(&sli), None);
     }
 }
 
