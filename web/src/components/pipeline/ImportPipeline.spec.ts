@@ -1089,6 +1089,28 @@ describe("ImportPipeline.vue", () => {
       await nextTick();
       expect(wrapper.find('[data-test="pipeline-import-creation-title"]').exists()).toBe(true);
     });
+
+    it("colours a plain-string error like the ones with an inline fix-up", async () => {
+      // Asserting the pushed value cannot catch a missing colour class; only the render can.
+      wrapper = createWrapper();
+      wrapper.vm.pipelineErrorsToDisplay = [
+        [
+          { field: "pipeline_name", message: "Pipeline - 1: Name is required" },
+          "Pipeline - 1: the file carries two different bodies for the same function name: fn",
+        ],
+      ];
+      await nextTick();
+
+      const classesOf = (errorIndex: number) =>
+        wrapper
+          .find(`[data-test="pipeline-import-error-0-${errorIndex}"]`)
+          .find("span")
+          .classes();
+
+      expect(classesOf(1)).toContain("text-status-negative");
+      // Same colour as the branch that does have an inline control.
+      expect(classesOf(1)).toEqual(classesOf(0));
+    });
   });
 
   // -----------------------------------------------------------------------
