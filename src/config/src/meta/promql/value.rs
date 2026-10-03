@@ -855,7 +855,6 @@ fn extrapolate_from_delta(
             .checked_sub(range_plus_offset)
             .expect("BUG: overflow")
     };
-    assert!(start > 0);
     let end = eval_ts
         .checked_sub(
             offset
@@ -864,7 +863,6 @@ fn extrapolate_from_delta(
                 .expect("BUG: integer conversion failed"),
         )
         .expect("BUG: overflow");
-    assert!(end > 0);
     assert!(start <= end);
 
     let first = &samples[0];
@@ -880,11 +878,19 @@ fn extrapolate_from_delta(
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
-    let duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
+    let mut duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
 
     let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
     let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
 
+    // If the first/last samples are close to the boundaries of the range,
+    // extrapolate the result. This is as we expect that another sample
+    // will exist given the spacing between samples we've seen thus far,
+    // with an allowance for noise.
+    let extrapolation_threshold = avg_duration_between_samples * 1.1;
+    if duration_to_start >= extrapolation_threshold {
+        duration_to_start = avg_duration_between_samples / 2.0;
+    }
     if is_counter && result > 0.0 && first.value >= 0.0 {
         // Counters cannot be negative. If we have any slope at all
         // (i.e. `result` went up), we can extrapolate the zero point
@@ -898,24 +904,10 @@ fn extrapolate_from_delta(
         }
     }
 
-    // If the first/last samples are close to the boundaries of the range,
-    // extrapolate the result. This is as we expect that another sample
-    // will exist given the spacing between samples we've seen thus far,
-    // with an allowance for noise.
-    let extrapolation_threshold = avg_duration_between_samples * 1.1;
-    let mut extrapolate_to_interval = sampled_interval;
-
-    if duration_to_start < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_start;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
+    if duration_to_end >= extrapolation_threshold {
+        duration_to_end = avg_duration_between_samples / 2.0;
     }
-    if duration_to_end < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_end;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
-    }
-    let factor = extrapolate_to_interval / sampled_interval;
+    let factor = (sampled_interval + duration_to_start + duration_to_end) / sampled_interval;
     if matches!(kind, ExtrapolationKind::Rate) {
         result *= factor / range.as_secs_f64();
     } else {
@@ -2062,6 +2054,37 @@ mod tests {
             ExtrapolationKind::Rate,
         );
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extrapolated_rate_caps_start_before_the_counter_zero_point() {
+        let second = 1_000_000;
+        let samples: Vec<_> = [(70, 1.0), (80, 2.0), (90, 3.0), (100, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let increase = extrapolated_rate(
+            &samples,
+            100 * second,
+            Duration::from_secs(60),
+            Duration::ZERO,
+            ExtrapolationKind::Increase,
+        );
+        assert_eq!(increase, Some(3.5));
+
+        // a window reaching back before epoch 0 is still a window
+        let samples: Vec<_> = [(15, 1.0), (30, 2.0), (45, 3.0), (60, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let rate = extrapolated_rate(
+            &samples,
+            60 * second,
+            Duration::from_secs(300),
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        );
+        assert!((rate.unwrap() - 3.5 / 300.0).abs() < 1e-15);
     }
 
     #[test]

@@ -116,6 +116,7 @@ impl Engine {
                         Value::Matrix(matrix)
                     }
                     Value::Float(f) => Value::Float(-f),
+                    Value::None => Value::None,
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Unary: {expr:?}"
@@ -753,6 +754,14 @@ pub(crate) mod tests {
         assert_eq!(series.len(), 1);
         assert!(series[0].labels.is_empty());
         assert_eq!(series[0].samples[0].value, 2.0);
+    }
+
+    #[tokio::test]
+    async fn test_unary_minus_of_nothing_is_nothing() {
+        assert!(matches!(
+            eval_on_empty("-up", 3).await.unwrap(),
+            Value::None
+        ));
     }
 
     fn single_value(value: Value) -> f64 {
