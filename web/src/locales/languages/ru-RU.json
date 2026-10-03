@@ -10126,6 +10126,7 @@
     "layoutVertical": "Вертикально",
     "layoutForce": "Принудительная компоновка",
     "exportTraces": "Экспорт трейсов",
+    "exportTracesFailed": "Не удалось экспортировать трейсы",
     "waterfall": "Водопад",
     "flameGraph": "Пламенный график",
     "traceGraph": "Граф трейса",

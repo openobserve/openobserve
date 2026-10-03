@@ -10126,6 +10126,7 @@
     "layoutVertical": "Dọc",
     "layoutForce": "Bố cục lực",
     "exportTraces": "Xuất trace",
+    "exportTracesFailed": "Xuất trace thất bại",
     "waterfall": "Thác nước",
     "flameGraph": "Biểu đồ ngọn lửa",
     "traceGraph": "Biểu đồ trace",

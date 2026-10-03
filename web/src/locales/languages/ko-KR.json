@@ -10126,6 +10126,7 @@
     "layoutVertical": "수직형",
     "layoutForce": "포스 레이아웃",
     "exportTraces": "트레이스 내보내기",
+    "exportTracesFailed": "트레이스를 내보내지 못했습니다",
     "waterfall": "폭포",
     "flameGraph": "플레임 그래프",
     "traceGraph": "트레이스 그래프",

@@ -10126,6 +10126,7 @@
     "layoutVertical": "垂直",
     "layoutForce": "原力布局",
     "exportTraces": "导出追踪",
+    "exportTracesFailed": "导出追踪失败",
     "waterfall": "瀑布",
     "flameGraph": "火焰图",
     "traceGraph": "追踪图",

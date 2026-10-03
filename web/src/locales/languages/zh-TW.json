@@ -10121,6 +10121,7 @@
     "layoutVertical": "垂直",
     "layoutForce": "力導向版面配置",
     "exportTraces": "匯出追蹤",
+    "exportTracesFailed": "匯出追蹤失敗",
     "waterfall": "瀑布圖",
     "flameGraph": "火焰圖",
     "traceGraph": "追蹤圖",

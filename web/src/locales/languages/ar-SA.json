@@ -10126,6 +10126,7 @@
     "layoutVertical": "عمودي",
     "layoutForce": "تخطيط القوة",
     "exportTraces": "آثار التصدير",
+    "exportTracesFailed": "فشل تصدير الآثار",
     "waterfall": "الشلال",
     "flameGraph": "مخطط اللهب",
     "traceGraph": "رسم بياني للأثر",
