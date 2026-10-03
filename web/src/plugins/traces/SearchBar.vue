@@ -244,6 +244,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="download" size="sm" />
           </OButton>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                data-test="traces-search-bar-saved-views-btn"
+                variant="outline"
+                size="icon-toolbar"
+                :title="t('search.listSavedViews')"
+              >
+                <OIcon name="saved-search" size="sm" />
+              </OButton>
+            </template>
+            <ODropdownGroup :label="t('search.savedViewsLabel')">
+              <div
+                v-if="tracesSavedViews.length"
+                class="max-h-72 overflow-y-auto overscroll-contain"
+              >
+                <ODropdownItem
+                  v-for="view in tracesSavedViews"
+                  :key="view.view_id"
+                  :data-test="`traces-saved-view-apply-${view.view_id}`"
+                  @select="applySavedView(view)"
+                >
+                  <span class="max-w-56 truncate">{{ view.view_name }}</span>
+                  <template #icon-right>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      icon-left="edit"
+                      class="ms-auto"
+                      :title="t('search.updateSavedViewWithCurrent')"
+                      :data-test="`traces-saved-view-update-${view.view_id}`"
+                      @click.stop.prevent="updateSavedViewFromCurrent(view)"
+                    />
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      icon-left="delete"
+                      :title="t('search.deleteSavedView')"
+                      :data-test="`traces-saved-view-delete-${view.view_id}`"
+                      @click.stop.prevent="deleteTracesSavedView(view)"
+                    />
+                  </template>
+                </ODropdownItem>
+              </div>
+              <ODropdownItem v-else disabled>
+                {{ t("search.savedViewsNotFound") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
+            <ODropdownItem
+              icon-left="save"
+              data-test="traces-saved-view-create"
+              @select="openSaveViewDialog"
+            >
+              {{ t("search.createSavedView") }}
+            </ODropdownItem>
+          </ODropdown>
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
@@ -357,6 +414,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <ODialog
+      v-model:open="saveViewDialogOpen"
+      size="xs"
+      :title="t('search.createSavedView')"
+      :primary-button-label="t('common.save')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-loading="isSavingView"
+      @click:primary="saveAsNewView"
+      @click:secondary="saveViewDialogOpen = false"
+    >
+      <OInput
+        v-model="newViewName"
+        :label="t('search.savedViewName')"
+        autofocus
+        data-test="traces-saved-view-name-input"
+      />
+    </ODialog>
   </div>
 </template>
 
@@ -385,6 +459,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -408,6 +486,16 @@ import { isDatetimeChanged } from "./tracesSearchBar.utils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import savedViewsService from "@/services/saved_views";
+import {
+  savedViewsQuery,
+  createSavedViewMutation,
+  updateSavedViewMutation,
+  deleteSavedViewMutation,
+} from "@/services/saved_views.queries";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -421,6 +509,10 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownGroup,
+    ODropdownSeparator,
+    ODialog,
+    OInput,
     OSwitch,
     OSelect,
     OTooltip,
@@ -436,6 +528,7 @@ export default defineComponent({
     "onChangeTimezone",
     "service-graph-refresh",
     "services-catalog-refresh",
+    "apply-saved-view",
   ],
   props: {
     fieldValues: {
@@ -858,6 +951,112 @@ export default defineComponent({
       { excludeMatchAll: true },
     );
 
+    const orgId = useOrgId();
+    const savedViewsList = useQuery(() => ({
+      ...savedViewsQuery(orgId.value),
+      enabled: !!orgId.value,
+    }));
+    const tracesSavedViews = computed(() =>
+      (savedViewsList.data.value ?? []).filter((view) => view.view_type === "traces"),
+    );
+    const createSavedView = useMutation(() => createSavedViewMutation(orgId.value));
+    const updateSavedView = useMutation(() => updateSavedViewMutation(orgId.value));
+    const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgId.value));
+    const isSavingView = createSavedView.isPending;
+    const saveViewDialogOpen = ref(false);
+    const newViewName = ref("");
+    const { confirm } = useConfirmDialog();
+
+    const buildSavedViewData = () => {
+      const { datetime, stream } = searchObj.data;
+      return {
+        version: 1,
+        stream: { label: stream.selectedStream.label, value: stream.selectedStream.value },
+        editorValue: searchObj.data.editorValue,
+        datetime: {
+          type: datetime.type,
+          relativeTimePeriod: datetime.relativeTimePeriod,
+          startTime: datetime.startTime,
+          endTime: datetime.endTime,
+        },
+        searchMode: searchObj.meta.searchMode,
+        sortBy: searchObj.meta.resultGrid.sortBy,
+        sortOrder: searchObj.meta.resultGrid.sortOrder,
+        selectedFields: [...stream.selectedFields],
+      };
+    };
+
+    const errorDetail = (err) => err?.response?.data?.message ?? err?.message ?? "";
+
+    const openSaveViewDialog = () => {
+      newViewName.value = "";
+      saveViewDialogOpen.value = true;
+    };
+
+    const saveAsNewView = async () => {
+      const viewName = newViewName.value.trim();
+      if (!viewName) {
+        toast({ message: t("logs.searchBar.provideValidViewName"), variant: "warning" });
+        return;
+      }
+      try {
+        await createSavedView.mutateAsync({
+          view_name: viewName,
+          view_type: "traces",
+          data: buildSavedViewData(),
+        });
+        saveViewDialogOpen.value = false;
+        toast({ message: t("search.viewCreatedSuccessfully"), variant: "success" });
+      } catch (err) {
+        toast({
+          message: t("search.errorCreatingSavedViewDetail", { detail: errorDetail(err) }),
+          variant: "error",
+        });
+      }
+    };
+
+    const updateSavedViewFromCurrent = async (view) => {
+      try {
+        await updateSavedView.mutateAsync({
+          viewId: view.view_id,
+          view: { view_name: view.view_name, data: buildSavedViewData() },
+        });
+        toast({ message: t("search.viewUpdatedSuccessfully"), variant: "success" });
+      } catch (err) {
+        toast({
+          message: t("search.errorUpdatingSavedViewDetail", { detail: errorDetail(err) }),
+          variant: "error",
+        });
+      }
+    };
+
+    const deleteTracesSavedView = async (view) => {
+      const confirmed = await confirm({
+        title: t("search.deleteSavedView"),
+        message: t("search.deleteSavedViewConfirm"),
+      });
+      if (!confirmed) return;
+      try {
+        await deleteSavedView.mutateAsync(view.view_id);
+        toast({ message: t("search.viewDeletedSuccessfully"), variant: "success" });
+      } catch (err) {
+        toast({
+          message: t("search.errorDeletingSavedViewDetail", { detail: errorDetail(err) }),
+          variant: "error",
+        });
+      }
+    };
+
+    const applySavedView = async (view) => {
+      try {
+        // Uncached on purpose, as in logs: applying must use the server's current copy.
+        const res = await savedViewsService.getViewDetail(orgId.value, view.view_id);
+        emit("apply-saved-view", res.data.data);
+      } catch (err) {
+        toast({ message: t("search.errorWhileApplyingSavedView"), variant: "error" });
+      }
+    };
+
     // Responsive toolbar — shared composable tracks available left-section width
     const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
 
@@ -906,6 +1105,15 @@ export default defineComponent({
       toolbarRightRef,
       shouldHideToggleText,
       shouldHideResetText,
+      tracesSavedViews,
+      isSavingView,
+      saveViewDialogOpen,
+      newViewName,
+      openSaveViewDialog,
+      saveAsNewView,
+      updateSavedViewFromCurrent,
+      deleteTracesSavedView,
+      applySavedView,
     };
   },
   computed: {

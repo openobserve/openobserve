@@ -10662,6 +10662,7 @@
     "layoutHorizontal": "Horizontal",
     "layoutVertical": "Vertical",
     "layoutForce": "Force Layout",
+    "savedViewStreamMissing": "Stream \"{stream}\" no longer exists, so this saved view cannot be applied.",
     "exportTraces": "Export Traces",
     "exportTracesFailed": "Failed to export traces",
     "waterfall": "Waterfall",

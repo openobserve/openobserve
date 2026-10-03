@@ -98,6 +98,39 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   toast: toastMock,
 }));
 
+const {
+  mockSavedViewsGet,
+  mockSavedViewsPost,
+  mockSavedViewsPut,
+  mockSavedViewsDelete,
+  mockGetViewDetail,
+  mockConfirm,
+} = vi.hoisted(() => ({
+  mockSavedViewsGet: vi.fn(),
+  mockSavedViewsPost: vi.fn(),
+  mockSavedViewsPut: vi.fn(),
+  mockSavedViewsDelete: vi.fn(),
+  mockGetViewDetail: vi.fn(),
+  mockConfirm: vi.fn(),
+}));
+
+vi.mock("@/services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: mockSavedViewsGet,
+      post: mockSavedViewsPost,
+      put: mockSavedViewsPut,
+      delete: mockSavedViewsDelete,
+      getViewDetail: mockGetViewDetail,
+    },
+  });
+});
+
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({ confirm: mockConfirm }),
+}));
+
 // ---------------------------------------------------------------------------
 // Shared mutable searchObj — reset to a fresh copy in every beforeEach so
 // that mutations in one test cannot affect the next.
@@ -342,9 +375,11 @@ const sharedStubs = {
   ODropdownItem: {
     name: "ODropdownItem",
     template:
-      '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
+      '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
     emits: ["select"],
   },
+  ODropdownGroup: { template: "<div><slot /></div>" },
+  ODropdownSeparator: { template: "<hr />" },
 };
 
 // ---------------------------------------------------------------------------
@@ -1389,6 +1424,125 @@ describe("SearchBar", () => {
       wrapper.vm.applyFilters(testTerms, false);
 
       expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("saved views", () => {
+    const tracesView = { view_id: "t1", view_name: "checkout errors", view_type: "traces" };
+    const logsView = { view_id: "l1", view_name: "logs view" };
+
+    const expectedData = () => ({
+      version: 1,
+      stream: { label: "default", value: "default" },
+      editorValue: "span_status = 'ERROR'",
+      datetime: { type: "relative", relativeTimePeriod: "1h", startTime: 10, endTime: 20 },
+      searchMode: "spans",
+      sortBy: "duration",
+      sortOrder: "asc",
+      selectedFields: ["service_name", "duration"],
+    });
+
+    beforeEach(() => {
+      mockSavedViewsGet.mockResolvedValue({ data: { views: [tracesView, logsView] } });
+      mockSavedViewsPost.mockResolvedValue({ status: 200, data: { view_id: "n1" } });
+      mockSavedViewsPut.mockResolvedValue({ status: 200, data: {} });
+      mockSavedViewsDelete.mockResolvedValue({ status: 200, data: {} });
+      mockConfirm.mockResolvedValue(true);
+
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.data.editorValue = "span_status = 'ERROR'";
+      searchObjInstance.data.datetime = {
+        startTime: 10,
+        endTime: 20,
+        relativeTimePeriod: "1h",
+        type: "relative",
+        queryRangeRestrictionInHour: 0,
+        queryRangeRestrictionMsg: "",
+      };
+      searchObjInstance.meta.resultGrid.sortBy = "duration";
+      searchObjInstance.meta.resultGrid.sortOrder = "asc";
+      searchObjInstance.data.stream.selectedFields = ["service_name", "duration"];
+    });
+
+    it("lists only traces views", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="traces-search-bar-saved-views-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-saved-view-apply-t1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-saved-view-apply-l1"]').exists()).toBe(false);
+    });
+
+    it.each(["service-graph", "services-catalog"])("is hidden on the %s tab", async (mode) => {
+      searchObjInstance.meta.searchMode = mode as any;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="traces-search-bar-saved-views-btn"]').exists()).toBe(false);
+    });
+
+    it("save serialises exactly the view fields", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      (wrapper.vm as any).newViewName = "checkout errors";
+      await (wrapper.vm as any).saveAsNewView();
+
+      expect(mockSavedViewsPost).toHaveBeenCalledTimes(1);
+      expect(mockSavedViewsPost.mock.calls[0][1]).toEqual({
+        view_name: "checkout errors",
+        view_type: "traces",
+        data: expectedData(),
+      });
+    });
+
+    it("apply emits apply-saved-view with the stored data", async () => {
+      mockGetViewDetail.mockResolvedValue({ data: { ...tracesView, data: expectedData() } });
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-saved-view-apply-t1"]').trigger("click");
+      await flushPromises();
+
+      expect(mockGetViewDetail).toHaveBeenCalledWith(expect.any(String), "t1");
+      expect(wrapper.emitted("apply-saved-view")?.[0]).toEqual([expectedData()]);
+    });
+
+    it("update overwrites the view with the current state", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-saved-view-update-t1"]').trigger("click");
+      await flushPromises();
+
+      expect(mockSavedViewsPut).toHaveBeenCalledWith(expect.any(String), "t1", {
+        view_name: "checkout errors",
+        data: expectedData(),
+      });
+      expect(wrapper.emitted("apply-saved-view")).toBeUndefined();
+    });
+
+    it("delete calls the delete mutation once confirmed", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-saved-view-delete-t1"]').trigger("click");
+      await flushPromises();
+
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
+    });
+
+    it("delete does nothing when not confirmed", async () => {
+      mockConfirm.mockResolvedValue(false);
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-saved-view-delete-t1"]').trigger("click");
+      await flushPromises();
+
+      expect(mockSavedViewsDelete).not.toHaveBeenCalled();
     });
   });
 });

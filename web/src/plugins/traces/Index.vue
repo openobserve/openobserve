@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
+              @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
             />
@@ -379,6 +380,17 @@ import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+
+interface TracesSavedView {
+  version: number;
+  stream: { label: string; value: string };
+  editorValue: string;
+  datetime: { type: string; relativeTimePeriod: string; startTime: number; endTime: number };
+  searchMode: "spans" | "traces";
+  sortBy: string;
+  sortOrder: string;
+  selectedFields: string[];
+}
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -1898,6 +1910,56 @@ const getMoreData = () => {
 
 const onChangeStream = async () => {
   await extractFields();
+  runQueryFn();
+};
+
+const syncSavedViewDateTime = (datetime: TracesSavedView["datetime"]) => {
+  const picker = searchBarRef.value?.dateTimeRef;
+  if (datetime.type === "relative") picker?.setRelativeTime(datetime.relativeTimePeriod);
+  else picker?.setAbsoluteTime(datetime.startTime, datetime.endTime);
+};
+
+const onApplySavedView = async (view: TracesSavedView) => {
+  const streamName = view.stream?.value;
+  const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
+  if (
+    streamChanged &&
+    !searchObj.data.stream.streamLists.some((s: any) => s.value === streamName)
+  ) {
+    toast({
+      variant: "warning",
+      message: t("traces.savedViewStreamMissing", { stream: streamName }),
+    });
+    return;
+  }
+  if (streamChanged) {
+    searchObj.data.stream.selectedStream = { label: streamName, value: streamName };
+    // Not onChangeStream: it runs a search of its own before the view is restored.
+    await extractFields();
+  }
+
+  searchObj.meta.searchMode = view.searchMode;
+  searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
+  syncSavedViewDateTime(view.datetime);
+  searchObj.data.editorValue = view.editorValue;
+  searchBarRef.value?.setEditorValue?.(view.editorValue);
+  searchObj.meta.resultGrid.sortBy = view.sortBy;
+  searchObj.meta.resultGrid.sortOrder = view.sortOrder;
+
+  // A zero-hit search never rebuilds the columns, so the view's columns are applied here.
+  searchObj.data.stream.selectedFields = [...view.selectedFields];
+  rebuildColumns();
+  updatedLocalLogFilterField(view.searchMode);
+
+  // getUrlQueryParams copies trace_id/span_id from the route, which would reopen a trace.
+  const query = { ...router.currentRoute.value.query, tab: view.searchMode };
+  delete query.trace_id;
+  delete query.span_id;
+  await router.replace({ query });
+
+  if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
+    restoreFilters(view.editorValue);
+  }
   runQueryFn();
 };
 
