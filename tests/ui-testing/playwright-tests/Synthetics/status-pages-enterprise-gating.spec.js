@@ -1,40 +1,30 @@
-/**
- * Status Pages — Notices / Custom Domains Enterprise Gating
- *
- * StatusPagesList.vue locks three per-row dropdown items (Post update, View
- * updates, Custom domains) behind `advancedEnabled`, a computed keyed off
- * `store.state.zoConfig.build_type === "enterprise"`. On an OSS build the
- * items render disabled with a lock icon; on Enterprise they render fully
- * clickable with no lock. The fourth dropdown item (Copy URL) and Delete are
- * never gated and are not asserted here.
- *
- * Exactly one of the two tests runs per environment: the active build is
- * detected directly from the live `/api/{org}/config` response's
- * `build_type` field (see StatusPagesPage.detectBuildType) rather than a
- * rendered UI signal — `build_type` IS the value the gate itself reads, so
- * there is no frontend/backend mismatch to tolerate the way
- * EditionFeaturesPage.detectEdition has to for the enterprise-upsell dialog.
- */
+// Status pages — the three advanced row-menu items lock on OSS and unlock on Enterprise; build_type from /config is the value the gate reads.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { GATED_ITEMS } = require('../../pages/generalPages/statusPagesPage.js');
+const { uniqueName } = require('../utils/synthetics-helpers.js');
 
 test.describe.configure({ mode: 'serial' });
 
-/** Creates a status page via the admin API so the table always has a row to open. */
-async function seedStatusPage(page, orgId) {
-  // Backend is a separate origin from the Vite-served frontend (ZO_BASE_URL) —
-  // same reasoning as StatusPagesPage.detectBuildType.
+// The backend is a separate origin from the Vite-served frontend, same as StatusPagesPage.detectBuildType.
+function adminApi() {
   const baseUrl = (process.env['INGESTION_URL'] || process.env['ZO_BASE_URL']).replace(/\/+$/, '');
   const auth = Buffer.from(
     `${process.env['ZO_ROOT_USER_EMAIL']}:${process.env['ZO_ROOT_USER_PASSWORD']}`,
   ).toString('base64');
+  return { baseUrl, headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' } };
+}
+
+/** Creates a status page via the admin API so the table always has a row to open. */
+async function seedStatusPage(page, orgId) {
+  const { baseUrl, headers } = adminApi();
   const response = await page.request.post(`${baseUrl}/api/${orgId}/status_pages`, {
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+    headers,
     data: {
-      name: `Enterprise Gating Test Page ${Date.now()}`,
+      // The synth_e2e_ prefix lets cleanup.spec.js sweep pages that a crashed run left behind.
+      name: uniqueName('status_page', test.info()),
       description: 'seeded by status-pages-enterprise-gating.spec.js',
     },
   });
@@ -43,15 +33,28 @@ async function seedStatusPage(page, orgId) {
   return body.id;
 }
 
+async function deleteStatusPage(page, orgId, id) {
+  const { baseUrl, headers } = adminApi();
+  const response = await page.request.delete(`${baseUrl}/api/${orgId}/status_pages/${id}`, { headers });
+  expect([200, 404], 'deleting the seeded status page should succeed').toContain(response.status());
+}
+
 test.describe('Status Pages — Enterprise Gating', () => {
   let pm;
   let orgId;
+  let seededId;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     orgId = process.env['ORGNAME'] || 'default';
+    seededId = null;
     await navigateToBase(page);
     pm = new PageManager(page);
+  });
+
+  // One of the two tests always skips before seeding, so only delete when a page was created.
+  test.afterEach(async ({ page }) => {
+    if (seededId) await deleteStatusPage(page, orgId, seededId);
   });
 
   test('OSS - status page advanced features are locked', {
@@ -62,6 +65,7 @@ test.describe('Status Pages — Enterprise Gating', () => {
 
     testLogger.step('Seeding a status page to open its row menu against');
     const rowId = await seedStatusPage(page, orgId);
+    seededId = rowId;
 
     testLogger.step('Navigating to Synthetics -> Status Pages');
     await pm.statusPagesPage.navigate(orgId);
@@ -84,6 +88,7 @@ test.describe('Status Pages — Enterprise Gating', () => {
 
     testLogger.step('Seeding a status page to open its row menu against');
     const rowId = await seedStatusPage(page, orgId);
+    seededId = rowId;
 
     testLogger.step('Navigating to Synthetics -> Status Pages');
     await pm.statusPagesPage.navigate(orgId);
