@@ -19,6 +19,9 @@ import PipelinesList from "@/components/pipeline/PipelinesList.vue";
 import i18n from "@/locales";
 import { nextTick, reactive } from "vue";
 import pipelineService from "@/services/pipelines";
+import jstransform from "@/services/jstransform";
+import { queryClient } from "@/composables/query/queryClient";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { createStore } from "vuex";
 
 // Mock services
@@ -33,6 +36,21 @@ vi.mock("@/services/pipelines", async (importOriginal) => {
       deletePipeline: vi.fn(),
     },
   });
+});
+
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  // Callers hold on to the dismiss handle and call it, so hand one back.
+  return { ...actual, toast: vi.fn(() => vi.fn()) };
 });
 
 // Mock router — currentRoute.value is reactive() so the component's route-name watch fires on mutation, matching vue-router's real currentRoute.
@@ -561,14 +579,14 @@ describe("PipelinesList", () => {
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Export Methods", () => {
-    it("exportPipeline triggers a download for a single pipeline", () => {
-      wrapper.vm.exportPipeline(mockRealtimePipeline);
+    it("exportPipeline triggers a download for a single pipeline", async () => {
+      await wrapper.vm.exportPipeline(mockRealtimePipeline);
 
       expect(global.URL.createObjectURL).toHaveBeenCalled();
       expect(global.URL.revokeObjectURL).toHaveBeenCalled();
     });
 
-    it("exportBulkPipelines downloads all selected pipelines and clears selection", () => {
+    it("exportBulkPipelines downloads all selected pipelines and clears selection", async () => {
       // Populate filteredPipelines so the computed selectedPipelines can resolve them
       wrapper.vm.filteredPipelines = [mockRealtimePipeline, mockScheduledPipeline];
       // Set selection by IDs (the read-only computed derives values from this)
@@ -577,10 +595,136 @@ describe("PipelinesList", () => {
         mockScheduledPipeline.pipeline_id,
       ];
 
-      wrapper.vm.exportBulkPipelines();
+      await wrapper.vm.exportBulkPipelines();
 
       expect(global.URL.createObjectURL).toHaveBeenCalled();
       expect(wrapper.vm.selectedPipelineIds).toEqual([]);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Export Methods — bundled functions", () => {
+    const parseNginx = {
+      name: "parse_nginx",
+      function: ".a = 1",
+      params: "row",
+      transType: 0,
+      // Both are dropped on the way out: `streams` is a deprecated association
+      // whose names mean nothing in another org, `numArgs` is derived.
+      streams: [{ stream: "x", stream_type: "logs" }],
+      numArgs: 1,
+    };
+
+    // Two nodes on one function, so the dedupe has something to do.
+    const fnPipeline = {
+      ...mockRealtimePipeline,
+      pipeline_id: "pipeline3",
+      name: "fn-pipeline",
+      nodes: [
+        { id: "n1", io_type: "input", data: { node_type: "stream", name: "s" } },
+        { id: "n2", io_type: "default", data: { node_type: "function", name: "parse_nginx" } },
+        { id: "n3", io_type: "default", data: { node_type: "function", name: "parse_nginx" } },
+      ],
+    };
+
+    let blobParts: any[] = [];
+    let realBlob: any;
+
+    const exportedFile = () => JSON.parse(String(blobParts[0]));
+
+    beforeEach(() => {
+      blobParts = [];
+      realBlob = global.Blob;
+      // The only way to read what was written: the anchor is a stub and the blob
+      // URL is a mock.
+      global.Blob = class {
+        constructor(parts: any[]) {
+          blobParts = parts;
+        }
+      } as any;
+
+      // fetchQuery caches, and these tests hand it different lists.
+      queryClient.clear();
+      (jstransform.list as MockedFunction<any>).mockResolvedValue({
+        data: { list: [parseNginx] },
+      });
+    });
+
+    afterEach(() => {
+      global.Blob = realBlob;
+    });
+
+    it("bundles the functions a single exported pipeline calls", async () => {
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile().functions).toEqual([
+        { name: "parse_nginx", function: ".a = 1", params: "row", transType: 0 },
+      ]);
+    });
+
+    it("writes one entry per function however many nodes call it", async () => {
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile().functions).toHaveLength(1);
+    });
+
+    it("leaves a pipeline that calls no function unchanged", async () => {
+      await wrapper.vm.exportPipeline(mockRealtimePipeline);
+
+      expect(exportedFile()).not.toHaveProperty("functions");
+      // Nothing to bundle, so the list is never read.
+      expect(jstransform.list).not.toHaveBeenCalled();
+    });
+
+    it("bulk export stays an array, each pipeline carrying its own functions", async () => {
+      wrapper.unmount();
+      (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
+        data: { list: [fnPipeline, mockScheduledPipeline] },
+      });
+      wrapper = createWrapper();
+      await nextTick();
+      await flushPromises();
+
+      wrapper.vm.selectedPipelineIds = [fnPipeline.pipeline_id, mockScheduledPipeline.pipeline_id];
+      await nextTick();
+
+      await wrapper.vm.exportBulkPipelines();
+
+      const file = exportedFile();
+      expect(Array.isArray(file)).toBe(true);
+      expect(file[0].functions).toHaveLength(1);
+      expect(file[1]).not.toHaveProperty("functions");
+    });
+
+    it("leaves out a function it cannot read and names it in a warning", async () => {
+      // Enterprise RBAC filters the list per user, so a node can call a function
+      // this user cannot read.
+      (jstransform.list as MockedFunction<any>).mockResolvedValue({ data: { list: [] } });
+
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile()).not.toHaveProperty("functions");
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: expect.stringContaining("parse_nginx"),
+        }),
+      );
+    });
+
+    it("still exports the pipeline when the function read fails", async () => {
+      (jstransform.list as MockedFunction<any>).mockRejectedValue(new Error("boom"));
+
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(exportedFile().name).toBe("fn-pipeline");
+      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+    });
+
+    it("does not touch the cached row it exported", async () => {
+      await wrapper.vm.exportPipeline(fnPipeline);
+
+      expect(fnPipeline).not.toHaveProperty("functions");
     });
   });
 

@@ -337,7 +337,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </span>
-                  <span v-else>{{ errorMessage }}</span>
+                  <!-- Errors with no inline fix-up are pushed as plain strings, and must read as errors too. -->
+                  <span v-else class="text-status-negative">{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
@@ -408,6 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
+import { functionKeys } from "@/services/jstransform.querykeys";
 import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -502,9 +504,22 @@ export default defineComponent({
       },
     });
 
+    // The endpoint paginates; every consumer here wants the whole list.
+    const ALL_FUNCTIONS = 100000;
+    // How far the copy search walks before giving up. A name that needs more than
+    // this has a problem the import cannot name its way out of.
+    const MAX_FUNCTION_COPY_SUFFIX = 50;
+
     const streamTypes = ["logs", "metrics", "traces"];
     const destinationStreamTypes = ["logs", "metrics", "traces", "enrichment_tables"];
     const existingFunctions = ref<any>([]);
+    // The same functions keyed by name, bodies and all. The bundled-function
+    // resolver compares against these; the remap OSelect still reads the name
+    // list above.
+    const functionsByName = ref<Map<string, any>>(new Map());
+    // Set when a bundled function was created, so the batch invalidates the
+    // functions cache once at the end rather than per pipeline.
+    const functionsCreatedInBatch = ref(false);
     const pipelineDestinations = ref<any>([]);
     const alertDestinations = ref<any>([]);
     const userSelectedSqlQuery = ref<string[]>([]);
@@ -641,13 +656,18 @@ export default defineComponent({
     const getFunctions = async () => {
       const functions = await jstransform.list(
         1,
-        100,
+        // Every function in the org, not the first page: a name missing from this
+        // list answers the create with 400 `already exist`, which the bundled
+        // resolver reads as "taken" and works around with a needless copy.
+        ALL_FUNCTIONS,
         "created_at",
         true,
         "",
         store.state.selectedOrganization.identifier,
       );
-      existingFunctions.value = functions.data.list.map((fun: any) => {
+      const list = functions.data.list ?? [];
+      functionsByName.value = new Map(list.map((fun: any) => [fun.name, fun]));
+      existingFunctions.value = list.map((fun: any) => {
         return fun.name;
       });
     };
@@ -662,6 +682,7 @@ export default defineComponent({
     const importJson = async ({ jsonStr: jsonString }: any) => {
       pipelineErrorsToDisplay.value = [];
       pipelineCreators.value = [];
+      functionsCreatedInBatch.value = false;
 
       try {
         // Check if jsonStr is empty or null
@@ -703,6 +724,14 @@ export default defineComponent({
       if (anyPipelineCreated) {
         void queryClient.invalidateQueries({
           queryKey: pipelineKeys.all(store.state.selectedOrganization.identifier),
+        });
+      }
+
+      // Same reasoning for the functions a bundle created, so the Functions page
+      // shows them without a reload.
+      if (functionsCreatedInBatch.value) {
+        void queryClient.invalidateQueries({
+          queryKey: functionKeys.all(store.state.selectedOrganization.identifier),
         });
       }
 
@@ -1010,12 +1039,28 @@ export default defineComponent({
       //validate function node in pipeline
       const validateFunctionNode = (input: any, pipelineIndex: number) => {
         let functionCounter = 0;
+        const { byName: bundledNames, conflicting } = bundledFunctionsByName(input);
+
+        if (conflicting.length) {
+          pipelineErrors.push(
+            t("pipeline.importErrors.functionBundleConflict", {
+              index: pipelineIndex,
+              names: conflicting.join(", "),
+            }),
+          );
+        }
 
         input.nodes.forEach((node: any, nodeIndex: number) => {
           if (node.io_type === "default" && node.data.node_type === "function") {
             functionCounter++;
 
-            if (!node.data.name || !existingFunctions.value.includes(node.data.name)) {
+            // A bundled name needs no match in the org: the import creates it.
+            const isKnown =
+              !!node.data.name &&
+              (existingFunctions.value.includes(node.data.name) ||
+                bundledNames.has(node.data.name));
+
+            if (!isKnown) {
               pipelineErrors.push({
                 message: t("pipeline.importErrors.functionNameRequired", {
                   index: pipelineIndex,
@@ -1173,7 +1218,216 @@ export default defineComponent({
       });
     };
 
+    /**
+     * Trims, then strips the one trailing `" \n ."` that `save_function` appends to
+     * a VRL body it is given without a return (src/core/src/functions.rs). An
+     * export taken after that rewrite differs from the file it was imported from
+     * by those three characters alone, so without this every older file reports a
+     * false conflict against the very function it came from. JS bodies are stored
+     * verbatim and are unaffected.
+     */
+    const normaliseFunctionBody = (body: any) =>
+      String(body ?? "")
+        .trim()
+        .replace(/\s*\n\s*\.$/, "")
+        .trim();
+
+    // `params` defaults to `row` on the server, so a file that omits it and one
+    // that spells it out describe the same function.
+    const sameFunctionLogic = (a: any, b: any) =>
+      normaliseFunctionBody(a?.function) === normaliseFunctionBody(b?.function) &&
+      (a?.params || "row") === (b?.params || "row") &&
+      Number(a?.transType ?? 0) === Number(b?.transType ?? 0);
+
+    /**
+     * The functions a file bundles for one pipeline, keyed by name.
+     *
+     * `conflicting` names an unresolvable file: two entries under one name
+     * describing different logic, where no choice of body can be the right one for
+     * the node that calls it.
+     */
+    const bundledFunctionsByName = (input: any) => {
+      const byName = new Map<string, any>();
+      const conflicting: string[] = [];
+      const bundle = Array.isArray(input?.functions) ? input.functions : [];
+
+      bundle.forEach((fn: any) => {
+        if (!fn || typeof fn.name !== "string" || fn.name === "") return;
+        const seen = byName.get(fn.name);
+        if (!seen) {
+          byName.set(fn.name, fn);
+          return;
+        }
+        if (!sameFunctionLogic(seen, fn) && !conflicting.includes(fn.name)) {
+          conflicting.push(fn.name);
+        }
+      });
+
+      return { byName, conflicting };
+    };
+
+    // Only the bundled functions a node actually calls: a file may carry more than
+    // the pipeline needs, and creating those would be a surprise.
+    const usedBundledFunctions = (input: any, byName: Map<string, any>) => {
+      const used: any[] = [];
+      const seen = new Set<string>();
+      (input?.nodes ?? []).forEach((node: any) => {
+        if (node?.data?.node_type !== "function") return;
+        const name = node?.data?.name;
+        if (!name || seen.has(name) || !byName.has(name)) return;
+        seen.add(name);
+        used.push(byName.get(name));
+      });
+      return used;
+    };
+
+    // Names a node calls that the file did not carry, for a file that carried some.
+    // An old file bundles nothing at all, and those nodes are the remap OSelect's
+    // business, so they are not reported here.
+    const unbundledFunctionNames = (input: any, byName: Map<string, any>) => {
+      if (!byName.size) return [];
+      const missing: string[] = [];
+      (input?.nodes ?? []).forEach((node: any) => {
+        const name = node?.data?.name;
+        if (node?.data?.node_type !== "function" || !name) return;
+        if (!byName.has(name) && !missing.includes(name)) missing.push(name);
+      });
+      return missing;
+    };
+
+    /**
+     * Creates the functions this pipeline bundles and points its nodes at them.
+     *
+     * Never overwrites: a name taken by different logic gets a copy under the first
+     * free `_N`, so no pipeline but this one changes behaviour, and this one runs
+     * the logic it was exported with. Decided per function with no prompt.
+     *
+     * Returns false when a function could not be resolved — the caller abandons the
+     * pipeline rather than create it against the wrong logic.
+     */
+    const resolveBundledFunctions = async (input: any, index: any) => {
+      const { byName, conflicting } = bundledFunctionsByName(input);
+
+      if (conflicting.length) {
+        pipelineCreators.value.push({
+          message: t("pipeline.importErrors.functionBundleConflict", {
+            index,
+            names: conflicting.join(", "),
+          }),
+          success: false,
+        });
+        return false;
+      }
+
+      const unbundled = unbundledFunctionNames(input, byName);
+      if (unbundled.length) {
+        pipelineCreators.value.push({
+          message: t("pipeline.importErrors.functionsNotBundled", {
+            index,
+            names: unbundled.join(", "),
+          }),
+          success: true,
+        });
+      }
+
+      const renamed = new Map<string, string>();
+
+      for (const fn of usedBundledFunctions(input, byName)) {
+        let target: string | null = null;
+
+        for (let n = 0; n <= MAX_FUNCTION_COPY_SUFFIX; n++) {
+          // `_N` keeps the name inside the Add form's rule, /^[A-Za-z_][A-Za-z0-9_]*$/.
+          const candidate = n === 0 ? fn.name : `${fn.name}_${n}`;
+          const existing = functionsByName.value.get(candidate);
+
+          if (existing) {
+            if (!sameFunctionLogic(existing, fn)) continue;
+            target = candidate;
+            if (n > 0) {
+              pipelineCreators.value.push({
+                message: t("pipeline.importErrors.functionReusedCopy", {
+                  index,
+                  name: fn.name,
+                  copy: candidate,
+                }),
+                success: true,
+              });
+            }
+            break;
+          }
+
+          try {
+            await jstransform.create(store.state.selectedOrganization.identifier, {
+              ...fn,
+              name: candidate,
+            });
+          } catch (error: any) {
+            // Under enterprise RBAC the list is filtered per user, so a name this
+            // user cannot read is free as far as the map knows and taken as far as
+            // the server is concerned. Same answer either way: try the next one.
+            if (/already exist/i.test(error?.response?.data?.message ?? "")) continue;
+            pipelineCreators.value.push({
+              message: t("pipeline.importErrors.functionCreateFailed", {
+                index,
+                name: candidate,
+                reason: error?.response?.data?.message || t("pipeline.importErrors.unknownError"),
+              }),
+              success: false,
+            });
+            return false;
+          }
+
+          // A later pipeline in the same file, and a re-import of it, then reuse
+          // this one instead of creating another copy.
+          functionsByName.value.set(candidate, { ...fn, name: candidate });
+          if (!existingFunctions.value.includes(candidate)) {
+            existingFunctions.value.push(candidate);
+          }
+          functionsCreatedInBatch.value = true;
+          target = candidate;
+          pipelineCreators.value.push({
+            message:
+              n === 0
+                ? t("pipeline.importErrors.functionCreated", { index, name: candidate })
+                : t("pipeline.importErrors.functionCreatedCopy", {
+                    index,
+                    name: fn.name,
+                    copy: candidate,
+                  }),
+            success: true,
+          });
+          break;
+        }
+
+        if (!target) {
+          pipelineCreators.value.push({
+            message: t("pipeline.importErrors.functionNoFreeName", {
+              index,
+              name: fn.name,
+              limit: MAX_FUNCTION_COPY_SUFFIX,
+            }),
+            success: false,
+          });
+          return false;
+        }
+        renamed.set(fn.name, target);
+      }
+
+      // Point every function node at the name that was actually resolved.
+      (input?.nodes ?? []).forEach((node: any) => {
+        if (node?.data?.node_type === "function" && renamed.has(node.data.name)) {
+          node.data.name = renamed.get(node.data.name);
+        }
+      });
+
+      return true;
+    };
+
     const createPipeline = async (input: any, index: any) => {
+      // The functions this file bundles come first: the nodes may be rewritten to
+      // point at a copy, and nothing should be created if they cannot be resolved.
+      if (!(await resolveBundledFunctions(input, index))) return false;
+
       // VERSION DETECTION AND CONVERSION
       // Convert V0 and V1 conditions to V2 format in condition nodes before creating pipeline
       if (input.nodes && Array.isArray(input.nodes)) {
@@ -1428,6 +1682,11 @@ export default defineComponent({
       validateNodesForOrg,
       validateRemoteDestination,
       createPipeline,
+      resolveBundledFunctions,
+      bundledFunctionsByName,
+      sameFunctionLogic,
+      normaliseFunctionBody,
+      functionsByName,
       getFunctions,
       getAlertDestinations,
       getScheduledPipelines,
