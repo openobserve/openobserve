@@ -110,10 +110,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-compact="isMobile"
           @trigger="onRefreshTick"
         />
-        <!-- Labeled Refresh button. In Visualize it re-runs the chart's query;
-             in Explore/Workspace it refreshes the grid — so its
-             disabled/loading state follows the grid only there. -->
+        <!-- Visualize runs its query with an explicit Run, the one action that
+             writes query history; the grid modes refresh instead. -->
+        <template v-if="mode === 'visualize'">
+          <QueryHistoryDrawer @load="onHistoryLoad" />
+          <OButton
+            variant="primary"
+            size="sm-toolbar"
+            icon-left="play-arrow"
+            data-test="metrics-explorer-run"
+            @click="onVisualizeRun"
+          >
+            <span class="max-md:hidden">{{ t("metrics.runQuery") }}</span>
+            <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+          </OButton>
+        </template>
         <OButton
+          v-else
           variant="primary"
           size="sm-toolbar"
           icon-left="refresh"
@@ -388,6 +401,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OToggleGroup>
 
+          <ExplorerSavedViews :state="viewState" @apply="onApplyView" @saved="onViewSaved" />
+
           <!-- Convert to dashboard: each favourite becomes a panel. FAVOURITES
                only, where they are what's on screen. -->
           <OButton
@@ -591,6 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
       @seed-consumed="visualizeSeed = null"
+      @update:time-range="onVisualizeTimeRange"
     />
 
     <FunctionConfigDialog
@@ -651,6 +667,8 @@ import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
 import MetricDetailView from "./MetricDetailView.vue";
+import ExplorerSavedViews from "./ExplorerSavedViews.vue";
+import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
 
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
@@ -675,7 +693,10 @@ import {
   selectedDateToQueryParams,
   refreshLabelToInterval,
   refreshIntervalToLabel,
+  type SelectedDate,
 } from "@/utils/dashboard/urlTimeParams";
+import { pickerSavedDate } from "@/utils/metrics/queryHistory";
+import type { ExplorerViewState } from "@/utils/metrics/explorerSavedView";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -727,6 +748,8 @@ export default defineComponent({
     LabelFilterBar,
     FunctionConfigDialog,
     MetricDetailView,
+    ExplorerSavedViews,
+    QueryHistoryDrawer,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -739,7 +762,7 @@ export default defineComponent({
     const dateTimePickerRef = ref<any>(null);
     const refreshInterval = ref(0);
     /** A factory, not a literal: the route watcher resets to this too. */
-    const defaultSelectedDate = () => ({
+    const defaultSelectedDate = (): SelectedDate => ({
       valueType: "relative",
       startTime: null,
       endTime: null,
@@ -1507,6 +1530,25 @@ export default defineComponent({
       return query;
     };
 
+    /* ------------------------------------------------------ saved views */
+
+    // The menu saves this slice, allow-listed again on its side.
+    const viewState = computed(() => managedFromState());
+
+    // Applying is a navigation: the route watcher below applies the state.
+    const onApplyView = (query: ExplorerViewState) => {
+      router
+        .push({
+          name: "metrics",
+          query: { org_identifier: store.state.selectedOrganization?.identifier, ...query },
+        })
+        .catch(() => {});
+      track("metrics_explorer_view_applied", { key_count: Object.keys(query).length });
+    };
+
+    const onViewSaved = (action: "created" | "updated") =>
+      track("metrics_explorer_view_saved", { action });
+
     /* -------------------------------------------- convert to dashboard */
 
     // The bridge from ephemeral Favourites to a durable Dashboard: build one
@@ -1676,8 +1718,14 @@ export default defineComponent({
       applyDetailKeys(f);
       if (f.labelFilters?.length) grid.ensureSchemas();
 
-      selectedDate.value =
+      const nextDate =
         q.period || (q.from && q.to) ? queryParamsToSelectedDate(q) : defaultSelectedDate();
+      if (
+        !isEqual(selectedDateToQueryParams(nextDate), selectedDateToQueryParams(selectedDate.value))
+      ) {
+        setPickerDate(nextDate);
+        onDateChange();
+      }
       refreshInterval.value =
         q.refresh != null
           ? refreshLabelToInterval(q.refresh, store.state?.zoConfig?.min_auto_refresh_interval || 0)
@@ -1725,6 +1773,13 @@ export default defineComponent({
       // The rendered objects, not the ones `onScreen` captured: a refresh's stream reload rebuilds every card.
       const live = visibleCards.value.filter((c) => onScreen.has(c.name));
       return Promise.all(live.map((card) => grid.requestPreview(card, opts)));
+    };
+
+    // The picker reads its v-model only on mount, so a range set from outside
+    // (a URL change, a history entry) must move the picker itself too.
+    const setPickerDate = (date: SelectedDate) => {
+      selectedDate.value = date;
+      dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
     };
 
     const syncTimeRange = (opts?: { keepPreviews?: boolean }) => {
@@ -1857,6 +1912,23 @@ export default defineComponent({
     /** The auto-refresh timer. Keeps the no-data set; see onRefresh. */
     const onRefreshTick = () => onRefresh({ manual: false });
 
+    /* --------------------------------------------- Visualize: run, history */
+
+    /** An explicit Run in Visualize — the only Visualize run that writes history. */
+    const onVisualizeRun = () => visualizeRef.value?.onUserRun?.(selectedDate.value);
+
+    const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
+      visualizeRef.value?.applyPanelData?.(entry.metricsData, entry.timeRange);
+      track("metrics_explorer_history_loaded");
+    };
+
+    // A loaded entry's range. The grid is paused under Visualize, so it only
+    // takes the new window and re-queries when it is back on screen.
+    const onVisualizeTimeRange = (date: SelectedDate) => {
+      setPickerDate(date);
+      syncTimeRange();
+    };
+
     watch(refreshInterval, (value) => grid.setRefreshInterval(value));
 
     /* -------------------------------------------------------- telemetry */
@@ -1952,10 +2024,12 @@ export default defineComponent({
     // scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
-        // ⌘/Ctrl+Enter — run the query. In Visualize this re-runs the chart;
-        // in Explore/Workspace it refreshes the grid (there is no single query).
+        // ⌘/Ctrl+Enter — run the query. In Visualize this is an explicit Run
+        // of the chart; in Explore/Workspace it refreshes the grid (there is
+        // no single query).
         id: "metricsRunQuery",
-        handler: () => onRefresh({ manual: true }),
+        handler: () =>
+          mode.value === "visualize" ? onVisualizeRun() : onRefresh({ manual: true }),
       },
       {
         id: "metricsRefresh",
@@ -2095,6 +2169,12 @@ export default defineComponent({
       onCardZoom,
       onRefresh,
       refreshing,
+      viewState,
+      onApplyView,
+      onViewSaved,
+      onVisualizeRun,
+      onHistoryLoad,
+      onVisualizeTimeRange,
     };
   },
 });

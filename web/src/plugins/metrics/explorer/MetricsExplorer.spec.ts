@@ -141,6 +141,14 @@ vi.mock("@tanstack/vue-virtual", () => ({
     })),
 }));
 
+// Captures the registered handlers so a test can fire a shortcut directly.
+const shortcuts = vi.hoisted(() => ({ handlers: {} as Record<string, () => void> }));
+vi.mock("@/lib/vue-shortcut-manager", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  useShortcuts: (list: Array<{ id: string; handler: () => void }>) =>
+    list.forEach((s) => (shortcuts.handlers[s.id] = s.handler)),
+}));
+
 import MetricsExplorer from "./MetricsExplorer.vue";
 import analytics from "@/services/product_analytics";
 
@@ -149,6 +157,9 @@ const CARD = { name: "http_requests_total", unsupported: false, cardKind: "count
 /** The Visualize pane's runQuery — the toolbar refresh must drive this in
  *  visualize mode instead of sweeping the Explore grid. */
 const visualizeRunQuery = vi.fn();
+/** The pane's explicit-run (records history) and live-apply entry points. */
+const visualizeOnUserRun = vi.fn();
+const visualizeApplyPanelData = vi.fn();
 
 /** The panel state the stubbed Visualize pane exposes to its parent — the parent
  *  reads it to build the `metrics_data` blob. Set per test before entering
@@ -205,9 +216,20 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
           // encode the shareable blob.
           setup: () => ({
             runQuery: visualizeRunQuery,
+            onUserRun: visualizeOnUserRun,
+            applyPanelData: visualizeApplyPanelData,
             dashboardPanelData: visualizePanel,
           }),
           template: '<div data-test="metrics-explorer-visualize">visualize</div>',
+        },
+        ExplorerSavedViews: {
+          props: ["state"],
+          emits: ["apply", "saved"],
+          template: '<div data-test="metrics-explorer-views" />',
+        },
+        QueryHistoryDrawer: {
+          emits: ["load"],
+          template: '<div data-test="metrics-history" />',
         },
         ...stubOverrides,
       },
@@ -1204,6 +1226,164 @@ describe("MetricsExplorer wiring", () => {
 
       grid.showFavoritesOnly.value = false; // reset shared mock
       grid.selectedPrefixes.value = new Set();
+    });
+  });
+
+  describe("saved views", () => {
+    const VIEWS = '[data-test="metrics-explorer-views"]';
+
+    it("offers the Views menu on the grid, never in Visualize or the detail view", async () => {
+      const wrapper = mountExplorer();
+      expect(wrapper.find(VIEWS).exists()).toBe(true);
+
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(true);
+
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(false);
+
+      (wrapper.vm as any).setMode("explore");
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(false);
+    });
+
+    it("hands the menu the grid's URL slice", () => {
+      routerState.query = { sort: "z-a", period: "1h" };
+      grid.sortBy.value = "z-a";
+      const wrapper = mountExplorer();
+      const state = wrapper.findComponent(VIEWS).props("state");
+      expect(state).toMatchObject({ sort: "z-a", period: "1h" });
+      grid.sortBy.value = "a-z";
+    });
+
+    it("applying a view navigates to /metrics with its query and is tracked", async () => {
+      const wrapper = mountExplorer();
+      wrapper.findComponent(VIEWS).vm.$emit("apply", { sort: "z-a", prefix: "node" });
+      await flushPromises();
+
+      expect(routerState.push).toHaveBeenCalledWith({
+        name: "metrics",
+        query: { org_identifier: "org1", sort: "z-a", prefix: "node" },
+      });
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_view_applied",
+        expect.any(Object),
+      );
+    });
+
+    it("tracks a saved view", async () => {
+      const wrapper = mountExplorer();
+      wrapper.findComponent(VIEWS).vm.$emit("saved", "created");
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_view_saved",
+        expect.objectContaining({ action: "created" }),
+      );
+    });
+
+    it("a URL change with a new range sets the picker, not just the model", async () => {
+      const setSavedDate = vi.fn();
+      const wrapper = mountExplorer({
+        DateTimePickerDashboard: {
+          setup: (_: any, { expose }: any) => {
+            expose({ setSavedDate, getConsumableDateTime: () => ({ startTime: 1, endTime: 2 }) });
+            return {};
+          },
+          template: "<div />",
+        },
+      });
+      routerState.query = { sort: "z-a", period: "6h" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await flushPromises();
+
+      expect(setSavedDate).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "6h" });
+      expect(grid.setTimeRange).toHaveBeenCalled();
+    });
+  });
+
+  describe("query history in Visualize", () => {
+    const RUN = '[data-test="metrics-explorer-run"]';
+    const withButtons = () =>
+      mountExplorer({ OButton: { template: '<button v-bind="$attrs"><slot /></button>' } });
+
+    beforeEach(() => {
+      shortcuts.handlers = {};
+    });
+
+    it("Visualize has a Run button and History; the grid modes do not", async () => {
+      const wrapper = withButtons();
+      expect(wrapper.find(RUN).exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-history"]').exists()).toBe(false);
+
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(RUN).exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-history"]').exists()).toBe(true);
+    });
+
+    it("Run and the run shortcut are explicit runs; refresh and auto-refresh are not", async () => {
+      const wrapper = withButtons();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      await wrapper.find(RUN).trigger("click");
+      shortcuts.handlers.metricsRunQuery();
+      expect(visualizeOnUserRun).toHaveBeenCalledTimes(2);
+      expect(visualizeOnUserRun).toHaveBeenCalledWith(
+        expect.objectContaining({ relativeTimePeriod: "15m" }),
+      );
+
+      shortcuts.handlers.metricsRefresh();
+      (wrapper.vm as any).onRefreshTick();
+      expect(visualizeOnUserRun).toHaveBeenCalledTimes(2);
+      expect(visualizeRunQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it("the run shortcut in Explore refreshes the grid and records nothing", async () => {
+      mountExplorer();
+      shortcuts.handlers.metricsRunQuery();
+      await flushPromises();
+      expect(visualizeOnUserRun).not.toHaveBeenCalled();
+      expect(grid.loadStreams).toHaveBeenCalled();
+    });
+
+    it("loading an entry applies it to the pane and is tracked", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
+      wrapper
+        .findComponent('[data-test="metrics-history"]')
+        .vm.$emit("load", { metricsData: "blob", timeRange });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange);
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_history_loaded",
+        expect.any(Object),
+      );
+    });
+
+    it("the pane's range change sets the toolbar picker", async () => {
+      const setSavedDate = vi.fn();
+      const wrapper = mountExplorer({
+        DateTimePickerDashboard: {
+          setup: (_: any, { expose }: any) => {
+            expose({ setSavedDate, getConsumableDateTime: () => ({ startTime: 1, endTime: 2 }) });
+            return {};
+          },
+          template: "<div />",
+        },
+      });
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      wrapper
+        .findComponent('[data-test="metrics-explorer-visualize"]')
+        .vm.$emit("update:time-range", { valueType: "absolute", startTime: 5, endTime: 9 });
+      expect(setSavedDate).toHaveBeenCalledWith({ type: "absolute", startTime: 5, endTime: 9 });
+      expect((wrapper.vm as any).selectedDate).toMatchObject({ startTime: 5, endTime: 9 });
     });
   });
 });

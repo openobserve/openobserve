@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 
 // A fresh panel-data object per test so mounting can reset it in place and the
@@ -92,7 +92,16 @@ vi.mock("vuex", async (importOriginal) => ({
   }),
 }));
 
+const historyApi = vi.hoisted(() => ({
+  record: vi.fn(),
+  list: vi.fn(),
+  star: vi.fn(),
+  remove: vi.fn(),
+}));
+vi.mock("@/services/query_history", () => ({ default: historyApi }));
+
 import MetricsVisualize from "./MetricsVisualize.vue";
+import { encodeMetricsConfig } from "@/composables/metrics/metricsUrlState";
 
 const mountVisualize = (props: Record<string, any> = {}) =>
   mount(MetricsVisualize, {
@@ -222,6 +231,123 @@ describe("MetricsVisualize", () => {
       // build a query; querying an empty panel would be a guaranteed error.
       expect(editorRunQuery).not.toHaveBeenCalled();
       wrapper.unmount();
+    });
+  });
+
+  describe("query history", () => {
+    const RANGE = {
+      valueType: "relative",
+      relativeTimePeriod: "1h",
+      startTime: null,
+      endTime: null,
+    };
+    const withQuery = (query: string) => {
+      panelData.current.data.queries = [{ query, customQuery: true, fields: {} }];
+    };
+    let consoleError: any;
+
+    beforeEach(() => {
+      historyApi.record.mockResolvedValue({ data: {} });
+      validatePanel.mockImplementation(() => {});
+      consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => consoleError.mockRestore());
+
+    it("an explicit run runs the query and records it", async () => {
+      const wrapper = mountVisualize({ selectedDateTime: { startTime: 1000, endTime: 2000 } });
+      await flushPromises();
+      withQuery("sum(up)");
+
+      (wrapper.vm as any).onUserRun(RANGE);
+      await flushPromises();
+
+      expect(editorRunQuery).toHaveBeenCalledTimes(1);
+      expect(historyApi.record).toHaveBeenCalledWith(
+        "org1",
+        expect.objectContaining({
+          query: "sum(up)",
+          context: expect.objectContaining({ time_range: { period: "1h" }, chart_type: "line" }),
+        }),
+      );
+    });
+
+    it("does not record a query that fails validation", async () => {
+      validatePanel.mockImplementation((errors: string[]) => errors.push("bad"));
+      const wrapper = mountVisualize();
+      await flushPromises();
+      withQuery("sum(up)");
+
+      (wrapper.vm as any).onUserRun(RANGE);
+      await flushPromises();
+      expect(historyApi.record).not.toHaveBeenCalled();
+    });
+
+    it("a failed record is logged and never blocks the run", async () => {
+      historyApi.record.mockRejectedValue(new Error("boom"));
+      const wrapper = mountVisualize();
+      await flushPromises();
+      withQuery("sum(up)");
+
+      (wrapper.vm as any).onUserRun(RANGE);
+      await flushPromises();
+      expect(editorRunQuery).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalled();
+      expect(showErrorNotification).not.toHaveBeenCalled();
+    });
+
+    it("the seed auto-run and the time-range watcher record nothing", async () => {
+      const wrapper = mountVisualize({
+        seed: { type: "line", queries: [{ query: "sum(up)", customQuery: true, fields: {} }] },
+        selectedDateTime: { startTime: 1000, endTime: 2000 },
+      });
+      await flushPromises();
+      await flushPromises();
+      await wrapper.setProps({ selectedDateTime: { startTime: 3000, endTime: 4000 } });
+      await flushPromises();
+
+      expect(editorRunQuery).toHaveBeenCalledTimes(2);
+      expect(historyApi.record).not.toHaveBeenCalled();
+    });
+
+    it("applies two consecutive entries live, each with its range, running once each", async () => {
+      // A parent that owns the range, as the explorer does.
+      const Parent = {
+        components: { MetricsVisualize },
+        data: () => ({ range: { startTime: 1000, endTime: 2000 } as any }),
+        template:
+          '<MetricsVisualize ref="viz" :selected-date-time="range" @update:time-range="(r) => (range = { startTime: r.startTime, endTime: r.endTime })" />',
+      };
+      const wrapper = mount(Parent);
+      await flushPromises();
+      const viz: any = wrapper.vm.$refs.viz;
+      const data = panelData.current.data;
+      const blob = (type: string, query: string) =>
+        encodeMetricsConfig({ v: 1, data: { type, queries: [{ query, fields: {} }] } });
+
+      await viz.applyPanelData(blob("bar", "sum(a)"), {
+        valueType: "absolute",
+        startTime: 5000,
+        endTime: 9000,
+      });
+      await flushPromises();
+      expect(panelData.current.data).toBe(data);
+      expect(data.type).toBe("bar");
+      expect(data.queries[0].query).toBe("sum(a)");
+      expect(panelData.current.meta.dateTime.start_time).toEqual(new Date(5000));
+      expect(editorRunQuery).toHaveBeenCalledTimes(1);
+
+      await viz.applyPanelData(blob("area", "max(b)"), {
+        valueType: "absolute",
+        startTime: 7000,
+        endTime: 8000,
+      });
+      await flushPromises();
+      expect(data.type).toBe("area");
+      expect(data.queries[0].query).toBe("max(b)");
+      expect(panelData.current.meta.dateTime.start_time).toEqual(new Date(7000));
+      expect(editorRunQuery).toHaveBeenCalledTimes(2);
+      expect(historyApi.record).not.toHaveBeenCalled();
     });
   });
 });

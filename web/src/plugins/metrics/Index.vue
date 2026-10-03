@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         shortcut-id="metricsCopyUrl"
         class="h-8"
       />
+      <QueryHistoryDrawer @load="onHistoryLoad" />
       <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
         <OButton
           v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
@@ -77,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-apply"
           :loading="disable"
           :disabled="disable"
-          @click="runQuery"
+          @click="onUserRun"
         >
           {{ t("metrics.runQuery") }}
           <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
@@ -146,11 +147,16 @@ import {
   applyMetricsBlob,
   applyDeepLinkOverrides,
 } from "@/composables/metrics/metricsUrlState";
+import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
+import { pickerSavedDate } from "@/utils/metrics/queryHistory";
+import QueryHistoryDrawer from "./QueryHistoryDrawer.vue";
+import analytics from "@/services/product_analytics";
 import {
   queryParamsToSelectedDate,
   selectedDateToQueryParams,
   refreshLabelToInterval,
   refreshIntervalToLabel,
+  type SelectedDate,
 } from "@/utils/dashboard/urlTimeParams";
 import { hasAnyDeepLinkParam } from "@/utils/url/deepLinkParams";
 import { METRICS_PARAMS } from "@/utils/metrics/metricsParamRegistry";
@@ -178,6 +184,7 @@ export default defineComponent({
     OButton,
     OTooltip,
     ShareButton,
+    QueryHistoryDrawer,
   },
   setup() {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -402,9 +409,12 @@ export default defineComponent({
       },
     );
 
-    const runQuery = () => {
+    // Every run goes through here — auto-refresh, deep links, the refresh
+    // shortcut — so it never writes history; `onUserRun` does. Returns whether
+    // the query passed validation and ran.
+    const runQuery = (): boolean => {
       if (!isValid(true, false)) {
-        return;
+        return false;
       }
 
       // copy the data object excluding the reactivity
@@ -420,6 +430,38 @@ export default defineComponent({
 
       // panel -> URL (full blob + time/refresh); normalizes any inbound params.
       syncStateToUrl();
+      return true;
+    };
+
+    const { record } = useQueryHistoryRecorder();
+
+    /** An explicit Run (button or shortcut): runs, then records a valid query. */
+    const onUserRun = () => {
+      if (runQuery()) record(dashboardPanelData, selectedDate.value);
+    };
+
+    /**
+     * Loads a history entry live. The editor hydrates only on mount, so a
+     * metrics_data URL would not reload it: the panel is replaced in place, the
+     * picker moved, and the query run.
+     */
+    const applyPanelData = (metricsData: string, timeRange: SelectedDate) => {
+      if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
+      selectedDate.value = timeRange;
+      dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(timeRange));
+      runQuery();
+    };
+
+    const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
+      applyPanelData(entry.metricsData, entry.timeRange);
+      try {
+        analytics.track("metrics_query_history_loaded", {
+          org_id: store.state.selectedOrganization?.identifier,
+          surface: "editor",
+        });
+      } catch {
+        // Telemetry must never break the page.
+      }
     };
 
     const updateDateTime = () => {
@@ -582,7 +624,7 @@ export default defineComponent({
     useShortcuts([
       {
         id: "metricsRunQuery",
-        handler: () => runQuery(),
+        handler: () => onUserRun(),
       },
       {
         id: "metricsRefresh",
@@ -622,6 +664,9 @@ export default defineComponent({
       isMobile,
       updateDateTime,
       runQuery,
+      onUserRun,
+      applyPanelData,
+      onHistoryLoad,
       dashboardPanelData,
       chartData,
       editMode,

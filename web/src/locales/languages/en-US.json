@@ -9496,6 +9496,23 @@
         "noPrefixMatch": "No prefixes match.",
         "noSuffixMatch": "No suffixes match.",
         "noTypeMatch": "No types match."
+      },
+      "views": {
+        "label": "Views",
+        "none": "No saved views",
+        "saveAs": "Save as new view",
+        "update": "Update \"{name}\"",
+        "delete": "Delete \"{name}\"",
+        "saveTitle": "Save view",
+        "name": "View name",
+        "saved": "View saved",
+        "updated": "View updated",
+        "deleted": "View deleted",
+        "saveFailed": "Could not save the view",
+        "applyFailed": "Could not open the view",
+        "deleteFailed": "Could not delete the view",
+        "deleteTitle": "Delete view",
+        "deleteMessage": "Delete \"{name}\" for everyone in this organization?"
       }
     },
     "index": {
@@ -9620,6 +9637,16 @@
       "summary": "Summary",
       "other": "Other",
       "facetWithCount": "{label} ({count})"
+    },
+    "history": {
+      "title": "Query history",
+      "searchPlaceholder": "Search queries",
+      "starredOnly": "Starred only",
+      "star": "Star",
+      "unstar": "Unstar",
+      "query": "Query",
+      "ranAt": "Ran",
+      "empty": "No queries yet"
     }
   },
   "settings": {

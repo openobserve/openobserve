@@ -65,7 +65,9 @@ import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
 import { restoreMetricsStream } from "@/utils/streamPersist";
-import { normaliseMetricsBlobData } from "@/composables/metrics/metricsUrlState";
+import { applyMetricsBlob, normaliseMetricsBlobData } from "@/composables/metrics/metricsUrlState";
+import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
+import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
@@ -96,7 +98,7 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ["seed-consumed"],
+  emits: ["seed-consumed", "update:time-range"],
   setup(props, { emit }) {
     // The PanelEditor family keys its shared state off this provide — "metrics"
     // gives us the metrics defaults and the promql query bar, matching Index.vue.
@@ -215,6 +217,30 @@ export default defineComponent({
       panelEditorRef.value?.runQuery?.();
     };
 
+    const { record } = useQueryHistoryRecorder();
+
+    /** An explicit Run (button or shortcut): the only run that writes history. */
+    const onUserRun = (selectedDate: SelectedDate) => {
+      runQuery();
+      const errors: string[] = [];
+      validatePanel(errors, false);
+      if (!errors.length) record(dashboardPanelData, selectedDate);
+    };
+
+    // Set while a history entry is applied, so its range change does not run
+    // the old query too: the entry's own run follows once the range lands.
+    let applyingEntry = false;
+
+    /** Loads a history entry live: its panel in place, its range on the parent's picker, one run. */
+    const applyPanelData = async (metricsData: string, timeRange: SelectedDate) => {
+      if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
+      applyingEntry = true;
+      emit("update:time-range", timeRange);
+      await nextTick();
+      applyingEntry = false;
+      runQuery();
+    };
+
     // Declared AFTER applyDateTime/runQuery: the hooks call them, and a const
     // arrow function is in its temporal dead zone until defined.
     //
@@ -241,6 +267,7 @@ export default defineComponent({
     watch(
       () => props.selectedDateTime,
       () => {
+        if (applyingEntry) return;
         if (dashboardPanelData.data?.queries?.[0]?.query) runQuery();
         else applyDateTime();
       },
@@ -255,6 +282,8 @@ export default defineComponent({
       onAddToDashboard,
       onChartApiError,
       runQuery,
+      onUserRun,
+      applyPanelData,
     };
   },
 });

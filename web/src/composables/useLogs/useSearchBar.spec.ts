@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
@@ -319,6 +319,26 @@ describe("useSearchBar Composable", () => {
 
       wrapper.vm.getSavedViews();
       // Loading state is set before the async call
+    });
+
+    it("lists only logs views: untyped ones and view_type logs", async () => {
+      mockSavedViewsGet.mockResolvedValue({
+        data: {
+          views: [
+            { view_id: "a", view_name: "old" },
+            { view_id: "b", view_name: "typed", view_type: "logs" },
+            { view_id: "c", view_name: "grid", view_type: "metrics_explorer" },
+          ],
+        },
+      });
+
+      wrapper.vm.getSavedViews(true);
+      await flushPromises();
+
+      expect(searchState().searchObj.data.savedViews.map((v: any) => v.view_id)).toEqual([
+        "a",
+        "b",
+      ]);
     });
   });
 
