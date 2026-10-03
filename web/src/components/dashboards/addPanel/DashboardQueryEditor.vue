@@ -230,7 +230,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #after>
               <div class="flex h-full w-full flex-col">
-                <div class="min-h-0 w-full flex-1">
+                <div
+                  class="border-border-default flex w-full shrink-0 items-center gap-1 border-b px-2 py-1.5"
+                  data-test="dashboard-vrl-function-toolbar"
+                >
+                  <OSelect
+                    v-model="selectedFunction"
+                    :label="t('dashboard.useSavedFunction')"
+                    :options="functionSelectOptions"
+                    label-position="inside"
+                    data-test="dashboard-use-saved-vrl-function"
+                    labelKey="name"
+                    valueKey="function"
+                    @search="onFunctionSearch"
+                    @update:model-value="onFunctionSelect"
+                    class="min-w-0 flex-1"
+                  />
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    data-test="dashboard-addpanel-config-drilldown-info"
+                  >
+                    <template #icon-left><OIcon name="info-outline" size="sm" /></template>
+                    <OTooltip
+                      :content="t('dashboard.vrlExtractionTooltip')"
+                      max-width="15.625rem"
+                    />
+                  </OButton>
+                </div>
+                <div class="relative min-h-0 w-full flex-1">
                   <UnifiedQueryEditor
                     class="h-full w-full"
                     v-if="!promqlMode && dashboardPanelData.layout.vrlFunctionToggle"
@@ -266,33 +294,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
                       >{{ vrlPlaceholder }}</span
                     >
-                  </div>
-                </div>
-                <div class="w-full shrink-0">
-                  <div class="flex items-center">
-                    <OSelect
-                      v-model="selectedFunction"
-                      :label="t('dashboard.useSavedFunction')"
-                      :options="functionSelectOptions"
-                      label-position="inside"
-                      data-test="dashboard-use-saved-vrl-function"
-                      labelKey="name"
-                      valueKey="function"
-                      @search="onFunctionSearch"
-                      @update:model-value="onFunctionSelect"
-                      class="flex-1"
-                    />
-                    <OButton
-                      variant="ghost"
-                      size="icon"
-                      data-test="dashboard-addpanel-config-drilldown-info"
-                    >
-                      <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-                      <OTooltip
-                        :content="t('dashboard.vrlExtractionTooltip')"
-                        max-width="15.625rem"
-                      />
-                    </OButton>
                   </div>
                 </div>
               </div>
