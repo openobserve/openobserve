@@ -252,9 +252,17 @@ struct RecentIngestedTraceStream {
 /// The shared §5.1 metric block: batch-aware statement count, call/error
 /// counts, total/percentile/max latency (ns — `start_time`/`end_time` are
 /// nanoseconds), distinct traces, and (schema-gated) row-count columns.
+///
+/// `db_response_returned_rows` is a user span attribute, so its column type is
+/// whatever ingestion produced. OTLP stores every attribute value as a string,
+/// so an integer `db.response.returned_rows` lands as Utf8, where a bare `SUM`
+/// fails at plan time and holds the stream's offset back on every tick
+/// (#14744). The row columns therefore `TRY_CAST` the value: a numeric column is
+/// unchanged, a numeric string counts, and anything else is NULL and counts
+/// toward neither column.
 fn metric_block(has_rows_col: bool) -> String {
     let rows = if has_rows_col {
-        ",\n    SUM(CASE WHEN db_response_returned_rows IS NOT NULL THEN db_response_returned_rows ELSE 0 END) AS rows_returned,\n    COUNT(db_response_returned_rows) AS rows_emitting_calls"
+        ",\n    SUM(COALESCE(TRY_CAST(db_response_returned_rows AS BIGINT), 0)) AS rows_returned,\n    COUNT(TRY_CAST(db_response_returned_rows AS BIGINT)) AS rows_emitting_calls"
     } else {
         ""
     };
@@ -1291,8 +1299,8 @@ SELECT
     CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99_ns,
     MAX(end_time - start_time) AS max_ns,
     COUNT(DISTINCT trace_id) AS traces,
-    SUM(CASE WHEN db_response_returned_rows IS NOT NULL THEN db_response_returned_rows ELSE 0 END) AS rows_returned,
-    COUNT(db_response_returned_rows) AS rows_emitting_calls
+    SUM(COALESCE(TRY_CAST(db_response_returned_rows AS BIGINT), 0)) AS rows_returned,
+    COUNT(TRY_CAST(db_response_returned_rows AS BIGINT)) AS rows_emitting_calls
 FROM "otel_demo"
 WHERE o2_db_fingerprint IS NOT NULL
 GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db_env, service_name
@@ -1300,6 +1308,128 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
   ) AS fp_totaled
 ) AS ranked WHERE rnk <= 200"#;
         assert_eq!(sql, expected);
+    }
+
+    // The row columns must not sum the raw column: OTLP stores every attribute
+    // value as a string, so the column is usually Utf8, where a bare SUM fails at
+    // plan time and pins the stream's offset forever (#14744). Both builders
+    // share the metric block, so check each.
+    #[test]
+    fn test_rows_columns_cast_rather_than_sum_the_raw_column() {
+        for sql in [
+            build_rank_sql("s", 50, true, 0),
+            build_totals_sql("s", true, 0),
+        ] {
+            assert!(
+                sql.contains(
+                    "SUM(COALESCE(TRY_CAST(db_response_returned_rows AS BIGINT), 0)) AS rows_returned"
+                ),
+                "{sql}"
+            );
+            assert!(
+                sql.contains(
+                    "COUNT(TRY_CAST(db_response_returned_rows AS BIGINT)) AS rows_emitting_calls"
+                ),
+                "{sql}"
+            );
+            assert!(
+                !sql.contains("THEN db_response_returned_rows ELSE"),
+                "the raw column must not be summed: {sql}"
+            );
+        }
+    }
+
+    /// Runs the real totals SQL through DataFusion over a row-count column of
+    /// each type it meets. A numeric column must measure exactly as before; a
+    /// string column (what OTLP produces) must measure the same, where the raw
+    /// SUM refused to plan (#14744). Non-numeric strings and nulls count toward
+    /// neither row column.
+    #[tokio::test]
+    async fn test_totals_sql_measures_numeric_and_string_row_columns_alike() {
+        use std::sync::Arc;
+
+        use arrow::{
+            array::{Array, ArrayRef, Int64Array, StringArray, StringViewArray},
+            record_batch::RecordBatch,
+        };
+        use arrow_schema::{DataType, Field, Schema};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        async fn measure(rows: ArrayRef) -> (i64, i64) {
+            let n = rows.len();
+            let text = |v: &str| Arc::new(StringArray::from(vec![v; n])) as ArrayRef;
+            let int = |v: i64| Arc::new(Int64Array::from(vec![v; n])) as ArrayRef;
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("o2_db_fingerprint", DataType::Utf8, true),
+                Field::new("o2_db_system", DataType::Utf8, true),
+                Field::new("o2_db_instance", DataType::Utf8, true),
+                Field::new("o2_db_namespace", DataType::Utf8, true),
+                Field::new("o2_db_stmt_class", DataType::Utf8, true),
+                Field::new("o2_db_batch_multiplier", DataType::Int64, true),
+                Field::new("span_status", DataType::Utf8, true),
+                Field::new("start_time", DataType::Int64, true),
+                Field::new("end_time", DataType::Int64, true),
+                Field::new("trace_id", DataType::Utf8, true),
+                Field::new("db_response_returned_rows", rows.data_type().clone(), true),
+            ]));
+            let trace_ids: ArrayRef = Arc::new(StringArray::from(
+                (0..n).map(|i| format!("t{i}")).collect::<Vec<_>>(),
+            ));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    text("fp"),
+                    text("postgresql"),
+                    text("db1"),
+                    text("app"),
+                    text("query"),
+                    Arc::new(Int64Array::from(vec![None::<i64>; n])),
+                    text("OK"),
+                    int(0),
+                    int(5),
+                    trace_ids,
+                    rows,
+                ],
+            )
+            .unwrap();
+            let ctx = SessionContext::new();
+            let table = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+            ctx.register_table("s", Arc::new(table)).unwrap();
+            let batches = ctx
+                .sql(&build_totals_sql("s", true, 0))
+                .await
+                .expect("the totals SQL must plan")
+                .collect()
+                .await
+                .unwrap();
+            // Both UNION arms group the same rows, so any row carries the totals.
+            let out = batches
+                .iter()
+                .find(|b| b.num_rows() > 0)
+                .expect("a row per grain");
+            let value = |name: &str| {
+                out.column_by_name(name)
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .value(0)
+            };
+            (value("rows_returned"), value("rows_emitting_calls"))
+        }
+
+        let numeric: ArrayRef = Arc::new(Int64Array::from(vec![18, 18, 18]));
+        assert_eq!(measure(numeric).await, (54, 3), "numeric column");
+
+        let string: ArrayRef = Arc::new(StringViewArray::from(vec!["18", "18", "18"]));
+        assert_eq!(measure(string).await, (54, 3), "string column");
+
+        let mixed: ArrayRef = Arc::new(StringViewArray::from(vec![Some("18"), Some("abc"), None]));
+        assert_eq!(
+            measure(mixed).await,
+            (18, 1),
+            "non-numeric and null values count toward neither column"
+        );
     }
 
     // Rows columns are schema-gated: streams without db_response_returned_rows
