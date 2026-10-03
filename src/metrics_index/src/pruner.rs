@@ -15,42 +15,40 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
+    ops::Range,
     sync::Arc,
 };
 
+use anyhow::{Context, Result, bail, ensure};
 use arrow::{
-    array::{Array, BooleanArray},
+    array::{Array, AsArray},
     datatypes::Schema,
 };
 use config::{
-    TIMESTAMP_COL_NAME,
+    FileFormat, TIMESTAMP_COL_NAME,
     meta::{
         promql::{NAME_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label},
         stream::{FileKey, FileSelection},
     },
 };
 use datafusion::{
-    common::{DFSchema, DataFusionError, Result},
-    execution::context::ExecutionProps,
-    logical_expr::Expr,
-    physical_expr::create_physical_expr,
-    physical_plan::PhysicalExpr,
+    common::DFSchema, execution::context::ExecutionProps, logical_expr::Expr,
+    physical_expr::create_physical_expr, physical_plan::PhysicalExpr,
 };
 use futures::{StreamExt, stream};
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::label::Matchers;
 
 use crate::{
     block::Index,
+    block_cache::{Sidecar, load_index},
     layout::MetricsFileLayout,
-    reader::{IndexLabels, evaluate_metrics_index, load_metrics_index_file},
 };
 
 pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>> {
-    if !matchers.or_matchers.is_empty() {
-        return Err(DataFusionError::Execution(
-            "OR matchers require the source reader".into(),
-        ));
-    }
+    ensure!(
+        matchers.or_matchers.is_empty(),
+        "OR matchers require the source reader"
+    );
     for matcher in &matchers.matchers {
         if [NAME_LABEL, VALUE_LABEL, TIMESTAMP_COL_NAME].contains(&matcher.name.as_str()) {
             continue;
@@ -61,13 +59,15 @@ pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>>
             .field_with_name(&matcher.name)
             .is_err()
         {
-            if index.source_schema.field_with_name(&matcher.name).is_err() {
+            if index
+                .header
+                .source_schema
+                .field_with_name(&matcher.name)
+                .is_err()
+            {
                 return Ok(Vec::new());
             }
-            return Err(DataFusionError::Execution(format!(
-                "MIDX lacks identity label {}",
-                matcher.name
-            )));
+            bail!("MIDX lacks identity label {}", matcher.name);
         }
     }
     let Some(filter) = create_physical_filter(index.labels.schema().as_ref(), matchers)? else {
@@ -77,9 +77,8 @@ pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>>
         .evaluate(&index.labels)?
         .into_array(index.blocks.len())?;
     let mask = mask
-        .as_any()
-        .downcast_ref::<BooleanArray>()
-        .ok_or_else(|| DataFusionError::Execution("MIDX matcher was not boolean".into()))?;
+        .as_boolean_opt()
+        .context("MIDX matcher was not boolean")?;
     Ok((0..mask.len())
         .filter(|&id| !mask.is_null(id) && mask.value(id))
         .collect())
@@ -122,31 +121,15 @@ pub async fn search(
         {
             continue;
         }
-        let Some(sidecar_path) = MetricsFileLayout::metrics_index_path(&file.key) else {
-            log::warn!(
-                "[trace_id {trace_id}] promql->metrics-index: indexed file {} has no metrics-index path, leaving the file unpruned",
+        match Sidecar::of(file) {
+            Ok(sidecar) => {
+                index_files.insert(file.key.clone(), sidecar);
+            }
+            Err(error) => log::warn!(
+                "[trace_id {trace_id}] promql->metrics-index: indexed file {} has no usable sidecar, leaving the file unpruned: {error}",
                 file.key,
-            );
-            continue;
-        };
-        let Ok(expected_rows) = usize::try_from(file.meta.records) else {
-            log::warn!(
-                "[trace_id {trace_id}] promql->metrics-index: invalid record count {} for {}, leaving the file unpruned",
-                file.meta.records,
-                file.key,
-            );
-            continue;
-        };
-        index_files.insert(
-            file.key.clone(),
-            (
-                file.account.clone(),
-                sidecar_path,
-                expected_rows,
-                file.meta.compressed_size,
-                file.meta.mindex_size,
             ),
-        );
+        }
     }
     if index_files.is_empty() {
         return Ok(None);
@@ -156,58 +139,26 @@ pub async fn search(
     let start = std::time::Instant::now();
     let mut evaluated = Vec::with_capacity(index_files.len());
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
-    let regex_labels = Arc::new(
-        matchers
-            .matchers
-            .iter()
-            .filter(|matcher| matches!(&matcher.op, MatchOp::Re(_) | MatchOp::NotRe(_)))
-            .map(|matcher| matcher.name.clone())
-            .collect::<Vec<_>>(),
-    );
     let matchers = Arc::new(matchers.clone());
-    let mut evaluations = stream::iter(index_files.into_iter().map(
-        |(data_path, (account, sidecar_path, expected_rows, compressed_size, mindex_size))| {
-            let labels = Arc::clone(&matcher_labels);
-            let regex_labels = Arc::clone(&regex_labels);
-            let matchers = Arc::clone(&matchers);
-            async move {
-                let result = async {
-                    let data = load_metrics_index_file(
-                        &account,
-                        &data_path,
-                        &sidecar_path,
-                        config::FileFormat::from_extension(&data_path).ok_or_else(|| {
-                            DataFusionError::Execution("Unsupported metrics source format".into())
-                        })?,
-                        crate::block::ParentMetadata {
-                            rows: u64::try_from(expected_rows)
-                                .map_err(|error| DataFusionError::External(error.into()))?,
-                            compressed_size: u64::try_from(compressed_size)
-                                .map_err(|error| DataFusionError::External(error.into()))?,
-                        },
-                        mindex_size,
-                        IndexLabels {
-                            requested: Arc::clone(&labels),
-                            flat: regex_labels,
-                        },
-                    )
-                    .await?;
-                    tokio::task::spawn_blocking(move || {
-                        let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
-                        let row_group_size = data.row_group_size;
-                        let physical_filter =
-                            create_physical_filter(data.schema.as_ref(), &matchers)?;
-                        evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
-                            .map(|ranges| (Arc::new(ranges), complete, row_group_size))
-                    })
-                    .await
-                    .map_err(|error| DataFusionError::External(Box::new(error)))?
-                }
-                .await;
-                (data_path, result)
+    let mut evaluations = stream::iter(index_files.into_iter().map(|(data_path, sidecar)| {
+        let labels = Arc::clone(&matcher_labels);
+        let matchers = Arc::clone(&matchers);
+        async move {
+            let result: Result<_> = async {
+                let format = FileFormat::from_extension(&data_path)
+                    .context("Unsupported metrics source format")?;
+                let index = load_index(&sidecar, &labels).await?;
+                let row_group_size = parent_row_group_size(&index, format)?;
+                tokio::task::spawn_blocking(move || {
+                    let (ranges, complete) = select_rows(&index, &labels, &matchers)?;
+                    Ok((Arc::new(ranges), complete, row_group_size))
+                })
+                .await?
             }
-        },
-    ))
+            .await;
+            (data_path, result)
+        }
+    }))
     .buffer_unordered(concurrency);
 
     // Consume each result as soon as it is decoded and evaluated. This keeps
@@ -272,11 +223,43 @@ pub async fn search(
     Ok(Some((took_ms, exact)))
 }
 
-/// A sidecar missing a matcher label skips that matcher and over-selects.
-pub(super) fn sidecar_covers_labels(sidecar_schema: &Schema, labels: &[String]) -> bool {
-    labels
-        .iter()
-        .all(|label| sidecar_schema.index_of(label).is_ok())
+/// Parent row ranges that may match, and whether the sidecar holds every label in `labels`.
+pub(super) fn select_rows(
+    index: &Index,
+    labels: &[String],
+    matchers: &Matchers,
+) -> Result<(Vec<Range<usize>>, bool)> {
+    let stored = |name: &str| index.labels.column_by_name(name).is_some();
+    let complete = labels.iter().all(|label| stored(label));
+    // a label this file never had cannot be evaluated here: skip it and over-select
+    let answerable = Matchers::new(
+        matchers
+            .matchers
+            .iter()
+            .filter(|matcher| stored(&matcher.name))
+            .cloned()
+            .collect(),
+    );
+    let mut ranges: Vec<Range<usize>> = Vec::new();
+    for id in matching_blocks(index, &answerable)? {
+        let block = index.blocks.block(id);
+        let start = usize::try_from(block.row_start)?;
+        let end = start + block.row_count as usize;
+        match ranges.last_mut() {
+            Some(last) if last.end == start => last.end = end,
+            _ => ranges.push(start..end),
+        }
+    }
+    Ok((ranges, complete))
+}
+
+/// Parquet parents are split into equal row groups; Vortex parents have none.
+fn parent_row_group_size(index: &Index, format: FileFormat) -> Result<Option<u32>> {
+    match (format, index.header.row_group_size) {
+        (FileFormat::Parquet, Some(size)) => Ok(Some(size)),
+        (FileFormat::Vortex, None) => Ok(None),
+        _ => bail!("Invalid block parent format/row-group binding"),
+    }
 }
 
 /// Whether every matcher the query would re-apply on the table is one the
@@ -329,11 +312,10 @@ pub(super) fn create_physical_filter(
     let df_schema = DFSchema::try_from(sidecar_schema.clone())?;
     // plain expression planning: no session/registry needed for column
     // comparisons and regexp_like
-    create_physical_expr(
+    Ok(Some(create_physical_expr(
         &filter,
         &df_schema,
         &ExecutionProps::new(),
         &Default::default(),
-    )
-    .map(Some)
+    )?))
 }

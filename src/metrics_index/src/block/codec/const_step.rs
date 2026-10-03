@@ -15,8 +15,6 @@
 
 //! ConstStep: evenly spaced timestamps, rebuilt from the directory's min, max and row count.
 
-use anyhow::{Result, ensure};
-
 use super::step;
 
 /// True when every step is equal, so the body stays empty.
@@ -25,21 +23,14 @@ pub(crate) fn fits(ts: &[i64]) -> bool {
     ts.windows(2).all(|w| step(w[0], w[1]) == first)
 }
 
-/// Appends `rows` timestamps from `min` to `max` and returns the last one.
-pub(crate) fn decode(rows: usize, min: i64, max: i64, ts: &mut Vec<i64>) -> Result<i64> {
+/// Appends `rows` evenly spaced timestamps from `min` to `max`.
+pub(crate) fn decode(rows: usize, min: i64, max: i64, ts: &mut Vec<i64>) {
     if rows == 1 {
         ts.push(min);
-        return Ok(min);
+        return;
     }
-    let span = step(min, max);
-    let steps = rows as u64 - 1;
-    ensure!(
-        span.is_multiple_of(steps),
-        "inexact constant timestamp step"
-    );
-    let each = span / steps;
+    let each = step(min, max) / (rows as u64 - 1);
     ts.extend((0..rows as u64).map(|i| min.wrapping_add((each * i) as i64)));
-    Ok(max)
 }
 
 #[cfg(test)]
@@ -49,8 +40,8 @@ mod tests {
     fn roundtrip(ts: &[i64]) {
         assert!(fits(ts));
         let mut out = Vec::new();
-        let last = decode(ts.len(), ts[0], ts[ts.len() - 1], &mut out).unwrap();
-        assert_eq!((out.as_slice(), last), (ts, ts[ts.len() - 1]));
+        decode(ts.len(), ts[0], ts[ts.len() - 1], &mut out);
+        assert_eq!(out.as_slice(), ts);
     }
 
     #[test]
@@ -73,9 +64,8 @@ mod tests {
     }
 
     #[test]
-    fn uneven_steps_do_not_fit_and_inexact_spans_fail() {
+    fn uneven_steps_do_not_fit() {
         assert!(!fits(&[0, 15, 45]));
         assert!(!fits(&[0, 0, 1]));
-        assert!(decode(3, 0, 5, &mut Vec::new()).is_err());
     }
 }

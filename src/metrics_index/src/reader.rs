@@ -15,39 +15,14 @@
 
 use std::{ops::Range, sync::Arc};
 
-use arrow::{
-    array::{Array, BooleanArray, RecordBatch, UInt32Array},
-    datatypes::SchemaRef,
-};
+use anyhow::{Context, Result, ensure};
 use bytes::Bytes;
-use datafusion::{
-    common::{DataFusionError, Result},
-    physical_plan::PhysicalExpr,
-};
 
-use crate::{
-    block_cache::{
-        CacheKey, CachedIndex, INDEX_CACHE, ParentIdentity, SidecarBinding, cache_limit,
-    },
-    layout::METRICS_INDEX_ROW_COUNT,
-};
+use crate::block_cache::{CachedIndex, Sidecar, SidecarBinding, covers};
 
 /// Label and directory regions up to this total are fetched in one read instead of per column.
 /// 1 MiB is object_store's coalescing gap: below it, one more request costs more than the bytes.
 const SMALL_METADATA_BYTES: u64 = 1024 * 1024;
-
-pub(super) struct MetricsIndexData {
-    pub(super) schema: SchemaRef,
-    pub(super) batches: Vec<RecordBatch>,
-    pub(super) parent_records: usize,
-    /// Vortex does not use Parquet row groups.
-    pub(super) row_group_size: Option<u32>,
-}
-
-pub(super) struct IndexLabels {
-    pub requested: Arc<Vec<String>>,
-    pub flat: Arc<Vec<String>>,
-}
 
 /// Trailing bytes of a MIDX file already fetched while reading its header.
 struct Tail {
@@ -57,179 +32,47 @@ struct Tail {
 
 impl Tail {
     fn slice(&self, range: Range<u64>) -> Result<Bytes> {
-        let start = usize::try_from(range.start - self.start)
-            .map_err(|error| DataFusionError::External(error.into()))?;
-        let end = usize::try_from(range.end - self.start)
-            .map_err(|error| DataFusionError::External(error.into()))?;
-        if start > end || end > self.bytes.len() {
-            return Err(DataFusionError::Execution(
-                "MIDX column outside tail".into(),
-            ));
-        }
+        let start = usize::try_from(range.start - self.start)?;
+        let end = usize::try_from(range.end - self.start)?;
+        ensure!(
+            start <= end && end <= self.bytes.len(),
+            "MIDX column outside tail"
+        );
         Ok(self.bytes.slice(start..end))
     }
 }
 
-pub(super) async fn load_metrics_index_file(
-    account: &str,
-    data_path: &str,
-    path: &str,
-    format: config::FileFormat,
-    parent: crate::block::ParentMetadata,
-    index_size: i64,
-    labels: IndexLabels,
-) -> Result<MetricsIndexData> {
-    let key = CacheKey {
-        account: account.to_owned(),
-        parent: ParentIdentity {
-            object_key: data_path.to_owned(),
-            rows: parent.rows,
-            compressed_size: parent.compressed_size,
-        },
-    };
-    let limit = cache_limit();
-    let cached = {
-        let mut cache = INDEX_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        cache.trim(limit);
-        cache.get(&key)
-    };
-    let entry = if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(&labels.requested))
-        .transpose()
-        .map_err(|error| DataFusionError::External(error.into()))?
-        .is_some_and(|missing| missing.is_empty())
-    {
-        cached.unwrap()
-    } else {
-        let loaded =
-            fetch_parsed_index(account, path, parent, index_size, &labels.requested, cached)
-                .await?;
-        INDEX_CACHE
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(key, loaded, limit)
-            .map_err(|error| DataFusionError::External(error.into()))?
-    };
-    let index = entry
-        .index
-        .project(&labels.requested)
-        .map_err(|error| DataFusionError::External(error.into()))?;
-    tokio::task::spawn_blocking(move || metrics_block_index_data(&index, format, &labels.flat))
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?
-}
-
-/// Evaluate `filter` over the run rows and collect the selected physical row
-/// ranges. Runs tile the data file, so each run's start is the prefix sum of
-/// the preceding counts.
-pub(super) fn evaluate_metrics_index(
-    data: &MetricsIndexData,
-    filter: Option<&dyn PhysicalExpr>,
-    expected_rows: usize,
-) -> Result<Vec<Range<usize>>> {
-    let parent_records = data.parent_records;
-    if parent_records != expected_rows {
-        return Err(DataFusionError::Execution(format!(
-            "metrics-index was written for {parent_records} rows, but the parent file contains {expected_rows} records"
-        )));
-    }
-    let count_index = data.schema.index_of(METRICS_INDEX_ROW_COUNT)?;
-    let mut ranges: Vec<Range<usize>> = Vec::new();
-    let mut next_row: usize = 0;
-
-    for batch in &data.batches {
-        let mask = match filter {
-            Some(filter) => {
-                let mask = filter.evaluate(batch)?.into_array(batch.num_rows())?;
-                mask.as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .ok_or_else(|| {
-                        DataFusionError::Execution(
-                            "metrics-index filter did not produce a boolean array".to_string(),
-                        )
-                    })?
-                    .clone()
-            }
-            None => BooleanArray::from(vec![true; batch.num_rows()]),
-        };
-        let mask = &mask;
-        let counts = batch
-            .column(count_index)
-            .as_any()
-            .downcast_ref::<UInt32Array>()
-            .ok_or_else(|| {
-                DataFusionError::Execution("metrics-index row count is not UInt32".to_string())
-            })?;
-
-        for row in 0..batch.num_rows() {
-            let count = counts.value(row) as usize;
-            if count == 0 {
-                return Err(DataFusionError::Execution(
-                    "metrics-index contains an empty row range".to_string(),
-                ));
-            }
-            let start = next_row;
-            let end = start.checked_add(count).ok_or_else(|| {
-                DataFusionError::Execution("metrics-index row range overflow".to_string())
-            })?;
-            if end > expected_rows {
-                return Err(DataFusionError::Execution(format!(
-                    "metrics-index row range ends at {end}, beyond the parent file's {expected_rows} records"
-                )));
-            }
-            next_row = end;
-            if mask.is_null(row) || !mask.value(row) {
-                continue;
-            }
-            if let Some(previous) = ranges.last_mut()
-                && start == previous.end
-            {
-                previous.end = end;
-            } else {
-                ranges.push(start..end);
-            }
-        }
-    }
-    if next_row != expected_rows {
-        return Err(DataFusionError::Execution(format!(
-            "metrics-index covers {next_row} rows, but the parent file contains {expected_rows} records"
-        )));
-    }
-    Ok(ranges)
-}
-
-pub async fn fetch_parsed_index(
-    account: &str,
-    path: &str,
-    parent: crate::block::ParentMetadata,
-    index_size: i64,
+/// Reads the sidecar columns `cached` lacks for `labels` and decodes them into a new entry.
+pub(crate) async fn fetch_parsed_index(
+    sidecar: &Sidecar,
     labels: &[String],
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(labels))
-        .transpose()
-        .map_err(|error| DataFusionError::External(error.into()))?
-        .is_some_and(|missing| missing.is_empty())
+    if let Some(entry) = &cached
+        && covers(entry, labels)?
     {
-        return Ok(cached.unwrap());
+        return Ok(Arc::clone(entry));
     }
+    let (account, path, parent) = (
+        sidecar.account.as_str(),
+        sidecar.path.as_str(),
+        &sidecar.parent,
+    );
+    let index_size = sidecar.size;
     let known_size = u64::try_from(index_size).ok().filter(|size| *size > 0);
     let size = if let Some(size) = known_size {
         size
     } else {
         head_size(account, path).await?
     };
-    let (header, tail, size) = match read_header(account, path, size, &parent).await {
+    let (header, tail, size) = match read_header(account, path, size, parent).await {
         Ok((header, tail)) => (header, tail, size),
         Err(error) if known_size.is_some() => {
             let actual_size = head_size(account, path).await?;
             if actual_size == size {
                 return Err(error);
             }
-            let (header, tail) = read_header(account, path, actual_size, &parent).await?;
+            let (header, tail) = read_header(account, path, actual_size, parent).await?;
             (header, tail, actual_size)
         }
         Err(error) => return Err(error),
@@ -237,27 +80,20 @@ pub async fn fetch_parsed_index(
     let trailer = tail
         .bytes
         .get(tail.bytes.len() - crate::block::MIDX_TRAILER_LEN..)
-        .ok_or_else(|| DataFusionError::Execution("short MIDX trailer".into()))?;
-    let binding = SidecarBinding::parse(size, trailer)
-        .map_err(|error| DataFusionError::External(error.into()))?;
-    if let Some(existing) = &cached
-        && existing.binding != binding
-    {
-        return Err(DataFusionError::Execution(
-            "MIDX sidecar differs from cached trailer/size".into(),
-        ));
+        .context("short MIDX trailer")?;
+    let binding = SidecarBinding::parse(size, trailer)?;
+    if let Some(existing) = &cached {
+        ensure!(
+            existing.binding == binding,
+            "MIDX sidecar differs from cached trailer/size"
+        );
     }
     let requested = if let Some(existing) = &cached {
-        existing
-            .index
-            .missing_labels(labels)
-            .map_err(|error| DataFusionError::External(error.into()))?
+        existing.index.missing_labels(labels)?
     } else {
         labels.to_vec()
     };
-    let mut ranges = header
-        .column_ranges(&requested)
-        .map_err(|error| DataFusionError::External(error.into()))?;
+    let mut ranges = header.column_ranges(&requested)?;
     if cached.is_some() {
         ranges.remove(0);
     }
@@ -265,39 +101,31 @@ pub async fn fetch_parsed_index(
     tokio::task::spawn_blocking(move || -> Result<_> {
         let index = if let Some(existing) = cached {
             let additional =
-                crate::block::decode_additional_labels(&existing.index, &columns, &requested)
-                    .map_err(|error| DataFusionError::External(error.into()))?;
-            existing
-                .index
-                .merge_columns(&additional)
-                .map_err(|error| DataFusionError::External(error.into()))?
+                crate::block::decode_additional_labels(&existing.index, &columns, &requested)?;
+            existing.index.merge_columns(&additional)?
         } else {
-            crate::block::decode_index(&header, &columns, &requested)
-                .map_err(|error| DataFusionError::External(error.into()))?
+            crate::block::decode_index(&header, &columns, &requested)?
         };
         Ok(Arc::new(CachedIndex {
-            index: Arc::new(index.for_cache()),
+            index: Arc::new(index),
             binding,
         }))
     })
-    .await
-    .map_err(|error| DataFusionError::External(Box::new(error)))?
+    .await?
 }
 
 async fn head_size(account: &str, path: &str) -> Result<u64> {
     Ok(infra::cache::storage::head(account, &path.into())
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?
+        .await?
         .size)
 }
 
 async fn get_range(account: &str, path: &str, range: Range<u64>) -> Result<Bytes> {
-    let bytes = infra::cache::storage::get_range(account, &path.into(), range.clone())
-        .await
-        .map_err(|error| DataFusionError::External(Box::new(error)))?;
-    if bytes.len() as u64 != range.end - range.start {
-        return Err(DataFusionError::Execution("Truncated MIDX range".into()));
-    }
+    let bytes = infra::cache::storage::get_range(account, &path.into(), range.clone()).await?;
+    ensure!(
+        bytes.len() as u64 == range.end - range.start,
+        "Truncated MIDX range"
+    );
     Ok(bytes)
 }
 
@@ -312,10 +140,9 @@ async fn read_header(
     size: u64,
     parent: &crate::block::ParentMetadata,
 ) -> Result<(crate::block::Header, Tail)> {
-    let external = |error: anyhow::Error| DataFusionError::External(error.into());
     let mut start = size.saturating_sub(crate::block::HEADER_PROBE_BYTES);
     let mut bytes = get_range(account, path, start..size).await?;
-    let trailer = crate::block::Header::trailer(&bytes, size).map_err(external)?;
+    let trailer = crate::block::Header::trailer(&bytes, size)?;
     let needed = if trailer.label_len + trailer.directory_len <= SMALL_METADATA_BYTES {
         trailer.blocks_end(size)
     } else if trailer.header_start(size) < start {
@@ -328,7 +155,7 @@ async fn read_header(
         start = needed;
         bytes = concat(&prefix, &bytes);
     }
-    let header = crate::block::Header::parse(&bytes, size, parent).map_err(external)?;
+    let header = crate::block::Header::parse(&bytes, size, parent)?;
     Ok((header, Tail { start, bytes }))
 }
 
@@ -347,9 +174,7 @@ async fn read_columns(
     let mut fetched = if remote.is_empty() {
         Vec::new()
     } else {
-        infra::cache::storage::get_ranges(account, &path.into(), &remote)
-            .await
-            .map_err(|error| DataFusionError::External(Box::new(error)))?
+        infra::cache::storage::get_ranges(account, &path.into(), &remote).await?
     }
     .into_iter()
     .zip(remote);
@@ -360,12 +185,11 @@ async fn read_columns(
             columns.push(local);
             continue;
         }
-        let (prefix, expected) = fetched
-            .next()
-            .ok_or_else(|| DataFusionError::Execution("Missing MIDX column range".into()))?;
-        if prefix.len() as u64 != expected.end - expected.start {
-            return Err(DataFusionError::Execution("Truncated MIDX column".into()));
-        }
+        let (prefix, expected) = fetched.next().context("Missing MIDX column range")?;
+        ensure!(
+            prefix.len() as u64 == expected.end - expected.start,
+            "Truncated MIDX column"
+        );
         columns.push(if local.is_empty() {
             prefix
         } else {
@@ -375,60 +199,10 @@ async fn read_columns(
     Ok(columns)
 }
 
-fn metrics_block_index_data(
-    index: &crate::block::Index,
-    format: config::FileFormat,
-    flat_labels: &[String],
-) -> Result<MetricsIndexData> {
-    let row_group_size = match format {
-        config::FileFormat::Parquet => Some(index.row_group_size.ok_or_else(|| {
-            DataFusionError::Execution("Parquet block index lacks parent row group size".into())
-        })?),
-        config::FileFormat::Vortex if index.row_group_size.is_none() => None,
-        _ => {
-            return Err(DataFusionError::Execution(
-                "Invalid block parent format/row-group binding".into(),
-            ));
-        }
-    };
-    let mut fields = vec![arrow::datatypes::Field::new(
-        METRICS_INDEX_ROW_COUNT,
-        arrow::datatypes::DataType::UInt32,
-        false,
-    )];
-    let mut columns: Vec<arrow::array::ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
-        index.blocks.row_counts(),
-    ))];
-    for (i, field) in index.labels.schema().fields().iter().enumerate() {
-        if index.source_schema.field_with_name(field.name()).is_ok() {
-            if flat_labels.contains(field.name()) {
-                let source_field = index.source_schema.field_with_name(field.name())?;
-                fields.push(source_field.clone());
-                columns.push(arrow::compute::cast(
-                    index.labels.column(i),
-                    source_field.data_type(),
-                )?);
-            } else {
-                fields.push(field.as_ref().clone());
-                columns.push(Arc::clone(index.labels.column(i)));
-            }
-        }
-    }
-    let schema = Arc::new(arrow::datatypes::Schema::new(fields));
-    let batch = RecordBatch::try_new(Arc::clone(&schema), columns)?;
-    Ok(MetricsIndexData {
-        schema,
-        batches: vec![batch],
-        parent_records: usize::try_from(index.parent.rows)
-            .map_err(|e| DataFusionError::External(e.into()))?,
-        row_group_size,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{Float64Array, Int64Array, StringArray, UInt64Array},
+        array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
         datatypes::{DataType, Field, Schema},
     };
     use config::meta::stream::{FileKey, FileMeta, FileSelection};
@@ -477,8 +251,7 @@ mod tests {
             },
             false,
         );
-        let mut writer =
-            crate::block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
+        let mut writer = crate::block::BlockWriter::new(Vec::new(), schema.clone(), 2).unwrap();
         writer.write(&batch).unwrap();
         let bytes = match format {
             config::FileFormat::Parquet => {
@@ -572,62 +345,12 @@ mod tests {
     async fn stale_mindex_size_retries_with_object_size() {
         let (_, file, bytes) = fixture(config::FileFormat::Parquet).await;
         store(&file, Some(bytes)).await;
-        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
-        let data = load_metrics_index_file(
-            &file.account,
-            &file.key,
-            &path,
-            config::FileFormat::Parquet,
-            crate::block::ParentMetadata {
-                rows: file.meta.records as u64,
-                compressed_size: file.meta.compressed_size as u64,
-            },
-            file.meta.mindex_size + 1,
-            IndexLabels {
-                requested: Arc::new(vec!["path".to_string()]),
-                flat: Arc::new(Vec::new()),
-            },
-        )
-        .await
-        .unwrap();
-        assert_eq!(data.parent_records, 6);
-    }
-
-    #[tokio::test]
-    async fn equality_keeps_dictionary_and_regex_flattens_label() {
-        let (_, file, bytes) = fixture(config::FileFormat::Vortex).await;
-        store(&file, Some(bytes)).await;
-        let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
-        for flat in [false, true] {
-            let data = load_metrics_index_file(
-                &file.account,
-                &file.key,
-                &path,
-                config::FileFormat::Vortex,
-                crate::block::ParentMetadata {
-                    rows: file.meta.records as u64,
-                    compressed_size: file.meta.compressed_size as u64,
-                },
-                file.meta.mindex_size,
-                IndexLabels {
-                    requested: Arc::new(vec!["path".to_string()]),
-                    flat: Arc::new(if flat {
-                        vec!["path".to_string()]
-                    } else {
-                        vec![]
-                    }),
-                },
-            )
+        let mut sidecar = Sidecar::of(&file).unwrap();
+        sidecar.size += 1;
+        let index = crate::block_cache::load_index(&sidecar, &["path".to_string()])
             .await
             .unwrap();
-            assert_eq!(
-                matches!(
-                    data.schema.field_with_name("path").unwrap().data_type(),
-                    DataType::Dictionary(_, _)
-                ),
-                !flat
-            );
-        }
+        assert_eq!(index.header.parent.rows, 6);
     }
 
     #[tokio::test]

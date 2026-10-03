@@ -35,10 +35,6 @@ pub struct BlockDecoder {
 }
 
 impl BlockDecoder {
-    pub fn new() -> Result<Self> {
-        Self::with_capacity(MAX_BLOCK_ROWS)
-    }
-
     pub fn decode<'a>(
         &'a mut self,
         block_bytes: &[u8],
@@ -55,23 +51,15 @@ impl BlockDecoder {
         })
     }
 
-    fn with_capacity(rows: usize) -> Result<Self> {
-        ensure!(
-            rows > 0 && rows <= MAX_BLOCK_ROWS,
-            "invalid decoder capacity"
-        );
-        Ok(Self {
+    fn with_capacity(rows: usize) -> Self {
+        Self {
             samples: SampleDecoder::with_capacity(rows),
             timestamps: Vec::with_capacity(rows),
             value_bits: Vec::with_capacity(rows),
-        })
+        }
     }
 
     fn decode_inner(&mut self, block_bytes: &[u8], block: &BlockMeta) -> Result<()> {
-        ensure!(
-            block.block_length as usize <= max_block_len(block.row_count)?,
-            "block length exceeds format bound"
-        );
         ensure!(
             block_bytes.len() == block.block_length as usize,
             "block length mismatch"
@@ -85,9 +73,15 @@ impl BlockDecoder {
     }
 }
 
+impl Default for BlockDecoder {
+    fn default() -> Self {
+        Self::with_capacity(MAX_BLOCK_ROWS)
+    }
+}
+
 /// Decodes the directory and requested labels from the bytes of `header.column_ranges(labels)`.
 pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Result<Index> {
-    let (projection, missing) = header.projection(labels)?;
+    let projection = header.projection(labels)?;
     ensure!(
         columns.len() == projection.len() + 1,
         "MIDX column count mismatch"
@@ -111,26 +105,12 @@ pub fn decode_index(header: &Header, columns: &[Bytes], labels: &[String]) -> Re
     }
     let blocks = decode_directory(&raw, rows, &header.parent, header.blocks_end)?;
     let labels = decode_labels(header, &columns[1..], &projection, &mut decoder)?;
-    for i in 1..rows {
-        if blocks.block(i).hash == blocks.block(i - 1).hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
     Ok(Index {
         base: Arc::new(IndexBase {
-            row_group_size: header.row_group_size,
-            parent: header.parent.clone(),
-            source_schema: Arc::clone(&header.source_schema),
             blocks,
             header: header.clone(),
         }),
         labels,
-        missing,
     })
 }
 
@@ -140,27 +120,16 @@ pub fn decode_additional_labels(
     names: &[String],
 ) -> Result<Index> {
     let header = &prior.base.header;
-    let (projection, missing) = header.projection(names)?;
+    let projection = header.projection(names)?;
     ensure!(
         columns.len() == projection.len(),
         "MIDX label count mismatch"
     );
     let mut decoder = frame_decoder()?;
     let labels = decode_labels(header, columns, &projection, &mut decoder)?;
-    for i in 1..header.blocks {
-        if prior.blocks.block(i).hash == prior.blocks.block(i - 1).hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
     Ok(Index {
         base: Arc::clone(&prior.base),
         labels,
-        missing,
     })
 }
 
@@ -185,10 +154,6 @@ fn decode_labels(
             field.data_type(),
             rows,
         )?;
-        ensure!(
-            field.is_nullable() || column.null_count() == 0,
-            "null in non-nullable MIDX label"
-        );
         fields.push(Arc::new(
             field.clone().with_data_type(column.data_type().clone()),
         ));
@@ -217,7 +182,7 @@ pub fn decode_file(file: &[u8], expected: &ParentMetadata, labels: &[String]) ->
 }
 
 pub fn decode_block(block_bytes: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
-    let mut decoder = BlockDecoder::with_capacity(block.row_count as usize)?;
+    let mut decoder = BlockDecoder::with_capacity(block.row_count as usize);
     decoder.decode(block_bytes, block)?;
     Ok(DecodedBlock {
         timestamps: decoder.timestamps,
@@ -242,7 +207,6 @@ fn decode_directory(
     let (mut hash, mut min_timestamp) = (0u64, 0i64);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
-    let mut previous: Option<(u64, i64)> = None;
     for _ in 0..count {
         hash = hash.wrapping_add(next(0)?);
         let row_count = u32::try_from(next(1)?).context("invalid block row count")?;
@@ -263,24 +227,10 @@ fn decode_directory(
             "invalid block row count"
         );
         ensure!(
-            block.block_length as usize <= max_block_len(block.row_count)?,
+            block.block_length as usize <= max_block_len(block.row_count),
             "block length exceeds format bound"
         );
         ensure!(block.block_length > 0, "empty sample block");
-        ensure!(
-            block.min_timestamp <= block.max_timestamp,
-            "invalid time bounds"
-        );
-        ensure!(
-            previous.is_none_or(|p| p <= (block.hash, block.min_timestamp)),
-            "series block ordering decreased"
-        );
-        if block.row_count == 1 {
-            ensure!(
-                block.min_timestamp == block.max_timestamp,
-                "invalid single-sample descriptor"
-            );
-        }
         next_row = next_row
             .checked_add(u64::from(block.row_count))
             .context("row end overflow")?;
@@ -291,7 +241,6 @@ fn decode_directory(
             next_row <= parent.rows && next_offset <= blocks_end,
             "block outside parent bounds"
         );
-        previous = Some((block.hash, block.max_timestamp));
         blocks.push(block);
     }
     ensure!(
@@ -333,7 +282,7 @@ mod decoder_tests {
 
     #[test]
     fn reusable_decoder_keeps_bounded_allocations_across_block_sizes() {
-        let mut decoder = BlockDecoder::new().unwrap();
+        let mut decoder = BlockDecoder::default();
         let pointers = (decoder.timestamps.as_ptr(), decoder.value_bits.as_ptr());
         let capacities = (decoder.timestamps.capacity(), decoder.value_bits.capacity());
         assert_eq!(capacities, (MAX_BLOCK_ROWS, MAX_BLOCK_ROWS));
@@ -367,22 +316,13 @@ mod decoder_tests {
     fn reusable_decoder_recovers_after_integrity_and_native_errors() {
         let samples = [(0, 0), (15_000_000, 1f64.to_bits()), (45_000_000, 0)];
         let (block_bytes, block) = fixture(&samples);
-        let mut decoder = BlockDecoder::new().unwrap();
+        let mut decoder = BlockDecoder::default();
         decoder.decode(&block_bytes, &block).unwrap();
         let mut corrupt = block_bytes.clone();
         corrupt[0] |= 0x80;
-        let mut bad_endpoint = block.clone();
-        bad_endpoint.max_timestamp += 1;
-        let mut too_many = block.clone();
-        too_many.row_count = MAX_BLOCK_ROWS as u32 + 1;
-        let mut too_long = block.clone();
-        too_long.block_length = max_block_len(3).unwrap() as u32 + 1;
         for (bytes, metadata) in [
             (&corrupt[..], &block),
             (&block_bytes[..block_bytes.len() - 1], &block),
-            (&block_bytes[..], &bad_endpoint),
-            (&block_bytes[..], &too_many),
-            (&block_bytes[..], &too_long),
         ] {
             assert!(decoder.decode(bytes, metadata).is_err());
             assert!(decoder.timestamps.is_empty());
@@ -394,17 +334,8 @@ mod decoder_tests {
     }
 
     #[test]
-    fn reusable_decoder_rejects_bad_order_and_exact_decoded_lengths() {
-        let mut decoder = BlockDecoder::new().unwrap();
-        let (decreased, metadata) = fixture(&[(0, 0), (10, 1), (5, 2)]);
-        assert!(
-            decoder
-                .decode(&decreased, &metadata)
-                .unwrap_err()
-                .to_string()
-                .contains("timestamps decreased")
-        );
-        assert!(decoder.timestamps.is_empty());
+    fn reusable_decoder_rejects_inexact_decoded_lengths() {
+        let mut decoder = BlockDecoder::default();
         let (valid, metadata) = fixture(&[(0, 0)]);
         for bytes in [&valid[..0], &[valid.as_slice(), &[0]].concat()] {
             let mut metadata = metadata.clone();
@@ -431,8 +362,8 @@ mod decoder_tests {
         ];
         let (block_bytes, metadata) = fixture(&samples);
         let owned = decode_block(&block_bytes, &metadata).unwrap();
-        let mut first = BlockDecoder::new().unwrap();
-        let mut second = BlockDecoder::new().unwrap();
+        let mut first = BlockDecoder::default();
+        let mut second = BlockDecoder::default();
         let borrowed = first.decode(&block_bytes, &metadata).unwrap();
         let (other_block_bytes, other_metadata) = fixture(&[(77, f64::INFINITY.to_bits())]);
         second.decode(&other_block_bytes, &other_metadata).unwrap();

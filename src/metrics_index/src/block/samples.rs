@@ -51,7 +51,7 @@ impl SampleEncoder {
         let values = self.encode_values(bits, out);
         out[start] = Codec::tag(timestamps, values);
         ensure!(
-            out.len() - start <= max_block_len(u32::try_from(ts.len())?)?,
+            out.len() - start <= max_block_len(u32::try_from(ts.len())?),
             "sample block exceeds format bound"
         );
         Ok(())
@@ -149,14 +149,6 @@ impl SampleDecoder {
         ts.clear();
         bits.clear();
         let rows = block.row_count as usize;
-        ensure!(
-            rows > 0 && rows <= MAX_BLOCK_ROWS,
-            "invalid decoded row count"
-        );
-        ensure!(
-            block.min_timestamp <= block.max_timestamp,
-            "invalid time bounds"
-        );
         let (&tag, body) = bytes.split_first().context("empty sample block")?;
         let mut pos = 0;
         self.decode_timestamps(Codec::from_id(tag & 0x0f)?, body, &mut pos, block, ts)?;
@@ -175,13 +167,12 @@ impl SampleDecoder {
     ) -> Result<()> {
         let rows = block.row_count as usize;
         let (min, max) = (block.min_timestamp, block.max_timestamp);
-        let last = match kind {
-            Codec::ConstStep => const_step::decode(rows, min, max, ts)?,
+        match kind {
+            Codec::ConstStep => const_step::decode(rows, min, max, ts),
             Codec::Dod => dod::decode(body, pos, rows, min, &mut self.seq, ts)?,
             Codec::Rle => rle::decode(body, pos, rows, min, ts)?,
             _ => bail!("{kind:?} is not a timestamp encoding"),
-        };
-        ensure!(last == max, "decoded timestamp bounds mismatch");
+        }
         Ok(())
     }
 
@@ -205,12 +196,8 @@ impl SampleDecoder {
 }
 
 /// Upper bound of one encoded sample block, enforced by the writer and on every read.
-pub fn max_block_len(row_count: u32) -> Result<usize> {
-    ensure!(
-        row_count > 0 && row_count as usize <= MAX_BLOCK_ROWS,
-        "invalid block row count"
-    );
-    Ok(32 + 18 * row_count as usize)
+pub fn max_block_len(row_count: u32) -> usize {
+    32 + 18 * row_count as usize
 }
 
 #[cfg(test)]
@@ -251,7 +238,7 @@ mod tests {
 
     fn roundtrip(ts: &[i64], bits: &[u64]) -> Vec<u8> {
         let block = encode(ts, bits);
-        assert!(block.len() <= max_block_len(ts.len() as u32).unwrap());
+        assert!(block.len() <= max_block_len(ts.len() as u32));
         let (decoded_ts, decoded_bits) = decode(&block, &meta(ts, block.len())).unwrap();
         assert_eq!(decoded_ts, ts);
         assert_eq!(decoded_bits, bits);
@@ -558,12 +545,8 @@ mod tests {
             decoder.decode(block, meta, &mut ts, &mut bits).unwrap();
         }
         assert_eq!(bits, [0; 3]);
-        let mut shifted = three.clone();
-        shifted.max_timestamp = 30;
-        let mut uneven = three.clone();
-        uneven.max_timestamp = 5;
         let bad_xor_window = [&[xor][..], &[0; 8], &[0xff, 0x1f, 0, 0, 0, 0, 0, 0, 0, 0]].concat();
-        let invalid: [(&[u8], &BlockMeta); 19] = [
+        let invalid: [(&[u8], &BlockMeta); 14] = [
             (
                 &[Codec::tag(Codec::ConstInt, Codec::ConstInt), 0, 0],
                 &three,
@@ -574,11 +557,7 @@ mod tests {
             (&[0xf0, 0], &three),
             (&[rle, 10, 1, 0, 1, 2, 0], &three),
             (&[rle, 10, 1, 3, 0], &three),
-            (&[rle, 0, 1, 2, 0], &three),
-            (&[dod, 0, 2, 2, 0x02, 0], &three),
             (&[dod, 5, 65, 0], &three),
-            (&[rle, 10, 1, 2, 0], &shifted),
-            (&[Codec::tag(Codec::ConstStep, Codec::ConstInt), 0], &uneven),
             (
                 &[xor, 0, 0, 0, 0, 0, 0, 0, 0, 0b01, 0, 0, 0, 0, 0, 0, 0, 0],
                 &two,
@@ -590,12 +569,6 @@ mod tests {
                     alp, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2,
                 ],
                 &two,
-            ),
-            (
-                &[
-                    alp, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 4, 0,
-                ],
-                &three,
             ),
             (&[alp, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 4, 0], &three),
             (&[rle, 10, 1, 2, 0, 0], &three),

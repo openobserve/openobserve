@@ -20,9 +20,8 @@ use anyhow::Result;
 use super::{
     next_timestamp,
     pack::{get_sparse, put_sparse},
-    read_divisor,
 };
-use crate::block::compact::{put_varint, unzigzag, zigzag};
+use crate::block::compact::{get_varint, put_varint, unzigzag, zigzag};
 
 /// Writes the steps `quotients * divisor`, as returned by `scaled_steps`.
 pub(crate) fn encode(divisor: u64, quotients: &[u64], out: &mut Vec<u8>) {
@@ -37,7 +36,7 @@ pub(crate) fn encode(divisor: u64, quotients: &[u64], out: &mut Vec<u8>) {
     );
 }
 
-/// Appends `rows` timestamps starting at `min` and returns the last one.
+/// Appends `rows` timestamps starting at `min`.
 pub(crate) fn decode(
     body: &[u8],
     pos: &mut usize,
@@ -45,8 +44,8 @@ pub(crate) fn decode(
     min: i64,
     seq: &mut Vec<u64>,
     ts: &mut Vec<i64>,
-) -> Result<i64> {
-    let divisor = read_divisor(body, pos)?;
+) -> Result<()> {
+    let divisor = get_varint(body, pos)?;
     get_sparse(body, pos, rows - 1, seq)?;
     ts.push(min);
     let mut previous = min;
@@ -57,10 +56,10 @@ pub(crate) fn decode(
         } else {
             quotient.wrapping_add(unzigzag(*v) as u64)
         };
-        previous = next_timestamp(previous, quotient.wrapping_mul(divisor))?;
+        previous = next_timestamp(previous, quotient.wrapping_mul(divisor));
         ts.push(previous);
     }
-    Ok(previous)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -79,11 +78,8 @@ mod tests {
         let mut body = Vec::new();
         encode(divisor, &quotients, &mut body);
         let (mut pos, mut seq, mut out) = (0, Vec::new(), Vec::new());
-        let last = decode(&body, &mut pos, ts.len(), ts[0], &mut seq, &mut out).unwrap();
-        assert_eq!(
-            (out.as_slice(), last, pos),
-            (ts, ts[ts.len() - 1], body.len())
-        );
+        decode(&body, &mut pos, ts.len(), ts[0], &mut seq, &mut out).unwrap();
+        assert_eq!((out.as_slice(), pos), (ts, body.len()));
         assert_truncations_fail(&body, |bytes| {
             decode(
                 bytes,
@@ -93,7 +89,6 @@ mod tests {
                 &mut Vec::new(),
                 &mut Vec::new(),
             )
-            .map(|_| ())
         });
         body
     }
@@ -122,17 +117,5 @@ mod tests {
         roundtrip(&jitter(300, 1, 2));
         let millis = roundtrip(&jitter(200, 1000, 1));
         assert_eq!(get_divisor(&millis), 1000);
-    }
-
-    #[test]
-    fn zero_divisor_and_decreasing_steps_fail() {
-        let ts = [0, 10, 30];
-        let mut body = Vec::new();
-        encode(0, &[10, 20], &mut body);
-        assert!(decode(&body, &mut 0, 3, 0, &mut Vec::new(), &mut Vec::new()).is_err());
-        body.clear();
-        encode(1, &[10, u64::MAX - 9], &mut body);
-        let error = decode(&body, &mut 0, 3, ts[0], &mut Vec::new(), &mut Vec::new());
-        assert!(error.unwrap_err().to_string().contains("decreased"));
     }
 }
