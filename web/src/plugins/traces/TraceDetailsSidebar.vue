@@ -100,6 +100,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-3xs text-text-body font-semibold">{{ getDuration }}</span>
           </OTag>
 
+          <span v-if="operationPercentile" class="me-[0.325rem] inline-flex shrink-0">
+            <OTag
+              :variant="operationPercentile.variant"
+              size="sm"
+              data-test="trace-details-sidebar-header-toolbar-operation-percentile"
+              >{{
+                t("traces.traceDetailsSidebar.operationPercentileBand", {
+                  band: operationPercentile.band,
+                  operation: span.operation_name,
+                })
+              }}</OTag
+            >
+            <OTooltip :content="operationPercentile.tooltip" />
+          </span>
+
           <!-- TTFT Badge -->
           <OTag
             v-if="getTTFT"
@@ -1039,9 +1054,32 @@ import type { Span } from "@/ts/interfaces/traces/span.types";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import llmPromptsService from "@/services/llm-prompts.service";
 import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
+import searchService from "@/services/search";
+import { quoteSqlIdentifier, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 // luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
 const HUMAN_TZ_FORMAT = "MMM dd, yyyy HH:mm:ss.SSS ZZZ";
+const OPERATION_STATS_MIN_SAMPLES = 20;
+const OPERATION_STATS_FALLBACK_WINDOW_US = 3_600_000_000;
+
+interface OperationStats {
+  n: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  p99: number;
+}
+
+interface OperationStatsRequest {
+  key: string;
+  org: string;
+  stream: string;
+  service: string;
+  operation: string;
+  startTime: number;
+  endTime: number;
+}
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1829,6 +1867,105 @@ export default defineComponent({
     /** The trace stream this span was read from — the annotation API needs it. */
     const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
 
+    const operationStatsCache = ref<Record<string, OperationStats | null>>({});
+    const pendingOperationStats = new Set<string>();
+
+    const operationStatsRequest = computed((): OperationStatsRequest | null => {
+      const stream = spanSourceStream.value;
+      const service = props.span?.service_name;
+      const operation = props.span?.operation_name;
+      if (!stream || !service || !operation) return null;
+      const saved = searchObj.data?.queryPayload?.query;
+      // Re-resolving a relative range would move the window, so reuse the bounds the page searched.
+      const usePageBounds =
+        props.parentMode !== "embedded" &&
+        stream === searchObj.data?.stream?.selectedStream?.value &&
+        saved?.start_time &&
+        saved?.end_time;
+      let startTime: number;
+      let endTime: number;
+      if (usePageBounds) {
+        startTime = Number(saved.start_time);
+        endTime = Number(saved.end_time);
+      } else {
+        const spanStartUs = Math.floor(Number(props.span?.start_time) / 1_000);
+        if (!Number.isFinite(spanStartUs)) return null;
+        startTime = spanStartUs - OPERATION_STATS_FALLBACK_WINDOW_US;
+        endTime = spanStartUs + OPERATION_STATS_FALLBACK_WINDOW_US;
+      }
+      const org = String(store.state.selectedOrganization?.identifier ?? "");
+      const key = JSON.stringify([org, stream, service, operation, startTime, endTime]);
+      return { key, org, stream, service, operation, startTime, endTime };
+    });
+
+    const fetchOperationStats = async (req: OperationStatsRequest) => {
+      if (req.key in operationStatsCache.value || pendingOperationStats.has(req.key)) return;
+      pendingOperationStats.add(req.key);
+      const sql =
+        "SELECT COUNT(*) AS n, " +
+        "approx_percentile_cont(duration, 0.5) AS p50, " +
+        "approx_percentile_cont(duration, 0.75) AS p75, " +
+        "approx_percentile_cont(duration, 0.9) AS p90, " +
+        "approx_percentile_cont(duration, 0.99) AS p99 " +
+        `FROM ${quoteSqlIdentifier(req.stream)} ` +
+        `WHERE service_name = ${quoteSqlLiteral(req.service)} ` +
+        `AND operation_name = ${quoteSqlLiteral(req.operation)}`;
+      try {
+        const res = await searchService.search({
+          org_identifier: req.org,
+          query: {
+            query: { sql, start_time: req.startTime, end_time: req.endTime, from: 0, size: 1 },
+          },
+          page_type: "traces",
+        });
+        const hit = res?.data?.hits?.[0];
+        operationStatsCache.value[req.key] = hit
+          ? {
+              n: Number(hit.n),
+              p50: Number(hit.p50),
+              p75: Number(hit.p75),
+              p90: Number(hit.p90),
+              p99: Number(hit.p99),
+            }
+          : null;
+      } catch {
+        operationStatsCache.value[req.key] = null;
+      } finally {
+        pendingOperationStats.delete(req.key);
+      }
+    };
+
+    watch(
+      operationStatsRequest,
+      (req) => {
+        if (req) fetchOperationStats(req);
+      },
+      { immediate: true },
+    );
+
+    const operationPercentile = computed(() => {
+      const req = operationStatsRequest.value;
+      const stats = req ? operationStatsCache.value[req.key] : null;
+      const duration = Number(props.span?.duration);
+      // approx_percentile_cont returns 0 when the column type is not inferred.
+      if (!stats || !(stats.n >= OPERATION_STATS_MIN_SAMPLES) || !(stats.p50 > 0)) return null;
+      if (!Number.isFinite(duration)) return null;
+      let band = "> p99";
+      let variant: BadgeVariant = "error-soft";
+      if (duration < stats.p50) [band, variant] = ["< p50", "default-soft"];
+      else if (duration < stats.p75) [band, variant] = ["p50–p75", "default-soft"];
+      else if (duration < stats.p90) [band, variant] = ["p75–p90", "default-soft"];
+      else if (duration <= stats.p99) [band, variant] = ["p90–p99", "warning-soft"];
+      const tooltip = t("traces.traceDetailsSidebar.operationPercentilesTooltip", {
+        p50: formatTimeWithSuffix(stats.p50),
+        p75: formatTimeWithSuffix(stats.p75),
+        p90: formatTimeWithSuffix(stats.p90),
+        p99: formatTimeWithSuffix(stats.p99),
+        n: stats.n,
+      });
+      return { band, variant, tooltip };
+    });
+
     /** Span start in MICROSECONDS (`start_time` is nanoseconds), widened by 1µs
      *  so an inclusive lower-bound search can't exclude the span itself. A span
      *  with no usable start falls back to the trace's own start: the APIs take
@@ -2411,6 +2548,7 @@ export default defineComponent({
       spanHttpResendCount,
       navigateToError,
       getDuration,
+      operationPercentile,
       getTTFT,
       viewSpanLogs,
       evaluateSpan,

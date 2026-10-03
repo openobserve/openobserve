@@ -10853,6 +10853,8 @@
       "service": "Service",
       "duration": "Duration",
       "start": "Start",
+      "operationPercentileBand": "{band} of {operation}",
+      "operationPercentilesTooltip": "p50 {p50} · p75 {p75} · p90 {p90} · p99 {p99} · n {n}",
       "requestResent": "Request resent {count} time | Request resent {count} times",
       "resends": "Resends",
       "spanIdTitle": "Span ID: {id}",

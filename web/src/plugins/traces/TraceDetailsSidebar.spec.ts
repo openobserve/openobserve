@@ -25,6 +25,8 @@ const {
   mockNavigateToCorrelatedLogs,
   mockToast,
   mockPromptResolve,
+  mockSearch,
+  mockSearchObj,
 } = vi.hoisted(() => ({
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
@@ -32,6 +34,12 @@ const {
   mockNavigateToCorrelatedLogs: vi.fn(),
   mockPromptResolve: vi.fn(),
   mockToast: vi.fn(),
+  mockSearch: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+  mockSearchObj: { meta: { serviceColors: { scheduler: "#1ab8be" } } } as Record<string, any>,
+}));
+
+vi.mock("@/services/search", () => ({
+  default: { search: mockSearch },
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -48,7 +56,7 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: { meta: { serviceColors: { scheduler: "#1ab8be" } } },
+    searchObj: mockSearchObj,
     buildQueryDetails: mockBuildQueryDetails,
     navigateToLogs: mockNavigateToLogs,
     navigateToCorrelatedLogs: mockNavigateToCorrelatedLogs,
@@ -79,6 +87,7 @@ vi.mock("@/composables/traces/useTraceDetails", () => ({
 import componentSource from "@/plugins/traces/TraceDetailsSidebar.vue?raw";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import config from "@/aws-exports";
 import i18n from "@/locales";
@@ -2235,5 +2244,154 @@ describe("TraceDetailsSidebar", async () => {
       expect(hasScoresLabel(w)).toBe(true);
       w.unmount();
     });
+  });
+});
+
+describe("TraceDetailsSidebar — span vs operation percentiles", () => {
+  const SAVED_START = 1752490000000000;
+  const SAVED_END = 1752490900000000;
+  const SPAN_START_US = Math.floor(mockSpan.start_time / 1_000);
+  const HOUR_US = 3_600_000_000;
+  const STATS = { n: 120, p50: 1000, p75: 2000, p90: 4000, p99: 8000 };
+  const PERCENTILE_TAG_ID = "trace-details-sidebar-header-toolbar-operation-percentile";
+  const PERCENTILE_TAG = `[data-test="${PERCENTILE_TAG_ID}"]`;
+
+  function statsResponse(overrides: Record<string, number> = {}) {
+    return { data: { hits: [{ ...STATS, ...overrides }] } };
+  }
+
+  async function mountWith(spanOverrides: Record<string, unknown> = {}, props = {}) {
+    const w = mountSidebar({
+      span: { ...mockSpan, ...spanOverrides },
+      streamName: "default",
+      ...props,
+    });
+    await flushPromises();
+    return w;
+  }
+
+  function percentileTag(w: ReturnType<typeof mountSidebar>) {
+    return w.findAllComponents(OTag).find((c) => c.find(PERCENTILE_TAG).exists());
+  }
+
+  beforeEach(() => {
+    mockSearch.mockReset();
+    mockSearch.mockResolvedValue(statsResponse());
+    mockSearchObj.data = {
+      stream: { selectedStream: { label: "default", value: "default" } },
+      queryPayload: { query: { start_time: SAVED_START, end_time: SAVED_END } },
+      traceDetails: {},
+    };
+  });
+
+  afterEach(() => {
+    delete (mockSearchObj as Record<string, unknown>).data;
+  });
+
+  it("queries the four percentiles with quoted service, operation and stream", async () => {
+    const w = await mountWith({
+      _stream: 'odd"stream',
+      service_name: "o'svc",
+      operation_name: "GET /it's",
+    });
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    const arg = mockSearch.mock.calls[0][0];
+    const sql: string = arg.query.query.sql;
+    expect(arg.page_type).toBe("traces");
+    expect(arg.org_identifier).toBe("test-org");
+    expect(sql).toContain('FROM "odd""stream"');
+    expect(sql).toContain("service_name = 'o''svc'");
+    expect(sql).toContain("operation_name = 'GET /it''s'");
+    expect(sql).toContain("COUNT(*) AS n");
+    for (const [q, alias] of [
+      ["0.5", "p50"],
+      ["0.75", "p75"],
+      ["0.9", "p90"],
+      ["0.99", "p99"],
+    ]) {
+      expect(sql).toContain(`approx_percentile_cont(duration, ${q}) AS ${alias}`);
+    }
+    w.unmount();
+  });
+
+  it("uses the page's saved query bounds when the span's stream is the page stream", async () => {
+    const w = await mountWith();
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual([SAVED_START, SAVED_END]);
+    w.unmount();
+  });
+
+  it("falls back to the span start ± 1 h for another stream", async () => {
+    const w = await mountWith({ _stream: "other" });
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual([SPAN_START_US - HOUR_US, SPAN_START_US + HOUR_US]);
+    w.unmount();
+  });
+
+  it("falls back to the span start ± 1 h in embedded mode", async () => {
+    const w = await mountWith({}, { parentMode: "embedded" });
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual([SPAN_START_US - HOUR_US, SPAN_START_US + HOUR_US]);
+    w.unmount();
+  });
+
+  it("falls back to the span start ± 1 h when the page has no saved bounds", async () => {
+    mockSearchObj.data.queryPayload = {};
+    const w = await mountWith();
+    const q = mockSearch.mock.calls[0][0].query.query;
+    expect([q.start_time, q.end_time]).toEqual([SPAN_START_US - HOUR_US, SPAN_START_US + HOUR_US]);
+    w.unmount();
+  });
+
+  it.each([
+    [500, "< p50", "default-soft"],
+    [1000, "p50–p75", "default-soft"],
+    [2000, "p75–p90", "default-soft"],
+    [4000, "p90–p99", "warning-soft"],
+    [8000, "p90–p99", "warning-soft"],
+    [8001, "> p99", "error-soft"],
+  ])("a %sµs span reads %s with the %s variant", async (duration, band, variant) => {
+    const w = await mountWith({ duration });
+    const tag = percentileTag(w);
+    expect(tag).toBeTruthy();
+    expect(tag!.text()).toBe(`${band} of ${mockSpan.operation_name}`);
+    expect(tag!.props("variant")).toBe(variant);
+    w.unmount();
+  });
+
+  it("puts p50, p75, p90, p99 and n in the tooltip", async () => {
+    const w = await mountWith();
+    const tooltip = w
+      .findAllComponents({ name: "OTooltip" })
+      .find((c) => String(c.props("content")).includes("p99"));
+    expect(tooltip).toBeTruthy();
+    const content = String(tooltip!.props("content"));
+    for (const part of ["p50 1.00ms", "p75 2.00ms", "p90 4.00ms", "p99 8.00ms", "n 120"]) {
+      expect(content).toContain(part);
+    }
+    w.unmount();
+  });
+
+  it.each([
+    ["n < 20", () => mockSearch.mockResolvedValue(statsResponse({ n: 19 }))],
+    ["p50 == 0", () => mockSearch.mockResolvedValue(statsResponse({ p50: 0 }))],
+    ["the search fails", () => mockSearch.mockRejectedValue(new Error("boom"))],
+    ["the search is still loading", () => mockSearch.mockReturnValue(new Promise(() => {}))],
+  ])("hides the tag when %s", async (_label, arrange) => {
+    arrange();
+    const w = await mountWith();
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    expect(w.find(PERCENTILE_TAG).exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("serves sibling spans from one cached call, each with its own band", async () => {
+    const w = await mountWith({ duration: 500 });
+    expect(percentileTag(w)!.text()).toContain("< p50");
+    await w.setProps({ span: { ...mockSpan, span_id: "sibling", duration: 9000 } });
+    await flushPromises();
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    expect(percentileTag(w)!.text()).toContain("> p99");
+    w.unmount();
   });
 });
