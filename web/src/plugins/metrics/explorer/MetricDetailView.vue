@@ -216,21 +216,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-class="cursor-pointer"
               @row-click="(row: RelatedRow) => $emit('open-related', row.name)"
             >
-              <template #cell="{ row, column }">
-                <span v-if="column.id === 'name'" class="font-mono text-xs">{{
-                  row.original.name
-                }}</span>
-                <OTag
-                  v-else-if="column.id === 'type'"
-                  type="metricType"
-                  :value="row.original.typeFilterBucket"
-                />
-                <span v-else-if="column.id === 'unit'" class="text-text-secondary text-xs">{{
-                  row.original.unitLabel
-                }}</span>
-                <span v-else-if="column.id === 'shared'" class="text-text-secondary text-xs">{{
-                  row.original.sharedLabels.length
-                    ? row.original.sharedLabels.join(", ")
+              <template #cell-name="{ row }">
+                <span class="font-mono text-xs">{{ row.name }}</span>
+              </template>
+              <template #cell-type="{ row }">
+                <OTag type="metricType" :value="row.typeFilterBucket" />
+              </template>
+              <template #cell-unit="{ row }">
+                <span class="text-text-secondary text-xs">{{ row.unitLabel }}</span>
+              </template>
+              <template #cell-shared="{ row }">
+                <span class="text-text-secondary text-xs">{{
+                  row.sharedLabels.length
+                    ? row.sharedLabels.join(", ")
                     : t("metrics.explorer.detail.related.noSharedLabels")
                 }}</span>
               </template>

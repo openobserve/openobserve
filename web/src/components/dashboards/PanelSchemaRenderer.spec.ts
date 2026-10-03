@@ -2535,4 +2535,96 @@ describe("PanelSchemaRenderer", () => {
       expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([1, 1]);
     });
   });
+  // Every streamed chunk starts an async conversion, and they need not finish in
+  // the order they started. A chunk's conversion that lands after the final one
+  // must not overwrite it — with a PromQL time shift that dropped the
+  // "(… ago)" series although both streams had returned their data.
+  describe("conversions finishing out of order", () => {
+    const PAGE_KEY = "conversion-race";
+    const primary = { resultType: "matrix", result: [{ metric: { host: "a" }, values: [[1, "1"]] }] };
+    const shifted = { resultType: "matrix", result: [{ metric: { host: "a" }, values: [[1, "2"]] }] };
+    const optionsWith = (...names: string[]) => ({
+      chartType: "line",
+      options: { series: names.map((name) => ({ name, data: [[1, 1]] })) },
+      extras: {},
+    });
+
+    it("keeps the latest conversion when an earlier, slower one resolves after it", async () => {
+      const data = ref<any[]>([]);
+      const loading = ref(false);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data,
+        loading,
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 600_000, periodAsStr: "10 Minutes ago" } },
+          ],
+        }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-race",
+            type: "line",
+            queryType: "promql",
+            queries: [{ query: "x", fields: {}, config: { time_shift: [{ offSet: "10m" }] } }],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: PAGE_KEY,
+            variablesAndPanelsDataLoadingState: { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+
+      // A streamed chunk with only the primary: its conversion is slow.
+      let resolveChunk!: (v: any) => void;
+      vi.mocked(convertPanelData).mockImplementationOnce(
+        () => new Promise((resolve) => (resolveChunk = resolve)),
+      );
+      loading.value = true;
+      data.value = [primary];
+      await flushPromises();
+
+      // The final render with both streams resolves at once.
+      vi.mocked(convertPanelData).mockResolvedValueOnce(optionsWith("a", "a (10 Minutes ago)"));
+      data.value = [primary, shifted];
+      loading.value = false;
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual([
+        "a",
+        "a (10 Minutes ago)",
+      ]);
+
+      // The stale chunk lands last.
+      resolveChunk(optionsWith("a"));
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual([
+        "a",
+        "a (10 Minutes ago)",
+      ]);
+    });
+  });
 });

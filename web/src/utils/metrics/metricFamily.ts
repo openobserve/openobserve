@@ -174,9 +174,13 @@ const DERIVED_SLOTS: Array<keyof FamilyMembers> = [
   "gcount",
 ];
 
-/** Label names a stream carries, from a `fetchSchema=true` load. */
+/**
+ * Label names a stream carries, from a `fetchSchema=true` load. The landing load
+ * (fetchSchema=false) sends `schema: []`: that is "not fetched", not "no labels"
+ * — a fetched metrics schema always has at least `_timestamp` and `value`.
+ */
 export function labelsOf(stream: MetricStream): string[] | undefined {
-  if (!Array.isArray(stream.schema)) return undefined;
+  if (!Array.isArray(stream.schema) || !stream.schema.length) return undefined;
   return stream.schema
     .map((f) => f.name)
     .filter((n) => n && !INTERNAL_FIELDS.has(n) && !n.startsWith("__"));

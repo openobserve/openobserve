@@ -108,23 +108,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :row-class="rowClass"
         @row-click="(row: BreakdownRow) => $emit('update:selectedLabel', row.label)"
       >
-        <template #cell="{ row, column }">
+        <template #cell-label="{ row }">
           <span
-            v-if="column.id === 'label'"
             class="font-mono text-xs"
-            :class="row.original.label === activeLabel ? 'text-text-heading font-semibold' : ''"
-            >{{ row.original.label }}</span
+            :class="row.label === selectedLabel ? 'text-text-heading font-semibold' : ''"
+            >{{ row.label }}</span
           >
+        </template>
 
-          <div
-            v-else-if="column.id === 'values'"
-            class="flex flex-wrap items-center gap-x-3 gap-y-1"
-          >
+        <template #cell-values="{ row }">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span
-              v-for="entry in row.original.top"
+              v-for="entry in row.top"
               :key="entry.value"
               class="inline-flex items-center gap-1"
-              :data-test="`metrics-breakdown-value-${row.original.label}-${entry.value}`"
+              :data-test="`metrics-breakdown-value-${row.label}-${entry.value}`"
             >
               <span class="text-text-body font-mono text-xs">{{ entry.value }}</span>
               <span class="text-text-secondary text-2xs tabular-nums">{{
@@ -140,12 +138,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="add-circle-outline"
                 :aria-label="
                   t('metrics.explorer.detail.breakdown.addToFilterAria', {
-                    label: row.original.label,
+                    label: row.label,
                     value: entry.value,
                   })
                 "
-                :data-test="`metrics-breakdown-add-${row.original.label}-${entry.value}`"
-                @click.stop="addFilter(row.original.label, entry.value, '=')"
+                :data-test="`metrics-breakdown-add-${row.label}-${entry.value}`"
+                @click.stop="addFilter(row.label, entry.value, '=')"
               >
                 <OTooltip :content="t('metrics.explorer.detail.breakdown.addToFilter')" />
               </OButton>
@@ -155,23 +153,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="block"
                 :aria-label="
                   t('metrics.explorer.detail.breakdown.excludeAria', {
-                    label: row.original.label,
+                    label: row.label,
                     value: entry.value,
                   })
                 "
-                :data-test="`metrics-breakdown-exclude-${row.original.label}-${entry.value}`"
-                @click.stop="addFilter(row.original.label, entry.value, '!=')"
+                :data-test="`metrics-breakdown-exclude-${row.label}-${entry.value}`"
+                @click.stop="addFilter(row.label, entry.value, '!=')"
               >
                 <OTooltip :content="t('metrics.explorer.detail.breakdown.exclude')" />
               </OButton>
             </span>
           </div>
+        </template>
 
+        <template #cell-distinct="{ row }">
           <span
-            v-else-if="column.id === 'distinct'"
             class="text-xs tabular-nums"
-            :data-test="`metrics-breakdown-distinct-${row.original.label}`"
-            >{{ distinctLabel(row.original) }}</span
+            :data-test="`metrics-breakdown-distinct-${row.label}`"
+            >{{ distinctLabel(row) }}</span
           >
         </template>
       </OTable>

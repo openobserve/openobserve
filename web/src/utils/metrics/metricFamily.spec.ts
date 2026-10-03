@@ -288,6 +288,14 @@ describe("labels", () => {
     expect(buildMetricCards([fallback("m_total")])[0].labels).toBeUndefined();
   });
 
+  // The landing list (fetchSchema=false) still carries `schema: []`. Read as
+  // "no labels", a stream reload landing after the schema load replaced every
+  // card with one whose empty label list beats labelsByStream — a deep-linked
+  // Breakdown tab then showed "No labels" for a metric that has them.
+  it("leaves labels undefined when the landing load sends an empty schema", () => {
+    expect(buildMetricCards([{ ...fallback("m_total"), schema: [] }])[0].labels).toBeUndefined();
+  });
+
   it("keeps the internal exemplars column out of the label list", () => {
     const stream: MetricStream = {
       ...fallback("m_bucket"),

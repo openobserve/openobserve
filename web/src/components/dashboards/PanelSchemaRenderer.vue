@@ -1236,6 +1236,9 @@ export default defineComponent({
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
     });
+    // Each streamed chunk starts a conversion, and an earlier one can resolve
+    // after a later one; only the most recently started may land.
+    let conversionGeneration = 0;
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Preserve the previously rendered chart during a reload. While loading,
       // if the new data buffer has no rows yet but a chart is already rendered,
@@ -1253,6 +1256,7 @@ export default defineComponent({
       }
 
       if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
+        const generation = ++conversionGeneration;
         try {
           const result = await convertPanelData(
             filteredPanelSchema.value,
@@ -1267,6 +1271,8 @@ export default defineComponent({
             loading.value,
             filteredSparklineData.value,
           );
+          // Superseded while awaiting: its data is older than what is coming.
+          if (generation !== conversionGeneration) return;
 
           // Apply overlay BEFORE assigning to panelData.value.
           // This ensures a single watcher trigger with the overlaid options,
@@ -1379,6 +1385,7 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
+          if (generation !== conversionGeneration) return;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",

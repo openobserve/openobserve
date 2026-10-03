@@ -62,7 +62,7 @@ const OTableStub = {
         @click="$emit('row-click', row, $event)"
       >
         <div v-for="col in columns" :key="col.id">
-          <slot name="cell" :row="{ original: row }" :column="{ id: col.id }" :value="row[col.id]" />
+          <slot :name="'cell-' + col.id" :row="row" :column="col" :value="row[col.id]" />
         </div>
       </div>
     </div>
@@ -85,7 +85,7 @@ const OPageHeaderStub = {
 const runQuery = vi.fn();
 const cancelQueries = vi.fn();
 
-const mountView = (props: Record<string, any> = {}) =>
+const mountView = (props: Record<string, any> = {}, { realTable = false } = {}) =>
   mount(MetricDetailView, {
     props: {
       card: SELECTED,
@@ -117,7 +117,7 @@ const mountView = (props: Record<string, any> = {}) =>
       plugins: [i18n, store],
       stubs: {
         OPageHeader: OPageHeaderStub,
-        OTable: OTableStub,
+        ...(realTable ? {} : { OTable: OTableStub }),
         MetricBreakdown: {
           name: "MetricBreakdown",
           template: "<div data-test='breakdown-stub' />",
@@ -235,6 +235,31 @@ describe("MetricDetailView", () => {
         .map((row) => row.attributes("data-test")!.replace("related-row-", ""));
       expect(names).toHaveLength(12);
       expect(names).not.toContain("http_server_active_requests");
+    });
+
+    // The stub proves only the template's own slot wiring; the real OTable
+    // renders `#cell-<id>` slots and ignores a generic `#cell`.
+    it("renders each related metric's cells in the real OTable", async () => {
+      wrapper = mountView(
+        {
+          tab: "related",
+          labelsByStream: {
+            [SELECTED.name]: ["job", "route"],
+            http_server_active_requests: ["job", "route"],
+          },
+        },
+        { realTable: true },
+      );
+      await vi.waitFor(() =>
+        expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(12),
+      );
+      const names = wrapper.findAll('[data-test="o2-table-cell-name"]').map((c) => c.text());
+      expect(names).toContain("http_server_active_requests");
+      const shared = wrapper.findAll('[data-test="o2-table-cell-shared"]').map((c) => c.text());
+      expect(shared).toContain("job, route");
+      expect(
+        wrapper.findAll('[data-test="o2-table-cell-type"]').every((c) => c.text() !== ""),
+      ).toBe(true);
     });
 
     it("opens a related metric's detail view on click", async () => {

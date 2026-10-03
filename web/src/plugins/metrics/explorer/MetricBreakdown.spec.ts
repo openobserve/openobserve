@@ -47,7 +47,7 @@ const CARD: any = {
 };
 
 // OTable is heavy (TanStack + virtualisation); this stub renders its rows through
-// the same `cell` slot contract — `{ row: { original }, column: { id }, value }`.
+// the same per-column slot contract — `#cell-<id>` with `{ row: original, column, value }`.
 const OTableStub = {
   name: "OTable",
   props: ["data", "columns", "loading", "error", "rowClass"],
@@ -61,7 +61,7 @@ const OTableStub = {
         @click="$emit('row-click', row, $event)"
       >
         <div v-for="col in columns" :key="col.id">
-          <slot name="cell" :row="{ original: row }" :column="{ id: col.id }" :value="row[col.id]">{{ row[col.id] }}</slot>
+          <slot :name="'cell-' + col.id" :row="row" :column="col" :value="row[col.id]">{{ row[col.id] }}</slot>
         </div>
       </div>
     </div>
@@ -282,5 +282,57 @@ describe("MetricBreakdown", () => {
       expect(chart.props("queries")[0].expr).toContain("by (route)");
       expect(chart.props("results")).toEqual([SERIES]);
     });
+  });
+});
+
+// The stub above only proves the template's own slot wiring. This mounts the
+// real OTable, so a slot OTable does not render (it supports `#cell-<id>`, not
+// a generic `#cell`) leaves the cells empty here.
+describe("MetricBreakdown with the real OTable", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fieldValues.mockResolvedValue({ data: { hits: HITS } });
+    runQuery.mockResolvedValue(SERIES);
+  });
+
+  afterEach(() => wrapper?.unmount());
+
+  const mountReal = () =>
+    mount(MetricBreakdown, {
+      props: {
+        card: CARD,
+        labelsByStream: {},
+        filters: [],
+        timeRange: { start_time: 1_000, end_time: 2_000 },
+        selectedLabel: null,
+        rateWindow: "4m",
+        nanGuard: false,
+        color: "#000",
+        runQuery,
+        cancelQueries,
+      },
+      global: { plugins: [i18n, store], stubs: { MetricCardChart: MetricCardChartStub } },
+    });
+
+  it("renders each label's top values with their Add to filter and Exclude actions", async () => {
+    wrapper = mountReal();
+    await flushPromises();
+
+    // The rows themselves render (once OTable drops its loading skeleton);
+    // what is under test is their cells.
+    await vi.waitFor(() =>
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(4),
+    );
+    expect(wrapper.find('[data-test="metrics-breakdown-value-method-m0"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="metrics-breakdown-distinct-instance"]').text()).toBe("20+");
+
+    await wrapper.find('[data-test="metrics-breakdown-add-status-500"]').trigger("click");
+    await wrapper.find('[data-test="metrics-breakdown-exclude-status-500"]').trigger("click");
+    expect(wrapper.emitted("add-filter")).toEqual([
+      [{ label: "status", operator: "=", value: "500" }],
+      [{ label: "status", operator: "!=", value: "500" }],
+    ]);
   });
 });
