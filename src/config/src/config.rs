@@ -93,7 +93,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 94: create synthetics_refs.
 // 95: add band settings to anomaly_detection_config.
 // 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
-pub const DB_SCHEMA_VERSION: u64 = 96;
+// 97: create query_history.
+pub const DB_SCHEMA_VERSION: u64 = 97;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2650,6 +2651,12 @@ pub struct Limit {
         help = "How long the alert availability ledger (alert_eval_intervals) is kept, in days. This is the history every alert-based SLO measures against, so it must cover the longest SLO window (90 days) plus backfill headroom; lowering it below that silently freezes those SLOs for want of coverage. 0 or less disables the reaper."
     )]
     pub alert_eval_ledger_retention_days: i64,
+    #[env_config(
+        name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
+        default = 14,
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less disables the reaper."
+    )]
+    pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

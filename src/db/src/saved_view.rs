@@ -15,6 +15,7 @@
 
 use common::meta::saved_view::{
     CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, ViewsWithoutData,
+    default_view_type,
 };
 use config::utils::json;
 use infra::errors::Error;
@@ -34,12 +35,7 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         )));
     }
     let view_id = config::ider::uuid();
-    let view = View {
-        org_id: org_id.into(),
-        view_id: view_id.clone(),
-        data: view.data.clone(),
-        view_name: view.view_name.clone(),
-    };
+    let view = new_view(org_id, &view_id, view);
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     let val = json::to_vec(&view)
         .map_err(|e| Error::Message(format!("Failed to serialize saved view: {e}")))?;
@@ -65,14 +61,7 @@ pub async fn update_view(
         )));
     }
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
-    let updated_view = match get_view(org_id, view_id).await {
-        Ok(original_view) => View {
-            data: view.data.clone(),
-            view_name: view.view_name.clone(),
-            ..original_view
-        },
-        Err(e) => return Err(e),
-    };
+    let updated_view = apply_update(get_view(org_id, view_id).await?, view);
     let val = json::to_vec(&updated_view)
         .map_err(|e| Error::Message(format!("Failed to serialize saved view: {e}")))?;
     if val.is_empty() {
@@ -80,6 +69,26 @@ pub async fn update_view(
     }
     db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
     Ok(updated_view)
+}
+
+fn new_view(org_id: &str, view_id: &str, view: &CreateViewRequest) -> View {
+    View {
+        org_id: org_id.into(),
+        view_id: view_id.into(),
+        data: view.data.clone(),
+        view_name: view.view_name.clone(),
+        view_type: view.view_type.clone().or_else(default_view_type),
+    }
+}
+
+/// A request without `view_type` keeps the stored one.
+fn apply_update(original: View, view: &UpdateViewRequest) -> View {
+    View {
+        data: view.data.clone(),
+        view_name: view.view_name.clone(),
+        view_type: view.view_type.clone().or(original.view_type),
+        ..original
+    }
 }
 
 /// Get the saved view id associated with an org_id
@@ -137,5 +146,51 @@ mod tests {
     #[test]
     fn test_saved_views_key_prefix_starts_with_slash() {
         assert!(SAVED_VIEWS_KEY_PREFIX.starts_with('/'));
+    }
+
+    fn stored(view_type: &str) -> View {
+        View {
+            org_id: "o".into(),
+            data: json::json!({"v": 1}),
+            view_id: "id".into(),
+            view_name: "old".into(),
+            view_type: Some(view_type.into()),
+        }
+    }
+
+    #[test]
+    fn test_update_without_view_type_keeps_stored() {
+        let req = UpdateViewRequest {
+            data: json::json!({"v": 2}),
+            view_name: "new".into(),
+            view_type: None,
+        };
+        let updated = apply_update(stored("metrics_explorer"), &req);
+        assert_eq!(updated.view_type.as_deref(), Some("metrics_explorer"));
+        assert_eq!(updated.view_name, "new");
+        assert_eq!(updated.data, json::json!({"v": 2}));
+        assert_eq!(updated.view_id, "id");
+    }
+
+    #[test]
+    fn test_update_with_view_type_replaces_stored() {
+        let req = UpdateViewRequest {
+            data: json::json!({}),
+            view_name: "new".into(),
+            view_type: Some("metrics_explorer".into()),
+        };
+        let updated = apply_update(stored("logs"), &req);
+        assert_eq!(updated.view_type.as_deref(), Some("metrics_explorer"));
+    }
+
+    #[test]
+    fn test_new_view_without_view_type_is_logs() {
+        let req = CreateViewRequest {
+            data: json::json!({}),
+            view_name: "n".into(),
+            view_type: None,
+        };
+        let view = new_view("o", "id", &req);
+        assert_eq!(view.view_type.as_deref(), Some("logs"));
     }
 }

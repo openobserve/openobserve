@@ -32,8 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, rum_analytics, service_accounts, short_url, slos, sourcemaps, status,
-    status_pages, stream, synthetics, users,
+    organization, query_history, rum_analytics, service_accounts, short_url, slos, sourcemaps,
+    status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
@@ -999,6 +999,10 @@ pub fn service_routes() -> Router {
         // Saved views
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
+
+        // Query history
+        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record))
+        .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete))
 
         // Functions
         .route("/{org_id}/functions", get(functions::list_functions).post(functions::save_function))

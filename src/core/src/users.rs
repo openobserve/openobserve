@@ -1213,6 +1213,11 @@ pub async fn remove_user_from_org(
                             ),
                         }
                     }
+                    if let Err(e) =
+                        infra::table::query_history::delete_by_user(org_id, email_id).await
+                    {
+                        log::error!("error deleting query history of {email_id} in {org_id}: {e}");
+                    }
                     Ok(MetaHttpResponse::ok("User removed from organization"))
                 } else {
                     Ok(MetaHttpResponse::not_found(
@@ -1232,7 +1237,12 @@ pub async fn remove_user_from_org(
 pub async fn delete_user(email_id: &str) -> Result<Response, Error> {
     let result = db::user::delete(email_id).await;
     match result {
-        Ok(_) => Ok(MetaHttpResponse::ok("User deleted")),
+        Ok(_) => {
+            if let Err(e) = infra::table::query_history::delete_by_email(email_id).await {
+                log::error!("error deleting query history of {email_id}: {e}");
+            }
+            Ok(MetaHttpResponse::ok("User deleted"))
+        }
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
 }
@@ -1796,6 +1806,76 @@ mod tests {
 
         let resp = delete_user("admin@zo.dev").await;
         assert!(resp.is_ok());
+    }
+
+    async fn create_query_history_table() {
+        use sea_orm::{ConnectionTrait, Schema};
+        let conn = get_orm_client_rw().await;
+        let backend = conn.get_database_backend();
+        let mut stmt = Schema::new(backend)
+            .create_table_from_entity(infra_table::entity::query_history::Entity);
+        conn.execute(backend.build(stmt.if_not_exists()))
+            .await
+            .unwrap();
+    }
+
+    async fn create_user_with_history(email: &str) {
+        create_query_history_table().await;
+        let user = DBUser {
+            email: email.to_string(),
+            password: "".to_string(),
+            salt: "".to_string(),
+            first_name: "History".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                org_name: "Dummy Org".to_string(),
+                token: "".to_string(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        };
+        create_new_user(user).await.unwrap();
+        for org in ["dummy", "other"] {
+            infra_table::query_history::record(org, email, "up", serde_json::json!({}), 1)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn history_count(org: &str, email: &str) -> usize {
+        infra_table::query_history::list(org, email, None, None, 10, 0)
+            .await
+            .unwrap()
+            .len()
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_from_org_deletes_their_query_history_in_that_org() {
+        let _guard = set_up().await;
+        let email = "history-leaver@example.com";
+        create_user_with_history(email).await;
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev")
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(history_count("dummy", email).await, 0);
+        assert_eq!(history_count("other", email).await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_delete_user_deletes_their_query_history() {
+        let _guard = set_up().await;
+        let email = "history-deleted@example.com";
+        create_user_with_history(email).await;
+
+        let resp = delete_user(email).await.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(history_count("dummy", email).await, 0);
+        assert_eq!(history_count("other", email).await, 0);
     }
 
     #[tokio::test]

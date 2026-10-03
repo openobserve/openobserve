@@ -25,6 +25,10 @@ pub struct CreateViewRequest {
 
     /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
+
+    /// Page the view belongs to, e.g. `logs` or `metrics_explorer`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -36,6 +40,10 @@ pub struct UpdateViewRequest {
 
     /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
+
+    /// Page the view belongs to, e.g. `logs` or `metrics_explorer`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -44,6 +52,8 @@ pub struct View {
     pub data: serde_json::Value,
     pub view_id: String,
     pub view_name: String,
+    #[serde(default = "default_view_type")]
+    pub view_type: Option<String>,
 }
 
 /// Save the bandwidth for a given view, without sending the actual data
@@ -53,6 +63,13 @@ pub struct ViewWithoutData {
     pub org_id: String,
     pub view_id: String,
     pub view_name: String,
+    #[serde(default = "default_view_type")]
+    pub view_type: Option<String>,
+}
+
+/// Views stored before `view_type` existed are logs views.
+pub fn default_view_type() -> Option<String> {
+    Some("logs".to_string())
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -82,10 +99,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_view_without_view_type_reads_as_logs() {
+        let stored = r#"{"org_id":"o","data":{},"view_id":"v","view_name":"n"}"#;
+        let view: View = serde_json::from_str(stored).unwrap();
+        assert_eq!(view.view_type.as_deref(), Some("logs"));
+        let listed: ViewWithoutData = serde_json::from_str(stored).unwrap();
+        assert_eq!(listed.view_type.as_deref(), Some("logs"));
+    }
+
+    #[test]
+    fn test_view_type_round_trips() {
+        let stored = r#"{"org_id":"o","data":{},"view_id":"v","view_name":"n","view_type":"metrics_explorer"}"#;
+        let view: View = serde_json::from_str(stored).unwrap();
+        assert_eq!(view.view_type.as_deref(), Some("metrics_explorer"));
+        let listed: ViewWithoutData = serde_json::from_str(stored).unwrap();
+        assert_eq!(listed.view_type.as_deref(), Some("metrics_explorer"));
+    }
+
+    #[test]
+    fn test_requests_view_type_is_optional() {
+        let create: CreateViewRequest =
+            serde_json::from_str(r#"{"data":{},"view_name":"n"}"#).unwrap();
+        assert_eq!(create.view_type, None);
+        let update: UpdateViewRequest =
+            serde_json::from_str(r#"{"data":{},"view_name":"n","view_type":"metrics_explorer"}"#)
+                .unwrap();
+        assert_eq!(update.view_type.as_deref(), Some("metrics_explorer"));
+    }
+
+    #[test]
     fn test_create_view_request_serialization_deserialization() {
         let request = CreateViewRequest {
             data: serde_json::json!({"key": "value", "number": 42}),
             view_name: "test-view".to_string(),
+            view_type: None,
         };
 
         let serialized = serde_json::to_string(&request);
@@ -109,6 +156,7 @@ mod tests {
         let request = UpdateViewRequest {
             data: serde_json::json!({"updated": true, "version": 2}),
             view_name: "updated-view".to_string(),
+            view_type: None,
         };
 
         let serialized = serde_json::to_string(&request);
@@ -134,6 +182,7 @@ mod tests {
             data: serde_json::json!({"dashboard": "main"}),
             view_id: "view456".to_string(),
             view_name: "main-dashboard".to_string(),
+            view_type: None,
         };
 
         let serialized = serde_json::to_string(&view);
@@ -159,6 +208,7 @@ mod tests {
             org_id: "org123".to_string(),
             view_id: "view456".to_string(),
             view_name: "main-dashboard".to_string(),
+            view_type: None,
         };
 
         let serialized = serde_json::to_string(&view);
@@ -185,11 +235,13 @@ mod tests {
                     org_id: "org123".to_string(),
                     view_id: "view1".to_string(),
                     view_name: "dashboard1".to_string(),
+                    view_type: None,
                 },
                 ViewWithoutData {
                     org_id: "org123".to_string(),
                     view_id: "view2".to_string(),
                     view_name: "dashboard2".to_string(),
+                    view_type: None,
                 },
             ],
         };
