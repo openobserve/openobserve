@@ -1004,8 +1004,6 @@ mod tests {
             table_provider::empty_table::NewEmptyTable,
         };
 
-        unsafe { std::env::set_var("ZO_AGGREGATION_TOPK_ENABLED", "true") };
-        config::refresh_config().unwrap();
         let schema = Arc::new(Schema::new(vec![
             Field::new("service_name", DataType::Utf8, true),
             Field::new("span_kind", DataType::Utf8, true),
