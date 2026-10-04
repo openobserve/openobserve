@@ -1201,10 +1201,25 @@ describe("MetricBreakdown", () => {
         { name: "build_info", cardKind: CARD_KIND.INFO },
         'count by (method) ({__name__="build_info"})',
       ],
+      [
+        "a mean pair",
+        { name: "lat_sum", cardKind: CARD_KIND.MEAN_PAIR },
+        'sum by (method) (rate({__name__="lat_sum"}[$__rate_interval])) / sum by (method) (rate({__name__="lat_count"}[$__rate_interval]))',
+      ],
+      [
+        "an exponential histogram fallback",
+        { name: "size_bucket", cardKind: CARD_KIND.EXP_HISTOGRAM_FALLBACK },
+        'sum by (method) (rate({__name__="size_count"}[$__rate_interval]))',
+      ],
     ])(
       "charts %s as the tile does: a line, without the card's own chart contract",
       async (_, card, query) => {
-        wrapper = mountBreakdown({ card: { ...CARD, ...card }, selectedLabel: "method" });
+        wrapper = mountBreakdown({
+          card: { ...CARD, ...card },
+          // A mean pair breaks down only by labels its `_count` also carries.
+          labelsByStream: { lat_count: CARD.labels },
+          selectedLabel: "method",
+        });
         await flushPromises();
         await button(wrapper).trigger("click");
 
@@ -1251,6 +1266,26 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown({ selectedLabel: "method" });
       await flushPromises();
       expect(runQuery).toHaveBeenCalled();
+      expect(button(wrapper).attributes("disabled")).toBeDefined();
+
+      resolve(SERIES);
+      await flushPromises();
+      expect(button(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    it("waits again for the chart when another label is focused", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(button(wrapper).attributes("disabled")).toBeUndefined();
+
+      let resolve!: (v: any) => void;
+      runQuery.mockImplementation(() => new Promise((r) => (resolve = r)));
+      await wrapper.setProps({ selectedLabel: "route" });
+      await flushPromises();
+      expect(runQuery).toHaveBeenLastCalledWith(
+        'sum by (route) (rate({__name__="http_requests_total"}[4m]))',
+        expect.any(AbortSignal),
+      );
       expect(button(wrapper).attributes("disabled")).toBeDefined();
 
       resolve(SERIES);

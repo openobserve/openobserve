@@ -934,7 +934,7 @@ describe("AddToDashboard — schema gates submit (real OForm)", () => {
     expect(mockAddPanel).toHaveBeenCalled();
   });
 
-  it("seeds the title with defaultPanelTitle, which then needs no typing", async () => {
+  it("seeds the title with defaultPanelTitle, again on every open", async () => {
     const wrapper = mount(AddToDashboard, {
       props: {
         dashboardPanelData: { data: { ...defaultDashboardPanelData.data } },
@@ -943,7 +943,8 @@ describe("AddToDashboard — schema gates submit (real OForm)", () => {
       },
       global: {
         stubs: {
-          ODialog: { template: "<div><slot /></div>" },
+          // Like ODialog, the body exists only while open, so a reopen re-seeds the form.
+          ODialog: { props: ["open"], template: "<div><slot v-if='open' /></div>" },
           SelectFolderDropdown: true,
           SelectDashboardDropdown: true,
           SelectTabDropdown: true,
@@ -951,10 +952,21 @@ describe("AddToDashboard — schema gates submit (real OForm)", () => {
       },
     });
     await flushPromises();
+    const formOf = () => (wrapper.findComponent(OFormReal).vm as any).form;
+
+    // An edit abandoned by closing the dialog does not survive the next open.
+    formOf().setFieldValue("panelTitle", "Edited");
+    await flushPromises();
+    await wrapper.setProps({ open: false });
+    await flushPromises();
+    expect(wrapper.findComponent(OFormReal).exists()).toBe(false);
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    expect(formOf().state.values.panelTitle).toBe("Rate by zone · http_requests_total");
+
     (wrapper.vm as any).selectedDashboard = "dash-1";
     (wrapper.vm as any).activeTabId = "tab-1";
-    const form = (wrapper.findComponent(OFormReal).vm as any).form;
-    await form.handleSubmit();
+    await formOf().handleSubmit();
     await flushPromises();
 
     expect(mockAddPanel).toHaveBeenCalledWith(
