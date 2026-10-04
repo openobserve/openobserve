@@ -774,6 +774,8 @@ describe("useTraces", () => {
 
       expect(mockSearch).toHaveBeenCalledTimes(2);
       expect(pushedQuery()).toBe("trace_id = 'trace-u'");
+      // trace_id alone: the stream whose span count failed keeps its trace logs.
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs,web_logs");
     });
 
     it("keeps the span query when any successful count is non-zero, despite a failure", async () => {
@@ -786,7 +788,49 @@ describe("useTraces", () => {
       await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
 
       expect(pushedQuery()).toBe("span_id = 'span-k' and trace_id = 'trace-k'");
+      // web_logs (no span_id column) would fail the span-scoped logs query.
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
       expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    });
+
+    it("treats partial, errored or non-numeric count responses as unknown", async () => {
+      const responses: Record<string, any> = {
+        a_logs: { data: { is_partial: true, hits: [{ zo_count: 0 }] } },
+        b_logs: { data: { function_error: "vrl failed", hits: [{ zo_count: 0 }] } },
+        c_logs: { data: { hits: [] } },
+        d_logs: { data: { hits: [{ zo_count: "n/a" }] } },
+      };
+      mockSearch.mockImplementation(async (req: any) => {
+        const stream = Object.keys(responses).find((n) =>
+          req.query.query.sql.includes(`FROM ${n} `),
+        );
+        return responses[stream!];
+      });
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-p", "trace-p");
+
+      await navigateToCorrelatedLogs(streams("a_logs", "b_logs", "c_logs", "d_logs"));
+
+      // Nothing is known, so no fallback: span-scoped over every stream.
+      expect(pushedQuery()).toBe("span_id = 'span-p' and trace_id = 'trace-p'");
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("a_logs,b_logs,c_logs,d_logs");
+      expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    });
+
+    it("does not let a partial zero count outweigh a complete non-zero count", async () => {
+      mockSearch.mockImplementation(async (req: any) =>
+        req.query.query.sql.includes("FROM a_logs ")
+          ? { data: { is_partial: true, hits: [{ zo_count: 0 }] } }
+          : { data: { hits: [{ zo_count: 0 }] } },
+      );
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-q", "trace-q");
+
+      await navigateToCorrelatedLogs(streams("a_logs", "b_logs"));
+
+      // The one complete count is 0, the partial one is unknown: fall back.
+      expect(pushedQuery()).toBe("trace_id = 'trace-q'");
+      expect(mockShowInfoNotification).toHaveBeenCalledTimes(1);
     });
 
     it("navigates with the span-scoped query when every count fails", async () => {
@@ -838,6 +882,20 @@ describe("useTraces", () => {
 
       await navigateToCorrelatedLogs(streams("app_logs"));
 
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("shows no fallback notification when the span changed while counting", async () => {
+      const { navigateToCorrelatedLogs, searchObj } = useTraces();
+      selectSpan("span-a", "trace-a");
+      mockSearch.mockImplementation(async () => {
+        searchObj.data.traceDetails.selectedSpanId = "span-b";
+        return { data: { hits: [{ zo_count: 0 }] } };
+      });
+
+      await navigateToCorrelatedLogs(streams("app_logs"));
+
+      expect(mockShowInfoNotification).not.toHaveBeenCalled();
       expect(mockRouterPush).not.toHaveBeenCalled();
     });
 

@@ -552,9 +552,10 @@ const useTraces = () => {
 
     // A span (often a DB or client span) may have no logs of its own. Count
     // each stream separately so one failing stream (e.g. no span_id column)
-    // stays "unknown" instead of sinking the check. Fall back to the whole
-    // trace's logs only when at least one count succeeded and all were 0; if
-    // every count failed, keep the span-scoped query.
+    // stays "unknown" instead of sinking the check. Only a complete response
+    // with a numeric count is evidence; anything else is unknown.
+    let navStreams = streamList;
+    let showTraceFallback = false;
     if (spanId && traceId) {
       const counts = await Promise.allSettled(
         streamList.map((name) =>
@@ -573,24 +574,41 @@ const useTraces = () => {
           }),
         ),
       );
-      const succeeded = counts.filter((c) => c.status === "fulfilled");
-      const allEmpty = succeeded.every(
-        (c) => !Number((c as PromiseFulfilledResult<any>).value?.data?.hits?.[0]?.zo_count),
-      );
-      if (succeeded.length && allEmpty) {
+      const countOf = (c: PromiseSettledResult<any>): number | null => {
+        if (c.status !== "fulfilled") return null;
+        const data = c.value?.data;
+        if (!data || data.is_partial || data.function_error) return null;
+        const raw = data.hits?.[0]?.zo_count;
+        const n = typeof raw === "number" || typeof raw === "string" ? Number(raw) : NaN;
+        return raw !== "" && Number.isFinite(n) ? n : null;
+      };
+      const known = counts.map(countOf);
+      const counted = streamList.filter((_, i) => known[i] !== null);
+
+      // Unknown (null) streams don't count against the fallback.
+      if (counted.length && known.every((n) => !n)) {
+        // No span logs anywhere we could check: show the whole trace's logs.
+        // trace_id alone is one field, which the logs page tolerates on
+        // streams lacking it, so every eligible stream stays in.
         conditions.delete(groupIdFor(getSpanIdField()));
         queryString = Array.from(conditions.values()).join(" and ");
         // Trace-level logs span the whole trace, not the clicked span's window.
         timeRange = correlationProps.traceTimeRange ?? timeRange;
-        showInfoNotification(gt("traces.spanHasNoLogsShowingTrace"));
+        showTraceFallback = true;
+      } else if (counted.length) {
+        // Span-scoped: keep only streams whose count ran, i.e. that have both
+        // id columns — a stream without span_id would fail the logs query.
+        navStreams = counted;
       }
     }
 
     // The user selected another span while this ran: do not navigate.
     if (searchObj.data.traceDetails.selectedSpanId !== spanId) return;
 
+    if (showTraceFallback) showInfoNotification(gt("traces.spanHasNoLogsShowingTrace"));
+
     const encodedQuery = b64EncodeUnicode(queryString);
-    const streamNames = streamList.join(",");
+    const streamNames = navStreams.join(",");
 
     store.dispatch("logs/setIsInitialized", false);
     await nextTick();
