@@ -323,12 +323,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Service name via TraceServiceCell -->
             <template #cell-service_name="{ row }">
-              <TraceServiceCell
-                :item="row"
-                class="cursor-pointer"
-                :data-test="`services-catalog-service-link-${row.service_name}`"
-                @click.stop="handleRowClick(row)"
-              />
+              <div class="flex min-w-0 items-center gap-1.5">
+                <TraceServiceCell
+                  :item="row"
+                  class="min-w-0 cursor-pointer"
+                  :data-test="`services-catalog-service-link-${row.service_name}`"
+                  @click.stop="handleRowClick(row)"
+                />
+                <span
+                  v-if="row.infer_service_name && row.infer_service_system"
+                  class="text-text-secondary max-w-24 shrink-0 truncate text-xs"
+                  :title="row.infer_service_system"
+                  data-test="services-catalog-service-system"
+                  >{{ row.infer_service_system }}</span
+                >
+              </div>
             </template>
 
             <!-- Error rate with progress bar -->
@@ -1030,7 +1039,28 @@ FROM "${streamName}"
 GROUP BY service_name
 ORDER BY total_requests DESC`;
 
-  currentTraceId = generateTraceContext().traceId;
+  const traceId = generateTraceContext().traceId;
+  currentTraceId = traceId;
+  // Owned by this request so a superseded search cannot leak rows or real names into the current one.
+  const rows = new Map<string, ServiceRow>();
+  const realNames = new Set<string>();
+  const publish = () => {
+    // Inferred HTTP/RPC rows named like an instrumented service are its callers' view of the same calls; datastores and queues are distinct backends.
+    services.value = Array.from(rows.values()).filter(
+      (r) =>
+        !(
+          r.infer_service_name &&
+          realNames.has(r.service_name) &&
+          ["external", "rpc", "service"].includes(classifyEntity(false, r.infer_service_type))
+        ),
+    );
+  };
+  const closePanelIfRowGone = () => {
+    const selectedId = selectedServiceRow.value?.id;
+    if (selectedId && !services.value.some((r) => r.id === selectedId)) {
+      handleCloseSidePanel();
+    }
+  };
 
   await fetchQueryDataWithHttpStream(
     {
@@ -1047,17 +1077,17 @@ ORDER BY total_requests DESC`;
       type: "search",
       pageType: "traces",
       searchType: "ui",
-      traceId: currentTraceId,
+      traceId,
       org_id: searchObj.organizationIdentifier,
     },
     {
       data: (_payload: any, response: any) => {
+        if (traceId !== currentTraceId) return;
         if (
           response.type === "search_response_hits" ||
           response.type === "search_response_metadata"
         ) {
           const hits: any[] = response.content?.results?.hits ?? [];
-          const serviceMap = new Map(services.value.map((s) => [s.id, s]));
           for (const hit of hits) {
             const name = hit.service_name ?? "";
             const inferredName = hit._infer_service_name ?? undefined;
@@ -1069,7 +1099,7 @@ ORDER BY total_requests DESC`;
               infer_service_system: inferredSystem,
               infer_service_type: inferredType,
             });
-            serviceMap.set(id, {
+            rows.set(id, {
               id,
               service_name: name,
               total_requests: hit.total_requests ?? 0,
@@ -1086,18 +1116,23 @@ ORDER BY total_requests DESC`;
               infer_service_system: inferredSystem,
               infer_service_type: inferredType,
             });
+            if (hit._is_real_service) realNames.add(name);
           }
-          // RPC entities are kept as their own category (matching the Service
-          // Graph and the shared classifier) — never dropped, so a genuine
-          // uninstrumented gRPC backend is never hidden.
-          services.value = Array.from(serviceMap.values());
+          // Metadata arrives before any hits, so publishing it would blank the previous rows mid-refresh.
+          if (hits.length > 0) publish();
         }
       },
       error: () => {
+        if (traceId !== currentTraceId) return;
+        closePanelIfRowGone();
         isLoading.value = false;
         isSearching.value = false;
       },
       complete: () => {
+        if (traceId !== currentTraceId) return;
+        // Publishing here also clears the previous search's rows when this one returned no batches.
+        publish();
+        closePanelIfRowGone();
         isLoading.value = false;
         isSearching.value = false;
         lastRunAt.value = Date.now();

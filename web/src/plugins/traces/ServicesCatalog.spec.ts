@@ -314,6 +314,7 @@ const mockServices: ServiceRow[] = [
 function mountServicesCatalog(
   options: {
     storeOverrides?: Record<string, any>;
+    stubs?: Record<string, any>;
   } = {},
 ) {
   const mockStore = options.storeOverrides
@@ -396,6 +397,7 @@ function mountServicesCatalog(
           emits: ["close", "view-traces"],
         },
         OIcon: false,
+        ...options.stubs,
       },
     },
   });
@@ -2226,6 +2228,372 @@ describe("ServicesCatalog", () => {
           false,
         );
       });
+    });
+  });
+
+  describe("same-named entities", () => {
+    const metrics = {
+      error_count: 0,
+      error_rate: 0,
+      avg_duration_ns: 0,
+      max_duration_ns: 0,
+      p50_latency_ns: 0,
+      p95_latency_ns: 0,
+      p99_latency_ns: 0,
+    };
+
+    function mockHits(hits: any[]) {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks?.data?.(null, {
+          type: "search_response_hits",
+          content: { results: { hits: hits.map((h) => ({ ...metrics, ...h })) } },
+        });
+        callbacks?.complete?.(null, {});
+      });
+    }
+
+    const cellRenderingTable = {
+      template: `
+          <div data-test="services-catalog-table">
+            <div v-for="row in data" :key="row.id">
+              <slot name="cell-service_name" :row="row" />
+            </div>
+          </div>
+        `,
+      props: ["data"],
+    };
+
+    it("drops inferred rows named like an instrumented service instead of listing it again", async () => {
+      mockHits([
+        { service_name: "email-service", _is_real_service: 1, total_requests: 14152 },
+        {
+          service_name: "email-service",
+          _infer_service_name: "email-service",
+          _infer_service_system: "http",
+          _infer_service_type: "external",
+          _is_real_service: 0,
+          total_requests: 14129,
+        },
+        {
+          service_name: "email-service",
+          _infer_service_name: "email-service",
+          _infer_service_type: "rpc",
+          _is_real_service: 0,
+          total_requests: 13937,
+        },
+        {
+          service_name: "google.com",
+          _infer_service_name: "google.com",
+          _infer_service_system: "http",
+          _infer_service_type: "external",
+          _is_real_service: 0,
+          total_requests: 10,
+        },
+      ]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const emailRows = wrapper.vm.services.filter((s: any) => s.service_name === "email-service");
+      expect(emailRows).toHaveLength(1);
+      expect(emailRows[0].total_requests).toBe(14152);
+      expect(wrapper.vm.categoryCounts).toEqual({
+        all: 2,
+        service: 1,
+        datastore: 0,
+        queue: 0,
+        external: 1,
+        rpc: 0,
+      });
+    });
+
+    it("labels same-named dependencies with their system", async () => {
+      mockHits([
+        {
+          service_name: "orders",
+          _infer_service_name: "orders",
+          _infer_service_system: "postgresql",
+          _infer_service_type: "database",
+          total_requests: 14212,
+        },
+        {
+          service_name: "orders",
+          _infer_service_name: "orders",
+          _infer_service_system: "kafka",
+          _infer_service_type: "queue",
+          total_requests: 14165,
+        },
+        {
+          service_name: "orders",
+          _infer_service_name: "orders",
+          _infer_service_system: "mysql",
+          _infer_service_type: "database",
+          total_requests: 14078,
+        },
+      ]);
+      wrapper = mountServicesCatalog({ stubs: { OTable: cellRenderingTable } });
+      await flushPromises();
+
+      wrapper.vm.onTypeFilterChange("datastore");
+      await flushPromises();
+      const labels = wrapper
+        .findAll('[data-test="services-catalog-service-system"]')
+        .map((l) => l.text());
+      expect(labels.sort()).toEqual(["mysql", "postgresql"]);
+
+      wrapper.vm.onTypeFilterChange("all");
+      await flushPromises();
+      expect(
+        wrapper.findAll('[data-test="services-catalog-service-system"]').map((l) => l.text()),
+      ).toHaveLength(3);
+    });
+
+    function mockBatches(batches: any[][]) {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        for (const hits of batches) {
+          callbacks?.data?.(null, {
+            type: "search_response_hits",
+            content: { results: { hits: hits.map((h) => ({ ...metrics, ...h })) } },
+          });
+        }
+        callbacks?.complete?.(null, {});
+      });
+    }
+
+    const inferredEmailExternal = {
+      service_name: "email-service",
+      _infer_service_name: "email-service",
+      _infer_service_system: "http",
+      _infer_service_type: "external",
+      _is_real_service: 0,
+      total_requests: 14129,
+    };
+
+    it("drops inferred rows that arrive in an earlier batch than the real row", async () => {
+      mockBatches([
+        [
+          inferredEmailExternal,
+          {
+            service_name: "email-service",
+            _infer_service_name: "email-service",
+            _infer_service_type: "rpc",
+            _is_real_service: 0,
+            total_requests: 13937,
+          },
+        ],
+        [{ service_name: "email-service", _is_real_service: 1, total_requests: 14152 }],
+      ]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const emailRows = wrapper.vm.services.filter((s: any) => s.service_name === "email-service");
+      expect(emailRows).toHaveLength(1);
+      expect(emailRows[0].is_real_service).toBe(1);
+    });
+
+    it("does not let a real row from a previous search hide this search's inferred row", async () => {
+      mockHits([{ service_name: "email-service", _is_real_service: 1, total_requests: 14152 }]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      mockHits([inferredEmailExternal]);
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      const inferred = wrapper.vm.services.filter(
+        (s: any) => s.service_name === "email-service" && s.infer_service_name,
+      );
+      expect(inferred).toHaveLength(1);
+      expect(inferred[0].infer_service_type).toBe("external");
+      expect(wrapper.vm.services.some((s: any) => s.is_real_service === 1)).toBe(false);
+    });
+
+    it("keeps a datastore or queue that shares a real service's name", async () => {
+      mockHits([
+        { service_name: "orders", _is_real_service: 1, total_requests: 500 },
+        {
+          service_name: "orders",
+          _infer_service_name: "orders",
+          _infer_service_system: "postgresql",
+          _infer_service_type: "database",
+          _is_real_service: 0,
+          total_requests: 400,
+        },
+        {
+          service_name: "orders",
+          _infer_service_name: "orders",
+          _infer_service_system: "kafka",
+          _infer_service_type: "queue",
+          _is_real_service: 0,
+          total_requests: 300,
+        },
+      ]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.services).toHaveLength(3);
+      expect(wrapper.vm.categoryCounts).toMatchObject({ service: 1, datastore: 1, queue: 1 });
+    });
+
+    it("shows no system label on an instrumented row", async () => {
+      mockHits([
+        { service_name: "checkout", _is_real_service: 1, total_requests: 500 },
+        {
+          service_name: "orders-db",
+          _infer_service_name: "orders-db",
+          _infer_service_system: "postgresql",
+          _infer_service_type: "database",
+          _is_real_service: 0,
+          total_requests: 400,
+        },
+      ]);
+      const rowTable = {
+        template: `
+            <div data-test="services-catalog-table">
+              <div v-for="row in data" :key="row.id" :data-row="row.service_name">
+                <slot name="cell-service_name" :row="row" />
+              </div>
+            </div>
+          `,
+        props: ["data"],
+      };
+      wrapper = mountServicesCatalog({ stubs: { OTable: rowTable } });
+      await flushPromises();
+      wrapper.vm.onTypeFilterChange("all");
+      await flushPromises();
+
+      const label = '[data-test="services-catalog-service-system"]';
+      const checkout = wrapper.find('[data-row="checkout"]');
+      expect(checkout.exists()).toBe(true);
+      expect(checkout.find(label).exists()).toBe(false);
+      expect(wrapper.find('[data-row="orders-db"]').find(label).text()).toBe("postgresql");
+    });
+
+    const realEmail = { service_name: "email-service", _is_real_service: 1, total_requests: 14152 };
+
+    function hitsResponse(hits: any[]) {
+      return {
+        type: "search_response_hits",
+        content: { results: { hits: hits.map((h) => ({ ...metrics, ...h })) } },
+      };
+    }
+
+    it("keeps the previous search's rows on screen until the new search's first batch", async () => {
+      mockHits([realEmail]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => {});
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.services.map((s: any) => s.service_name)).toEqual(["email-service"]);
+    });
+
+    it("clears the previous search's rows when the new search finds nothing", async () => {
+      mockHits([realEmail]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks?.complete?.(null, {});
+      });
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.services).toEqual([]);
+    });
+
+    it("ignores batches from a superseded search", async () => {
+      const calls: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        calls.push(callbacks);
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      const [superseded, current] = calls.slice(-2);
+      current.data(null, hitsResponse([inferredEmailExternal]));
+      superseded.data(null, hitsResponse([realEmail]));
+      superseded.complete(null, {});
+      current.complete(null, {});
+      await flushPromises();
+
+      const emailRows = wrapper.vm.services.filter((s: any) => s.service_name === "email-service");
+      expect(emailRows).toHaveLength(1);
+      expect(emailRows[0].infer_service_type).toBe("external");
+    });
+
+    it("closes the side panel when its row is dropped as a duplicate", async () => {
+      mockHits([inferredEmailExternal]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      expect(wrapper.vm.showSidePanel).toBe(true);
+
+      mockHits([realEmail, inferredEmailExternal]);
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(false);
+      expect(wrapper.vm.selectedServiceRow).toBeNull();
+    });
+
+    it("keeps the side panel open when a new search still has its row", async () => {
+      mockHits([realEmail]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("email-service");
+    });
+
+    it("keeps the previous rows through a metadata event and replaces them on the first hits", async () => {
+      mockHits([realEmail]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      let callbacks: any;
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, cb: any) => {
+        callbacks = cb;
+      });
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      callbacks.data(null, {
+        type: "search_response_metadata",
+        content: { results: { hits: [], total: 1, took: 3 } },
+      });
+      await flushPromises();
+      expect(wrapper.vm.services.map((s: any) => s.service_name)).toEqual(["email-service"]);
+
+      callbacks.data(null, hitsResponse([inferredEmailExternal]));
+      await flushPromises();
+      expect(wrapper.vm.services).toHaveLength(1);
+      expect(wrapper.vm.services[0].infer_service_type).toBe("external");
+    });
+
+    it("closes the side panel when a batch drops its row and the search then errors", async () => {
+      mockHits([inferredEmailExternal]);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      expect(wrapper.vm.showSidePanel).toBe(true);
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.data(null, hitsResponse([realEmail]));
+        callbacks.error(null, { type: "error", content: { message: "boom" } });
+      });
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.showSidePanel).toBe(false);
+      expect(wrapper.vm.selectedServiceRow).toBeNull();
     });
   });
 });
