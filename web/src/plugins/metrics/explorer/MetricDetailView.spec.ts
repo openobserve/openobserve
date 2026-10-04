@@ -22,6 +22,7 @@ import store from "@/test/unit/helpers/store";
 import { CARD_KIND, baseNameOf } from "@/utils/metrics/metricDefaults";
 import { MISC_GROUP_ID } from "@/utils/metrics/prefixGrouping";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
+import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 
 const card = (name: string, over: Record<string, any> = {}): any => ({
   name,
@@ -176,6 +177,14 @@ describe("MetricDetailView", () => {
       await wrapper.setProps({ timeRange: { start_time: 1, end_time: 2 } });
       await flushPromises();
       expect(runQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks again when something else cancels the overview query, and charts the answer", async () => {
+      runQuery.mockRejectedValueOnce(new PreviewCancelledError("k"));
+      wrapper = mountView();
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalledTimes(2);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
     });
 
     it("cancels the overview query when the view closes", async () => {

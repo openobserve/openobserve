@@ -1418,7 +1418,7 @@ export default defineComponent({
       if (!card) return null;
       // An unpreviewed card has no widening or NaN-guard decision yet, so a sparse counter charts "No data".
       if (!grid.previews.value[card.name]) await grid.requestPreview(card);
-      // Abandoned during that wait: the chart that asked has moved on, so its query must not start.
+      // Abandoned, or made stale by the preview (the chart reloads on its new query, aborting `signal`).
       if (signal.aborted) throw new PreviewCancelledError(expr);
       return grid.runDetailQuery(expr, card, signal);
     };

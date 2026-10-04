@@ -450,7 +450,11 @@ export default defineComponent({
         if (mine !== generation) return;
         cancelActive();
         overviewRefreshing.value = false;
-        if (isCancelled(error)) return;
+        // Not its own doing (that bumps `generation`): a shared query or bulk clear cancelled it.
+        if (isCancelled(error)) {
+          loadOverview(true);
+          return;
+        }
         overviewState.value = {
           status: "error",
           results: [],

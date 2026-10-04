@@ -82,7 +82,6 @@ const grid = vi.hoisted(() => {
     runDialogQuery: vi.fn(),
     cancelDialogQueries: vi.fn(),
     runDetailQuery: vi.fn(),
-    cancelDetailQueries: vi.fn(),
     rateWindowFor: vi.fn(() => "4m"),
     labelsByStream: { value: {} },
     prefixAssignment: { value: { groupOf: new Map() } },
