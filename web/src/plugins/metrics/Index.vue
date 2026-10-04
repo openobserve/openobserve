@@ -562,6 +562,9 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
+    // The focused PromQL editor swallows Cmd+Enter, so the page shortcut never sees it; it runs this instead.
+    provide("runQuery", onUserRun);
+
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState.searchRequestTraceIds,

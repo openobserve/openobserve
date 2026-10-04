@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { reactive } from "vue";
+import { inject, reactive } from "vue";
 import { encodeMetricsConfig, getMetricsConfig } from "@/composables/metrics/metricsUrlState";
 
 // Only an explicit Run writes history; auto-refresh, deep links and refresh share runQuery.
@@ -82,6 +82,8 @@ vi.mock("@/composables/dashboard/useDefaultPanelFields", () => ({
 import MetricsIndex from "./Index.vue";
 
 const editorRunQuery = vi.fn();
+type RunQuery = (withoutCache?: boolean) => void;
+const injected = { runQuery: null as RunQuery | null };
 const picker = {
   refresh: vi.fn(),
   setSavedDate: vi.fn(),
@@ -118,6 +120,7 @@ const mountIndex = () =>
         },
         PanelEditor: {
           setup: (_: any, { expose }: any) => {
+            injected.runQuery = inject<RunQuery | null>("runQuery", null);
             expose({ runQuery: editorRunQuery });
             return {};
           },
@@ -175,6 +178,18 @@ describe("Metrics editor — query history", () => {
 
     shortcuts.handlers.metricsRunQuery();
     await flushPromises();
+    expect(api.record).toHaveBeenCalledTimes(1);
+  });
+
+  // The focused PromQL editor swallows Cmd+Enter and calls the injected runQuery instead.
+  it("runs and records once from the editor's own Cmd+Enter", async () => {
+    mountIndex();
+    await flushPromises();
+
+    injected.runQuery?.(false);
+    await flushPromises();
+
+    expect(editorRunQuery).toHaveBeenCalledTimes(1);
     expect(api.record).toHaveBeenCalledTimes(1);
   });
 
