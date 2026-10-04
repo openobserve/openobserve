@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2">
       <OButton
+        ref="backBtnRef"
         data-test="traces-drill-down-back-btn"
         variant="outline"
         size="xs"
@@ -30,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("traces.backToResults") }}
       </OButton>
-      <span class="text-text-heading shrink-0 truncate text-base font-semibold">{{ title }}</span>
+      <span class="text-text-heading min-w-0 truncate text-base font-semibold">{{ title }}</span>
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <slot name="header-left" />
       </div>
@@ -57,6 +58,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const rootRef = ref<HTMLElement | null>(null);
+const backBtnRef = ref<{ $el?: HTMLElement } | null>(null);
 
 const close = () => emit("update:open", false);
 
@@ -67,6 +69,12 @@ const onKeydown = (e: KeyboardEvent) => {
   if (target === document.body || (target && rootRef.value?.contains(target))) close();
 };
 
-onMounted(() => document.addEventListener("keydown", onKeydown));
-onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
+onMounted(() => {
+  document.addEventListener("keydown", onKeydown);
+  backBtnRef.value?.$el?.focus?.();
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("keydown", onKeydown);
+  document.querySelector<HTMLElement>('[data-test="insights-button"]')?.focus();
+});
 </script>

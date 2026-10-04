@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left>
             <OIcon name="timeline" size="sm" class="shrink-0" />
           </template>
-          {{ t("traces.drillDown") }}
+          <span v-if="!shouldHideToggleText">{{ t("traces.drillDown") }}</span>
           <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
 
@@ -102,9 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
 
-        <!-- More menu: RED Metrics toggle + Syntax Guide — always last.
-             Sessions + LLM Insights were removed from Traces; they now
-             live as standalone pages under AI Observability. -->
+        <!-- More menu: RED Metrics toggle + Syntax Guide — always last. -->
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -1100,11 +1098,13 @@ export default defineComponent({
     const shouldHideToggleText = computed(() => availableLeftWidth.value < 750);
     const shouldHideResetText = computed(() => availableLeftWidth.value < 540);
 
-    // Same conditions under which the results header (and its analysis dashboard) renders.
+    // Only while Index renders SearchResult with its header, since the click is routed to it.
     const showDrillDown = computed(
       () =>
         searchObj.meta.searchMode !== "service-graph" &&
         searchObj.meta.searchMode !== "services-catalog" &&
+        !searchObj.loadingStream &&
+        searchObj.data.stream.streamLists.length > 0 &&
         !!searchObj.data.stream.selectedStream?.value &&
         !searchObj.data.errorMsg?.trim()?.length &&
         !!searchObj.searchApplied,

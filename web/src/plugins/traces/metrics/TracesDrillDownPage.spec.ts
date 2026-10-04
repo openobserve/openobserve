@@ -50,6 +50,26 @@ describe("TracesDrillDownPage", () => {
     expect(wrapper.find('[data-test="body-content"]').exists()).toBe(true);
   });
 
+  it("should focus the Back button on mount", () => {
+    wrapper = mountPage();
+
+    expect(document.activeElement).toBe(
+      wrapper.find('[data-test="traces-drill-down-back-btn"]').element,
+    );
+  });
+
+  it("should return focus to the Drill down button on close", () => {
+    const drillDown = document.createElement("button");
+    drillDown.setAttribute("data-test", "insights-button");
+    document.body.appendChild(drillDown);
+    wrapper = mountPage();
+
+    wrapper.unmount();
+
+    expect(document.activeElement).toBe(drillDown);
+    drillDown.remove();
+  });
+
   it("should render nothing when closed", () => {
     wrapper = mountPage({ open: false });
 

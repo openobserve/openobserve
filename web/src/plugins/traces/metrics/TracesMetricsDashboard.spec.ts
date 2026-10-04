@@ -44,6 +44,7 @@ vi.mock("./TracesAnalysisDashboard.vue", () => ({
 // ---------------------------------------------------------------------------
 const mockMetricsRangeFilters = new Map();
 const mockSearchObj = reactive({
+  loading: false,
   data: {
     editorValue: "",
     datetime: { startTime: 1_000_000, endTime: 2_000_000 },
@@ -182,6 +183,7 @@ describe("TracesMetricsDashboard", () => {
   beforeEach(async () => {
     // Reset all shared state before every test
     mockMetricsRangeFilters.clear();
+    mockSearchObj.loading = false;
     mockSearchObj.data.editorValue = "";
     mockSearchObj.meta.showHistogram = true;
     mockSearchObj.meta.searchMode = "traces";
@@ -615,6 +617,29 @@ describe("TracesMetricsDashboard", () => {
       await flushPromises();
       expect(wrapper.find("teleport-stub").exists()).toBe(false);
       expect(wrapper.vm.showAnalysisDashboard).toBe(false);
+    });
+
+    it("should close the analysis dashboard when a new search starts", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      mockSearchObj.loading = true;
+      await flushPromises();
+
+      expect(wrapper.vm.showAnalysisDashboard).toBe(false);
+      expect(wrapper.find("teleport-stub").exists()).toBe(false);
+    });
+
+    it("should keep the analysis dashboard open when a search finishes", async () => {
+      mockSearchObj.loading = true;
+      await flushPromises();
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      mockSearchObj.loading = false;
+      await flushPromises();
+
+      expect(wrapper.vm.showAnalysisDashboard).toBe(true);
     });
 
     it("should set defaultAnalysisTab to volume when no brush selection exists", async () => {

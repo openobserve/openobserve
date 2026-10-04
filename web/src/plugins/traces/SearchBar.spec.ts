@@ -706,6 +706,21 @@ describe("SearchBar", () => {
       expect(searchObjInstance.meta.showHistogram).toBe(true);
     });
 
+    it("should flip showHistogram exactly once when the switch itself is clicked", async () => {
+      searchObjInstance.meta.showHistogram = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper
+        .find(
+          '[data-test="traces-search-bar-menu-metrics-btn"] [data-test="traces-search-bar-show-metrics-toggle-btn"]',
+        )
+        .trigger("click");
+      await flushPromises();
+
+      expect(searchObjInstance.meta.showHistogram).toBe(false);
+    });
+
     it("should keep the Syntax Guide in the More menu", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
@@ -732,6 +747,7 @@ describe("SearchBar", () => {
     const applySearch = () => {
       searchObjInstance.searchApplied = true;
       searchObjInstance.data.errorMsg = "";
+      searchObjInstance.data.stream.streamLists = [{ label: "default", value: "default" }] as any;
     };
 
     it.each(["spans", "traces"] as const)(
@@ -744,7 +760,9 @@ describe("SearchBar", () => {
 
         const btn = wrapper.find('[data-test="insights-button"]');
         expect(btn.exists()).toBe(true);
-        expect(btn.text()).toContain("traces.drillDown");
+        expect(btn.text().includes("traces.drillDown")).toBe(
+          !(wrapper.vm as any).shouldHideToggleText,
+        );
         const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
         expect(toggleGroup.nextElementSibling).toBe(btn.element);
       },
@@ -772,6 +790,24 @@ describe("SearchBar", () => {
     it("should be hidden when the search errored", async () => {
       applySearch();
       searchObjInstance.data.errorMsg = "boom";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+    });
+
+    it("should be hidden while streams are loading", async () => {
+      applySearch();
+      searchObjInstance.loadingStream = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+    });
+
+    it("should be hidden when the org has no trace streams", async () => {
+      applySearch();
+      searchObjInstance.data.stream.streamLists = [];
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -1370,6 +1406,7 @@ describe("SearchBar", () => {
   describe("tooltips on icon-only buttons", () => {
     it("should have the analysis tooltip inside the Drill down button", async () => {
       searchObjInstance.searchApplied = true;
+      searchObjInstance.data.stream.streamLists = [{ label: "default", value: "default" }] as any;
       wrapper = mountSearchBar();
       await flushPromises();
 

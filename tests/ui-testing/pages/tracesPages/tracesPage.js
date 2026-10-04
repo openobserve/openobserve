@@ -116,8 +116,7 @@ export class TracesPage {
     this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
     // Traces SearchBar.vue: RED Metrics switch inside the "More" menu
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    // On Traces, TracesAnalysisDashboard.vue renders as a full-page Drill down view (not a drawer)
-    // that keeps data-test="traces-analysis-dashboard-drawer"; scope all selectors via that slug.
+    // Traces Drill down renders full page (not a drawer) but keeps the traces-analysis-dashboard-drawer slug.
     this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
     this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-drill-down-back-btn"]';
     // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
@@ -2017,7 +2016,7 @@ export class TracesPage {
   // --- Insights Button (TracesMetricsDashboard.vue) ---
 
   /**
-   * Check if the Drill down (formerly Insights) button is visible.
+   * Check if the Drill down button is visible.
    * It shows in Spans/Traces mode once a search is applied without error.
    * @returns {Promise<boolean>}
    */

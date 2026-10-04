@@ -1387,6 +1387,14 @@ describe("Index.vue (Main Traces Page)", () => {
       delete store.state.zoConfig.auto_query_enabled;
     });
 
+    it("should render the drill-down target in the search tab", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("search");
+      expect(wrapper.find("#traces-drill-down-page").exists()).toBe(true);
+    });
+
     it("should open the analysis dashboard on SearchResult when SearchBar emits drill-down", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
