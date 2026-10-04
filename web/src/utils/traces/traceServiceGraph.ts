@@ -52,7 +52,6 @@ interface NamedTreeNode {
   children?: NamedTreeNode[];
 }
 
-/** Aggregates a trace's spans into the service graph shape `convertServiceGraphToNetwork` draws. */
 export function buildTraceServiceGraph(
   spans: TraceGraphSpan[],
   unknownServiceLabel = "unknown",

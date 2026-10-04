@@ -751,6 +751,15 @@ describe("TraceDetails", () => {
           .sort(),
       ).toEqual(["catalog", "checkout", "frontend", "payments"]);
       expect(
+        series()
+          .links.map((l: any) => [l.source, l.target])
+          .sort(),
+      ).toEqual([
+        ["checkout", "payments"],
+        ["frontend", "catalog"],
+        ["frontend", "checkout"],
+      ]);
+      expect(
         wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data")
           .notMerge,
       ).toBe(true);
@@ -766,9 +775,12 @@ describe("TraceDetails", () => {
       expect(series().type).toBe("graph");
     });
 
-    it("filters the tree to matches and their ancestors", async () => {
+    it("filters the tree to matches and their ancestors from the search input", async () => {
       await mountMap();
-      wrapper.vm.traceGraphSearch = "PAY";
+      const field = wrapper.find('[data-test="trace-graph-search-input"]');
+      const input = field.element.tagName === "INPUT" ? field : field.find("input");
+      await input.setValue("PAY");
+      await new Promise((resolve) => setTimeout(resolve, 350));
       await flushPromises();
       expect(treeNames(series().data)).toEqual(["frontend", "checkout", "payments"]);
     });
@@ -828,6 +840,21 @@ describe("TraceDetails", () => {
       await treeBtn().trigger("click");
       await tooltipSetupDelay();
       expect(fakeChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
+    it("does not attach the tree tooltip when Graph View is chosen during the setup delay", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      await mountMap();
+      await graphBtn().trigger("click");
+      await tooltipSetupDelay();
+
+      // Both calls land before the first one's nextTick resumes and schedules its timer.
+      wrapper.vm.setTraceGraphView("tree");
+      wrapper.vm.setTraceGraphView("graph");
+      await tooltipSetupDelay();
+
+      expect(wrapper.vm.traceGraphView).toBe("graph");
+      expect(fakeChart.on).not.toHaveBeenCalled();
     });
   });
 

@@ -2057,6 +2057,8 @@ export default defineComponent({
       // 300ms delay matches Service Graph tooltip setup timing
       pendingTooltipSetup = setTimeout(() => {
         pendingTooltipSetup = null;
+        // The view or tab may have changed during the delay.
+        if (traceGraphView.value !== "tree" || activeTab.value !== "map") return;
         const chart = chartRendererRef.value?.chart;
         if (chart) {
           const { setupTraceNodeTooltips } = createTreeVisualizationEngine();

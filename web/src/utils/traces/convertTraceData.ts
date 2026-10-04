@@ -3,6 +3,7 @@ import { computeTreeLayout } from "./computeTreeLayout";
 import { resolveModelVendorLogo } from "./modelVendorLogo";
 import { cssToken } from "@/utils/theme";
 import { gt } from "@/types/i18n";
+import { escapeHtml } from "@/utils/html";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
@@ -1462,7 +1463,7 @@ export const convertServiceGraphToNetwork = (
       },
       tooltip: {
         formatter: `
-          <strong>${node.label || node.id}</strong><br/>
+          <strong>${escapeHtml(node.label || node.id)}</strong><br/>
           ${gt("traces.graphTooltip.requests", { value: formatNumber(metrics.requests) })}<br/>
           ${gt("traces.graphTooltip.errors", { value: formatNumber(metrics.errors) })}<br/>
           ${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(2) })}
