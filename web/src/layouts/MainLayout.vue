@@ -1202,6 +1202,7 @@ export default defineComponent({
         claim_parser_function: "",
         org_storage_enabled: false,
         domain_org_mappings: [],
+        red_insights_enabled: false,
       };
 
       try {
@@ -1246,6 +1247,8 @@ export default defineComponent({
           org_storage_enabled:
             orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
           domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
+          red_insights_enabled:
+            orgSettings?.data?.data?.red_insights_enabled ?? defaultSettings.red_insights_enabled,
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
