@@ -1387,6 +1387,18 @@ describe("Index.vue (Main Traces Page)", () => {
       delete store.state.zoConfig.auto_query_enabled;
     });
 
+    it("should open the analysis dashboard on SearchResult when SearchBar emits drill-down", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      const openUnifiedAnalysisDashboard = vi.fn();
+      wrapper.vm.searchResultRef = { openUnifiedAnalysisDashboard };
+
+      wrapper.findComponent('[data-test="logs-search-bar"]').vm.$emit("drill-down");
+      await flushPromises();
+
+      expect(openUnifiedAnalysisDashboard).toHaveBeenCalledTimes(1);
+    });
+
     it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();

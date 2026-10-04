@@ -142,6 +142,7 @@ const makeSearchObj = () =>
     runQuery: false,
     loading: false,
     loadingStream: false,
+    searchApplied: false,
     config: {
       refreshTimes: [
         [
@@ -672,32 +673,127 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("histogram toggle", () => {
-    it("should render the histogram (metrics) toggle", async () => {
+  describe("RED Metrics toggle", () => {
+    it("should render the metrics toggle inside the More menu, not on the toolbar", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-search-bar-show-metrics-toggle-btn"]').exists()).toBe(
-        true,
-      );
+      const menuItem = wrapper.find('[data-test="traces-search-bar-menu-metrics-btn"]');
+      expect(menuItem.exists()).toBe(true);
+      expect(menuItem.text()).toContain("traces.redMetrics");
+      expect(
+        menuItem.find('[data-test="traces-search-bar-show-metrics-toggle-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.findAll('[data-test="traces-search-bar-show-metrics-toggle-btn"]'),
+      ).toHaveLength(1);
     });
 
-    it("should reflect showHistogram=false from searchObj", async () => {
-      searchObjInstance.meta.showHistogram = false;
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      // The toggle is bound via v-model to searchObj.meta.showHistogram.
-      // Verify the reactive source has the correct initial value.
-      expect(searchObjInstance.meta.showHistogram).toBe(false);
-    });
-
-    it("should reflect showHistogram=true from searchObj", async () => {
+    it("should toggle showHistogram when the menu item is selected", async () => {
       searchObjInstance.meta.showHistogram = true;
       wrapper = mountSearchBar();
       await flushPromises();
 
+      const item = wrapper
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c) => c.attributes("data-test") === "traces-search-bar-menu-metrics-btn")!;
+      item.vm.$emit("select", new Event("select"));
+      await flushPromises();
+      expect(searchObjInstance.meta.showHistogram).toBe(false);
+
+      item.vm.$emit("select", new Event("select"));
+      await flushPromises();
       expect(searchObjInstance.meta.showHistogram).toBe(true);
+    });
+
+    it("should keep the Syntax Guide in the More menu", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="traces-search-bar-syntax-guide-btn"]').exists()).toBe(true);
+    });
+
+    it.each(["service-graph", "services-catalog"] as const)(
+      "should hide the metrics toggle in %s mode",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="traces-search-bar-menu-metrics-btn"]').exists()).toBe(
+          false,
+        );
+      },
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Drill down button", () => {
+    const applySearch = () => {
+      searchObjInstance.searchApplied = true;
+      searchObjInstance.data.errorMsg = "";
+    };
+
+    it.each(["spans", "traces"] as const)(
+      "should render right after the tab group in %s mode once a search is applied",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        applySearch();
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        const btn = wrapper.find('[data-test="insights-button"]');
+        expect(btn.exists()).toBe(true);
+        expect(btn.text()).toContain("traces.drillDown");
+        const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
+        expect(toggleGroup.nextElementSibling).toBe(btn.element);
+      },
+    );
+
+    it.each(["service-graph", "services-catalog"] as const)(
+      "should be hidden in %s mode",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        applySearch();
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+      },
+    );
+
+    it("should be hidden before a search is applied", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+    });
+
+    it("should be hidden when the search errored", async () => {
+      applySearch();
+      searchObjInstance.data.errorMsg = "boom";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+    });
+
+    it("should be hidden when no stream is selected", async () => {
+      applySearch();
+      searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+    });
+
+    it("should emit drill-down when clicked", async () => {
+      applySearch();
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="insights-button"]').trigger("click");
+      expect(wrapper.emitted("drill-down")).toHaveLength(1);
     });
   });
 
@@ -1272,40 +1368,16 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   describe("tooltips on icon-only buttons", () => {
-    it("should have a tooltip inside the reset filters button", async () => {
+    it("should have the analysis tooltip inside the Drill down button", async () => {
+      searchObjInstance.searchApplied = true;
       wrapper = mountSearchBar();
       await flushPromises();
 
-      const resetBtn = wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]');
-      expect(resetBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
-    });
-
-    it("should have a tooltip inside the Traces mode toggle button", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      const searchBtn = wrapper.find('[data-test="traces-search-mode-traces-btn"]');
-      expect(searchBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
-    });
-
-    it("should have a tooltip inside the Traces search mode button", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      const tracesBtn = wrapper.find('[data-test="traces-search-mode-traces-btn"]');
-      expect(tracesBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
-    });
-
-    it("should have a tooltip inside the Spans search mode button", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      const spansBtn = wrapper.find('[data-test="traces-search-mode-spans-btn"]');
-      expect(spansBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+      const tooltip = wrapper
+        .find('[data-test="insights-button"]')
+        .findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(tooltip.props("content")).toBe("volumeInsights.analyzeTooltipTraces");
     });
   });
 

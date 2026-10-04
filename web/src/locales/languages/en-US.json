@@ -10668,6 +10668,9 @@
       }
     },
     "spansTab": "Spans",
+    "drillDown": "Drill down",
+    "backToResults": "Back to results",
+    "redMetrics": "RED Metrics",
     "tracesTab": "Traces",
     "serviceGraphTab": "Service Graph",
     "serviceGraphSubtitle": "See how your services call each other — dependencies, throughput, and error rates",

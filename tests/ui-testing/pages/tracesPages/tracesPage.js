@@ -110,20 +110,16 @@ export class TracesPage {
     this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-    // TracesMetricsDashboard.vue: data-test="insights-button"
+    // Traces SearchBar.vue: the "Drill down" button next to the mode tabs keeps data-test="insights-button"
     this.insightsButton = '[data-test="insights-button"]';
     // SearchResult.vue: error-count badge doubles as the error-only toggle
     this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
-    // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
+    // Traces SearchBar.vue: RED Metrics switch inside the "More" menu
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    // TracesAnalysisDashboard.vue was migrated to ODrawer
-    // (data-test="traces-analysis-dashboard-drawer"). The legacy
-    // `analysis-dashboard-close` data-test and `.analysis-dashboard-card`
-    // template class were removed — `.analysis-dashboard-card` only survives
-    // in CSS rules now, no element actually carries the class. Scope all
-    // selectors via the ODrawer slug instead.
+    // On Traces, TracesAnalysisDashboard.vue renders as a full-page Drill down view (not a drawer)
+    // that keeps data-test="traces-analysis-dashboard-drawer"; scope all selectors via that slug.
     this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
-    this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
+    this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-drill-down-back-btn"]';
     // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
     this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
     this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
@@ -471,7 +467,9 @@ export class TracesPage {
   }
 
   async toggleMetricsDashboard() {
+    await this.getMoreMenuButton().click();
     await this.page.locator(this.showMetricsToggle).click();
+    await this.page.keyboard.press('Escape');
   }
 
   async switchToServiceMaps() {
@@ -2019,9 +2017,8 @@ export class TracesPage {
   // --- Insights Button (TracesMetricsDashboard.vue) ---
 
   /**
-   * Check if Insights button is visible.
-   * The Insights button is ALWAYS visible when metrics dashboard shows
-   * (does NOT require brush selection).
+   * Check if the Drill down (formerly Insights) button is visible.
+   * It shows in Spans/Traces mode once a search is applied without error.
    * @returns {Promise<boolean>}
    */
   async isInsightsButtonVisible() {
@@ -2029,7 +2026,7 @@ export class TracesPage {
   }
 
   /**
-   * Click Insights button to open the Analysis Dashboard
+   * Click the Drill down button to open the Analysis Dashboard
    */
   async clickInsightsButton() {
     await this.page.locator(this.insightsButton).click();
@@ -2047,7 +2044,7 @@ export class TracesPage {
   }
 
   /**
-   * Close Analysis Dashboard via close button
+   * Close the Drill down view via its Back button
    */
   async closeAnalysisDashboard() {
     const closeBtn = this.page.locator(this.analysisDashboardClose);

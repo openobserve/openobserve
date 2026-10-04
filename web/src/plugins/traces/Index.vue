@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+              @drill-down="searchResultRef?.openUnifiedAnalysisDashboard()"
             />
           </div>
         </template>
@@ -104,8 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="activeTab === 'search'"
               id="tracesThirdLevel"
-              class="traces-search-result-container relative-position h-full"
+              class="traces-search-result-container relative-position relative isolate h-full"
             >
+              <!-- Drill down teleports into this; it covers the results so their scroll and brush state survive. -->
+              <div id="traces-drill-down-page" class="absolute inset-0 z-20 hidden has-[>*]:flex" />
               <!-- Note: Splitter max-height to be dynamically calculated with JS -->
               <OSplitter
                 v-model="searchObj.config.splitterModel"
@@ -442,7 +445,7 @@ const correlationFilters = useCorrelationFilters({
 correlationFilters.watchQuery();
 
 let refreshIntervalID = 0;
-const searchResultRef = ref(null);
+const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);

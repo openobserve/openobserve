@@ -50,21 +50,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @close="hideContextMenu"
     />
 
-    <!-- Unified Analysis Dashboard with Tabs -->
-    <TracesAnalysisDashboard
-      v-if="showAnalysisDashboard"
-      :streamName="streamName"
-      streamType="traces"
-      :timeRange="originalTimeRangeBeforeSelection || effectiveTimeRange"
-      :rateFilter="analysisRateFilter"
-      :durationFilter="analysisDurationFilter"
-      :errorFilter="analysisErrorFilter"
-      :baseFilter="parsedEffectiveFilter"
-      :streamFields="streamFields"
-      :analysisType="defaultAnalysisTab"
-      :availableAnalysisTypes="['volume', 'error', 'duration']"
-      @close="showAnalysisDashboard = false"
-    />
+    <!-- Unified Analysis Dashboard: full page over the results, target lives in traces Index.vue -->
+    <Teleport v-if="showAnalysisDashboard" defer to="#traces-drill-down-page">
+      <TracesAnalysisDashboard
+        full-page
+        :streamName="streamName"
+        streamType="traces"
+        :timeRange="originalTimeRangeBeforeSelection || effectiveTimeRange"
+        :rateFilter="analysisRateFilter"
+        :durationFilter="analysisDurationFilter"
+        :errorFilter="analysisErrorFilter"
+        :baseFilter="parsedEffectiveFilter"
+        :streamFields="streamFields"
+        :analysisType="defaultAnalysisTab"
+        :availableAnalysisTypes="['volume', 'error', 'duration']"
+        @close="showAnalysisDashboard = false"
+      />
+    </Teleport>
   </div>
 </template>
 

@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <component
+    :is="fullPage ? TracesDrillDownPage : ODrawer"
     data-test="traces-analysis-dashboard-drawer"
-    bleed
+    v-bind="fullPage ? {} : { bleed: true, width: 80 }"
     v-model:open="isOpen"
-    :width="80"
     :title="raw(drawerTitle)"
-    @update:open="(v) => !v && onClose()"
+    @update:open="(v: boolean) => !v && onClose()"
   >
     <template #header-left>
       <OIcon name="timeline" size="md" />
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSplitter>
       </div>
     </div>
-  </ODrawer>
+  </component>
 </template>
 
 <script lang="ts" setup>
@@ -307,6 +307,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import TracesDrillDownPage from "./TracesDrillDownPage.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -372,6 +373,7 @@ interface Props {
   availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
+  fullPage?: boolean; // Render in-page with a Back button instead of as a drawer
 }
 
 const props = withDefaults(defineProps<Props>(), {

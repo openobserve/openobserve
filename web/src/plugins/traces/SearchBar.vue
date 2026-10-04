@@ -67,6 +67,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
+        <OButton
+          v-if="showDrillDown"
+          data-test="insights-button"
+          variant="outline"
+          size="xs"
+          @click="$emit('drill-down')"
+        >
+          <template #icon-left>
+            <OIcon name="timeline" size="sm" class="shrink-0" />
+          </template>
+          {{ t("traces.drillDown") }}
+          <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
+        </OButton>
+
         <!-- Show search controls only when not on Service Graph or Services Catalog -->
         <template
           v-if="
@@ -86,22 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
           </OButton>
-
-          <div
-            class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
-          >
-            <OSwitch
-              data-test="traces-search-bar-show-metrics-toggle-btn"
-              v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs flex items-center justify-center pe-1"
-              size="lg"
-            />
-            <OIcon name="bar-chart" size="sm" class="shrink-0" />
-            <OTooltip :content="raw('RED Metrics')" />
-          </div>
         </template>
 
-        <!-- More menu: Syntax Guide — always last.
+        <!-- More menu: RED Metrics toggle + Syntax Guide — always last.
              Sessions + LLM Insights were removed from Traces; they now
              live as standalone pages under AI Observability. -->
         <ODropdown side="bottom" align="start">
@@ -116,6 +117,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.menuMore") }}
             </OButton>
           </template>
+
+          <ODropdownItem
+            v-if="
+              searchObj.meta.searchMode !== 'service-graph' &&
+              searchObj.meta.searchMode !== 'services-catalog'
+            "
+            data-test="traces-search-bar-menu-metrics-btn"
+            @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+          >
+            <template #icon-left>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="bar-chart" size="sm" />
+              </span>
+            </template>
+            {{ t("traces.redMetrics") }}
+            <template #icon-right>
+              <OSwitch
+                v-model="searchObj.meta.showHistogram"
+                size="md"
+                class="ms-auto"
+                data-test="traces-search-bar-show-metrics-toggle-btn"
+                @click.stop
+              />
+            </template>
+          </ODropdownItem>
 
           <SyntaxGuide
             :sqlmode="searchObj.meta.sqlMode"
@@ -448,7 +476,7 @@ import {
   toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -530,6 +558,7 @@ export default defineComponent({
     "service-graph-refresh",
     "services-catalog-refresh",
     "apply-saved-view",
+    "drill-down",
   ],
   props: {
     fieldValues: {
@@ -1071,9 +1100,18 @@ export default defineComponent({
     const shouldHideToggleText = computed(() => availableLeftWidth.value < 750);
     const shouldHideResetText = computed(() => availableLeftWidth.value < 540);
 
+    // Same conditions under which the results header (and its analysis dashboard) renders.
+    const showDrillDown = computed(
+      () =>
+        searchObj.meta.searchMode !== "service-graph" &&
+        searchObj.meta.searchMode !== "services-catalog" &&
+        !!searchObj.data.stream.selectedStream?.value &&
+        !searchObj.data.errorMsg?.trim()?.length &&
+        !!searchObj.searchApplied,
+    );
+
     return {
       t,
-      raw,
       router,
       store,
       searchObj,
@@ -1110,6 +1148,7 @@ export default defineComponent({
       toolbarRightRef,
       shouldHideToggleText,
       shouldHideResetText,
+      showDrillDown,
       tracesSavedViews,
       isSavingView,
       saveViewDialogOpen,
