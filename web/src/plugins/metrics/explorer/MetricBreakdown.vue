@@ -726,6 +726,8 @@ export default defineComponent({
       });
     };
     watch([focused, () => store.state.theme], () => {
+      // Never show a colour read from the previous result or theme while the new one draws.
+      seriesColors.value = {};
       colorsRead = false;
       bindChart();
     });

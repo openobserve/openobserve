@@ -30,16 +30,19 @@ vi.mock("@/services/stream", async (importOriginal) => {
 });
 
 // The focused chart's echarts instance: the table reads series colours from it and highlights on it.
-const { fakeChart, getInstanceByDom } = vi.hoisted(() => {
-  const fakeChart = {
+const { fakeChart, makeChart, liveChart, getInstanceByDom } = vi.hoisted(() => {
+  const makeChart = () => ({
     dispatchAction: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
     isDisposed: vi.fn(() => false),
     getOption: vi.fn((): any => ({ series: [] })),
     getVisual: vi.fn((): any => undefined),
-  };
-  return { fakeChart, getInstanceByDom: vi.fn((): any => fakeChart) };
+  });
+  const fakeChart = makeChart();
+  /** The instance on the chart's DOM now: a theme switch rebuilds it. */
+  const liveChart = { current: fakeChart as ReturnType<typeof makeChart> };
+  return { fakeChart, makeChart, liveChart, getInstanceByDom: vi.fn((): any => liveChart.current) };
 });
 vi.mock("echarts/core", async (importOriginal) => ({
   ...(await importOriginal<any>()),
@@ -143,6 +146,7 @@ describe("MetricBreakdown", () => {
     runQuery.mockResolvedValue(SERIES);
     fakeChart.getOption.mockReturnValue({ series: [] });
     fakeChart.getVisual.mockReturnValue(undefined);
+    liveChart.current = fakeChart;
     io = installFakeIntersectionObserver({ autoVisible: true });
   });
 
@@ -884,6 +888,76 @@ describe("MetricBreakdown", () => {
           [{ type: "highlight", seriesName: "m1" }],
           [{ type: "downplay", seriesName: "m1" }],
         ]);
+      });
+
+      const TWO = byMethod(
+        [
+          "m0",
+          [
+            [1, "1"],
+            [2, "2"],
+          ],
+        ],
+        [
+          "m1",
+          [
+            [1, "3"],
+            [2, "4"],
+          ],
+        ],
+      );
+      const settle = async () => {
+        await flushPromises();
+        await nextFrame();
+        await flushPromises();
+      };
+      const stroke = (value: string) => cell("trend", value).find("path").attributes("stroke");
+
+      it("drops the previous result's colours the moment a new result lands", async () => {
+        runQuery.mockResolvedValue(TWO);
+        fakeChart.getOption.mockReturnValue({ series: [{ name: "m1" }, { name: "m0" }] });
+        fakeChart.getVisual.mockReturnValue("#111111");
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await settle();
+        expect(stroke("m1")).toBe("#111111");
+
+        fakeChart.getVisual.mockReturnValue("#333333");
+        await wrapper.setProps({ timeRange: { start_time: 1_000, end_time: 3_000 } });
+        await flushPromises();
+        // Landed, but its chart not yet read: no colour rather than the old one.
+        expect(stroke("m1")).toBe("currentColor");
+
+        await nextFrame();
+        await flushPromises();
+        expect(stroke("m1")).toBe("#333333");
+      });
+
+      it("moves to the rebuilt chart on a theme switch: unbinds the old, reads the new", async () => {
+        runQuery.mockResolvedValue(TWO);
+        fakeChart.getOption.mockReturnValue({ series: [{ name: "m1" }, { name: "m0" }] });
+        fakeChart.getVisual.mockReturnValue("#111111");
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await settle();
+        expect(stroke("m1")).toBe("#111111");
+
+        const rebuilt = makeChart();
+        rebuilt.getOption.mockReturnValue({ series: [{ name: "m1" }, { name: "m0" }] });
+        rebuilt.getVisual.mockReturnValue("#444444");
+        liveChart.current = rebuilt;
+        const theme = store.state.theme;
+        try {
+          store.commit("appTheme", theme === "dark" ? "light" : "dark");
+          await flushPromises();
+          expect(stroke("m1")).toBe("currentColor");
+          await settle();
+
+          const handler = fakeChart.on.mock.calls.find(([e]) => e === "finished")![1];
+          expect(fakeChart.off).toHaveBeenCalledWith("finished", handler);
+          expect(rebuilt.on).toHaveBeenCalledWith("finished", handler);
+          expect(stroke("m1")).toBe("#444444");
+        } finally {
+          store.commit("appTheme", theme);
+        }
       });
 
       it("reads the series colours once per result, not on every chart render", async () => {

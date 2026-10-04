@@ -256,4 +256,33 @@ describe("MetricChartTile", () => {
       expect(runQuery).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe("results emit", () => {
+    it("reports idle, then loading, then done with the fetched results", async () => {
+      let answer!: (value: any) => void;
+      runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+      wrapper = mountTile();
+      await flushPromises();
+      answer(SERIES);
+      await flushPromises();
+
+      expect(wrapper.emitted("results")).toEqual([
+        [{ status: "idle", results: [] }],
+        [{ status: "loading", results: [] }],
+        [{ status: "done", results: [SERIES] }],
+      ]);
+    });
+
+    it("reports an error with no results when the query fails", async () => {
+      runQuery.mockRejectedValueOnce(new Error("boom"));
+      wrapper = mountTile();
+      await flushPromises();
+
+      expect(wrapper.emitted("results")).toEqual([
+        [{ status: "idle", results: [] }],
+        [{ status: "loading", results: [] }],
+        [{ status: "error", results: [] }],
+      ]);
+    });
+  });
 });
