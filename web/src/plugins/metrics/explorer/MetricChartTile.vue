@@ -21,11 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default rounded-surface flex min-w-0 flex-col overflow-hidden border"
     :data-test="dataTest"
   >
-    <PanelBar class="min-w-0 gap-2">
+    <PanelBar class="min-w-0 gap-2" @click="emit('select')">
       <slot name="header" />
     </PanelBar>
 
-    <div class="relative min-h-0 flex-1">
+    <!-- Not part of the select target: the mouseup ending a drag-to-zoom arrives as a click. -->
+    <div class="relative min-h-0 flex-1 cursor-default">
+      <OSpinner
+        v-if="refreshing"
+        size="xs"
+        class="absolute top-1 right-1 z-10"
+        :data-test="`${dataTest}-refreshing`"
+      />
       <div
         v-if="state.status === 'error'"
         class="text-text-secondary flex h-full flex-col items-center justify-center gap-1 text-xs"
@@ -90,6 +97,7 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { parseSearchError } from "@/utils/query/searchError";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
@@ -125,6 +133,8 @@ const props = withDefaults(
   { chartType: "line", unit: null, bucketUnit: null, legend: false },
 );
 
+const emit = defineEmits<{ select: [] }>();
+
 const { t } = useI18nTyped();
 
 const root = ref<HTMLElement | null>(null);
@@ -136,6 +146,8 @@ const bucketO2Unit = computed(() =>
 );
 
 const visible = ref(false);
+/** A drawn chart stays up while its next result loads. */
+const refreshing = ref(false);
 /** The shown result no longer matches the query and window; reload when next seen. */
 let stale = true;
 /** Bumped per load, so a superseded result never lands. */
@@ -162,18 +174,24 @@ const load = async () => {
   stale = false;
   loadedFor = { key: exprs.join("\n"), timeRange: props.timeRange };
   activeExprs = exprs;
-  state.value = { status: "loading", results: [], error: "" };
+  // Only a chart of this same query is still kept here: a new query resets to IDLE first.
+  if (state.value.status === "done") refreshing.value = true;
+  else state.value = { status: "loading", results: [], error: "" };
   try {
     const results = await Promise.all(exprs.map((expr) => props.runQuery(expr)));
     if (mine !== generation) return;
     activeExprs = [];
+    refreshing.value = false;
     state.value = { status: "done", results, error: "" };
   } catch (error: any) {
     if (mine !== generation) return;
     activeExprs = [];
+    refreshing.value = false;
     if (isCancelled(error)) {
+      // Not its own doing (that bumps `generation`): a shared query or bulk clear cancelled it.
       stale = true;
-      state.value = IDLE;
+      if (visible.value) load();
+      else if (state.value.status === "loading") state.value = IDLE;
       return;
     }
     state.value = { status: "error", results: [], error: parseSearchError(error).message };
@@ -183,10 +201,13 @@ const load = async () => {
 /** Drops whatever is shown or running; only an on-screen tile queries again now. */
 const invalidate = () => {
   if (!stale && loadedFor?.key === queryKey() && loadedFor?.timeRange === props.timeRange) return;
+  // A new window alone (a refresh tick) keeps the drawn chart until the new result lands.
+  const windowOnly = loadedFor?.key === queryKey();
   generation += 1;
   cancelActive();
+  refreshing.value = false;
   stale = true;
-  state.value = IDLE;
+  if (!windowOnly || state.value.status !== "done") state.value = IDLE;
   if (visible.value) load();
 };
 
@@ -196,12 +217,13 @@ watch([queryKey, () => props.timeRange], invalidate);
 watch(visible, (isVisible) => {
   if (isVisible) {
     if (stale) load();
-  } else if (state.value.status === "loading") {
+  } else if (activeExprs.length) {
     // Scrolled away mid-load: its queue slot belongs to a tile someone is looking at.
     generation += 1;
     cancelActive();
+    refreshing.value = false;
     stale = true;
-    state.value = IDLE;
+    if (state.value.status === "loading") state.value = IDLE;
   }
 });
 

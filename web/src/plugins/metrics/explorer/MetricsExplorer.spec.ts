@@ -1264,24 +1264,54 @@ describe("MetricsExplorer wiring", () => {
       expect(detailView(wrapper).exists()).toBe(false);
     });
 
-    it("hands the detail view the grid's detail-query plumbing", () => {
+    it("hands the detail view the grid's detail-query plumbing", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
       const view = detailView(wrapper);
 
-      view.props("runQuery")("sum(up)");
+      await view.props("runQuery")("sum(up)");
       expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD);
       view.props("cancelQueries")(["sum(up)"]);
       expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"]);
     });
 
-    it("runs a related metric's chart on that metric's own step", () => {
+    it("runs a related metric's chart on that metric's own step", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
       const OTHER = { ...CARD, name: "http_responses_total" };
 
-      detailView(wrapper).props("runQuery")("sum(other)", OTHER);
+      await detailView(wrapper).props("runQuery")("sum(other)", OTHER);
       expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(other)", OTHER);
+    });
+
+    it("settles a metric the grid never previewed before charting it, so a sparse one widens", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const OTHER = { ...CARD, name: "http_responses_total" };
+      grid.requestPreview.mockClear();
+      grid.runDetailQuery.mockClear();
+      const order: string[] = [];
+      grid.requestPreview.mockImplementationOnce(async () => {
+        order.push("preview");
+      });
+      grid.runDetailQuery.mockImplementationOnce(() => order.push("run"));
+
+      await detailView(wrapper).props("runQuery")("sum(other)", OTHER);
+      expect(grid.requestPreview).toHaveBeenCalledWith(OTHER);
+      expect(order).toEqual(["preview", "run"]);
+
+      grid.previews.value[OTHER.name] = { status: "done", widenedRateWindow: "30m" };
+      grid.requestPreview.mockClear();
+      await detailView(wrapper).props("runQuery")("sum(other)", OTHER);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      delete grid.previews.value[OTHER.name];
+    });
+
+    it("colours the view and its related cards as their grid cards", () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const view = detailView(wrapper);
+      expect(view.props("colorOf")(CARD.name)).toBe(view.props("color"));
     });
 
     it("charts a related metric with the query its explorer card would run", () => {

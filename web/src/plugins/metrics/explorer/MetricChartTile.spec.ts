@@ -106,11 +106,62 @@ describe("MetricChartTile", () => {
     expect(wrapper.find('[data-test="tile-chart-stub"]').exists()).toBe(true);
   });
 
-  it("treats a cancelled query as no error", async () => {
-    runQuery.mockRejectedValue(new PreviewCancelledError("k"));
+  it("treats a cancelled query as no error, and asks again while on screen", async () => {
+    runQuery.mockRejectedValueOnce(new PreviewCancelledError("k"));
     wrapper = mountTile();
     await flushPromises();
     expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(false);
+    expect(runQuery).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-test="tile-chart-stub"]').exists()).toBe(true);
+  });
+
+  it("selects from its header, never from a click on the chart", async () => {
+    wrapper = mountTile();
+    await flushPromises();
+    // The mouseup ending a drag-to-zoom on the chart arrives as a click.
+    await wrapper.find('[data-test="tile-chart-stub"]').trigger("click");
+    expect(wrapper.emitted("select")).toBeUndefined();
+
+    await wrapper.find('[data-test="tile-header"]').trigger("click");
+    expect(wrapper.emitted("select")).toHaveLength(1);
+  });
+
+  it("keeps its chart through a refresh and swaps in the new result", async () => {
+    const NEXT = { resultType: "matrix", result: [{ metric: {}, values: [[2, "2"]] }] };
+    wrapper = mountTile();
+    await flushPromises();
+    let answer!: (value: any) => void;
+    runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+
+    await wrapper.setProps({ timeRange: { start_time: 1, end_time: 3 } });
+    await flushPromises();
+    const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+    expect(chart().props("results")).toEqual([SERIES]);
+    expect(wrapper.find('[data-test="tile-refreshing"]').exists()).toBe(true);
+
+    answer(NEXT);
+    await flushPromises();
+    expect(chart().props("results")).toEqual([NEXT]);
+    expect(wrapper.find('[data-test="tile-refreshing"]').exists()).toBe(false);
+  });
+
+  it("never lands a superseded refresh", async () => {
+    const OLD = { resultType: "matrix", result: [{ metric: { v: "old" }, values: [[2, "2"]] }] };
+    const NEW = { resultType: "matrix", result: [{ metric: { v: "new" }, values: [[3, "3"]] }] };
+    wrapper = mountTile();
+    await flushPromises();
+    const answers: ((value: any) => void)[] = [];
+    runQuery.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+
+    await wrapper.setProps({ timeRange: { start_time: 1, end_time: 3 } });
+    await flushPromises();
+    await wrapper.setProps({ timeRange: { start_time: 1, end_time: 4 } });
+    await flushPromises();
+    answers[1](NEW);
+    await flushPromises();
+    answers[0](OLD);
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([NEW]);
   });
 
   it("cancels the old query and runs the new one when the query changes", async () => {
@@ -179,6 +230,7 @@ describe("MetricChartTile", () => {
       io.setVisible(wrapper.element, true);
       await flushPromises();
       io.setVisible(wrapper.element, false);
+      await flushPromises();
       io.setVisible(wrapper.element, true);
       await flushPromises();
       expect(runQuery).toHaveBeenCalledTimes(1);

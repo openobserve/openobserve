@@ -588,6 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rate-window="detailCard ? grid.rateWindowFor(detailCard) : ''"
       :nan-guard="!!(detailMetric && grid.previews.value[detailMetric]?.nanGuardApplied)"
       :color="detailColor"
+      :color-of="colorOf"
       :run-query="runDetailPreview"
       :cancel-queries="cancelDetailPreviews"
       @close="closeDetail"
@@ -1405,13 +1406,20 @@ export default defineComponent({
         : { queries: [], chartType: "line", unit: "", bucketUnit: null },
     );
 
-    const detailColor = computed(() => {
-      const index = visibleCards.value.findIndex((c) => c.name === detailMetric.value);
+    /** A metric's colour on its grid card. */
+    const colorOf = (name: string) => {
+      const index = visibleCards.value.findIndex((c) => c.name === name);
       return cardColorForIndex(Math.max(0, index), isDark.value);
-    });
+    };
 
-    const runDetailPreview = (expr: string, card = detailCard.value) =>
-      card ? grid.runDetailQuery(expr, card) : Promise.resolve(null);
+    const detailColor = computed(() => colorOf(detailMetric.value ?? ""));
+
+    const runDetailPreview = async (expr: string, card = detailCard.value) => {
+      if (!card) return null;
+      // An unpreviewed card has no widening or NaN-guard decision yet, so a sparse counter charts "No data".
+      if (!grid.previews.value[card.name]) await grid.requestPreview(card);
+      return grid.runDetailQuery(expr, card);
+    };
     const cancelDetailPreviews = (exprs: string[]) => grid.cancelDetailQueries(exprs);
 
     const showDetail = (name: string) => {
@@ -2148,6 +2156,7 @@ export default defineComponent({
       detailLoading,
       detailOverview,
       chartOf,
+      colorOf,
       detailColor,
       runDetailPreview,
       cancelDetailPreviews,

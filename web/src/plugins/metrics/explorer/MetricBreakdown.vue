@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :run-query="runQuery"
           :cancel-queries="cancelQueries"
           :data-test="`metrics-breakdown-card-${label}`"
-          @click="select(label)"
+          @select="select(label)"
         >
           <template #header>
             <span class="min-w-0 truncate font-mono" :title="label">{{ label }}</span>
@@ -403,11 +403,14 @@ export default defineComponent({
           b64EncodeUnicode(labelFiltersToSql(valuesStream.value, applicableFilters.value)) ?? "",
       });
 
-    const loadHead = async () => {
+    /** `keep`: only the window moved, so the counts shown stay up until the new ones land. */
+    const loadHead = async (keep = false) => {
       const generation = ++headGeneration;
       const fields = headLabels.value;
-      headError.value = "";
-      headLoaded.value = false;
+      if (!keep || headError.value) {
+        headError.value = "";
+        headLoaded.value = false;
+      }
       if (!fields.length) {
         headCounts.value = { fields, hits: [] };
         headLoaded.value = true;
@@ -426,14 +429,15 @@ export default defineComponent({
       }
     };
 
-    const loadExtra = async () => {
+    const loadExtra = async (keep = false) => {
       const generation = ++extraGeneration;
       const label = pastCapLabel.value;
       if (!label) {
         extraCounts.value = { label: "", status: "done", values: [], error: "" };
         return;
       }
-      extraCounts.value = { label, status: "loading", values: [], error: "" };
+      if (!keep || extraCounts.value.status !== "done")
+        extraCounts.value = { label, status: "loading", values: [], error: "" };
       try {
         const response = await fetchValues([label]);
         if (generation !== extraGeneration) return;
@@ -457,14 +461,24 @@ export default defineComponent({
       if (extraCounts.value.status === "error") loadExtra();
     };
 
+    /** Every source but the trailing window is unchanged: a refresh tick, or a new range. */
+    const windowOnly = (now: unknown[], before: unknown[] | undefined) =>
+      !!before && now.slice(0, -1).every((value, i) => value === before[i]);
+
     // Sources compared one by one: a getter returning a fresh array re-fires on every card rebuild.
     const countSources = [
       valuesStream,
       () => JSON.stringify(applicableFilters.value),
       () => props.timeRange,
     ];
-    watch([() => headLabels.value.join(","), ...countSources], loadHead, { immediate: true });
-    watch([pastCapLabel, ...countSources], loadExtra, { immediate: true });
+    watch(
+      [() => headLabels.value.join(","), ...countSources],
+      (now, before) => loadHead(windowOnly(now, before)),
+      { immediate: true },
+    );
+    watch([pastCapLabel, ...countSources], (now, before) => loadExtra(windowOnly(now, before)), {
+      immediate: true,
+    });
 
     const countsFor = (label: string): LabelCounts => {
       if (label === pastCapLabel.value) {

@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :run-query="row.runQuery"
                 :cancel-queries="cancelQueries"
                 :data-test="`metrics-detail-related-card-${row.name}`"
-                @click="$emit('open-related', row.name)"
+                @select="$emit('open-related', row.name)"
               >
                 <template #header>
                   <div class="flex min-w-0 flex-1 flex-col py-0.5">
@@ -276,8 +276,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { parseSearchError } from "@/utils/query/searchError";
 import { supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
-import { UNIT_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
-import useTheme from "@/composables/useTheme";
+import { UNIT_LABELS } from "@/utils/metrics/metricPalette";
 import { rankRelatedMetrics, relatedCandidates } from "@/utils/metrics/relatedMetrics";
 import type { DetailTab } from "@/utils/metrics/explorerUrlState";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
@@ -365,6 +364,8 @@ export default defineComponent({
     rateWindow: { type: String, required: true },
     nanGuard: { type: Boolean, default: false },
     color: { type: String, required: true },
+    /** A metric's colour on its grid card, so a Related card matches it. */
+    colorOf: { type: Function as PropType<(name: string) => string>, required: true },
     /** Runs one PromQL query on the scheduler, stepped for `card` (default: this view's metric). */
     runQuery: {
       type: Function as PropType<(expr: string, card?: MetricCardModel) => Promise<any>>,
@@ -383,7 +384,6 @@ export default defineComponent({
   ],
   setup(props) {
     const { t } = useI18nTyped();
-    const { isDark } = useTheme();
 
     const unitLabel = computed(() => raw(UNIT_LABELS[props.card?.unit ?? ""] ?? ""));
 
@@ -476,7 +476,7 @@ export default defineComponent({
       const candidates = relatedCandidates(card.name, [...byName.keys()], props.prefixOf);
       return rankRelatedMetrics(card.name, candidates, props.labelsByStream, props.familyOf)
         .slice(0, RELATED_LIMIT)
-        .flatMap(({ name, sharedLabels }, index) => {
+        .flatMap(({ name, sharedLabels }) => {
           const other = byName.get(name);
           if (!other) return [];
           return [
@@ -485,7 +485,7 @@ export default defineComponent({
               sharedLabels,
               typeFilterBucket: other.typeFilterBucket ?? "other",
               chart: props.chartOf(other),
-              color: cardColorForIndex(index, isDark.value),
+              color: props.colorOf(name),
               runQuery: (expr: string) => props.runQuery(expr, other),
             },
           ];

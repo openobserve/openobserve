@@ -318,12 +318,35 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-breakdown-grid"]').exists()).toBe(false);
     });
 
-    it("selects a label from its Select action, or by clicking the card", async () => {
+    it("selects a label from its Select action or its header, never from its chart", async () => {
       wrapper = mountBreakdown();
       await flushPromises();
       await wrapper.find('[data-test="metrics-breakdown-select-route"]').trigger("click");
-      await wrapper.find('[data-test="metrics-breakdown-card-method"]').trigger("click");
+      await wrapper.find('[data-test="metrics-breakdown-distinct-method"]').trigger("click");
+      // The mouseup ending a drag-to-zoom on the chart arrives as a click.
+      await wrapper
+        .find('[data-test="metrics-breakdown-card-status"] [data-test="breakdown-chart-stub"]')
+        .trigger("click");
       expect(wrapper.emitted("update:selectedLabel")).toEqual([["route"], ["method"]]);
+    });
+
+    it("keeps the counts and charts up while a refresh re-counts the new window", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      let answer!: (value: any) => void;
+      fieldValues.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+
+      await wrapper.setProps({ timeRange: { start_time: 1_000, end_time: 3_000 } });
+      await flushPromises();
+      expect(wrapper.findAll('[data-test="breakdown-chart-stub"]')).toHaveLength(4);
+      expect(wrapper.find('[data-test="metrics-breakdown-distinct-method"]').exists()).toBe(true);
+      expect(runQuery).toHaveBeenCalledTimes(8);
+
+      answer({ data: { hits: HITS } });
+      await flushPromises();
+      expect(fieldValues).toHaveBeenCalledTimes(2);
+      expect(runQuery).toHaveBeenCalledTimes(8);
+      expect(wrapper.findAll('[data-test="breakdown-chart-stub"]')).toHaveLength(4);
     });
   });
 

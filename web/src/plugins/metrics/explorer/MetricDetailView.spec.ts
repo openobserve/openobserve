@@ -101,6 +101,7 @@ const mountView = (props: Record<string, any> = {}, { realHeader = false } = {})
       runQuery,
       cancelQueries,
       chartOf,
+      colorOf: () => "#000",
       ...props,
     },
     global: {
@@ -343,10 +344,18 @@ describe("MetricDetailView", () => {
       expect(wrapper.find('[data-test="metrics-detail-related-empty"]').exists()).toBe(true);
     });
 
-    it("opens a related metric's detail view from its card or its title", async () => {
+    it("opens a related metric's detail view from its header or its title, never its chart", async () => {
       wrapper = mountView({ tab: "related" });
-      await wrapper
-        .find('[data-test="metrics-detail-related-card-http_server_active_requests"]')
+      await flushPromises();
+      const cardEl = wrapper.find(
+        '[data-test="metrics-detail-related-card-http_server_active_requests"]',
+      );
+      // The mouseup ending a drag-to-zoom on the chart arrives as a click.
+      await cardEl.findComponent({ name: "MetricCardChart" }).trigger("click");
+      expect(wrapper.emitted("open-related")).toBeUndefined();
+
+      await cardEl
+        .find('[data-test="metrics-detail-related-shared-http_server_active_requests"]')
         .trigger("click");
       await wrapper
         .find('[data-test="metrics-detail-related-open-http_server_active_requests"]')
@@ -355,6 +364,20 @@ describe("MetricDetailView", () => {
         ["http_server_active_requests"],
         ["http_server_active_requests"],
       ]);
+    });
+
+    it("colours each related card as the metric's own grid card", () => {
+      wrapper = mountView({
+        tab: "related",
+        colorOf: (name: string) => (name === "http_server_active_requests" ? "#123456" : "#000"),
+      });
+      const tile = wrapper
+        .findAllComponents({ name: "MetricChartTile" })
+        .find(
+          (c) =>
+            c.attributes("data-test") === "metrics-detail-related-card-http_server_active_requests",
+        )!;
+      expect(tile.props("color")).toBe("#123456");
     });
   });
 
