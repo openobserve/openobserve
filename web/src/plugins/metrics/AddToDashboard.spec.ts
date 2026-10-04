@@ -933,6 +933,38 @@ describe("AddToDashboard — schema gates submit (real OForm)", () => {
     expect(form.state.isValid).toBe(true);
     expect(mockAddPanel).toHaveBeenCalled();
   });
+
+  it("seeds the title with defaultPanelTitle, which then needs no typing", async () => {
+    const wrapper = mount(AddToDashboard, {
+      props: {
+        dashboardPanelData: { data: { ...defaultDashboardPanelData.data } },
+        open: true,
+        defaultPanelTitle: "Rate by zone · http_requests_total",
+      },
+      global: {
+        stubs: {
+          ODialog: { template: "<div><slot /></div>" },
+          SelectFolderDropdown: true,
+          SelectDashboardDropdown: true,
+          SelectTabDropdown: true,
+        },
+      },
+    });
+    await flushPromises();
+    (wrapper.vm as any).selectedDashboard = "dash-1";
+    (wrapper.vm as any).activeTabId = "tab-1";
+    const form = (wrapper.findComponent(OFormReal).vm as any).form;
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(mockAddPanel).toHaveBeenCalledWith(
+      mockStore,
+      "dash-1",
+      expect.objectContaining({ title: "Rate by zone · http_requests_total" }),
+      "default",
+      "tab-1",
+    );
+  });
 });
 
 describe("AddToDashboard — product analytics", () => {

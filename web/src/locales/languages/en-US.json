@@ -9355,7 +9355,9 @@
           "colTrend": "Trend",
           "colAvg": "Avg",
           "colLatest": "Latest",
-          "colShare": "Share"
+          "colShare": "Share",
+          "addToDashboard": "Add to dashboard",
+          "panelTitle": "{title} · {metric}"
         },
         "related": {
           "empty": "No related metrics",

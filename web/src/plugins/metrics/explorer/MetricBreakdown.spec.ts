@@ -21,7 +21,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { b64DecodeUnicode } from "@/utils/zincutils";
-import { CARD_KIND } from "@/utils/metrics/metricDefaults";
+import { CARD_KIND, toO2Unit } from "@/utils/metrics/metricDefaults";
+import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
 
 const { fieldValues } = vi.hoisted(() => ({ fieldValues: vi.fn() }));
 vi.mock("@/services/stream", async (importOriginal) => {
@@ -91,6 +92,13 @@ const MetricCardChartStub = {
   template: `<div data-test="breakdown-chart-stub"><div data-test="chart-renderer" /></div>`,
 };
 
+// The dialog is the shared metrics one, covered by its own spec; here only what it is handed matters.
+const AddToDashboardStub = {
+  name: "AddToDashboard",
+  props: { open: Boolean, dashboardPanelData: Object, defaultPanelTitle: String },
+  template: `<div data-test="add-to-dashboard-stub" />`,
+};
+
 const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] };
 
 /** A `sum by (method)` range response: one series per [value, points]. */
@@ -120,7 +128,10 @@ const mountBreakdown = (props: Record<string, any> = {}) =>
       runQuery,
       ...props,
     },
-    global: { plugins: [i18n, store], stubs: { MetricCardChart: MetricCardChartStub } },
+    global: {
+      plugins: [i18n, store],
+      stubs: { MetricCardChart: MetricCardChartStub, AddToDashboard: AddToDashboardStub },
+    },
   });
 
 const lastRequest = () => fieldValues.mock.calls.at(-1)![0];
@@ -1122,6 +1133,83 @@ describe("MetricBreakdown", () => {
         ).toBe(true);
         expect(wrapper.find('[data-test="metrics-breakdown-values-error"]').exists()).toBe(false);
       });
+    });
+  });
+
+  describe("add to dashboard", () => {
+    const dialog = (w: VueWrapper<any>) => w.findComponent({ name: "AddToDashboard" });
+    const button = (w: VueWrapper<any>) =>
+      w.find('[data-test="metrics-breakdown-add-to-dashboard"]');
+
+    it("hands the dialog a panel that reproduces the focused chart", async () => {
+      const results = byMethod(
+        [
+          "GET",
+          [
+            [1, "0.004"],
+            [2, "0.006"],
+          ],
+        ],
+        [
+          "POST",
+          [
+            [1, "0.002"],
+            [2, null],
+          ],
+        ],
+      );
+      runQuery.mockResolvedValue(results);
+      wrapper = mountBreakdown({
+        selectedLabel: "method",
+        filters: [{ label: "pod", operator: "=", value: "api-1" }],
+      });
+      await flushPromises();
+      expect(dialog(wrapper).props("open")).toBe(false);
+
+      await button(wrapper).trigger("click");
+
+      const stub = dialog(wrapper);
+      expect(stub.props("open")).toBe(true);
+      expect(stub.props("defaultPanelTitle")).toBe("Rate by method · http_requests_total");
+      const data = stub.props("dashboardPanelData")!.data;
+      expect(data.type).toBe("line");
+      expect(data.queryType).toBe("promql");
+      expect(data.queries).toHaveLength(1);
+      expect(data.queries[0].query).toBe(exprs()[0]);
+      expect(data.queries[0].query).toBe(
+        'sum by (method) (rate({__name__="http_requests_total",pod="api-1"}[4m]))',
+      );
+      expect(data.queries[0].customQuery).toBe(true);
+      expect(data.queries[0].config.promql_legend).toBe("{method}");
+      expect(data.config.unit).toBe(toO2Unit("count-per-sec").unit);
+      expect(data.config.decimals).toBe(adaptiveDecimals([results]));
+      expect(data.config.show_legends).toBe(true);
+      // The focused chart is not a place to switch labels from.
+      expect(wrapper.emitted("update:selectedLabel")).toBeFalsy();
+    });
+
+    it("keeps the topk cap the chart runs with", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "instance" });
+      await flushPromises();
+      await button(wrapper).trigger("click");
+
+      expect(dialog(wrapper).props("dashboardPanelData")!.data.queries[0].query).toBe(
+        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
+      );
+    });
+
+    it("waits until the chart's query is decided", async () => {
+      fieldValues.mockImplementation(() => new Promise(() => {}));
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+
+      expect(button(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("is offered on the focused chart only, not on the grid tiles", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(button(wrapper).exists()).toBe(false);
     });
   });
 });

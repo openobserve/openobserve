@@ -61,6 +61,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-breakdown-topk"
             >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
           >
+          <div class="flex-1" />
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            icon-left="dashboard-customize"
+            class="shrink-0"
+            :disabled="!queriesByLabel[activeLabel]?.length"
+            :aria-label="t('metrics.explorer.detail.breakdown.addToDashboard')"
+            data-test="metrics-breakdown-add-to-dashboard"
+            @click.stop="openAddToDashboard"
+          >
+            <OTooltip :content="t('metrics.explorer.detail.breakdown.addToDashboard')" />
+          </OButton>
         </template>
       </MetricChartTile>
 
@@ -298,6 +311,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </MetricChartTile>
       </div>
     </template>
+
+    <AddToDashboard
+      v-model:open="dashboardDialogOpen"
+      :dashboard-panel-data="dashboardPanel"
+      :default-panel-title="dashboardPanelTitle"
+    />
   </div>
 </template>
 
@@ -315,6 +334,7 @@ import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
+import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -340,6 +360,7 @@ import {
 import { seriesStatsByValue } from "@/utils/metrics/breakdownStats";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
+import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
 /** 21, not 20: a 21st value is how "more than 20" is known. */
@@ -408,6 +429,7 @@ export default defineComponent({
   name: "MetricBreakdown",
   components: {
     MetricChartTile,
+    AddToDashboard,
     PanelBar,
     OButton,
     OTag,
@@ -805,6 +827,26 @@ export default defineComponent({
 
     const select = (label: string) => emit("update:selectedLabel", label);
 
+    const dashboardDialogOpen = ref(false);
+    const dashboardPanel = ref<{ data: Record<string, any> }>({ data: {} });
+    const dashboardPanelTitle = ref("");
+
+    /** The focused chart as a panel: its exact queries, filters and topk cap included. */
+    const openAddToDashboard = () => {
+      const label = activeLabel.value;
+      const queries = label ? queriesByLabel.value[label] : null;
+      if (!label || !queries?.length) return;
+      const data = buildPanelDataForCard(props.card, { queries, chartType: "line" });
+      // The tile sizes its decimals to the values it drew; the panel would otherwise round them to 2.
+      data.config.decimals = adaptiveDecimals(focused.value.results);
+      dashboardPanel.value = { data };
+      dashboardPanelTitle.value = t("metrics.explorer.detail.breakdown.panelTitle", {
+        title: t(breakdownTitleKey(props.card.cardKind), { label }),
+        metric: props.card.name,
+      });
+      dashboardDialogOpen.value = true;
+    };
+
     const addFilter = (label: string, value: string, operator: "=" | "!=") =>
       emit("add-filter", { label: raw(label), operator, value });
 
@@ -838,6 +880,10 @@ export default defineComponent({
       highlight,
       select,
       addFilter,
+      dashboardDialogOpen,
+      dashboardPanel,
+      dashboardPanelTitle,
+      openAddToDashboard,
     };
   },
 });
