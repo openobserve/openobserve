@@ -474,7 +474,7 @@ pub async fn search(
     crate::cache::apply_regex_to_response(
         &req,
         org_id,
-        &stream_name,
+        &all_streams,
         stream_type,
         &mut res,
         trace_id,
@@ -1224,8 +1224,13 @@ pub async fn apply_regex_to_response(
     redaction_skipped(
         config::get_config().common.sdr_fail_closed,
         || {
-            all_streams.split(',').any(|stream| {
-                pattern_manager.has_unbuilt_patterns(org_id, stream_type, stream.trim())
+            any_stream(all_streams, |stream| {
+                pattern_manager.has_unbuilt_patterns(
+                    org_id,
+                    stream_type,
+                    stream,
+                    o2_enterprise::enterprise::re_patterns::ApplyTime::Search,
+                )
             })
         },
         all_streams,
@@ -1283,6 +1288,12 @@ pub async fn apply_regex_to_response(
     ret
 }
 
+/// Every stream a query reads, not only the first: a join exposes the fields of each.
+#[cfg(any(feature = "vectorscan", test))]
+fn any_stream(all_streams: &str, pred: impl Fn(&str) -> bool) -> bool {
+    all_streams.split(',').any(|stream| pred(stream.trim()))
+}
+
 /// Under `ZO_SDR_FAIL_CLOSED`, hits a search-time pattern applies to are never returned unredacted.
 #[cfg(any(feature = "vectorscan", test))]
 fn redaction_skipped(
@@ -1302,6 +1313,12 @@ fn redaction_skipped(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_any_stream_checks_every_joined_stream() {
+        assert!(any_stream("first, second", |stream| stream == "second"));
+        assert!(!any_stream("first,second", |stream| stream == "third"));
+    }
 
     #[test]
     fn test_redaction_skipped_fails_open_by_default() {

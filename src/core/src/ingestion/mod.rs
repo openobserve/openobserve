@@ -574,7 +574,12 @@ pub async fn sdr_fail_closed_refusal(
     }
     let unscannable = match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
         Ok(mgr) => unscannable_streams(streams, true, |stream| {
-            mgr.has_unbuilt_patterns(org_id, stream_type, stream)
+            mgr.has_unbuilt_patterns(
+                org_id,
+                stream_type,
+                stream,
+                o2_enterprise::enterprise::re_patterns::ApplyTime::Ingestion,
+            )
         }),
         Err(e) => {
             log::error!("[SDR] pattern manager unavailable for org {org_id}: {e}");
@@ -601,6 +606,13 @@ pub async fn sdr_fail_closed_refusal(
     }
     log::error!("[SDR] {reason}");
     Some(reason)
+}
+
+/// The fail-closed redaction refusal, as opposed to an overload or another resource error.
+#[cfg(any(feature = "vectorscan", test))]
+pub fn is_sdr_fail_closed_refusal(e: &Error) -> bool {
+    matches!(e, Error::ResourceError(reason)
+        if config::meta::self_reporting::redaction::is_fail_closed_rejection(reason))
 }
 
 /// Only a server fault is 500: a batch the client must fix is 400 and an overload is 503.
@@ -889,6 +901,24 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_only_the_fail_closed_refusal_is_recognised() {
+        let reason = config::meta::self_reporting::redaction::fail_closed_rejection(
+            true,
+            "acme",
+            StreamType::Logs,
+            ["app"].into_iter(),
+        )
+        .expect("refused");
+        assert!(is_sdr_fail_closed_refusal(&Error::ResourceError(
+            reason.clone()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::ResourceError(
+            "memtable is full".to_string()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::IngestionError(reason)));
+    }
 
     #[test]
     fn test_unscannable_streams_is_every_stream_while_the_manager_is_down() {

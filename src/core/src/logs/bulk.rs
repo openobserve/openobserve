@@ -311,6 +311,13 @@ pub async fn ingest(
             }
             Err(e) => {
                 log::error!("[LOGS:BULK] stream {org_id}/logs/{stream_name}: Ingestion error: {e}");
+                // A pipeline destination the preflight could not see was refused fail-closed: a
+                // 503 for the whole request, which shippers retry where they drop a 4xx item.
+                // Groups already written are written again on that retry.
+                #[cfg(feature = "vectorscan")]
+                if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
+                    return Err(e);
+                }
                 bulk_res.errors = true;
                 metrics::INGEST_ERRORS
                     .with_label_values(&[

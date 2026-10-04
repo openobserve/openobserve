@@ -193,9 +193,8 @@ export function useTextHighlighter() {
    * - match_all('keyword')
    * - fuzzy_match('keyword', 2)
    * - fuzzy_match_all('keyword', 2)
-   * - str_match_ignore_case(field, 'keyword') / match_field_ignore_case(field, 'keyword')
-   * Keywords are highlighted case-insensitively; case-sensitive and regex
-   * filters are returned by extractHighlightPatterns instead.
+   * Keywords are highlighted case-insensitively within each token; field
+   * filters (str_match, re_match, ...) are returned by extractHighlightPatterns.
    *
    * @param queryString - The SQL query string to parse
    * @returns Array of extracted keywords
@@ -219,35 +218,34 @@ export function useTextHighlighter() {
       }
     }
 
-    for (const filter of queryString.matchAll(FIELD_FILTER_REGEX)) {
-      if (!filter[1].toLowerCase().endsWith("_ignore_case")) continue;
-      const keyword = (filter[2]?.replace(/''/g, "'") ?? filter[3] ?? "").trim();
-      if (keyword) {
-        result.push(keyword);
-      }
-    }
-
     return Array.from(new Set(result));
   }
 
   /**
-   * Extracts highlight patterns from filters that cannot be expressed as
-   * case-insensitive keywords:
-   * - str_match(field, 'value') / match_field(field, 'value') — case-sensitive literal
-   * - re_match(field, 'pattern') — regex; re_not_match is skipped since its
-   *   rows by definition do not contain a match
-   * Patterns JS cannot compile, or that risk catastrophic backtracking, are
-   * skipped silently.
-   *
-   * @param queryString - The SQL query string to parse
-   * @returns Array of global RegExps to highlight
+   * Builds a global RegExp matching a str_match literal verbatim. Ignore-case
+   * literals get the u flag too, so case folding follows Unicode as the
+   * server's lowercase match does (e.g. the Kelvin sign matches k).
    */
-  function literalPattern(value: string): RegExp {
-    const regex = new RegExp(escapeRegExp(value), "g");
+  function literalPattern(value: string, ignoreCase: boolean): RegExp {
+    const regex = new RegExp(escapeRegExp(value), ignoreCase ? "giu" : "g");
     literalPatterns.add(regex);
     return regex;
   }
 
+  /**
+   * Extracts highlight patterns from field filters; they are matched against a
+   * whole field value, so anchors and literals containing spaces behave as on
+   * the server:
+   * - str_match(field, 'value') / match_field(field, 'value') — case-sensitive literal
+   * - str_match_ignore_case / match_field_ignore_case — case-insensitive literal
+   * - re_match(field, 'pattern') — regex; re_not_match is skipped since its
+   *   rows by definition do not contain a match
+   * Literals are kept verbatim (the server does not trim them). Patterns JS
+   * cannot compile, or that risk catastrophic backtracking, are skipped silently.
+   *
+   * @param queryString - The SQL query string to parse
+   * @returns Array of global RegExps to highlight
+   */
   function extractHighlightPatterns(queryString: string): RegExp[] {
     if (!queryString?.trim()) return [];
     if (queryString === cachedPatternQuery) return cachedPatterns;
@@ -257,14 +255,12 @@ export function useTextHighlighter() {
 
     for (const filter of queryString.matchAll(FIELD_FILTER_REGEX)) {
       const name = filter[1].toLowerCase();
-      if (name.endsWith("_ignore_case")) continue;
-
       const value = filter[2]?.replace(/''/g, "'") ?? filter[3] ?? "";
       const regex =
         name === "re_match"
           ? compileHighlightRegex(value)
-          : value.trim()
-            ? literalPattern(value.trim())
+          : value
+            ? literalPattern(value, name.endsWith("_ignore_case"))
             : null;
 
       if (regex && !seen.has(`${regex.source}/${regex.flags}`)) {
@@ -346,7 +342,7 @@ export function useTextHighlighter() {
     if (extraRanges.length) {
       const ranges = [...extraRanges];
       if (keywords.length) {
-        collectMatchRanges(text, new RegExp(keywords.map(escapeRegExp).join("|"), "gi"), ranges);
+        collectMatchRanges(text, new RegExp(keywords.map(escapeRegExp).join("|"), "giu"), ranges);
       }
       ranges.sort((a, b) => a[0] - b[0]);
 
@@ -370,7 +366,7 @@ export function useTextHighlighter() {
     // Create regex pattern from keywords (escape special characters)
     const escapedKeywords = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
-    const pattern = new RegExp(`(${escapedKeywords.join("|")})`, "gi");
+    const pattern = new RegExp(`(${escapedKeywords.join("|")})`, "giu");
 
     // Split by pattern but keep the delimiters
     const parts = text.split(pattern);

@@ -131,6 +131,12 @@ pub async fn ingest(
         return Ok(HecStatus::Custom(e.to_string(), 400).into());
     }
     if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
+        // A pipeline destination refused fail-closed is a 503, which HEC clients retry where they
+        // drop a 400; groups already written are written again on that retry.
+        #[cfg(feature = "vectorscan")]
+        if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
+            return Err(e);
+        }
         return Ok(HecStatus::Custom(e.to_string(), 400).into());
     }
 

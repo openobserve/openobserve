@@ -523,6 +523,14 @@ pub fn is_self_reporting_stream(org_id: &str, stream_name: &str, stream_type: St
     }
 }
 
+/// Ends every reason `fail_closed_rejection` gives, so a caller can tell it from an overload.
+const FAIL_CLOSED_MARKER: &str = "(ZO_SDR_FAIL_CLOSED)";
+
+/// True for a reason made by `fail_closed_rejection`.
+pub fn is_fail_closed_rejection(reason: &str) -> bool {
+    reason.ends_with(FAIL_CLOSED_MARKER)
+}
+
 /// `ZO_SDR_FAIL_CLOSED`: why a batch the scanner could not see is refused; `None` stores it open.
 pub fn fail_closed_rejection<'a>(
     fail_closed: bool,
@@ -536,7 +544,7 @@ pub fn fail_closed_rejection<'a>(
     // Unscanned, we cannot know a stream's patterns, so every scannable stream is refused.
     let stream = streams.find(|stream| !is_self_reporting_stream(org_id, stream, stream_type))?;
     Some(format!(
-        "sensitive-data redaction is unavailable; refusing to store unredacted data for {org_id}/{stream_type}/{stream} (ZO_SDR_FAIL_CLOSED)"
+        "sensitive-data redaction is unavailable; refusing to store unredacted data for {org_id}/{stream_type}/{stream} {FAIL_CLOSED_MARKER}"
     ))
 }
 
@@ -609,6 +617,14 @@ mod tests {
             fail_closed_rejection(true, "acme", StreamType::Traces, ["default"].into_iter())
                 .is_some()
         );
+    }
+
+    #[test]
+    fn a_fail_closed_rejection_is_recognised_and_nothing_else_is() {
+        let reason = fail_closed_rejection(true, "acme", StreamType::Logs, ["app"].into_iter())
+            .expect("refused");
+        assert!(is_fail_closed_rejection(&reason));
+        assert!(!is_fail_closed_rejection("memtable is full"));
     }
 
     #[test]

@@ -171,12 +171,43 @@ describe("useTextHighlighter", () => {
         ),
       );
 
-    it("should extract str_match_ignore_case and match_field_ignore_case as keywords", () => {
-      expect(
-        textHighlighter.extractKeywords(
-          "str_match_ignore_case(log, 'Error') AND match_field_ignore_case(\"msg\", 'Timeout')",
-        ),
-      ).toEqual(["Error", "Timeout"]);
+    it("should extract str_match_ignore_case and match_field_ignore_case as patterns", () => {
+      const query =
+        "str_match_ignore_case(log, 'Error') AND match_field_ignore_case(\"msg\", 'Timeout')";
+      expect(textHighlighter.extractKeywords(query)).toEqual([]);
+      expect(textHighlighter.extractHighlightPatterns(query).map((regex) => regex.flags)).toEqual([
+        "giu",
+        "giu",
+      ]);
+      expect(highlight("an ERROR then timeout", query)).toEqual(["ERROR", "timeout"]);
+    });
+
+    it("should match str_match literals verbatim, without trimming", () => {
+      expect(highlight("error and  error ", "str_match(log, ' error ')")).toEqual([" error "]);
+      expect(highlight("a\tb  c", "str_match(log, '  ')")).toEqual(["  "]);
+      expect(highlight("an Error here", "str_match_ignore_case(log, ' error ')")).toEqual([
+        " Error ",
+      ]);
+      expect(textHighlighter.extractHighlightPatterns("str_match(log, '')")).toEqual([]);
+    });
+
+    it("should fold case with Unicode rules like the server", () => {
+      // U+212A KELVIN SIGN lowercases to k
+      expect(highlight("\u212Aelvin", "str_match_ignore_case(log, 'kelvin')")).toEqual([
+        "\u212Aelvin",
+      ]);
+      expect(highlight("\u212Aelvin", "match_all('kelvin') AND re_match(log, 'zzz')")).toEqual([
+        "\u212Aelvin",
+      ]);
+      expect(textHighlighter.splitTextByKeywords("\u212Aelvin scale", ["kelvin"])).toEqual([
+        { text: "\u212Aelvin", isHighlighted: true },
+        { text: " scale", isHighlighted: false },
+      ]);
+      expect(textHighlighter.extractKeywords("match_all('a-b/c')")).toEqual(["a-b/c"]);
+      expect(textHighlighter.splitTextByKeywords("x a-b/c y", ["a-b/c"])[1]).toEqual({
+        text: "a-b/c",
+        isHighlighted: true,
+      });
     });
 
     it("should highlight str_match_ignore_case terms case-insensitively", () => {
