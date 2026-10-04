@@ -139,7 +139,7 @@ async fn view_exists_with_name(org_id: &str, view_name: &str, view_type: &str) -
         .map(|v| v.view_id.clone())
 }
 
-// The trailing `/` keeps a prefix-scanning store from matching org `ab` when listing org `a`.
+// Defensive trailing `/`: a pure prefix-scanning store would otherwise match org `ab` for `a`.
 fn list_prefix(org_id: &str) -> String {
     format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/")
 }

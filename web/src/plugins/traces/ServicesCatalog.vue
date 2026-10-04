@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary">{{
           t(`traces.servicesCatalog.insights.signals.${entry.signal}`)
         }}</span>
-        <span class="text-text-tertiary tabular-nums">{{
+        <span class="text-text-secondary tabular-nums">{{
           formatInsightTime(entry.timestampUs)
         }}</span>
         <span class="text-text-secondary tabular-nums">{{
@@ -638,6 +638,7 @@ interface RedInsight {
 }
 const insights = ref<RedInsight[]>([]);
 let insightsRequest = 0;
+let catalogLoad = 0;
 const redInsightsEnabled = computed(
   () => store.state.organizationData?.organizationSettings?.red_insights_enabled === true,
 );
@@ -1241,6 +1242,7 @@ async function loadServicesCatalog() {
   // stay on screen while the next search runs rather than the panel emptying.
   isLoading.value = services.value.length === 0;
   isSearching.value = true;
+  const load = ++catalogLoad;
 
   const { start_time, end_time } = getTimeRange();
 
@@ -1253,6 +1255,11 @@ async function loadServicesCatalog() {
       org !== searchObj.organizationIdentifier ||
       streamName !== streamFilter.value?.replaceAll('"', "")
     ) {
+      // A newer load that got this far owns the flags; otherwise nothing would ever clear them.
+      if (load === catalogLoad) {
+        isLoading.value = false;
+        isSearching.value = false;
+      }
       return;
     }
     schemaFlags.value = flags;

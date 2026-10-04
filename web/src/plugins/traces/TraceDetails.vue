@@ -968,7 +968,7 @@ import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
 import {
   computeCriticalPathForRoots,
-  type CriticalPathNode,
+  toCriticalPathNode,
   type CriticalPathSection,
 } from "@/utils/traces/criticalPath";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -2648,13 +2648,6 @@ export default defineComponent({
         resolvedIdentity: resolveSpanIdentity(span),
       };
     };
-
-    const toCriticalPathNode = (span: any): CriticalPathNode => ({
-      spanId: span.spanId,
-      startTimeUs: span.startTimeUs,
-      endTimeUs: span.endTimeUs,
-      children: span.spans.map(toCriticalPathNode),
-    });
 
     const assignCriticalSections = (spans: any[]) => {
       const sectionsBySpan = new Map<string, CriticalPathSection[]>();

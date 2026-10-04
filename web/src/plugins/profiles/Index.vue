@@ -1000,8 +1000,9 @@ const initPage = async () => {
     resetProfilesState();
     if (seed) applyRouteSeed(seed);
     await loadStreams();
-    if (!selectedStream.value) return;
+    if (run !== initRunSeq || !selectedStream.value) return;
     await loadMeta();
+    if (run !== initRunSeq) return;
     if (seed) {
       appliedFilters.value = seed.filters;
       if (seed.view) activeView.value = seed.view;

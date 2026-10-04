@@ -241,6 +241,17 @@ pub fn plan(
     Plan { create, delete }
 }
 
+/// Keeps detectors on streams this cycle read, so a stream missing from the cache never loses them.
+pub fn on_read_streams(
+    existing: Vec<ManagedDetector>,
+    streams: &BTreeMap<String, StreamColumns>,
+) -> Vec<ManagedDetector> {
+    existing
+        .into_iter()
+        .filter(|d| streams.contains_key(&d.stream))
+        .collect()
+}
+
 /// Builds one managed detector, or `None` when the engine would reject or mis-score it.
 pub fn template(
     stream: &str,
@@ -296,11 +307,7 @@ pub fn template(
 }
 
 /// Recovers `(service, signal)` from the tag and the exact template SQL, never the editable name.
-pub fn parse_managed(
-    _name: &str,
-    tags: &[String],
-    custom_sql: &str,
-) -> Option<(String, RedSignal)> {
+pub fn parse_managed(tags: &[String], custom_sql: &str) -> Option<(String, RedSignal)> {
     let signal = tags.iter().find_map(|t| RedSignal::from_tag(t))?;
     let (head, rest) = custom_sql.split_once(SERVICE_MARKER)?;
     let quoted_stream = head.split_once(" AS value FROM ")?.1;
@@ -823,6 +830,17 @@ mod tests {
     }
 
     #[test]
+    fn detectors_on_unread_streams_are_left_out_of_the_plan() {
+        let streams = BTreeMap::from([("default".to_string(), ALL_COLS)]);
+        let mut cold = det("b", "svc", RedSignal::Rate, false);
+        cold.stream = "cold".to_string();
+        let read = det("a", "svc", RedSignal::Rate, true);
+        let existing = on_read_streams(vec![read.clone(), cold], &streams);
+        assert_eq!(existing, vec![read]);
+        assert_eq!(plan_default(&[], &existing).delete, vec!["a".to_string()]);
+    }
+
+    #[test]
     fn parse_managed_round_trips_every_template() {
         for has_parent in [true, false] {
             let cols = StreamColumns {
@@ -833,14 +851,10 @@ mod tests {
                 for signal in RedSignal::ALL {
                     let t = template("my\"stream", service, signal, &cols).unwrap();
                     assert_eq!(
-                        parse_managed(&t.name, &t.tags, &t.custom_sql),
+                        parse_managed(&t.tags, &t.custom_sql),
                         Some((service.to_string(), signal)),
                         "{}",
                         t.custom_sql
-                    );
-                    assert_eq!(
-                        parse_managed("renamed by a user", &t.tags, &t.custom_sql),
-                        Some((service.to_string(), signal))
                     );
                 }
             }
@@ -851,16 +865,16 @@ mod tests {
     fn parse_managed_rejects_edited_sql_and_missing_tags() {
         let t = template("default", "checkout", RedSignal::P95Latency, &ALL_COLS).unwrap();
         let edited = t.custom_sql.replace("0.95", "0.99");
-        assert_eq!(parse_managed(&t.name, &t.tags, &edited), None);
+        assert_eq!(parse_managed(&t.tags, &edited), None);
         let other_service = t.custom_sql.replace("= 'checkout'", "= 'cart' OR 1=1");
-        assert_eq!(parse_managed(&t.name, &t.tags, &other_service), None);
+        assert_eq!(parse_managed(&t.tags, &other_service), None);
         let rate_tags = vec![MANAGED_TAG.to_string(), RedSignal::Rate.tag().to_string()];
-        assert_eq!(parse_managed(&t.name, &rate_tags, &t.custom_sql), None);
+        assert_eq!(parse_managed(&rate_tags, &t.custom_sql), None);
         assert_eq!(
-            parse_managed(&t.name, &[MANAGED_TAG.to_string()], &t.custom_sql),
+            parse_managed(&[MANAGED_TAG.to_string()], &t.custom_sql),
             None
         );
-        assert_eq!(parse_managed(&t.name, &t.tags, ""), None);
+        assert_eq!(parse_managed(&t.tags, ""), None);
     }
 
     #[test]

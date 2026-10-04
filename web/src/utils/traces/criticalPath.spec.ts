@@ -17,8 +17,10 @@ import { describe, it, expect } from "vitest";
 import {
   computeCriticalPath,
   computeCriticalPathForRoots,
+  toCriticalPathNode,
   type CriticalPathNode,
   type CriticalPathSection,
+  type TraceTreeSpan,
 } from "./criticalPath";
 
 interface JaegerSpan {
@@ -243,5 +245,41 @@ describe("computeCriticalPath", () => {
     expect(sections).toHaveLength(count);
     expect(sections[0]).toEqual(section(`c${count - 1}`, count - 1, count));
     expect(sections[count - 1]).toEqual(section("c0", 0, 1));
+  });
+});
+
+describe("toCriticalPathNode", () => {
+  const treeSpan = (spanId: string, start: number, end: number, spans: TraceTreeSpan[] = []) => ({
+    spanId,
+    startTimeUs: start,
+    endTimeUs: end,
+    spans,
+  });
+
+  it("keeps ids, times and child order", () => {
+    const tree = treeSpan("root", 0, 10, [
+      treeSpan("a", 1, 2),
+      treeSpan("b", 3, 9, [treeSpan("c", 4, 5)]),
+    ]);
+
+    expect(toCriticalPathNode(tree)).toEqual(
+      node("root", 0, 10, [node("a", 1, 2), node("b", 3, 9, [node("c", 4, 5)])]),
+    );
+  });
+
+  it("converts a 20,000-deep chain without overflowing the stack", () => {
+    const depth = 20_000;
+    const root = treeSpan("s0", 0, depth);
+    let parent = root;
+    for (let i = 1; i < depth; i++) {
+      const child = treeSpan(`s${i}`, i, depth);
+      parent.spans.push(child);
+      parent = child;
+    }
+
+    const sections = computeCriticalPath(toCriticalPathNode(root));
+
+    expect(sections).toHaveLength(depth);
+    expect(sections[0]).toEqual(section(`s${depth - 1}`, depth - 1, depth));
   });
 });

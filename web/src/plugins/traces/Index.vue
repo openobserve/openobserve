@@ -382,14 +382,14 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface TracesSavedView {
-  version: number;
+  version?: number;
   stream: { label: string; value: string };
   editorValue: string;
   datetime: { type: string; relativeTimePeriod: string; startTime: number; endTime: number };
   searchMode: "spans" | "traces";
   sortBy: string;
   sortOrder: string;
-  selectedFields: string[];
+  selectedFields?: string[];
 }
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
@@ -1920,6 +1920,10 @@ const syncSavedViewDateTime = (datetime: TracesSavedView["datetime"]) => {
 };
 
 const onApplySavedView = async (view: TracesSavedView) => {
+  if (view.version !== undefined && view.version !== 1) {
+    toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
+    return;
+  }
   const streamName = view.stream?.value;
   const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
   if (
@@ -1947,7 +1951,7 @@ const onApplySavedView = async (view: TracesSavedView) => {
   searchObj.meta.resultGrid.sortOrder = view.sortOrder;
 
   // A zero-hit search never rebuilds the columns, so the view's columns are applied here.
-  searchObj.data.stream.selectedFields = [...view.selectedFields];
+  searchObj.data.stream.selectedFields = [...(view.selectedFields ?? [])];
   rebuildColumns();
   updatedLocalLogFilterField(view.searchMode);
 

@@ -45,6 +45,10 @@ pub async fn run() {
         if !super::anomaly_holds_job_cluster_claim().await {
             continue;
         }
+        // The per-org lock waits, not skips, so each scheduler would re-reconcile in turn.
+        if !super::leader::is_alert_manager_leader().await {
+            continue;
+        }
         let orgs = match db::organization::list(None).await {
             Ok(orgs) => orgs,
             Err(e) => {
@@ -90,9 +94,12 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
         return Ok(());
     }
 
-    let streams = stream_columns(org_id).await;
+    let streams = stream_columns(org_id).await?;
     let volumes = service_volumes(org_id, &streams).await?;
-    let existing: Vec<ManagedDetector> = configs.iter().filter_map(managed_detector).collect();
+    let existing = red_insights::on_read_streams(
+        configs.iter().filter_map(managed_detector).collect(),
+        &streams,
+    );
     // Uncapped here: a signal the template skips must not use up the per-cycle create budget.
     let plan = red_insights::plan(
         true,
@@ -155,11 +162,8 @@ fn config_str<'a>(config: &'a serde_json::Value, key: &str) -> &'a str {
 
 /// An unparseable managed detector maps to `None`, so the plan leaves it alone.
 fn managed_detector(config: &serde_json::Value) -> Option<ManagedDetector> {
-    let (service, signal) = red_insights::parse_managed(
-        config_str(config, "name"),
-        &config_tags(config),
-        config_str(config, "custom_sql"),
-    )?;
+    let (service, signal) =
+        red_insights::parse_managed(&config_tags(config), config_str(config, "custom_sql"))?;
     Some(ManagedDetector {
         id: config_str(config, "anomaly_id").to_string(),
         stream: config_str(config, "stream_name").to_string(),
@@ -211,17 +215,13 @@ async fn red_folder(org_id: &str, configs: &[serde_json::Value]) -> anyhow::Resu
     }
 }
 
-/// Trace streams that can be ranked by request volume, with the columns each signal needs.
-async fn stream_columns(org_id: &str) -> BTreeMap<String, StreamColumns> {
+/// Rankable trace streams; a schema error fails the org, as a search error does.
+async fn stream_columns(org_id: &str) -> anyhow::Result<BTreeMap<String, StreamColumns>> {
     let mut out = BTreeMap::new();
     for stream in db::schema::list_streams_from_cache(org_id, StreamType::Traces).await {
-        let schema = match infra::schema::get(org_id, &stream, StreamType::Traces).await {
-            Ok(schema) => schema,
-            Err(e) => {
-                log::warn!("[RED insights] org {org_id}: no schema for {stream}: {e}");
-                continue;
-            }
-        };
+        let schema = infra::schema::get(org_id, &stream, StreamType::Traces)
+            .await
+            .map_err(|e| anyhow::anyhow!("schema read for {stream} failed: {e}"))?;
         let has = |name: &str| schema.field_with_name(name).is_ok();
         if !has("service_name") || !has("span_kind") {
             log::info!("[RED insights] org {org_id}: {stream} has no service_name/span_kind");
@@ -234,7 +234,7 @@ async fn stream_columns(org_id: &str) -> BTreeMap<String, StreamColumns> {
         };
         out.insert(stream, cols);
     }
-    out
+    Ok(out)
 }
 
 /// Fails on any stream error: a missing stream would read as zero traffic and lose its detectors.

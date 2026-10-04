@@ -554,6 +554,31 @@ describe("Profiles page", () => {
       );
     });
 
+    it("applies only the latest seed when the route changes while an earlier seed is loading", async () => {
+      const names = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(names.promise);
+      mountSeeded();
+      await flushPromises();
+
+      route.query = { ...seedQuery, stream: "profiles-a", filters: "trace_id=t2,span_id=s2" };
+      await flushPromises();
+      names.resolve(streamResponse);
+      await flushPromises();
+
+      expect(mocks.series).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-a",
+        expect.objectContaining({
+          filters: [
+            { key: "trace_id", op: "=", value: "t2" },
+            { key: "span_id", op: "=", value: "s2" },
+          ],
+        }),
+      );
+    });
+
     it("keeps the default first stream, 15-minute window and top view without params", async () => {
       route.query = {};
       const wrapper = mountSeeded();

@@ -2434,6 +2434,48 @@ describe("ServicesCatalog", () => {
       expect(mockStreamSchema).toHaveBeenLastCalledWith("other-org", "default", "traces");
     });
 
+    it("stops loading when a superseded schema fetch is discarded and no newer load runs", async () => {
+      let release!: (value: any) => void;
+      mockStreamSchema.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      expect(wrapper.vm.isSearching).toBe(true);
+
+      mockSearchObj.organizationIdentifier = "other-org";
+      release(schemaWith("reference_parent_span_id"));
+      await flushPromises();
+
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.vm.isLoading).toBe(false);
+      expect(wrapper.vm.isSearching).toBe(false);
+    });
+
+    it("keeps loading when a newer load is still fetching its schema", async () => {
+      const releases: ((value: any) => void)[] = [];
+      const pending = () =>
+        new Promise((resolve) => {
+          releases.push(resolve);
+        });
+      mockStreamSchema.mockImplementationOnce(pending).mockImplementationOnce(pending);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      wrapper.vm.streamFilter = "production";
+      await flushPromises();
+      releases[0](schemaWith("reference_parent_span_id"));
+      await flushPromises();
+
+      expect(wrapper.vm.isSearching).toBe(true);
+      releases[1](schemaWith("reference_parent_span_id"));
+      await flushPromises();
+      expect(decodedSqls()).toHaveLength(1);
+    });
+
     it("labels latency tooltips in µs and warns on a P99 above 1 s", async () => {
       const latencyRow = (name: string, p99: number) => ({
         id: name,

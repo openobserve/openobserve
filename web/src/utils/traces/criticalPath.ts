@@ -28,6 +28,14 @@ export interface CriticalPathNode {
   children: CriticalPathNode[];
 }
 
+/** The slice of a TraceDetails tree span the critical path reads. */
+export interface TraceTreeSpan {
+  spanId: string;
+  startTimeUs: number;
+  endTimeUs: number;
+  spans: TraceTreeSpan[];
+}
+
 interface WindowNode {
   spanId: string;
   start: number;
@@ -67,6 +75,28 @@ export function computeCriticalPath(root: CriticalPathNode): CriticalPathSection
 
 export function computeCriticalPathForRoots(roots: CriticalPathNode[]): CriticalPathSection[] {
   return roots.flatMap(computeCriticalPath);
+}
+
+/** Iterative, so trace depth never bounds the call stack. */
+export function toCriticalPathNode(span: TraceTreeSpan): CriticalPathNode {
+  const toNode = (s: TraceTreeSpan): CriticalPathNode => ({
+    spanId: s.spanId,
+    startTimeUs: s.startTimeUs,
+    endTimeUs: s.endTimeUs,
+    children: [],
+  });
+  const root = toNode(span);
+  const stack: [TraceTreeSpan, CriticalPathNode][] = [[span, root]];
+
+  while (stack.length) {
+    const [raw, node] = stack.pop()!;
+    for (const child of raw.spans) {
+      const converted = toNode(child);
+      node.children.push(converted);
+      stack.push([child, converted]);
+    }
+  }
+  return root;
 }
 
 /** Clamps children into their parent's window (dropping disjoint subtrees) and orders them latest-ending first. */

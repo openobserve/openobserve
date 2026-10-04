@@ -388,7 +388,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_views_of_a_prefixed_org_are_not_listed_or_name_checked() {
+    async fn test_an_org_sharing_a_name_prefix_keeps_its_views_separate() {
         infra::db::create_table().await.unwrap();
         let org = new_org();
         let longer_org = format!("{org}b");

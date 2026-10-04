@@ -3208,6 +3208,31 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(query.tab).toBe("spans");
     });
 
+    it("applies a view saved without selectedFields as no selected fields", async () => {
+      await mountPage();
+      mockSearchObj.data.stream.selectedFields = ["stale_field"];
+      const { selectedFields: _omitted, ...view } = savedView();
+
+      await applyViewAndWaitForSearch(view);
+
+      expect(mockSearchObj.data.stream.selectedFields).toEqual([]);
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("toasts an error and leaves state unchanged for an unknown view version", async () => {
+      await mountPage();
+      const before = mockSearchObj.data.editorValue;
+      const modeBefore = mockSearchObj.meta.searchMode;
+
+      await applyView(savedView({ version: 2 }));
+
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(mockSearchObj.data.editorValue).toBe(before);
+      expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
     it("toasts and leaves state unchanged when the stream no longer exists", async () => {
       await mountPage();
       const before = mockSearchObj.data.editorValue;
