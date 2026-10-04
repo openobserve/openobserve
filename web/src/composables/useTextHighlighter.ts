@@ -49,6 +49,19 @@ export interface TextSegment {
 }
 
 /**
+ * Matches two-argument filter functions with a string-literal second argument:
+ * - str_match(field, 'value') / match_field(field, 'value')
+ * - str_match_ignore_case(field, 'value') / match_field_ignore_case(field, 'value')
+ * - re_match(field, 'pattern')
+ * Group 1 is the function name, group 2 the field, group 3 a single-quoted
+ * literal ('' escapes a quote), group 4 a double-quoted literal.
+ */
+const FIELD_FILTER_REGEX =
+  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match)\s*\(\s*([^,()]+?)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")\s*\)/gi;
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
  * Bounds that keep re_match highlighting from stalling the UI. JS regexes
  * backtrack (Rust's do not), so a pattern that is cheap on the server can be
  * catastrophic here; patterns or texts beyond these limits are not highlighted.
@@ -56,94 +69,174 @@ export interface TextSegment {
 const MAX_REGEX_PATTERN_LENGTH = 256;
 const MAX_REGEX_TEXT_LENGTH = 512;
 const MAX_REGEX_MATCHES = 100;
-/** A {n,m} repeat wider than this counts as unbounded. */
-const MAX_BOUNDED_REPEAT = 16;
 /**
- * Caps on the product of variable-width choices ({n,m}, ?, |), which multiply
- * backtracking: alongside an unbounded quantifier only one binary choice is
- * allowed (https?://\S+), without one the product may reach 81 (four \d{1,3}).
+ * Cap on the product of choice widths ({n,m}, ?, |) in a pattern with groups
+ * or alternation, which is only accepted without unbounded quantifiers.
  */
-const MAX_VARIANTS_WITH_UNBOUNDED = 2;
 const MAX_VARIANTS = 81;
 
 /** Escaped str_match literals: linear to match, so exempt from MAX_REGEX_TEXT_LENGTH. */
 const literalPatterns = new WeakSet<RegExp>();
 
+/** Characters probed when testing whether two atoms can match the same character. */
+const PROBE_CHARS = [
+  ...Array.from({ length: 128 }, (_, code) => String.fromCharCode(code)),
+  " ",
+  "é",
+  "K",
+  "　",
+  "日",
+];
+
+/** One regex atom (a character, escape, class or .) with its repeat bounds. */
+interface RegexItem {
+  test: RegExp;
+  min: number;
+  max: number;
+}
+
 /**
- * Matches two-argument filter functions with a string-literal second argument:
- * - str_match(field, 'value') / match_field(field, 'value')
- * - str_match_ignore_case(field, 'value') / match_field_ignore_case(field, 'value')
- * - re_match(field, 'pattern')
- * Group 1 is the function name, group 2 a single-quoted literal ('' escapes a
- * quote), group 3 a double-quoted literal.
+ * Splits a regex source into atoms with their quantifiers. Returns null for
+ * syntax this does not model (backreferences, lookarounds, \p{..}, \x.., a
+ * quantified group, a stray quantifier), which the caller treats as unsafe.
+ * `grouped` is set when the source uses groups or alternation.
  */
-const FIELD_FILTER_REGEX =
-  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match)\s*\(\s*[^,()]+?\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")\s*\)/gi;
+function tokenizeRegex(
+  source: string,
+  flags: string,
+): { items: RegexItem[]; grouped: boolean; choices: number; probes: string[] } | null {
+  const items: RegexItem[] = [];
+  const probes = [...PROBE_CHARS];
+  let grouped = false;
+  let choices = 1;
+  let i = 0;
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const atom = (atomSource: string): RegexItem | null => {
+    try {
+      const regex = new RegExp(`^(?:${atomSource})$`, flags.replace("g", ""));
+      return { test: regex, min: 1, max: 1 };
+    } catch {
+      return null;
+    }
+  };
 
-/**
- * Whether a regex source risks super-linear backtracking. Rejected: a
- * quantified group such as (a+)+ or (x)*; more than one unbounded quantifier
- * (*, +, {n,} or a {n,m} wider than MAX_BOUNDED_REPEAT); or variable-width
- * choices ({n,m}, ?, |) whose widths multiply past MAX_VARIANTS_WITH_UNBOUNDED
- * when an unbounded quantifier is present, else past MAX_VARIANTS. Escaped
- * characters and character classes are skipped, so [a*]+ has one quantifier.
- * What passes stays near-quadratic with a small constant on a
- * MAX_REGEX_TEXT_LENGTH text (well under 1 ms per field, measured in Node 24).
- */
-function isBacktrackingRisk(source: string): boolean {
-  let unbounded = 0;
-  let variants = 1;
-  let inClass = false;
-  // Previous token: a quantifier makes a following ? lazy; "(" makes it a group modifier.
-  let previous: "quantifier" | "open" | "other" = "other";
-
-  for (let i = 0; i < source.length; i++) {
+  while (i < source.length) {
     const char = source[i];
+    let item: RegexItem | null = null;
+
     if (char === "\\") {
-      i++;
-      previous = "other";
-      continue;
-    }
-    if (inClass) {
-      if (char === "]") inClass = false;
-      continue;
-    }
-    if (char === "[") {
-      inClass = true;
-      previous = "other";
-      continue;
-    }
-
-    const next = source[i + 1];
-    if (char === ")" && (next === "*" || next === "+" || next === "{")) return true;
-
-    let isQuantifier = false;
-    if (char === "*" || char === "+") {
-      unbounded++;
-      isQuantifier = true;
-    } else if (char === "?") {
-      if (previous === "other") variants *= 2;
-      isQuantifier = previous !== "open";
-    } else if (char === "|") {
-      variants *= 2;
-    } else if (char === "{") {
-      const repeat = /^\{(\d+)(,(\d*))?\}/.exec(source.slice(i));
-      if (repeat) {
-        isQuantifier = true;
-        if (repeat[2] && (repeat[3] === "" || Number(repeat[3]) > MAX_BOUNDED_REPEAT)) {
-          unbounded++;
-        } else if (repeat[2]) {
-          variants *= Math.max(Number(repeat[3]) - Number(repeat[1]) + 1, 1);
-        }
-        i += repeat[0].length - 1;
+      const next = source[i + 1];
+      if (next === "b" || next === "B") {
+        i += 2;
+        continue;
       }
+      if (next === undefined || !(/[dDwWsSntrfv]/.test(next) || /[^a-zA-Z0-9]/.test(next))) {
+        return null;
+      }
+      item = atom(`\\${next}`);
+      if (/[^a-zA-Z0-9]/.test(next)) probes.push(next);
+      i += 2;
+    } else if (char === ".") {
+      item = atom(".");
+      i++;
+    } else if (char === "[") {
+      let end = i + 1;
+      if (source[end] === "^") end++;
+      if (source[end] === "]") end++;
+      while (end < source.length && source[end] !== "]") end += source[end] === "\\" ? 2 : 1;
+      if (end >= source.length) return null;
+      item = atom(source.slice(i, end + 1));
+      i = end + 1;
+    } else if (char === "(") {
+      if (source[i + 1] === "?") {
+        if (source[i + 2] !== ":") return null;
+        i += 3;
+      } else {
+        i++;
+      }
+      grouped = true;
+      continue;
+    } else if (char === ")") {
+      if (/^[*+?{]/.test(source.slice(i + 1))) return null;
+      i++;
+      continue;
+    } else if (char === "|") {
+      grouped = true;
+      choices *= 2;
+      i++;
+      continue;
+    } else if (char === "^" || char === "$") {
+      i++;
+      continue;
+    } else if (char === "*" || char === "+" || char === "?") {
+      return null;
+    } else {
+      item = atom(escapeRegExp(char));
+      probes.push(char);
+      i++;
     }
-    previous = isQuantifier ? "quantifier" : char === "(" ? "open" : "other";
 
-    if (unbounded > 1 || variants > (unbounded ? MAX_VARIANTS_WITH_UNBOUNDED : MAX_VARIANTS)) {
-      return true;
+    if (!item) return null;
+
+    // Quantifier, with an optional lazy ? after it
+    const quantifier = /^(?:([*+?])|\{(\d+)(?:(,)(\d*))?\})\??/.exec(source.slice(i));
+    if (quantifier) {
+      if (quantifier[1]) {
+        item.min = quantifier[1] === "+" ? 1 : 0;
+        item.max = quantifier[1] === "?" ? 1 : Infinity;
+      } else {
+        item.min = Number(quantifier[2]);
+        item.max = !quantifier[3] ? item.min : quantifier[4] ? Number(quantifier[4]) : Infinity;
+      }
+      if (item.max !== Infinity) choices *= item.max - item.min + 1;
+      i += quantifier[0].length;
+    }
+    items.push(item);
+  }
+
+  return { items, grouped, choices, probes };
+}
+
+/**
+ * Whether a regex source risks super-linear backtracking in a JS engine.
+ *
+ * Without groups or alternation, two variable-width atoms (*, +, ?, {n,m})
+ * are only ambiguous when they can match a common character and nothing
+ * mandatory between them stops the first from running into the second: a
+ * required atom that one of the two cannot match. So [a-z]+-\d+ (disjoint
+ * classes) and https?://\S+ (s? cannot match ':') pass, while \w*\w*,
+ * a+a?, .*.* and \d+\s*\d+ are rejected.
+ *
+ * With groups or alternation only bounded patterns pass, and only while the
+ * product of their choice widths stays within MAX_VARIANTS. Anything the
+ * tokenizer cannot model (lookarounds, backreferences, \p{..}, quantified
+ * groups) is treated as a risk.
+ */
+function isBacktrackingRisk(source: string, flags: string): boolean {
+  const tokens = tokenizeRegex(source, flags);
+  if (!tokens) return true;
+  const { items, grouped, choices, probes } = tokens;
+
+  if (grouped) {
+    return items.some((item) => item.max === Infinity) || choices > MAX_VARIANTS;
+  }
+
+  // Which probe characters each atom matches, so overlap is a set intersection
+  const sets = items.map((item) => probes.map((char) => item.test.test(char)));
+  const overlaps = (a: number, b: number) => sets[a].some((hit, k) => hit && sets[b][k]);
+
+  for (let first = 0; first < items.length; first++) {
+    if (items[first].min === items[first].max) continue;
+    for (let second = first + 1; second < items.length; second++) {
+      if (items[second].min === items[second].max) continue;
+      if (!overlaps(first, second)) continue;
+
+      let separated = false;
+      for (let between = first + 1; between < second && !separated; between++) {
+        separated =
+          items[between].min > 0 && (!overlaps(between, first) || !overlaps(between, second));
+      }
+      if (!separated) return true;
     }
   }
 
@@ -169,7 +262,7 @@ function compileHighlightRegex(pattern: string): RegExp | null {
     source = source.slice(inlineFlags[0].length);
   }
 
-  if (isBacktrackingRisk(source)) return null;
+  if (isBacktrackingRisk(source, flags)) return null;
 
   try {
     return new RegExp(source, flags);
@@ -178,8 +271,34 @@ function compileHighlightRegex(pattern: string): RegExp | null {
   }
 }
 
-let cachedPatternQuery: string | null = null;
-let cachedPatterns: RegExp[] = [];
+/** Compiled patterns per (field-scoped) query string; cleared when it grows past 64 entries. */
+const patternCache = new Map<string, RegExp[]>();
+
+const normalizeFieldName = (field: string) =>
+  field
+    .trim()
+    .replace(/^["`]|["`]$/g, "")
+    .toLowerCase();
+
+/**
+ * Narrows a highlight query to one field: drops the field filters (str_match,
+ * match_field, their _ignore_case forms and re_match) that name another field,
+ * so they only highlight their own column / detail row. match_all and fuzzy
+ * keywords are not field-scoped and stay.
+ *
+ * @param queryString - The highlight query
+ * @param field - The field (column id or JSON key) being rendered
+ * @returns The query without other fields' filters
+ */
+export function scopeHighlightQuery(queryString: string, field: string): string {
+  if (!queryString) return queryString;
+  const target = normalizeFieldName(field);
+  return queryString.replace(
+    FIELD_FILTER_REGEX,
+    (filter: string, _name: string, filterField: string) =>
+      normalizeFieldName(filterField) === target ? filter : "",
+  );
+}
 
 /**
  * Composable for text highlighting and semantic colorization
@@ -204,7 +323,7 @@ export function useTextHighlighter() {
 
     // Regex to support match_all, fuzzy_match, and fuzzy_match_all SQL functions
     const regex =
-      /\b(?:match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
+      /\b(?:match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/gi;
     const result: string[] = [];
     let match: RegExpExecArray | null;
 
@@ -248,14 +367,15 @@ export function useTextHighlighter() {
    */
   function extractHighlightPatterns(queryString: string): RegExp[] {
     if (!queryString?.trim()) return [];
-    if (queryString === cachedPatternQuery) return cachedPatterns;
+    const cached = patternCache.get(queryString);
+    if (cached) return cached;
 
     const patterns: RegExp[] = [];
     const seen = new Set<string>();
 
     for (const filter of queryString.matchAll(FIELD_FILTER_REGEX)) {
       const name = filter[1].toLowerCase();
-      const value = filter[2]?.replace(/''/g, "'") ?? filter[3] ?? "";
+      const value = filter[3]?.replace(/''/g, "'") ?? filter[4] ?? "";
       const regex =
         name === "re_match"
           ? compileHighlightRegex(value)
@@ -269,8 +389,8 @@ export function useTextHighlighter() {
       }
     }
 
-    cachedPatternQuery = queryString;
-    cachedPatterns = patterns;
+    if (patternCache.size >= 64) patternCache.clear();
+    patternCache.set(queryString, patterns);
     return patterns;
   }
 

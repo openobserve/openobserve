@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import { useTextHighlighter, scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { escapeHtml } from "@/utils/html";
 
 // Mock Vuex store
@@ -274,15 +274,22 @@ describe("useTextHighlighter", () => {
         "a+a?a?a?a?a?a?a?!",
         "a+a?a?!",
         "\\w+\\d+!",
-        "\\w+\\s\\w+!",
+        "\\w*\\w*\\w*\\w*!",
+        "\\d+\\s*\\d+x",
         ".*.*!",
+        ".*a.*b",
+        "a{0,8}a{0,8}!",
+        "[a-z]+\\d*[a-z]+!",
+        "(a|b).*",
         "a*?a*?!",
         "a?a?a?a?a?a?a?a?aaaaaaaa!",
         "(a|aa)?(a|aa)?(a|aa)?(a|aa)?!",
         "(a|ab)+!",
         "\\d{1,3}(\\.\\d{1,3}){3}",
-        "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d+x",
         "a{0,16}a{0,4}!",
+        "(?=a)a+",
+        "(a)\\1+",
+        "\\p{L}+",
       ]) {
         expect(accepts(pattern), pattern).toBe(false);
       }
@@ -300,12 +307,49 @@ describe("useTextHighlighter", () => {
         "(foo|bar)baz",
         "(?i)warn",
         "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
-        "a{0,8}a{0,8}!",
         "(a|aa)(a|aa)(a|aa)(a|aa)(a|aa)(a|aa)!",
+        // Quantified atoms that cannot overlap, or that a required separator splits
+        "id=[a-z]+-\\d+",
+        "[a-z]+-\\d+",
+        "id=[a-z]+-[0-9]+",
+        "\\w+\\s\\w+!",
+        "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d+x",
+        "\\S+\\s+\\S+",
       ]) {
         expect(accepts(pattern), pattern).toBe(true);
       }
       expect(highlight("xa*a*y", "re_match(log, '[a*]+')")).toEqual(["a*a*"]);
+      expect(
+        highlight("request id=abc-123 status=500", "re_match(body, 'id=[a-z]+-\\d+')"),
+      ).toEqual(["id=abc-123"]);
+    });
+
+    it("should keep case-sensitive terms with uppercase letters", () => {
+      expect(highlight("Error while parsing config", "str_match(body, 'Error')")).toEqual([
+        "Error",
+      ]);
+      expect(highlight("ERROR connection refused to db", "re_match(body, '^ERROR')")).toEqual([
+        "ERROR",
+      ]);
+      expect(highlight("ERROR connection refused", "STR_MATCH(body, 'ERROR connection')")).toEqual([
+        "ERROR connection",
+      ]);
+      expect(textHighlighter.extractKeywords("MATCH_ALL('Error')")).toEqual(["Error"]);
+    });
+
+    it("should scope field filters to their own field", () => {
+      const query =
+        "match_all('db') AND str_match_ignore_case(body, 'kelvin') AND re_match(\"level\", '^E')";
+      expect(scopeHighlightQuery(query, "body")).toBe(
+        "match_all('db') AND str_match_ignore_case(body, 'kelvin') AND ",
+      );
+      expect(scopeHighlightQuery(query, "level")).toBe(
+        "match_all('db') AND  AND re_match(\"level\", '^E')",
+      );
+      expect(scopeHighlightQuery(query, "edge_case")).toBe("match_all('db') AND  AND ");
+      expect(highlight("kelvin_sign", scopeHighlightQuery(query, "edge_case"))).toEqual([]);
+      expect(highlight("kelvin db", scopeHighlightQuery(query, "body"))).toEqual(["kelvin", "db"]);
+      expect(highlight("db", scopeHighlightQuery(query, "edge_case"))).toEqual(["db"]);
     });
 
     it("should apply re_match anchors to the whole value, not each token", () => {

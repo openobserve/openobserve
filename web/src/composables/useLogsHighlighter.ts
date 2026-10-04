@@ -21,7 +21,7 @@
  */
 
 import type { TranslateFn } from "@/types/i18n";
-import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import { useTextHighlighter, scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
 import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
@@ -145,7 +145,11 @@ export function useLogsHighlighter(t: TranslateFn) {
             ),
             showBraces: columns[columnIndex].id === "source",
             showQuotes: columns[columnIndex].id === "source",
-            queryString,
+            // Field filters highlight only their own column; source scopes per key
+            queryString:
+              columns[columnIndex].id === "source"
+                ? queryString
+                : scopeHighlightQuery(queryString, columns[columnIndex].id),
           });
 
           batchUpdates[cacheKey] = processedHtml;
@@ -587,7 +591,11 @@ export function useLogsHighlighter(t: TranslateFn) {
     }
 
     const entries = Object.entries(obj);
+    const allFieldsQuery = queryString;
     entries.forEach(([key, value], index) => {
+      // Field filters (str_match, re_match, ...) highlight only their own key
+      const queryString = scopeHighlightQuery(allFieldsQuery, key);
+
       // KEYS: Always colored, never highlighted
       let keyContent = "";
 

@@ -276,13 +276,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="getContentSize(row.value) > 50000"
                       :data="row.value"
                       :field-key="`detail_${row.field}`"
-                      :query-string="highlightQuery"
+                      :query-string="scopeHighlightQuery(highlightQuery, row.field)"
                       :simple-mode="false"
                     /><LogsHighLighting
                       v-else
                       :data="getDisplayValue(row.field, row.value)"
                       :show-braces="false"
-                      :query-string="highlightQuery"
+                      :query-string="scopeHighlightQuery(highlightQuery, row.field)"
                     /></pre>
                   </div>
                 </div>
@@ -518,6 +518,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
+import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -1131,6 +1132,7 @@ export default defineComponent({
       showViewTraceBtn,
       hasAggregationQuery,
       canSearchAroundStream,
+      scopeHighlightQuery,
       sendToAiChat,
       addSearchTerm,
       closeTable,
