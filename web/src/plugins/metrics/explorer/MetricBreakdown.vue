@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="h-3 w-full"
                   data-test="metrics-breakdown-stat-loading"
                 />
+                <!-- Inline, not OSparkline: it has no colour prop, and the line must match its series. -->
                 <svg
                   v-else-if="row.trend"
                   viewBox="0 0 100 24"
@@ -158,11 +159,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-secondary block h-5 w-full"
                   aria-hidden="true"
                 >
-                  <polyline
-                    :points="row.trend"
+                  <path
+                    :d="row.trend"
                     fill="none"
                     :stroke="row.color ?? 'currentColor'"
                     stroke-width="1.5"
+                    stroke-linecap="round"
                     stroke-linejoin="round"
                     vector-effect="non-scaling-stroke"
                   />
@@ -335,7 +337,7 @@ import {
   CARD_KIND,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
-import { adaptiveDecimals, seriesStatsByValue } from "@/utils/metrics/breakdownStats";
+import { seriesStatsByValue } from "@/utils/metrics/breakdownStats";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -356,7 +358,7 @@ interface LabelCounts {
 }
 
 /** Measures whose values add up, so one value's share of their sum means something. */
-const ADDITIVE_KINDS = [CARD_KIND.COUNTER_RATE, CARD_KIND.EXP_HISTOGRAM_FALLBACK];
+const ADDITIVE_KINDS = [CARD_KIND.COUNTER_RATE, CARD_KIND.EXP_HISTOGRAM_FALLBACK, CARD_KIND.INFO];
 
 const STAT_COLUMNS = ["avg", "latest", "share"] as const;
 
@@ -368,14 +370,16 @@ interface BreakdownRow {
   avg: string | null;
   latest: string | null;
   share: string | null;
-  /** Sparkline polyline points in a 100×24 box. */
+  /** Sparkline path in a 100×24 box, one subpath per unbroken run. */
   trend: string | null;
   color: string | null;
 }
 
 /**
- * Spaced by sample index, so a gap keeps its width. Scaled from zero, like OSparkline, so a
- * flat series with a 0.01% dip reads as flat rather than as a crash; all zeros sit mid-height.
+ * Spaced by sample index, and drawn straight through a gap, as the focused chart connects nulls.
+ * A lone real point is a zero-length segment its round cap draws as a dot. Scaled from zero, like
+ * OSparkline, so a flat series with a 0.01% dip reads as flat rather than as a crash; all zeros
+ * sit mid-height.
  */
 const trendOf = (points: (number | null)[]): string | null => {
   const real = points.filter((p): p is number => p !== null);
@@ -383,14 +387,12 @@ const trendOf = (points: (number | null)[]): string | null => {
   const min = Math.min(...real, 0);
   const range = Math.max(...real, 0) - min;
   const step = points.length > 1 ? 100 / (points.length - 1) : 0;
-  return points
-    .map((p, i) =>
-      p === null
-        ? null
-        : `${(i * step).toFixed(2)},${(range ? 22 - ((p - min) / range) * 20 : 12).toFixed(2)}`,
-    )
-    .filter(Boolean)
-    .join(" ");
+  const xy = points.flatMap((p, i) =>
+    p === null
+      ? []
+      : [`${(i * step).toFixed(2)} ${(range ? 22 - ((p - min) / range) * 20 : 12).toFixed(2)}`],
+  );
+  return xy.length === 1 ? `M${xy[0]} l0 0` : `M${xy.join(" L")}`;
 };
 
 const PENDING: LabelCounts = { ready: false, counted: true, failed: false, error: "", values: [] };
@@ -662,7 +664,12 @@ export default defineComponent({
     const statsLoading = computed(
       () => focused.value.status === "idle" || focused.value.status === "loading",
     );
-    const showShare = computed(() => ADDITIVE_KINDS.includes(props.card.cardKind));
+    // A topk-capped chart holds only the top 10, whose shares would always sum to 100%.
+    const showShare = computed(
+      () =>
+        ADDITIVE_KINDS.includes(props.card.cardKind) &&
+        !(activeLabel.value && topkByLabel.value[activeLabel.value]),
+    );
 
     const focusedTile = ref<ComponentPublicInstance | null>(null);
     const focusedChart = (): ECharts | undefined => {
@@ -675,13 +682,30 @@ export default defineComponent({
     /** Series colours as echarts drew them, so a row's trend matches its line. */
     const seriesColors = ref<Record<string, string>>({});
     let boundChart: ECharts | undefined;
+    /** Set once the drawn chart carries this result's series; reset by a new result or theme. */
+    let colorsRead = false;
     const readColors = () => {
-      const series: any[] = (boundChart?.getOption() as any)?.series ?? [];
-      const colors = Object.fromEntries(
-        series.map((s) => [s.name, String(boundChart!.getVisual({ seriesName: s.name }, "color"))]),
+      // "finished" fires on every render, hover highlights included; getOption copies all data.
+      if (colorsRead || !boundChart) return;
+      const label = activeLabel.value;
+      const expected: string[] = focused.value.results.flatMap((r: any) =>
+        (r?.result ?? [])
+          .map((s: any) => s?.metric?.[label ?? ""])
+          .filter((v: unknown) => v !== undefined)
+          .map(String),
       );
-      if (JSON.stringify(colors) !== JSON.stringify(seriesColors.value))
-        seriesColors.value = colors;
+      const series: any[] = (boundChart.getOption() as any)?.series ?? [];
+      const names = series.map((s) => String(s.name));
+      // Still the previous result's chart: wait for the next render.
+      if (!expected.length || expected.some((name) => !names.includes(name))) return;
+      // Only this result's series: the chart also holds unnamed helper series echarts cannot find.
+      seriesColors.value = Object.fromEntries(
+        expected.map((name) => [
+          name,
+          String(boundChart!.getVisual({ seriesName: name }, "color")),
+        ]),
+      );
+      colorsRead = true;
     };
     let colorFrame = 0;
     /** The chart renders after its results land, and is rebuilt on a theme switch: re-read once it draws. */
@@ -701,7 +725,10 @@ export default defineComponent({
         readColors();
       });
     };
-    watch([focused, () => store.state.theme], () => bindChart());
+    watch([focused, () => store.state.theme], () => {
+      colorsRead = false;
+      bindChart();
+    });
 
     const highlight = (row: BreakdownRow, type: "highlight" | "downplay") => {
       if (row.avg !== null) focusedChart()?.dispatchAction({ type, seriesName: row.value });
@@ -717,19 +744,18 @@ export default defineComponent({
       for (const value of stats.keys()) if (!values.includes(value)) values.push(value);
 
       const unit = toO2Unit(props.card.unit ?? "");
-      const decimals = adaptiveDecimals(focused.value.results);
-      const format = (v: number) =>
+      const format = (v: number, decimals: number) =>
         formatUnitValue(getUnitValue(v, unit.unit, unit.unitCustom ?? "", decimals));
-      const total = [...stats.values()].reduce((sum, s) => sum + s.avg, 0);
+      const total = [...stats.values()].reduce((sum, s) => sum + s.sum, 0);
 
       const ranked = values.map((value) => {
         const s = stats.get(value);
         return {
           value,
           rank: s?.avg ?? -Infinity,
-          avg: s ? format(s.avg) : null,
-          latest: s ? format(s.latest) : null,
-          share: s && total > 0 ? `${((s.avg / total) * 100).toFixed(1)}%` : null,
+          avg: s ? format(s.avg, s.decimals) : null,
+          latest: s ? format(s.latest, s.decimals) : null,
+          share: s && total > 0 ? `${((s.sum / total) * 100).toFixed(1)}%` : null,
           trend: s ? trendOf(s.points) : null,
           color: seriesColors.value[value] ?? null,
         };

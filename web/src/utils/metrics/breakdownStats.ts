@@ -18,6 +18,10 @@ export interface SeriesStats {
   avg: number;
   /** The last real point. */
   latest: number;
+  /** Over the window, a missing step counting as 0: what a share of the total is taken from. */
+  sum: number;
+  /** Decimal places for this series alone, so a small value keeps its digits beside a large one. */
+  decimals: number;
   /** Oldest first; `null` where the point is missing or NaN. */
   points: (number | null)[];
 }
@@ -38,9 +42,12 @@ export function seriesStatsByValue(responses: any[], label: string): Map<string,
       const points = (series?.values ?? []).map(([, raw]: [unknown, unknown]) => pointOf(raw));
       const real = points.filter((p: number | null): p is number => p !== null);
       if (!real.length) continue;
+      const sum = real.reduce((total: number, p: number) => total + p, 0);
       stats.set(String(value), {
-        avg: real.reduce((sum: number, p: number) => sum + p, 0) / real.length,
+        avg: sum / real.length,
         latest: real[real.length - 1],
+        sum,
+        decimals: decimalsForMax(Math.max(...real.map(Math.abs))),
         points,
       });
     }
@@ -66,6 +73,10 @@ export function adaptiveDecimals(responses: any[]): number {
       }
     }
   }
+  return decimalsForMax(max);
+}
+
+function decimalsForMax(max: number): number {
   if (max === 0) return 2;
   if (max < 0.001) return 6;
   if (max < 0.01) return 5;
