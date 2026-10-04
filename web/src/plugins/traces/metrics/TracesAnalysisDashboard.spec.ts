@@ -850,11 +850,10 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.vm.selectedDimensions).not.toContain("span_status");
     });
 
-    it("should NOT remove the last remaining dimension", () => {
+    it("removes the last remaining dimension too", () => {
       wrapper.vm.selectedDimensions = ["service_name"];
       wrapper.vm.toggleDimension("service_name");
-      expect(wrapper.vm.selectedDimensions).toContain("service_name");
-      expect(wrapper.vm.selectedDimensions).toHaveLength(1);
+      expect(wrapper.vm.selectedDimensions).toEqual([]);
     });
 
     it("should create a new array reference on add (reactive)", () => {
@@ -1060,6 +1059,8 @@ describe("TracesAnalysisDashboard", () => {
         await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.selectedDimensions = ["service_name", "http_method"];
+      // Let the selection watcher append its panel first, so the last call is loadAnalysis'.
+      await flushPromises();
       await wrapper.vm.loadAnalysis();
       await flushPromises();
       const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
@@ -1224,22 +1225,98 @@ describe("TracesAnalysisDashboard", () => {
   // Watcher: selectedDimensions triggers loadAnalysis on removal
   // -------------------------------------------------------------------------
   describe("watcher: selectedDimensions", () => {
-    it("should call loadAnalysis when a dimension is removed", async () => {
-      const { useLatencyInsightsDashboard } =
-        await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
+    const chartsEl = () => wrapper.find('[data-test="render-dashboard-charts"]').element;
+    const panelTitles = () =>
+      wrapper.vm.dashboardData.tabs[0].panels.map((p: { title: string }) => p.title);
 
-      // Ensure there are at least 2 dimensions to allow removal
-      wrapper.vm.selectedDimensions = ["service_name", "span_status"];
+    it("removes only that dimension's panel, without regenerating or remounting the rest", async () => {
+      // Mount state: both panels (service_name, span_status) rendered once.
+      const dashboardBefore = wrapper.vm.dashboardData;
+      const renderKeyBefore = wrapper.vm.dashboardRenderKey;
+      const chartsBefore = chartsEl();
+      mockGenerateDashboard.mockClear();
+
+      wrapper.vm.handlePanelDelete("panel-service");
       await flushPromises();
 
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
-      wrapper.vm.selectedDimensions = ["service_name"];
+      expect(panelTitles()).toEqual(["span_status"]);
+      // Same dashboard object, same render key, same mounted charts: the
+      // remaining panel keeps its data and no new queries are generated.
+      expect(wrapper.vm.dashboardData).toBe(dashboardBefore);
+      expect(wrapper.vm.dashboardRenderKey).toBe(renderKeyBefore);
+      expect(chartsEl()).toBe(chartsBefore);
+      expect(mockGenerateDashboard).not.toHaveBeenCalled();
+    });
+
+    it("adds a panel for a newly ticked dimension without remounting the existing ones", async () => {
+      const dashboardBefore = wrapper.vm.dashboardData;
+      const chartsBefore = chartsEl();
+      mockGenerateDashboard.mockClear();
+      mockGenerateDashboard.mockReturnValueOnce({
+        tabs: [
+          {
+            panels: [
+              {
+                id: "panel-method",
+                title: "http_method",
+                layout: { x: 0, y: 0, w: 64, h: 16, i: "i-method" },
+              },
+            ],
+          },
+        ],
+      });
+
+      wrapper.vm.toggleDimension("http_method");
       await flushPromises();
 
-      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
-        callsBefore,
+      expect(panelTitles()).toEqual(["service_name", "span_status", "http_method"]);
+      expect(wrapper.vm.dashboardData).toBe(dashboardBefore);
+      expect(chartsEl()).toBe(chartsBefore);
+      // Only the added dimension is generated.
+      expect(mockGenerateDashboard).toHaveBeenCalledTimes(1);
+      expect(mockGenerateDashboard.mock.calls[0][0].map((a: any) => a.dimensionName)).toEqual([
+        "http_method",
+      ]);
+    });
+
+    it("deletes the last remaining panel and shows the no-dimensions state", async () => {
+      wrapper.vm.handlePanelDelete("panel-service");
+      await flushPromises();
+      wrapper.vm.handlePanelDelete("panel-status");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDimensions).toEqual([]);
+      expect(panelTitles()).toEqual([]);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-analysis-dashboard-no-dimensions"]').exists()).toBe(
+        true,
       );
+    });
+
+    it("brings the dashboard back when a dimension is ticked after removing them all", async () => {
+      wrapper.vm.handlePanelDelete("panel-service");
+      await flushPromises();
+      wrapper.vm.handlePanelDelete("panel-status");
+      await flushPromises();
+
+      mockGenerateDashboard.mockReturnValueOnce({
+        tabs: [
+          {
+            panels: [
+              {
+                id: "panel-service-2",
+                title: "service_name",
+                layout: { x: 0, y: 0, w: 64, h: 16, i: "i-service-2" },
+              },
+            ],
+          },
+        ],
+      });
+      wrapper.vm.toggleDimension("service_name");
+      await flushPromises();
+
+      expect(panelTitles()).toEqual(["service_name"]);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
   });
 
@@ -1339,5 +1416,46 @@ describe("TracesAnalysisDashboard", () => {
       // Should not throw at the wrapper level
       await expect(wrapper.vm.loadAnalysis()).resolves.not.toThrow();
     });
+  });
+});
+
+describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockGenerateDashboard.mockReturnValue(JSON.parse(JSON.stringify(mockGeneratedDashboard)));
+    wrapper = mountComponent({
+      embedded: true,
+      streamType: "logs",
+      analysisType: "volume",
+      availableAnalysisTypes: ["volume"],
+    });
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("renders in place as a page, not a drawer", () => {
+    expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="traces-analysis-dashboard-page"]').exists()).toBe(true);
+  });
+
+  it("keeps the header content (baseline time range chip) on the page", () => {
+    const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
+    expect(page.find(".baseline-chip").exists()).toBe(true);
+  });
+
+  it("loads the analysis and renders the dashboard on mount", () => {
+    expect(mockGenerateDashboard).toHaveBeenCalled();
+    expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+  });
+
+  it("does not leak drawer-only attributes onto the page root", () => {
+    const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
+    expect(page.attributes("width")).toBeUndefined();
+    expect(page.attributes("title")).toBeUndefined();
   });
 });

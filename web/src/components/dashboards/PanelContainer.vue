@@ -239,12 +239,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
         </OButton>
-        <!-- Direct delete icon (shown when simplifiedPanelView is true) -->
+        <!-- Direct delete icon (shown when simplifiedPanelView is true). Its panels are
+             ephemeral (Insights / Drill down), so it removes without a confirm. -->
         <OButton
           v-if="!viewOnly && simplifiedPanelView"
           variant="ghost"
           size="icon"
-          @click="onPanelModifyClick('DeletePanel')"
+          @click="deletePanelDialog"
           :title="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
           icon-left="close"

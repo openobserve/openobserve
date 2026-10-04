@@ -165,39 +165,45 @@ test.describe("Logs Analyze Dimensions testcases", () => {
 
   // ─── P2 — Edge Cases ─────────────────────────────────────────────────────────
 
-  test("P2: Analyze button hidden in SQL mode", {
+  test("P2: Drill down disabled in SQL mode", {
     tag: ['@logsAnalyze', '@logs', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing analyze button hidden in SQL mode');
+    testLogger.info('Testing Drill down toggle disabled in SQL mode');
 
-    // First do a normal search to confirm button IS visible with results
+    // First do a normal search so the Drill down toggle is enabled with results
     await searchAndOpenAnalyzeButton(page);
 
-    // Switch to SQL mode — button should disappear (condition: !sqlMode)
+    // Switch to SQL mode — the toggle stays visible but becomes disabled (:disabled="sqlMode")
     await pm.logsPage.clickSQLModeSwitch();
     await pm.logsPage.waitForSQLModeActive();
 
-    // Analyze button should NOT be visible in SQL mode
-    const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-    expect(analyzeButtonVisible).toBeFalsy();
+    // Drill down toggle is disabled in SQL mode
+    await pm.logsPage.expectAnalyzeDimensionsButtonNotVisible();
 
-    testLogger.info('Analyze button correctly hidden in SQL mode');
+    testLogger.info('Drill down toggle correctly disabled in SQL mode');
   });
 
-  test("P2: Analyze button hidden when no search results", {
+  test("P2: Drill down shows no dashboard without search results", {
     tag: ['@logsAnalyze', '@logs', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing analyze button hidden when no results');
+    testLogger.info('Testing Drill down shows no dashboard when there are no results');
 
     // Navigate to logs page but do NOT select a stream — no auto-search runs,
-    // so hits array is empty and button should be hidden
+    // so the hits array is empty and the Drill down page has nothing to analyze
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Analyze button should NOT be visible with no search results (hits.length === 0)
-    await pm.logsPage.expectAnalyzeDimensionsButtonNotVisible();
+    // With no results the Drill down page shows the same empty state as the results pane:
+    // pick-a-stream when none is selected, run-a-query otherwise
+    await page.locator('[data-test="logs-drilldown-toggle"]').click();
+    await expect(
+      page
+        .locator('[data-test="logs-drill-down-no-stream-selected-text"]')
+        .or(page.locator('[data-test="logs-drill-down-apply-search-text"]')),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-test="traces-analysis-dashboard-page"]')).not.toBeVisible();
 
-    testLogger.info('Analyze button correctly hidden when no results');
+    testLogger.info('Drill down correctly shows no dashboard when no results');
   });
 
   test("P2: Dashboard loading state transitions to content", {
@@ -222,6 +228,7 @@ test.describe("Logs Analyze Dimensions testcases", () => {
 
     const hasCharts = await pm.logsPage.hasAnalysisDashboardCharts();
     testLogger.info(`After load — Charts: ${hasCharts}`);
+    expect(hasCharts).toBeTruthy();
 
     testLogger.info('Dashboard loading state test completed');
 
