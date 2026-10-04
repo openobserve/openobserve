@@ -9332,7 +9332,6 @@
         "tabBreakdown": "Breakdown",
         "tabRelated": "Related",
         "breakdown": {
-          "samples": "{count} sample | {count} samples",
           "distinctCount": "{count} value | {count} values",
           "distinctMany": "{count}+ values",
           "addToFilter": "Add to filter",
@@ -9351,7 +9350,12 @@
           "titleAvg": "Average by {label}",
           "titleMedian": "Median by {label}",
           "titleCount": "Count by {label}",
-          "topk": "top {count}"
+          "topk": "top {count}",
+          "colValue": "Value",
+          "colTrend": "Trend",
+          "colAvg": "Avg",
+          "colLatest": "Latest",
+          "colShare": "Share"
         },
         "related": {
           "empty": "No related metrics",

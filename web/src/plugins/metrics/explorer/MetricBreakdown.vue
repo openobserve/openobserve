@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <MetricChartTile
+        ref="focusedTile"
         class="h-60"
         :queries="queriesByLabel[activeLabel]"
         :unit="card.unit"
@@ -46,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :run-query="runQuery"
         legend
         data-test="metrics-breakdown-chart"
+        @results="focused = $event"
       >
         <template #header>
           <span class="truncate">{{
@@ -111,64 +113,113 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <p
-            v-else-if="!activeValues.length"
+            v-else-if="!rows.length"
             class="text-text-secondary px-1 text-xs"
             data-test="metrics-breakdown-values-empty"
           >
             {{ t("metrics.explorer.noData") }}
           </p>
 
-          <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-6">
-            <li
-              v-for="entry in activeValues"
-              :key="entry.value"
-              class="flex min-w-0 items-center gap-2 px-1 py-0.5"
-              :data-test="`metrics-breakdown-value-${activeLabel}-${entry.value}`"
-            >
+          <OTable
+            v-else
+            :data="rows"
+            :columns="columns"
+            row-key="value"
+            :frame="false"
+            :fill-height="false"
+            pagination="none"
+            sorting="none"
+            :show-global-filter="false"
+            dense
+            data-test="metrics-breakdown-table"
+            @row-mouseenter="(row) => highlight(row, 'highlight')"
+            @row-mouseleave="(row) => highlight(row, 'downplay')"
+          >
+            <template #cell-value="{ row }">
               <span
-                class="text-text-body min-w-0 flex-1 truncate font-mono text-xs"
-                :title="entry.value"
-                >{{ entry.value }}</span
+                class="text-text-body block truncate font-mono text-xs"
+                :title="row.value"
+                :data-test="`metrics-breakdown-value-${activeLabel}-${row.value}`"
+                >{{ row.value }}</span
               >
-              <span class="text-text-secondary text-2xs shrink-0 tabular-nums">{{
-                t(
-                  "metrics.explorer.detail.breakdown.samples",
-                  { count: entry.count.toLocaleString() },
-                  entry.count,
-                )
-              }}</span>
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                icon-left="add-circle-outline"
-                :aria-label="
-                  t('metrics.explorer.detail.breakdown.addToFilterAria', {
-                    label: activeLabel,
-                    value: entry.value,
-                  })
-                "
-                :data-test="`metrics-breakdown-add-${activeLabel}-${entry.value}`"
-                @click="addFilter(activeLabel, entry.value, '=')"
+            </template>
+
+            <template #cell-trend="{ row }">
+              <div :data-test="`metrics-breakdown-trend-${activeLabel}-${row.value}`">
+                <OSkeleton
+                  v-if="statsLoading"
+                  class="h-3 w-full"
+                  data-test="metrics-breakdown-stat-loading"
+                />
+                <svg
+                  v-else-if="row.trend"
+                  viewBox="0 0 100 24"
+                  preserveAspectRatio="none"
+                  class="text-text-secondary block h-5 w-full"
+                  aria-hidden="true"
+                >
+                  <polyline
+                    :points="row.trend"
+                    fill="none"
+                    :stroke="row.color ?? 'currentColor'"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                    vector-effect="non-scaling-stroke"
+                  />
+                </svg>
+                <span v-else class="text-text-secondary text-xs">{{ ABSENT }}</span>
+              </div>
+            </template>
+
+            <template v-for="stat in STAT_COLUMNS" :key="stat" #[`cell-${stat}`]="{ row }">
+              <span
+                class="text-text-body block text-xs tabular-nums"
+                :data-test="`metrics-breakdown-${stat}-${activeLabel}-${row.value}`"
               >
-                <OTooltip :content="t('metrics.explorer.detail.breakdown.addToFilter')" />
-              </OButton>
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                icon-left="block"
-                :aria-label="
-                  t('metrics.explorer.detail.breakdown.excludeAria', {
-                    label: activeLabel,
-                    value: entry.value,
-                  })
-                "
-                :data-test="`metrics-breakdown-exclude-${activeLabel}-${entry.value}`"
-                @click="addFilter(activeLabel, entry.value, '!=')"
-              >
-                <OTooltip :content="t('metrics.explorer.detail.breakdown.exclude')" />
-              </OButton>
-            </li>
-          </ul>
+                <OSkeleton
+                  v-if="statsLoading"
+                  class="ms-auto h-3 w-12"
+                  data-test="metrics-breakdown-stat-loading"
+                />
+                <template v-else>{{ row[stat] ?? ABSENT }}</template>
+              </span>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="flex items-center justify-end gap-1">
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="add-circle-outline"
+                  :aria-label="
+                    t('metrics.explorer.detail.breakdown.addToFilterAria', {
+                      label: activeLabel,
+                      value: row.value,
+                    })
+                  "
+                  :data-test="`metrics-breakdown-add-${activeLabel}-${row.value}`"
+                  @click="addFilter(activeLabel, row.value, '=')"
+                >
+                  <OTooltip :content="t('metrics.explorer.detail.breakdown.addToFilter')" />
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="block"
+                  :aria-label="
+                    t('metrics.explorer.detail.breakdown.excludeAria', {
+                      label: activeLabel,
+                      value: row.value,
+                    })
+                  "
+                  :data-test="`metrics-breakdown-exclude-${activeLabel}-${row.value}`"
+                  @click="addFilter(activeLabel, row.value, '!=')"
+                >
+                  <OTooltip :content="t('metrics.explorer.detail.breakdown.exclude')" />
+                </OButton>
+              </div>
+            </template>
+          </OTable>
         </div>
       </section>
     </template>
@@ -249,7 +300,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, ref, watch, type PropType } from "vue";
+import {
+  computed,
+  defineComponent,
+  onBeforeUnmount,
+  ref,
+  watch,
+  type ComponentPublicInstance,
+  type PropType,
+} from "vue";
+import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
@@ -260,6 +320,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import streamService from "@/services/stream";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { parseSearchError } from "@/utils/query/searchError";
@@ -270,7 +333,9 @@ import {
   breakdownTitleKey,
   buildBreakdownQuery,
   CARD_KIND,
+  toO2Unit,
 } from "@/utils/metrics/metricDefaults";
+import { adaptiveDecimals, seriesStatsByValue } from "@/utils/metrics/breakdownStats";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -289,6 +354,44 @@ interface LabelCounts {
   error: string;
   values: any[];
 }
+
+/** Measures whose values add up, so one value's share of their sum means something. */
+const ADDITIVE_KINDS = [CARD_KIND.COUNTER_RATE, CARD_KIND.EXP_HISTOGRAM_FALLBACK];
+
+const STAT_COLUMNS = ["avg", "latest", "share"] as const;
+
+const ABSENT = raw("—");
+
+interface BreakdownRow {
+  value: string;
+  /** Formatted like the chart's y-axis; `null` when the value has no series. */
+  avg: string | null;
+  latest: string | null;
+  share: string | null;
+  /** Sparkline polyline points in a 100×24 box. */
+  trend: string | null;
+  color: string | null;
+}
+
+/**
+ * Spaced by sample index, so a gap keeps its width. Scaled from zero, like OSparkline, so a
+ * flat series with a 0.01% dip reads as flat rather than as a crash; all zeros sit mid-height.
+ */
+const trendOf = (points: (number | null)[]): string | null => {
+  const real = points.filter((p): p is number => p !== null);
+  if (!real.length) return null;
+  const min = Math.min(...real, 0);
+  const range = Math.max(...real, 0) - min;
+  const step = points.length > 1 ? 100 / (points.length - 1) : 0;
+  return points
+    .map((p, i) =>
+      p === null
+        ? null
+        : `${(i * step).toFixed(2)},${(range ? 22 - ((p - min) / range) * 20 : 12).toFixed(2)}`,
+    )
+    .filter(Boolean)
+    .join(" ");
+};
 
 const PENDING: LabelCounts = { ready: false, counted: true, failed: false, error: "", values: [] };
 const UNCOUNTED: LabelCounts = {
@@ -310,6 +413,7 @@ export default defineComponent({
     OBanner,
     OSkeleton,
     OTooltip,
+    OTable,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -550,11 +654,123 @@ export default defineComponent({
       activeLabel.value ? countsByLabel.value[activeLabel.value] : PENDING,
     );
     const activeValues = computed(() =>
-      activeCounts.value.values.slice(0, VALUES_SIZE - 1).map((v) => ({
-        value: String(v?.zo_sql_key ?? ""),
-        count: Number(v?.zo_sql_num ?? 0),
-      })),
+      activeCounts.value.values.slice(0, VALUES_SIZE - 1).map((v) => String(v?.zo_sql_key ?? "")),
     );
+
+    /** The focused chart's fetched series: the table summarises them rather than querying again. */
+    const focused = ref<{ status: string; results: any[] }>({ status: "idle", results: [] });
+    const statsLoading = computed(
+      () => focused.value.status === "idle" || focused.value.status === "loading",
+    );
+    const showShare = computed(() => ADDITIVE_KINDS.includes(props.card.cardKind));
+
+    const focusedTile = ref<ComponentPublicInstance | null>(null);
+    const focusedChart = (): ECharts | undefined => {
+      const el = (focusedTile.value?.$el as HTMLElement | undefined)?.querySelector?.(
+        '[data-test="chart-renderer"]',
+      );
+      return el ? getInstanceByDom(el as HTMLElement) : undefined;
+    };
+
+    /** Series colours as echarts drew them, so a row's trend matches its line. */
+    const seriesColors = ref<Record<string, string>>({});
+    let boundChart: ECharts | undefined;
+    const readColors = () => {
+      const series: any[] = (boundChart?.getOption() as any)?.series ?? [];
+      const colors = Object.fromEntries(
+        series.map((s) => [s.name, String(boundChart!.getVisual({ seriesName: s.name }, "color"))]),
+      );
+      if (JSON.stringify(colors) !== JSON.stringify(seriesColors.value))
+        seriesColors.value = colors;
+    };
+    let colorFrame = 0;
+    /** The chart renders after its results land, and is rebuilt on a theme switch: re-read once it draws. */
+    const bindChart = (tries = 30) => {
+      cancelAnimationFrame(colorFrame);
+      colorFrame = requestAnimationFrame(() => {
+        const chart = focusedChart();
+        if (!chart) {
+          if (tries > 0) bindChart(tries - 1);
+          return;
+        }
+        if (chart !== boundChart) {
+          if (boundChart && !boundChart.isDisposed()) boundChart.off("finished", readColors);
+          chart.on("finished", readColors);
+          boundChart = chart;
+        }
+        readColors();
+      });
+    };
+    watch([focused, () => store.state.theme], () => bindChart());
+
+    const highlight = (row: BreakdownRow, type: "highlight" | "downplay") => {
+      if (row.avg !== null) focusedChart()?.dispatchAction({ type, seriesName: row.value });
+    };
+
+    const rows = computed<BreakdownRow[]>(() => {
+      const label = activeLabel.value;
+      const stats =
+        label && focused.value.status === "done"
+          ? seriesStatsByValue(focused.value.results, label)
+          : new Map();
+      const values = [...activeValues.value];
+      for (const value of stats.keys()) if (!values.includes(value)) values.push(value);
+
+      const unit = toO2Unit(props.card.unit ?? "");
+      const decimals = adaptiveDecimals(focused.value.results);
+      const format = (v: number) =>
+        formatUnitValue(getUnitValue(v, unit.unit, unit.unitCustom ?? "", decimals));
+      const total = [...stats.values()].reduce((sum, s) => sum + s.avg, 0);
+
+      const ranked = values.map((value) => {
+        const s = stats.get(value);
+        return {
+          value,
+          rank: s?.avg ?? -Infinity,
+          avg: s ? format(s.avg) : null,
+          latest: s ? format(s.latest) : null,
+          share: s && total > 0 ? `${((s.avg / total) * 100).toFixed(1)}%` : null,
+          trend: s ? trendOf(s.points) : null,
+          color: seriesColors.value[value] ?? null,
+        };
+      });
+      // Stable: values without a series keep their count order, after the rest.
+      ranked.sort((a, b) => b.rank - a.rank);
+      return ranked.map(({ rank: _rank, ...row }) => row);
+    });
+
+    const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => [
+      {
+        id: "value",
+        header: t("metrics.explorer.detail.breakdown.colValue"),
+        accessorKey: "value",
+        meta: { autoWidth: true, fillRemaining: true },
+      },
+      { id: "trend", header: t("metrics.explorer.detail.breakdown.colTrend"), size: 128 },
+      {
+        id: "avg",
+        header: t("metrics.explorer.detail.breakdown.colAvg"),
+        size: 112,
+        meta: { align: "right" },
+      },
+      {
+        id: "latest",
+        header: t("metrics.explorer.detail.breakdown.colLatest"),
+        size: 112,
+        meta: { align: "right" },
+      },
+      ...(showShare.value
+        ? [
+            {
+              id: "share",
+              header: t("metrics.explorer.detail.breakdown.colShare"),
+              size: 80,
+              meta: { align: "right" },
+            },
+          ]
+        : []),
+      { id: "actions", header: raw(""), size: 72, isAction: true },
+    ]);
 
     const select = (label: string) => emit("update:selectedLabel", label);
 
@@ -564,6 +780,8 @@ export default defineComponent({
     onBeforeUnmount(() => {
       headGeneration += 1;
       extraGeneration += 1;
+      cancelAnimationFrame(colorFrame);
+      if (boundChart && !boundChart.isDisposed()) boundChart.off("finished", readColors);
     });
 
     return {
@@ -579,7 +797,14 @@ export default defineComponent({
       queriesByLabel,
       distinctText,
       activeCounts,
-      activeValues,
+      ABSENT,
+      STAT_COLUMNS,
+      focused,
+      focusedTile,
+      statsLoading,
+      rows,
+      columns,
+      highlight,
       select,
       addFilter,
     };

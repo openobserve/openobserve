@@ -29,6 +29,23 @@ vi.mock("@/services/stream", async (importOriginal) => {
   return { ...actual, default: { ...actual.default, fieldValues } };
 });
 
+// The focused chart's echarts instance: the table reads series colours from it and highlights on it.
+const { fakeChart, getInstanceByDom } = vi.hoisted(() => {
+  const fakeChart = {
+    dispatchAction: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+    isDisposed: vi.fn(() => false),
+    getOption: vi.fn((): any => ({ series: [] })),
+    getVisual: vi.fn((): any => undefined),
+  };
+  return { fakeChart, getInstanceByDom: vi.fn((): any => fakeChart) };
+});
+vi.mock("echarts/core", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  getInstanceByDom,
+}));
+
 /** `n` values for one label, counts descending. */
 const values = (prefix: string, n: number) =>
   Array.from({ length: n }, (_, i) => ({ zo_sql_key: `${prefix}${i}`, zo_sql_num: 1000 - i }));
@@ -68,10 +85,18 @@ const MetricCardChartStub = {
     timeRange: Object,
     legend: Boolean,
   },
-  template: `<div data-test="breakdown-chart-stub" />`,
+  template: `<div data-test="breakdown-chart-stub"><div data-test="chart-renderer" /></div>`,
 };
 
 const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] };
+
+/** A `sum by (method)` range response: one series per [value, points]. */
+const byMethod = (...series: [string, [number, string | null][]][]) => ({
+  resultType: "matrix",
+  result: series.map(([method, values]) => ({ metric: { method }, values })),
+});
+
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
 const runQuery = vi.fn();
 /** The exprs whose request a chart has abandoned through its signal. */
@@ -116,6 +141,8 @@ describe("MetricBreakdown", () => {
     vi.clearAllMocks();
     fieldValues.mockResolvedValue({ data: { hits: HITS } });
     runQuery.mockResolvedValue(SERIES);
+    fakeChart.getOption.mockReturnValue({ series: [] });
+    fakeChart.getVisual.mockReturnValue(undefined);
     io = installFakeIntersectionObserver({ autoVisible: true });
   });
 
@@ -427,12 +454,13 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-breakdown-chart"]').exists()).toBe(false);
     });
 
-    it("lists the label's values with sample counts, up to 20", async () => {
+    it("lists the label's values in a table, up to 20, without sample counts", async () => {
       wrapper = mountBreakdown({ selectedLabel: "instance" });
       await flushPromises();
       const list = wrapper.find('[data-test="metrics-breakdown-values"]');
+      expect(list.find('[data-test="metrics-breakdown-table"]').exists()).toBe(true);
       expect(list.findAll('[data-test^="metrics-breakdown-value-instance-"]')).toHaveLength(20);
-      expect(list.text()).toContain("samples");
+      expect(list.text()).not.toContain("samples");
       expect(list.find('[data-test="metrics-breakdown-distinct-instance"]').text()).toBe(
         "20+ values",
       );
@@ -583,6 +611,138 @@ describe("MetricBreakdown", () => {
       expect(fieldValues).toHaveBeenCalledTimes(2);
       expect(lastRequest().start_time).toBe(3_000);
       expect(runQuery).toHaveBeenCalledTimes(2);
+    });
+
+    describe("ranked values table", () => {
+      const cell = (kind: string, value: string) =>
+        wrapper.find(`[data-test="metrics-breakdown-${kind}-method-${value}"]`);
+      const rankedValues = () =>
+        wrapper
+          .findAll('[data-test^="metrics-breakdown-value-method-"]')
+          .map((c) => c.attributes("data-test")!.replace("metrics-breakdown-value-method-", ""));
+
+      it("ranks the values by average, highest first, with chartless values last", async () => {
+        runQuery.mockResolvedValue(
+          byMethod(
+            [
+              "m0",
+              [
+                [1, "1"],
+                [2, "1"],
+              ],
+            ],
+            [
+              "m1",
+              [
+                [1, "5"],
+                [2, "5"],
+              ],
+            ],
+          ),
+        );
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+
+        // m2 is counted by `_values` but has no series in the chart.
+        expect(rankedValues()).toEqual(["m1", "m0", "m2"]);
+        expect(cell("avg", "m2").text()).toBe("—");
+        expect(cell("latest", "m2").text()).toBe("—");
+        expect(cell("trend", "m2").find("polyline").exists()).toBe(false);
+        expect(cell("trend", "m1").find("polyline").exists()).toBe(true);
+      });
+
+      it("averages and takes the latest over real points only, skipping null and NaN", async () => {
+        runQuery.mockResolvedValue(
+          byMethod([
+            "m0",
+            [
+              [1, "2"],
+              [2, "NaN"],
+              [3, "4"],
+              [4, null],
+            ],
+          ]),
+        );
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+
+        // Formatted like the chart's y-axis: the card's unit, the chart's decimals.
+        expect(cell("avg", "m0").text()).toBe("3.00c/s");
+        expect(cell("latest", "m0").text()).toBe("4.00c/s");
+      });
+
+      it("shows each value's share of the total for a counter", async () => {
+        runQuery.mockResolvedValue(byMethod(["m0", [[1, "1"]]], ["m1", [[1, "3"]]]));
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="metrics-breakdown-table"]').text()).toContain("Share");
+        expect(cell("share", "m1").text()).toBe("75.0%");
+        expect(cell("share", "m0").text()).toBe("25.0%");
+        expect(cell("share", "m2").text()).toBe("—");
+      });
+
+      it("has no share column when the values do not add up: a gauge or a p90", async () => {
+        runQuery.mockResolvedValue(byMethod(["m0", [[1, "1"]]], ["m1", [[1, "3"]]]));
+        for (const cardKind of [CARD_KIND.GAUGE, CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS]) {
+          wrapper = mountBreakdown({ card: { ...CARD, cardKind }, selectedLabel: "method" });
+          await flushPromises();
+          expect(cell("avg", "m1").exists()).toBe(true);
+          expect(wrapper.find('[data-test^="metrics-breakdown-share-"]').exists()).toBe(false);
+          expect(wrapper.find('[data-test="metrics-breakdown-table"]').text()).not.toContain(
+            "Share",
+          );
+          wrapper.unmount();
+        }
+      });
+
+      it("keeps add and exclude on a value without a series", async () => {
+        runQuery.mockResolvedValue(byMethod(["m0", [[1, "1"]]]));
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+
+        await wrapper.find('[data-test="metrics-breakdown-add-method-m2"]').trigger("click");
+        await wrapper.find('[data-test="metrics-breakdown-exclude-method-m2"]').trigger("click");
+        expect(wrapper.emitted("add-filter")).toEqual([
+          [{ label: "method", operator: "=", value: "m2" }],
+          [{ label: "method", operator: "!=", value: "m2" }],
+        ]);
+      });
+
+      it("shows the rows with a loading state, never zeros, while the chart loads", async () => {
+        runQuery.mockImplementation(() => new Promise(() => {}));
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+
+        expect(rankedValues()).toEqual(["m0", "m1", "m2"]);
+        expect(
+          wrapper.findAll('[data-test="metrics-breakdown-stat-loading"]').length,
+        ).toBeGreaterThan(0);
+        expect(cell("avg", "m0").text()).not.toMatch(/\d/);
+      });
+
+      it("draws each trend in its series' chart colour and highlights the series on hover", async () => {
+        runQuery.mockResolvedValue(byMethod(["m0", [[1, "1"]]], ["m1", [[1, "3"]]]));
+        fakeChart.getOption.mockReturnValue({ series: [{ name: "m1" }, { name: "m0" }] });
+        fakeChart.getVisual.mockImplementation(({ seriesName }: any) =>
+          seriesName === "m1" ? "#111111" : "#222222",
+        );
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+        await nextFrame();
+        await flushPromises();
+
+        expect(cell("trend", "m1").find("polyline").attributes("stroke")).toBe("#111111");
+        expect(cell("trend", "m0").find("polyline").attributes("stroke")).toBe("#222222");
+
+        const row = cell("value", "m1").element.closest("tr")!;
+        row.dispatchEvent(new MouseEvent("mouseenter"));
+        row.dispatchEvent(new MouseEvent("mouseleave"));
+        expect(fakeChart.dispatchAction.mock.calls).toEqual([
+          [{ type: "highlight", seriesName: "m1" }],
+          [{ type: "downplay", seriesName: "m1" }],
+        ]);
+      });
     });
 
     describe("past the value-count cap", () => {

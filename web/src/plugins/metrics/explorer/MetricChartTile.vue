@@ -134,12 +134,17 @@ const props = withDefaults(
   { chartType: "line", unit: null, bucketUnit: null, legend: false },
 );
 
-const emit = defineEmits<{ select: [] }>();
+const emit = defineEmits<{
+  select: [];
+  /** What the tile holds, so a parent can read the fetched series without querying again. */
+  results: [state: { status: TileState["status"]; results: any[] }];
+}>();
 
 const { t } = useI18nTyped();
 
 const root = ref<HTMLElement | null>(null);
 const state = ref<TileState>(IDLE);
+watch(state, ({ status, results }) => emit("results", { status, results }), { immediate: true });
 const hasData = computed(() => state.value.results.some(hasSamples));
 const o2Unit = computed(() => toO2Unit(props.unit ?? ""));
 const bucketO2Unit = computed(() =>
