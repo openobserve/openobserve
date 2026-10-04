@@ -183,8 +183,7 @@ describe("MetricCard (ported to @/lib)", () => {
     });
 
     it("does NOT open the detail view from the card body", async () => {
-      // The chart body already owns drag-to-zoom, exemplar markers and the
-      // right-click Create alert.
+      // The chart body owns drag-to-zoom, exemplar markers and right-click Create alert.
       wrapper = createWrapper();
       await wrapper.trigger("click");
       expect(wrapper.emitted("open-detail")).toBeFalsy();

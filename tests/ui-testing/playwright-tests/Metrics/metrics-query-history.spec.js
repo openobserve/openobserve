@@ -1,13 +1,3 @@
-/**
- * Metrics editor — PromQL query history.
- *
- * An explicit Run in `/metrics/editor` records the query on the server
- * (POST /api/{org}/query_history). The History drawer lists the caller's
- * entries newest first; an entry can be starred (kept past retention) and
- * clicked to load it back into the open editor without a remount.
- *
- * Feature: metrics-explore-features §5 (tmp/metrics_explore_features_spec.md)
- */
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
@@ -21,8 +11,7 @@ async function runAndRecord(page, pm, query) {
   await expect
     .poll(() => pm.metricsQueryEditorPage.getCurrentQueryText(), { timeout: 10000 })
     .toBe(query);
-  // The editor commits its text to the panel model on a 500ms debounce; Run
-  // before that validates an empty query and records nothing.
+  // The editor commits its text on a 500ms debounce; an earlier Run records nothing.
   await page.waitForTimeout(600);
   const recorded = page.waitForResponse(isHistoryCall('POST'), { timeout: 30000 });
   await pm.metricsPage.clickApplyButton();
@@ -48,8 +37,7 @@ test.describe('Metrics editor query history', () => {
     const second = `memory_usage + ${marker}`;
 
     await metrics.gotoMetricsPage();
-    // Custom mode before typing: an entry recorded in Builder mode reloads as
-    // Builder, which regenerates the query from its fields instead of restoring it.
+    // Custom mode first: a Builder entry reloads by regenerating the query from its fields.
     const custom = metrics.customQueryTypeButton.first();
     await expect(custom).toBeVisible({ timeout: 15000 });
     await custom.click();

@@ -150,8 +150,7 @@ describe("explorerUrlState", () => {
 
   describe("metric detail view keys", () => {
     it("owns metric, tab and breakdown_label — and never stream", () => {
-      // `stream` is an editor key: a /metrics URL carrying it redirects to the
-      // editor, so the detail view must never claim it.
+      // `stream` is an editor key that redirects /metrics to the editor.
       expect(EXPLORER_FILTER_PARAM_KEYS).toEqual(
         expect.arrayContaining(["metric", "tab", "breakdown_label"]),
       );

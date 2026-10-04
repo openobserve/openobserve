@@ -237,8 +237,7 @@ describe("MetricDetailView", () => {
       expect(names).not.toContain("http_server_active_requests");
     });
 
-    // The stub proves only the template's own slot wiring; the real OTable
-    // renders `#cell-<id>` slots and ignores a generic `#cell`.
+    // The real OTable renders `#cell-<id>` slots and ignores a generic `#cell`.
     it("renders each related metric's cells in the real OTable", async () => {
       wrapper = mountView(
         {

@@ -2535,10 +2535,7 @@ describe("PanelSchemaRenderer", () => {
       expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([1, 1]);
     });
   });
-  // Every streamed chunk starts an async conversion, and they need not finish in
-  // the order they started. A chunk's conversion that lands after the final one
-  // must not overwrite it — with a PromQL time shift that dropped the
-  // "(… ago)" series although both streams had returned their data.
+  // A chunk conversion landing after the final one must not overwrite it.
   describe("conversions finishing out of order", () => {
     const PAGE_KEY = "conversion-race";
     const primary = { resultType: "matrix", result: [{ metric: { host: "a" }, values: [[1, "1"]] }] };
@@ -2549,13 +2546,14 @@ describe("PanelSchemaRenderer", () => {
       extras: {},
     });
 
-    it("keeps the latest conversion when an earlier, slower one resolves after it", async () => {
+    const mountRacing = async () => {
       const data = ref<any[]>([]);
       const loading = ref(false);
+      const errorDetail = ref({ message: "", code: "" });
       vi.mocked(usePanelDataLoader).mockReturnValue({
         data,
         loading,
-        errorDetail: ref({ message: "", code: "" }),
+        errorDetail,
         metadata: ref({
           queries: [
             { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
@@ -2598,6 +2596,11 @@ describe("PanelSchemaRenderer", () => {
         },
       });
       await flushPromises();
+      return { data, loading, errorDetail };
+    };
+
+    it("keeps the latest conversion when an earlier, slower one resolves after it", async () => {
+      const { data, loading } = await mountRacing();
 
       // A streamed chunk with only the primary: its conversion is slow.
       let resolveChunk!: (v: any) => void;
@@ -2625,6 +2628,44 @@ describe("PanelSchemaRenderer", () => {
         "a",
         "a (10 Minutes ago)",
       ]);
+    });
+
+    // Run 1 has rendered a chart and has a chunk conversion in flight when run 2 resets the buffer.
+    const startRunTwoOverPendingChunk = async (data: any, loading: any) => {
+      vi.mocked(convertPanelData).mockResolvedValueOnce(optionsWith("run1"));
+      data.value = [primary];
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual(["run1"]);
+
+      loading.value = true;
+      const chunk: { resolve: (v: any) => void; reject: (e: any) => void } = {} as any;
+      vi.mocked(convertPanelData).mockImplementationOnce(
+        () => new Promise((resolve, reject) => Object.assign(chunk, { resolve, reject })),
+      );
+      data.value = [primary, shifted];
+      await flushPromises();
+
+      data.value = [];
+      await flushPromises();
+      return chunk;
+    };
+
+    it("drops a previous run's conversion that resolves after the next run reset", async () => {
+      const { data, loading } = await mountRacing();
+      const chunk = await startRunTwoOverPendingChunk(data, loading);
+
+      chunk.resolve(optionsWith("stale"));
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual(["run1"]);
+    });
+
+    it("drops a previous run's conversion error that lands after the next run reset", async () => {
+      const { data, loading, errorDetail } = await mountRacing();
+      const chunk = await startRunTwoOverPendingChunk(data, loading);
+
+      chunk.reject(new Error("stale failure"));
+      await flushPromises();
+      expect(errorDetail.value.message).toBe("");
     });
   });
 });

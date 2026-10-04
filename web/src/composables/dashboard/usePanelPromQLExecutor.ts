@@ -22,8 +22,7 @@ import { parseSearchError } from "@/utils/query/searchError";
 import { gt } from "@/types/i18n";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 
-// A PromQL time shift moves both ends of the window by one constant delta, so
-// only fixed-length units qualify (no months). Values are milliseconds.
+// Fixed-length units only (ms): a time shift moves both ends of the window by one delta.
 const FIXED_OFFSET_MS: Record<string, number> = {
   s: 1_000,
   m: 60_000,
@@ -113,14 +112,10 @@ export const usePanelPromQLExecutor = (ctx: {
       const queryResults: any[] = [];
       const queryMetadata: any[] = [];
       const completedQueries = new Set<number>(); // Track completed streams
-      // Chunk statistics of every completed stream, merged into one warning so
-      // a later-finishing stream cannot hide an earlier stream's truncation.
+      // Merged across streams so a later stream cannot hide an earlier one's truncation.
       const streamStats: { totalMetricsReceived: number; uniqueSeriesSeen: number; metricsStored: number }[] = [];
 
-      // Each range query with time_shift offsets expands into 1 + N streams. The
-      // shifted ones are appended after EVERY primary, so index i < queries.length
-      // is still panel query i — exemplars read only those indexes. An instant
-      // query ignores its offsets (they stay saved for a switch back to range).
+      // Shifted streams follow every primary, so index i < queries.length stays panel query i.
       let nextShiftedIndex = panelSchema.value.queries.length;
       const shiftsByQuery = panelSchema.value.queries.map((it: any) =>
         (it.config?.query_type === "instant" ? [] : (it.config?.time_shift ?? []))
@@ -199,8 +194,7 @@ export const usePanelPromQLExecutor = (ctx: {
               return;
             }
 
-            // The query string is the same for every stream, so a past window
-            // already queried can reuse the server's result cache.
+            // One query string for every stream, so a past window can hit the server's result cache.
             const runStream = (
               queryIndex: number,
               timeRangeGap: { seconds: number; periodAsStr: string },
@@ -347,8 +341,7 @@ export const usePanelPromQLExecutor = (ctx: {
                   uniqueSeriesSeen: stats.uniqueSeriesSeen ?? stats.metricsStored,
                   metricsStored: stats.metricsStored,
                 };
-                // Summed: a stream that dropped series has uniqueSeriesSeen above
-                // metricsStored, so the totals keep that gap.
+                // Summed, so a stream that dropped series keeps uniqueSeriesSeen above metricsStored.
                 const sumOf = (key: keyof (typeof streamStats)[number]) =>
                   streamStats.reduce((total, s) => total + (s?.[key] ?? 0), 0);
 

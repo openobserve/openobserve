@@ -125,8 +125,7 @@ const props = defineProps({
     type: String as PropType<DropdownAlign>,
     validator: (v: DropdownAlign) => ["start", "center", "end"].includes(v),
   },
-  // A calendar month has no single length, so a PromQL time shift (one fixed
-  // delta for both ends of the range) cannot offer it.
+  // A month has no fixed length, so a time shift (one delta for both ends) cannot use it.
   excludeMonths: {
     default: false,
     required: false,

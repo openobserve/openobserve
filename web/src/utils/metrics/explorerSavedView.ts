@@ -13,17 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Explorer grid <-> saved-view payload. A view is the grid's URL slice, so
- * applying one is a navigation the explorer's URL watcher already handles.
- */
+// A view is the grid's URL slice, so applying one is a navigation.
 
 export const METRICS_EXPLORER_VIEW_TYPE = "metrics_explorer";
 
 const VIEW_VERSION = 1;
 
-// Grid keys and the time range only: the detail view, the refresh interval
-// and the Visualize chart never travel in a view.
+// Grid keys and time range only: the detail view, refresh interval and Visualize chart never travel.
 const VIEW_STATE_KEYS = [
   "search",
   "prefix",

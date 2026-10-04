@@ -2763,18 +2763,12 @@ export class MetricsPage {
     }
 
 
-    /* ---------------------------------------------------------- query history */
-
     async openQueryHistory() {
         await this.historyButton.click();
         await this.historyTable.waitFor({ state: 'visible', timeout: 15000 });
     }
 
-    /**
-     * Narrow the drawer to entries containing `text` (server-side substring
-     * match). Resolves once the filtered list has answered: the table re-renders
-     * on it, and a click landing mid-render is lost.
-     */
+    /** Resolves once the filtered list answers: a click landing mid-re-render is lost. */
     async searchQueryHistory(text) {
         const listed = this.page.waitForResponse(
             (res) => res.url().includes('/query_history?') && res.url().includes(`q=${encodeURIComponent(text)}`),

@@ -110,8 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-compact="isMobile"
           @trigger="onRefreshTick"
         />
-        <!-- Visualize adds an explicit Run, the one action that writes query
-             history; Refresh re-runs the chart without recording it. -->
+        <!-- Only an explicit Run writes query history; Refresh does not. -->
         <template v-if="mode === 'visualize'">
           <QueryHistoryDrawer @load="onHistoryLoad" />
           <OButton
@@ -565,9 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- The metric detail view — in place of the grid (and its facet panel),
-         keyed by the URL's `metric`. The grid stays mounted-out and paused; the
-         filter row above stays, because the page's filters apply here too. -->
+    <!-- The grid stays paused while this replaces it; the page's filters apply here too. -->
     <MetricDetailView
       v-else-if="detailOpen"
       :key="detailMetric ?? ''"
@@ -874,8 +871,7 @@ export default defineComponent({
     // rail); only Visualize swaps to the query workspace.
     const isGridMode = computed(() => mode.value === "explore" || mode.value === "workspace");
 
-    // The metric detail view: driven by the URL's `metric`, not by a mode, so the
-    // grid's mode survives it and closing returns to whichever grid was showing.
+    // Not a mode, so the grid's mode survives and closing returns to the grid that was showing.
     const detailMetric = ref<string | null>(null);
     const detailTab = ref<DetailTab | null>(null);
     const breakdownLabel = ref<string | null>(null);
@@ -917,10 +913,7 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Pause the grid whenever it is not on screen (Visualize, or the detail view
-    // in its place). The grid sweeps its slice whenever the slice changes — and
-    // switching modes changes it (the pinned-only narrowing flips). Unpaused,
-    // that sweep re-queries every card for a grid the user just navigated away from.
+    // Paused whenever off screen: a mode switch changes the slice, and its sweep re-queries every card.
     watch(
       () => isGridMode.value && !detailMetric.value,
       (on) => {
@@ -1353,16 +1346,13 @@ export default defineComponent({
       setMode("visualize");
     };
 
-    /* ---------------------------------------------------- detail view */
-
     const detailCard = computed(() =>
       detailMetric.value
         ? (grid.cards.value.find((c) => c.name === detailMetric.value) ?? null)
         : null,
     );
 
-    // Stream loading omits schemas, and Breakdown and Related both need the
-    // label sets — so entering the view waits for them.
+    // Stream loading omits schemas, which Breakdown and Related both need.
     const detailSchemasPending = ref(false);
     let detailSchemaGeneration = 0;
     watch(
@@ -1379,8 +1369,7 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    // Only the FIRST stream load: a manual refresh reloads the streams too, and
-    // must not swap the open view for a spinner (remounting it).
+    // Only the first load: a manual refresh must not remount the open view behind a spinner.
     const detailLoading = computed(
       () => (grid.loading.value && !grid.cards.value.length) || detailSchemasPending.value,
     );
@@ -1411,9 +1400,7 @@ export default defineComponent({
 
     const runDetailPreview = (expr: string) =>
       detailCard.value ? grid.runDetailQuery(expr, detailCard.value) : Promise.resolve(null);
-    const cancelDetailPreviews = (exprs: string[]) => {
-      if (detailCard.value) grid.cancelDetailQueries(exprs, detailCard.value);
-    };
+    const cancelDetailPreviews = (exprs: string[]) => grid.cancelDetailQueries(exprs);
 
     const showDetail = (name: string) => {
       // Paused synchronously, before the grid unmounts — see `setMode`.
@@ -1543,8 +1530,6 @@ export default defineComponent({
       return query;
     };
 
-    /* ------------------------------------------------------ saved views */
-
     // The menu saves this slice, allow-listed again on its side.
     const viewState = computed(() => managedFromState());
     // Here, not in the menu: it unmounts under the detail view and Visualize.
@@ -1622,9 +1607,7 @@ export default defineComponent({
       // `explore` serializes to an ABSENT key, so compare against "" — not
       // `undefined` vs "explore", which would read as a change on every sync.
       const modeChanged = String(query.mode ?? "") !== String(route.query.mode ?? "");
-      // Opening the detail view, opening a related metric and closing the view
-      // are navigations too: each gets its own Back step. Its tab and breakdown
-      // label are not — they replace.
+      // Changing the detail metric gets its own Back step; its tab and breakdown label replace.
       const metricChanged = String(query.metric ?? "") !== String(route.query.metric ?? "");
       const navigate = modeChanged || metricChanged ? router.push : router.replace;
       navigate.call(router, { query }).catch(() => {});
@@ -1703,13 +1686,7 @@ export default defineComponent({
       }
       if (isEqual(incoming, current)) return;
 
-      // A change limited to the MODE (Explore <-> Visualize <-> Workspace) or
-      // the detail view (metric / tab / breakdown_label) is not grid state:
-      // it must not re-apply the filters. Re-assigning them hands the grid
-      // brand-new Set/array identities, and its watchers answer an
-      // identical-but-new value by re-querying EVERY card — ~40 requests just
-      // for clicking a card's Open, or for pressing Back out of the detail
-      // view. Sync those keys and leave the grid alone.
+      // Mode/detail-only changes skip the filters: new Set/array identities re-query every card.
       const withoutPageKeys = (o: Record<string, string>) => {
         const { mode: _m, metric: _x, tab: _t, breakdown_label: _b, ...rest } = o;
         return rest;
@@ -1792,8 +1769,7 @@ export default defineComponent({
       return Promise.all(live.map((card) => grid.requestPreview(card, opts)));
     };
 
-    // The picker reads its v-model only on mount, so a range set from outside
-    // (a URL change, a history entry) must move the picker itself too.
+    // The picker reads its v-model only on mount, so an outside range change must move it too.
     const setPickerDate = (date: SelectedDate) => {
       selectedDate.value = date;
       dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
@@ -1929,8 +1905,6 @@ export default defineComponent({
     /** The auto-refresh timer. Keeps the no-data set; see onRefresh. */
     const onRefreshTick = () => onRefresh({ manual: false });
 
-    /* --------------------------------------------- Visualize: run, history */
-
     /** An explicit Run in Visualize — the only Visualize run that writes history. */
     const onVisualizeRun = () => visualizeRef.value?.onUserRun?.(selectedDate.value);
 
@@ -1939,8 +1913,7 @@ export default defineComponent({
       track("metrics_explorer_history_loaded");
     };
 
-    // A loaded entry's range. The grid is paused under Visualize, so it only
-    // takes the new window and re-queries when it is back on screen.
+    // The grid is paused under Visualize, so it re-queries the new window only once back on screen.
     const onVisualizeTimeRange = (date: SelectedDate) => {
       setPickerDate(date);
       syncTimeRange();
@@ -2041,9 +2014,7 @@ export default defineComponent({
     // scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
-        // ⌘/Ctrl+Enter — run the query. In Visualize this is an explicit Run
-        // of the chart; in Explore/Workspace it refreshes the grid (there is
-        // no single query).
+        // ⌘/Ctrl+Enter: an explicit Run in Visualize; elsewhere a grid refresh (there is no single query).
         id: "metricsRunQuery",
         handler: () =>
           mode.value === "visualize" ? onVisualizeRun() : onRefresh({ manual: true }),

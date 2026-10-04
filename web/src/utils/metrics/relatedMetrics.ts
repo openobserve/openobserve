@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * "What else in this area should I look at?" — name-based, as in Grafana.
- */
-
 import { MISC_GROUP_ID } from "./prefixGrouping";
 
 export interface RelatedMetric {
@@ -25,10 +21,7 @@ export interface RelatedMetric {
   sharedLabels: string[];
 }
 
-/**
- * The metrics worth ranking: the rest of the selected metric's prefix group.
- * A "misc" metric has no group to speak of, so every metric is a candidate.
- */
+/** The rest of the metric's prefix group; a "misc" metric has no group, so every metric qualifies. */
 export function relatedCandidates(
   selected: string,
   names: string[],
@@ -42,11 +35,7 @@ export function relatedCandidates(
 
 const segmentsOf = (name: string) => new Set(name.split("_").filter(Boolean));
 
-/**
- * Orders candidates by shared `_`-separated name segments, then label-set
- * overlap (Jaccard), then name. The selected metric's own family is left out:
- * `foo_bucket` listing `foo_count` says nothing new.
- */
+/** By shared name segments, then label Jaccard, then name; the metric's own family is left out. */
 export function rankRelatedMetrics(
   selected: string,
   candidates: string[],

@@ -227,8 +227,7 @@ export default defineComponent({
       if (!errors.length) record(dashboardPanelData, selectedDate);
     };
 
-    // Set while a history entry is applied, so its range change does not run
-    // the old query too: the entry's own run follows once the range lands.
+    // Set while applying an entry, so its range change does not also run the old query.
     let applyingEntry = false;
 
     /** Loads a history entry live: its panel in place, its range on the parent's picker, one run. */

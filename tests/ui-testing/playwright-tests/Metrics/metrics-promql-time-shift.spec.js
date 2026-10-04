@@ -1,14 +1,4 @@
-/**
- * PromQL time shift in the metrics editor (`/metrics/editor`).
- *
- * The "Comparison against" section used to be SQL-only. For a PromQL range
- * query each offset now issues one extra query_range over the shifted window and
- * draws its series next to the current ones, suffixed " (10 Minutes ago)" and
- * so on. A minutes offset, not a day: see seedTimeShiftMetric for why.
- * The dashboard-panel case lives in Dashboards/dashboard-config-advanced.spec.js.
- *
- * Feature: metrics-explore-features §1 (tmp/metrics_explore_features_spec.md)
- */
+// A minutes offset, not a day: see seedTimeShiftMetric for why.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');

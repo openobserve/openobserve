@@ -43,9 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-1.5">
         <!-- Matches the dashboard panel title's classes (PanelContainer's
              dashboard-panel-header): same size, weight, tracking and token. -->
-        <!-- The title opens the metric's detail view (as does the Details
-             action below). The chart body does not: it owns drag-to-zoom,
-             exemplar markers and right-click Create alert. -->
+        <!-- The title opens the detail view, not the chart body: that owns drag-to-zoom and right-click. -->
         <OButton
           variant="ghost"
           size="chip"
@@ -140,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
           </OButton>
 
-          <!-- Details — the metric's detail view (Breakdown / Related). -->
           <OButton
             variant="ghost"
             size="icon"
@@ -632,7 +629,6 @@ export default defineComponent({
     "toggle-exemplars",
     "retry-exemplars",
     "select",
-    // The metric's detail view, from the Details action or the title.
     "open-detail",
     "configure",
     "toggle-favorite",

@@ -72,7 +72,6 @@ export class MetricsExplorerPage {
         this.promqlQueryUrlPart = '/prometheus/api/v1/query_range';
 
         // ===== DETAIL VIEW (MetricDetailView / MetricBreakdown) =====
-        // Opened by the card's Details button; driven by the URL's `metric` param.
         this.cardDetailsPrefix = 'metrics-explorer-card-details-';
         this.detailRoot = '[data-test="metrics-detail"]';
         this.detailTitle = '[data-test="metrics-detail-title"]';
@@ -559,12 +558,7 @@ export class MetricsExplorerPage {
         });
     }
 
-    /* ----------------------------------------------------------- detail view */
-
-    /**
-     * Open a metric's detail view from its card. Details sits in the card's
-     * action row, which only expands on hover — so hover first, as a user does.
-     */
+    /** Details sits in the card's action row, which only expands on hover, so hover first. */
     async openMetricDetails(metric) {
         await this.cardRoot(metric).hover();
         await this.page.locator(`[data-test="${this.cardDetailsPrefix}${metric}"]`).click();

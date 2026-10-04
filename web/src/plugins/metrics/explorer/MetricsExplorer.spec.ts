@@ -996,10 +996,6 @@ describe("MetricsExplorer wiring", () => {
     });
   });
 
-  /**
-   * The metric detail view is driven by the URL's `metric` key, not by a mode:
-   * the grid underneath keeps its mode, and is paused while the view is open.
-   */
   describe("the metric detail view", () => {
     const DETAIL = '[data-test="metrics-explorer-scroll"]';
     const detailView = (wrapper: any) => wrapper.findComponent({ name: "MetricDetailView" });
@@ -1007,8 +1003,7 @@ describe("MetricsExplorer wiring", () => {
     beforeEach(() => {
       grid.cards.value = [CARD];
       grid.paused.value = false;
-      // Earlier tests leave grid state behind (a z-a sort, say); the fast-path
-      // tests need a URL that differs from the state ONLY in the detail keys.
+      // Fast-path tests need a URL differing from leftover grid state ONLY in the detail keys.
       grid.searchTerm.value = "";
       grid.selectedPrefixes.value = new Set();
       grid.selectedSuffixes.value = new Set();
@@ -1250,7 +1245,21 @@ describe("MetricsExplorer wiring", () => {
       view.props("runQuery")("sum(up)");
       expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD);
       view.props("cancelQueries")(["sum(up)"]);
-      expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"], CARD);
+      expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"]);
+    });
+
+    it("still cancels the view's queries when it is closed before it unmounts", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const view = detailView(wrapper);
+      const cancelQueries = view.props("cancelQueries");
+      view.props("runQuery")("sum(up)");
+      grid.cancelDetailQueries.mockClear();
+
+      (wrapper.vm as any).closeDetail();
+      await wrapper.vm.$nextTick();
+      cancelQueries(["sum(up)"]);
+      expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"]);
     });
   });
 

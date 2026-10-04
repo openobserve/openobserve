@@ -539,8 +539,7 @@ describe("legendBuilder", () => {
       expect(names.get(metrics[0])).toBe("app");
     });
 
-    // A time-shifted result re-uses its primary's metric object: the same series,
-    // which must not collide with itself and pick up extra labels.
+    // A shifted result re-uses its primary's metric object and must not collide with itself.
     it("names a metric object passed twice exactly as when passed once", () => {
       const metrics = [
         { pod: "api-1", region: "us", zone: "a" },

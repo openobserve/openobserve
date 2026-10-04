@@ -409,9 +409,7 @@ export default defineComponent({
       },
     );
 
-    // Every run goes through here — auto-refresh, deep links, the refresh
-    // shortcut — so it never writes history; `onUserRun` does. Returns whether
-    // the query passed validation and ran.
+    // Auto-refresh and deep links run here too, so only `onUserRun` writes history.
     const runQuery = (): boolean => {
       if (!isValid(true, false)) {
         return false;
@@ -440,11 +438,7 @@ export default defineComponent({
       if (runQuery()) record(dashboardPanelData, selectedDate.value);
     };
 
-    /**
-     * Loads a history entry live. The editor hydrates only on mount, so a
-     * metrics_data URL would not reload it: the panel is replaced in place, the
-     * picker moved, and the query run.
-     */
+    /** The editor hydrates only on mount, so an entry replaces the panel in place and reruns. */
     const applyPanelData = (metricsData: string, timeRange: SelectedDate) => {
       if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
       selectedDate.value = timeRange;

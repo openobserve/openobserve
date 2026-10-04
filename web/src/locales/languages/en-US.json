@@ -9647,7 +9647,8 @@
       "unstar": "Unstar",
       "query": "Query",
       "ranAt": "Ran",
-      "empty": "No queries yet"
+      "empty": "No queries yet",
+      "loadMore": "Load more"
     }
   },
   "settings": {

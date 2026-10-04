@@ -42,10 +42,7 @@ export interface ExplorerFilterState {
   viewMode: "grid" | "rows";
   /** Page mode — the Explore grid vs the query-driven Visualize workspace. */
   mode: "explore" | "visualize" | "workspace";
-  /**
-   * The metric whose detail view is open. Not a mode: the grid's `mode` stays
-   * as it was, so closing the view returns to whichever grid was showing.
-   */
+  /** The open detail view's metric; not a mode, so closing returns to the grid that was showing. */
   metric?: string | null;
   /** The detail view's tab. Meaningful only alongside `metric`. */
   tab?: DetailTab | null;
@@ -68,8 +65,7 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "sort",
   "view",
   "mode",
-  // The detail view. Never `stream`: that is an editor key and would redirect
-  // /metrics to the editor.
+  // Never `stream`: that is an editor key and would redirect /metrics to the editor.
   "metric",
   "tab",
   "breakdown_label",

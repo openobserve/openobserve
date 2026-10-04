@@ -566,10 +566,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const isLabelEligible = (card: MetricCard): boolean =>
     inapplicableLabelFilters(card).length === 0;
 
-  /**
-   * The active filters this card cannot apply — the ones `isLabelEligible`
-   * fails on. The detail view names them, since it charts such a card anyway.
-   */
+  /** The active filters this card cannot apply (those `isLabelEligible` fails on). */
   const inapplicableLabelFilters = (card: MetricCard): LabelFilter[] => {
     if (labelFilters.value.length === 0) return [];
     if (!membershipKnown.value) return [];
@@ -586,8 +583,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       (filter) =>
         !operands.every((stream) => {
           const labels = labelsByStream.value[stream];
-          // A stream we have no schema for (e.g. a `_count` sibling that is not in
-          // the list) cannot be proven to carry the label.
+          // A stream with no known schema cannot be proven to carry the label.
           return !!labels && labels.includes(filter.label);
         }),
     );
@@ -1910,33 +1906,28 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   /** The metric detail view's queries: dialog-grade priority, their own owner. */
   const DETAIL_OWNER = "\u0000detail";
 
-  /**
-   * Runs one query for the metric detail view — copied from `runDialogQuery`,
-   * under its own owner so closing the view never aborts a card's preview or a
-   * dialog tile sharing the same query. The card's step keeps the cache shared.
-   */
+  // Keyed at run time: by cancel time the view may show a card on another step, or none.
+  const detailKeys = new Map<string, string>();
+
+  /** Own owner, so closing the view never aborts a card preview or dialog tile on the same query. */
   const runDetailQuery = (expr: string, card: MetricCard) => {
     const step = dialogStepFor(card);
-    return queue.run(
-      previewCacheKey(expr, step),
-      PRIORITY.DIALOG,
-      (signal) => streamQuery(expr, step, signal),
-      DETAIL_OWNER,
-    );
+    const key = previewCacheKey(expr, step);
+    detailKeys.set(expr, key);
+    return queue.run(key, PRIORITY.DIALOG, (signal) => streamQuery(expr, step, signal), DETAIL_OWNER);
   };
 
   /** Detail view closed, or its chart replaced: drop what it still has running. */
-  const cancelDetailQueries = (exprs: string[], card: MetricCard) => {
-    const step = dialogStepFor(card);
+  const cancelDetailQueries = (exprs: string[]) => {
     for (const expr of exprs) {
-      queue.cancel(previewCacheKey(expr, step), DETAIL_OWNER);
+      const key = detailKeys.get(expr);
+      if (key === undefined) continue;
+      detailKeys.delete(expr);
+      queue.cancel(key, DETAIL_OWNER);
     }
   };
 
-  /**
-   * The concrete rate window the card charts with — the widened one when the
-   * card needed it — so a breakdown of the card measures over the same window.
-   */
+  /** The rate window the card charts with, widened if it was, so a breakdown measures alike. */
   const rateWindowFor = (card: MetricCard): string =>
     previews.value[card.name]?.widenedRateWindow ??
     computeRateWindow(rangeSeconds.value, pointsFor(card), scrapeIntervalSeconds.value);
@@ -2438,7 +2429,6 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     cancelDetailQueries,
     rateWindowFor,
 
-    // the detail view's Related tab
     labelsByStream,
     prefixAssignment,
     prefixOf,

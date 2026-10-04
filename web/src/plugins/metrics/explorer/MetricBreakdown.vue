@@ -14,14 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The detail view's Breakdown tab: "which pod / instance / route is it?"
-
-  Step 1 is a table of the metric's labels, each with its top values and how
-  many distinct values it has — one field-values request, scoped to the active
-  filters. Step 2: selecting a row charts the card's measure grouped by that
-  label. One chart at a time; the table already ranks the labels.
--->
 <template>
   <div class="flex min-h-0 flex-col gap-3" data-test="metrics-breakdown">
     <section
@@ -92,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="metrics-breakdown-no-labels"
     />
 
-    <!-- Scrolls sideways inside its own box on a phone, never the page. -->
     <div v-else class="min-w-0 overflow-x-auto" data-test="metrics-breakdown-table">
       <OTable
         :data="rows"
@@ -208,7 +199,6 @@ import { hasSamples, type LabelFilter } from "@/composables/metrics/useMetricsEx
 
 /** 21, not 20: a 21st value is how "more than 20" is known. */
 const VALUES_SIZE = 21;
-/** Values shown per label. */
 const TOP_VALUES = 5;
 /** Series kept for a label with "20+" values — beyond it the chart is a smear. */
 const TOPK = 10;
@@ -236,7 +226,6 @@ export default defineComponent({
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
     labelsByStream: { type: Object as PropType<Record<string, string[]>>, required: true },
-    /** The page's label filters — global, as on the grid. */
     filters: { type: Array as PropType<LabelFilter[]>, required: true },
     /** The Explorer's window, µs. */
     timeRange: {
@@ -263,8 +252,7 @@ export default defineComponent({
 
     const labels = computed(() => {
       const own = props.card.labels ?? props.labelsByStream[props.card.name];
-      // A mean pair divides `_sum` by `_count`: a label only one side carries
-      // would split one side of the ratio.
+      // A label on only one side of `_sum / _count` would split half the ratio.
       const alsoOn =
         props.card.cardKind === CARD_KIND.MEAN_PAIR
           ? (props.labelsByStream[`${baseNameOf(props.card.name)}_count`] ?? [])
@@ -279,18 +267,13 @@ export default defineComponent({
         : null,
     );
 
-    /**
-     * Filters the values stream can answer. PromQL ignores a matcher on a label
-     * the stream lacks; SQL would reject the column, so it is left out here too.
-     */
+    /** SQL rejects a column the stream lacks (PromQL ignores the matcher), so such filters are dropped. */
     const applicableFilters = computed(() => {
       const known =
         props.labelsByStream[valuesStream.value] ??
         (valuesStream.value === props.card.name ? props.card.labels : undefined);
       return known ? props.filters.filter((f) => known.includes(String(f.label))) : props.filters;
     });
-
-    /* ----------------------------------------------------------- table */
 
     const rows = ref<BreakdownRow[]>([]);
     const tableLoading = ref(false);
@@ -380,8 +363,6 @@ export default defineComponent({
 
     const addFilter = (label: string, value: string, operator: "=" | "!=") =>
       emit("add-filter", { label: raw(label), operator, value });
-
-    /* ----------------------------------------------------------- chart */
 
     const selectedRow = computed(
       () => rows.value.find((row) => row.label === activeLabel.value) ?? null,

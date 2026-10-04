@@ -18,11 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
 import { encodeMetricsConfig, getMetricsConfig } from "@/composables/metrics/metricsUrlState";
 
-/**
- * Which triggers write query history. Only an explicit Run does: the Run button
- * and the run shortcut. Auto-refresh, a deep-link auto-run and the refresh
- * shortcut all go through the same runQuery and must record nothing.
- */
+// Only an explicit Run writes history; auto-refresh, deep links and refresh share runQuery.
 
 const api = vi.hoisted(() => ({
   record: vi.fn(),

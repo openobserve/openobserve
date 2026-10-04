@@ -516,14 +516,7 @@ export default class DashboardactionPage {
     await this.page.waitForTimeout(1000);
   }
 
-  /**
-   * Names of the series every mounted ECharts instance under `scopeSelector`
-   * is drawing — the legend's entries. The legend is painted on the canvas, so
-   * it has no DOM text to assert on.
-   *
-   * Reads ChartRenderer's `chart` getter through the vnode tree from #app:
-   * `__vueParentComponent` is dev-only, while `_vnode` also exists in prod builds.
-   */
+  // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
   async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
     return this.page.evaluate((scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));

@@ -19,10 +19,7 @@ import { recordQueryHistoryMutation } from "@/services/query_history.queries";
 import { buildHistoryEntry } from "@/utils/metrics/queryHistory";
 import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 
-/**
- * Records an explicit run in the user's query history. Fire-and-forget: a
- * failure is logged to the console only and never reaches the run.
- */
+/** Fire-and-forget: a failed record is only logged and never reaches the run. */
 export const useQueryHistoryRecorder = () => {
   const orgId = useOrgId();
   const recordEntry = useMutation(() => recordQueryHistoryMutation(orgId.value));

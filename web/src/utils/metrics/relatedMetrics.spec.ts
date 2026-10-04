@@ -75,8 +75,7 @@ describe("rankRelatedMetrics", () => {
       {},
       familyOf,
     ).map((r) => r.name);
-    // memory+free+node (3) and memory+bytes+node (3) beat node alone (1); the tie
-    // falls through to alphabetical.
+    // memory+free+node (3) and memory+bytes+node (3) beat node (1); the tie goes alphabetical.
     expect(ranked).toEqual([
       "node_memory_free_ratio",
       "node_memory_total_bytes",

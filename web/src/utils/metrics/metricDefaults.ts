@@ -1417,10 +1417,6 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* Breakdown — one chart of the card's measure, grouped by one label            */
-/* -------------------------------------------------------------------------- */
-
 /** At most this many labels are offered: each one costs the server a scan. */
 export const BREAKDOWN_LABEL_LIMIT = 15;
 
@@ -1432,13 +1428,7 @@ export function supportsBreakdown(cardKind: string): boolean {
   return cardKind !== CARD_KIND.TIMESTAMP && cardKind !== CARD_KIND.OTHER;
 }
 
-/**
- * The labels the Breakdown tab offers, alphabetical and capped.
- *
- * @param labels the card's own label names
- * @param alsoOn a second operand's label names (a mean pair's `_count`); a label
- *   missing from either operand would split one side of the ratio only
- */
+/** Breakdown labels, alphabetical and capped; `alsoOn` keeps only labels both operands carry. */
 export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[]): string[] {
   if (!Array.isArray(labels)) return [];
   const other = alsoOn ? new Set(alsoOn) : null;
@@ -1446,6 +1436,7 @@ export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[
     .filter(
       (l) =>
         typeof l === "string" &&
+        LABEL_NAME_RE.test(l) &&
         !l.startsWith("_") &&
         !NON_BREAKDOWN_LABELS.has(l) &&
         (!other || other.has(l)),
@@ -1454,17 +1445,7 @@ export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[
     .slice(0, BREAKDOWN_LABEL_LIMIT);
 }
 
-/**
- * The card's measure grouped by one label, as one PromQL expression.
- *
- * The classic histogram charts a p90 line rather than its default heatmap: a
- * heatmap per label value is unreadable. A summary charts its median, selected
- * through `buildSelector` so the extra matcher is validated and ordered like any
- * other.
- *
- * @returns the expression, or `null` for a kind with no breakdown or a label
- *   name that is not a valid PromQL identifier
- */
+/** A classic histogram charts p90, as a heatmap per label value is unreadable; null if unbuildable. */
 export function buildBreakdownQuery(
   cardKind: string,
   ctx: {

@@ -1000,7 +1000,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
 
-        // Query history
         .route("/{org_id}/query_history", get(query_history::list).post(query_history::record))
         .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete))
 

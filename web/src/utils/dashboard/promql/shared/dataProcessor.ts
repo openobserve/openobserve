@@ -24,8 +24,7 @@ import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
  * @param searchQueryData - Array of PromQL API responses (one per query)
  * @param panelSchema - Panel configuration schema
  * @param store - Vuex store instance
- * @param shift - time-shift alignment from alignShiftedPromQLResults: the panel
- *   query index and name suffix of each expanded result
+ * @param shift - each expanded result's panel query index and name suffix (alignShiftedPromQLResults)
  * @returns Processed data array ready for chart-specific conversion
  */
 export async function processPromQLData(
@@ -152,10 +151,7 @@ function formatTimestamps(
 }
 
 /**
- * Limit number of series per query to prevent performance issues. A time-shifted
- * result is not limited on its own: alignShiftedPromQLResults gives each shifted
- * series its primary's metric object, so a shifted series is kept only when that
- * primary survives the limit (one with no primary series at all is kept as is).
+ * Limit number of series per query to prevent performance issues; a shifted series follows its primary.
  *
  * @param data - Array of PromQL responses
  * @param limit - Maximum number of series to keep per query

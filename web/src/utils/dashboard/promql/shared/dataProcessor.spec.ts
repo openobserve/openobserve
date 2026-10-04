@@ -210,9 +210,7 @@ describe("dataProcessor", () => {
     });
 
     it("keeps a shifted series only when its primary survives the series limit (stacked)", async () => {
-      // As alignShiftedPromQLResults leaves it: a shifted series re-uses its
-      // primary's metric object. The previous window returns the series in a
-      // different order and lacks one of them.
+      // Shifted series re-use their primaries' metric objects, reordered and with one missing.
       const metrics = ["a", "b", "c", "d", "e", "f", "g"].map((job) => ({ job }));
       const primary = metrics.map((metric) => ({ metric, values: [[1000, "1"]] }));
       const shifted = [6, 5, 4, 3, 2, 1].map((i) => ({ metric: metrics[i], values: [[1000, "2"]] }));

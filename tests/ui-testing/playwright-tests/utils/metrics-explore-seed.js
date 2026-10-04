@@ -1,12 +1,4 @@
-/**
- * Deterministic metric seeds for the metrics-exploration suites: PromQL time
- * shift, the Explorer detail view (Breakdown / Related) and query history.
- *
- * The shared OTLP seed (shared-metrics-setup.js) picks label values at random
- * and only ever writes "now", so it can neither back a shifted-window overlay
- * nor pin a breakdown value such as status="500". These rows go through the JSON
- * metrics endpoint, whose `_timestamp` is MILLIseconds (the logs one is micros).
- */
+// The JSON metrics endpoint takes `_timestamp` in MILLIseconds (the logs one takes micros).
 const { expect } = require('@playwright/test');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
@@ -51,15 +43,7 @@ async function waitForInstantQuery(request, query, timeout = 60_000) {
     .toBeGreaterThan(0);
 }
 
-/**
- * One gauge series, a point every 30s over the last 40 minutes.
- *
- * Why the tests shift by minutes and not by a day: a PromQL window that ends
- * before now − 3 × ZO_MAX_FILE_RETENTION_TIME (30 minutes by default) is read
- * from storage only, never the WAL, and back-dated rows reach storage only
- * after the WAL rotates them out — 15-20 minutes on a default server. A shifted
- * window that ends inside the last 30 minutes is answered from the WAL at once.
- */
+// Shift by minutes: a window ending past ~30m ago skips the WAL, and back-dated rows reach storage late.
 async function seedTimeShiftMetric(request) {
   const now = Date.now();
   const rows = [];
@@ -76,11 +60,7 @@ async function seedTimeShiftMetric(request) {
   await waitForInstantQuery(request, TIME_SHIFT_METRIC);
 }
 
-/**
- * Two counters and a gauge under one prefix, a point every 15s over the last
- * 10 minutes. method has 2 values (a breakdown chart without topk) and status
- * pins "500" for the Add-to-filter case.
- */
+// method has 2 values (a breakdown without topk); status pins "500" for Add-to-filter.
 async function seedDetailMetrics(request) {
   const now = Date.now();
   const series = [];

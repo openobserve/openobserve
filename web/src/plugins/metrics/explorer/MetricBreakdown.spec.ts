@@ -46,8 +46,7 @@ const CARD: any = {
   labels: ["instance", "method", "route", "status", "le", "__name__"],
 };
 
-// OTable is heavy (TanStack + virtualisation); this stub renders its rows through
-// the same per-column slot contract — `#cell-<id>` with `{ row: original, column, value }`.
+// Light OTable stub with the same `#cell-<id>` slot contract: `{ row: original, column, value }`.
 const OTableStub = {
   name: "OTable",
   props: ["data", "columns", "loading", "error", "rowClass"],
@@ -285,9 +284,7 @@ describe("MetricBreakdown", () => {
   });
 });
 
-// The stub above only proves the template's own slot wiring. This mounts the
-// real OTable, so a slot OTable does not render (it supports `#cell-<id>`, not
-// a generic `#cell`) leaves the cells empty here.
+// The real OTable renders only `#cell-<id>` slots, so a wrong slot name leaves cells empty here.
 describe("MetricBreakdown with the real OTable", () => {
   let wrapper: VueWrapper<any>;
 
@@ -320,8 +317,7 @@ describe("MetricBreakdown with the real OTable", () => {
     wrapper = mountReal();
     await flushPromises();
 
-    // The rows themselves render (once OTable drops its loading skeleton);
-    // what is under test is their cells.
+    // Wait out OTable's loading skeleton; the cells are what is under test.
     await vi.waitFor(() =>
       expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(4),
     );

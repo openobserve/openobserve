@@ -13,28 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import { infiniteQueryOptions, mutationOptions } from "@tanstack/vue-query";
 import queryHistory, { type QueryHistoryEntry } from "./query_history";
 import { queryHistoryKeys } from "./query_history.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
+export const QUERY_HISTORY_PAGE_SIZE = 50;
+
 export const queryHistoryQuery = (org: string, starred: boolean, q: string) =>
-  queryOptions({
+  infiniteQueryOptions({
     queryKey: queryHistoryKeys.list(org, starred, q),
-    queryFn: async (): Promise<QueryHistoryEntry[]> => {
+    queryFn: async ({ pageParam }): Promise<QueryHistoryEntry[]> => {
       const res = await queryHistory.list(org, {
         ...(starred ? { starred: true } : {}),
         ...(q ? { q } : {}),
+        limit: QUERY_HISTORY_PAGE_SIZE,
+        offset: pageParam,
       });
       return Array.isArray(res.data) ? res.data : [];
     },
+    initialPageParam: 0,
+    // A short page is the last one.
+    getNextPageParam: (last, pages) =>
+      last.length < QUERY_HISTORY_PAGE_SIZE ? undefined : pages.length * QUERY_HISTORY_PAGE_SIZE,
     staleTime: MEDIUM_STALE_TIME,
   });
 
-// ── Writes ──────────────────────────────────────────────────────────────────
-
-// A failed record is logged by the caller and never toasted: it must not
-// disturb the run it belongs to.
+// Never toasted: a failed record must not disturb the run it belongs to.
 export const recordQueryHistoryMutation = (org: string) =>
   mutationOptions({
     mutationFn: (body: { query: string; context: Record<string, any> }) =>

@@ -14,8 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The caller's PromQL query history: newest first, searchable, starrable;
-     clicking an entry hands it to the host to apply live. -->
 <template>
   <ODrawer
     v-model:open="open"
@@ -111,13 +109,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </div>
+      <div
+        v-if="history.hasNextPage.value"
+        class="border-border-default flex shrink-0 justify-center border-t p-3"
+      >
+        <OButton
+          variant="outline"
+          size="sm"
+          :loading="history.isFetchingNextPage.value"
+          data-test="metrics-history-load-more"
+          @click="history.fetchNextPage()"
+        >
+          {{ t("metrics.history.loadMore") }}
+        </OButton>
+      </div>
     </div>
   </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useInfiniteQuery, useMutation } from "@tanstack/vue-query";
 import { useI18nTyped } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -151,13 +163,13 @@ const open = ref(false);
 const search = ref("");
 const starredOnly = ref(false);
 
-const history = useQuery(() =>
+const history = useInfiniteQuery(() =>
   Object.assign(queryHistoryQuery(orgId.value, starredOnly.value, search.value.trim()), {
     enabled: open.value && !!orgId.value,
   }),
 );
 // The server returns newest first; the table keeps that order.
-const rows = computed(() => history.data.value ?? []);
+const rows = computed(() => history.data.value?.pages.flat() ?? []);
 
 const starEntry = useMutation(() => starQueryHistoryMutation(orgId.value));
 const deleteEntry = useMutation(() => deleteQueryHistoryMutation(orgId.value));

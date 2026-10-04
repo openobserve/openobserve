@@ -111,7 +111,7 @@ describe("QueryHistoryDrawer", () => {
     expect(api.list).not.toHaveBeenCalled();
 
     await open(wrapper);
-    expect(api.list).toHaveBeenCalledWith("default", {});
+    expect(api.list).toHaveBeenCalledWith("default", { limit: 50, offset: 0 });
     const rows = wrapper.findAll('[data-test^="row-"]').map((r) => r.attributes("data-test"));
     expect(rows).toEqual(["row-e2", "row-e1"]);
   });
@@ -122,7 +122,7 @@ describe("QueryHistoryDrawer", () => {
 
     await wrapper.find('[data-test="metrics-history-starred-only"]').setValue(true);
     await flushPromises();
-    expect(api.list).toHaveBeenLastCalledWith("default", { starred: true });
+    expect(api.list).toHaveBeenLastCalledWith("default", { starred: true, limit: 50, offset: 0 });
   });
 
   it("searches on the server", async () => {
@@ -131,7 +131,7 @@ describe("QueryHistoryDrawer", () => {
 
     await wrapper.find('[data-test="metrics-history-search"]').setValue("rate");
     await flushPromises();
-    expect(api.list).toHaveBeenLastCalledWith("default", { q: "rate" });
+    expect(api.list).toHaveBeenLastCalledWith("default", { q: "rate", limit: 50, offset: 0 });
   });
 
   it("stars, unstars and deletes through the entry routes", async () => {
@@ -165,6 +165,41 @@ describe("QueryHistoryDrawer", () => {
       timeRange: { valueType: "relative", relativeTimePeriod: "6h" },
     });
     expect(wrapper.find('[data-test="drawer"]').exists()).toBe(false);
+  });
+
+  describe("loading past the first page", () => {
+    const page = (from: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        ...ENTRIES[1],
+        id: `p${from + i}`,
+        created_at: 1_000_000 - (from + i),
+      }));
+    const loadMore = (wrapper: any) => wrapper.find('[data-test="metrics-history-load-more"]');
+
+    it("fetches the next page by offset and appends it", async () => {
+      api.list.mockImplementation((_org: string, params: any) =>
+        Promise.resolve({ data: params.offset ? page(50, 7) : page(0, 50) }),
+      );
+      const wrapper = mountDrawer();
+      await open(wrapper);
+      expect(wrapper.findAll('[data-test^="row-"]')).toHaveLength(50);
+
+      await loadMore(wrapper).trigger("click");
+      await flushPromises();
+      expect(api.list).toHaveBeenLastCalledWith("default", { limit: 50, offset: 50 });
+      const rows = wrapper.findAll('[data-test^="row-"]').map((r) => r.attributes("data-test"));
+      expect(rows).toHaveLength(57);
+      expect(rows[0]).toBe("row-p0");
+      expect(rows[50]).toBe("row-p50");
+      // The short page was the last one.
+      expect(loadMore(wrapper).exists()).toBe(false);
+    });
+
+    it("offers no more when the first page is already short", async () => {
+      const wrapper = mountDrawer();
+      await open(wrapper);
+      expect(loadMore(wrapper).exists()).toBe(false);
+    });
   });
 
   it("goes full screen on mobile", async () => {

@@ -204,7 +204,7 @@ import useMetricsExplorerGrid, {
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
 import i18nInstance from "@/locales";
-import { PRIORITY } from "./useMetricsPreviewQueue";
+import { PRIORITY, isCancelled } from "./useMetricsPreviewQueue";
 const t = (i18nInstance.global as any).t;
 
 const SERIES = {
@@ -1873,8 +1873,30 @@ describe("useMetricsExplorerGrid", () => {
       grid.runDetailQuery("sum(up)", card).catch(() => {});
       const [key, , , owner] = run.mock.calls.at(-1)!;
 
-      grid.cancelDetailQueries(["sum(up)"], card);
+      grid.cancelDetailQueries(["sum(up)"]);
       expect(cancel).toHaveBeenCalledWith(key, owner);
+    });
+
+    it("cancels a detail query by the key it ran under after a related card on another step opened", async () => {
+      const grid = await setup();
+      const outcomes: Record<string, string> = {};
+      const track = (expr: string, card: any) => {
+        outcomes[expr] = "pending";
+        grid.runDetailQuery(expr, card).then(
+          () => (outcomes[expr] = "landed"),
+          (error: any) => (outcomes[expr] = isCancelled(error) ? "cancelled" : "failed"),
+        );
+      };
+      track("sum(up)", cardNamed(grid, "http_requests_total"));
+      await flush();
+      // A heatmap card charts on a different step.
+      track("sum(lat)", cardNamed(grid, "lat_seconds_bucket"));
+      await flush();
+
+      grid.cancelDetailQueries(["sum(up)"]);
+      await flush();
+      expect(outcomes).toEqual({ "sum(up)": "cancelled", "sum(lat)": "pending" });
+      inFlight.length = 0;
     });
 
     it("exposes what the detail view ranks and filters with", async () => {

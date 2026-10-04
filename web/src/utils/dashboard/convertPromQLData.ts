@@ -84,22 +84,7 @@ const getMarkLineData = (panelSchema: any) => {
 const labelSetKey = (metric: Record<string, string> = {}) =>
   JSON.stringify(Object.entries(metric).sort(([a], [b]) => a.localeCompare(b)));
 
-/**
- * Prepares time-shifted ("compare to a previous period") results for either
- * converter path. The executor appends one entry per (range query, offset)
- * after the primaries and tags each with `timeRangeGap` (ms) and
- * `panelQueryIndex`. For every shifted entry this:
- *  - moves the samples forward by the offset and snaps them onto the current
- *    step grid, so an offset that is not a multiple of the step (35s vs 1d)
- *    does not double the x values;
- *  - keeps only series whose label set matches a primary series, re-using the
- *    primary's metric object so naming treats them as the same series. With no
- *    primary series at all, the shifted series are kept as they are.
- *
- * Returns the panel query index and the name suffix (periodAsStr, "" for a
- * primary) of every expanded index; legend templates and query config must be
- * read through `parentQueryIndex`, never through the raw index.
- */
+/** Snaps shifted results onto the step grid and their primaries' series; read config via `parentQueryIndex`. */
 export const alignShiftedPromQLResults = (
   data: any[],
   metadata: any,
@@ -183,8 +168,7 @@ export const convertPromQLData = async (
 
   await importMoment();
 
-  // if no data than return it. Any expanded result counts: with a time shift
-  // the current period can be empty while a previous one has data.
+  // if no data than return it; with a time shift only a previous period may have data
   if (!Array.isArray(searchQueryData) || !searchQueryData.some(Boolean) || !panelSchema) {
     // console.timeEnd("convertPromQLData");
     return { options: null };
@@ -256,8 +240,7 @@ export const convertPromQLData = async (
     }
   });
 
-  // For multiple queries (multi y-axis equivalent), divide the limit equally.
-  // A shifted window is not a query of its own.
+  // For multiple queries (multi y-axis equivalent), divide the limit equally; a shifted window is not one
   const numberOfQueries = searchQueryData.filter(
     (q: any, i: number) => !nameSuffixes[i] && q?.result?.length > 0,
   ).length;

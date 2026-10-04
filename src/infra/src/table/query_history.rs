@@ -153,8 +153,7 @@ pub async fn list_with<C: ConnectionTrait>(
         .await?)
 }
 
-/// Case-insensitive literal substring match, the same on every backend:
-/// `%`, `_` and `\` in `q` match only themselves.
+/// Case-insensitive literal substring match: `%`, `_` and `\` match only themselves.
 fn query_matches(q: &str) -> SimpleExpr {
     let mut pattern = String::with_capacity(q.len() + 2);
     pattern.push('%');
@@ -185,8 +184,7 @@ pub async fn set_starred_with<C: ConnectionTrait>(
     id: &str,
     starred: bool,
 ) -> Result<Option<Model>, errors::Error> {
-    // Look the entry up first: MySQL's rows_affected counts changed rows, so
-    // re-starring a starred entry reports 0 and cannot signal "not found".
+    // MySQL rows_affected counts changed rows, so a re-star reports 0; "not found" needs a lookup.
     let Some(entry) = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::UserEmail.eq(user_email))

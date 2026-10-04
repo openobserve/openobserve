@@ -14,8 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The grid's saved views: org-shared setups of search, facets, label filters,
-     sort, scope, view, mode and time range. Applying one is a navigation. -->
 <template>
   <ODropdown align="end">
     <template #trigger>
@@ -161,8 +159,7 @@ const views = computed<ViewSummary[]>(() =>
   ),
 );
 
-// Owned by the parent: this menu unmounts with the grid (detail view, Visualize),
-// and Update/Delete must still target the applied view when it comes back.
+// Parent-owned: this menu unmounts with the grid, and Update/Delete must still find the view.
 const activeViewId = defineModel<string | null>("activeViewId", { default: null });
 const activeView = computed(() => views.value.find((v) => v.view_id === activeViewId.value));
 

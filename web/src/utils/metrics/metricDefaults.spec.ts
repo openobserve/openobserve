@@ -977,6 +977,15 @@ describe("supportsBreakdown", () => {
 });
 
 describe("breakdownLabelsOf", () => {
+  it("offers only labels the breakdown query can group by", () => {
+    const labels = breakdownLabelsOf(["1st_pod", "pod", "k8s.node", "zone"]);
+    expect(labels).toEqual(["pod", "zone"]);
+    for (const label of labels) {
+      expect(buildBreakdownQuery(CARD_KIND.GAUGE, { metricName: "up" }, label)).not.toBeNull();
+    }
+    expect(buildBreakdownQuery(CARD_KIND.GAUGE, { metricName: "up" }, "1st_pod")).toBeNull();
+  });
+
   it("drops le, quantile and internal labels, sorted alphabetically", () => {
     expect(
       breakdownLabelsOf(["route", "le", "quantile", "_ts", "__name__", "method", "instance"]),

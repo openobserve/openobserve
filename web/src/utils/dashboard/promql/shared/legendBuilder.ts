@@ -262,8 +262,7 @@ export const buildPromqlSeriesNames = (
   }
 
   const auto = queries.filter((q) => !q.template);
-  // Unique by object: a time-shifted result re-uses its primary's metric object,
-  // and a series must not collide with itself.
+  // Unique by object: a shifted result re-uses its primary's metric object.
   const allMetrics = [...new Set(auto.flatMap((q) => q.metrics))];
   if (!allMetrics.length) return names;
 

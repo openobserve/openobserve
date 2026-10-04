@@ -67,8 +67,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
-    // One gauge series back-filled over 40 minutes. The offset is minutes, not
-    // a day: see seedTimeShiftMetric for why.
+    // Minutes, not a day: see seedTimeShiftMetric for why.
     await seedTimeShiftMetric(page.request);
 
     await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", query: TIME_SHIFT_METRIC });
@@ -87,8 +86,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Assert on the saved panel: in PromQL custom mode the editor's preview sits
-    // in a sliver under the query editor and was seen not to draw its chart.
+    // Assert on the saved panel: the PromQL custom-mode editor preview was seen not to draw.
     await pm.dashboardPanelActions.savePanel();
     let names = [];
     await expect

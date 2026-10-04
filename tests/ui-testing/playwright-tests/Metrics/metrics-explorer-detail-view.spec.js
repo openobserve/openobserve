@@ -1,16 +1,4 @@
-/**
- * Metrics Explorer — metric detail view: Breakdown and Related tabs.
- *
- * A card's Details button opens one metric in detail (driven by the URL's
- * `metric` param). Breakdown ranks the metric's labels by top values and charts
- * the metric grouped by the selected label; Related lists nearby metrics by
- * name, and opening one navigates to its own detail view.
- *
- * Feature: metrics-explore-features §2–3 (tmp/metrics_explore_features_spec.md)
- *
- * Seeds its own deterministic metrics (metrics-explore-seed.js): the shared OTLP
- * seed draws label values at random, so it cannot pin status="500".
- */
+// Own deterministic seed: the shared OTLP seed draws label values at random, so cannot pin status="500".
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');

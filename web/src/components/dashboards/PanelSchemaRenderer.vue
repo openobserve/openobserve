@@ -804,8 +804,7 @@ export default defineComponent({
       t,
     );
 
-    // PromQL time shift appends shifted results after the primaries ([A, B, A', B']),
-    // so a result's array index is not its panel query index: read it from metadata.
+    // Shifted results follow the primaries ([A, B, A', B']), so an array index is not a query index.
     const isHiddenAt = (index: number) =>
       hiddenQueries.value.includes(
         panelSchema.value?.queryType === "promql"
@@ -1236,8 +1235,7 @@ export default defineComponent({
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
     });
-    // Each streamed chunk starts a conversion, and an earlier one can resolve
-    // after a later one; only the most recently started may land.
+    // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Preserve the previously rendered chart during a reload. While loading,
@@ -1513,6 +1511,8 @@ export default defineComponent({
           data.value?.length > 0 &&
           (data.value[0]?.result?.length > 0 ||
             (Array.isArray(data.value[0]) && data.value[0].length > 0));
+        // An emptied buffer is a new run: no conversion started before it may land.
+        if (!data.value?.length) conversionGeneration++;
 
         if (loading.value) {
           // ---- STREAMING (chunks arriving) ----

@@ -96,7 +96,7 @@ export const BADGE_LABEL_KEYS: Record<string, I18nKey> = {
   other: "metrics.badge.other",
 };
 
-/** Human-facing unit text, as the card header and the detail view show it. */
+/** Human-facing unit text. */
 export const UNIT_LABELS: Record<string, string> = {
   seconds: "s",
   milliseconds: "ms",

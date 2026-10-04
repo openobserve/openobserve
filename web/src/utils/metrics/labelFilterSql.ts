@@ -24,13 +24,7 @@ const PREDICATE: Record<string, (column: string, literal: string) => string> = {
   "!~": (column, literal) => `re_not_match(${column}, ${literal})`,
 };
 
-/**
- * The Explorer's label filters as a complete SQL statement over one stream.
- *
- * Handed to the field-values endpoint as `query_context`, so the value counts
- * reflect the filters. A complete `SELECT … WHERE …` and not a bare clause: the
- * server parses a full statement to pick the WHERE out of it.
- */
+/** A full SELECT, not a bare clause: the field-values endpoint picks the WHERE out of a statement. */
 export function labelFiltersToSql(stream: string, filters: LabelFilter[]): string {
   const where = filters.map((filter) => {
     const operator = filter.operator ?? "=";

@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Metrics panel <-> query history entry. The panel itself travels as the
-// metrics_data blob, so an entry reopens exactly what was run.
+// The panel travels as the metrics_data blob, so an entry reopens exactly what was run.
 
 import { encodeMetricsConfig, getMetricsConfig } from "@/composables/metrics/metricsUrlState";
 import {

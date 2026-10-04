@@ -14,13 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  One metric, in detail: its current query at full width, then Breakdown (which
-  label value is it?) and Related (what else is nearby?).
-
-  Driven by the URL's `metric` parameter, not by a page mode — the parent swaps
-  this in for the grid and pauses the grid while it is open.
--->
 <template>
   <div class="flex min-h-0 flex-1 flex-col" data-test="metrics-detail">
     <div
@@ -105,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="min-h-0 flex-1 overflow-y-auto">
         <OContent class="flex flex-col gap-3 py-3">
-          <!-- The engine ignores a matcher on a label the metric lacks, so the
-               chart below is unfiltered by these — say so rather than imply it. -->
+          <!-- The engine ignores matchers on labels the metric lacks, so the chart is unfiltered by these. -->
           <OBanner
             v-if="inapplicableFilters.length"
             variant="info"
@@ -268,7 +260,6 @@ import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { hasSamples, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
-/** Related metrics shown — a ranked list, no charts. */
 const RELATED_LIMIT = 12;
 
 interface RelatedRow {
@@ -374,8 +365,6 @@ export default defineComponent({
       breakdownSupported.value ? (props.tab ?? "breakdown") : "related",
     );
 
-    /* --------------------------------------------------------- overview */
-
     const overviewState = ref<OverviewState>(IDLE);
     const overviewHasSamples = computed(() => overviewState.value.results.some(hasSamples));
     const overviewUnit = computed(() => toO2Unit(props.overview.unit));
@@ -443,13 +432,10 @@ export default defineComponent({
       cancelActive();
     });
 
-    /* ---------------------------------------------------------- related */
-
     const related = computed<RelatedRow[]>(() => {
       const card = props.card;
       if (!card) return [];
-      // A metric the filters do not apply to is hidden from the grid; it is no
-      // nearer a neighbour here.
+      // A metric the filters do not apply to is hidden from the grid, so it is no neighbour here.
       const byName = new Map(
         props.allCards.filter((c) => props.isLabelEligible(c)).map((c) => [c.name, c]),
       );
