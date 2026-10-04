@@ -112,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 })
               }}</OTag
             >
-            <OTooltip :content="operationPercentile.tooltip" />
+            <OTooltip
+              :content="operationPercentile.tooltip"
+              max-width="none"
+              content-class="whitespace-nowrap"
+            />
           </span>
 
           <!-- TTFT Badge -->

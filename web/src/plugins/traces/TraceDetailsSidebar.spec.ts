@@ -2411,16 +2411,19 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
     w.unmount();
   });
 
-  it("puts p50, p75, p90, p99 and n in the tooltip", async () => {
+  it("puts p50, p75, p90, p99 and a labelled sample count on one tooltip line", async () => {
     const w = await mountWith();
     const tooltip = w
       .findAllComponents({ name: "OTooltip" })
       .find((c) => String(c.props("content")).includes("p99"));
     expect(tooltip).toBeTruthy();
     const content = String(tooltip!.props("content"));
-    for (const part of ["p50 1.00ms", "p75 2.00ms", "p90 4.00ms", "p99 8.00ms", "n 120"]) {
+    for (const part of ["p50 1.00ms", "p75 2.00ms", "p90 4.00ms", "p99 8.00ms", "120 samples"]) {
       expect(content).toContain(part);
     }
+    expect(content).not.toContain("n 120");
+    expect(tooltip!.props("contentClass")).toContain("whitespace-nowrap");
+    expect(tooltip!.props("maxWidth")).toBe("none");
     w.unmount();
   });
 

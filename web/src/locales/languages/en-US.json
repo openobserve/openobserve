@@ -10872,7 +10872,7 @@
       "duration": "Duration",
       "start": "Start",
       "operationPercentileBand": "{band} of {operation}",
-      "operationPercentilesTooltip": "p50 {p50} · p75 {p75} · p90 {p90} · p99 {p99} · n {n}",
+      "operationPercentilesTooltip": "p50 {p50} · p75 {p75} · p90 {p90} · p99 {p99} · {n} samples",
       "operationBandBelowP50": "< p50",
       "operationBandP50ToP75": "p50–p75",
       "operationBandP75ToP90": "p75–p90",
