@@ -1277,7 +1277,7 @@ pub async fn apply_regex_to_response(
             log::error!(
                 "[trace_id {trace_id}] SDR patterns application: error in processing records for stream: {all_streams}: {e}"
             );
-            Err(infra::errors::Error::Message(e.to_string()))
+            Err(redaction_error(all_streams, &e.to_string()))
         }
     };
     let took = start.elapsed().as_millis();
@@ -1311,6 +1311,15 @@ fn redaction_skipped(
     Ok(())
 }
 
+/// Hits the redaction step failed on are refused with a 503, not a 400: the fault is the
+/// servers, not the querys.
+#[cfg(any(feature = "vectorscan", test))]
+fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
+    infra::errors::Error::ResourceError(format!(
+        "sensitive-data redaction failed for {all_streams}: {reason}; refusing to return unredacted hits"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1319,6 +1328,13 @@ mod tests {
     fn test_any_stream_checks_every_joined_stream() {
         assert!(any_stream("first, second", |stream| stream == "second"));
         assert!(!any_stream("first,second", |stream| stream == "third"));
+    }
+
+    #[test]
+    fn test_redaction_error_is_a_503() {
+        let err = redaction_error("app_logs", "scan failed");
+        assert_eq!(err.http_status(), 503, "{err}");
+        assert!(err.to_string().contains("app_logs"), "{err}");
     }
 
     #[test]

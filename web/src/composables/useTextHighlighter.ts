@@ -54,11 +54,13 @@ export interface TextSegment {
  * - str_match_ignore_case(field, 'value') / match_field_ignore_case(field, 'value')
  * - re_match(field, 'pattern')
  * - fuzzy_match(field, 'value', distance)
- * Group 1 is the function name, group 2 the field, group 3 a single-quoted
- * literal ('' escapes a quote), group 4 a double-quoted literal.
+ * Group 1 is the function name; group 2 the field: a double-quoted identifier
+ * ("" escapes a quote), a backtick-quoted one (`` escapes a backtick) or a bare
+ * identifier; group 3 a single-quoted literal ('' escapes a quote), group 4 a
+ * double-quoted literal.
  */
 const FIELD_FILTER_REGEX =
-  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match|fuzzy_match)\s*\(\s*([^,()]+?)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")(?:\s*,\s*\d+)?\s*\)/gi;
+  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match|fuzzy_match)\s*\(\s*("(?:[^"]|"")*"|`(?:[^`]|``)*`|[^,()"`\s]+)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")(?:\s*,\s*\d+)?\s*\)/gi;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -79,7 +81,10 @@ const MAX_REGEX_MATCHES = 100;
 const MAX_VARIANTS = 81;
 const MAX_VARIANTS_WITH_UNBOUNDED = 2;
 
-/** Escaped str_match literals: linear to match, so exempt from MAX_REGEX_TEXT_LENGTH. */
+/**
+ * Escaped str_match literals: no backtracking (at worst text length × literal
+ * length), so exempt from MAX_REGEX_TEXT_LENGTH.
+ */
 const literalPatterns = new WeakSet<RegExp>();
 
 /**
@@ -386,7 +391,9 @@ function parseSequence(
 }
 
 /**
- * Whether a regex source risks super-linear backtracking in a JS engine.
+ * Whether a regex source risks catastrophic backtracking in a JS engine.
+ * Accepted patterns are bounded but not linear: quadratic at worst in the text
+ * length (a+! retries from every start), which MAX_REGEX_TEXT_LENGTH keeps cheap.
  *
  * Each top-level alternative is parsed into a sequence of items (see
  * parseSequence). Two variable-width (quantified) items are only ambiguous when their
@@ -463,13 +470,16 @@ const patternCache = new Map<string, RegExp[]>();
 
 /**
  * The field a filter's first argument names, as the backend resolves it: a
- * quoted identifier ("ERROR" or `ERROR`) keeps its case, an unquoted one is
- * lowercased (DataFusion identifier normalization).
+ * quoted identifier ("ERROR" or `ERROR`) keeps its case and has its doubled
+ * quotes unescaped ("a""b" is a"b), an unquoted one is lowercased (DataFusion
+ * identifier normalization).
  */
 const resolveFilterField = (field: string) => {
-  const trimmed = field.trim();
-  const quoted = /^"(.*)"$|^`(.*)`$/.exec(trimmed);
-  return quoted ? (quoted[1] ?? quoted[2]) : trimmed.toLowerCase();
+  const quote = field[0];
+  if ((quote === '"' || quote === "`") && field.length > 1 && field.endsWith(quote)) {
+    return field.slice(1, -1).replaceAll(quote + quote, quote);
+  }
+  return field.toLowerCase();
 };
 
 /**

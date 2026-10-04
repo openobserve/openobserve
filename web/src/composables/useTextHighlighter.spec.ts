@@ -392,6 +392,31 @@ describe("useTextHighlighter", () => {
       );
     });
 
+    it("should unescape quoted field names, including commas and parentheses", () => {
+      for (const [query, field] of [
+        ['str_match("a""b", \'boom\')', 'a"b'],
+        ["str_match(`a``b`, 'boom')", "a`b"],
+        ["str_match(\"a,b\", 'boom')", "a,b"],
+        ["str_match_ignore_case(\"f(x)\", 'boom')", "f(x)"],
+        ["re_match(\"a, (b)\", 'bo+m')", "a, (b)"],
+      ]) {
+        expect(scopeHighlightQuery(query, field), query).toBe(query);
+        expect(scopeHighlightQuery(query, "other"), query).toBe("");
+        const patterns = textHighlighter.extractHighlightPatterns(
+          scopeHighlightQuery(query, field),
+        );
+        expect(patterns, query).toHaveLength(1);
+        expect(
+          textHighlighter
+            .splitTextByKeywords("a boom here", [], patterns)
+            .filter((part) => part.isHighlighted)
+            .map((part) => part.text),
+          query,
+        ).toEqual(["boom"]);
+      }
+      expect(scopeHighlightQuery('str_match("a""b", \'boom\')', "a")).toBe("");
+    });
+
     it("should highlight the whole match of grouped alternation regexes when rendered", () => {
       const highlightedText = (text: string, query: string) =>
         [
