@@ -2571,7 +2571,7 @@ describe("ServicesCatalog", () => {
       expect(cell("slow").attributes("data-tooltip")).toBe(`${(1_500_000).toLocaleString()} µs`);
     });
 
-    it("shows a dash instead of latencies and a Healthy status for zero-traffic rows", async () => {
+    it("shows a dash instead of latencies, error rate and a Healthy status for zero-traffic rows", async () => {
       const row = (name: string, requests: number) => ({
         id: name,
         service_name: name,
@@ -2587,6 +2587,7 @@ describe("ServicesCatalog", () => {
       });
       const cols = [
         "status",
+        "error_rate",
         "p50_latency_ns",
         "p95_latency_ns",
         "p99_latency_ns",

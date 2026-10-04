@@ -381,7 +381,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Error rate with progress bar -->
             <template #cell-error_rate="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
                 :label="raw(formatPercent(row.error_rate))"
