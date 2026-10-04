@@ -30,8 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Deliberately NOT a button. Making the whole card clickable meant any
          attempt to select the metric name — or drag across the help text —
          navigated away instead, so this is a plain container and its text stays
-         selectable. Still fully keyboard reachable: Drill down reveals on
-         `focus-within`. -->
+         selectable. Drill down is the keyboard's way in. -->
     <!-- The SAME bar the dashboard panels use — box, tint and title type all
          come from PanelBar; only this card's layout is added on top. -->
     <PanelBar class="@container/panelbar relative min-w-0 gap-2">
@@ -70,41 +69,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            spacer, then the action row). -->
       <div class="flex-1" />
 
-      <!-- The right-hand cluster: the query function · unit, then Drill down
-           (revealed on hover/focus), then the freshness clock. The function,
-           unit and clock are status and stay put on hover; the metric name is
-           what gives way when the row runs short. -->
+      <!-- The right-hand cluster: the query function · unit, Drill down, then
+           the freshness clock. None of it truncates; the metric name is what
+           gives way when the row runs short. -->
       <div class="flex shrink-0 flex-nowrap items-center">
         <span
           v-if="restInfo"
-          class="text-2xs text-text-secondary max-w-40 truncate opacity-70"
+          class="text-2xs text-text-secondary whitespace-nowrap opacity-70"
           :title="restInfo"
           :data-test="`metrics-explorer-card-rest-info-${card.name}`"
           >{{ restInfo }}</span
         >
 
-        <!-- Revealed by width+opacity, NOT display — a display:none control
-             leaves the tab order, and this reveal is focus-driven too: tabbing
-             onto the (invisible) button expands it for keyboards. -->
-        <div
-          class="flex w-0 flex-nowrap items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100 max-md:w-auto max-md:opacity-100"
-          :data-test="`metrics-explorer-card-actions-${card.name}`"
+        <!-- Help — the SAME element the dashboard panel bar uses for its panel
+             description: an info-outline icon with a width-capped, pre-wrapped
+             OTooltip, since a full help sentence never fits on the card. -->
+        <OButton
+          v-if="card.help"
+          variant="ghost"
+          size="icon"
+          icon-left="info-outline"
+          class="ms-1 shrink-0"
+          :aria-label="
+            t('metrics.explorer.card.helpAria', {
+              name: card.name,
+              help: card.help,
+            })
+          "
+          :data-test="`metrics-explorer-card-help-${card.name}`"
+          @click.stop
         >
-          <!-- One labelled entry instead of a row of unlabelled icons: help,
-               ⚙, exemplars, Open in Visualize and the star all live in the
-               detail view this opens. -->
-          <OButton
-            variant="ghost"
-            size="xs"
-            icon-left="open-in-full"
-            class="ms-1"
-            :aria-label="t('metrics.explorer.card.detailsAria', { name: card.name })"
-            :data-test="`metrics-explorer-card-details-${card.name}`"
-            @click="$emit('open-detail', card)"
-          >
-            {{ t("metrics.explorer.card.drillDown") }}
-          </OButton>
-        </div>
+          <OTooltip side="bottom" align="end" max-width="13.75rem">
+            <template #content
+              ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
+            >
+          </OTooltip>
+        </OButton>
+
+        <!-- One labelled entry, always visible, instead of a hover row of
+             unlabelled icons: ⚙, exemplars, Open in Visualize and the star all
+             live in the detail view this opens. -->
+        <OButton
+          variant="ghost"
+          size="xs"
+          icon-left="open-in-full"
+          class="ms-1 shrink-0"
+          :aria-label="t('metrics.explorer.card.detailsAria', { name: card.name })"
+          :data-test="`metrics-explorer-card-details-${card.name}`"
+          @click="$emit('open-detail', card)"
+        >
+          {{ t("metrics.explorer.card.drillDown") }}
+        </OButton>
 
         <!-- An on toggle stays visible at rest so the viewer can see why markers are drawn. -->
         <div v-if="exemplarsEligible && exemplarsOn" class="flex shrink-0 items-center">
@@ -220,8 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            so the bar runs at its indeterminate floor with the shimmer. -->
       <LoadingProgress :loading="preview?.status === 'loading'" :loading-progress-percentage="0" />
 
-      <!-- Unsupported: a placeholder rather than a wrong chart. The open-in-
-           editor icon still works, so the metric stays explorable. -->
+      <!-- Unsupported: a placeholder rather than a wrong chart. Drill down
+           still works, so the metric stays explorable. -->
       <div
         v-if="card.unsupported"
         class="text-2xs text-text-secondary flex h-full flex-col items-center justify-center gap-1.5 opacity-65"
@@ -233,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Understood, but the chosen variant is not something a card can draw —
            an info metric's label table renders through a component the card does
-           not use. The drill-in works: the editor renders the table properly. -->
+           not use. Drill down, then Open in Visualize, renders the table properly. -->
       <div
         v-else-if="preview?.status === 'unavailable'"
         class="text-2xs text-text-secondary flex h-full flex-col items-center justify-center gap-1.5 opacity-65"

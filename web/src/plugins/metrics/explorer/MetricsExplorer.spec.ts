@@ -78,6 +78,7 @@ const grid = vi.hoisted(() => {
     exemplarStateOf: vi.fn(() => undefined),
     toggleExemplars: vi.fn(),
     retryExemplars: vi.fn(),
+    ensureExemplars: vi.fn(),
     requestPreview: vi.fn(async () => {}),
     refreshCard: vi.fn(),
     cancelPreview: vi.fn(),
@@ -1026,6 +1027,10 @@ describe("MetricsExplorer wiring", () => {
     });
     afterEach(() => {
       grid.cards.value = [];
+      grid.exemplarEligible.mockReturnValue(false);
+      grid.exemplarsEnabled.mockReturnValue(false);
+      grid.exemplarSwapsVariant.mockReturnValue(false);
+      grid.exemplarStateOf.mockReturnValue(undefined);
     });
 
     it("opens from a card: pushes a history entry, pauses the grid, loads the schemas", async () => {
@@ -1078,11 +1083,35 @@ describe("MetricsExplorer wiring", () => {
       // The ⚙ dialog opens on this metric, over the detail view.
       expect((wrapper.vm as any).dialogOpen).toBe(true);
       expect((wrapper.vm as any).dialogCard).toEqual(CARD);
+    });
 
-      grid.exemplarEligible.mockReturnValue(false);
-      grid.exemplarsEnabled.mockReturnValue(false);
-      grid.exemplarSwapsVariant.mockReturnValue(false);
-      grid.exemplarStateOf.mockReturnValue(undefined);
+    it("asks for the metric's exemplars again once its overview settles, even with a preview already in", async () => {
+      // Hiding the card on the way in cancels an exemplar fetch in flight and drops its
+      // state; a preview already exists, so the preview path never re-asks for them.
+      grid.previews.value[CARD.name] = { status: "done" };
+      grid.runDetailQuery.mockResolvedValue({ result: [] });
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      grid.ensureExemplars.mockClear();
+      grid.requestPreview.mockClear();
+
+      await (wrapper.vm as any).runDetailPreview("rate(x[4m])", new AbortController().signal);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.ensureExemplars).toHaveBeenCalledWith(CARD);
+
+      // Not for a Related metric's tile, whose chart draws no exemplars.
+      grid.ensureExemplars.mockClear();
+      const other = { ...CARD, name: "other_metric" };
+      grid.previews.value[other.name] = { status: "done" };
+      await (wrapper.vm as any).runDetailPreview(
+        "rate(y[4m])",
+        new AbortController().signal,
+        other,
+      );
+      expect(grid.ensureExemplars).not.toHaveBeenCalled();
+      delete grid.previews.value[CARD.name];
+      delete grid.previews.value[other.name];
     });
 
     it("hands the view the panel rate window Convert to dashboard would use", async () => {

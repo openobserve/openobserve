@@ -2410,6 +2410,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     exemplarStateOf: exemplars.stateOf,
     exemplarKeysOf: exemplars.exemplarKeysOf,
     retryExemplars: exemplars.retry,
+    ensureExemplars: exemplars.ensure,
     exemplarEligible,
     exemplarSwapsVariant,
     toggleExemplars,

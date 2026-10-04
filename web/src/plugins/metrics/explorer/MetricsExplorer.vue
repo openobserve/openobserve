@@ -1281,8 +1281,9 @@ export default defineComponent({
 
     /* ---------------------------------------------------- Select handoff */
 
-    // The panel-schema data a card hands to Visualize on "Open" — carries the
-    // metric's TYPE-BASED operation so Visualize opens on the card's own query.
+    // The panel-schema data the detail view hands to Visualize on "Open in
+    // Visualize" — carries the metric's TYPE-BASED operation so Visualize opens
+    // on the card's own query.
     // Consumed once by MetricsVisualize, then cleared.
     const visualizeSeed = ref<Record<string, any> | null>(null);
     const seedVisualizeFromUrl = (q: Record<string, any>) => {
@@ -1428,7 +1429,13 @@ export default defineComponent({
       if (!grid.previews.value[card.name]) await grid.requestPreview(card);
       // Abandoned, or made stale by the preview (the chart reloads on its new query, aborting `signal`).
       if (signal.aborted) throw new PreviewCancelledError(expr);
-      return grid.runDetailQuery(expr, card, signal);
+      try {
+        return await grid.runDetailQuery(expr, card, signal);
+      } finally {
+        // The card's unmount, or a refresh, cancels an exemplar fetch in flight and drops its
+        // state. Asked once the overview has settled, after that cancellation has landed.
+        if (!signal.aborted && card === detailCard.value) grid.ensureExemplars(card);
+      }
     };
 
     const showDetail = (name: string) => {
@@ -1787,7 +1794,7 @@ export default defineComponent({
       // Not while the grid is off screen. Leaving Explore unmounts the grid, and
       // the virtualizer's teardown briefly reports rows as "visible" on the way
       // out — each one would fire a FIRST-time query for a card the user will
-      // never see (~40 requests just for clicking a card's Open).
+      // never see (~40 requests just for clicking a card's Drill down).
       if (grid.paused.value) return;
       grid.requestPreview(card);
     };

@@ -362,7 +362,19 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-breakdown-grid"]').exists()).toBe(false);
     });
 
-    it("selects a label from its Select action or its header, never from its chart", async () => {
+    it("labels each tile's drill-in Drill down, with an icon, and says so above the grid", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      const drill = wrapper.find('[data-test="metrics-breakdown-select-route"]');
+      expect(drill.text()).toBe("Drill down");
+      expect(drill.find("svg").exists()).toBe(true);
+      expect(drill.attributes("aria-label")).toBe("Drill down into route to see its values");
+      expect(wrapper.text()).toContain(
+        "Each chart splits this metric by one label. Drill down into a label to see its values and filter by them.",
+      );
+    });
+
+    it("selects a label from its Drill down action or its header, never from its chart", async () => {
       wrapper = mountBreakdown();
       await flushPromises();
       await wrapper.find('[data-test="metrics-breakdown-select-route"]').trigger("click");

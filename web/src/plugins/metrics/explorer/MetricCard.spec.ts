@@ -58,6 +58,18 @@ const preview = (over: Partial<CardPreview> = {}): CardPreview => ({
   ...over,
 });
 
+const HIDING = ["hidden", "invisible", "w-0", "opacity-0", "truncate"];
+/** Every class on `el` or its ancestors that would hide or clip it, at rest or on hover / focus. */
+const hidingClasses = (el: Element | null, root: Element): string[] => {
+  const found: string[] = [];
+  for (let node = el; node && node !== root.parentElement; node = node.parentElement)
+    for (const cls of node.classList) {
+      const base = cls.split(":").pop() ?? "";
+      if (HIDING.includes(base) || base.startsWith("max-w-")) found.push(cls);
+    }
+  return found;
+};
+
 const createWrapper = (props: Record<string, any> = {}) =>
   mount(MetricCard, {
     props: { card: CARD, index: 0, ...props },
@@ -101,11 +113,14 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(wrapper.text()).not.toContain("Seconds the CPUs spent in each mode.");
     });
 
-    it("renders none of the old hover icons: they live in the detail view now", () => {
+    it("keeps only the info icon of the old hover icons: the rest live in the detail view", () => {
       // An unlabelled row of seven icons read as noise; one labelled Drill down
       // replaced it.
       wrapper = createWrapper({ exemplarsEligible: true, exemplarsOn: false, preview: preview() });
-      for (const action of ["help", "fn", "select", "favorite", "refresh", "exemplars"]) {
+      expect(
+        wrapper.find('[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]').exists(),
+      ).toBe(true);
+      for (const action of ["fn", "select", "favorite", "refresh", "exemplars"]) {
         expect
           .soft(
             wrapper
@@ -115,10 +130,23 @@ describe("MetricCard (ported to @/lib)", () => {
           )
           .toBe(false);
       }
-      const actions = wrapper.find(
-        '[data-test="metrics-explorer-card-actions-node_cpu_seconds_total"]',
-      );
-      expect(actions.findAll("button")).toHaveLength(1);
+    });
+
+    it("offers the help text through an always-visible info icon, announced in full", async () => {
+      wrapper = createWrapper();
+      const help = wrapper.find('[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]');
+      expect(help.element.tagName).toBe("BUTTON");
+      expect(help.attributes("aria-label")).toContain("Seconds the CPUs spent in each mode.");
+      expect(hidingClasses(help.element, wrapper.element)).toEqual([]);
+      await help.trigger("click");
+      expect(wrapper.emitted("open-detail")).toBeFalsy();
+    });
+
+    it("shows no info icon when the metric has no help text", () => {
+      wrapper = createWrapper({ card: { ...CARD, help: "" } });
+      expect(
+        wrapper.find('[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]').exists(),
+      ).toBe(false);
     });
   });
 
@@ -127,17 +155,6 @@ describe("MetricCard (ported to @/lib)", () => {
       info: w.find('[data-test="metrics-explorer-card-rest-info-node_cpu_seconds_total"]'),
       fresh: w.find('[data-test="metrics-explorer-card-last-refreshed-node_cpu_seconds_total"]'),
     });
-    const HIDING = ["hidden", "invisible", "w-0", "opacity-0"];
-    /** Every class that would hide an element, at rest or on hover / focus. */
-    const hidingClasses = (el: Element | null): string[] => {
-      const found: string[] = [];
-      for (let node = el; node && node !== wrapper.element.parentElement; node = node.parentElement)
-        for (const cls of node.classList) {
-          const base = cls.split(":").pop() ?? "";
-          if (HIDING.includes(base) && !cls.startsWith("max-md:")) found.push(cls);
-        }
-      return found;
-    };
 
     it("shows the function · unit and the freshness both at rest and on hover or focus", async () => {
       // Status, not actions: the Drill down button joins them on hover, never replaces them.
@@ -148,8 +165,8 @@ describe("MetricCard (ported to @/lib)", () => {
       const { info, fresh } = status(wrapper);
       expect(info.text()).toBe("sum(rate) · s");
       expect(fresh.text()).toContain("33");
-      expect(hidingClasses(info.element)).toEqual([]);
-      expect(hidingClasses(fresh.element)).toEqual([]);
+      expect(hidingClasses(info.element, wrapper.element)).toEqual([]);
+      expect(hidingClasses(fresh.element, wrapper.element)).toEqual([]);
     });
 
     it("lets the metric name give way, never the function · unit or the freshness", () => {
@@ -159,7 +176,21 @@ describe("MetricCard (ported to @/lib)", () => {
       const { info, fresh } = status(wrapper);
       const cluster = info.element.parentElement!;
       expect(cluster.contains(fresh.element)).toBe(true);
+      expect(
+        cluster.contains(
+          wrapper.find('[data-test="metrics-explorer-card-details-node_cpu_seconds_total"]')
+            .element,
+        ),
+      ).toBe(true);
       expect(cluster.className).toContain("shrink-0");
+      expect(info.classes()).toContain("whitespace-nowrap");
+      // The name is the row's one shrinkable element.
+      const title = wrapper.find(
+        '[data-test="metrics-explorer-card-title-node_cpu_seconds_total"]',
+      );
+      expect(title.classes()).toContain("min-w-0");
+      expect(title.element.parentElement!.className).toContain("min-w-0");
+      expect(title.find("span[title]").classes()).toContain("text-ellipsis");
     });
   });
 
@@ -193,7 +224,7 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(drill.element.tagName).toBe("BUTTON");
       expect(drill.text()).toBe("Drill down");
       expect(drill.find("svg").exists()).toBe(true);
-      expect(drill.attributes("aria-label")).toBe("Open details for node_cpu_seconds_total");
+      expect(drill.attributes("aria-label")).toBe("Drill down into node_cpu_seconds_total");
       await drill.trigger("click");
       expect(wrapper.emitted("open-detail")).toEqual([[CARD]]);
     });
@@ -213,22 +244,14 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(wrapper.emitted("open-detail")).toBeFalsy();
     });
 
-    it("keeps Drill down in the DOM and the tab order — the hover reveal is width/opacity, never display", () => {
-      // Collapsed at rest, but tabbing into it must expand it for keyboard
-      // users. `display:none` or `visibility:hidden` would drop it from the tab
-      // order — the trap the old `invisible group-hover:visible` bar had.
+    it("shows Drill down at rest, not only on hover or focus", () => {
       wrapper = createWrapper();
-      const actions = wrapper.find(
-        '[data-test="metrics-explorer-card-actions-node_cpu_seconds_total"]',
+      const drill = wrapper.find(
+        '[data-test="metrics-explorer-card-details-node_cpu_seconds_total"]',
       );
-      expect(
-        actions.find('[data-test="metrics-explorer-card-details-node_cpu_seconds_total"]').exists(),
-      ).toBe(true);
-      expect(actions.classes()).toContain("group-focus-within:w-auto");
-      expect(actions.classes()).toContain("group-hover:w-auto");
-      expect(actions.classes()).not.toContain("hidden");
-      expect(actions.classes()).not.toContain("invisible");
-      expect(wrapper.html()).not.toContain("group-hover:visible");
+      expect(hidingClasses(drill.element, wrapper.element)).toEqual([]);
+      expect(wrapper.html()).not.toContain("group-hover:");
+      expect(wrapper.html()).not.toContain("group-focus-within:");
     });
 
     it("shows the effective function, a ⚙ override included, in the header", () => {
@@ -645,10 +668,6 @@ describe("MetricCard (ported to @/lib)", () => {
         exemplarsOn: true,
         exemplars: { status: "loading", markers: [], errorMessage: "" },
       });
-      const actions = wrapper.find(
-        '[data-test="metrics-explorer-card-actions-node_cpu_seconds_total"]',
-      );
-      expect(actions.find(toggleSel).exists()).toBe(false);
       expect(wrapper.find(toggleSel).attributes("aria-pressed")).toBe("true");
       expect(
         wrapper

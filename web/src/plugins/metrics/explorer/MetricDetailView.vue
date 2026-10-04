@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="!overview.queries.length"
               class="text-text-secondary flex h-full items-center justify-center text-xs"
             >
-              {{ t("metrics.explorer.card.noPreview") }}
+              {{ t("metrics.explorer.detail.noPreview") }}
             </div>
             <div
               v-else-if="overviewState.status === 'done' && !overviewHasSamples"

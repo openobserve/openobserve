@@ -300,12 +300,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost-primary"
               size="xs"
+              icon-left="open-in-full"
               class="shrink-0"
-              :aria-label="t('metrics.explorer.detail.breakdown.selectAria', { label })"
+              :aria-label="t('metrics.explorer.detail.breakdown.drillDownAria', { label })"
               :data-test="`metrics-breakdown-select-${label}`"
               @click.stop="select(label)"
             >
-              {{ t("metrics.explorer.detail.breakdown.select") }}
+              {{ t("metrics.explorer.detail.breakdown.drillDown") }}
             </OButton>
           </template>
         </MetricChartTile>

@@ -50,9 +50,9 @@ export class MetricsExplorerPage {
         this.chartRenderer = '[data-test="chart-renderer"]';
 
         // ===== CARDS =====
-        // Card data-tests are name-suffixed (`…-card-select-cpu_usage`), so the
-        // "any card" locator matches on the stable prefix.
-        this.anyCardSelect = '[data-test^="metrics-explorer-card-select-"]';
+        // Card data-tests are name-suffixed (`…-card-details-cpu_usage`), so the
+        // "any card" locator matches on the stable prefix of the Drill down button.
+        this.anyCardSelect = '[data-test^="metrics-explorer-card-details-"]';
         // The same suffixing is why these are prefixes rather than whole selectors:
         // the metric name is only known at call time. Kept here so every selector
         // string still lives in one place.
@@ -76,6 +76,7 @@ export class MetricsExplorerPage {
         this.detailRoot = '[data-test="metrics-detail"]';
         this.detailTitle = '[data-test="metrics-detail-title"]';
         this.detailClose = '[data-test="metrics-detail-close"]';
+        this.detailOpenVisualize = '[data-test="metrics-detail-open-visualize"]';
         this.breakdownTable = '[data-test="metrics-breakdown-table"]';
         this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
         this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
@@ -416,24 +417,18 @@ export class MetricsExplorerPage {
     }
 
     /**
-     * Drill into the first rendered card — the real path into Visualize.
-     *
-     * The card's action row (`…-card-actions-<name>`) is w-0 / opacity-0 at rest
-     * and expands only on group-hover / group-focus-within; at rest the resting
-     * "fn · unit" and freshness spans sit over it and intercept the click. So
-     * hover the card first — the same gesture a real user makes — which hides
-     * those spans and expands the row before clicking the drill-in button.
+     * Open the first rendered card in Visualize — the real path: the card's
+     * always-visible Drill down, then the detail view's Open in Visualize.
      */
     async openFirstCardInVisualize() {
-        const select = this.page.locator(this.anyCardSelect).first();
-        await select.waitFor({ state: 'attached', timeout: 30000 });
+        const drill = this.page.locator(this.anyCardSelect).first();
+        await drill.waitFor({ state: 'attached', timeout: 30000 });
+        await expect(drill).toBeVisible({ timeout: 10000 });
+        await drill.click();
 
-        const testId = await select.getAttribute('data-test');
-        const metricName = String(testId).replace('metrics-explorer-card-select-', '');
-        await this.page.locator(`[data-test="metrics-explorer-card-${metricName}"]`).hover();
-
-        await expect(select).toBeVisible({ timeout: 10000 });
-        await select.click();
+        const openVisualize = this.page.locator(this.detailOpenVisualize);
+        await expect(openVisualize).toBeVisible({ timeout: 30000 });
+        await openVisualize.click();
     }
 
     /** True once at least one card has rendered (grid is populated). */
@@ -558,9 +553,8 @@ export class MetricsExplorerPage {
         });
     }
 
-    /** Details sits in the card's action row, which only expands on hover, so hover first. */
+    /** Drill down is always visible on the card. */
     async openMetricDetails(metric) {
-        await this.cardRoot(metric).hover();
         await this.page.locator(`[data-test="${this.cardDetailsPrefix}${metric}"]`).click();
     }
 
