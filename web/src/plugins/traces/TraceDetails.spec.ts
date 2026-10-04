@@ -630,6 +630,47 @@ describe("TraceDetails", () => {
         { spanId: leaf.spanId, sectionStartUs: leaf.startTimeUs, sectionEndUs: leaf.endTimeUs },
       ]);
     });
+
+    it("gives an orphan root no critical path even when it starts before the true root", async () => {
+      const template = tracesMockData.tracesDetails.traceSpans.hits[0];
+      const base = template.start_time;
+      const span = (
+        spanId: string,
+        parentId: string,
+        startOffsetNs: number,
+        endOffsetNs: number,
+      ) => ({
+        ...template,
+        span_id: spanId,
+        reference_parent_span_id: parentId,
+        start_time: base + startOffsetNs,
+        end_time: base + endOffsetNs,
+        _start_time_ns: String(base + startOffsetNs),
+        _end_time_ns: String(base + endOffsetNs),
+      });
+      localStorage.setItem("o2_trace_critical_path", "true");
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: {
+          mode: "embedded",
+          traceIdProp: "orphan-trace-id",
+          streamNameProp: "test-stream",
+          spanListProp: [
+            span("orphan", "parent-missing-from-trace", 0, 3_000_000),
+            span("true-root", "", 1_000_000, 5_000_000),
+            span("root-child", "true-root", 2_000_000, 4_000_000),
+          ],
+        },
+      });
+      await flushPromises();
+
+      expect(treeShowsCriticalPath()).toBe(true);
+      const row = (spanId: string) =>
+        wrapper.vm.spanPositionList.find((r: any) => r.spanId === spanId);
+      expect(row("orphan").criticalSections).toEqual([]);
+      expect(row("true-root").criticalSections.length).toBeGreaterThan(0);
+    });
   });
 
   describe("Data processing", () => {
