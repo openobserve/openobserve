@@ -29,6 +29,21 @@ import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import { gt } from "@/types/i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
+// Streams written only by OpenObserve itself; they never hold an app's logs.
+// Mirrors the backend's is_internal_stream() in config/src/meta/self_reporting/usage.rs.
+// Other `_`-prefixed streams are user data.
+const INTERNAL_LOG_STREAMS = new Set([
+  "_agent_signals",
+  "_redaction_evidence",
+  "_llm_scores",
+  "_evaluator",
+  "_llm_experiment",
+  "_anomalies",
+]);
+const isInternalLogStream = (name: string) =>
+  name.startsWith("_o2_") || INTERNAL_LOG_STREAMS.has(name);
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
@@ -485,6 +500,17 @@ const useTraces = () => {
   };
 
   const navigateToCorrelatedLogs = async (correlationProps: any) => {
+    const spanId = searchObj.data.traceDetails.selectedSpanId;
+    const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
+
+    const streamList: string[] = correlationProps.logStreams
+      .map((s: any) => s.stream_name)
+      .filter((name: string) => !isInternalLogStream(name));
+    if (!streamList.length) {
+      toast({ variant: "warning", message: gt("traces.noCorrelatedLogsFound") });
+      return;
+    }
+
     // Conditions are keyed by semantic group, not by field name, so that two
     // streams aliasing one dimension (k8s_namespace_name vs
     // service_k8s_namespace_name) collapse into a single condition.
@@ -499,9 +525,6 @@ const useTraces = () => {
         groupIdFor(field),
         `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
       );
-
-    const spanId = searchObj.data.traceDetails.selectedSpanId;
-    const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
     // Once the trace id is known it already pins the logs; the stream's
     // dimension filters (service, namespace, cluster) are redundant and drop
@@ -524,48 +547,47 @@ const useTraces = () => {
     if (spanId) setCondition(getSpanIdField(), spanId);
     if (traceId) setCondition(getTraceIdField(), traceId);
 
-    // System streams (`_`-prefixed, e.g. _o2_db_stats) never hold app logs.
-    const allStreamNames: string[] = correlationProps.logStreams.map((s: any) => s.stream_name);
-    const userStreamNames = allStreamNames.filter((name) => !name.startsWith("_"));
-    const streamList = userStreamNames.length ? userStreamNames : allStreamNames;
-
     let queryString = Array.from(conditions.values()).join(" and ");
+    let timeRange = correlationProps.timeRange;
 
-    // A span (often a DB or client span) may have no logs of its own. Check
-    // with one count query and, if it is empty, show the whole trace's logs.
-    // A failed check keeps the span-scoped query.
+    // A span (often a DB or client span) may have no logs of its own. Count
+    // each stream separately so one failing stream (e.g. no span_id column)
+    // stays "unknown" instead of sinking the check. Fall back to the whole
+    // trace's logs only when at least one count succeeded and all were 0; if
+    // every count failed, keep the span-scoped query.
     if (spanId && traceId) {
-      try {
-        const sql = streamList
-          .map(
-            (name) =>
-              `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
-          )
-          .join(" UNION ALL ");
-        const res = await searchService.search({
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: {
+      const counts = await Promise.allSettled(
+        streamList.map((name) =>
+          searchService.search({
+            org_identifier: store.state.selectedOrganization.identifier,
             query: {
-              sql,
-              start_time: correlationProps.timeRange.startTime,
-              end_time: correlationProps.timeRange.endTime,
-              from: 0,
-              size: streamList.length,
+              query: {
+                sql: `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
+                start_time: timeRange.startTime,
+                end_time: timeRange.endTime,
+                from: 0,
+                size: 1,
+              },
             },
-          },
-          page_type: "logs",
-        });
-        const hits: any[] = res?.data?.hits ?? [];
-        const total = hits.reduce((sum, hit) => sum + (Number(hit?.zo_count) || 0), 0);
-        if (total === 0) {
-          conditions.delete(groupIdFor(getSpanIdField()));
-          queryString = Array.from(conditions.values()).join(" and ");
-          showInfoNotification(gt("traces.spanHasNoLogsShowingTrace"));
-        }
-      } catch {
-        // Keep the span-scoped query.
+            page_type: "logs",
+          }),
+        ),
+      );
+      const succeeded = counts.filter((c) => c.status === "fulfilled");
+      const allEmpty = succeeded.every(
+        (c) => !Number((c as PromiseFulfilledResult<any>).value?.data?.hits?.[0]?.zo_count),
+      );
+      if (succeeded.length && allEmpty) {
+        conditions.delete(groupIdFor(getSpanIdField()));
+        queryString = Array.from(conditions.values()).join(" and ");
+        // Trace-level logs span the whole trace, not the clicked span's window.
+        timeRange = correlationProps.traceTimeRange ?? timeRange;
+        showInfoNotification(gt("traces.spanHasNoLogsShowingTrace"));
       }
     }
+
+    // The user selected another span while this ran: do not navigate.
+    if (searchObj.data.traceDetails.selectedSpanId !== spanId) return;
 
     const encodedQuery = b64EncodeUnicode(queryString);
     const streamNames = streamList.join(",");
@@ -579,8 +601,8 @@ const useTraces = () => {
         stream: streamNames,
         sql_mode: "false",
         query: encodedQuery,
-        from: String(correlationProps.timeRange.startTime),
-        to: String(correlationProps.timeRange.endTime),
+        from: String(timeRange.startTime),
+        to: String(timeRange.endTime),
         stream_type: "logs",
         org_identifier: store.state.selectedOrganization.identifier,
         type: "trace_explorer",

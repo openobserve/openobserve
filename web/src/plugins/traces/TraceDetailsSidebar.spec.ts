@@ -26,7 +26,12 @@ const {
   mockToast,
   mockPromptResolve,
   mockFindRelatedTelemetry,
+  mockSearchObj,
 } = vi.hoisted(() => ({
+  mockSearchObj: {
+    meta: { serviceColors: { scheduler: "#1ab8be" } },
+    data: { traceDetails: {} as Record<string, any> },
+  },
   mockFindRelatedTelemetry: vi.fn().mockResolvedValue(null),
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
@@ -50,7 +55,7 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: { meta: { serviceColors: { scheduler: "#1ab8be" } } },
+    searchObj: mockSearchObj,
     buildQueryDetails: mockBuildQueryDetails,
     navigateToLogs: mockNavigateToLogs,
     navigateToCorrelatedLogs: mockNavigateToCorrelatedLogs,
@@ -531,6 +536,36 @@ describe("TraceDetailsSidebar", async () => {
           "app_logs",
         );
         expect(mockToast).not.toHaveBeenCalled();
+      });
+
+      it("passes the whole trace's window (padded) for the trace-level fallback", async () => {
+        mockSearchObj.data.traceDetails.selectedTrace = {
+          trace_id: "t",
+          trace_start_time: 1_000_000_000,
+          trace_end_time: 1_002_000_000,
+        };
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+
+        await viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+        mockSearchObj.data.traceDetails.selectedTrace = undefined;
+
+        const bufferUs = 5 * 60 * 1000000;
+        expect(mockNavigateToCorrelatedLogs.mock.calls[0][0].traceTimeRange).toEqual({
+          startTime: 1_000_000_000 - bufferUs,
+          endTime: 1_002_000_000 + bufferUs,
+        });
       });
 
       it("never reuses, applies or navigates with another span's lookup", async () => {

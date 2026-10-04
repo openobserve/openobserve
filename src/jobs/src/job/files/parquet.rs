@@ -964,9 +964,8 @@ pub(crate) async fn queue_service_streams_if_needed(
     }
 }
 
-/// Whether a stream's data feeds service discovery. `_`-prefixed streams are
-/// written by OpenObserve itself (e.g. `_o2_db_stats`), so a `service_name`
-/// column in them describes the monitored system, not a service of the org.
+/// Whether a stream's data feeds service discovery. Internal streams such as
+/// `_o2_db_stats` are skipped: see `is_internal_stream`.
 #[cfg(feature = "enterprise")]
 fn is_service_discovery_candidate(
     org_id: &str,
@@ -978,7 +977,7 @@ fn is_service_discovery_candidate(
             stream_type,
             StreamType::Logs | StreamType::Metrics | StreamType::Traces
         )
-        && !stream_name.starts_with('_')
+        && !config::meta::self_reporting::usage::is_internal_stream(stream_name)
 }
 
 fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
@@ -1150,7 +1149,7 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn test_service_discovery_skips_underscore_system_streams() {
+    fn test_service_discovery_skips_internal_streams() {
         assert!(is_service_discovery_candidate(
             "default",
             StreamType::Logs,
@@ -1170,6 +1169,12 @@ mod tests {
             "default",
             StreamType::Metrics,
             "_agent_signals"
+        ));
+        // A user stream may legitimately start with `_`.
+        assert!(is_service_discovery_candidate(
+            "default",
+            StreamType::Logs,
+            "_orders"
         ));
         assert!(!is_service_discovery_candidate(
             "default",

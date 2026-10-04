@@ -2809,8 +2809,11 @@ export default defineComponent({
       // it loads the span's correlation (or waits for the in-flight lookup)
       // before navigating, instead of reading data that is not loaded yet.
       await nextTick();
-      if (treeSidebarRef.value?.viewSpanLogs) {
-        await treeSidebarRef.value.viewSpanLogs();
+      const sidebar = treeSidebarRef.value;
+      if (sidebar?.viewSpanLogs) {
+        // The selection moved on before the sidebar showed this span.
+        if (selectedSpanId.value !== spanId || sidebar.span?.span_id !== spanId) return;
+        await sidebar.viewSpanLogs();
         return;
       }
 

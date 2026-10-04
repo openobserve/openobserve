@@ -3219,6 +3219,16 @@ describe("TraceDetails", () => {
 
       expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(spanId);
       expect(viewSpanLogs).toHaveBeenCalledTimes(1);
+
+      // The selection moves to another span before the sidebar shows the
+      // clicked one: nothing is opened.
+      viewSpanLogs.mockClear();
+      const [first, second] = tracesMockData.tracesDetails.traceSpans.hits;
+      const pending = wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: first.span_id });
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = second.span_id;
+      await pending;
+
+      expect(viewSpanLogs).not.toHaveBeenCalled();
     });
   });
 });

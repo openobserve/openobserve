@@ -2143,6 +2143,8 @@ export default defineComponent({
           const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
           const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
           const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
+          // Microseconds, from the trace's own spans (TraceDetails).
+          const selectedTrace = searchObj.data?.traceDetails?.selectedTrace;
 
           // Build availableDimensions from raw span attributes (actual field names)
           // This is critical for log queries to use the correct field names (e.g., k8s_pod_name)
@@ -2216,6 +2218,15 @@ export default defineComponent({
               startTime: spanStartUs - bufferUs,
               endTime: spanEndUs + bufferUs,
             },
+            // The whole trace's window, used when View Logs falls back from
+            // the span to the trace. Unknown bounds leave it unset.
+            traceTimeRange:
+              selectedTrace?.trace_start_time && selectedTrace?.trace_end_time
+                ? {
+                    startTime: selectedTrace.trace_start_time - bufferUs,
+                    endTime: selectedTrace.trace_end_time + bufferUs,
+                  }
+                : undefined,
           };
         } else {
           correlationError.value = t("correlation.noDataFound");
