@@ -17,18 +17,24 @@ impl MigrationTrait for Migration {
         manager
             .create_table(create_incidents_table_statement())
             .await?;
-        manager
-            .create_index(create_incidents_org_status_idx())
-            .await?;
-        manager
-            .create_index(create_incidents_org_correlation_idx())
-            .await?;
-        manager
-            .create_index(create_incidents_first_alert_idx())
-            .await?;
-        manager
-            .create_index(create_incidents_last_alert_idx())
-            .await?;
+        // only the pre-20260318 table has correlation_key; SQLite would index it as a constant
+        if manager
+            .has_column("alert_incidents", "correlation_key")
+            .await?
+        {
+            manager
+                .create_index(create_incidents_org_status_idx())
+                .await?;
+            manager
+                .create_index(create_incidents_org_correlation_idx())
+                .await?;
+            manager
+                .create_index(create_incidents_first_alert_idx())
+                .await?;
+            manager
+                .create_index(create_incidents_last_alert_idx())
+                .await?;
+        }
 
         // Create alert_incident_alerts junction table
         manager
@@ -338,9 +344,11 @@ enum AlertIncidentAlerts {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database};
     use sea_query::SqliteQueryBuilder;
 
     use super::*;
+    use crate::table::migration::m20260318_000003_alter_alert_incidents_schema as rebuild;
 
     #[test]
     fn test_incidents_org_status_idx_name() {
@@ -388,5 +396,37 @@ mod tests {
     fn test_incident_alerts_table_contains_table_name() {
         let sql = create_incident_alerts_table_statement().build(SqliteQueryBuilder);
         assert!(sql.contains("alert_incident_alerts"));
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_after_the_rebuild_dropped_correlation_key() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        let old_indexes = [
+            INCIDENTS_ORG_STATUS_IDX,
+            INCIDENTS_ORG_CORRELATION_IDX,
+            INCIDENTS_FIRST_ALERT_IDX,
+            INCIDENTS_LAST_ALERT_IDX,
+        ];
+        for idx in old_indexes {
+            assert!(manager.has_index("alert_incidents", idx).await.unwrap());
+        }
+        rebuild::Migration.up(&manager).await.unwrap();
+
+        Migration.up(&manager).await.unwrap();
+        for idx in old_indexes {
+            assert!(
+                !manager.has_index("alert_incidents", idx).await.unwrap(),
+                "{idx}"
+            );
+        }
+        // SQLite re-checks every index in the schema on DROP COLUMN
+        db.execute_unprepared("CREATE TABLE probe (a INTEGER, b INTEGER)")
+            .await
+            .unwrap();
+        db.execute_unprepared("ALTER TABLE probe DROP COLUMN b")
+            .await
+            .expect("DROP COLUMN must still work after a re-run");
     }
 }
