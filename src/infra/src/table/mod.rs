@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use migration::Migrator;
-use sea_orm_migration::MigratorTrait;
+use sea_orm::DatabaseConnection;
+use sea_orm_migration::{MigratorTrait, SchemaManager};
 
 use crate::{db::get_orm_client_ddl, dist_lock};
 
@@ -112,6 +113,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
+    check_migration_history(get_orm_client_ddl().await).await?;
     let locker = dist_lock::lock("/database/migration", 0).await?;
     let client = get_orm_client_ddl().await;
     // This is a hack to fix the failing alerts migration
@@ -143,6 +145,27 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
     Ok(index)
 }
 
+/// Refuses to run every migration again on a database whose migration history is gone.
+async fn check_migration_history(client: &DatabaseConnection) -> Result<(), anyhow::Error> {
+    let manager = SchemaManager::new(client);
+    // the first migration creates folders, so only a database that has run the chain has it
+    if !manager.has_table("folders").await? {
+        return Ok(());
+    }
+    // checked first because reading the history creates its table when it is missing
+    if manager.has_table("seaql_migrations").await?
+        && !Migrator::get_applied_migrations(client).await?.is_empty()
+    {
+        return Ok(());
+    }
+    Err(anyhow::anyhow!(
+        "the migration history in seaql_migrations is empty or missing, but this database \
+         already has tables created by migrations; running every migration again would fail or \
+         rebuild tables that hold data, so the upgrade stops here. Restore the seaql_migrations \
+         rows, for example from a backup, and start again"
+    ))
+}
+
 pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
     let client = get_orm_client_ddl().await;
     Migrator::down(client, steps).await?;
@@ -166,4 +189,47 @@ macro_rules! orm_err {
             $crate::errors::DbError::SeaORMError($e.to_string()),
         ))
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ConnectionTrait, Database};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_check_migration_history_allows_a_fresh_database() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        check_migration_history(&db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_check_migration_history_allows_a_recorded_history() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migrator::up(&db, Some(1)).await.unwrap();
+        check_migration_history(&db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_check_migration_history_refuses_tables_without_history() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migrator::up(&db, Some(1)).await.unwrap();
+        db.execute_unprepared("DELETE FROM seaql_migrations")
+            .await
+            .unwrap();
+        let err = check_migration_history(&db).await.unwrap_err();
+        assert!(err.to_string().contains("seaql_migrations"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_check_migration_history_refuses_a_dropped_history_without_writing() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migrator::up(&db, Some(1)).await.unwrap();
+        db.execute_unprepared("DROP TABLE seaql_migrations")
+            .await
+            .unwrap();
+        check_migration_history(&db).await.unwrap_err();
+        let manager = SchemaManager::new(&db);
+        assert!(!manager.has_table("seaql_migrations").await.unwrap());
+    }
 }
