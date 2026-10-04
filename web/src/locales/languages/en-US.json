@@ -9347,6 +9347,7 @@
           "allLabels": "All labels",
           "valuesOf": "Values of {label}",
           "countsFailed": "Could not count label values: {error}",
+          "titleFn": "{fn} by {label}",
           "titleP90": "p90 by {label}",
           "titleRate": "Rate by {label}",
           "titleAvg": "Average by {label}",

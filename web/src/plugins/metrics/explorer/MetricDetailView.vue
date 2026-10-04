@@ -54,6 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="shrink-0"
             data-test="metrics-detail-badge"
           />
+          <!-- The function in effect, ⚙ override included: the same text the card shows. -->
+          <span
+            v-if="overview.footerLabel"
+            class="text-text-secondary shrink-0 text-xs"
+            data-test="metrics-detail-function"
+            >{{ overview.footerLabel }}</span
+          >
           <span
             v-if="unitLabel"
             class="text-text-secondary shrink-0 text-xs max-md:hidden"
@@ -283,6 +290,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :nan-guard="nanGuard"
             :color="color"
             :run-query="runQuery"
+            :variant="overview"
+            :panel-queries="panelQueries"
             @update:selected-label="$emit('update:breakdownLabel', $event)"
             @add-filter="$emit('add-filter', $event)"
           />
@@ -388,6 +397,8 @@ export interface DetailChart {
   chartType: string;
   unit: string;
   bucketUnit: string | null;
+  /** The function in effect, as the card's footer names it. */
+  footerLabel?: string;
 }
 
 interface RelatedRow {
@@ -438,6 +449,8 @@ export default defineComponent({
     breakdownLabel: { type: String as PropType<string | null>, default: null },
     /** The card's current query — its ⚙ override included — resolved by the grid. */
     overview: { type: Object as PropType<DetailChart>, required: true },
+    /** The overview's queries at a dashboard panel's rate window, for Breakdown's Add to dashboard. */
+    panelQueries: { type: Array as PropType<TileQuery[]>, default: () => [] },
     /** Any metric's chart as the grid would draw it, for the Related cards. */
     chartOf: {
       type: Function as PropType<(card: MetricCardModel) => DetailChart>,

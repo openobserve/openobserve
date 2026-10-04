@@ -1509,6 +1509,46 @@ export function buildBreakdownQuery(
   return opts?.topk ? `topk(${opts.topk}, ${expr})` : expr;
 }
 
+const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s*)?\(/g;
+
+/**
+ * One query of the configured function, split into one series per value of `label`.
+ *
+ * Every aggregation is regrouped by the label: `le` stays, since `histogram_quantile` needs it,
+ * and any other grouping goes, as does a `topk` wrapper — the breakdown IS the split. A query
+ * with no aggregation (`quantile_over_time`) is averaged per value. Quoted label values are
+ * never rewritten. Null when `label` is not a label name.
+ */
+export function breakdownQueryOf(
+  expr: string,
+  label: string,
+  opts?: { topk?: number },
+): string | null {
+  if (!LABEL_NAME_RE.test(label)) return null;
+  const inner = /^topk\(\s*\d+\s*,\s*([\s\S]*)\)$/.exec(expr.trim())?.[1] ?? expr.trim();
+
+  let split = false;
+  // Odd parts are quoted strings, left as they are.
+  const parts = inner.split(/("(?:[^"\\]|\\.)*")/);
+  const regrouped = parts
+    .map((part, i) =>
+      i % 2
+        ? part
+        : part.replace(AGGREGATION_RE, (_, op: string, groups?: string) => {
+            split = true;
+            const keep = (groups ?? "")
+              .split(",")
+              .map((g) => g.trim())
+              .filter((g) => g === "le");
+            return `${op} by (${[...keep, label].join(", ")}) (`;
+          }),
+    )
+    .join("");
+
+  const result = split ? regrouped : `avg by (${label}) (${inner})`;
+  return opts?.topk ? `topk(${opts.topk}, ${result})` : result;
+}
+
 /** Footer label shown on the card — explorer UI only, never written to a panel. */
 const FOOTER_LABEL = {
   [CARD_KIND.COUNTER_RATE]: "sum(rate)",

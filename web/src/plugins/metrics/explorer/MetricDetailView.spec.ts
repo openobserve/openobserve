@@ -117,6 +117,7 @@ const mountView = (
         ...stubs,
         MetricBreakdown: {
           name: "MetricBreakdown",
+          props: ["variant", "panelQueries"],
           template: "<div data-test='breakdown-stub' />",
         },
         MetricCardChart: {
@@ -452,6 +453,32 @@ describe("MetricDetailView", () => {
       expect(wrapper.emitted("close")).toHaveLength(1);
       expect(wrapper.emitted("open-visualize")).toHaveLength(1);
       expect(wrapper.emitted("toggle-favorite")).toHaveLength(1);
+    });
+  });
+
+  describe("the function in effect", () => {
+    const OVERVIEW = {
+      queries: [{ expr: "avg(rate(x[4m]))" }],
+      chartType: "line",
+      unit: "count-per-sec",
+      bucketUnit: null,
+      footerLabel: "avg(rate)",
+    };
+
+    it("names it in the header, as the card does, and follows a change", async () => {
+      wrapper = mountView({ overview: OVERVIEW });
+      const fn = () => wrapper.find('[data-test="metrics-detail-function"]');
+      expect(fn().text()).toBe("avg(rate)");
+      await wrapper.setProps({ overview: { ...OVERVIEW, footerLabel: "sum(increase)" } });
+      expect(fn().text()).toBe("sum(increase)");
+    });
+
+    it("hands Breakdown the overview's function and its panel queries", () => {
+      const panelQueries = [{ expr: "avg(rate(x[$__rate_interval]))" }];
+      wrapper = mountView({ overview: OVERVIEW, panelQueries });
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      expect(breakdown.props("variant")).toEqual(OVERVIEW);
+      expect(breakdown.props("panelQueries")).toEqual(panelQueries);
     });
   });
 

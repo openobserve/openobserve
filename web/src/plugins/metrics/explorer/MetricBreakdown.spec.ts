@@ -1149,6 +1149,139 @@ describe("MetricBreakdown", () => {
     });
   });
 
+  describe("the configured function", () => {
+    const SEL = '{__name__="http_requests_total"}';
+    const AVG = {
+      queries: [{ expr: `avg(rate(${SEL}[4m]))`, legendTemplate: "http_requests_total" }],
+      chartType: "line",
+      unit: "count-per-sec",
+      footerLabel: "avg(rate)",
+    };
+    const AVG_PANEL = [{ expr: `avg(rate(${SEL}[$__rate_interval]))` }];
+    const INCREASE = {
+      queries: [{ expr: `sum(increase(${SEL}[4m]))`, legendTemplate: "http_requests_total" }],
+      chartType: "line",
+      unit: "short",
+      footerLabel: "sum(increase)",
+    };
+    const tile = (label: string) =>
+      wrapper
+        .findAllComponents({ name: "MetricChartTile" })
+        .find((c) => c.attributes("data-test") === `metrics-breakdown-card-${label}`)!;
+
+    it("charts every tile with the function the overview charts, split by the tile's label", async () => {
+      wrapper = mountBreakdown({ variant: AVG, panelQueries: AVG_PANEL });
+      await flushPromises();
+      expect(exprs()).toEqual([
+        `topk(10, avg by (instance) (rate(${SEL}[4m])))`,
+        `avg by (method) (rate(${SEL}[4m]))`,
+        `avg by (route) (rate(${SEL}[4m]))`,
+        `avg by (status) (rate(${SEL}[4m]))`,
+      ]);
+      expect(wrapper.find('[data-test="metrics-breakdown-card-method"]').text()).toContain(
+        "method",
+      );
+    });
+
+    it("re-queries every tile when the function changes", async () => {
+      wrapper = mountBreakdown({ variant: AVG, panelQueries: AVG_PANEL });
+      await flushPromises();
+      runQuery.mockClear();
+      await wrapper.setProps({ variant: INCREASE });
+      await flushPromises();
+      expect(exprs()).toEqual([
+        `topk(10, sum by (instance) (increase(${SEL}[4m])))`,
+        `sum by (method) (increase(${SEL}[4m]))`,
+        `sum by (route) (increase(${SEL}[4m]))`,
+        `sum by (status) (increase(${SEL}[4m]))`,
+      ]);
+      expect(tile("method").props("unit")).toBe("short");
+    });
+
+    it("draws the tiles in the function's chart type and unit", async () => {
+      wrapper = mountBreakdown({
+        variant: { ...AVG, chartType: "area", unit: "short" },
+        panelQueries: AVG_PANEL,
+      });
+      await flushPromises();
+      expect(tile("method").props("chartType")).toBe("area");
+      expect(tile("method").props("unit")).toBe("short");
+    });
+
+    it("re-queries the focused chart, titled with the function, and its panel follows", async () => {
+      wrapper = mountBreakdown({ variant: AVG, panelQueries: AVG_PANEL, selectedLabel: "method" });
+      await flushPromises();
+      const chart = () => wrapper.find('[data-test="metrics-breakdown-chart"]');
+      expect(exprs()).toEqual([`avg by (method) (rate(${SEL}[4m]))`]);
+      expect(chart().text()).toContain("avg(rate) by method");
+
+      await wrapper.setProps({
+        variant: INCREASE,
+        panelQueries: [{ expr: `sum(increase(${SEL}[$__rate_interval]))` }],
+      });
+      await flushPromises();
+      expect(exprs().at(-1)).toBe(`sum by (method) (increase(${SEL}[4m]))`);
+      expect(chart().text()).toContain("sum(increase) by method");
+
+      await wrapper.find('[data-test="metrics-breakdown-add-to-dashboard"]').trigger("click");
+      const data = wrapper
+        .findComponent({ name: "AddToDashboard" })
+        .props("dashboardPanelData")!.data;
+      expect(data.queries[0].query).toBe(`sum by (method) (increase(${SEL}[$__rate_interval]))`);
+      expect(data.config.unit).toBe(toO2Unit("short").unit);
+      expect(wrapper.findComponent({ name: "AddToDashboard" }).props("defaultPanelTitle")).toBe(
+        "sum(increase) by method · http_requests_total",
+      );
+    });
+
+    it("names a percentile it charts rather than the function's family", async () => {
+      wrapper = mountBreakdown({
+        card: { ...CARD, name: "lat_bucket", cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS },
+        variant: {
+          queries: [
+            {
+              expr: "histogram_quantile(0.95, sum by (le) (rate(lat_bucket[4m])))",
+              legendTemplate: "p95",
+            },
+          ],
+          chartType: "line",
+          unit: "seconds",
+          footerLabel: "percentiles",
+        },
+        panelQueries: [
+          { expr: "histogram_quantile(0.95, sum by (le) (rate(lat_bucket[$__rate_interval])))" },
+        ],
+        selectedLabel: "method",
+      });
+      await flushPromises();
+      expect(exprs()).toEqual([
+        "histogram_quantile(0.95, sum by (le, method) (rate(lat_bucket[4m])))",
+      ]);
+      expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
+        "p95 by method",
+      );
+    });
+
+    it("keeps a heatmap's breakdown as p90 lines: a heatmap holds one series", async () => {
+      wrapper = mountBreakdown({
+        card: { ...CARD, name: "lat_bucket", cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS },
+        variant: {
+          queries: [{ expr: "sum by (le) (rate(lat_bucket[4m]))", legendTemplate: "{le}" }],
+          chartType: "heatmap",
+          unit: "count-per-sec",
+          footerLabel: "heatmap",
+        },
+        panelQueries: [{ expr: "sum by (le) (rate(lat_bucket[$__rate_interval]))" }],
+        selectedLabel: "method",
+      });
+      await flushPromises();
+      expect(exprs()).toEqual([
+        'histogram_quantile(0.9, sum by (le, method) (rate({__name__="lat_bucket"}[4m])))',
+      ]);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("chartType")).toBe("line");
+    });
+  });
+
   describe("add to dashboard", () => {
     const dialog = (w: VueWrapper<any>) => w.findComponent({ name: "AddToDashboard" });
     const button = (w: VueWrapper<any>) =>

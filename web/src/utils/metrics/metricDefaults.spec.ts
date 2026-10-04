@@ -20,6 +20,7 @@ import {
   breakdownLabelsOf,
   breakdownTitleKey,
   buildBreakdownQuery,
+  breakdownQueryOf,
   buildSelector,
   supportsBreakdown,
   computePercentileWindow,
@@ -1028,5 +1029,71 @@ describe("breakdownTitleKey", () => {
       "metrics.explorer.detail.breakdown.titleMedian",
     );
     expect(breakdownTitleKey(CARD_KIND.INFO)).toBe("metrics.explorer.detail.breakdown.titleCount");
+  });
+});
+
+describe("breakdownQueryOf", () => {
+  const S = '{__name__="http_requests_total"}';
+
+  it("splits each aggregation of the configured function by the label", () => {
+    expect(breakdownQueryOf(`sum(rate(${S}[4m]))`, "az")).toBe(`sum by (az) (rate(${S}[4m]))`);
+    expect(breakdownQueryOf(`avg(rate(${S}[4m]))`, "az")).toBe(`avg by (az) (rate(${S}[4m]))`);
+    expect(breakdownQueryOf(`sum(increase(${S}[4m]))`, "az")).toBe(
+      `sum by (az) (increase(${S}[4m]))`,
+    );
+    expect(breakdownQueryOf("stddev(g)", "az")).toBe("stddev by (az) (g)");
+    expect(breakdownQueryOf("count(info)", "az")).toBe("count by (az) (info)");
+  });
+
+  it("splits both sides of a ratio", () => {
+    expect(breakdownQueryOf("sum(rate(a_sum[4m])) / sum(rate(a_count[4m]))", "az")).toBe(
+      "sum by (az) (rate(a_sum[4m])) / sum by (az) (rate(a_count[4m]))",
+    );
+  });
+
+  it("keeps le for a histogram quantile, so each label value gets its own quantile", () => {
+    expect(breakdownQueryOf("histogram_quantile(0.95, sum by (le) (rate(b[4m])))", "az")).toBe(
+      "histogram_quantile(0.95, sum by (le, az) (rate(b[4m])))",
+    );
+  });
+
+  it("replaces a function's own grouping and topk: the breakdown is the split", () => {
+    expect(breakdownQueryOf("topk(5, sum by (route) (rate(x[4m])))", "az")).toBe(
+      "sum by (az) (rate(x[4m]))",
+    );
+  });
+
+  it("averages a function that does not aggregate, per label value", () => {
+    expect(breakdownQueryOf("quantile_over_time(0.95, g[20m])", "az")).toBe(
+      "avg by (az) (quantile_over_time(0.95, g[20m]))",
+    );
+  });
+
+  it("never rewrites inside a quoted label value", () => {
+    expect(breakdownQueryOf('sum(rate({__name__="x",path="/sum(1)"}[4m]))', "az")).toBe(
+      'sum by (az) (rate({__name__="x",path="/sum(1)"}[4m]))',
+    );
+  });
+
+  it("caps to the top values when asked", () => {
+    expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { topk: 10 })).toBe(
+      "topk(10, sum by (az) (rate(x[4m])))",
+    );
+  });
+
+  it("refuses a label that is not a label name", () => {
+    expect(breakdownQueryOf("sum(rate(x[4m]))", "a z")).toBeNull();
+  });
+
+  it("splits every line variant a counter, gauge and histogram offer", () => {
+    const variants = [
+      ...getMetricDefaults("http_requests_total", "counter", "").variants,
+      ...getMetricDefaults("cpu_utilization_percent", "gauge", "").variants,
+      ...getMetricDefaults("lat_seconds_bucket", "histogram", "seconds").variants,
+    ].filter((v) => v.chartType === "line");
+    for (const variant of variants) {
+      const expr = breakdownQueryOf(variant.queries[0].expr, "az");
+      expect.soft(expr, variant.id).toMatch(/by \((le, )?az\)/);
+    }
   });
 });

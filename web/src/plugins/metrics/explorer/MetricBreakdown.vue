@@ -41,7 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="focusedTile"
         class="h-60"
         :queries="queriesByLabel[activeLabel]"
-        :unit="card.unit"
+        :chart-type="chartType"
+        :unit="unit"
         :color="color"
         :time-range="timeRange"
         :run-query="runQuery"
@@ -50,9 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @results="focused = $event"
       >
         <template #header>
-          <span class="truncate">{{
-            t(breakdownTitleKey(card.cardKind), { label: activeLabel })
-          }}</span>
+          <span class="truncate">{{ titleOf(activeLabel) }}</span>
           <OTag
             v-if="topkByLabel[activeLabel]"
             variant="default-outline"
@@ -273,7 +272,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="label"
           class="hover:border-primary h-56 cursor-pointer"
           :queries="queriesByLabel[label]"
-          :unit="card.unit"
+          :chart-type="chartType"
+          :unit="unit"
           :color="color"
           :time-range="timeRange"
           :run-query="runQuery"
@@ -356,6 +356,7 @@ import {
   BREAKDOWN_LABEL_LIMIT,
   breakdownTitleKey,
   buildBreakdownQuery,
+  breakdownQueryOf,
   CARD_KIND,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
@@ -364,6 +365,13 @@ import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/me
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+
+interface BreakdownVariant {
+  queries: TileQuery[];
+  chartType: string;
+  unit: string;
+  footerLabel?: string;
+}
 
 /** 21, not 20: a 21st value is how "more than 20" is known. */
 const VALUES_SIZE = 21;
@@ -458,6 +466,10 @@ export default defineComponent({
     /** The card's own query needed the NaN guard. */
     nanGuard: { type: Boolean, default: false },
     color: { type: String, required: true },
+    /** The overview's function: the breakdown splits it. Absent, the kind's default measure. */
+    variant: { type: Object as PropType<BreakdownVariant | null>, default: null },
+    /** `variant`'s queries at the panel's rate window, for Add to dashboard. */
+    panelQueries: { type: Array as PropType<TileQuery[]>, default: () => [] },
     /** Runs one PromQL query on the detail view's scheduler slot. */
     runQuery: {
       type: Function as PropType<(expr: string, signal: AbortSignal) => Promise<any>>,
@@ -645,19 +657,55 @@ export default defineComponent({
       ),
     );
 
-    const queriesFor = (label: string, rateWindow = props.rateWindow): TileQuery[] | null => {
+    /**
+     * The breakdown splits the function the overview charts. A heatmap holds one series, and
+     * every summary function already splits by quantile, so those keep the kind's own measure.
+     */
+    const follows = computed(
+      () =>
+        !!props.variant?.queries.length &&
+        props.variant.chartType !== "heatmap" &&
+        props.card.cardKind !== CARD_KIND.SUMMARY_QUANTILES,
+    );
+    const chartType = computed(() => (follows.value ? props.variant!.chartType : "line"));
+    const unit = computed(() => (follows.value ? props.variant!.unit : props.card.unit));
+
+    /** A percentile, or one line of a several-line function, is named rather than its family. */
+    const fnLabel = computed(() => {
+      const queries = props.variant?.queries ?? [];
+      const legend = queries[0]?.legendTemplate ?? "";
+      return queries.length > 1 || /^p\d+$/.test(legend)
+        ? legend
+        : (props.variant?.footerLabel ?? "");
+    });
+    const titleOf = (label: string) =>
+      follows.value
+        ? t("metrics.explorer.detail.breakdown.titleFn", { fn: raw(fnLabel.value), label })
+        : t(breakdownTitleKey(props.card.cardKind), { label });
+
+    /** `panel`: at the dashboard panel's rate window rather than the tile's. */
+    const queriesFor = (label: string, panel = false): TileQuery[] | null => {
       if (!countsByLabel.value[label].ready) return null;
-      const expr = buildBreakdownQuery(
-        props.card.cardKind,
-        {
-          metricName: props.card.name,
-          filters: props.filters,
-          rateWindow,
-          applyNanGuard: props.nanGuard,
-        },
-        label,
-        topkByLabel.value[label] ? { topk: TOPK } : undefined,
-      );
+      const topk = topkByLabel.value[label] ? { topk: TOPK } : undefined;
+      // Several-line functions chart their first line: a tile is one series per label value.
+      const source = follows.value
+        ? (panel ? props.panelQueries : props.variant!.queries)[0]?.expr
+        : undefined;
+      const expr = follows.value
+        ? source
+          ? breakdownQueryOf(source, label, topk)
+          : null
+        : buildBreakdownQuery(
+            props.card.cardKind,
+            {
+              metricName: props.card.name,
+              filters: props.filters,
+              rateWindow: panel ? props.panelRateWindow : props.rateWindow,
+              applyNanGuard: props.nanGuard,
+            },
+            label,
+            topk,
+          );
       return expr ? [{ expr, legendTemplate: `{${label}}` }] : [];
     };
 
@@ -774,9 +822,9 @@ export default defineComponent({
       const values = [...activeValues.value];
       for (const value of stats.keys()) if (!values.includes(value)) values.push(value);
 
-      const unit = toO2Unit(props.card.unit ?? "");
+      const o2Unit = toO2Unit(unit.value ?? "");
       const format = (v: number, decimals: number) =>
-        formatUnitValue(getUnitValue(v, unit.unit, unit.unitCustom ?? "", decimals));
+        formatUnitValue(getUnitValue(v, o2Unit.unit, o2Unit.unitCustom ?? "", decimals));
       const total = [...stats.values()].reduce((sum, s) => sum + s.sum, 0);
 
       const ranked = values.map((value) => {
@@ -839,14 +887,18 @@ export default defineComponent({
     const openAddToDashboard = () => {
       const label = activeLabel.value;
       // Not the tile's window, which would freeze the panel at this range.
-      const queries = label ? queriesFor(label, props.panelRateWindow) : null;
+      const queries = label ? queriesFor(label, true) : null;
       if (!label || !queries?.length) return;
-      const data = buildPanelDataForCard(props.card, { queries, chartType: "line" });
+      const data = buildPanelDataForCard(props.card, {
+        queries,
+        chartType: chartType.value,
+        unit: unit.value,
+      });
       // The tile sizes its decimals to the values it drew; the panel would otherwise round them to 2.
       data.config.decimals = adaptiveDecimals(focused.value.results);
       dashboardPanel.value = { data };
       dashboardPanelTitle.value = t("metrics.explorer.detail.breakdown.panelTitle", {
-        title: t(breakdownTitleKey(props.card.cardKind), { label }),
+        title: titleOf(label),
         metric: props.card.name,
       });
       dashboardDialogOpen.value = true;
@@ -865,7 +917,9 @@ export default defineComponent({
     return {
       t,
       raw,
-      breakdownTitleKey,
+      titleOf,
+      chartType,
+      unit,
       TOPK,
       labels,
       activeLabel,

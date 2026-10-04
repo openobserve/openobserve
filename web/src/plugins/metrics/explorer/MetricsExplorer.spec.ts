@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { reactive, computed, ref } from "vue";
 import {
@@ -1031,6 +1031,11 @@ describe("MetricsExplorer wiring", () => {
       grid.exemplarsEnabled.mockReturnValue(false);
       grid.exemplarSwapsVariant.mockReturnValue(false);
       grid.exemplarStateOf.mockReturnValue(undefined);
+      grid.runDetailQuery.mockReset();
+      grid.effectiveVariant.mockImplementation(() => ({
+        defaults: { variants: [] },
+        resolved: { queries: [] },
+      }));
     });
 
     it("opens from a card: pushes a history entry, pauses the grid, loads the schemas", async () => {
@@ -1089,7 +1094,7 @@ describe("MetricsExplorer wiring", () => {
       // Hiding the card on the way in cancels an exemplar fetch in flight and drops its
       // state; a preview already exists, so the preview path never re-asks for them.
       grid.previews.value[CARD.name] = { status: "done" };
-      grid.runDetailQuery.mockResolvedValue({ result: [] });
+      grid.runDetailQuery.mockResolvedValueOnce({ result: [] });
       const wrapper = mountExplorer();
       (wrapper.vm as any).openDetail(CARD);
       await wrapper.vm.$nextTick();
@@ -1112,6 +1117,55 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.ensureExemplars).not.toHaveBeenCalled();
       delete grid.previews.value[CARD.name];
       delete grid.previews.value[other.name];
+    });
+
+    it("still asks for the exemplars when a refresh rebuilds the cards mid-query", async () => {
+      grid.previews.value[CARD.name] = { status: "done" };
+      let answer!: (value: any) => void;
+      grid.runDetailQuery.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      // Reactive here, as the real grid's is, so the view sees the rebuilt card.
+      const plainCards = grid.cards;
+      grid.cards = ref([CARD]);
+      onTestFinished(() => {
+        grid.cards = plainCards;
+      });
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      grid.ensureExemplars.mockClear();
+
+      const pending = (wrapper.vm as any).runDetailPreview(
+        "rate(x[4m])",
+        new AbortController().signal,
+      );
+      // `loadStreams(true)` rebuilds every card as a new object.
+      grid.cards.value = [{ ...CARD }];
+      answer({ result: [] });
+      await pending;
+      expect(grid.ensureExemplars).toHaveBeenCalledTimes(1);
+      expect(grid.ensureExemplars.mock.calls[0][0].name).toBe(CARD.name);
+      delete grid.previews.value[CARD.name];
+    });
+
+    it("hands the detail view the function in effect and its queries for a dashboard panel", async () => {
+      grid.effectiveVariant.mockImplementation((_card: any, _points: any, opts: any) => ({
+        defaults: { variants: [], bucketUnit: null },
+        resolved: {
+          queries: [{ expr: `avg(rate(x[${opts?.rateWindow ?? "4m"}]))` }],
+          chartType: "line",
+          unit: "count-per-sec",
+          footerLabel: "avg(rate)",
+        },
+      }));
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      const view = detailView(wrapper);
+      expect(view.props("overview")).toMatchObject({
+        queries: [{ expr: "avg(rate(x[4m]))" }],
+        footerLabel: "avg(rate)",
+      });
+      expect(view.props("panelQueries")).toEqual([{ expr: "avg(rate(x[$__rate_interval]))" }]);
     });
 
     it("hands the view the panel rate window Convert to dashboard would use", async () => {

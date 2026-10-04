@@ -572,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tab="detailTab"
       :breakdown-label="breakdownLabel"
       :overview="detailOverview"
+      :panel-queries="detailPanelQueries"
       :chart-of="chartOf"
       :is-favorite="!!detailMetric && grid.favorites.value.includes(detailMetric)"
       :all-cards="grid.cards.value"
@@ -1406,6 +1407,7 @@ export default defineComponent({
         chartType,
         unit: resolved?.unit ?? card.unit,
         bucketUnit: chartType === "heatmap" ? (defaults?.bucketUnit ?? null) : null,
+        footerLabel: resolved?.footerLabel || card.footerLabel,
       };
     };
 
@@ -1414,6 +1416,18 @@ export default defineComponent({
         ? chartOf(detailCard.value)
         : { queries: [], chartType: "line", unit: "", bucketUnit: null },
     );
+
+    /** The overview's queries at the panel's rate window: see `onSelect`. */
+    const detailPanelQueries = computed(() => {
+      const card = detailCard.value;
+      if (!card || !detailOverview.value.queries.length) return [];
+      return (
+        grid.effectiveVariant(card, undefined, {
+          rateWindow: panelRateWindowFor(card.name),
+          applyNanGuard: grid.previews.value[card.name]?.nanGuardApplied,
+        }).resolved?.queries ?? []
+      );
+    });
 
     /** Indexed in the whole sorted list, of which the page is a prefix, so off-page metrics match too. */
     const colorOf = (name: string) => {
@@ -1434,7 +1448,8 @@ export default defineComponent({
       } finally {
         // The card's unmount, or a refresh, cancels an exemplar fetch in flight and drops its
         // state. Asked once the overview has settled, after that cancellation has landed.
-        if (!signal.aborted && card === detailCard.value) grid.ensureExemplars(card);
+        // By name: a refresh rebuilds every card as a new object mid-query.
+        if (!signal.aborted && card.name === detailMetric.value) grid.ensureExemplars(card);
       }
     };
 
@@ -2186,6 +2201,7 @@ export default defineComponent({
       detailCard,
       detailLoading,
       detailOverview,
+      detailPanelQueries,
       chartOf,
       colorOf,
       detailColor,
