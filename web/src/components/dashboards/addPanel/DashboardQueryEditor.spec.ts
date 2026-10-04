@@ -719,7 +719,6 @@ describe("DashboardQueryEditor", () => {
     });
   });
 
-  // The code editor's own Cmd+Enter handler emits run-query; CodeQueryEditor.spec covers that half.
   it("runs the page's injected runQuery when the code editor emits run-query", async () => {
     const runQuery = vi.fn();
     wrapper = mount(DashboardQueryEditor, {

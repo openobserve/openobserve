@@ -181,7 +181,6 @@ describe("Metrics editor — query history", () => {
     expect(api.record).toHaveBeenCalledTimes(1);
   });
 
-  // The editor's Cmd+Enter calls this injected runQuery; DashboardQueryEditor.spec covers that half.
   it("provides runQuery as the user's Run: one call runs and records once", async () => {
     mountIndex();
     await flushPromises();

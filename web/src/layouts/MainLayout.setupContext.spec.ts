@@ -99,7 +99,6 @@ describe("MainLayout — layout mixin runs inside setup()", () => {
 
     expect(setupContextWarnings(warnSpy)).toEqual([]);
     expect((wrapper.vm as any).linksList.some((l: any) => l.name === "pipeline")).toBe(true);
-    // The mixin's onMounted loads the org list that names the selected org in the header.
     expect(organizationService.os_list).toHaveBeenCalledTimes(1);
   });
 
@@ -108,9 +107,12 @@ describe("MainLayout — layout mixin runs inside setup()", () => {
     await flushPromises();
     warnSpy.mockClear();
 
+    expect(organizationService.os_list).toHaveBeenCalledTimes(1);
+
     await router.push({ query: { ...router.currentRoute.value.query, update_org: "1" } });
     await flushPromises();
 
+    expect(organizationService.os_list).toHaveBeenCalledTimes(2);
     expect(setupContextWarnings(warnSpy)).toEqual([]);
   });
 });

@@ -282,7 +282,6 @@ describe("MetricDetailView", () => {
       expect(names).toContain("http_server_active_requests");
       const shared = wrapper.findAll('[data-test="o2-table-cell-shared"]').map((c) => c.text());
       expect(shared).toContain("job, route");
-      // A long list ellipsises in its column; the title carries the whole of it.
       const cell = wrapper.find(
         '[data-test="metrics-detail-related-shared-http_server_active_requests"]',
       );

@@ -395,7 +395,6 @@ describe("MetricBreakdown with the real OTable", () => {
     expect(wrapper.find('[data-test="metrics-breakdown-distinct-service_name"]').text()).toBe("–");
   });
 
-  /** Answers each request with three values for every field it asked for. */
   const echoFields = ({ fields }: any) =>
     Promise.resolve({
       data: { hits: fields.map((field: string) => ({ field, values: values(`${field}-`, 3) })) },
@@ -457,6 +456,37 @@ describe("MetricBreakdown with the real OTable", () => {
     expect(runQuery).toHaveBeenCalledWith(
       'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
     );
+  });
+
+  it("shows a failed count for a label past the cap as the table error, and retries it alone", async () => {
+    fieldValues.mockImplementation((req: any) =>
+      req.fields.length === 1
+        ? Promise.reject(new Error("tenant values unavailable"))
+        : echoFields(req),
+    );
+    wrapper = mountReal({ card: WIDE, selectedLabel: "tenant_id" });
+    await flushPromises();
+
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="o2-table-error"]').text()).toContain(
+        "tenant values unavailable",
+      ),
+    );
+
+    fieldValues.mockImplementation(echoFields);
+    await wrapper.find('[data-test="o2-table-error-retry-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(fieldValues.mock.calls.map(([req]) => req.fields).slice(1)).toEqual([
+      ["tenant_id"],
+      ["tenant_id"],
+    ]);
+    await vi.waitFor(() =>
+      expect(
+        wrapper.find('[data-test="metrics-breakdown-value-tenant_id-tenant_id-0"]').exists(),
+      ).toBe(true),
+    );
+    expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(false);
   });
 
   it("titles the chart with the measure it plots: p90 for a histogram, rate for a counter", async () => {

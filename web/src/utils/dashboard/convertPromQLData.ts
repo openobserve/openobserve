@@ -781,7 +781,7 @@ export const convertPromQLData = async (
               });
 
               const seriesName = nameOf(seriesNames, metric.metric, index);
-              // A shifted series takes its primary's colour, so the pair reads as one series over two periods.
+              // Both periods of one series must share a colour to read as the same series.
               const colorName = nameSuffixes[index]
                 ? (seriesNames.get(metric.metric) ?? "")
                 : seriesName;
@@ -825,7 +825,7 @@ export const convertPromQLData = async (
                 showSymbol: panelSchema.config?.show_symbol ?? false,
                 itemStyle: {
                   color: resolvedSeriesColor,
-                  // Bars and points ignore lineStyle, so a fainter fill is what marks the previous period.
+                  // Bars and points have no line to dash.
                   ...(nameSuffixes[index] && ["bar", "scatter"].includes(panelSchema.type)
                     ? { opacity: 0.5 }
                     : {}),
@@ -839,7 +839,7 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
-                // Sharing the primary's colour, the previous period is only told apart by its dash.
+                // The shared colour leaves the dash as the only cue to the earlier period.
                 ...(nameSuffixes[index]
                   ? { lineStyle: { ...seriesPropsBasedOnChartType?.lineStyle, type: "dashed" } }
                   : {}),
@@ -1236,8 +1236,9 @@ export const convertPromQLData = async (
     store.state.theme,
   );
   // Mapped and value-based colours are final only now, and a mapping would otherwise recolour a twin.
+  const colorBySeries = panelSchema?.config?.color?.colorBySeries;
   const mappedNames = new Set(
-    (panelSchema?.config?.color?.colorBySeries ?? [])
+    (Array.isArray(colorBySeries) ? colorBySeries : [])
       .filter((mapping: any) => mapping?.value && mapping?.color)
       .map((mapping: any) => String(mapping.value)),
   );

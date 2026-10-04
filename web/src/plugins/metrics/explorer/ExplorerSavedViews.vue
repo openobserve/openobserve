@@ -199,10 +199,14 @@ const payload = (viewName: string, state: ExplorerViewState) => ({
 const saveAs = async (value: ExplorerViewForm) => {
   // The grid can move while the request is in flight; only what was sent is saved.
   const submitted = { ...props.state } as ExplorerViewState;
+  const selectedId = activeViewId.value;
   try {
     const res: any = await createView.mutateAsync(payload(value.viewName, submitted));
-    activeViewId.value = res?.data?.view_id ?? null;
-    activeViewState.value = submitted;
+    // A view picked meanwhile is what the grid now shows, so the new view must not take its place.
+    if (activeViewId.value === selectedId) {
+      activeViewId.value = res?.data?.view_id ?? null;
+      activeViewState.value = submitted;
+    }
     saveDialogOpen.value = false;
     toast({ variant: "success", message: t("metrics.explorer.views.saved") });
     emit("saved", "created");
@@ -220,7 +224,8 @@ const updateActive = async () => {
       viewId: view.view_id,
       view: payload(view.view_name, submitted),
     });
-    activeViewState.value = submitted;
+    // A view picked meanwhile owns the baseline now.
+    if (activeViewId.value === view.view_id) activeViewState.value = submitted;
     toast({ variant: "success", message: t("metrics.explorer.views.updated") });
     emit("saved", "updated");
   } catch (err) {

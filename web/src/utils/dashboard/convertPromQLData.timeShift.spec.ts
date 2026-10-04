@@ -463,6 +463,22 @@ describe("convertPromQLData with time-shifted results", () => {
     });
   });
 
+  it.each([
+    ["without", [twoPods()], meta([{ panelQueryIndex: 0 }]), 1],
+    [
+      "with",
+      [twoPods(), twoPods(DAY_S)],
+      meta([{ panelQueryIndex: 0 }, { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" }]),
+      2,
+    ],
+  ])("converts a panel whose colorBySeries is not an array, %s a shift", async (_c, data, m, n) => {
+    const unmapped: any = panel("line");
+    unmapped.config = { color: { mode: "palette-classic-by-series", colorBySeries: false } };
+    const result = await convert(unmapped, data, m, stepMeta(n, 60));
+
+    expect(names(result)).toHaveLength(2 * n);
+  });
+
   it("does not count shifted windows as extra queries when splitting the series budget", async () => {
     const tightStore = {
       state: { ...store.state, zoConfig: { max_dashboard_series: 2 } },

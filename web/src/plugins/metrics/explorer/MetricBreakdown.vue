@@ -97,8 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :fill-height="false"
         horizontal-scroll
         :loading="tableLoading"
-        :error="tableError || null"
+        :error="tableError || extraCounts.error || null"
         :row-class="rowClass"
+        @pagination-change="retryCounts"
         @row-click="(row: BreakdownRow) => $emit('update:selectedLabel', row.label)"
       >
         <template #cell-label="{ row }">
@@ -297,13 +298,16 @@ export default defineComponent({
 
     const headLabels = computed(() => labels.value.slice(0, BREAKDOWN_LABEL_LIMIT));
 
-    /** A selected label past the cap: its counts come from a request of its own. */
+    // Counted on a request of its own, so selecting it never re-scans the labels under the cap.
     const pastCapLabel = computed(() =>
       activeLabel.value && !headLabels.value.includes(activeLabel.value) ? activeLabel.value : null,
     );
-    const extraCounts = ref<{ label: string; status: "loading" | "done" | "error"; values: any[] }>(
-      { label: "", status: "done", values: [] },
-    );
+    const extraCounts = ref<{
+      label: string;
+      status: "loading" | "done" | "error";
+      values: any[];
+      error?: string;
+    }>({ label: "", status: "done", values: [] });
     let extraGeneration = 0;
 
     const fetchValues = (fields: string[]) =>
@@ -360,10 +364,21 @@ export default defineComponent({
         const hits: any[] = response?.data?.hits ?? [];
         const values = hits.find((hit) => hit?.field === label)?.values ?? [];
         extraCounts.value = { label, status: "done", values };
-      } catch {
+      } catch (error: any) {
         if (generation !== extraGeneration) return;
-        extraCounts.value = { label, status: "error", values: [] };
+        extraCounts.value = {
+          label,
+          status: "error",
+          values: [],
+          error: parseSearchError(error).message,
+        };
       }
+    };
+
+    // OTable's error banner retries through `pagination-change`; only the failed request is repeated.
+    const retryCounts = () => {
+      if (tableError.value) loadTable();
+      if (extraCounts.value.status === "error") loadExtra();
     };
 
     // Sources compared one by one: a getter returning a fresh array re-fires on every card rebuild.
@@ -531,6 +546,8 @@ export default defineComponent({
       columns,
       tableLoading,
       tableError,
+      extraCounts,
+      retryCounts,
       distinctLabel,
       rowClass,
       addFilter,

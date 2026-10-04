@@ -243,6 +243,79 @@ describe("ExplorerSavedViews", () => {
     });
   });
 
+  describe("selecting another view while the save is in flight keeps that view's baseline", () => {
+    const stateA = { search: "http", labels: ["job=api"], sort: "z-a", period: "1h" };
+    const stateB = { search: "db", labels: [], sort: "a-z", period: "6h" };
+    const detail: Record<string, any> = {
+      m1: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: stateA } },
+      m2: { view_id: "m2", view_name: "db view", data: { version: 1, state: stateB } },
+    };
+    const deferred = () => {
+      let resolve!: (v: any) => void;
+      const promise = new Promise((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    const mountBound = () => {
+      const wrapper: any = mountViews(stateA, {
+        "onUpdate:activeViewId": (v: any) => wrapper.setProps({ activeViewId: v }),
+        "onUpdate:activeViewState": (v: any) => wrapper.setProps({ activeViewState: v }),
+        onApply: (q: any) => wrapper.setProps({ state: q }),
+      });
+      return wrapper;
+    };
+    const label = (wrapper: any) => wrapper.find('[data-test="metrics-explorer-views-btn"]').text();
+    const select = async (wrapper: any, id: string) => {
+      await wrapper.find(`[data-test="metrics-explorer-view-${id}"]`).trigger("click");
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      api.get.mockResolvedValue({
+        data: {
+          views: [...VIEWS, { view_id: "m2", view_name: "db view", view_type: "metrics_explorer" }],
+        },
+      });
+      api.getViewDetail.mockImplementation((_org: string, id: string) =>
+        Promise.resolve({ data: detail[id] }),
+      );
+    });
+
+    it("on Update", async () => {
+      const put = deferred();
+      api.put.mockReturnValue(put.promise);
+      const wrapper = mountBound();
+      await flushPromises();
+      await select(wrapper, "m1");
+
+      await wrapper.setProps({ state: { ...stateA, search: "grpc" } });
+      await wrapper.find('[data-test="metrics-explorer-views-update"]').trigger("click");
+      await select(wrapper, "m2");
+      put.resolve({ data: {} });
+      await flushPromises();
+
+      expect(label(wrapper)).toContain("db view");
+      expect(label(wrapper)).not.toContain("(modified)");
+    });
+
+    it("on Save As", async () => {
+      const post = deferred();
+      api.post.mockReturnValue(post.promise);
+      const wrapper = mountBound();
+      await flushPromises();
+      await select(wrapper, "m1");
+
+      const saving = wrapper.vm.saveAs({ viewName: "mine" });
+      await select(wrapper, "m2");
+      post.resolve({ data: { view_id: "new1" } });
+      await saving;
+      await flushPromises();
+
+      expect(wrapper.props("activeViewId")).toBe("m2");
+      expect(label(wrapper)).toContain("db view");
+      expect(label(wrapper)).not.toContain("(modified)");
+    });
+  });
+
   it("updates and deletes the applied view", async () => {
     api.getViewDetail.mockResolvedValue({
       data: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: {} } },

@@ -272,7 +272,7 @@ describe("QueryHistoryDrawer with the real OTable", () => {
       "max-md:hidden",
     );
 
-    // The menu is portalled to <body>; only its trigger is hidden on desktop.
+    // The menu is portalled to <body>, outside the wrapper.
     const pick = async (dataTest: string) => {
       await more().trigger("keydown", { key: "Enter" });
       await flushPromises();
