@@ -133,8 +133,11 @@ impl TreeNodeRewriter for AggregateTopkRewriter {
             }
 
             let input_plan = Arc::clone(agg_node);
-            let agg_plan =
-                AggregateTopkExec::new(input_plan, &self.field, self.descending, self.limit);
+            let Ok(agg_plan) =
+                AggregateTopkExec::try_new(input_plan, &self.field, self.descending, self.limit)
+            else {
+                return Ok(Transformed::no(node));
+            };
 
             let node = node.replace_children(
                 vec![Arc::new(agg_plan) as Arc<dyn ExecutionPlan>],
@@ -248,6 +251,10 @@ mod tests {
     /// Whether the rule inserts `AggregateTopkExec` for `agg(v)` grouped by `name`, sorted
     /// on the aggregate and limited.
     async fn inserts_topk(agg: &str) -> bool {
+        inserts_topk_for(&format!("{agg}(v)")).await
+    }
+
+    async fn inserts_topk_for(select_expr: &str) -> bool {
         enable_topk();
         let schema = Arc::new(Schema::new(vec![
             Field::new("name", DataType::Utf8, false),
@@ -258,8 +265,9 @@ mod tests {
         );
         ctx.register_table("t", Arc::new(NewEmptyTable::new("t", schema)))
             .unwrap();
-        let sql =
-            format!("SELECT name, {agg}(v) AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 10");
+        let sql = format!(
+            "SELECT name, {select_expr} AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 10"
+        );
         let plan = ctx
             .sql(&sql)
             .await
@@ -281,6 +289,12 @@ mod tests {
         for agg in ["count", "avg", "min", "max", "sum"] {
             assert!(inserts_topk(agg).await, "{agg} must stay eligible");
         }
+    }
+
+    #[tokio::test]
+    async fn test_topk_matches_an_aggregate_name_with_brackets() {
+        let filtered = "COUNT(*) FILTER (WHERE CAST(v AS VARCHAR) IN ('2','5'))";
+        assert!(inserts_topk_for(filtered).await, "{filtered}");
     }
 
     #[tokio::test]
