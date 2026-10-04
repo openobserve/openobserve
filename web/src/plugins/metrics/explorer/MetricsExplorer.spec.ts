@@ -1044,6 +1044,19 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
+    it("hands the view the panel rate window Convert to dashboard would use", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("panelRateWindow")).toBe("$__rate_interval");
+
+      grid.previews.value[CARD.name] = { widenedRateWindow: "30m" };
+      await wrapper.vm.$forceUpdate();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("panelRateWindow")).toBe("30m");
+      delete grid.previews.value[CARD.name];
+    });
+
     it("keeps the grid paused when the mode changes underneath an open view", async () => {
       const wrapper = mountExplorer();
       (wrapper.vm as any).openDetail(CARD);

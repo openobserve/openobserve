@@ -99,6 +99,7 @@ const mountView = (props: Record<string, any> = {}, { realHeader = false } = {})
       filters: [],
       timeRange: { start_time: 1, end_time: 2 },
       rateWindow: "4m",
+      panelRateWindow: "$__rate_interval",
       nanGuard: false,
       color: "#000",
       runQuery,
@@ -239,6 +240,13 @@ describe("MetricDetailView", () => {
       wrapper = mountView();
       expect(tabNames(wrapper)).toEqual(["breakdown", "related"]);
       expect(wrapper.find('[data-test="breakdown-stub"]').exists()).toBe(true);
+    });
+
+    it("hands Breakdown the window its dashboard panel rates over", () => {
+      wrapper = mountView({ panelRateWindow: "30m" });
+      expect(
+        wrapper.findComponent({ name: "MetricBreakdown" }).attributes("panel-rate-window"),
+      ).toBe("30m");
     });
 
     it("hides Breakdown for timestamp and other cards", () => {

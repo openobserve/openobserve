@@ -452,6 +452,8 @@ export default defineComponent({
     selectedLabel: { type: String as PropType<string | null>, default: null },
     /** The card's concrete rate window, so the breakdown measures like the card. */
     rateWindow: { type: String, required: true },
+    /** What the dashboard panel rates over: a widened card's concrete window, else `$__rate_interval`. */
+    panelRateWindow: { type: String, default: PANEL_RATE_WINDOW },
     /** The card's own query needed the NaN guard. */
     nanGuard: { type: Boolean, default: false },
     color: { type: String, required: true },
@@ -835,8 +837,8 @@ export default defineComponent({
     /** The focused chart as a panel: its queries, filters and topk cap included. */
     const openAddToDashboard = () => {
       const label = activeLabel.value;
-      // `$__rate_interval`, as Convert to dashboard does: the tile's window would freeze the panel at this range.
-      const queries = label ? queriesFor(label, PANEL_RATE_WINDOW) : null;
+      // Not the tile's window, which would freeze the panel at this range.
+      const queries = label ? queriesFor(label, props.panelRateWindow) : null;
       if (!label || !queries?.length) return;
       const data = buildPanelDataForCard(props.card, { queries, chartType: "line" });
       // The tile sizes its decimals to the values it drew; the panel would otherwise round them to 2.

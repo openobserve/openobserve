@@ -1201,6 +1201,17 @@ describe("MetricBreakdown", () => {
       );
     });
 
+    it("keeps the concrete window of a card that only charted by widening it", async () => {
+      // `$__rate_interval` would resolve back to the window that came up empty.
+      wrapper = mountBreakdown({ selectedLabel: "method", panelRateWindow: "30m" });
+      await flushPromises();
+      await button(wrapper).trigger("click");
+
+      expect(dialog(wrapper).props("dashboardPanelData")!.data.queries[0].query).toBe(
+        'sum by (method) (rate({__name__="http_requests_total"}[30m]))',
+      );
+    });
+
     it("waits until the chart's query is decided", async () => {
       fieldValues.mockImplementation(() => new Promise(() => {}));
       wrapper = mountBreakdown({ selectedLabel: "method" });

@@ -587,6 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :is-label-eligible="grid.isLabelEligible"
       :time-range="grid.timeRange.value"
       :rate-window="detailCard ? grid.rateWindowFor(detailCard) : ''"
+      :panel-rate-window="panelRateWindowFor(detailMetric ?? '')"
       :nan-guard="!!(detailMetric && grid.previews.value[detailMetric]?.nanGuardApplied)"
       :color="detailColor"
       :color-of="colorOf"
@@ -1317,6 +1318,10 @@ export default defineComponent({
       return url.href;
     });
 
+    /** The rate window a panel built from `name`'s card rates over: see `onSelect` for why widened cards keep theirs. */
+    const panelRateWindowFor = (name: string) =>
+      grid.previews.value[name]?.widenedRateWindow ?? PANEL_RATE_WINDOW;
+
     const onSelect = (card: MetricCardModel) => {
       // Resolved for a PANEL, not for the card: the rate window goes over as
       // `$__rate_interval` rather than the concrete window the card charted, so
@@ -1334,9 +1339,8 @@ export default defineComponent({
       // instead. It IS frozen to the card's range, but frozen-and-charting
       // beats adaptive-and-blank, and it keeps the drill-in contract: the
       // editor opens on what the card actually shows.
-      const widenedRateWindow = grid.previews.value[card.name]?.widenedRateWindow;
       const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-        rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
+        rateWindow: panelRateWindowFor(card.name),
         percentileWindow: PANEL_PERCENTILE_WINDOW,
       });
       if (!resolved) return;
@@ -1604,9 +1608,8 @@ export default defineComponent({
         // Same rule as the drill-in: a card that only charted through a widened
         // window must hand the panel that concrete window, or the dashboard is
         // born with a permanently blank panel for a metric the card charts.
-        const widenedRateWindow = grid.previews.value[name]?.widenedRateWindow;
         const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-          rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
+          rateWindow: panelRateWindowFor(name),
           percentileWindow: PANEL_PERCENTILE_WINDOW,
         });
         if (!resolved) continue;
@@ -2162,6 +2165,7 @@ export default defineComponent({
       onApplyOverride,
       onRestoreOverride,
       openConvertToDashboard,
+      panelRateWindowFor,
       convertPanels,
       convertDialogOpen,
       onSelect,

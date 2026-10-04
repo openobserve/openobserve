@@ -188,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :time-range="timeRange"
             :selected-label="breakdownLabel"
             :rate-window="rateWindow"
+            :panel-rate-window="panelRateWindow"
             :nan-guard="nanGuard"
             :color="color"
             :run-query="runQuery"
@@ -368,6 +369,8 @@ export default defineComponent({
       required: true,
     },
     rateWindow: { type: String, required: true },
+    /** The rate window a dashboard panel built from this metric rates over. */
+    panelRateWindow: { type: String, required: true },
     nanGuard: { type: Boolean, default: false },
     color: { type: String, required: true },
     /** A metric's colour on its grid card, so a Related card matches it. */
