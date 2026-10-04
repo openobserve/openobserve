@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="card.help ? raw(card.help) : undefined"
         title-data-test="metrics-detail-title"
         :back="{
-          label: t('metrics.explorer.detail.close'),
+          label: t('metrics.explorer.detail.backTo'),
           onClick: () => $emit('close'),
           dataTest: 'metrics-detail-close',
         }"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span
             v-if="unitLabel"
-            class="text-text-secondary shrink-0 text-xs"
+            class="text-text-secondary shrink-0 text-xs max-md:hidden"
             data-test="metrics-detail-unit"
             >{{ unitLabel }}</span
           >
@@ -66,10 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-toolbar"
             icon-left="edit"
+            :aria-label="t('metrics.explorer.detail.openInVisualize')"
             data-test="metrics-detail-open-visualize"
             @click="$emit('open-visualize')"
           >
-            {{ t("metrics.explorer.detail.openInVisualize") }}
+            <span class="max-md:hidden">{{ t("metrics.explorer.detail.openInVisualize") }}</span>
+            <OTooltip :content="t('metrics.explorer.detail.openInVisualize')" />
           </OButton>
           <OButton
             variant="ghost"
@@ -204,7 +206,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               sorting="none"
               :show-global-filter="false"
               :fill-height="false"
-              horizontal-scroll
               row-class="cursor-pointer"
               @row-click="(row: RelatedRow) => $emit('open-related', row.name)"
             >
@@ -218,11 +219,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-secondary text-xs">{{ row.unitLabel }}</span>
               </template>
               <template #cell-shared="{ row }">
-                <span class="text-text-secondary text-xs">{{
-                  row.sharedLabels.length
-                    ? row.sharedLabels.join(", ")
-                    : t("metrics.explorer.detail.related.noSharedLabels")
-                }}</span>
+                <span
+                  class="text-text-secondary block truncate text-xs"
+                  :title="row.sharedLabels.join(', ')"
+                  :data-test="`metrics-detail-related-shared-${row.name}`"
+                  >{{
+                    row.sharedLabels.length
+                      ? row.sharedLabels.join(", ")
+                      : t("metrics.explorer.detail.related.noSharedLabels")
+                  }}</span
+                >
               </template>
             </OTable>
           </div>
@@ -405,13 +411,13 @@ export default defineComponent({
       }
     };
 
+    // Sources compared one by one: a getter returning a fresh array re-fires on every card rebuild.
     watch(
-      () => [
-        props.loading,
-        props.card?.name,
-        props.overview.queries.map((query: any) => query.expr).join("\n"),
-        props.timeRange.start_time,
-        props.timeRange.end_time,
+      [
+        () => props.loading,
+        () => props.card?.name,
+        () => props.overview.queries.map((query: any) => query.expr).join("\n"),
+        () => props.timeRange,
       ],
       loadOverview,
       { immediate: true },

@@ -62,6 +62,12 @@ export const buildExplorerViewData = (query: Record<string, unknown>): ExplorerV
   state: pickViewState(query),
 });
 
+/** Whether two URL slices save as the same view. */
+export const sameExplorerViewState = (
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean => JSON.stringify(pickViewState(a)) === JSON.stringify(pickViewState(b));
+
 /** The allow-listed query a saved payload applies, or null for one this version cannot read. */
 export const explorerViewToQuery = (data: unknown): ExplorerViewState | null => {
   const payload = data as Partial<ExplorerViewData> | null;

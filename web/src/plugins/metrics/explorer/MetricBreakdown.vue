@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-2 px-3 pt-2">
         <span class="text-text-heading truncate text-sm font-medium">
-          {{ t("metrics.explorer.detail.breakdown.chartTitle", { label: activeLabel }) }}
+          {{ t(breakdownTitleKey(card.cardKind), { label: activeLabel }) }}
         </span>
         <OTag
           v-if="topkApplied"
@@ -65,6 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :unit="o2Unit.unit"
           :unit-custom="o2Unit.unitCustom ?? undefined"
           :color="color"
+          :time-range="timeRange"
+          legend
           @error="onRenderError"
         />
 
@@ -108,7 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-values="{ row }">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span v-if="!row.counted" class="text-text-secondary text-xs">{{
+            t("metrics.explorer.detail.breakdown.notCounted")
+          }}</span>
+          <div v-else class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span
               v-for="entry in row.top"
               :key="entry.value"
@@ -188,6 +193,8 @@ import { parseSearchError } from "@/utils/query/searchError";
 import {
   baseNameOf,
   breakdownLabelsOf,
+  breakdownQueryLabels,
+  breakdownTitleKey,
   buildBreakdownQuery,
   CARD_KIND,
   toO2Unit,
@@ -209,6 +216,8 @@ interface BreakdownRow {
   distinct: number;
   /** The endpoint hit its cap: there are more than `VALUES_SIZE - 1` values. */
   more: boolean;
+  /** Its values were requested; past `BREAKDOWN_LABEL_LIMIT` only the selected label's are. */
+  counted: boolean;
 }
 
 interface ChartState {
@@ -286,9 +295,11 @@ export default defineComponent({
     const tableError = ref("");
     let tableGeneration = 0;
 
+    const queryLabels = computed(() => breakdownQueryLabels(labels.value, props.selectedLabel));
+
     const loadTable = async () => {
       const generation = ++tableGeneration;
-      const fields = labels.value;
+      const fields = queryLabels.value;
       tableError.value = "";
       tableLoaded.value = false;
       if (!fields.length) {
@@ -311,7 +322,7 @@ export default defineComponent({
         });
         if (generation !== tableGeneration) return;
         const hits: any[] = response?.data?.hits ?? [];
-        rows.value = fields.map((label) => {
+        rows.value = labels.value.map((label) => {
           const values: any[] = hits.find((hit) => hit?.field === label)?.values ?? [];
           return {
             label,
@@ -321,6 +332,7 @@ export default defineComponent({
             })),
             distinct: values.length,
             more: values.length >= VALUES_SIZE,
+            counted: fields.includes(label),
           };
         });
       } catch (error: any) {
@@ -335,13 +347,13 @@ export default defineComponent({
       }
     };
 
+    // Sources compared one by one: a getter returning a fresh array re-fires on every card rebuild.
     watch(
-      () => [
-        valuesStream.value,
-        labels.value.join(","),
-        JSON.stringify(applicableFilters.value),
-        props.timeRange.start_time,
-        props.timeRange.end_time,
+      [
+        valuesStream,
+        () => queryLabels.value.join(","),
+        () => JSON.stringify(applicableFilters.value),
+        () => props.timeRange,
       ],
       loadTable,
       { immediate: true },
@@ -359,9 +371,11 @@ export default defineComponent({
     ]);
 
     const distinctLabel = (row: BreakdownRow) =>
-      row.more
-        ? t("metrics.explorer.detail.breakdown.distinctMany", { count: VALUES_SIZE - 1 })
-        : raw(String(row.distinct));
+      !row.counted
+        ? raw("–")
+        : row.more
+          ? t("metrics.explorer.detail.breakdown.distinctMany", { count: VALUES_SIZE - 1 })
+          : raw(String(row.distinct));
 
     const rowClass = (row: BreakdownRow) =>
       row.label === activeLabel.value ? "bg-accent/10 cursor-pointer" : "cursor-pointer";
@@ -433,11 +447,7 @@ export default defineComponent({
       }
     };
 
-    watch(
-      () => [chartExpr.value, props.timeRange.start_time, props.timeRange.end_time],
-      loadChart,
-      { immediate: true },
-    );
+    watch([chartExpr, () => props.timeRange], loadChart, { immediate: true });
 
     const onRenderError = (error: any) => {
       chart.value = {
@@ -456,6 +466,7 @@ export default defineComponent({
 
     return {
       t,
+      breakdownTitleKey,
       TOPK,
       labels,
       activeLabel,

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-right="arrow-drop-down"
         data-test="metrics-explorer-views-btn"
       >
-        {{ activeView ? activeView.view_name : t("metrics.explorer.views.label") }}
+        {{ buttonLabel }}
       </OButton>
     </template>
 
@@ -116,6 +116,7 @@ import {
   METRICS_EXPLORER_VIEW_TYPE,
   buildExplorerViewData,
   explorerViewToQuery,
+  sameExplorerViewState,
   type ExplorerViewState,
 } from "@/utils/metrics/explorerSavedView";
 import { makeExplorerViewSchema, type ExplorerViewForm } from "./ExplorerSavedViews.schema";
@@ -162,6 +163,21 @@ const views = computed<ViewSummary[]>(() =>
 // Parent-owned: this menu unmounts with the grid, and Update/Delete must still find the view.
 const activeViewId = defineModel<string | null>("activeViewId", { default: null });
 const activeView = computed(() => views.value.find((v) => v.view_id === activeViewId.value));
+// What the active view saved, to tell when the grid has moved off it; parent-owned like the id.
+const activeViewState = defineModel<ExplorerViewState | null>("activeViewState", {
+  default: null,
+});
+const modified = computed(
+  () =>
+    !!activeView.value &&
+    !!activeViewState.value &&
+    !sameExplorerViewState(activeViewState.value, props.state),
+);
+const buttonLabel = computed(() => {
+  if (!activeView.value) return t("metrics.explorer.views.label");
+  const name = activeView.value.view_name;
+  return modified.value ? t("metrics.explorer.views.modified", { name }) : raw(name);
+});
 
 const saveDialogOpen = ref(false);
 const deleteDialogOpen = ref(false);
@@ -184,6 +200,7 @@ const saveAs = async (value: ExplorerViewForm) => {
   try {
     const res: any = await createView.mutateAsync(payload(value.viewName));
     activeViewId.value = res?.data?.view_id ?? null;
+    activeViewState.value = { ...props.state } as ExplorerViewState;
     saveDialogOpen.value = false;
     toast({ variant: "success", message: t("metrics.explorer.views.saved") });
     emit("saved", "created");
@@ -197,6 +214,7 @@ const updateActive = async () => {
   if (!view) return;
   try {
     await updateView.mutateAsync({ viewId: view.view_id, view: payload(view.view_name) });
+    activeViewState.value = { ...props.state } as ExplorerViewState;
     toast({ variant: "success", message: t("metrics.explorer.views.updated") });
     emit("saved", "updated");
   } catch (err) {
@@ -210,6 +228,7 @@ const deleteActive = async () => {
   try {
     await deleteView.mutateAsync(view.view_id);
     activeViewId.value = null;
+    activeViewState.value = null;
     toast({ variant: "success", message: t("metrics.explorer.views.deleted") });
   } catch (err) {
     showError(err, t("metrics.explorer.views.deleteFailed"));
@@ -223,6 +242,7 @@ const applyView = async (view: ViewSummary) => {
     const query = explorerViewToQuery(res?.data?.data);
     if (!query) throw new Error("unreadable view");
     activeViewId.value = view.view_id;
+    activeViewState.value = query;
     emit("apply", query);
   } catch (err) {
     showError(err, t("metrics.explorer.views.applyFailed"));

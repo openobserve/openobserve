@@ -78,6 +78,8 @@ export default defineComponent({
      * place to author an alert.
      */
     allowAlertCreation: { type: Boolean, default: false },
+    /** Names each series below the chart, coloured by position so neighbours never share a hue. */
+    legend: { type: Boolean, default: false },
     /** The card's exemplar state; the explorer grid owns the fetch. */
     injectedExemplars: {
       type: Object as PropType<InjectedExemplars | undefined>,
@@ -135,10 +137,10 @@ export default defineComponent({
      * Hashing the series NAME into the palette also keeps p50 the same colour on
      * every re-render and between the tile and the card it applies to.
      */
-    const colorConfig = () =>
-      seriesCount() > 1
-        ? { mode: "palette-classic-by-series" }
-        : { mode: "fixed", fixedColor: [props.color] };
+    const colorConfig = () => {
+      if (seriesCount() <= 1) return { mode: "fixed", fixedColor: [props.color] };
+      return { mode: props.legend ? "palette-classic" : "palette-classic-by-series" };
+    };
 
     /**
      * The panel schema. The same shape the drill-in hands the editor, which is
@@ -160,7 +162,7 @@ export default defineComponent({
         unit: props.unit,
         unit_custom: props.unitCustom,
         decimals: adaptiveDecimals(),
-        show_legends: false,
+        show_legends: props.legend,
         // Gridlines make a small chart readable — without them a sparkline is
         // just a shape. The heatmap is solid colour, so they'd only add noise.
         show_gridlines: props.chartType !== "heatmap",

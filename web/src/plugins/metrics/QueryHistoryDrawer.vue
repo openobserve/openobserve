@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :icon-left="row.starred ? 'star' : 'star-outline'"
                 :aria-label="row.starred ? t('metrics.history.unstar') : t('metrics.history.star')"
                 :data-test="`metrics-history-star-${row.id}`"
@@ -90,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 icon-left="delete"
                 :aria-label="t('common.delete')"
                 :data-test="`metrics-history-delete-${row.id}`"
@@ -97,13 +99,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('common.delete')" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    icon-left="more-vert"
+                    class="md:hidden"
+                    :aria-label="t('common.more')"
+                    :data-test="`metrics-history-more-${row.id}`"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  :icon-left="row.starred ? 'star' : 'star-outline'"
+                  class="md:hidden"
+                  :data-test="`metrics-history-star-${row.id}-menu`"
+                  @select="toggleStar(row)"
+                >
+                  <span>{{
+                    row.starred ? t("metrics.history.unstar") : t("metrics.history.star")
+                  }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  variant="destructive"
+                  icon-left="delete"
+                  class="md:hidden"
+                  :data-test="`metrics-history-delete-${row.id}-menu`"
+                  @select="deleteEntry.mutate(row.id)"
+                >
+                  <span>{{ t("common.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
           <template #empty>
             <OEmptyState
               size="inline"
               icon="history"
-              :title="t('metrics.history.empty')"
+              :title="filtered ? t('metrics.history.noMatch') : t('metrics.history.empty')"
               data-test="metrics-history-empty"
             />
           </template>
@@ -150,6 +184,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
 const emit = defineEmits<{
   load: [entry: { metricsData: string; timeRange: SelectedDate }];
@@ -168,6 +204,7 @@ const history = useInfiniteQuery(() =>
     enabled: open.value && !!orgId.value,
   }),
 );
+const filtered = computed(() => !!search.value.trim() || starredOnly.value);
 // The server returns newest first; the table keeps that order.
 const rows = computed(() => history.data.value?.pages.flat() ?? []);
 

@@ -754,7 +754,12 @@ export const convertPromQLData = async (
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
 
+  const primaryByMetric = new Map<any, any>();
+  const shiftedTwins: [any, any][] = [];
+
   options.series = limitedSearchQueryData.map((it: any, index: number) => {
+    // A stream that has not delivered yet is an undefined slot; the gauge fall-through would make it an undefined series.
+    if (!it) return [];
     switch (panelSchema.type) {
       case "bar":
       case "line":
@@ -776,12 +781,16 @@ export const convertPromQLData = async (
               });
 
               const seriesName = nameOf(seriesNames, metric.metric, index);
+              // A shifted series takes its primary's colour, so the pair reads as one series over two periods.
+              const colorName = nameSuffixes[index]
+                ? (seriesNames.get(metric.metric) ?? "")
+                : seriesName;
 
               const resolvedSeriesColor = (() => {
                 try {
                   return getSeriesColor(
                     panelSchema?.config?.color,
-                    seriesName,
+                    colorName,
                     metric.values.map((value: any) => value[1]),
                     chartMin,
                     chartMax,
@@ -794,7 +803,7 @@ export const convertPromQLData = async (
                 }
               })();
 
-              return {
+              const seriesObject = {
                 name: seriesName,
                 // Position among the rendered queries; exemplar markers take the colour of their query's first series.
                 // A shifted series is never a query's first series.
@@ -826,11 +835,15 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
+                // Dashed is the usual "previous period" mark; the shared colour ties it to its primary.
+                ...(nameSuffixes[index]
+                  ? { lineStyle: { ...seriesPropsBasedOnChartType?.lineStyle, type: "dashed" } }
+                  : {}),
                 ...getAreaStyleOverride(
                   panelSchema.type,
                   seriesPropsBasedOnChartType?.areaStyle,
                   resolvedSeriesColor,
-                  seriesName,
+                  colorName,
                   store.state.theme,
                 ),
                 // markLine if exist
@@ -848,6 +861,9 @@ export const convertPromQLData = async (
                 },
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
+              if (nameSuffixes[index]) shiftedTwins.push([seriesObject, metric.metric]);
+              else primaryByMetric.set(metric.metric, seriesObject);
+              return seriesObject;
             });
 
             return seriesObj;
@@ -1215,6 +1231,11 @@ export const convertPromQLData = async (
     panelSchema?.config?.color?.colorBySeries,
     store.state.theme,
   );
+  // Mapped and value-based colours are final only now, and a mapping would otherwise recolour a twin.
+  for (const [twin, metric] of shiftedTwins) {
+    const color = primaryByMetric.get(metric)?.itemStyle?.color;
+    if (color) twin.itemStyle.color = color;
+  }
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only

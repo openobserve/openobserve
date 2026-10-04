@@ -19,6 +19,8 @@ import {
   BREAKDOWN_LABEL_LIMIT,
   baseNameOf,
   breakdownLabelsOf,
+  breakdownQueryLabels,
+  breakdownTitleKey,
   buildBreakdownQuery,
   buildSelector,
   supportsBreakdown,
@@ -999,15 +1001,52 @@ describe("breakdownLabelsOf", () => {
     ]);
   });
 
-  it("caps the list, because each label costs the server one scan", () => {
+  it("offers every label, however many the metric carries", () => {
     const many = Array.from({ length: 30 }, (_, i) => `l${String(i).padStart(2, "0")}`);
-    const out = breakdownLabelsOf(many);
-    expect(out).toHaveLength(BREAKDOWN_LABEL_LIMIT);
-    expect(BREAKDOWN_LABEL_LIMIT).toBe(15);
-    expect(out[0]).toBe("l00");
+    expect(breakdownLabelsOf(many)).toEqual(many);
   });
 
   it("returns nothing when the labels are unknown", () => {
     expect(breakdownLabelsOf(undefined)).toEqual([]);
+  });
+});
+
+describe("breakdownQueryLabels", () => {
+  const many = Array.from({ length: 30 }, (_, i) => `l${String(i).padStart(2, "0")}`);
+
+  it("counts values for the first labels only, because each costs the server one scan", () => {
+    expect(BREAKDOWN_LABEL_LIMIT).toBe(15);
+    expect(breakdownQueryLabels(many, null)).toEqual(many.slice(0, BREAKDOWN_LABEL_LIMIT));
+  });
+
+  it("also counts a selected label past the cap, so its chart can pick topk", () => {
+    expect(breakdownQueryLabels(many, "l20")).toEqual([...many.slice(0, 15), "l20"]);
+    expect(breakdownQueryLabels(many, "l03")).toEqual(many.slice(0, 15));
+  });
+
+  it("ignores a selected label the metric does not carry", () => {
+    expect(breakdownQueryLabels(many, "tenant_id")).toEqual(many.slice(0, 15));
+  });
+});
+
+describe("breakdownTitleKey", () => {
+  it("names the measure each card kind's breakdown query charts", () => {
+    expect(breakdownTitleKey(CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS)).toBe(
+      "metrics.explorer.detail.breakdown.titleP90",
+    );
+    expect(breakdownTitleKey(CARD_KIND.COUNTER_RATE)).toBe(
+      "metrics.explorer.detail.breakdown.titleRate",
+    );
+    expect(breakdownTitleKey(CARD_KIND.EXP_HISTOGRAM_FALLBACK)).toBe(
+      "metrics.explorer.detail.breakdown.titleRate",
+    );
+    expect(breakdownTitleKey(CARD_KIND.GAUGE)).toBe("metrics.explorer.detail.breakdown.titleAvg");
+    expect(breakdownTitleKey(CARD_KIND.MEAN_PAIR)).toBe(
+      "metrics.explorer.detail.breakdown.titleAvg",
+    );
+    expect(breakdownTitleKey(CARD_KIND.SUMMARY_QUANTILES)).toBe(
+      "metrics.explorer.detail.breakdown.titleMedian",
+    );
+    expect(breakdownTitleKey(CARD_KIND.INFO)).toBe("metrics.explorer.detail.breakdown.titleCount");
   });
 });

@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
         <OButton
-          variant="primary"
+          :variant="mode === 'visualize' ? 'outline' : 'primary'"
           size="sm-toolbar"
           icon-left="refresh"
           :disabled="isGridMode && (refreshing || grid.loading.value)"
@@ -401,6 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ExplorerSavedViews
             v-model:active-view-id="activeViewId"
+            v-model:active-view-state="activeViewState"
             :state="viewState"
             @apply="onApplyView"
             @saved="onViewSaved"
@@ -1536,6 +1537,7 @@ export default defineComponent({
     const viewState = computed(() => managedFromState());
     // Here, not in the menu: it unmounts under the detail view and Visualize.
     const activeViewId = ref<string | null>(null);
+    const activeViewState = ref<ExplorerViewState | null>(null);
 
     // Applying is a navigation: the route watcher below applies the state.
     const onApplyView = (query: ExplorerViewState) => {
@@ -2163,6 +2165,7 @@ export default defineComponent({
       refreshing,
       viewState,
       activeViewId,
+      activeViewState,
       onApplyView,
       onViewSaved,
       onVisualizeRun,

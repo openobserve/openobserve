@@ -85,7 +85,10 @@ const OPageHeaderStub = {
 const runQuery = vi.fn();
 const cancelQueries = vi.fn();
 
-const mountView = (props: Record<string, any> = {}, { realTable = false } = {}) =>
+const mountView = (
+  props: Record<string, any> = {},
+  { realTable = false, realHeader = false } = {},
+) =>
   mount(MetricDetailView, {
     props: {
       card: SELECTED,
@@ -116,7 +119,7 @@ const mountView = (props: Record<string, any> = {}, { realTable = false } = {}) 
     global: {
       plugins: [i18n, store],
       stubs: {
-        OPageHeader: OPageHeaderStub,
+        ...(realHeader ? {} : { OPageHeader: OPageHeaderStub }),
         ...(realTable ? {} : { OTable: OTableStub }),
         MetricBreakdown: {
           name: "MetricBreakdown",
@@ -162,6 +165,29 @@ describe("MetricDetailView", () => {
       expect(runQuery).toHaveBeenCalledWith("sum by (le) (rate(x[4m]))");
       const chart = wrapper.findComponent({ name: "MetricCardChart" });
       expect(chart.props("results")).toEqual([SERIES]);
+    });
+
+    it("queries once per window, not again when the card is rebuilt unchanged", async () => {
+      wrapper = mountView();
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalledTimes(1);
+
+      // A refresh reloads the stream list first, rebuilding every card before the window moves.
+      await wrapper.setProps({
+        card: { ...SELECTED },
+        allCards: [...ALL],
+        overview: {
+          ...wrapper.props("overview"),
+          queries: [{ expr: "sum by (le) (rate(x[4m]))" }],
+        },
+      });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalledTimes(1);
+
+      // Refreshing an absolute window hands over an equal but new range: it still re-queries.
+      await wrapper.setProps({ timeRange: { start_time: 1, end_time: 2 } });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalledTimes(2);
     });
 
     it("cancels the overview query when the view closes", async () => {
@@ -256,6 +282,12 @@ describe("MetricDetailView", () => {
       expect(names).toContain("http_server_active_requests");
       const shared = wrapper.findAll('[data-test="o2-table-cell-shared"]').map((c) => c.text());
       expect(shared).toContain("job, route");
+      // A long list ellipsises in its column; the title carries the whole of it.
+      const cell = wrapper.find(
+        '[data-test="metrics-detail-related-shared-http_server_active_requests"]',
+      );
+      expect(cell.classes()).toContain("truncate");
+      expect(cell.attributes("title")).toBe("job, route");
       expect(
         wrapper.findAll('[data-test="o2-table-cell-type"]').every((c) => c.text() !== ""),
       ).toBe(true);
@@ -269,6 +301,19 @@ describe("MetricDetailView", () => {
   });
 
   describe("header actions", () => {
+    it("labels the back button once with Back to, through the real header", async () => {
+      wrapper = mountView({}, { realHeader: true });
+      const back = wrapper.find('[data-test="metrics-detail-close"]');
+      expect(back.attributes("aria-label")).toBe("Back to metrics");
+    });
+
+    it("keeps Open in Visualize named when its label is hidden on a phone", () => {
+      wrapper = mountView();
+      const open = wrapper.find('[data-test="metrics-detail-open-visualize"]');
+      expect(open.attributes("aria-label")).toBe("Open in Visualize");
+      expect(open.find("span.max-md\\:hidden").text()).toBe("Open in Visualize");
+    });
+
     it("closes, opens Visualize and toggles the favorite", async () => {
       wrapper = mountView();
       await wrapper.find('[data-test="detail-back"]').trigger("click");

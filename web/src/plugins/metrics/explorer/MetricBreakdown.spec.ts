@@ -69,7 +69,16 @@ const OTableStub = {
 
 const MetricCardChartStub = {
   name: "MetricCardChart",
-  props: ["results", "queries", "chartType", "unit", "unitCustom", "color"],
+  props: {
+    results: Array,
+    queries: Array,
+    chartType: String,
+    unit: String,
+    unitCustom: String,
+    color: String,
+    timeRange: Object,
+    legend: Boolean,
+  },
   template: `<div data-test="breakdown-chart-stub" />`,
 };
 
@@ -321,7 +330,7 @@ describe("MetricBreakdown with the real OTable", () => {
 
   afterEach(() => wrapper?.unmount());
 
-  const mountReal = () =>
+  const mountReal = (props: Record<string, any> = {}) =>
     mount(MetricBreakdown, {
       props: {
         card: CARD,
@@ -334,6 +343,7 @@ describe("MetricBreakdown with the real OTable", () => {
         color: "#000",
         runQuery,
         cancelQueries,
+        ...props,
       },
       global: { plugins: [i18n, store], stubs: { MetricCardChart: MetricCardChartStub } },
     });
@@ -353,5 +363,76 @@ describe("MetricBreakdown with the real OTable", () => {
       [{ label: "status", operator: "=", value: "500" }],
       [{ label: "status", operator: "!=", value: "500" }],
     ]);
+  });
+
+  // 20 labels: `tenant_id` sorts past the first 15, whose values are counted.
+  const WIDE_LABELS = [
+    ...Array.from({ length: 18 }, (_, i) => `a${String(i).padStart(2, "0")}`),
+    "service_name",
+    "tenant_id",
+  ];
+  const WIDE: any = { ...CARD, labels: WIDE_LABELS };
+
+  it("offers every label, and honours a deep-linked label past the value-count cap", async () => {
+    fieldValues.mockResolvedValue({
+      data: { hits: [{ field: "tenant_id", values: values("t", 3) }] },
+    });
+    wrapper = mountReal({ card: WIDE, selectedLabel: "tenant_id" });
+    await flushPromises();
+
+    await vi.waitFor(() =>
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(20),
+    );
+    expect(fieldValues).toHaveBeenCalledTimes(1);
+    expect(lastRequest().fields).toEqual([...WIDE_LABELS.slice(0, 15), "tenant_id"]);
+    expect(runQuery).toHaveBeenCalledWith(
+      'sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))',
+    );
+    expect(wrapper.find('[data-test="metrics-breakdown-value-tenant_id-t0"]').exists()).toBe(true);
+    // An uncounted label is still a row to pick, not a silent absence.
+    expect(wrapper.find('[data-test="metrics-breakdown-distinct-service_name"]').text()).toBe("–");
+  });
+
+  it("titles the chart with the measure it plots: p90 for a histogram, rate for a counter", async () => {
+    wrapper = mountReal({
+      card: { ...CARD, name: "lat_bucket", cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS },
+      selectedLabel: "method",
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain("p90 by method");
+    wrapper.unmount();
+
+    wrapper = mountReal({ selectedLabel: "method" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
+      "Rate by method",
+    );
+  });
+
+  it("charts the selected window with a legend, like the overview above it", async () => {
+    wrapper = mountReal({ selectedLabel: "method" });
+    await flushPromises();
+    const chart = wrapper.findComponent({ name: "MetricCardChart" });
+    expect(chart.props("timeRange")).toEqual({ start_time: 1_000, end_time: 2_000 });
+    expect(chart.props("legend")).toBe(true);
+  });
+
+  it("queries once per window, not again when the card is rebuilt unchanged", async () => {
+    wrapper = mountReal({ selectedLabel: "method" });
+    await flushPromises();
+    expect(fieldValues).toHaveBeenCalledTimes(1);
+    expect(runQuery).toHaveBeenCalledTimes(1);
+
+    // A refresh reloads the stream list first, rebuilding every card before the window moves.
+    await wrapper.setProps({ card: { ...CARD }, labelsByStream: {}, filters: [] });
+    await flushPromises();
+    expect(fieldValues).toHaveBeenCalledTimes(1);
+    expect(runQuery).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({ timeRange: { start_time: 3_000, end_time: 4_000 } });
+    await flushPromises();
+    expect(fieldValues).toHaveBeenCalledTimes(2);
+    expect(lastRequest().start_time).toBe(3_000);
+    expect(runQuery).toHaveBeenCalledTimes(2);
   });
 });

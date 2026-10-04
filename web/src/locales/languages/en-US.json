@@ -6423,12 +6423,12 @@
       "seriesLimitWarning": "Limiting the displayed series to ensure optimal performance",
       "mapLayerName": "Layer 1",
       "mapLayerNameIndexed": "Layer {index}",
-      "secondsAgo": "{count} Seconds ago",
-      "minutesAgo": "{count} Minutes ago",
-      "hoursAgo": "{count} Hours ago",
-      "daysAgo": "{count} Days ago",
-      "weeksAgo": "{count} Weeks ago",
-      "monthsAgo": "{count} Months ago",
+      "secondsAgo": "{count} Second ago | {count} Seconds ago",
+      "minutesAgo": "{count} Minute ago | {count} Minutes ago",
+      "hoursAgo": "{count} Hour ago | {count} Hours ago",
+      "daysAgo": "{count} Day ago | {count} Days ago",
+      "weeksAgo": "{count} Week ago | {count} Weeks ago",
+      "monthsAgo": "{count} Month ago | {count} Months ago",
       "unableToExtractValueField": "Unable to extract value field from the query.",
       "unableToExtractLabelField": "Unable to extract label field from the query.",
       "unableToExtractGroupingField": "Unable to extract grouping field from the query.",
@@ -9326,6 +9326,7 @@
         "notFound": "Metric not found",
         "notFoundDesc": "{name} is not in this organization's metric list.",
         "close": "Back to metrics",
+        "backTo": "metrics",
         "openInVisualize": "Open in Visualize",
         "filtersNotApplied": "Filter {filters} does not apply to this metric; showing all its series | Filters {filters} do not apply to this metric; showing all its series",
         "tabBreakdown": "Breakdown",
@@ -9342,7 +9343,12 @@
           "excludeAria": "Exclude {label} = {value}",
           "noLabels": "No labels to break this metric down by",
           "selectHint": "Select a label to chart this metric by it.",
-          "chartTitle": "By {label}",
+          "titleP90": "p90 by {label}",
+          "titleRate": "Rate by {label}",
+          "titleAvg": "Average by {label}",
+          "titleMedian": "Median by {label}",
+          "titleCount": "Count by {label}",
+          "notCounted": "Select to count its values",
           "topk": "top {count}"
         },
         "related": {
@@ -9513,7 +9519,8 @@
         "applyFailed": "Could not open the view",
         "deleteFailed": "Could not delete the view",
         "deleteTitle": "Delete view",
-        "deleteMessage": "Delete \"{name}\" for everyone in this organization?"
+        "deleteMessage": "Delete \"{name}\" for everyone in this organization?",
+        "modified": "{name} (modified)"
       }
     },
     "index": {
@@ -9648,6 +9655,7 @@
       "query": "Query",
       "ranAt": "Ran",
       "empty": "No queries yet",
+      "noMatch": "No queries match the search or starred filter",
       "loadMore": "Load more"
     }
   },

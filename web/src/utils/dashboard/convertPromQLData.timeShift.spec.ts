@@ -274,6 +274,104 @@ describe("convertPromQLData with time-shifted results", () => {
     expect(names(result)).toEqual(["api-1 (1 day ago)", "api-2 (1 day ago)"]);
   });
 
+  // The executor publishes `[...queryResults]`, so a stream that has not delivered yet is an undefined slot.
+  it.each([
+    ["a shifted stream lands before its primary", [undefined, twoPods(DAY_S)]],
+    [
+      "the second of two offsets lands before the first",
+      [twoPods(), undefined, twoPods(7 * DAY_S)],
+    ],
+  ])("builds only real time series while %s", async (_case, data) => {
+    const result = await convert(panel("line"), data, overlayMeta, stepMeta(3, 60));
+
+    expect(result.options.series.every((s: any) => s && typeof s === "object")).toBe(true);
+    expect(result.options.xAxis.type).toBe("time");
+    expect(result.extras.isTimeSeries).toBe(true);
+  });
+
+  describe("ties each shifted series to its primary", () => {
+    const pair = (result: any, name: string) => [
+      result.options.series.find((s: any) => s.name === name),
+      result.options.series.find((s: any) => s.name === `${name} (1 day ago)`),
+    ];
+    const oneDay = meta([
+      { panelQueryIndex: 0 },
+      { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" },
+    ]);
+
+    it("draws it dashed in the primary's palette colour", async () => {
+      const result = await convert(
+        panel("line"),
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+
+      for (const name of ["api-1", "api-2"]) {
+        const [primary, shifted] = pair(result, name);
+        expect(shifted.itemStyle.color).toBeTruthy();
+        expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
+        expect(shifted.lineStyle.type).toBe("dashed");
+        expect(primary.lineStyle?.type).not.toBe("dashed");
+      }
+    });
+
+    it("follows a series colour mapping set on the primary", async () => {
+      const mapped: any = panel("line");
+      mapped.config = { color: { colorBySeries: [{ value: "api-1", color: "#123456" }] } };
+      const result = await convert(mapped, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
+
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.itemStyle.color).toBe("#123456");
+      expect(shifted.itemStyle.color).toBe("#123456");
+    });
+
+    it("takes the primary's colour when the colour depends on the values", async () => {
+      const shaded: any = panel("line");
+      shaded.config = { color: { mode: "continuous-green-yellow-red" } };
+      // Numeric samples: the value scale skips PromQL's string samples.
+      const past = matrix(
+        series(
+          { pod: "api-1" },
+          ts.map((t) => t - DAY_S),
+          9 as any,
+        ),
+      );
+      const result = await convert(
+        shaded,
+        [
+          matrix(series({ pod: "api-1" }, ts, 1 as any), series({ pod: "api-2" }, ts, 5 as any)),
+          past,
+        ],
+        oneDay,
+        stepMeta(2, 60),
+      );
+
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.itemStyle.color).toBeTruthy();
+      expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
+    });
+
+    it("keeps the primary's colour while the primary stream is still pending", async () => {
+      const full = await convert(
+        panel("line"),
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      const partial = await convert(
+        panel("line"),
+        [undefined, twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+
+      const [primary] = pair(full, "api-1");
+      const [, shifted] = pair(partial, "api-1");
+      expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
+    });
+  });
+
   it("does not count shifted windows as extra queries when splitting the series budget", async () => {
     const tightStore = {
       state: { ...store.state, zoConfig: { max_dashboard_series: 2 } },

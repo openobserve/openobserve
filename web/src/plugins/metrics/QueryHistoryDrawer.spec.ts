@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { ref } from "vue";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -207,5 +208,64 @@ describe("QueryHistoryDrawer", () => {
     const wrapper = mountDrawer();
     await open(wrapper);
     expect(wrapper.find('[data-test="drawer"]').attributes("data-size")).toBe("full");
+  });
+});
+
+// The real OTable: it owns the #empty slot and the cell slots, so a stub would hide a wrong slot.
+describe("QueryHistoryDrawer with the real OTable", () => {
+  const DrawerStub = {
+    props: ["open", "size"],
+    emits: ["update:open"],
+    template: `<div>
+      <span @click="$emit('update:open', true)"><slot name="trigger" /></span>
+      <div v-if="open" data-test="drawer"><slot /></div>
+    </div>`,
+  };
+  const mountReal = () =>
+    mount(QueryHistoryDrawer, {
+      global: { plugins: [i18n, store], stubs: { ODrawer: DrawerStub } },
+    });
+  const emptyTitle = (wrapper: any) => wrapper.find('[data-test="metrics-history-empty"]').text();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    breakpoint.mobile = false;
+    api.list.mockResolvedValue({ data: [] });
+  });
+
+  it("says there are no queries yet when nothing filters the list", async () => {
+    const wrapper = mountReal();
+    await open(wrapper);
+    await vi.waitFor(() => expect(emptyTitle(wrapper)).toContain("No queries yet"));
+  });
+
+  it("says no queries match when a search finds nothing", async () => {
+    const wrapper = mountReal();
+    await open(wrapper);
+    const search = wrapper.find('[data-test="metrics-history-search"]');
+    await (search.element.tagName === "INPUT" ? search : search.find("input")).setValue("nomatch");
+    await vi.waitFor(() =>
+      expect(api.list).toHaveBeenCalledWith("default", expect.objectContaining({ q: "nomatch" })),
+    );
+    await vi.waitFor(() =>
+      expect(emptyTitle(wrapper)).toContain("No queries match the search or starred filter"),
+    );
+  });
+
+  it("folds the row actions into a kebab on a phone, so none is clipped", async () => {
+    breakpoint.mobile = true;
+    api.list.mockResolvedValue({ data: ENTRIES });
+    const wrapper = mountReal();
+    await open(wrapper);
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="metrics-history-more-e1"]').exists()).toBe(true),
+    );
+    expect(wrapper.find('[data-test="metrics-history-more-e1"]').classes()).toContain("md:hidden");
+    expect(wrapper.find('[data-test="metrics-history-delete-e1"]').classes()).toContain(
+      "max-md:hidden",
+    );
+    expect(wrapper.find('[data-test="metrics-history-star-e1"]').classes()).toContain(
+      "max-md:hidden",
+    );
   });
 });

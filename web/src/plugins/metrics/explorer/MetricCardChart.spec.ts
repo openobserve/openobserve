@@ -161,6 +161,18 @@ describe("MetricCardChart colours multi-series charts per series", () => {
     expect(panelProp(wrapper, "panelSchema").config.color.mode).toBe("palette-classic-by-series");
   });
 
+  it("shows a legend and colours by position when asked, so no two series share a hue", () => {
+    const config = panelProp(
+      mountChart({ results: matrix(3), legend: true }),
+      "panelSchema",
+    ).config;
+    expect(config.show_legends).toBe(true);
+    expect(config.color.mode).toBe("palette-classic");
+    expect(panelProp(mountChart({ results: matrix(3) }), "panelSchema").config.show_legends).toBe(
+      false,
+    );
+  });
+
   it("re-evaluates when the results change", async () => {
     const wrapper = mountChart({ results: matrix(1) });
     expect(panelProp(wrapper, "panelSchema").config.color.mode).toBe("fixed");

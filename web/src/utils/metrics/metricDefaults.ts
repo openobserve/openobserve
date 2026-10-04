@@ -1417,7 +1417,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
   }
 }
 
-/** At most this many labels are offered: each one costs the server a scan. */
+/** At most this many labels get value counts: each one costs the server a scan. */
 export const BREAKDOWN_LABEL_LIMIT = 15;
 
 /** Labels a breakdown never groups by — the same set `resolveTopkLabel` skips. */
@@ -1428,7 +1428,7 @@ export function supportsBreakdown(cardKind: string): boolean {
   return cardKind !== CARD_KIND.TIMESTAMP && cardKind !== CARD_KIND.OTHER;
 }
 
-/** Breakdown labels, alphabetical and capped; `alsoOn` keeps only labels both operands carry. */
+/** Breakdown labels, alphabetical; `alsoOn` keeps only labels both operands carry. */
 export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[]): string[] {
   if (!Array.isArray(labels)) return [];
   const other = alsoOn ? new Set(alsoOn) : null;
@@ -1441,8 +1441,30 @@ export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[
         !NON_BREAKDOWN_LABELS.has(l) &&
         (!other || other.has(l)),
     )
-    .sort()
-    .slice(0, BREAKDOWN_LABEL_LIMIT);
+    .sort();
+}
+
+/** The labels whose values are counted: the first few, plus the selected one wherever it sorts. */
+export function breakdownQueryLabels(labels: string[], selected: string | null): string[] {
+  const head = labels.slice(0, BREAKDOWN_LABEL_LIMIT);
+  return selected && !head.includes(selected) && labels.includes(selected)
+    ? [...head, selected]
+    : head;
+}
+
+const BREAKDOWN_TITLE_KEYS: Record<string, I18nKey> = {
+  [CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS]: "metrics.explorer.detail.breakdown.titleP90",
+  [CARD_KIND.COUNTER_RATE]: "metrics.explorer.detail.breakdown.titleRate",
+  [CARD_KIND.EXP_HISTOGRAM_FALLBACK]: "metrics.explorer.detail.breakdown.titleRate",
+  [CARD_KIND.GAUGE]: "metrics.explorer.detail.breakdown.titleAvg",
+  [CARD_KIND.MEAN_PAIR]: "metrics.explorer.detail.breakdown.titleAvg",
+  [CARD_KIND.SUMMARY_QUANTILES]: "metrics.explorer.detail.breakdown.titleMedian",
+  [CARD_KIND.INFO]: "metrics.explorer.detail.breakdown.titleCount",
+};
+
+/** The breakdown chart's title, naming the measure `buildBreakdownQuery` charts for the kind. */
+export function breakdownTitleKey(cardKind: string): I18nKey {
+  return BREAKDOWN_TITLE_KEYS[cardKind] ?? "metrics.explorer.detail.breakdown.titleAvg";
 }
 
 /** A classic histogram charts p90, as a heatmap per label value is unreadable; null if unbuildable. */

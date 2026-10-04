@@ -155,6 +155,37 @@ describe("ExplorerSavedViews", () => {
     expect(fresh.emitted("update:activeViewId")?.at(-1)).toEqual(["m1"]);
   });
 
+  it("marks the applied view modified once the grid moves off it, and clean again on update", async () => {
+    const saved = { search: "http", labels: ["job=api"], sort: "z-a", period: "1h" };
+    api.getViewDetail.mockResolvedValue({
+      data: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: saved } },
+    });
+    api.put.mockResolvedValue({ data: {} });
+    // The parent owns both models; feed each update back the way v-model would.
+    const wrapper: any = mountViews(
+      { ...saved, metric: "up" },
+      {
+        "onUpdate:activeViewId": (v: any) => wrapper.setProps({ activeViewId: v }),
+        "onUpdate:activeViewState": (v: any) => wrapper.setProps({ activeViewState: v }),
+      },
+    );
+    await flushPromises();
+    const label = () => wrapper.find('[data-test="metrics-explorer-views-btn"]').text();
+
+    await wrapper.find('[data-test="metrics-explorer-view-m1"]').trigger("click");
+    await flushPromises();
+    // Detail-view keys are not part of a view, so opening a metric is no change.
+    expect(label()).toContain("errors by job");
+    expect(label()).not.toContain("(modified)");
+
+    await wrapper.setProps({ state: { ...saved, search: "grpc" } });
+    expect(label()).toContain("errors by job (modified)");
+
+    await wrapper.find('[data-test="metrics-explorer-views-update"]').trigger("click");
+    await flushPromises();
+    expect(label()).not.toContain("(modified)");
+  });
+
   it("updates and deletes the applied view", async () => {
     api.getViewDetail.mockResolvedValue({
       data: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: {} } },
