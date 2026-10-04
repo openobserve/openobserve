@@ -960,6 +960,7 @@ import {
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import {
+  MAX_NETWORK_NODE_SYMBOL_SIZE,
   convertServiceGraphToNetwork,
   convertTimelineData,
   convertTraceServiceMapData,
@@ -1325,17 +1326,27 @@ export default defineComponent({
           traceGraphSearch.value,
         );
         if (!graph.nodes.length) return { options: {}, notMerge: true };
+        const network = convertServiceGraphToNetwork(
+          graph,
+          "force",
+          new Map(),
+          isDarkMode.value,
+          undefined,
+          // computeForceLayout subtracts ~330×310 of padding; smaller sizes yield NaN positions.
+          Math.max(chartRendererRef.value?.$el?.clientWidth || 1200, 800),
+          Math.max(chartRendererRef.value?.$el?.clientHeight || 700, 500),
+        );
+        // ECharts fits node centres, not symbols, into the series box; inset by the largest radius.
+        const inset = MAX_NETWORK_NODE_SYMBOL_SIZE / 2;
+        const [graphSeries, ...otherSeries] = network.options.series;
         return {
-          ...convertServiceGraphToNetwork(
-            graph,
-            "force",
-            new Map(),
-            isDarkMode.value,
-            undefined,
-            // computeForceLayout subtracts ~330×310 of padding; smaller sizes yield NaN positions.
-            Math.max(chartRendererRef.value?.$el?.clientWidth || 1200, 800),
-            Math.max(chartRendererRef.value?.$el?.clientHeight || 700, 500),
-          ),
+          options: {
+            ...network.options,
+            series: [
+              { ...graphSeries, top: inset, bottom: inset, left: inset, right: inset },
+              ...otherSeries,
+            ],
+          },
           notMerge: true,
           lazyUpdate: true,
         };

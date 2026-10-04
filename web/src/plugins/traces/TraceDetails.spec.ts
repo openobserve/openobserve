@@ -813,6 +813,13 @@ describe("TraceDetails", () => {
       expect(chartData()).toEqual({ options: {}, notMerge: true });
     });
 
+    it("insets the graph series by the largest node radius so nodes stay inside the chart", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(series()).toMatchObject({ top: 55, bottom: 55, left: 55, right: 55 });
+    });
+
     it("lays out a graph with finite positions in a tiny chart container", async () => {
       await mountMap();
       const el = wrapper.find('[data-test="trace-details-service-map-chart"]').element;
