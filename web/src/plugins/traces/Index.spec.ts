@@ -216,7 +216,7 @@ vi.mock("@/composables/useTraces", () => ({
     loadLocalLogFilterField: vi.fn(),
     updatedLocalLogFilterField: vi.fn(),
     loadTracesParser: vi.fn().mockResolvedValue(undefined),
-    tracesParser: { value: { astify: vi.fn() } },
+    tracesParser: { value: trackTracesParser({ astify: vi.fn() }) },
   }),
 }));
 
@@ -231,6 +231,15 @@ const { mockGetStreams, mockGetStream, mockSetServiceColors } = vi.hoisted(() =>
   mockGetStream: vi.fn(),
   mockSetServiceColors: vi.fn(),
 }));
+
+// Each mount gets its own parser, so a spy call's parser argument identifies which test's mount made it.
+const { createdTracesParsers, trackTracesParser } = vi.hoisted(() => {
+  const createdTracesParsers: unknown[] = [];
+  return {
+    createdTracesParsers,
+    trackTracesParser: <T extends object>(p: T): T => (createdTracesParsers.push(p), p),
+  };
+});
 
 // Hoisted so tests can assert resetSearchObj was called by the component lifecycle.
 const { mockResetSearchObj } = vi.hoisted(() => ({
@@ -280,7 +289,9 @@ vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
 
 // Hoisted so tests can assert on the spy and override its return value per test.
 const { mockParseSpanKindWhereClause } = vi.hoisted(() => ({
-  mockParseSpanKindWhereClause: vi.fn((whereClause: string) => whereClause),
+  mockParseSpanKindWhereClause: vi.fn(
+    (whereClause: string, _parser?: unknown, _streamName?: string) => whereClause,
+  ),
 }));
 
 // Use importOriginal so SPAN_KIND_MAP and SPAN_KIND_LABEL_TO_KEY remain available,
@@ -363,6 +374,7 @@ describe("Index.vue (Main Traces Page)", () => {
     mockSearchObj.data.queryResults = { hits: [] };
     mockSearchObj.data.errorMsg = "";
     mockSearchObj.data.editorValue = "";
+    createdTracesParsers.length = 0;
 
     // Reset hoisted mocks to safe defaults for each test
     mockResetSearchObj.mockReset();
@@ -2089,10 +2101,18 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
+      // Guards the parser filter below from going vacuous if the parser argument stops being passed.
+      expect(parseSpy.mock.calls.some(([, parser]) => createdTracesParsers.includes(parser))).toBe(
+        true,
+      );
+
       // parseDurationWhereClause returns the input unchanged for empty strings (no-op)
       // Either it was not called, or if called, it was with an empty string and returned it
       const callsWithNonEmpty = parseSpy.mock.calls.filter(
-        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+        ([clause, parser]) =>
+          createdTracesParsers.includes(parser) &&
+          typeof clause === "string" &&
+          clause.trim() !== "",
       );
       expect(callsWithNonEmpty.length).toBe(0);
     });
@@ -2291,10 +2311,20 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
+      // Guards the parser filter below from going vacuous if the parser argument stops being passed.
+      expect(
+        mockParseSpanKindWhereClause.mock.calls.some(([, parser]) =>
+          createdTracesParsers.includes(parser),
+        ),
+      ).toBe(true);
+
       // parseSpanKindWhereClause is guarded by `whereClause.trim() != ""` in buildSearch;
       // for an empty editorValue the spy must not have been called with a non-empty string.
       const callsWithNonEmpty = mockParseSpanKindWhereClause.mock.calls.filter(
-        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+        ([clause, parser]) =>
+          createdTracesParsers.includes(parser) &&
+          typeof clause === "string" &&
+          clause.trim() !== "",
       );
       expect(callsWithNonEmpty.length).toBe(0);
     });
