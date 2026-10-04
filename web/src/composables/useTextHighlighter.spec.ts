@@ -49,9 +49,22 @@ describe("useTextHighlighter", () => {
       expect(result).toEqual(["error"]);
     });
 
-    it("should extract keywords from fuzzy_match queries", () => {
-      const result = textHighlighter.extractKeywords("fuzzy_match('test', 2)");
-      expect(result).toEqual(["test"]);
+    it("should extract fuzzy_match(field, term, distance) as a field-scoped pattern", () => {
+      const query = "fuzzy_match(body, 'Test', 2)";
+      expect(textHighlighter.extractKeywords(query)).toEqual([]);
+      expect(textHighlighter.extractHighlightPatterns(query).map((regex) => regex.flags)).toEqual([
+        "giu",
+      ]);
+      const parts = textHighlighter.splitTextByKeywords(
+        "a test here",
+        [],
+        textHighlighter.extractHighlightPatterns(query),
+      );
+      expect(parts.filter((part) => part.isHighlighted).map((part) => part.text)).toEqual(["test"]);
+      expect(scopeHighlightQuery(query, "other")).toBe("");
+      expect(scopeHighlightQuery(`${query} AND fuzzy_match_all('x', 1)`, "other")).toBe(
+        " AND fuzzy_match_all('x', 1)",
+      );
     });
 
     it("should extract keywords from fuzzy_match_all queries", () => {
@@ -70,7 +83,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should extract multiple keywords from different functions", () => {
-      const query = "match_all('error') AND fuzzy_match('warning', 1)";
+      const query = "match_all('error') AND fuzzy_match_all('warning', 1)";
       const result = textHighlighter.extractKeywords(query);
       expect(result).toEqual(["error", "warning"]);
     });
@@ -280,7 +293,14 @@ describe("useTextHighlighter", () => {
         ".*a.*b",
         "a{0,8}a{0,8}!",
         "[a-z]+\\d*[a-z]+!",
-        "(a|b).*",
+        // Overlap decided from definitions, not sampled characters
+        "[\u0100]+[\u0100]+[\u0100]+!",
+        "[^x]+[^y]+!",
+        ".*(a|aa|aaa)(a|aa|aaa)!",
+        "\u0100+\u0100*!",
+        "[\u0100-\u0200]+\u0150*!",
+        "(?i)[a-z]+K*!",
+        "(?:x\\w+)\\w+!",
         "a*?a*?!",
         "a?a?a?a?a?a?a?a?aaaaaaaa!",
         "(a|aa)?(a|aa)?(a|aa)?(a|aa)?!",
@@ -307,7 +327,15 @@ describe("useTextHighlighter", () => {
         "(foo|bar)baz",
         "(?i)warn",
         "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
+        // Unquantified groups: flattened, or one item per alternation group
         "(a|aa)(a|aa)(a|aa)(a|aa)(a|aa)(a|aa)!",
+        "\\w+(a|aa)!",
+        "(?:foo)bar+",
+        "(foo|bar)baz+",
+        "(a|b).*",
+        "ERROR (connection|timeout).*",
+        "[^-]+-[^-]+!",
+        "\u0100+-\\d+",
         // Quantified atoms that cannot overlap, or that a required separator splits
         "id=[a-z]+-\\d+",
         "[a-z]+-\\d+",
@@ -350,6 +378,48 @@ describe("useTextHighlighter", () => {
       expect(highlight("kelvin_sign", scopeHighlightQuery(query, "edge_case"))).toEqual([]);
       expect(highlight("kelvin db", scopeHighlightQuery(query, "body"))).toEqual(["kelvin", "db"]);
       expect(highlight("db", scopeHighlightQuery(query, "edge_case"))).toEqual(["db"]);
+    });
+
+    it("should match quoted field names case-sensitively and unquoted ones lowercased", () => {
+      const quoted = "str_match(\"ERROR\", 'boom')";
+      expect(scopeHighlightQuery(quoted, "ERROR")).toBe(quoted);
+      expect(scopeHighlightQuery(quoted, "error")).toBe("");
+      const unquoted = "str_match(Body, 'boom')";
+      expect(scopeHighlightQuery(unquoted, "body")).toBe(unquoted);
+      expect(scopeHighlightQuery(unquoted, "Body")).toBe("");
+      expect(scopeHighlightQuery("str_match(`Msg`, 'boom')", "Msg")).toBe(
+        "str_match(`Msg`, 'boom')",
+      );
+    });
+
+    it("should highlight the whole match of grouped alternation regexes when rendered", () => {
+      const highlightedText = (text: string, query: string) =>
+        [
+          ...textHighlighter
+            .processTextWithHighlights(text, query, {})
+            .matchAll(/class="log-highlighted">([^<]*)</g),
+        ]
+          .map((match) => match[1])
+          .join("");
+
+      const errorQuery = "re_match(body,'ERROR (connection|timeout).*')";
+      expect(textHighlighter.extractHighlightPatterns(errorQuery).map(String)).toEqual([
+        "/ERROR (connection|timeout).*/g",
+      ]);
+      expect(highlightedText("ERROR connection refused to db", errorQuery)).toBe(
+        "ERROR connection refused to db",
+      );
+
+      const requestQuery = "re_match(body,'(request|response) id=\\w+')";
+      expect(textHighlighter.extractHighlightPatterns(requestQuery).map(String)).toEqual([
+        "/(request|response) id=\\w+/g",
+      ]);
+      expect(highlightedText("request id=abc-123 status=500", requestQuery)).toBe("request id=abc");
+    });
+
+    it("should highlight through unquantified groups", () => {
+      expect(highlight("foobarrr x", "re_match(log, '(?:foo)bar+')")).toEqual(["foobarrr"]);
+      expect(highlight("barbazz x", "re_match(log, '(foo|bar)baz+')")).toEqual(["barbazz"]);
     });
 
     it("should apply re_match anchors to the whole value, not each token", () => {

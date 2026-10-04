@@ -1303,7 +1303,8 @@ fn redaction_skipped(
     reason: &str,
 ) -> Result<(), infra::errors::Error> {
     if fail_closed && has_search_patterns() {
-        return Err(infra::errors::Error::Message(format!(
+        // 503, not 400: the refusal is a server-side condition, not a fault in the query.
+        return Err(infra::errors::Error::ResourceError(format!(
             "sensitive-data redaction could not run for {all_streams}: {reason}; refusing to return unredacted hits (ZO_SDR_FAIL_CLOSED)"
         )));
     }
@@ -1330,6 +1331,7 @@ mod tests {
         let err = redaction_skipped(true, || true, "app_logs", "parse error")
             .expect_err("a stream with search-time patterns must not return unredacted hits");
         assert!(err.to_string().contains("app_logs"), "{err}");
+        assert_eq!(err.http_status(), 503, "{err}");
         assert!(redaction_skipped(true, || false, "app_logs", "parse error").is_ok());
     }
 

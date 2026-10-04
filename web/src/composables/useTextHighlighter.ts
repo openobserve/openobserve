@@ -53,11 +53,12 @@ export interface TextSegment {
  * - str_match(field, 'value') / match_field(field, 'value')
  * - str_match_ignore_case(field, 'value') / match_field_ignore_case(field, 'value')
  * - re_match(field, 'pattern')
+ * - fuzzy_match(field, 'value', distance)
  * Group 1 is the function name, group 2 the field, group 3 a single-quoted
  * literal ('' escapes a quote), group 4 a double-quoted literal.
  */
 const FIELD_FILTER_REGEX =
-  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match)\s*\(\s*([^,()]+?)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")\s*\)/gi;
+  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match|fuzzy_match)\s*\(\s*([^,()]+?)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")(?:\s*,\s*\d+)?\s*\)/gi;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -70,114 +71,302 @@ const MAX_REGEX_PATTERN_LENGTH = 256;
 const MAX_REGEX_TEXT_LENGTH = 512;
 const MAX_REGEX_MATCHES = 100;
 /**
- * Cap on the product of choice widths ({n,m}, ?, |) in a pattern with groups
- * or alternation, which is only accepted without unbounded quantifiers.
+ * Caps on the product of alternation branches across a pattern's groups, e.g.
+ * (a|b)(c|d) has 4 combinations. Next to an unbounded quantifier each
+ * combination is retried at every split point, so only one binary choice is
+ * allowed there (ERROR (connection|timeout).*).
  */
 const MAX_VARIANTS = 81;
+const MAX_VARIANTS_WITH_UNBOUNDED = 2;
 
 /** Escaped str_match literals: linear to match, so exempt from MAX_REGEX_TEXT_LENGTH. */
 const literalPatterns = new WeakSet<RegExp>();
 
-/** Characters probed when testing whether two atoms can match the same character. */
-const PROBE_CHARS = [
-  ...Array.from({ length: 128 }, (_, code) => String.fromCharCode(code)),
-  " ",
-  "é",
-  "K",
-  "　",
-  "日",
-];
+/**
+ * The characters a regex atom can match, as UTF-16 code unit ranges (optionally
+ * negated). `any` means "assume it can match anything": `.`, and sets this
+ * analysis does not bound.
+ */
+interface CharSet {
+  ranges: Array<[number, number]>;
+  negated: boolean;
+  any: boolean;
+}
 
-/** One regex atom (a character, escape, class or .) with its repeat bounds. */
+/** One regex element (atom or unquantified group) with its width bounds. */
 interface RegexItem {
-  test: RegExp;
+  chars: CharSet;
   min: number;
   max: number;
 }
 
+const ANY_CHAR: CharSet = { ranges: [], negated: false, any: true };
+// JS (non-unicode) \d, \w and \s
+const CLASS_ESCAPE_RANGES: Record<string, Array<[number, number]>> = {
+  d: [[0x30, 0x39]],
+  w: [
+    [0x30, 0x39],
+    [0x41, 0x5a],
+    [0x5f, 0x5f],
+    [0x61, 0x7a],
+  ],
+  s: [
+    [0x09, 0x0d],
+    [0x20, 0x20],
+    [0xa0, 0xa0],
+    [0x1680, 0x1680],
+    [0x2000, 0x200a],
+    [0x2028, 0x2029],
+    [0x202f, 0x202f],
+    [0x205f, 0x205f],
+    [0x3000, 0x3000],
+    [0xfeff, 0xfeff],
+  ],
+};
+const CONTROL_ESCAPES: Record<string, number> = { n: 10, t: 9, r: 13, f: 12, v: 11 };
+
+const literalSet = (code: number): CharSet => ({
+  ranges: [[code, code]],
+  negated: false,
+  any: false,
+});
+
+/** Code unit of a literal, or null for a surrogate half (astral characters are not modelled). */
+const literalCode = (char: string): number | null => {
+  const code = char.charCodeAt(0);
+  return code >= 0xd800 && code <= 0xdfff ? null : code;
+};
+
+/** Parses the escape at source[i] ("\"), returning its set and length, or null. */
+function parseEscape(source: string, i: number): { chars: CharSet; length: number } | null {
+  const next = source[i + 1];
+  if (next === undefined) return null;
+  const lower = next.toLowerCase();
+  if (CLASS_ESCAPE_RANGES[lower]) {
+    return {
+      chars: { ranges: CLASS_ESCAPE_RANGES[lower], negated: next !== lower, any: false },
+      length: 2,
+    };
+  }
+  if (CONTROL_ESCAPES[next] !== undefined) {
+    return { chars: literalSet(CONTROL_ESCAPES[next]), length: 2 };
+  }
+  if (/[a-zA-Z0-9]/.test(next)) return null; // \p{..}, \x.., \u...., backreferences, \A ...
+  const code = literalCode(next);
+  return code === null ? null : { chars: literalSet(code), length: 2 };
+}
+
+/** Parses the class starting at source[i] ("["), returning its set and end index, or null. */
+function parseClass(source: string, i: number): { chars: CharSet; end: number } | null {
+  let j = i + 1;
+  const negated = source[j] === "^";
+  if (negated) j++;
+  if (source[j] === "]") return null; // [] and [^] differ between Rust and JS
+  const ranges: Array<[number, number]> = [];
+  let unbounded = false;
+
+  // One class member: a literal code unit, or a class escape such as \d
+  const member = (): { code?: number; chars?: CharSet; length: number } | null => {
+    if (source[j] === "\\") {
+      const escape = parseEscape(source, j);
+      if (!escape) return null;
+      const single = !escape.chars.negated && escape.chars.ranges.length === 1;
+      const [lo, hi] = escape.chars.ranges[0];
+      return single && lo === hi ? { code: lo, length: 2 } : { chars: escape.chars, length: 2 };
+    }
+    if (source[j] === "[" || source.startsWith("&&", j) || source.startsWith("--", j)) return null;
+    const code = literalCode(source[j]);
+    return code === null ? null : { code, length: 1 };
+  };
+
+  while (j < source.length && source[j] !== "]") {
+    const first = member();
+    if (!first) return null;
+    j += first.length;
+    if (first.chars) {
+      if (first.chars.negated) unbounded = true;
+      else ranges.push(...first.chars.ranges);
+      continue;
+    }
+    if (source[j] === "-" && source[j + 1] !== undefined && source[j + 1] !== "]") {
+      j++;
+      const last = member();
+      if (!last || last.code === undefined || last.code < first.code!) return null;
+      j += last.length;
+      ranges.push([first.code!, last.code]);
+    } else {
+      ranges.push([first.code!, first.code!]);
+    }
+  }
+  if (j >= source.length) return null;
+  return { chars: unbounded ? ANY_CHAR : { ranges, negated, any: false }, end: j };
+}
+
 /**
- * Splits a regex source into atoms with their quantifiers. Returns null for
- * syntax this does not model (backreferences, lookarounds, \p{..}, \x.., a
- * quantified group, a stray quantifier), which the caller treats as unsafe.
- * `grouped` is set when the source uses groups or alternation.
+ * Adds the other-case form of every character, for the i flag. Negated or very
+ * wide non-ASCII sets are not folded precisely and become ANY_CHAR.
  */
-function tokenizeRegex(
+function foldCase(chars: CharSet): CharSet {
+  if (chars.any) return chars;
+  if (chars.negated) return ANY_CHAR;
+  const ranges = [...chars.ranges];
+  for (const [lo, hi] of chars.ranges) {
+    if (hi >= 0x80 && hi - Math.max(lo, 0x80) > 512) return ANY_CHAR;
+    for (let code = lo; code <= hi; code++) {
+      const char = String.fromCharCode(code);
+      for (const variant of [char.toLowerCase(), char.toUpperCase()]) {
+        if (variant.length === 1) ranges.push([variant.charCodeAt(0), variant.charCodeAt(0)]);
+      }
+    }
+  }
+  return { ranges, negated: false, any: false };
+}
+
+/** Whether every code unit in [lo, hi] lies inside the given ranges. */
+function isCovered(lo: number, hi: number, ranges: Array<[number, number]>): boolean {
+  let next = lo;
+  for (const [from, to] of [...ranges].sort((a, b) => a[0] - b[0])) {
+    if (from > next) break;
+    next = Math.max(next, to + 1);
+    if (next > hi) return true;
+  }
+  return next > hi;
+}
+
+/**
+ * Whether two sets may share a character. Disjointness is only concluded when
+ * it follows from the sets' definitions; otherwise they are assumed to overlap.
+ */
+function charSetsOverlap(a: CharSet, b: CharSet): boolean {
+  if (a.any || b.any || (a.negated && b.negated)) return true;
+  if (a.negated || b.negated) {
+    const [excluded, included] = a.negated ? [a, b] : [b, a];
+    return !included.ranges.every(([lo, hi]) => isCovered(lo, hi, excluded.ranges));
+  }
+  return a.ranges.some(([aLo, aHi]) => b.ranges.some(([bLo, bHi]) => aLo <= bHi && bLo <= aHi));
+}
+
+/** Splits source at "|" that is outside groups, classes and escapes; null if unbalanced. */
+function splitAlternation(source: string): string[] | null {
+  const branches: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === "\\") {
+      i++;
+    } else if (char === "[") {
+      const parsed = parseClass(source, i);
+      if (!parsed) return null;
+      i = parsed.end;
+    } else if (char === "(") {
+      depth++;
+    } else if (char === ")") {
+      if (--depth < 0) return null;
+    } else if (char === "|" && depth === 0) {
+      branches.push(source.slice(start, i));
+      start = i + 1;
+    }
+  }
+  if (depth !== 0) return null;
+  branches.push(source.slice(start));
+  return branches;
+}
+
+/**
+ * Parses one alternation-free sequence into items. An unquantified group
+ * without alternation is flattened into the sequence; one whose branches are
+ * unquantified becomes a single item over the union of their characters.
+ * Returns null for anything not modelled (lookarounds, backreferences, \p{..},
+ * quantified groups, stray quantifiers).
+ */
+function parseSequence(
   source: string,
   flags: string,
-): { items: RegexItem[]; grouped: boolean; choices: number; probes: string[] } | null {
+): { items: RegexItem[]; choices: number } | null {
   const items: RegexItem[] = [];
-  const probes = [...PROBE_CHARS];
-  let grouped = false;
   let choices = 1;
   let i = 0;
 
-  const atom = (atomSource: string): RegexItem | null => {
-    try {
-      const regex = new RegExp(`^(?:${atomSource})$`, flags.replace("g", ""));
-      return { test: regex, min: 1, max: 1 };
-    } catch {
-      return null;
-    }
-  };
-
   while (i < source.length) {
     const char = source[i];
-    let item: RegexItem | null = null;
+    let chars: CharSet | null = null;
 
     if (char === "\\") {
-      const next = source[i + 1];
-      if (next === "b" || next === "B") {
+      if (source[i + 1] === "b" || source[i + 1] === "B") {
         i += 2;
         continue;
       }
-      if (next === undefined || !(/[dDwWsSntrfv]/.test(next) || /[^a-zA-Z0-9]/.test(next))) {
-        return null;
-      }
-      item = atom(`\\${next}`);
-      if (/[^a-zA-Z0-9]/.test(next)) probes.push(next);
-      i += 2;
-    } else if (char === ".") {
-      item = atom(".");
-      i++;
+      const escape = parseEscape(source, i);
+      if (!escape) return null;
+      chars = escape.chars;
+      i += escape.length;
     } else if (char === "[") {
-      let end = i + 1;
-      if (source[end] === "^") end++;
-      if (source[end] === "]") end++;
-      while (end < source.length && source[end] !== "]") end += source[end] === "\\" ? 2 : 1;
-      if (end >= source.length) return null;
-      item = atom(source.slice(i, end + 1));
-      i = end + 1;
-    } else if (char === "(") {
-      if (source[i + 1] === "?") {
-        if (source[i + 2] !== ":") return null;
-        i += 3;
-      } else {
-        i++;
-      }
-      grouped = true;
-      continue;
-    } else if (char === ")") {
-      if (/^[*+?{]/.test(source.slice(i + 1))) return null;
+      const parsed = parseClass(source, i);
+      if (!parsed) return null;
+      chars = parsed.chars;
+      i = parsed.end + 1;
+    } else if (char === ".") {
+      chars = ANY_CHAR;
       i++;
-      continue;
-    } else if (char === "|") {
-      grouped = true;
-      choices *= 2;
-      i++;
-      continue;
     } else if (char === "^" || char === "$") {
       i++;
       continue;
-    } else if (char === "*" || char === "+" || char === "?") {
+    } else if (char === "(") {
+      // Find the matching ")"; its content is checked by splitAlternation
+      let depth = 0;
+      let end = i;
+      for (; end < source.length; end++) {
+        if (source[end] === "\\") end++;
+        else if (source[end] === "[") end = parseClass(source, end)?.end ?? source.length;
+        else if (source[end] === "(") depth++;
+        else if (source[end] === ")" && --depth === 0) break;
+      }
+      if (end >= source.length || /^[*+?{]/.test(source.slice(end + 1))) return null;
+      const opening = source.startsWith("(?:", i) ? 3 : 1;
+      if (opening === 1 && source[i + 1] === "?") return null;
+      const branches = splitAlternation(source.slice(i + opening, end));
+      if (!branches) return null;
+
+      const parsed = branches.map((branch) => parseSequence(branch, flags));
+      if (parsed.some((branch) => !branch)) return null;
+      if (branches.length === 1) {
+        items.push(...parsed[0]!.items);
+        choices *= parsed[0]!.choices;
+      } else {
+        // Alternation: only fixed-width branches, merged into one item
+        if (parsed.some((branch) => branch!.items.some((item) => item.min !== item.max))) {
+          return null;
+        }
+        const widths = parsed.map((branch) =>
+          branch!.items.reduce((total, item) => total + item.min, 0),
+        );
+        const sets = parsed.flatMap((branch) => branch!.items.map((item) => item.chars));
+        const union: CharSet = sets.some((set) => set.any || set.negated)
+          ? ANY_CHAR
+          : { ranges: sets.flatMap((set) => set.ranges), negated: false, any: false };
+        // A fixed set of literal choices backtracks at most once per branch, which
+        // MAX_VARIANTS bounds; it is not a repeat, so it counts as fixed width here.
+        const width = Math.min(...widths);
+        items.push({ chars: union, min: width, max: width });
+        choices *= branches.length * parsed.reduce((total, branch) => total * branch!.choices, 1);
+      }
+      i = end + 1;
+      continue;
+    } else if ("*+?)|".includes(char)) {
       return null;
     } else {
-      item = atom(escapeRegExp(char));
-      probes.push(char);
+      const code = literalCode(char);
+      if (code === null) return null;
+      chars = literalSet(code);
       i++;
     }
 
-    if (!item) return null;
-
+    const item: RegexItem = {
+      chars: flags.includes("i") ? foldCase(chars) : chars,
+      min: 1,
+      max: 1,
+    };
     // Quantifier, with an optional lazy ? after it
     const quantifier = /^(?:([*+?])|\{(\d+)(?:(,)(\d*))?\})\??/.exec(source.slice(i));
     if (quantifier) {
@@ -188,55 +377,53 @@ function tokenizeRegex(
         item.min = Number(quantifier[2]);
         item.max = !quantifier[3] ? item.min : quantifier[4] ? Number(quantifier[4]) : Infinity;
       }
-      if (item.max !== Infinity) choices *= item.max - item.min + 1;
       i += quantifier[0].length;
     }
     items.push(item);
   }
 
-  return { items, grouped, choices, probes };
+  return { items, choices };
 }
 
 /**
  * Whether a regex source risks super-linear backtracking in a JS engine.
  *
- * Without groups or alternation, two variable-width atoms (*, +, ?, {n,m})
- * are only ambiguous when they can match a common character and nothing
- * mandatory between them stops the first from running into the second: a
- * required atom that one of the two cannot match. So [a-z]+-\d+ (disjoint
- * classes) and https?://\S+ (s? cannot match ':') pass, while \w*\w*,
- * a+a?, .*.* and \d+\s*\d+ are rejected.
- *
- * With groups or alternation only bounded patterns pass, and only while the
- * product of their choice widths stays within MAX_VARIANTS. Anything the
- * tokenizer cannot model (lookarounds, backreferences, \p{..}, quantified
- * groups) is treated as a risk.
+ * Each top-level alternative is parsed into a sequence of items (see
+ * parseSequence). Two variable-width (quantified) items are only ambiguous when their
+ * character sets may overlap and nothing mandatory between them stops the
+ * first from running into the second: a required item whose characters one of
+ * the two cannot match. So [a-z]+-\d+ (disjoint) and https?://\S+ (s? cannot
+ * match ':') pass, while \w*\w*, a+a?, .*.*, \d+\s*\d+ and [Ā]+[Ā]+ are
+ * rejected. Overlap is decided from the sets' definitions and assumed when
+ * unknown. Alternation groups multiply choices, capped at MAX_VARIANTS (or
+ * MAX_VARIANTS_WITH_UNBOUNDED beside an unbounded quantifier).
+ * Anything not modelled is treated as a risk.
  */
 function isBacktrackingRisk(source: string, flags: string): boolean {
-  const tokens = tokenizeRegex(source, flags);
-  if (!tokens) return true;
-  const { items, grouped, choices, probes } = tokens;
+  const alternatives = splitAlternation(source);
+  if (!alternatives) return true;
 
-  if (grouped) {
-    return items.some((item) => item.max === Infinity) || choices > MAX_VARIANTS;
-  }
+  for (const alternative of alternatives) {
+    const parsed = parseSequence(alternative, flags);
+    if (!parsed) return true;
+    const { items, choices } = parsed;
+    const unbounded = items.some((item) => item.max === Infinity);
+    if (choices > (unbounded ? MAX_VARIANTS_WITH_UNBOUNDED : MAX_VARIANTS)) return true;
+    const overlaps = (a: number, b: number) => charSetsOverlap(items[a].chars, items[b].chars);
 
-  // Which probe characters each atom matches, so overlap is a set intersection
-  const sets = items.map((item) => probes.map((char) => item.test.test(char)));
-  const overlaps = (a: number, b: number) => sets[a].some((hit, k) => hit && sets[b][k]);
+    for (let first = 0; first < items.length; first++) {
+      if (items[first].min === items[first].max) continue;
+      for (let second = first + 1; second < items.length; second++) {
+        if (items[second].min === items[second].max) continue;
+        if (!overlaps(first, second)) continue;
 
-  for (let first = 0; first < items.length; first++) {
-    if (items[first].min === items[first].max) continue;
-    for (let second = first + 1; second < items.length; second++) {
-      if (items[second].min === items[second].max) continue;
-      if (!overlaps(first, second)) continue;
-
-      let separated = false;
-      for (let between = first + 1; between < second && !separated; between++) {
-        separated =
-          items[between].min > 0 && (!overlaps(between, first) || !overlaps(between, second));
+        let separated = false;
+        for (let between = first + 1; between < second && !separated; between++) {
+          separated =
+            items[between].min > 0 && (!overlaps(between, first) || !overlaps(between, second));
+        }
+        if (!separated) return true;
       }
-      if (!separated) return true;
     }
   }
 
@@ -274,17 +461,22 @@ function compileHighlightRegex(pattern: string): RegExp | null {
 /** Compiled patterns per (field-scoped) query string; cleared when it grows past 64 entries. */
 const patternCache = new Map<string, RegExp[]>();
 
-const normalizeFieldName = (field: string) =>
-  field
-    .trim()
-    .replace(/^["`]|["`]$/g, "")
-    .toLowerCase();
+/**
+ * The field a filter's first argument names, as the backend resolves it: a
+ * quoted identifier ("ERROR" or `ERROR`) keeps its case, an unquoted one is
+ * lowercased (DataFusion identifier normalization).
+ */
+const resolveFilterField = (field: string) => {
+  const trimmed = field.trim();
+  const quoted = /^"(.*)"$|^`(.*)`$/.exec(trimmed);
+  return quoted ? (quoted[1] ?? quoted[2]) : trimmed.toLowerCase();
+};
 
 /**
  * Narrows a highlight query to one field: drops the field filters (str_match,
- * match_field, their _ignore_case forms and re_match) that name another field,
- * so they only highlight their own column / detail row. match_all and fuzzy
- * keywords are not field-scoped and stay.
+ * match_field, their _ignore_case forms, re_match and fuzzy_match) that name
+ * another field, so they only highlight their own column / detail row.
+ * match_all and fuzzy_match_all keywords are not field-scoped and stay.
  *
  * @param queryString - The highlight query
  * @param field - The field (column id or JSON key) being rendered
@@ -292,11 +484,10 @@ const normalizeFieldName = (field: string) =>
  */
 export function scopeHighlightQuery(queryString: string, field: string): string {
   if (!queryString) return queryString;
-  const target = normalizeFieldName(field);
   return queryString.replace(
     FIELD_FILTER_REGEX,
     (filter: string, _name: string, filterField: string) =>
-      normalizeFieldName(filterField) === target ? filter : "",
+      resolveFilterField(filterField) === field ? filter : "",
   );
 }
 
@@ -310,7 +501,6 @@ export function useTextHighlighter() {
    * Extracts keywords from SQL query strings
    * Matches patterns like:
    * - match_all('keyword')
-   * - fuzzy_match('keyword', 2)
    * - fuzzy_match_all('keyword', 2)
    * Keywords are highlighted case-insensitively within each token; field
    * filters (str_match, re_match, ...) are returned by extractHighlightPatterns.
@@ -321,9 +511,8 @@ export function useTextHighlighter() {
   function extractKeywords(queryString: string): string[] {
     if (!queryString?.trim()) return [];
 
-    // Regex to support match_all, fuzzy_match, and fuzzy_match_all SQL functions
-    const regex =
-      /\b(?:match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/gi;
+    // Regex to support match_all and fuzzy_match_all SQL functions
+    const regex = /\b(?:match_all|fuzzy_match_all)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/gi;
     const result: string[] = [];
     let match: RegExpExecArray | null;
 
@@ -380,7 +569,7 @@ export function useTextHighlighter() {
         name === "re_match"
           ? compileHighlightRegex(value)
           : value
-            ? literalPattern(value, name.endsWith("_ignore_case"))
+            ? literalPattern(value, name.endsWith("_ignore_case") || name === "fuzzy_match")
             : null;
 
       if (regex && !seen.has(`${regex.source}/${regex.flags}`)) {
