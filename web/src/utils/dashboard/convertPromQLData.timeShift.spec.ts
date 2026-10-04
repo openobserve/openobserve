@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { alignShiftedPromQLResults, convertPromQLData } from "./convertPromQLData";
+import { getAreaGradientColor } from "./colorPalette";
 
 vi.mock("./chartDimensionUtils", () => ({
   calculateOptimalFontSize: vi.fn(() => 14),
@@ -370,6 +371,76 @@ describe("convertPromQLData with time-shifted results", () => {
       const [primary, shifted] = pair(result, "api-1");
       expect(primary.itemStyle.color).toBeTruthy();
       expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
+    });
+
+    it.each(["bar", "scatter"])(
+      "fades it on a %s chart, which has no line to dash",
+      async (type) => {
+        const result = await convert(
+          panel(type),
+          [twoPods(), twoPods(DAY_S)],
+          oneDay,
+          stepMeta(2, 60),
+        );
+
+        const [primary, shifted] = pair(result, "api-1");
+        expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
+        expect(shifted.itemStyle.opacity).toBeLessThan(1);
+        expect(primary.itemStyle.opacity).toBeUndefined();
+      },
+    );
+
+    it("keeps line and area series unfaded, the dash marks them", async () => {
+      for (const type of ["line", "area"]) {
+        const result = await convert(
+          panel(type),
+          [twoPods(), twoPods(DAY_S)],
+          oneDay,
+          stepMeta(2, 60),
+        );
+        const [, shifted] = pair(result, "api-1");
+        expect(shifted.itemStyle.opacity).toBeUndefined();
+        expect(shifted.lineStyle.type).toBe("dashed");
+      }
+    });
+
+    describe("fills an area in its final colour", () => {
+      it("when the primary's value-based colour replaces its own", async () => {
+        const shaded: any = panel("area");
+        shaded.config = { color: { mode: "continuous-green-yellow-red" } };
+        const past = matrix(
+          series(
+            { pod: "api-1" },
+            ts.map((t) => t - DAY_S),
+            9 as any,
+          ),
+        );
+        const result = await convert(
+          shaded,
+          [
+            matrix(series({ pod: "api-1" }, ts, 1 as any), series({ pod: "api-2" }, ts, 5 as any)),
+            past,
+          ],
+          oneDay,
+          stepMeta(2, 60),
+        );
+
+        const [primary, shifted] = pair(result, "api-1");
+        expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
+        expect(shifted.areaStyle.color).toEqual(primary.areaStyle.color);
+      });
+
+      it("when a mapping on its own name colours it", async () => {
+        const mapped: any = panel("area");
+        mapped.config = {
+          color: { colorBySeries: [{ value: "api-1 (1 day ago)", color: "#abcdef" }] },
+        };
+        const result = await convert(mapped, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
+
+        const [, shifted] = pair(result, "api-1");
+        expect(shifted.itemStyle.color).toBe("#abcdef");
+        expect(shifted.areaStyle.color).toEqual(getAreaGradientColor("#abcdef"));
+      });
     });
 
     it("keeps the primary's colour while the primary stream is still pending", async () => {

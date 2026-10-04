@@ -825,6 +825,10 @@ export const convertPromQLData = async (
                 showSymbol: panelSchema.config?.show_symbol ?? false,
                 itemStyle: {
                   color: resolvedSeriesColor,
+                  // Bars and points ignore lineStyle, so a fainter fill is what marks the previous period.
+                  ...(nameSuffixes[index] && ["bar", "scatter"].includes(panelSchema.type)
+                    ? { opacity: 0.5 }
+                    : {}),
                 },
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
@@ -835,7 +839,7 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
-                // Dashed is the usual "previous period" mark; the shared colour ties it to its primary.
+                // Sharing the primary's colour, the previous period is only told apart by its dash.
                 ...(nameSuffixes[index]
                   ? { lineStyle: { ...seriesPropsBasedOnChartType?.lineStyle, type: "dashed" } }
                   : {}),
@@ -1239,9 +1243,21 @@ export const convertPromQLData = async (
   );
   for (const [twin, metric] of shiftedTwins) {
     // A mapping on the twin's own name is the user's choice and outranks the primary's colour.
-    if (mappedNames.has(twin.name)) continue;
-    const color = primaryByMetric.get(metric)?.itemStyle?.color;
-    if (color) twin.itemStyle.color = color;
+    if (!mappedNames.has(twin.name)) {
+      const color = primaryByMetric.get(metric)?.itemStyle?.color;
+      if (color) twin.itemStyle.color = color;
+    }
+    // The fill was built from the colour before this override, so the line and fill would disagree.
+    Object.assign(
+      twin,
+      getAreaStyleOverride(
+        panelSchema.type,
+        seriesPropsBasedOnChartType?.areaStyle,
+        twin.itemStyle.color,
+        seriesNames.get(metric) ?? "",
+        store.state.theme,
+      ),
+    );
   }
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width

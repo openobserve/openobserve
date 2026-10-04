@@ -292,7 +292,6 @@ export default defineComponent({
     const tableLoading = ref(false);
     const tableLoaded = ref(false);
     const tableError = ref("");
-    /** The first labels' counts, with the fields they were asked for. */
     const headCounts = ref<{ fields: string[]; hits: any[] } | null>(null);
     let tableGeneration = 0;
 

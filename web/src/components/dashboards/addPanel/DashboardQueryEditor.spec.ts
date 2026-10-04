@@ -718,4 +718,20 @@ describe("DashboardQueryEditor", () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  // The code editor's own Cmd+Enter handler emits run-query; CodeQueryEditor.spec covers that half.
+  it("runs the page's injected runQuery when the code editor emits run-query", async () => {
+    const runQuery = vi.fn();
+    wrapper = mount(DashboardQueryEditor, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { dashboardPanelDataPageKey: "dashboard", runQuery },
+        stubs: { QueryTypeSelector: true },
+      },
+    });
+
+    wrapper.findComponent({ name: "CodeQueryEditor" }).vm.$emit("run-query");
+
+    expect(runQuery).toHaveBeenCalledWith(false);
+  });
 });

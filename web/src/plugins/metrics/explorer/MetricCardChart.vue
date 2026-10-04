@@ -78,7 +78,6 @@ export default defineComponent({
      * place to author an alert.
      */
     allowAlertCreation: { type: Boolean, default: false },
-    /** Names each series below the chart, coloured by position so neighbours never share a hue. */
     legend: { type: Boolean, default: false },
     /** The card's exemplar state; the explorer grid owns the fetch. */
     injectedExemplars: {

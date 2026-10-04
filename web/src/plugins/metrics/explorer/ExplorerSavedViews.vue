@@ -190,17 +190,19 @@ const deleteView = useMutation(() => deleteSavedViewMutation(orgId.value));
 const showError = (err: any, fallback: I18nText) =>
   toast({ variant: "error", message: raw(err?.response?.data?.message) || fallback });
 
-const payload = (viewName: string) => ({
-  data: buildExplorerViewData(props.state),
+const payload = (viewName: string, state: ExplorerViewState) => ({
+  data: buildExplorerViewData(state),
   view_name: viewName,
   view_type: METRICS_EXPLORER_VIEW_TYPE,
 });
 
 const saveAs = async (value: ExplorerViewForm) => {
+  // The grid can move while the request is in flight; only what was sent is saved.
+  const submitted = { ...props.state } as ExplorerViewState;
   try {
-    const res: any = await createView.mutateAsync(payload(value.viewName));
+    const res: any = await createView.mutateAsync(payload(value.viewName, submitted));
     activeViewId.value = res?.data?.view_id ?? null;
-    activeViewState.value = { ...props.state } as ExplorerViewState;
+    activeViewState.value = submitted;
     saveDialogOpen.value = false;
     toast({ variant: "success", message: t("metrics.explorer.views.saved") });
     emit("saved", "created");
@@ -212,9 +214,13 @@ const saveAs = async (value: ExplorerViewForm) => {
 const updateActive = async () => {
   const view = activeView.value;
   if (!view) return;
+  const submitted = { ...props.state } as ExplorerViewState;
   try {
-    await updateView.mutateAsync({ viewId: view.view_id, view: payload(view.view_name) });
-    activeViewState.value = { ...props.state } as ExplorerViewState;
+    await updateView.mutateAsync({
+      viewId: view.view_id,
+      view: payload(view.view_name, submitted),
+    });
+    activeViewState.value = submitted;
     toast({ variant: "success", message: t("metrics.explorer.views.updated") });
     emit("saved", "updated");
   } catch (err) {

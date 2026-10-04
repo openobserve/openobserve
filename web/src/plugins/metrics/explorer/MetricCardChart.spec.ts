@@ -161,7 +161,7 @@ describe("MetricCardChart colours multi-series charts per series", () => {
     expect(panelProp(wrapper, "panelSchema").config.color.mode).toBe("palette-classic-by-series");
   });
 
-  it("shows a legend and colours by position when asked, so no two series share a hue", () => {
+  it("turns the legend on with the palette-classic colour mode when asked", () => {
     const config = panelProp(
       mountChart({ results: matrix(3), legend: true }),
       "panelSchema",

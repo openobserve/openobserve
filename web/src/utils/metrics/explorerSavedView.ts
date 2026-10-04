@@ -62,7 +62,6 @@ export const buildExplorerViewData = (query: Record<string, unknown>): ExplorerV
   state: pickViewState(query),
 });
 
-/** Whether two URL slices save as the same view. */
 export const sameExplorerViewState = (
   a: Record<string, unknown>,
   b: Record<string, unknown>,

@@ -186,6 +186,63 @@ describe("ExplorerSavedViews", () => {
     expect(label()).not.toContain("(modified)");
   });
 
+  describe("a grid change while the save is in flight stays modified", () => {
+    const saved = { search: "http", labels: ["job=api"], sort: "z-a", period: "1h" };
+    const deferred = () => {
+      let resolve!: (v: any) => void;
+      const promise = new Promise((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    const mountBound = () => {
+      const wrapper: any = mountViews(saved, {
+        "onUpdate:activeViewId": (v: any) => wrapper.setProps({ activeViewId: v }),
+        "onUpdate:activeViewState": (v: any) => wrapper.setProps({ activeViewState: v }),
+      });
+      return wrapper;
+    };
+    const label = (wrapper: any) => wrapper.find('[data-test="metrics-explorer-views-btn"]').text();
+
+    it("on Update", async () => {
+      api.getViewDetail.mockResolvedValue({
+        data: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: saved } },
+      });
+      const put = deferred();
+      api.put.mockReturnValue(put.promise);
+      const wrapper = mountBound();
+      await flushPromises();
+      await wrapper.find('[data-test="metrics-explorer-view-m1"]').trigger("click");
+      await flushPromises();
+
+      await wrapper.setProps({ state: { ...saved, search: "grpc" } });
+      await wrapper.find('[data-test="metrics-explorer-views-update"]').trigger("click");
+      await wrapper.setProps({ state: { ...saved, search: "db" } });
+      put.resolve({ data: {} });
+      await flushPromises();
+
+      expect(label(wrapper)).toContain("errors by job (modified)");
+    });
+
+    it("on Save As", async () => {
+      api.get.mockResolvedValue({
+        data: {
+          views: [...VIEWS, { view_id: "new1", view_name: "mine", view_type: "metrics_explorer" }],
+        },
+      });
+      const post = deferred();
+      api.post.mockReturnValue(post.promise);
+      const wrapper = mountBound();
+      await flushPromises();
+
+      const saving = wrapper.vm.saveAs({ viewName: "mine" });
+      await wrapper.setProps({ state: { ...saved, search: "db" } });
+      post.resolve({ data: { view_id: "new1" } });
+      await saving;
+      await flushPromises();
+
+      expect(label(wrapper)).toContain("mine (modified)");
+    });
+  });
+
   it("updates and deletes the applied view", async () => {
     api.getViewDetail.mockResolvedValue({
       data: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: {} } },
