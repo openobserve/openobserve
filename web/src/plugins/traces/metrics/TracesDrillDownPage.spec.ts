@@ -70,6 +70,29 @@ describe("TracesDrillDownPage", () => {
     drillDown.remove();
   });
 
+  it("should make the content it covers inert while open, and restore it on close", () => {
+    const container = document.createElement("div");
+    const covered = document.createElement("div");
+    const alreadyInert = document.createElement("div");
+    alreadyInert.setAttribute("inert", "");
+    container.append(covered, alreadyInert);
+    document.body.appendChild(container);
+
+    wrapper = mount(TracesDrillDownPage, {
+      attachTo: container,
+      props: { open: true, title: "Volume Insights" },
+    });
+
+    expect(covered.hasAttribute("inert")).toBe(true);
+    expect(wrapper.element.hasAttribute("inert")).toBe(false);
+
+    wrapper.unmount();
+
+    expect(covered.hasAttribute("inert")).toBe(false);
+    expect(alreadyInert.hasAttribute("inert")).toBe(true);
+    container.remove();
+  });
+
   it("should render nothing when closed", () => {
     wrapper = mountPage({ open: false });
 

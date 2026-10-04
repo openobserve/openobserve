@@ -102,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
 
-        <!-- More menu: RED Metrics toggle + Syntax Guide — always last. -->
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton

@@ -110,13 +110,12 @@ export class TracesPage {
     this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-    // Traces SearchBar.vue: the "Drill down" button next to the mode tabs keeps data-test="insights-button"
+    // The Drill down button kept the old Insights data-test so existing specs still find it.
     this.insightsButton = '[data-test="insights-button"]';
     // SearchResult.vue: error-count badge doubles as the error-only toggle
     this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
-    // Traces SearchBar.vue: RED Metrics switch inside the "More" menu
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    // Traces Drill down renders full page (not a drawer) but keeps the traces-analysis-dashboard-drawer slug.
+    // The full-page Drill down view kept the drawer's data-test so existing selectors still match.
     this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
     this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-drill-down-back-btn"]';
     // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
@@ -2013,7 +2012,7 @@ export class TracesPage {
   // ===== ANALYZE DIMENSIONS POM METHODS =====
   // Selectors verified against actual Vue source code
 
-  // --- Insights Button (TracesMetricsDashboard.vue) ---
+  // --- Drill down button (Traces SearchBar.vue) ---
 
   /**
    * Check if the Drill down button is visible.

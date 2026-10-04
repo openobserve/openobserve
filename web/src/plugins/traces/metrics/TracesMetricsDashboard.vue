@@ -50,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @close="hideContextMenu"
     />
 
-    <!-- Unified Analysis Dashboard: full page over the results, target lives in traces Index.vue -->
     <Teleport v-if="showAnalysisDashboard" defer to="#traces-drill-down-page">
       <TracesAnalysisDashboard
         full-page

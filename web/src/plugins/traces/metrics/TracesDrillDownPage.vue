@@ -62,6 +62,22 @@ const backBtnRef = ref<{ $el?: HTMLElement } | null>(null);
 
 const close = () => emit("update:open", false);
 
+// Content this page covers stays in the DOM to keep its state, so it must not take focus.
+const coveredSiblings: Element[] = [];
+const setCoveredInert = (inert: boolean) => {
+  if (!inert) {
+    coveredSiblings.splice(0).forEach((el) => el.removeAttribute("inert"));
+    return;
+  }
+  const host = rootRef.value?.parentElement;
+  for (const el of Array.from(host?.parentElement?.children ?? [])) {
+    if (el !== host && !el.hasAttribute("inert")) {
+      el.setAttribute("inert", "");
+      coveredSiblings.push(el);
+    }
+  }
+};
+
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key !== "Escape" || e.defaultPrevented) return;
   const target = e.target as Node | null;
@@ -70,10 +86,12 @@ const onKeydown = (e: KeyboardEvent) => {
 };
 
 onMounted(() => {
+  setCoveredInert(true);
   document.addEventListener("keydown", onKeydown);
   backBtnRef.value?.$el?.focus?.();
 });
 onBeforeUnmount(() => {
+  setCoveredInert(false);
   document.removeEventListener("keydown", onKeydown);
   document.querySelector<HTMLElement>('[data-test="insights-button"]')?.focus();
 });
