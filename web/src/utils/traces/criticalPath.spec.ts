@@ -225,14 +225,44 @@ describe("computeCriticalPath", () => {
     expect(computeCriticalPath(root)).toEqual([section("parent", 10, 50)]);
   });
 
-  it("concatenates the sections of every root tree", () => {
-    const roots = [node("root1", 0, 10, [node("child1", 2, 10)]), node("orphan", 20, 30)];
+  describe("multiple roots", () => {
+    const rooted = (n: CriticalPathNode, parentId: string) => ({ ...n, parentId });
 
-    expect(computeCriticalPathForRoots(roots)).toEqual([
-      section("child1", 2, 10),
-      section("root1", 0, 2),
-      section("orphan", 20, 30),
-    ]);
+    it("walks only the true root, not an orphan whose parent is missing", () => {
+      const roots = [
+        rooted(node("orphan", 0, 30), "missing"),
+        rooted(node("root1", 5, 10, [node("child1", 7, 10)]), ""),
+      ];
+
+      expect(computeCriticalPathForRoots(roots)).toEqual([
+        section("child1", 7, 10),
+        section("root1", 5, 7),
+      ]);
+    });
+
+    it("walks the earliest-starting span when every root is an orphan", () => {
+      const roots = Array.from({ length: 15 }, (_, i) =>
+        rooted(node(`orphan${i}`, 15 - i, 100), `missing${i}`),
+      );
+
+      expect(computeCriticalPathForRoots(roots)).toEqual([section("orphan14", 1, 100)]);
+    });
+
+    it("breaks a start-time tie by the longest duration", () => {
+      const roots = [
+        rooted(node("short", 0, 10), ""),
+        rooted(node("long", 0, 50), ""),
+        rooted(node("late", 1, 90), ""),
+      ];
+
+      expect(computeCriticalPathForRoots(roots)).toEqual([section("long", 0, 50)]);
+    });
+
+    it("walks a lone root even when its parent is missing", () => {
+      expect(computeCriticalPathForRoots([rooted(node("orphan", 3, 9), "missing")])).toEqual([
+        section("orphan", 3, 9),
+      ]);
+    });
   });
 
   it("handles 20,000 sequential children without overflowing the stack", () => {
@@ -264,6 +294,12 @@ describe("toCriticalPathNode", () => {
 
     expect(toCriticalPathNode(tree)).toEqual(
       node("root", 0, 10, [node("a", 1, 2), node("b", 3, 9, [node("c", 4, 5)])]),
+    );
+  });
+
+  it("keeps the root's parent id so orphan roots can be told apart", () => {
+    expect(toCriticalPathNode({ ...treeSpan("orphan", 0, 10), parentId: "missing" }).parentId).toBe(
+      "missing",
     );
   });
 

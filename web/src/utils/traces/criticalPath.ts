@@ -25,6 +25,8 @@ export interface CriticalPathNode {
   spanId: string;
   startTimeUs: number;
   endTimeUs: number;
+  /** Non-empty on a root marks an orphan whose parent is missing from the trace. */
+  parentId?: string;
   children: CriticalPathNode[];
 }
 
@@ -32,6 +34,7 @@ export interface TraceTreeSpan {
   spanId: string;
   startTimeUs: number;
   endTimeUs: number;
+  parentId?: string;
   spans: TraceTreeSpan[];
 }
 
@@ -72,8 +75,10 @@ export function computeCriticalPath(root: CriticalPathNode): CriticalPathSection
   return sections;
 }
 
+/** Critical path of the trace's primary root only; other roots get no sections. */
 export function computeCriticalPathForRoots(roots: CriticalPathNode[]): CriticalPathSection[] {
-  return roots.flatMap(computeCriticalPath);
+  const primary = primaryRoot(roots);
+  return primary ? computeCriticalPath(primary) : [];
 }
 
 /** Iterative, so trace depth never bounds the call stack. */
@@ -82,6 +87,7 @@ export function toCriticalPathNode(span: TraceTreeSpan): CriticalPathNode {
     spanId: s.spanId,
     startTimeUs: s.startTimeUs,
     endTimeUs: s.endTimeUs,
+    parentId: s.parentId,
     children: [],
   });
   const root = toNode(span);
@@ -96,6 +102,16 @@ export function toCriticalPathNode(span: TraceTreeSpan): CriticalPathNode {
     }
   }
   return root;
+}
+
+// A true root beats orphans; then the earliest start, then the longest span.
+function primaryRoot(roots: CriticalPathNode[]): CriticalPathNode | undefined {
+  const trueRoots = roots.filter((r) => !r.parentId);
+  const candidates = trueRoots.length ? trueRoots : roots;
+  return [...candidates].sort(
+    (a, b) =>
+      a.startTimeUs - b.startTimeUs || b.endTimeUs - b.startTimeUs - (a.endTimeUs - a.startTimeUs),
+  )[0];
 }
 
 /** Clamps children into their parent's window (dropping disjoint subtrees) and orders them latest-ending first. */
