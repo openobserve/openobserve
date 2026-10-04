@@ -111,6 +111,21 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   })),
 }));
 
+// navigateToCorrelatedLogs runs a count query before a span-level jump and
+// falls back to the trace's logs when it is empty.
+const { mockSearch, mockShowInfoNotification } = vi.hoisted(() => ({
+  mockSearch: vi.fn(),
+  mockShowInfoNotification: vi.fn(),
+}));
+
+vi.mock("@/services/search", () => ({
+  default: { search: mockSearch },
+}));
+
+vi.mock("@/composables/useNotifications", () => ({
+  default: vi.fn(() => ({ showInfoNotification: mockShowInfoNotification })),
+}));
+
 // Mock serviceColorRegistry so the singleton internal registry does not
 // leak state between tests.  The composable imports
 //   `import { getOrSetServiceColor as registryGetOrSetServiceColor }`
@@ -672,15 +687,91 @@ describe("useTraces", () => {
         : null;
     };
 
-    it("appends span_id and trace_id conditions to the stream filter conditions", async () => {
+    beforeEach(() => {
+      // Default: the span has logs of its own, so no fallback.
+      mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 3 }] } });
+    });
+
+    it("drops the stream dimension filters once the trace id is known", async () => {
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-1", "trace-1");
 
       await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
 
-      expect(pushedQuery()).toBe(
-        "k8s_namespace_name = 'prod' and span_id = 'span-1' and trace_id = 'trace-1'",
+      expect(pushedQuery()).toBe("span_id = 'span-1' and trace_id = 'trace-1'");
+    });
+
+    it("keeps the stream dimension filters when there is no trace id", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-1b", null);
+
+      await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
+
+      expect(pushedQuery()).toBe("k8s_namespace_name = 'prod' and span_id = 'span-1b'");
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
+
+    it("counts the span-scoped rows over the user streams and time range", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-c", "trace-c");
+
+      await navigateToCorrelatedLogs({
+        logStreams: [
+          { stream_name: "_o2_db_stats", filters: {} },
+          { stream_name: "app_logs", filters: {} },
+          { stream_name: "web_logs", filters: {} },
+        ],
+        timeRange: { startTime: 1000, endTime: 2000 },
+      });
+
+      expect(mockSearch).toHaveBeenCalledTimes(1);
+      const req = mockSearch.mock.calls[0][0];
+      expect(req.org_identifier).toBe("test-org");
+      expect(req.query.query).toMatchObject({ start_time: 1000, end_time: 2000 });
+      expect(req.query.query.sql).toBe(
+        "SELECT count(*) AS zo_count FROM app_logs WHERE span_id = 'span-c' and trace_id = 'trace-c'" +
+          " UNION ALL " +
+          "SELECT count(*) AS zo_count FROM web_logs WHERE span_id = 'span-c' and trace_id = 'trace-c'",
       );
+      expect(pushedQuery()).toBe("span_id = 'span-c' and trace_id = 'trace-c'");
+      expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the trace-scoped query when the span has no logs", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 0 }, { zo_count: 0 }] } });
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-f", "trace-f");
+
+      await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
+
+      expect(pushedQuery()).toBe("trace_id = 'trace-f'");
+      expect(mockShowInfoNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it("navigates with the span-scoped query when the count query fails", async () => {
+      mockSearch.mockRejectedValue(new Error("boom"));
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-e", "trace-e");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("span_id = 'span-e' and trace_id = 'trace-e'");
+      expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    });
+
+    it("excludes _-prefixed system streams from the logs page stream list", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-s", "trace-s");
+
+      await navigateToCorrelatedLogs({
+        logStreams: [
+          { stream_name: "_o2_db_stats", filters: {} },
+          { stream_name: "app_logs", filters: {} },
+        ],
+        timeRange: { startTime: 1000, endTime: 2000 },
+      });
+
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
     });
 
     it("adds the id conditions when the correlated stream has no filters", async () => {

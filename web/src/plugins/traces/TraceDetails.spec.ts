@@ -3193,4 +3193,32 @@ describe("TraceDetails", () => {
       expect(tabValues()).toEqual(before);
     });
   });
+
+  describe("Tree view: View Logs on a span", () => {
+    it("selects the span and runs the sidebar's own View Logs (which loads correlation)", async () => {
+      const viewSpanLogs = vi.fn().mockResolvedValue(undefined);
+      const baseStub = mountOptions.global.stubs["trace-details-sidebar"];
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        global: {
+          ...mountOptions.global,
+          stubs: {
+            ...mountOptions.global.stubs,
+            "trace-details-sidebar": { ...baseStub, methods: { viewSpanLogs } },
+          },
+        },
+      });
+      await flushPromises();
+
+      // No correlation data has been loaded for this span yet.
+      wrapper.vm.searchObj.data.traceDetails.correlationProps = null;
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      await wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: spanId });
+
+      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(spanId);
+      expect(viewSpanLogs).toHaveBeenCalledTimes(1);
+    });
+  });
 });

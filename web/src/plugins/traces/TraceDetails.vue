@@ -634,6 +634,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <TraceDetailsSidebar
+                  ref="treeSidebarRef"
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
                   :baseTracePosition="baseTracePosition"
@@ -1213,6 +1214,8 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
+    // The tree view's span sidebar; it owns the correlation lookup.
+    const treeSidebarRef = ref<any>(null);
 
     // Tooltip lifecycle management
     let tooltipCleanup: (() => void) | null = null;
@@ -2798,9 +2801,18 @@ export default defineComponent({
       });
     };
 
-    const handleTreeViewCorrelatedLogs = (span: any) => {
+    const handleTreeViewCorrelatedLogs = async (span: any) => {
       const spanId = span.spanId || span.span_id;
       updateSelectedSpan(spanId);
+
+      // Let the sidebar mount / switch to this span, then run its own View Logs:
+      // it loads the span's correlation (or waits for the in-flight lookup)
+      // before navigating, instead of reading data that is not loaded yet.
+      await nextTick();
+      if (treeSidebarRef.value?.viewSpanLogs) {
+        await treeSidebarRef.value.viewSpanLogs();
+        return;
+      }
 
       const correlationData = searchObj.data.traceDetails.correlationProps;
       if (correlationData?.logStreams?.length) {
@@ -3050,6 +3062,7 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       chartRendererRef,
+      treeSidebarRef,
       activeVisual,
       traceVisuals,
       getImageURL,

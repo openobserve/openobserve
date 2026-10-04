@@ -26,6 +26,9 @@ import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrel
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
+import searchService from "@/services/search";
+import useNotifications from "@/composables/useNotifications";
+import { gt } from "@/types/i18n";
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
@@ -212,6 +215,7 @@ const useTraces = () => {
   const router = useRouter();
 
   const { loadSemanticGroups } = useServiceCorrelation();
+  const { showInfoNotification } = useNotifications();
 
   const resetSearchObj = () => {
     // delete searchObj.data;
@@ -496,33 +500,75 @@ const useTraces = () => {
         `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
       );
 
-    for (const streamInfo of correlationProps.logStreams) {
-      const filters = streamInfo.filters ?? {};
-      for (const [field, value] of Object.entries(filters)) {
-        if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
-        // First stream to claim a group wins.
-        if (conditions.has(groupIdFor(field))) continue;
-        setCondition(field, String(value));
+    const spanId = searchObj.data.traceDetails.selectedSpanId;
+    const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
+
+    // Once the trace id is known it already pins the logs; the stream's
+    // dimension filters (service, namespace, cluster) are redundant and drop
+    // every log row that lacks one of them, so they apply only without it.
+    if (!traceId) {
+      for (const streamInfo of correlationProps.logStreams) {
+        const filters = streamInfo.filters ?? {};
+        for (const [field, value] of Object.entries(filters)) {
+          if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
+          // First stream to claim a group wins.
+          if (conditions.has(groupIdFor(field))) continue;
+          setCondition(field, String(value));
+        }
       }
     }
 
     // Narrow the correlated logs down to the span the user clicked "View Logs"
     // on. Field names come from org settings and values from the current
-    // selection, same as buildQueryDetails(). These deliberately overwrite a
-    // stream filter on the same group — an exact id is the more specific match.
-    const idFilters: Array<[string, string | null | undefined]> = [
-      [getSpanIdField(), searchObj.data.traceDetails.selectedSpanId],
-      [getTraceIdField(), searchObj.data.traceDetails.selectedTrace?.trace_id],
-    ];
+    // selection, same as buildQueryDetails().
+    if (spanId) setCondition(getSpanIdField(), spanId);
+    if (traceId) setCondition(getTraceIdField(), traceId);
 
-    for (const [field, value] of idFilters) {
-      if (!value) continue;
-      setCondition(field, value);
+    // System streams (`_`-prefixed, e.g. _o2_db_stats) never hold app logs.
+    const allStreamNames: string[] = correlationProps.logStreams.map((s: any) => s.stream_name);
+    const userStreamNames = allStreamNames.filter((name) => !name.startsWith("_"));
+    const streamList = userStreamNames.length ? userStreamNames : allStreamNames;
+
+    let queryString = Array.from(conditions.values()).join(" and ");
+
+    // A span (often a DB or client span) may have no logs of its own. Check
+    // with one count query and, if it is empty, show the whole trace's logs.
+    // A failed check keeps the span-scoped query.
+    if (spanId && traceId) {
+      try {
+        const sql = streamList
+          .map(
+            (name) =>
+              `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
+          )
+          .join(" UNION ALL ");
+        const res = await searchService.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: {
+            query: {
+              sql,
+              start_time: correlationProps.timeRange.startTime,
+              end_time: correlationProps.timeRange.endTime,
+              from: 0,
+              size: streamList.length,
+            },
+          },
+          page_type: "logs",
+        });
+        const hits: any[] = res?.data?.hits ?? [];
+        const total = hits.reduce((sum, hit) => sum + (Number(hit?.zo_count) || 0), 0);
+        if (total === 0) {
+          conditions.delete(groupIdFor(getSpanIdField()));
+          queryString = Array.from(conditions.values()).join(" and ");
+          showInfoNotification(gt("traces.spanHasNoLogsShowingTrace"));
+        }
+      } catch {
+        // Keep the span-scoped query.
+      }
     }
 
-    const queryString = Array.from(conditions.values()).join(" and ");
     const encodedQuery = b64EncodeUnicode(queryString);
-    const streamNames = correlationProps.logStreams.map((s: any) => s.stream_name).join(",");
+    const streamNames = streamList.join(",");
 
     store.dispatch("logs/setIsInitialized", false);
     await nextTick();

@@ -911,14 +911,9 @@ pub(crate) async fn queue_service_streams_if_needed(
 ) {
     let service_streams_config = &get_enterprise_config().service_streams;
 
-    let valid_stream_type = stream_type == StreamType::Logs
-        || stream_type == StreamType::Metrics
-        || stream_type == StreamType::Traces;
-
     if service_streams_config.enabled
         && service_streams_config.node_matches_processing_node(&LOCAL_NODE)
-        && org_id != config::META_ORG_ID
-        && valid_stream_type
+        && is_service_discovery_candidate(org_id, stream_type, stream_name)
     {
         // Get stream count for this type (cached, 5-min TTL — counts rarely change).
         let stream_count = db::schema::get_stream_count_cached(org_id, stream_type).await;
@@ -967,6 +962,23 @@ pub(crate) async fn queue_service_streams_if_needed(
             });
         }
     }
+}
+
+/// Whether a stream's data feeds service discovery. `_`-prefixed streams are
+/// written by OpenObserve itself (e.g. `_o2_db_stats`), so a `service_name`
+/// column in them describes the monitored system, not a service of the org.
+#[cfg(feature = "enterprise")]
+fn is_service_discovery_candidate(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> bool {
+    org_id != config::META_ORG_ID
+        && matches!(
+            stream_type,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
+        && !stream_name.starts_with('_')
 }
 
 fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
@@ -1135,6 +1147,41 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_service_discovery_skips_underscore_system_streams() {
+        assert!(is_service_discovery_candidate(
+            "default",
+            StreamType::Logs,
+            "app"
+        ));
+        assert!(is_service_discovery_candidate(
+            "default",
+            StreamType::Traces,
+            "default"
+        ));
+        assert!(!is_service_discovery_candidate(
+            "default",
+            StreamType::Logs,
+            "_o2_db_stats"
+        ));
+        assert!(!is_service_discovery_candidate(
+            "default",
+            StreamType::Metrics,
+            "_agent_signals"
+        ));
+        assert!(!is_service_discovery_candidate(
+            "default",
+            StreamType::EnrichmentTables,
+            "app"
+        ));
+        assert!(!is_service_discovery_candidate(
+            config::META_ORG_ID,
+            StreamType::Logs,
+            "app"
+        ));
+    }
 
     #[test]
     fn test_split_perfix_logs() {
