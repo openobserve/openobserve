@@ -1484,9 +1484,15 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
-    it("clearing a view lands on the default grid: no search, facets, labels, sort or period", async () => {
+    it("clearing a view lands on the default grid: no search, facets, labels, sort or period, but auto-refresh kept", async () => {
       // A view that both searches and facets: clearing the search alone leaves its prefix narrowing the grid.
-      routerState.query = { search: "cache", prefix: "cache", sort: "z-a", period: "1h" };
+      routerState.query = {
+        search: "cache",
+        prefix: "cache",
+        sort: "z-a",
+        period: "1h",
+        refresh: "30s",
+      };
       grid.searchTerm.value = "cache";
       grid.selectedPrefixes.value = new Set(["cache"]);
       grid.labelFilters.value = [{ label: "job", operator: "=", value: "api" }];
@@ -1497,7 +1503,7 @@ describe("MetricsExplorer wiring", () => {
       await flushPromises();
       expect(routerState.push).toHaveBeenCalledWith({
         name: "metrics",
-        query: { org_identifier: "org1" },
+        query: { org_identifier: "org1", refresh: "30s" },
       });
 
       routerState.query = routerState.push.mock.calls.at(-1)[0].query;
@@ -1507,7 +1513,7 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.selectedPrefixes.value.size).toBe(0);
       expect(grid.labelFilters.value).toEqual([]);
       expect(grid.sortBy.value).toBe("a-z");
-      expect((wrapper.vm as any).viewState).toEqual({});
+      expect((wrapper.vm as any).viewState).toEqual({ refresh: "30s" });
     });
 
     it("keeps the applied view across the detail view, so Update/Delete still target it", async () => {

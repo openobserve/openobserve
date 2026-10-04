@@ -1567,11 +1567,16 @@ export default defineComponent({
     };
 
     // A bare URL is a fresh visit: the route watcher resets every absent key to its default.
+    // Auto-refresh is not part of a view, so it survives the clear.
     const onClearView = () => {
+      const { refresh } = route.query;
       router
         .push({
           name: "metrics",
-          query: { org_identifier: store.state.selectedOrganization?.identifier },
+          query: {
+            org_identifier: store.state.selectedOrganization?.identifier,
+            ...(refresh ? { refresh } : {}),
+          },
         })
         .catch(() => {});
     };
