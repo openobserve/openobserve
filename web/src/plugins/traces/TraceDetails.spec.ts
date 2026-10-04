@@ -673,6 +673,113 @@ describe("TraceDetails", () => {
     });
   });
 
+  describe("Trace Graph view toggle and service search", () => {
+    const template = tracesMockData.tracesDetails.traceSpans.hits[0];
+    const spans = [
+      { ...template, span_id: "s1", reference_parent_span_id: "", service_name: "frontend" },
+      { ...template, span_id: "s2", reference_parent_span_id: "s1", service_name: "checkout" },
+      { ...template, span_id: "s3", reference_parent_span_id: "s2", service_name: "payments" },
+      { ...template, span_id: "s4", reference_parent_span_id: "s1", service_name: "catalog" },
+    ];
+    const treeBtn = () => wrapper.find('[data-test="trace-graph-tree-view-btn"]');
+    const graphBtn = () => wrapper.find('[data-test="trace-graph-graph-view-btn"]');
+    const series = () =>
+      wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data").options
+        .series?.[0];
+    const treeNames = (nodes: any[] = []): string[] =>
+      nodes.flatMap((n) => [n.name, ...treeNames(n.children)]);
+
+    async function mountMap() {
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: {
+          mode: "embedded",
+          traceIdProp: "graph-trace-id",
+          streamNameProp: "test-stream",
+          spanListProp: spans,
+        },
+      });
+      await flushPromises();
+      wrapper.vm.activeTab = "map";
+      await flushPromises();
+    }
+
+    beforeEach(() => localStorage.removeItem("o2_trace_graph_view"));
+
+    it("renders the toggle and service search only on the Trace Graph tab", async () => {
+      await mountMap();
+      expect(treeBtn().exists()).toBe(true);
+      expect(graphBtn().exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-graph-search-input"]').exists()).toBe(true);
+
+      wrapper.vm.activeTab = "waterfall";
+      await flushPromises();
+      expect(treeBtn().exists()).toBe(false);
+      expect(wrapper.find('[data-test="trace-graph-search-input"]').exists()).toBe(false);
+    });
+
+    it("defaults to Tree View and switches to a graph series", async () => {
+      await mountMap();
+      expect(series().type).toBe("tree");
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.traceGraphView).toBe("graph");
+      expect(series().type).toBe("graph");
+      expect(
+        series()
+          .data.map((n: any) => n.name)
+          .sort(),
+      ).toEqual(["catalog", "checkout", "frontend", "payments"]);
+      expect(
+        wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data")
+          .notMerge,
+      ).toBe(true);
+    });
+
+    it("persists the chosen view across remounts", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(localStorage.getItem("o2_trace_graph_view")).toBe("graph");
+
+      await mountMap();
+      expect(series().type).toBe("graph");
+    });
+
+    it("filters the tree to matches and their ancestors", async () => {
+      await mountMap();
+      wrapper.vm.traceGraphSearch = "PAY";
+      await flushPromises();
+      expect(treeNames(series().data)).toEqual(["frontend", "checkout", "payments"]);
+    });
+
+    it("filters the graph to edges touching a match", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      wrapper.vm.traceGraphSearch = "pay";
+      await flushPromises();
+      expect(
+        series()
+          .data.map((n: any) => n.name)
+          .sort(),
+      ).toEqual(["checkout", "payments"]);
+    });
+
+    it("renders an empty chart when no service matches", async () => {
+      await mountMap();
+      wrapper.vm.traceGraphSearch = "nope";
+      await flushPromises();
+      expect(treeNames(series().data)).toEqual([]);
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(series()).toBeUndefined();
+    });
+  });
+
   describe("Data processing", () => {
     it("should process span data correctly", () => {
       expect(wrapper.vm.spanList).toEqual(tracesMockData.tracesDetails.traceSpans.hits);

@@ -828,8 +828,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Map View with Pattern/Span Toggle -->
             <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
+              <div class="flex items-center gap-2 px-2.5 pt-2.5">
+                <OToggleGroup :model-value="traceGraphView" @update:model-value="setTraceGraphView">
+                  <OToggleGroupItem data-test="trace-graph-tree-view-btn" value="tree" size="sm">
+                    <template #icon-left>
+                      <OIcon name="git-branch" size="sm" />
+                    </template>
+                    <span class="max-lg:hidden">{{ t("traces.treeView") }}</span>
+                  </OToggleGroupItem>
+                  <OToggleGroupItem data-test="trace-graph-graph-view-btn" value="graph" size="sm">
+                    <template #icon-left
+                      ><OIcon name="share" size="sm" class="shrink-0"
+                    /></template>
+                    <span class="max-lg:hidden">{{ t("traces.graphView") }}</span>
+                  </OToggleGroupItem>
+                </OToggleGroup>
+                <OSearchInput
+                  v-model="traceGraphSearch"
+                  data-test="trace-graph-search-input"
+                  class="w-56! max-lg:w-40!"
+                  :placeholder="t('traces.serviceGraph.searchPlaceholder')"
+                  :debounce="300"
+                  clearable
+                />
+              </div>
               <!-- Chart Container -->
-              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
+              <div ref="traceGraphContainerRef" class="min-h-0 flex-1 overflow-hidden p-2.5">
                 <ChartRenderer
                   ref="chartRendererRef"
                   data-test="trace-details-service-map-chart"
@@ -935,7 +959,16 @@ import {
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
-import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
+import {
+  convertServiceGraphToNetwork,
+  convertTimelineData,
+  convertTraceServiceMapData,
+} from "@/utils/traces/convertTraceData";
+import {
+  buildTraceServiceGraph,
+  filterTraceServiceGraph,
+  filterTraceTree,
+} from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
@@ -1054,6 +1087,9 @@ const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
 const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
 const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
 const LS_TRACE_CRITICAL_PATH_KEY = "o2_trace_critical_path";
+const LS_TRACE_GRAPH_VIEW_KEY = "o2_trace_graph_view";
+
+type TraceGraphView = "tree" | "graph";
 
 const isKnownTraceTab = (value: string): value is TraceTabValue =>
   TRACE_TAB_DEFS.some((tab) => tab.value === value);
@@ -1103,6 +1139,14 @@ function loadTraceCriticalPath(): boolean {
     return localStorage.getItem(LS_TRACE_CRITICAL_PATH_KEY) === "true";
   } catch {
     return false;
+  }
+}
+
+function loadTraceGraphView(): TraceGraphView {
+  try {
+    return localStorage.getItem(LS_TRACE_GRAPH_VIEW_KEY) === "graph" ? "graph" : "tree";
+  } catch {
+    return "tree";
   }
 }
 
@@ -1221,6 +1265,8 @@ export default defineComponent({
     const activeTab = ref<string>(loadTraceActiveTab());
     const tabOrder = ref<TraceTabValue[]>(loadTraceTabOrder());
     const showCriticalPath = ref(loadTraceCriticalPath());
+    const traceGraphView = ref<TraceGraphView>(loadTraceGraphView());
+    const traceGraphSearch = ref("");
     const sidebarActiveTab = ref("attributes");
 
     const { searchObj, getUrlQueryParams, navigateToCorrelatedLogs } = useTraces();
@@ -1239,6 +1285,7 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
+    const traceGraphContainerRef = ref<HTMLElement | null>(null);
 
     // Tooltip lifecycle management
     let tooltipCleanup: (() => void) | null = null;
@@ -1273,6 +1320,26 @@ export default defineComponent({
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
+      if (traceGraphView.value === "graph") {
+        const graph = filterTraceServiceGraph(
+          buildTraceServiceGraph(effectiveSpanList.value, t("traces.traceDetails.unknownService")),
+          traceGraphSearch.value,
+        );
+        if (!graph.nodes.length) return { options: {}, notMerge: true };
+        return {
+          ...convertServiceGraphToNetwork(
+            graph,
+            "force",
+            new Map(),
+            isDarkMode.value,
+            undefined,
+            traceGraphContainerRef.value?.clientWidth || 1200,
+            traceGraphContainerRef.value?.clientHeight || 700,
+          ),
+          notMerge: true,
+          lazyUpdate: true,
+        };
+      }
       // Pattern view - use new pattern-based visualization
       // Engine TreeNode makes errorRate/children optional while the pattern
       // callbacks (useTreeVisualization) require errorRate; adapt each call to
@@ -1288,7 +1355,7 @@ export default defineComponent({
       });
       const chartOptions = generateEChartsOptions(
         {
-          treeData: patternTreeData.value,
+          treeData: filterTraceTree(patternTreeData.value, traceGraphSearch.value),
           getNodeLabel: (node: EngineTreeNode) => getPatternNodeLabel(toPatternNode(node)),
           getNodeTooltip: (node: EngineTreeNode) => getPatternNodeTooltip(toPatternNode(node)),
           getNodeErrorRate: (node: EngineTreeNode) => getPatternNodeErrorRate(toPatternNode(node)),
@@ -1945,6 +2012,16 @@ export default defineComponent({
       }
     };
 
+    const setTraceGraphView = (value: boolean | AcceptableValue | AcceptableValue[]) => {
+      traceGraphView.value = value === "graph" ? "graph" : "tree";
+      try {
+        localStorage.setItem(LS_TRACE_GRAPH_VIEW_KEY, traceGraphView.value);
+      } catch {
+        // Storage unavailable — the view still applies for this session.
+      }
+      setupTooltips();
+    };
+
     const updateActiveTab = (value: boolean | AcceptableValue | AcceptableValue[]) => {
       const tab = String(value);
       activeTab.value = tab;
@@ -1970,6 +2047,8 @@ export default defineComponent({
         clearTimeout(pendingTooltipSetup);
         pendingTooltipSetup = null;
       }
+      // Graph View draws ECharts' own tooltips; the custom tree tooltip would overlay them.
+      if (traceGraphView.value !== "tree") return;
 
       await nextTick();
       // 300ms delay matches Service Graph tooltip setup timing
@@ -3067,6 +3146,10 @@ export default defineComponent({
       raw,
       showCriticalPath,
       setShowCriticalPath,
+      traceGraphView,
+      setTraceGraphView,
+      traceGraphSearch,
+      traceGraphContainerRef,
       // Exposed for the template `v-if` gating the LLM Observability
       // surfaces (Thread tab toggle + ThreadView body) behind
       // `config.showLLMUI`.
