@@ -2543,6 +2543,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // response shape, etc.) rather than showing NaN.
       data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
+      // The saved type is the user's earlier answer; ask again only on a switch.
+      confirmedSaveMode.value = data.query_condition?.type ?? null;
 
       if (data.query_condition?.promql_condition) {
         if (!data.query_condition.promql_condition.column) {

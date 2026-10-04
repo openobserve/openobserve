@@ -1556,6 +1556,58 @@ describe("AddAlert (OForm owner)", () => {
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
     });
 
+    // A SQL alert saved through the dialog keeps its Builder filters, so without
+    // the stored type as the confirmed mode every later edit would ask again.
+    const mountSavedSqlAlert = () =>
+      mountAlert({
+        isUpdated: true,
+        modelValue: {
+          name: "existing_sql_alert",
+          description: "",
+          stream_type: "logs",
+          stream_name: "default",
+          is_real_time: false,
+          query_condition: {
+            type: "sql",
+            conditions: { version: 2, conditions: { ...builderTree, groupId: "g" } },
+            sql: SQL,
+          },
+          trigger_condition: {
+            period: 10,
+            operator: ">=",
+            frequency: 10,
+            cron: "",
+            threshold: 5,
+            silence: 10,
+            frequency_type: "minutes",
+            timezone: "UTC",
+          },
+          destinations: ["email"],
+        },
+        destinations: [{ name: "email" }],
+      });
+
+    it("saves an edit without asking when the stored mode is unchanged", async () => {
+      wrapper = mountSavedSqlAlert();
+      await flushPromises();
+
+      await clickSave();
+
+      expect(wrapper.vm.saveModeDialogOpen).toBe(false);
+      expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks on an edit that switches away from the stored mode", async () => {
+      wrapper = mountSavedSqlAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("query_condition.type", "custom");
+
+      await clickSave();
+
+      expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
+      expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
+    });
+
     it("says no query is written when the picked SQL mode is empty", async () => {
       wrapper = mountAlert();
       await flushPromises();
