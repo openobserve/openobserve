@@ -1473,6 +1473,17 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="traces-saved-view-apply-l1"]').exists()).toBe(false);
     });
 
+    it("marks the saved-views button as a menu with a drop-down caret, as logs does", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const icons = wrapper
+        .find('[data-test="traces-search-bar-saved-views-btn"]')
+        .findAllComponents({ name: "OIcon" })
+        .map((c) => c.props("name"));
+      expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
+    });
+
     it.each(["service-graph", "services-catalog"])("is hidden on the %s tab", async (mode) => {
       searchObjInstance.meta.searchMode = mode as any;
       wrapper = mountSearchBar();

@@ -253,6 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('search.listSavedViews')"
               >
                 <OIcon name="saved-search" size="sm" />
+                <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
               </OButton>
             </template>
             <ODropdownGroup :label="t('search.savedViewsLabel')">
