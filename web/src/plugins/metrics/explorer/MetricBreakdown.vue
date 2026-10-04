@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :color="color"
         :time-range="timeRange"
         :run-query="runQuery"
-        :cancel-queries="cancelQueries"
         legend
         data-test="metrics-breakdown-chart"
       >
@@ -212,7 +211,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :color="color"
           :time-range="timeRange"
           :run-query="runQuery"
-          :cancel-queries="cancelQueries"
           :data-test="`metrics-breakdown-card-${label}`"
           @select="select(label)"
         >
@@ -282,7 +280,6 @@ const VALUES_SIZE = 21;
 /** Series kept for a label with "20+" values — beyond it the chart is a smear. */
 const TOPK = 10;
 
-/** One label's value counts, as far as they are known. */
 interface LabelCounts {
   /** Its counts have answered, or will never be asked for. */
   ready: boolean;
@@ -330,8 +327,10 @@ export default defineComponent({
     nanGuard: { type: Boolean, default: false },
     color: { type: String, required: true },
     /** Runs one PromQL query on the detail view's scheduler slot. */
-    runQuery: { type: Function as PropType<(expr: string) => Promise<any>>, required: true },
-    cancelQueries: { type: Function as PropType<(exprs: string[]) => void>, required: true },
+    runQuery: {
+      type: Function as PropType<(expr: string, signal: AbortSignal) => Promise<any>>,
+      required: true,
+    },
   },
   emits: ["update:selectedLabel", "add-filter"],
   setup(props, { emit }) {
@@ -461,7 +460,7 @@ export default defineComponent({
       if (extraCounts.value.status === "error") loadExtra();
     };
 
-    /** Every source but the trailing window is unchanged: a refresh tick, or a new range. */
+    /** A window-only change keeps the shown counts, so a refresh does not blank every chart. */
     const windowOnly = (now: unknown[], before: unknown[] | undefined) =>
       !!before && now.slice(0, -1).every((value, i) => value === before[i]);
 

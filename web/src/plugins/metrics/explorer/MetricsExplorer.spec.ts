@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { reactive, computed } from "vue";
+import { reactive, computed, ref } from "vue";
 import {
   getMetricsConfig,
   encodeMetricsConfig,
@@ -99,7 +99,9 @@ const grid = vi.hoisted(() => {
   return g;
 });
 
-vi.mock("@/composables/metrics/useMetricsExplorerGrid", () => ({
+vi.mock("@/composables/metrics/useMetricsExplorerGrid", async (importOriginal) => ({
+  // The real helpers (`hasSamples`) for the detail view's charts; only the grid is faked.
+  ...(await importOriginal<any>()),
   default: () => grid,
   INITIAL_PAGE_SIZE: 8,
   PAGE_SIZE_INCREMENT: 6,
@@ -153,6 +155,9 @@ vi.mock("@/lib/vue-shortcut-manager", async (importOriginal) => ({
 
 import MetricsExplorer from "./MetricsExplorer.vue";
 import analytics from "@/services/product_analytics";
+import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
+import { cardColorForIndex } from "@/utils/metrics/metricPalette";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 
 const CARD = { name: "http_requests_total", unsupported: false, cardKind: "counterRate" };
 
@@ -1264,54 +1269,113 @@ describe("MetricsExplorer wiring", () => {
       expect(detailView(wrapper).exists()).toBe(false);
     });
 
-    it("hands the detail view the grid's detail-query plumbing", async () => {
+    it("hands the detail view the grid's detail-query plumbing, cancellable by the caller's signal", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
-      const view = detailView(wrapper);
+      const { signal } = new AbortController();
 
-      await view.props("runQuery")("sum(up)");
-      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD);
-      view.props("cancelQueries")(["sum(up)"]);
-      expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"]);
+      await detailView(wrapper).props("runQuery")("sum(up)", signal);
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD, signal);
     });
 
-    it("runs a related metric's chart on that metric's own step", async () => {
+    it("runs a related metric's chart as that metric, not the open one", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
       const OTHER = { ...CARD, name: "http_responses_total" };
+      const { signal } = new AbortController();
 
-      await detailView(wrapper).props("runQuery")("sum(other)", OTHER);
-      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(other)", OTHER);
+      await detailView(wrapper).props("runQuery")("sum(other)", signal, OTHER);
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(other)", OTHER, signal);
     });
 
-    it("settles a metric the grid never previewed before charting it, so a sparse one widens", async () => {
+    it("never starts the query of a chart abandoned while its metric's preview settled", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
       const OTHER = { ...CARD, name: "http_responses_total" };
-      grid.requestPreview.mockClear();
-      grid.runDetailQuery.mockClear();
-      const order: string[] = [];
-      grid.requestPreview.mockImplementationOnce(async () => {
-        order.push("preview");
+      let settle!: () => void;
+      grid.requestPreview.mockImplementationOnce(
+        () => new Promise<void>((resolve) => (settle = resolve)),
+      );
+      const controller = new AbortController();
+
+      const pending = detailView(wrapper).props("runQuery")("sum(other)", controller.signal, OTHER);
+      controller.abort();
+      settle();
+      await expect(pending).rejects.toSatisfy(isCancelled);
+      expect(grid.runDetailQuery).not.toHaveBeenCalled();
+    });
+
+    it("charts an unpreviewed sparse related metric with the window its preview widened to", async () => {
+      const OTHER = { ...CARD, name: "http_responses_total", typeFilterBucket: "counter" };
+      const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] };
+      const EMPTY = { resultType: "matrix", result: [] };
+      const previews = grid.previews;
+      grid.previews = ref<Record<string, any>>({});
+      grid.cards.value = [CARD, OTHER];
+      grid.prefixOf.mockImplementation(() => "http");
+      grid.effectiveVariant.mockImplementation((card: any, _points: any, opts: any) => ({
+        defaults: { variants: [] },
+        resolved: {
+          queries: [{ expr: `sum(rate(${card.name}[${opts?.rateWindow ?? "4m"}]))` }],
+          chartType: "line",
+          unit: "count",
+        },
+      }));
+      // The grid's own preview finds the counter too sparse for 4m and widens it.
+      grid.requestPreview.mockImplementation(async (card: any) => {
+        grid.previews.value[card.name] = {
+          status: "done",
+          widenedRateWindow: card.name === OTHER.name ? "30m" : null,
+        };
       });
-      grid.runDetailQuery.mockImplementationOnce(() => order.push("run"));
+      grid.runDetailQuery.mockImplementation(async (expr: string) =>
+        expr.includes("[30m]") ? SERIES : EMPTY,
+      );
+      const io = installFakeIntersectionObserver({ autoVisible: true });
+      try {
+        routerState.query = { metric: CARD.name, tab: "related" };
+        const wrapper = mountExplorer({
+          MetricDetailView: false,
+          MetricCardChart: {
+            name: "MetricCardChart",
+            props: ["results", "queries", "timeRange"],
+            template: "<div />",
+          },
+        });
+        await flushPromises();
 
-      await detailView(wrapper).props("runQuery")("sum(other)", OTHER);
-      expect(grid.requestPreview).toHaveBeenCalledWith(OTHER);
-      expect(order).toEqual(["preview", "run"]);
-
-      grid.previews.value[OTHER.name] = { status: "done", widenedRateWindow: "30m" };
-      grid.requestPreview.mockClear();
-      await detailView(wrapper).props("runQuery")("sum(other)", OTHER);
-      expect(grid.requestPreview).not.toHaveBeenCalled();
-      delete grid.previews.value[OTHER.name];
+        const exprs = grid.runDetailQuery.mock.calls.map(([expr]: any[]) => expr);
+        expect(exprs).toContain("sum(rate(http_responses_total[30m]))");
+        expect(exprs).not.toContain("sum(rate(http_responses_total[4m]))");
+        const tile = wrapper.find(`[data-test="metrics-detail-related-card-${OTHER.name}"]`);
+        expect(tile.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
+      } finally {
+        io.restore();
+        grid.previews = previews;
+        grid.prefixOf.mockImplementation(() => "misc");
+        grid.effectiveVariant.mockImplementation(() => ({
+          defaults: { variants: [] },
+          resolved: { queries: [] },
+        }));
+        grid.requestPreview.mockImplementation(async () => {});
+        grid.runDetailQuery.mockImplementation(() => undefined);
+      }
     });
 
-    it("colours the view and its related cards as their grid cards", () => {
+    it("colours a related metric past the first page as its grid card will be", () => {
       routerState.query = { metric: CARD.name };
-      const wrapper = mountExplorer();
-      const view = detailView(wrapper);
-      expect(view.props("colorOf")(CARD.name)).toBe(view.props("color"));
+      const OTHER = { ...CARD, name: "http_responses_total" };
+      grid.sortedCards.value = [CARD, { ...CARD, name: "b" }, OTHER];
+      try {
+        const wrapper = mountExplorer();
+        const colorOf = detailView(wrapper).props("colorOf");
+        expect([cardColorForIndex(2, false), cardColorForIndex(2, true)]).toContain(
+          colorOf(OTHER.name),
+        );
+        expect(colorOf(OTHER.name)).not.toBe(colorOf(CARD.name));
+      } finally {
+        grid.sortedCards.value = [];
+      }
     });
 
     it("charts a related metric with the query its explorer card would run", () => {
@@ -1340,20 +1404,6 @@ describe("MetricsExplorer wiring", () => {
       expect(detailView(wrapper).props("breakdownLabel")).toBeNull();
       expect(routerState.replace.mock.calls.at(-1)[0].query.breakdown_label).toBeUndefined();
       expect(routerState.push).not.toHaveBeenCalled();
-    });
-
-    it("still cancels the view's queries when it is closed before it unmounts", async () => {
-      routerState.query = { metric: CARD.name };
-      const wrapper = mountExplorer();
-      const view = detailView(wrapper);
-      const cancelQueries = view.props("cancelQueries");
-      view.props("runQuery")("sum(up)");
-      grid.cancelDetailQueries.mockClear();
-
-      (wrapper.vm as any).closeDetail();
-      await wrapper.vm.$nextTick();
-      cancelQueries(["sum(up)"]);
-      expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"]);
     });
   });
 

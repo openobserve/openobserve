@@ -119,6 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-default rounded-surface relative h-60 border"
             data-test="metrics-detail-overview"
           >
+            <OSpinner
+              v-if="overviewRefreshing"
+              size="xs"
+              class="absolute top-1 right-1 z-10"
+              data-test="metrics-detail-overview-refreshing"
+            />
             <div
               v-if="overviewState.status === 'error'"
               class="text-text-secondary flex h-full flex-col items-center justify-center gap-1 text-xs"
@@ -126,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="error" size="sm" class="text-error-600" />
               <span>{{ t("metrics.explorer.queryFailed") }}</span>
-              <OButton variant="ghost-primary" size="xs" @click="loadOverview">
+              <OButton variant="ghost-primary" size="xs" @click="loadOverview()">
                 {{ t("metrics.explorer.retry") }}
               </OButton>
             </div>
@@ -152,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :bucket-unit="overviewBucketUnit.unit ?? undefined"
               :bucket-unit-custom="overviewBucketUnit.unitCustom ?? undefined"
               :color="color"
-              :time-range="timeRange"
+              :time-range="overviewState.timeRange"
               @error="onOverviewRenderError"
             />
             <OSkeleton v-else class="h-full" animation="wave" />
@@ -185,7 +191,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :nan-guard="nanGuard"
             :color="color"
             :run-query="runQuery"
-            :cancel-queries="cancelQueries"
             @update:selected-label="$emit('update:breakdownLabel', $event)"
             @add-filter="$emit('add-filter', $event)"
           />
@@ -214,7 +219,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="row.color"
                 :time-range="timeRange"
                 :run-query="row.runQuery"
-                :cancel-queries="cancelQueries"
                 :data-test="`metrics-detail-related-card-${row.name}`"
                 @select="$emit('open-related', row.name)"
               >
@@ -299,13 +303,15 @@ interface RelatedRow {
   typeFilterBucket: string;
   chart: DetailChart;
   color: string;
-  runQuery: (expr: string) => Promise<any>;
+  runQuery: (expr: string, signal: AbortSignal) => Promise<any>;
 }
 
 interface OverviewState {
   status: "idle" | "loading" | "done" | "error";
   results: any[];
   error: string;
+  /** The window `results` were queried for: a chart kept through a refresh stays on its axis. */
+  timeRange?: { start_time: number; end_time: number };
 }
 
 const IDLE: OverviewState = { status: "idle", results: [], error: "" };
@@ -368,10 +374,11 @@ export default defineComponent({
     colorOf: { type: Function as PropType<(name: string) => string>, required: true },
     /** Runs one PromQL query on the scheduler, stepped for `card` (default: this view's metric). */
     runQuery: {
-      type: Function as PropType<(expr: string, card?: MetricCardModel) => Promise<any>>,
+      type: Function as PropType<
+        (expr: string, signal: AbortSignal, card?: MetricCardModel) => Promise<any>
+      >,
       required: true,
     },
-    cancelQueries: { type: Function as PropType<(exprs: string[]) => void>, required: true },
   },
   emits: [
     "close",
@@ -410,29 +417,40 @@ export default defineComponent({
 
     /** A resolution from a previous card or window must never land. */
     let generation = 0;
-    let activeExprs: string[] = [];
+    let active: AbortController | null = null;
+    const overviewRefreshing = ref(false);
 
     const cancelActive = () => {
-      if (activeExprs.length) props.cancelQueries(activeExprs);
-      activeExprs = [];
+      active?.abort();
+      active = null;
     };
 
-    const loadOverview = async () => {
+    /** `keep`: only the window moved, so the drawn chart stays up until the new result lands. */
+    const loadOverview = async (keep = false) => {
       const mine = ++generation;
       cancelActive();
+      overviewRefreshing.value = false;
       const exprs: string[] = props.overview.queries.map((query: any) => query.expr);
       if (props.loading || !props.card || !exprs.length) {
         overviewState.value = IDLE;
         return;
       }
-      activeExprs = exprs;
-      overviewState.value = { status: "loading", results: [], error: "" };
+      const timeRange = props.timeRange;
+      active = new AbortController();
+      const { signal } = active;
+      if (keep && overviewState.value.status === "done") overviewRefreshing.value = true;
+      else overviewState.value = { status: "loading", results: [], error: "" };
       try {
-        const results = await Promise.all(exprs.map((expr) => props.runQuery(expr)));
+        const results = await Promise.all(exprs.map((expr) => props.runQuery(expr, signal)));
         if (mine !== generation) return;
-        overviewState.value = { status: "done", results, error: "" };
+        active = null;
+        overviewRefreshing.value = false;
+        overviewState.value = { status: "done", results, error: "", timeRange };
       } catch (error: any) {
-        if (mine !== generation || isCancelled(error)) return;
+        if (mine !== generation) return;
+        cancelActive();
+        overviewRefreshing.value = false;
+        if (isCancelled(error)) return;
         overviewState.value = {
           status: "error",
           results: [],
@@ -449,7 +467,8 @@ export default defineComponent({
         () => props.overview.queries.map((query: any) => query.expr).join("\n"),
         () => props.timeRange,
       ],
-      loadOverview,
+      // Every source but the trailing window unchanged: a refresh, which must not blank the chart.
+      (now, before) => loadOverview(!!before && now.slice(0, -1).every((v, i) => v === before[i])),
       { immediate: true },
     );
 
@@ -486,7 +505,7 @@ export default defineComponent({
               typeFilterBucket: other.typeFilterBucket ?? "other",
               chart: props.chartOf(other),
               color: props.colorOf(name),
-              runQuery: (expr: string) => props.runQuery(expr, other),
+              runQuery: (expr: string, signal: AbortSignal) => props.runQuery(expr, signal, other),
             },
           ];
         });
@@ -503,6 +522,7 @@ export default defineComponent({
       overviewHasSamples,
       overviewUnit,
       overviewBucketUnit,
+      overviewRefreshing,
       loadOverview,
       onOverviewRenderError,
       related,

@@ -1846,7 +1846,7 @@ describe("useMetricsExplorerGrid", () => {
       const run = vi.spyOn(queue, "run");
       const card = cardNamed(grid, "http_requests_total");
 
-      const pending = grid.runDetailQuery("sum(up)", card);
+      const pending = grid.runDetailQuery("sum(up)", card, new AbortController().signal);
       const call = run.mock.calls.at(-1)!;
       // Same key the card and the ⚙ dialog would use: the step is the card's.
       expect(call[0]).toContain("|sum(up)|");
@@ -1863,40 +1863,55 @@ describe("useMetricsExplorerGrid", () => {
       inFlight.splice(0).forEach((q) => q.complete(SERIES));
     });
 
-    it("cancels its own queries by the same key and owner it ran them under", async () => {
+    it("cancels its own query by the key and owner it ran under when its signal aborts", async () => {
       const grid = await setup();
       const queue = createdQueues.at(-1);
       const run = vi.spyOn(queue, "run");
       const cancel = vi.spyOn(queue, "cancel");
       const card = cardNamed(grid, "http_requests_total");
+      const controller = new AbortController();
 
-      grid.runDetailQuery("sum(up)", card).catch(() => {});
+      const pending = grid.runDetailQuery("sum(up)", card, controller.signal);
       const [key, , , owner] = run.mock.calls.at(-1)!;
 
-      grid.cancelDetailQueries(["sum(up)"]);
+      controller.abort();
       expect(cancel).toHaveBeenCalledWith(key, owner);
+      await expect(pending).rejects.toSatisfy(isCancelled);
+      inFlight.length = 0;
     });
 
-    it("cancels a detail query by the key it ran under after a related card on another step opened", async () => {
+    it("never starts a query whose signal already aborted", async () => {
       const grid = await setup();
-      const outcomes: Record<string, string> = {};
-      const track = (expr: string, card: any) => {
-        outcomes[expr] = "pending";
-        grid.runDetailQuery(expr, card).then(
-          () => (outcomes[expr] = "landed"),
-          (error: any) => (outcomes[expr] = isCancelled(error) ? "cancelled" : "failed"),
-        );
-      };
-      track("sum(up)", cardNamed(grid, "http_requests_total"));
-      await flush();
-      // A heatmap card charts on a different step.
-      track("sum(lat)", cardNamed(grid, "lat_seconds_bucket"));
-      await flush();
+      const controller = new AbortController();
+      controller.abort();
+      await expect(
+        grid.runDetailQuery("sum(up)", cardNamed(grid, "http_requests_total"), controller.signal),
+      ).rejects.toSatisfy(isCancelled);
+      expect(inFlight).toHaveLength(0);
+    });
 
-      grid.cancelDetailQueries(["sum(up)"]);
+    it("shares one request between two charts of the same query, and one cancelling leaves the other", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const outcomes: string[] = ["pending", "pending"];
+      const controllers = [new AbortController(), new AbortController()];
+      controllers.forEach((controller, i) =>
+        grid.runDetailQuery("sum(up)", card, controller.signal).then(
+          () => (outcomes[i] = "landed"),
+          (error: any) => (outcomes[i] = isCancelled(error) ? "cancelled" : "failed"),
+        ),
+      );
       await flush();
-      expect(outcomes).toEqual({ "sum(up)": "cancelled", "sum(lat)": "pending" });
-      inFlight.length = 0;
+      expect(inFlight.filter((q) => q.query === "sum(up)")).toHaveLength(1);
+
+      // The later joiner: a shared owner would drop the first waiter, not this one.
+      controllers[1].abort();
+      await flush();
+      expect(outcomes).toEqual(["pending", "cancelled"]);
+
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+      await flush();
+      expect(outcomes).toEqual(["landed", "cancelled"]);
     });
 
     it("exposes what the detail view ranks and filters with", async () => {

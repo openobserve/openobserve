@@ -54,7 +54,12 @@ import {
   resolveVariant,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
-import { createPreviewQueue, isCancelled, PRIORITY } from "./useMetricsPreviewQueue";
+import {
+  createPreviewQueue,
+  isCancelled,
+  PreviewCancelledError,
+  PRIORITY,
+} from "./useMetricsPreviewQueue";
 import { useMetricsExplorerExemplars } from "./useMetricsExplorerExemplars";
 
 export interface LabelFilter {
@@ -1905,31 +1910,19 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /** The metric detail view's queries: dialog-grade priority, their own owner. */
   const DETAIL_OWNER = "\u0000detail";
+  let detailRequests = 0;
 
-  // Keyed at run time: by cancel time the view may show a card on another step, or none.
-  const detailKeys = new Map<string, string>();
-
-  /** Own owner, so closing the view never aborts a card preview or dialog tile on the same query. */
-  const runDetailQuery = (expr: string, card: MetricCard) => {
+  /** One owner per request, so the queue drops only the aborting chart's waiter from a shared job. */
+  const runDetailQuery = (expr: string, card: MetricCard, signal: AbortSignal) => {
     const step = dialogStepFor(card);
     const key = previewCacheKey(expr, step);
-    detailKeys.set(expr, key);
-    return queue.run(
-      key,
-      PRIORITY.DIALOG,
-      (signal) => streamQuery(expr, step, signal),
-      DETAIL_OWNER,
-    );
-  };
-
-  /** Detail view closed, or its chart replaced: drop what it still has running. */
-  const cancelDetailQueries = (exprs: string[]) => {
-    for (const expr of exprs) {
-      const key = detailKeys.get(expr);
-      if (key === undefined) continue;
-      detailKeys.delete(expr);
-      queue.cancel(key, DETAIL_OWNER);
-    }
+    if (signal.aborted) return Promise.reject(new PreviewCancelledError(key));
+    const owner = `${DETAIL_OWNER}:${++detailRequests}`;
+    const onAbort = () => queue.cancel(key, owner);
+    signal.addEventListener("abort", onAbort, { once: true });
+    return queue
+      .run(key, PRIORITY.DIALOG, (abort) => streamQuery(expr, step, abort), owner)
+      .finally(() => signal.removeEventListener("abort", onAbort));
   };
 
   /** The rate window the card charts with, widened if it was, so a breakdown measures alike. */
@@ -2431,7 +2424,6 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     runDialogQuery,
     cancelDialogQueries,
     runDetailQuery,
-    cancelDetailQueries,
     rateWindowFor,
 
     labelsByStream,

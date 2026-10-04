@@ -64,7 +64,9 @@ const OPageHeaderStub = {
 };
 
 const runQuery = vi.fn();
-const cancelQueries = vi.fn();
+/** The exprs whose request the view has abandoned through its signal. */
+const cancelled = () =>
+  runQuery.mock.calls.filter(([, signal]) => signal?.aborted).map(([expr]) => expr);
 
 /** The grid's default query for a metric, as the explorer resolves it. */
 const chartOf = (c: any) => ({
@@ -99,7 +101,6 @@ const mountView = (props: Record<string, any> = {}, { realHeader = false } = {})
       nanGuard: false,
       color: "#000",
       runQuery,
-      cancelQueries,
       chartOf,
       colorOf: () => "#000",
       ...props,
@@ -114,7 +115,7 @@ const mountView = (props: Record<string, any> = {}, { realHeader = false } = {})
         },
         MetricCardChart: {
           name: "MetricCardChart",
-          props: ["results", "queries", "color", "chartType", "unit"],
+          props: ["results", "queries", "color", "chartType", "unit", "timeRange"],
           template: "<div />",
         },
       },
@@ -149,7 +150,7 @@ describe("MetricDetailView", () => {
     it("charts the card's current query, ⚙ override included, at full width", async () => {
       wrapper = mountView();
       await flushPromises();
-      expect(runQuery).toHaveBeenCalledWith("sum by (le) (rate(x[4m]))");
+      expect(runQuery).toHaveBeenCalledWith("sum by (le) (rate(x[4m]))", expect.any(AbortSignal));
       const chart = wrapper.findComponent({ name: "MetricCardChart" });
       expect(chart.props("results")).toEqual([SERIES]);
     });
@@ -178,10 +179,30 @@ describe("MetricDetailView", () => {
     });
 
     it("cancels the overview query when the view closes", async () => {
+      runQuery.mockImplementation(() => new Promise(() => {}));
       wrapper = mountView();
       await flushPromises();
       wrapper.unmount();
-      expect(cancelQueries).toHaveBeenCalledWith(["sum by (le) (rate(x[4m]))"]);
+      expect(cancelled()).toEqual(["sum by (le) (rate(x[4m]))"]);
+    });
+
+    it("keeps the overview chart through a refresh, on the range its samples were queried for", async () => {
+      const NEXT = { resultType: "matrix", result: [{ metric: {}, values: [[2, "2"]] }] };
+      wrapper = mountView();
+      await flushPromises();
+      let answer!: (value: any) => void;
+      runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+
+      await wrapper.setProps({ timeRange: { start_time: 1, end_time: 3 } });
+      await flushPromises();
+      const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart().props("results")).toEqual([SERIES]);
+      expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 2 });
+
+      answer(NEXT);
+      await flushPromises();
+      expect(chart().props("results")).toEqual([NEXT]);
+      expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 3 });
     });
   });
 
@@ -295,7 +316,7 @@ describe("MetricDetailView", () => {
       const call = runQuery.mock.calls.find(
         ([expr]) => expr === "rate(http_server_active_requests[4m])",
       )!;
-      expect(call[1].name).toBe("http_server_active_requests");
+      expect(call[2].name).toBe("http_server_active_requests");
     });
 
     it("says so on a card whose metric has no chartable query", async () => {
@@ -335,8 +356,7 @@ describe("MetricDetailView", () => {
       wrapper = mountView({ tab: "related" });
       await flushPromises();
       wrapper.unmount();
-      const cancelled = cancelQueries.mock.calls.flatMap(([list]) => list);
-      expect(cancelled).toContain("rate(http_server_active_requests[4m])");
+      expect(cancelled()).toContain("rate(http_server_active_requests[4m])");
     });
 
     it("says so when nothing is related", () => {

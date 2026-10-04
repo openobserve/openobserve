@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One chart of the detail view, queried only while on screen. -->
 <template>
   <div
     ref="root"
@@ -77,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :bucket-unit="bucketO2Unit.unit ?? undefined"
         :bucket-unit-custom="bucketO2Unit.unitCustom ?? undefined"
         :color="color"
-        :time-range="timeRange"
+        :time-range="state.timeRange"
         :legend="legend"
         @error="onRenderError"
       />
@@ -112,6 +111,8 @@ interface TileState {
   status: "idle" | "loading" | "done" | "error";
   results: any[];
   error: string;
+  /** The window `results` were queried for: a chart kept through a refresh stays on its axis. */
+  timeRange?: { start_time: number; end_time: number };
 }
 
 const IDLE: TileState = { status: "idle", results: [], error: "" };
@@ -126,8 +127,8 @@ const props = withDefaults(
     color: string;
     timeRange: { start_time: number; end_time: number };
     legend?: boolean;
-    runQuery: (expr: string) => Promise<any>;
-    cancelQueries: (exprs: string[]) => void;
+    /** A signal, not a cancel by expr, so two tiles on one query never cancel each other. */
+    runQuery: (expr: string, signal: AbortSignal) => Promise<any>;
     dataTest: string;
   }>(),
   { chartType: "line", unit: null, bucketUnit: null, legend: false },
@@ -146,21 +147,21 @@ const bucketO2Unit = computed(() =>
 );
 
 const visible = ref(false);
-/** A drawn chart stays up while its next result loads. */
+/** Marks a kept chart, which would otherwise give no sign that it is reloading. */
 const refreshing = ref(false);
 /** The shown result no longer matches the query and window; reload when next seen. */
 let stale = true;
 /** Bumped per load, so a superseded result never lands. */
 let generation = 0;
-let activeExprs: string[] = [];
+let active: AbortController | null = null;
 /** What the last load asked for, so a watcher catching up on it does not ask again. */
 let loadedFor: { key: string; timeRange: object } | null = null;
 
 const queryKey = () => props.queries?.map((query) => query.expr).join("\n") ?? null;
 
 const cancelActive = () => {
-  if (activeExprs.length) props.cancelQueries(activeExprs);
-  activeExprs = [];
+  active?.abort();
+  active = null;
 };
 
 const load = async () => {
@@ -172,20 +173,23 @@ const load = async () => {
     return;
   }
   stale = false;
-  loadedFor = { key: exprs.join("\n"), timeRange: props.timeRange };
-  activeExprs = exprs;
+  const timeRange = props.timeRange;
+  loadedFor = { key: exprs.join("\n"), timeRange };
+  active = new AbortController();
+  const { signal } = active;
   // Only a chart of this same query is still kept here: a new query resets to IDLE first.
   if (state.value.status === "done") refreshing.value = true;
   else state.value = { status: "loading", results: [], error: "" };
   try {
-    const results = await Promise.all(exprs.map((expr) => props.runQuery(expr)));
+    const results = await Promise.all(exprs.map((expr) => props.runQuery(expr, signal)));
     if (mine !== generation) return;
-    activeExprs = [];
+    active = null;
     refreshing.value = false;
-    state.value = { status: "done", results, error: "" };
+    state.value = { status: "done", results, error: "", timeRange };
   } catch (error: any) {
     if (mine !== generation) return;
-    activeExprs = [];
+    // The other queries of a failed load are not worth finishing.
+    cancelActive();
     refreshing.value = false;
     if (isCancelled(error)) {
       // Not its own doing (that bumps `generation`): a shared query or bulk clear cancelled it.
@@ -217,7 +221,7 @@ watch([queryKey, () => props.timeRange], invalidate);
 watch(visible, (isVisible) => {
   if (isVisible) {
     if (stale) load();
-  } else if (activeExprs.length) {
+  } else if (active) {
     // Scrolled away mid-load: its queue slot belongs to a tile someone is looking at.
     generation += 1;
     cancelActive();

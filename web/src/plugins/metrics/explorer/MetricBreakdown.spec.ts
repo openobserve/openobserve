@@ -74,7 +74,9 @@ const MetricCardChartStub = {
 const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] };
 
 const runQuery = vi.fn();
-const cancelQueries = vi.fn();
+/** The exprs whose request a chart has abandoned through its signal. */
+const cancelled = () =>
+  runQuery.mock.calls.filter(([, signal]) => signal?.aborted).map(([expr]) => expr);
 
 const mountBreakdown = (props: Record<string, any> = {}) =>
   mount(MetricBreakdown, {
@@ -88,7 +90,6 @@ const mountBreakdown = (props: Record<string, any> = {}) =>
       nanGuard: false,
       color: "#000",
       runQuery,
-      cancelQueries,
       ...props,
     },
     global: { plugins: [i18n, store], stubs: { MetricCardChart: MetricCardChartStub } },
@@ -385,8 +386,7 @@ describe("MetricBreakdown", () => {
 
       await wrapper.setProps({ selectedLabel: "a05" });
       await flushPromises();
-      const cancelled = cancelQueries.mock.calls.flatMap(([list]) => list);
-      expect(cancelled).toEqual(
+      expect(cancelled()).toEqual(
         expect.arrayContaining([
           'sum by (a00) (rate({__name__="http_requests_total"}[4m]))',
           'sum by (a01) (rate({__name__="http_requests_total"}[4m]))',
@@ -402,9 +402,7 @@ describe("MetricBreakdown", () => {
       await flushPromises();
 
       wrapper.unmount();
-      expect(cancelQueries).toHaveBeenCalledWith([
-        'sum by (method) (rate({__name__="http_requests_total"}[4m]))',
-      ]);
+      expect(cancelled()).toEqual(['sum by (method) (rate({__name__="http_requests_total"}[4m]))']);
     });
   });
 
@@ -468,6 +466,7 @@ describe("MetricBreakdown", () => {
 
       expect(runQuery).toHaveBeenCalledWith(
         'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
+        expect.any(AbortSignal),
       );
       expect(wrapper.find('[data-test="metrics-breakdown-topk"]').text()).toContain("top 10");
     });
@@ -479,6 +478,7 @@ describe("MetricBreakdown", () => {
 
       expect(runQuery).toHaveBeenCalledWith(
         'topk(10, sum by (method) (rate({__name__="http_requests_total"}[4m])))',
+        expect.any(AbortSignal),
       );
     });
 
@@ -507,9 +507,10 @@ describe("MetricBreakdown", () => {
       await wrapper.setProps({ selectedLabel: "route" });
       await flushPromises();
 
-      expect(cancelQueries).toHaveBeenCalledWith([first]);
+      expect(cancelled()).toEqual([first]);
       expect(runQuery).toHaveBeenLastCalledWith(
         'sum by (route) (rate({__name__="http_requests_total"}[4m]))',
+        expect.any(AbortSignal),
       );
     });
 
@@ -520,7 +521,7 @@ describe("MetricBreakdown", () => {
       const expr = runQuery.mock.calls[0][0];
 
       wrapper.unmount();
-      expect(cancelQueries).toHaveBeenCalledWith([expr]);
+      expect(cancelled()).toEqual([expr]);
     });
 
     it("never lands a superseded label's result", async () => {
@@ -608,6 +609,7 @@ describe("MetricBreakdown", () => {
         expect(fieldValues).toHaveBeenCalledTimes(2);
         expect(runQuery).toHaveBeenLastCalledWith(
           'sum by (a03) (rate({__name__="http_requests_total"}[4m]))',
+          expect.any(AbortSignal),
         );
       });
 

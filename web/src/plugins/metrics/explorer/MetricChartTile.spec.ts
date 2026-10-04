@@ -33,7 +33,9 @@ const EMPTY = { resultType: "matrix", result: [] };
 const QUERIES = [{ expr: "sum(rate(x[4m]))" }];
 
 const runQuery = vi.fn();
-const cancelQueries = vi.fn();
+/** The exprs whose request the tile has abandoned through its signal. */
+const cancelled = () =>
+  runQuery.mock.calls.filter(([, signal]) => signal?.aborted).map(([expr]) => expr);
 
 const mountTile = (props: Record<string, any> = {}) =>
   mount(MetricChartTile, {
@@ -42,7 +44,6 @@ const mountTile = (props: Record<string, any> = {}) =>
       color: "#000",
       timeRange: { start_time: 1, end_time: 2 },
       runQuery,
-      cancelQueries,
       dataTest: "tile",
       ...props,
     },
@@ -69,7 +70,7 @@ describe("MetricChartTile", () => {
     wrapper = mountTile();
     await flushPromises();
     expect(wrapper.find('[data-test="tile-header"]').exists()).toBe(true);
-    expect(runQuery).toHaveBeenCalledWith("sum(rate(x[4m]))");
+    expect(runQuery).toHaveBeenCalledWith("sum(rate(x[4m]))", expect.any(AbortSignal));
     expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
   });
 
@@ -139,9 +140,13 @@ describe("MetricChartTile", () => {
     expect(chart().props("results")).toEqual([SERIES]);
     expect(wrapper.find('[data-test="tile-refreshing"]').exists()).toBe(true);
 
+    // The kept samples stay on the axis they were queried for.
+    expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 2 });
+
     answer(NEXT);
     await flushPromises();
     expect(chart().props("results")).toEqual([NEXT]);
+    expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 3 });
     expect(wrapper.find('[data-test="tile-refreshing"]').exists()).toBe(false);
   });
 
@@ -170,8 +175,8 @@ describe("MetricChartTile", () => {
     await flushPromises();
     await wrapper.setProps({ queries: [{ expr: "y" }] });
     await flushPromises();
-    expect(cancelQueries).toHaveBeenCalledWith(["sum(rate(x[4m]))"]);
-    expect(runQuery).toHaveBeenLastCalledWith("y");
+    expect(cancelled()).toEqual(["sum(rate(x[4m]))"]);
+    expect(runQuery).toHaveBeenLastCalledWith("y", expect.any(AbortSignal));
   });
 
   it("re-queries when the window moves", async () => {
@@ -187,7 +192,7 @@ describe("MetricChartTile", () => {
     wrapper = mountTile();
     await flushPromises();
     wrapper.unmount();
-    expect(cancelQueries).toHaveBeenCalledWith(["sum(rate(x[4m]))"]);
+    expect(cancelled()).toEqual(["sum(rate(x[4m]))"]);
   });
 
   describe("lazy loading", () => {
@@ -217,7 +222,7 @@ describe("MetricChartTile", () => {
 
       io.setVisible(wrapper.element, false);
       await flushPromises();
-      expect(cancelQueries).toHaveBeenCalledWith(["sum(rate(x[4m]))"]);
+      expect(cancelled()).toEqual(["sum(rate(x[4m]))"]);
 
       io.setVisible(wrapper.element, true);
       await flushPromises();
@@ -234,7 +239,7 @@ describe("MetricChartTile", () => {
       io.setVisible(wrapper.element, true);
       await flushPromises();
       expect(runQuery).toHaveBeenCalledTimes(1);
-      expect(cancelQueries).not.toHaveBeenCalled();
+      expect(cancelled()).toEqual([]);
     });
 
     it("defers a window change on an off-screen tile until it is seen", async () => {

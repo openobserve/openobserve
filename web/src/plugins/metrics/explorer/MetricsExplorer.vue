@@ -590,7 +590,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :color="detailColor"
       :color-of="colorOf"
       :run-query="runDetailPreview"
-      :cancel-queries="cancelDetailPreviews"
       @close="closeDetail"
       @open-visualize="onDetailOpenVisualize"
       @toggle-favorite="detailMetric && grid.toggleFavorite(detailMetric)"
@@ -681,6 +680,7 @@ import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
   type LabelFilter,
 } from "@/composables/metrics/useMetricsExplorerGrid";
+import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
 import {
   getMetricsConfig,
@@ -1406,21 +1406,22 @@ export default defineComponent({
         : { queries: [], chartType: "line", unit: "", bucketUnit: null },
     );
 
-    /** A metric's colour on its grid card. */
+    /** Indexed in the whole sorted list, of which the page is a prefix, so off-page metrics match too. */
     const colorOf = (name: string) => {
-      const index = visibleCards.value.findIndex((c) => c.name === name);
+      const index = grid.sortedCards.value.findIndex((c) => c.name === name);
       return cardColorForIndex(Math.max(0, index), isDark.value);
     };
 
     const detailColor = computed(() => colorOf(detailMetric.value ?? ""));
 
-    const runDetailPreview = async (expr: string, card = detailCard.value) => {
+    const runDetailPreview = async (expr: string, signal: AbortSignal, card = detailCard.value) => {
       if (!card) return null;
       // An unpreviewed card has no widening or NaN-guard decision yet, so a sparse counter charts "No data".
       if (!grid.previews.value[card.name]) await grid.requestPreview(card);
-      return grid.runDetailQuery(expr, card);
+      // Abandoned during that wait: the chart that asked has moved on, so its query must not start.
+      if (signal.aborted) throw new PreviewCancelledError(expr);
+      return grid.runDetailQuery(expr, card, signal);
     };
-    const cancelDetailPreviews = (exprs: string[]) => grid.cancelDetailQueries(exprs);
 
     const showDetail = (name: string) => {
       // Paused synchronously, before the grid unmounts — see `setMode`.
@@ -2159,7 +2160,6 @@ export default defineComponent({
       colorOf,
       detailColor,
       runDetailPreview,
-      cancelDetailPreviews,
       openDetail,
       closeDetail,
       onDetailTab,
