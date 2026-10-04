@@ -1175,9 +1175,12 @@ describe("MetricBreakdown", () => {
       expect(data.type).toBe("line");
       expect(data.queryType).toBe("promql");
       expect(data.queries).toHaveLength(1);
-      expect(data.queries[0].query).toBe(exprs()[0]);
-      expect(data.queries[0].query).toBe(
+      // The tile's concrete window becomes the dashboard's own, as Convert to dashboard does.
+      expect(exprs()[0]).toBe(
         'sum by (method) (rate({__name__="http_requests_total",pod="api-1"}[4m]))',
+      );
+      expect(data.queries[0].query).toBe(
+        'sum by (method) (rate({__name__="http_requests_total",pod="api-1"}[$__rate_interval]))',
       );
       expect(data.queries[0].customQuery).toBe(true);
       expect(data.queries[0].config.promql_legend).toBe("{method}");
@@ -1194,7 +1197,7 @@ describe("MetricBreakdown", () => {
       await button(wrapper).trigger("click");
 
       expect(dialog(wrapper).props("dashboardPanelData")!.data.queries[0].query).toBe(
-        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
+        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[$__rate_interval])))',
       );
     });
 

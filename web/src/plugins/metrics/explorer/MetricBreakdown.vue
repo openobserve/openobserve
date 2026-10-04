@@ -355,6 +355,7 @@ import {
   breakdownTitleKey,
   buildBreakdownQuery,
   CARD_KIND,
+  PANEL_RATE_WINDOW,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
 import { seriesStatsByValue } from "@/utils/metrics/breakdownStats";
@@ -641,14 +642,14 @@ export default defineComponent({
       ),
     );
 
-    const queriesFor = (label: string): TileQuery[] | null => {
+    const queriesFor = (label: string, rateWindow = props.rateWindow): TileQuery[] | null => {
       if (!countsByLabel.value[label].ready) return null;
       const expr = buildBreakdownQuery(
         props.card.cardKind,
         {
           metricName: props.card.name,
           filters: props.filters,
-          rateWindow: props.rateWindow,
+          rateWindow,
           applyNanGuard: props.nanGuard,
         },
         label,
@@ -831,10 +832,11 @@ export default defineComponent({
     const dashboardPanel = ref<{ data: Record<string, any> }>({ data: {} });
     const dashboardPanelTitle = ref("");
 
-    /** The focused chart as a panel: its exact queries, filters and topk cap included. */
+    /** The focused chart as a panel: its queries, filters and topk cap included. */
     const openAddToDashboard = () => {
       const label = activeLabel.value;
-      const queries = label ? queriesByLabel.value[label] : null;
+      // `$__rate_interval`, as Convert to dashboard does: the tile's window would freeze the panel at this range.
+      const queries = label ? queriesFor(label, PANEL_RATE_WINDOW) : null;
       if (!label || !queries?.length) return;
       const data = buildPanelDataForCard(props.card, { queries, chartType: "line" });
       // The tile sizes its decimals to the values it drew; the panel would otherwise round them to 2.
