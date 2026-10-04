@@ -1514,10 +1514,13 @@ const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s
 /**
  * One query of the configured function, split into one series per value of `label`.
  *
- * Every aggregation is regrouped by the label: `le` stays, since `histogram_quantile` needs it,
- * and any other grouping goes, as does a `topk` wrapper — the breakdown IS the split. A query
- * with no aggregation (`quantile_over_time`) is averaged per value. Quoted label values are
- * never rewritten. Null when `label` is not a label name.
+ * Its input is only the explorer's own variant queries (`getMetricDefaults`), which is why a
+ * regex suffices: aggregations there are always prefix `fn(…)` or `fn by (…) (…)`, never
+ * `without` or a trailing `by`; label values are double-quoted; and a `topk` only ever wraps the
+ * whole expression. Each such aggregation is regrouped by the label: `le` stays, since
+ * `histogram_quantile` needs it, and any other grouping goes, as does the `topk` — the breakdown
+ * IS the split. A query with no aggregation (`quantile_over_time`) is averaged per value. Null
+ * when `label` is not a label name.
  */
 export function breakdownQueryOf(
   expr: string,

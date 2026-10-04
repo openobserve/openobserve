@@ -388,8 +388,14 @@ interface LabelCounts {
   values: any[];
 }
 
-/** Measures whose values add up, so one value's share of their sum means something. */
-const ADDITIVE_KINDS = [CARD_KIND.COUNTER_RATE, CARD_KIND.EXP_HISTOGRAM_FALLBACK, CARD_KIND.INFO];
+/**
+ * Values add up, so one value's share of their total means something, only under an outer
+ * `sum` or `count` that is not one side of a ratio. Read off the query the chart runs, which
+ * follows the configured function; a quantile or an average never starts this way.
+ */
+const ADDITIVE_QUERY = /^(sum|count) by \(/;
+const isAdditive = (expr: string | undefined) =>
+  !!expr && ADDITIVE_QUERY.test(expr) && !expr.includes(" / ");
 
 const STAT_COLUMNS = ["avg", "latest", "share"] as const;
 
@@ -741,8 +747,9 @@ export default defineComponent({
     // A topk-capped chart holds only the top 10, whose shares would always sum to 100%.
     const showShare = computed(
       () =>
-        ADDITIVE_KINDS.includes(props.card.cardKind) &&
-        !(activeLabel.value && topkByLabel.value[activeLabel.value]),
+        !!activeLabel.value &&
+        !topkByLabel.value[activeLabel.value] &&
+        isAdditive(queriesByLabel.value[activeLabel.value]?.[0]?.expr),
     );
 
     const focusedTile = ref<ComponentPublicInstance | null>(null);

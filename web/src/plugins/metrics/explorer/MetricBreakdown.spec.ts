@@ -846,6 +846,40 @@ describe("MetricBreakdown", () => {
         }
       });
 
+      it.each([
+        ["a counter on avg(rate)", CARD_KIND.COUNTER_RATE, "avg(rate(x[4m]))", "avg(rate)", false],
+        ["a counter on sum(rate)", CARD_KIND.COUNTER_RATE, "sum(rate(x[4m]))", "sum(rate)", true],
+        ["a gauge on sum", CARD_KIND.GAUGE, "sum(g)", "sum", true],
+        ["a gauge on avg", CARD_KIND.GAUGE, "avg(g)", "avg", false],
+        [
+          "a histogram on percentiles",
+          CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
+          "histogram_quantile(0.95, sum by (le) (rate(b[4m])))",
+          "percentiles",
+          false,
+        ],
+        ["an info metric on count", CARD_KIND.INFO, "count(i)", "", true],
+      ])(
+        "offers a share only when the function charted adds up: %s",
+        async (_, cardKind, expr, footerLabel, share) => {
+          runQuery.mockResolvedValue(byMethod(["m0", [[1, "1"]]], ["m1", [[1, "3"]]]));
+          wrapper = mountBreakdown({
+            card: { ...CARD, cardKind },
+            variant: {
+              queries: [{ expr, legendTemplate: "x" }],
+              chartType: "line",
+              unit: "short",
+              footerLabel,
+            },
+            selectedLabel: "method",
+          });
+          await flushPromises();
+          expect(cell("avg", "m1").exists()).toBe(true);
+          expect(cell("share", "m1").exists()).toBe(share);
+          if (share) expect(cell("share", "m1").text()).toBe("75.0%");
+        },
+      );
+
       it("keeps add and exclude on a value without a series", async () => {
         runQuery.mockResolvedValue(byMethod(["m0", [[1, "1"]]]));
         wrapper = mountBreakdown({ selectedLabel: "method" });
