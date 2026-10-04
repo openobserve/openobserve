@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! RED insights planning, templates and identity recovery, ungated so the tests run in CI.
-
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use config::utils::sql::{quote_identifier, quote_sql_string};
 
@@ -114,7 +112,6 @@ pub struct StreamColumns {
     pub has_duration: bool,
 }
 
-/// The engine-agnostic detector shape; the enterprise driver turns it into a create request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DetectorTemplate {
     pub name: String,
@@ -175,7 +172,6 @@ impl DetectorTemplate {
     }
 }
 
-/// Diffs the busiest services against the managed detectors, with hysteresis at the boundary.
 pub fn plan(
     enabled: bool,
     volumes: &[ServiceVolume],
@@ -241,18 +237,18 @@ pub fn plan(
     Plan { create, delete }
 }
 
-/// Keeps detectors on streams this cycle read, so a stream missing from the cache never loses them.
+/// An unread stream keeps its detectors unless its schema lookup confirmed the stream removed.
 pub fn on_read_streams(
     existing: Vec<ManagedDetector>,
     streams: &BTreeMap<String, StreamColumns>,
+    removed_streams: &BTreeSet<String>,
 ) -> Vec<ManagedDetector> {
     existing
         .into_iter()
-        .filter(|d| streams.contains_key(&d.stream))
+        .filter(|d| streams.contains_key(&d.stream) || removed_streams.contains(&d.stream))
         .collect()
 }
 
-/// Builds one managed detector, or `None` when the engine would reject or mis-score it.
 pub fn template(
     stream: &str,
     service: &str,
@@ -420,6 +416,7 @@ mod tests {
         has_status: true,
         has_duration: true,
     };
+    const ROOT_ARM: &str = "OR (CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
 
     fn vol(stream: &str, service: &str, requests_24h: u64) -> ServiceVolume {
         ServiceVolume {
@@ -672,8 +669,6 @@ mod tests {
         assert!(second.delete.is_empty(), "{:?}", second.delete);
     }
 
-    const ROOT_ARM: &str = "OR (CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
-
     fn sql_of(signal: RedSignal, cols: &StreamColumns) -> String {
         template("default", "checkout", signal, cols)
             .unwrap()
@@ -835,9 +830,22 @@ mod tests {
         let mut cold = det("b", "svc", RedSignal::Rate, false);
         cold.stream = "cold".to_string();
         let read = det("a", "svc", RedSignal::Rate, true);
-        let existing = on_read_streams(vec![read.clone(), cold], &streams);
+        let existing = on_read_streams(vec![read.clone(), cold], &streams, &BTreeSet::new());
         assert_eq!(existing, vec![read]);
         assert_eq!(plan_default(&[], &existing).delete, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn detectors_on_confirmed_removed_streams_are_deleted() {
+        let streams = BTreeMap::from([("default".to_string(), ALL_COLS)]);
+        let mut gone = det("g", "svc", RedSignal::Rate, true);
+        gone.stream = "gone".to_string();
+        let mut cold = det("c", "svc", RedSignal::Rate, true);
+        cold.stream = "cold".to_string();
+        let removed = BTreeSet::from(["gone".to_string()]);
+        let existing = on_read_streams(vec![gone.clone(), cold], &streams, &removed);
+        assert_eq!(existing, vec![gone]);
+        assert_eq!(plan_default(&[], &existing).delete, vec!["g".to_string()]);
     }
 
     #[test]

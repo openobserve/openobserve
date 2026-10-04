@@ -1913,10 +1913,19 @@ const onChangeStream = async () => {
   runQueryFn();
 };
 
-const syncSavedViewDateTime = (datetime: TracesSavedView["datetime"]) => {
+const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
   const picker = searchBarRef.value?.dateTimeRef;
-  if (datetime.type === "relative") picker?.setRelativeTime(datetime.relativeTimePeriod);
-  else picker?.setAbsoluteTime(datetime.startTime, datetime.endTime);
+  if (!picker) return;
+  // The picker's date watcher emits after its programmatic marker resets, so the flag mutes it instead.
+  store.dispatch("setSavedViewFlag", true);
+  try {
+    if (datetime.type === "relative") picker.setRelativeTime(datetime.relativeTimePeriod);
+    else picker.setAbsoluteTime(datetime.startTime, datetime.endTime);
+    picker.setDateType(datetime.type);
+    await nextTick();
+  } finally {
+    store.dispatch("setSavedViewFlag", false);
+  }
 };
 
 const onApplySavedView = async (view: TracesSavedView) => {
@@ -1944,7 +1953,7 @@ const onApplySavedView = async (view: TracesSavedView) => {
 
   searchObj.meta.searchMode = view.searchMode;
   searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
-  syncSavedViewDateTime(view.datetime);
+  await syncSavedViewDateTime(view.datetime);
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;

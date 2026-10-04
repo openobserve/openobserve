@@ -28,7 +28,6 @@ export interface CriticalPathNode {
   children: CriticalPathNode[];
 }
 
-/** The slice of a TraceDetails tree span the critical path reads. */
 export interface TraceTreeSpan {
   spanId: string;
   startTimeUs: number;

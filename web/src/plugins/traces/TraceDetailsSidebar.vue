@@ -1075,6 +1075,7 @@ import { encodeProfileFilters } from "@/services/profiles";
 const HUMAN_TZ_FORMAT = "MMM dd, yyyy HH:mm:ss.SSS ZZZ";
 const OPERATION_STATS_MIN_SAMPLES = 20;
 const OPERATION_STATS_FALLBACK_WINDOW_US = 3_600_000_000;
+const OPERATION_STATS_FALLBACK_BUCKET_US = 600_000_000;
 const PROFILE_LINK_PAD_US = 60_000_000;
 const PROFILE_LINK_CONCURRENCY = 3;
 
@@ -1919,13 +1920,15 @@ export default defineComponent({
         startTime = Number(saved.start_time);
         endTime = Number(saved.end_time);
       } else {
-        // Anchoring on the trace start lets every span of the trace share one cached window.
-        const anchorUs =
-          Number(props.baseTracePosition?.startTimeUs) ||
-          Math.floor(Number(props.span?.start_time) / 1_000);
-        if (!Number.isFinite(anchorUs)) return null;
-        startTime = anchorUs - OPERATION_STATS_FALLBACK_WINDOW_US;
-        endTime = anchorUs + OPERATION_STATS_FALLBACK_WINDOW_US;
+        const spanStartUs = Math.floor(Number(props.span?.start_time) / 1_000);
+        if (!Number.isFinite(spanStartUs)) return null;
+        // Bucketing the span start lets nearby spans share one cached window that still contains each.
+        const bucketUs =
+          Math.floor(spanStartUs / OPERATION_STATS_FALLBACK_BUCKET_US) *
+          OPERATION_STATS_FALLBACK_BUCKET_US;
+        startTime = bucketUs - OPERATION_STATS_FALLBACK_WINDOW_US;
+        endTime =
+          bucketUs + OPERATION_STATS_FALLBACK_WINDOW_US + OPERATION_STATS_FALLBACK_BUCKET_US;
       }
       const org = String(store.state.selectedOrganization?.identifier ?? "");
       const key = JSON.stringify([org, stream, service, operation, startTime, endTime]);
@@ -2066,6 +2069,7 @@ export default defineComponent({
         .map((item: Record<string, unknown>) => String(item.name ?? item.stream_name ?? ""))
         .filter(Boolean);
       for (let i = 0; i < streams.length; i += PROFILE_LINK_CONCURRENCY) {
+        if (spanProfileRequest.value?.key !== req.key) return undefined;
         const batch = streams.slice(i, i + PROFILE_LINK_CONCURRENCY);
         const matches = await Promise.all(batch.map((s: string) => probeProfileStream(req, s)));
         const match = matches.find(Boolean);
@@ -2078,7 +2082,9 @@ export default defineComponent({
       if (req.key in spanProfileCache.value || pendingSpanProfiles.has(req.key)) return;
       pendingSpanProfiles.add(req.key);
       try {
-        spanProfileCache.value[req.key] = await findSpanProfile(req);
+        const match = await findSpanProfile(req);
+        // An abandoned probe proved nothing, so it must not cache a miss.
+        if (match !== undefined) spanProfileCache.value[req.key] = match;
       } catch {
         spanProfileCache.value[req.key] = null;
       } finally {

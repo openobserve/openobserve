@@ -579,6 +579,33 @@ describe("Profiles page", () => {
       );
     });
 
+    it("returns to the default stream and 15-minute window when the seed is dropped", async () => {
+      const wrapper = mountSeeded();
+      await flushPromises();
+      mocks.meta.mockClear();
+      mocks.merge.mockClear();
+
+      route.query = {};
+      await flushPromises();
+
+      const window = {
+        start_time: (mocks.nowMs - 15 * 60 * 1000) * 1000,
+        end_time: mocks.nowMs * 1000,
+      };
+      expect(
+        (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
+          .value,
+      ).toBe("profiles-a");
+      expect(mocks.meta).toHaveBeenCalledTimes(1);
+      expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-a", window);
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-a",
+        expect.objectContaining({ ...window, filters: [] }),
+      );
+    });
+
     it("keeps the default first stream, 15-minute window and top view without params", async () => {
       route.query = {};
       const wrapper = mountSeeded();

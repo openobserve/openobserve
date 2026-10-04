@@ -17,6 +17,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import Index from "@/plugins/traces/Index.vue";
+import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -3086,14 +3087,14 @@ describe("Index.vue (Main Traces Page)", () => {
       }
     };
 
-    const mountPage = async () => {
+    const mountPage = async (searchBar: any = true) => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
           plugins: [i18n, router],
           provide: { store: store },
           stubs: {
-            "search-bar": true,
+            "search-bar": searchBar,
             "index-list": true,
             "search-result": true,
             "service-graph": true,
@@ -3165,6 +3166,66 @@ describe("Index.vue (Main Traces Page)", () => {
       });
       expect(mockGetStream).not.toHaveBeenCalled();
       expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
+    });
+
+    describe("restores the picker's date type", () => {
+      const ABSOLUTE = {
+        type: "absolute",
+        relativeTimePeriod: "15m",
+        startTime: 1752490000000000,
+        endTime: 1752490900000000,
+      };
+      const RELATIVE = { type: "relative", relativeTimePeriod: "2h", startTime: 0, endTime: 0 };
+      let pickerEmits: any[];
+
+      // Pinned default-type, so only Index.vue itself can move the picker's type.
+      const searchBarWithPicker = (defaultType: string) =>
+        defineComponent({
+          name: "search-bar",
+          emits: ["apply-saved-view"],
+          setup() {
+            return { dateTimeRef: ref<any>(null) };
+          },
+          render() {
+            return h(DateTime, {
+              ref: "dateTimeRef",
+              autoApply: true,
+              defaultType,
+              defaultRelativeTime: "15m",
+              "onOn:date-change": (value: any) => pickerEmits.push(value),
+            });
+          },
+        });
+
+      const picker = () => wrapper.findComponent(DateTime).vm as any;
+
+      beforeEach(() => {
+        pickerEmits = [];
+      });
+
+      it("switches a relative picker to absolute with one search", async () => {
+        await mountPage(searchBarWithPicker("relative"));
+        pickerEmits.length = 0;
+
+        await applyViewAndWaitForSearch(savedView({ datetime: ABSOLUTE }));
+
+        expect(picker().selectedType).toBe("absolute");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+        expect(pickerEmits.filter((v) => v.userChangedValue)).toEqual([]);
+      });
+
+      it("switches an absolute picker to relative with one search", async () => {
+        await mountPage(searchBarWithPicker("absolute"));
+        pickerEmits.length = 0;
+
+        await applyViewAndWaitForSearch(savedView({ datetime: RELATIVE }));
+
+        expect(picker().selectedType).toBe("relative");
+        expect(picker().relativeValue).toBe(2);
+        expect(picker().relativePeriod).toBe("h");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+        expect(pickerEmits.filter((v) => v.userChangedValue)).toEqual([]);
+      });
     });
 
     it("extracts fields for a different stream without clearing the filter", async () => {

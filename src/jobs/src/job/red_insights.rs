@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Reconciles the auto-managed RED anomaly detectors of every org, every six hours.
-
-use std::{collections::BTreeMap, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    time::Duration,
+};
 
 use config::meta::{
     folder::{Folder, FolderType},
@@ -96,10 +97,9 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
 
     let streams = stream_columns(org_id).await?;
     let volumes = service_volumes(org_id, &streams).await?;
-    let existing = red_insights::on_read_streams(
-        configs.iter().filter_map(managed_detector).collect(),
-        &streams,
-    );
+    let detectors: Vec<_> = configs.iter().filter_map(managed_detector).collect();
+    let removed = removed_streams(org_id, &detectors, &streams).await;
+    let existing = red_insights::on_read_streams(detectors, &streams, &removed);
     // Uncapped here: a signal the template skips must not use up the per-cycle create budget.
     let plan = red_insights::plan(
         true,
@@ -235,6 +235,33 @@ async fn stream_columns(org_id: &str) -> anyhow::Result<BTreeMap<String, StreamC
         out.insert(stream, cols);
     }
     Ok(out)
+}
+
+/// A lookup error leaves the stream out, so a transient failure never deletes its detectors.
+async fn removed_streams(
+    org_id: &str,
+    detectors: &[ManagedDetector],
+    streams: &BTreeMap<String, StreamColumns>,
+) -> BTreeSet<String> {
+    let unread: BTreeSet<&str> = detectors
+        .iter()
+        .map(|d| d.stream.as_str())
+        .filter(|s| !streams.contains_key(*s))
+        .collect();
+    let mut removed = BTreeSet::new();
+    for stream in unread {
+        match infra::schema::get(org_id, stream, StreamType::Traces).await {
+            // A missing stream reads back as an empty schema, never as an error.
+            Ok(schema) if schema.fields().is_empty() => {
+                removed.insert(stream.to_string());
+            }
+            Ok(_) => {}
+            Err(e) => {
+                log::warn!("[RED insights] org {org_id}: schema read for {stream} failed: {e}")
+            }
+        }
+    }
+    removed
 }
 
 /// Fails on any stream error: a missing stream would read as zero traffic and lose its detectors.

@@ -45,9 +45,6 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Mock anomaly detection service (config list feeds the insights strip's Charts links)
-// ---------------------------------------------------------------------------
 const mockAnomalyList = vi.fn().mockResolvedValue({ data: [] });
 vi.mock("@/services/anomaly_detection", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -2244,9 +2241,6 @@ describe("ServicesCatalog", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Request-scoped RED
-  // -----------------------------------------------------------------------
   describe("request-scoped RED", () => {
     const KIND_PRED = "CAST(span_kind AS VARCHAR) IN ('2','5')";
     const ROOT_ARM =
@@ -2474,6 +2468,68 @@ describe("ServicesCatalog", () => {
       releases[1](schemaWith("reference_parent_span_id"));
       await flushPromises();
       expect(decodedSqls()).toHaveLength(1);
+    });
+
+    function hitsResponse(service: string) {
+      return {
+        type: "search_response_hits",
+        content: { results: { hits: [{ service_name: service, total_requests: 5 }] } },
+      };
+    }
+
+    it("lets only the newer of two same-stream loads search after their schema fetch", async () => {
+      let release!: (value: any) => void;
+      mockStreamSchema.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      const callbacks: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, cb: any) => {
+        callbacks.push(cb);
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const reload = wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      release(schemaWith("reference_parent_span_id"));
+      await reload;
+      await flushPromises();
+      callbacks
+        .reverse()
+        .forEach((cb, i) => cb.data(null, hitsResponse(i === 0 ? "newer" : "older")));
+      callbacks.forEach((cb) => cb.complete(null, {}));
+      await flushPromises();
+
+      expect(callbacks).toHaveLength(1);
+      expect(wrapper.vm.services.map((s: any) => s.service_name)).toEqual(["newer"]);
+    });
+
+    it("ignores stream callbacks from a superseded load", async () => {
+      const callbacks: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, cb: any) => {
+        callbacks.push(cb);
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const reload = wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+      expect(callbacks).toHaveLength(2);
+
+      callbacks[0].data(null, hitsResponse("older"));
+      callbacks[0].complete(null, {});
+      callbacks[0].error();
+      await flushPromises();
+      expect(wrapper.vm.isSearching).toBe(true);
+
+      callbacks[1].data(null, hitsResponse("newer"));
+      callbacks[1].complete(null, {});
+      await reload;
+      await flushPromises();
+      expect(wrapper.vm.services.map((s: any) => s.service_name)).toEqual(["newer"]);
+      expect(wrapper.vm.isSearching).toBe(false);
     });
 
     it("labels latency tooltips in µs and warns on a P99 above 1 s", async () => {

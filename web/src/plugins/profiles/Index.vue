@@ -451,12 +451,13 @@ const store = useStore();
 const route = useRoute();
 const pageRouteName = route.name;
 
-const dateState = ref({
+const defaultDateState = () => ({
   startTime: 0,
   endTime: 0,
   relativeTimePeriod: "15m",
   valueType: "relative",
 });
+const dateState = ref(defaultDateState());
 const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
@@ -486,8 +487,9 @@ let metaRequestSeq = 0;
 let queryRequestSeq = 0;
 let tagValuesRequestSeq = 0;
 let initRunSeq = 0;
-// Holds the stream and date watchers off while a route seed is applied, so they cannot reset it or reload.
+// Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
 let seeding = false;
+let lastRunSeeded = false;
 
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier as string | undefined,
@@ -995,10 +997,16 @@ const applyRouteSeed = (seed: RouteSeed) => {
 const initPage = async () => {
   const seed = parseRouteSeed(route.query);
   const run = ++initRunSeq;
-  seeding = !!seed;
+  const unseed = !seed && lastRunSeeded;
+  lastRunSeeded = !!seed;
+  seeding = !!seed || unseed;
   try {
     resetProfilesState();
     if (seed) applyRouteSeed(seed);
+    if (unseed) {
+      selectedStream.value = null;
+      dateState.value = defaultDateState();
+    }
     await loadStreams();
     if (run !== initRunSeq || !selectedStream.value) return;
     await loadMeta();

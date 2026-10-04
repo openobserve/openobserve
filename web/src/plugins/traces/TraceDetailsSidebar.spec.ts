@@ -2264,6 +2264,11 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
   const SAVED_END = 1752490900000000;
   const SPAN_START_US = Math.floor(mockSpan.start_time / 1_000);
   const HOUR_US = 3_600_000_000;
+  const BUCKET_US = 600_000_000;
+  const fallbackWindow = (spanStartUs: number) => {
+    const bucketUs = Math.floor(spanStartUs / BUCKET_US) * BUCKET_US;
+    return [bucketUs - HOUR_US, bucketUs + HOUR_US + BUCKET_US];
+  };
   const STATS = { n: 120, p50: 1000, p75: 2000, p90: 4000, p99: 8000 };
   const PERCENTILE_TAG_ID = "trace-details-sidebar-header-toolbar-operation-percentile";
   const PERCENTILE_TAG = `[data-test="${PERCENTILE_TAG_ID}"]`;
@@ -2333,58 +2338,59 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
     w.unmount();
   });
 
-  it("falls back to the span start ± 1 h for another stream", async () => {
+  it("falls back to the span's 10-minute bucket ± 1 h for another stream", async () => {
     const w = await mountWith({ _stream: "other" });
     const q = mockSearch.mock.calls[0][0].query.query;
-    expect([q.start_time, q.end_time]).toEqual([SPAN_START_US - HOUR_US, SPAN_START_US + HOUR_US]);
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(SPAN_START_US));
     w.unmount();
   });
 
-  it("falls back to the span start ± 1 h in embedded mode", async () => {
+  it("falls back to the span's 10-minute bucket ± 1 h in embedded mode", async () => {
     const w = await mountWith({}, { parentMode: "embedded" });
     const q = mockSearch.mock.calls[0][0].query.query;
-    expect([q.start_time, q.end_time]).toEqual([SPAN_START_US - HOUR_US, SPAN_START_US + HOUR_US]);
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(SPAN_START_US));
     w.unmount();
   });
 
-  it("falls back to the span start ± 1 h when the page has no saved bounds", async () => {
+  it("falls back to the span's 10-minute bucket ± 1 h when the page has no saved bounds", async () => {
     mockSearchObj.data.queryPayload = {};
     const w = await mountWith();
     const q = mockSearch.mock.calls[0][0].query.query;
-    expect([q.start_time, q.end_time]).toEqual([SPAN_START_US - HOUR_US, SPAN_START_US + HOUR_US]);
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(SPAN_START_US));
     w.unmount();
   });
 
-  it("anchors the fallback window on the trace start so sibling spans share one call", async () => {
-    const traceStartUs = SPAN_START_US - 5_000_000;
-    const w = await mountWith(
-      { _stream: "other" },
-      { baseTracePosition: { ...mockBaseTracePosition, startTimeUs: traceStartUs } },
-    );
+  it("shares one call between sibling spans in the same 10-minute bucket", async () => {
+    const bucketUs = Math.floor(SPAN_START_US / BUCKET_US) * BUCKET_US;
+    const w = await mountWith({ _stream: "other", start_time: (bucketUs + 1_000_000) * 1_000 });
     await w.setProps({
       span: {
         ...mockSpan,
         _stream: "other",
         span_id: "sibling",
-        start_time: mockSpan.start_time + 2_000_000_000,
+        start_time: (bucketUs + 120_000_000) * 1_000,
       },
     });
     await flushPromises();
     expect(mockSearch).toHaveBeenCalledTimes(1);
     const q = mockSearch.mock.calls[0][0].query.query;
-    expect([q.start_time, q.end_time]).toEqual([traceStartUs - HOUR_US, traceStartUs + HOUR_US]);
+    expect([q.start_time, q.end_time]).toEqual([
+      bucketUs - HOUR_US,
+      bucketUs + HOUR_US + BUCKET_US,
+    ]);
     w.unmount();
   });
 
-  it("anchors the fallback window on the span start when the trace start is absent", async () => {
-    const spanStartNs = mockSpan.start_time + 7_000_000_000;
+  it("covers a span two hours into a long trace", async () => {
+    const spanStartUs = SPAN_START_US + 2 * HOUR_US;
     const w = await mountWith(
-      { _stream: "other", start_time: spanStartNs },
-      { baseTracePosition: undefined },
+      { _stream: "other", start_time: spanStartUs * 1_000 },
+      { baseTracePosition: { ...mockBaseTracePosition, startTimeUs: SPAN_START_US } },
     );
     const q = mockSearch.mock.calls[0][0].query.query;
-    const spanStartUs = Math.floor(spanStartNs / 1_000);
-    expect([q.start_time, q.end_time]).toEqual([spanStartUs - HOUR_US, spanStartUs + HOUR_US]);
+    expect(q.start_time).toBeLessThanOrEqual(spanStartUs);
+    expect(q.end_time).toBeGreaterThan(spanStartUs);
+    expect([q.start_time, q.end_time]).toEqual(fallbackWindow(spanStartUs));
     w.unmount();
   });
 
@@ -2576,6 +2582,28 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     pending.splice(0).forEach((resolve) => resolve());
     await flushPromises();
     expect(profileCalls()).toHaveLength(5);
+    w.unmount();
+  });
+
+  it("stops probing for a span once another span is selected", async () => {
+    setStreams({ a: FULL_SCHEMA, b: FULL_SCHEMA, c: FULL_SCHEMA, d: FULL_SCHEMA, e: FULL_SCHEMA });
+    const pending: Array<() => void> = [];
+    mockSearch.mockImplementation((arg: any) => {
+      if (arg.page_type !== "profiles") return Promise.resolve({ data: { hits: [] } });
+      return new Promise((resolve) => pending.push(() => resolve({ data: { hits: [] } })));
+    });
+    const callsFor = (spanId: string) =>
+      profileCalls().filter((c) => c.query.query.sql.includes(`span_id = '${spanId}'`));
+    const w = await mountWith();
+    expect(callsFor(SPAN.span_id)).toHaveLength(3);
+    await w.setProps({ span: { ...SPAN, span_id: "next-span" } });
+    await flushPromises();
+    expect(callsFor("next-span")).toHaveLength(3);
+
+    pending.splice(0).forEach((resolve) => resolve());
+    await flushPromises();
+    expect(callsFor(SPAN.span_id)).toHaveLength(3);
+    expect(callsFor("next-span")).toHaveLength(5);
     w.unmount();
   });
 

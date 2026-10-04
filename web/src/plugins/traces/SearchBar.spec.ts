@@ -1427,7 +1427,6 @@ describe("SearchBar", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("saved views", () => {
     const tracesView = { view_id: "t1", view_name: "checkout errors", view_type: "traces" };
     const logsView = { view_id: "l1", view_name: "logs view" };

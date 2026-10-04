@@ -531,7 +531,6 @@ const emit = defineEmits<{
 // Latencies are in µs, so this is a p99 above 1 second.
 const P99_WARN_US = 1_000_000;
 
-// Managed RED detectors (traces/red_insights.rs): tag, name shape and histogram bucket.
 const RED_MANAGED_TAG = "auto:red-insights";
 const RED_NAME_PATTERN = /^RED (rate|errors|p95) · /;
 const RED_NAME_SEPARATOR = " · ";
@@ -1250,8 +1249,9 @@ async function loadServicesCatalog() {
   let flags = schemaFlags.value;
   if (!flags || flags.org !== org || flags.stream !== streamName) {
     flags = await fetchSchemaFlags(org, streamName);
-    // A newer load owns the catalog once the org or stream changed during the fetch.
+    // A newer load owns the catalog once it started or the org or stream changed during the fetch.
     if (
+      load !== catalogLoad ||
       org !== searchObj.organizationIdentifier ||
       streamName !== streamFilter.value?.replaceAll('"', "")
     ) {
@@ -1288,6 +1288,7 @@ async function loadServicesCatalog() {
     },
     {
       data: (_payload: any, response: any) => {
+        if (load !== catalogLoad) return;
         if (
           response.type === "search_response_hits" ||
           response.type === "search_response_metadata"
@@ -1330,15 +1331,18 @@ async function loadServicesCatalog() {
         }
       },
       error: () => {
+        if (load !== catalogLoad) return;
         isLoading.value = false;
         isSearching.value = false;
       },
       complete: () => {
+        if (load !== catalogLoad) return;
         isLoading.value = false;
         isSearching.value = false;
         lastRunAt.value = Date.now();
       },
       reset: () => {
+        if (load !== catalogLoad) return;
         services.value = [];
         isLoading.value = false;
         isSearching.value = false;
