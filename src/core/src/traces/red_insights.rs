@@ -37,7 +37,7 @@ const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5x
 const SERVICE_MARKER: &str = " WHERE service_name = '";
 /// An OR, not `IN ('2','5')`: the IN list's `[` in the aggregate name panics the top-k rule.
 const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
-/// Any root span is a request: a trace that starts with a client span still entered the system there.
+/// Any root span is a request, whatever its kind: a trace starting at a client span entered there.
 const ROOT_ARM: &str = "OR (reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
