@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MetricBreakdown from "./MetricBreakdown.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { CARD_KIND } from "@/utils/metrics/metricDefaults";
 
@@ -46,27 +47,15 @@ const CARD: any = {
   labels: ["instance", "method", "route", "status", "le", "__name__"],
 };
 
-// Light OTable stub with the same `#cell-<id>` slot contract: `{ row: original, column, value }`.
-const OTableStub = {
-  name: "OTable",
-  props: ["data", "columns", "loading", "error", "rowClass"],
-  emits: ["row-click"],
-  template: `
-    <div data-test="breakdown-table-stub">
-      <div
-        v-for="row in data"
-        :key="row.label"
-        :data-test="'breakdown-row-' + row.label"
-        @click="$emit('row-click', row, $event)"
-      >
-        <div v-for="col in columns" :key="col.id">
-          <slot :name="'cell-' + col.id" :row="row" :column="col" :value="row[col.id]">{{ row[col.id] }}</slot>
-        </div>
-      </div>
-    </div>
-  `,
-};
+// 20 labels: `service_name` and `tenant_id` sort past the first 15, whose values are counted.
+const WIDE_LABELS = [
+  ...Array.from({ length: 18 }, (_, i) => `a${String(i).padStart(2, "0")}`),
+  "service_name",
+  "tenant_id",
+];
+const WIDE: any = { ...CARD, labels: WIDE_LABELS };
 
+// Only the chart renderer is stubbed; every O2 component is real.
 const MetricCardChartStub = {
   name: "MetricCardChart",
   props: {
@@ -102,28 +91,40 @@ const mountBreakdown = (props: Record<string, any> = {}) =>
       cancelQueries,
       ...props,
     },
-    global: {
-      plugins: [i18n, store],
-      stubs: { OTable: OTableStub, MetricCardChart: MetricCardChartStub },
-    },
+    global: { plugins: [i18n, store], stubs: { MetricCardChart: MetricCardChartStub } },
   });
 
 const lastRequest = () => fieldValues.mock.calls.at(-1)![0];
 const lastSql = () => b64DecodeUnicode(lastRequest().query_context);
+const exprs = () => runQuery.mock.calls.map(([expr]) => expr);
+const cardLabels = (wrapper: VueWrapper<any>) =>
+  wrapper
+    .findAll('[data-test="metrics-breakdown-grid"] > [data-test]')
+    .map((c) => c.attributes("data-test")!.replace("metrics-breakdown-card-", ""));
+
+const echoFields = ({ fields }: any) =>
+  Promise.resolve({
+    data: { hits: fields.map((field: string) => ({ field, values: values(`${field}-`, 3) })) },
+  });
 
 describe("MetricBreakdown", () => {
   let wrapper: VueWrapper<any>;
+  let io: ReturnType<typeof installFakeIntersectionObserver>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     fieldValues.mockResolvedValue({ data: { hits: HITS } });
     runQuery.mockResolvedValue(SERIES);
+    io = installFakeIntersectionObserver({ autoVisible: true });
   });
 
-  afterEach(() => wrapper?.unmount());
+  afterEach(() => {
+    wrapper?.unmount();
+    io.restore();
+  });
 
-  describe("label table", () => {
-    it("asks the values endpoint for the eligible labels of the stream the query reads", async () => {
+  describe("value counts", () => {
+    it("asks the values endpoint once, for the eligible labels of the stream the query reads", async () => {
       wrapper = mountBreakdown();
       await flushPromises();
 
@@ -196,19 +197,228 @@ describe("MetricBreakdown", () => {
       expect(lastSql()).toContain(`"status" = '500'`);
     });
 
-    it("shows the top five values with sample counts, and 20+ when the cap was hit", async () => {
+    it("counts only the first 15 labels, in one request, even with every label on screen", async () => {
+      fieldValues.mockImplementation(echoFields);
+      wrapper = mountBreakdown({ card: WIDE });
+      await flushPromises();
+      expect(fieldValues.mock.calls.map(([req]) => req.fields)).toEqual([WIDE_LABELS.slice(0, 15)]);
+    });
+
+    it("says when the counts failed, and retries them", async () => {
+      fieldValues.mockRejectedValueOnce(new Error("values unavailable"));
       wrapper = mountBreakdown();
       await flushPromises();
+      const notice = wrapper.find('[data-test="metrics-breakdown-counts-error"]');
+      expect(notice.text()).toContain("values unavailable");
 
-      const instance = wrapper.find('[data-test="breakdown-row-instance"]');
-      expect(instance.findAll('[data-test^="metrics-breakdown-value-instance-"]')).toHaveLength(5);
-      expect(instance.text()).toContain("samples");
-      expect(instance.find('[data-test="metrics-breakdown-distinct-instance"]').text()).toBe("20+");
-      expect(wrapper.find('[data-test="metrics-breakdown-distinct-method"]').text()).toBe("3");
+      await notice.find('[data-test="metrics-breakdown-counts-retry"]').trigger("click");
+      await flushPromises();
+      expect(fieldValues).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="metrics-breakdown-counts-error"]').exists()).toBe(false);
+    });
+  });
+
+  describe("grid of label charts", () => {
+    it("renders one card per label, every label rather than the first 15", async () => {
+      fieldValues.mockImplementation(echoFields);
+      wrapper = mountBreakdown({ card: WIDE });
+      await flushPromises();
+      expect(cardLabels(wrapper)).toEqual(WIDE_LABELS);
+      expect(wrapper.find('[data-test="metrics-breakdown-chart"]').exists()).toBe(false);
+    });
+
+    it("lays the cards out three across, two on a tablet, one on a phone", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      const grid = wrapper.find('[data-test="metrics-breakdown-grid"]');
+      expect(grid.classes()).toEqual(
+        expect.arrayContaining(["grid", "grid-cols-3", "max-lg:grid-cols-2", "max-md:grid-cols-1"]),
+      );
+    });
+
+    it("heads each card with its label and distinct-value count, 20+ at the cap", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-card-instance"]').text()).toContain(
+        "instance",
+      );
+      expect(wrapper.find('[data-test="metrics-breakdown-distinct-instance"]').text()).toBe(
+        "20+ values",
+      );
+      expect(wrapper.find('[data-test="metrics-breakdown-distinct-method"]').text()).toBe(
+        "3 values",
+      );
+      expect(wrapper.find('[data-test="metrics-breakdown-distinct-status"]').text()).toBe(
+        "1 value",
+      );
+    });
+
+    it("leaves a label past the count cap without a count", async () => {
+      fieldValues.mockImplementation(echoFields);
+      wrapper = mountBreakdown({ card: WIDE });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-distinct-a00"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-breakdown-distinct-tenant_id"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("charts the metric by each label, topk(10) for a 20+ label", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(exprs()).toEqual([
+        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
+        'sum by (method) (rate({__name__="http_requests_total"}[4m]))',
+        'sum by (route) (rate({__name__="http_requests_total"}[4m]))',
+        'sum by (status) (rate({__name__="http_requests_total"}[4m]))',
+      ]);
+      expect(wrapper.find('[data-test="metrics-breakdown-topk-instance"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-breakdown-topk-method"]').exists()).toBe(false);
+    });
+
+    it("waits for the counts before charting a counted label: only they know whether to cap", async () => {
+      fieldValues.mockImplementation(() => new Promise(() => {}));
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(runQuery).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="metrics-breakdown-card-method-loading"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("caps a label of unknown cardinality: past the count cap, or when counts failed", async () => {
+      fieldValues.mockImplementation(echoFields);
+      wrapper = mountBreakdown({ card: WIDE });
+      await flushPromises();
+      expect(exprs()).toContain(
+        'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
+      );
+      expect(exprs()).toContain('sum by (a00) (rate({__name__="http_requests_total"}[4m]))');
+      wrapper.unmount();
+
+      runQuery.mockClear();
+      fieldValues.mockRejectedValue(new Error("values unavailable"));
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(exprs()).toContain(
+        'topk(10, sum by (method) (rate({__name__="http_requests_total"}[4m])))',
+      );
+    });
+
+    it("offers no filter actions on the grid: those live on a selected label", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(wrapper.find('[data-test^="metrics-breakdown-add-"]').exists()).toBe(false);
+    });
+
+    it("says so when the metric has no labels to break down by", async () => {
+      wrapper = mountBreakdown({ card: { ...CARD, labels: ["le", "__name__"] } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-no-labels"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-breakdown-grid"]').exists()).toBe(false);
+    });
+
+    it("selects a label from its Select action, or by clicking the card", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      await wrapper.find('[data-test="metrics-breakdown-select-route"]').trigger("click");
+      await wrapper.find('[data-test="metrics-breakdown-card-method"]').trigger("click");
+      expect(wrapper.emitted("update:selectedLabel")).toEqual([["route"], ["method"]]);
+    });
+  });
+
+  describe("lazy charts", () => {
+    let lazy: ReturnType<typeof installFakeIntersectionObserver>;
+
+    beforeEach(() => {
+      lazy = installFakeIntersectionObserver();
+    });
+
+    afterEach(() => lazy.restore());
+
+    it("charts a label only once its card scrolls into view", async () => {
+      fieldValues.mockImplementation(echoFields);
+      wrapper = mountBreakdown({ card: WIDE });
+      await flushPromises();
+      expect(runQuery).not.toHaveBeenCalled();
+
+      const card = wrapper.find('[data-test="metrics-breakdown-card-a03"]');
+      lazy.setVisible(card.element, true);
+      await flushPromises();
+      expect(exprs()).toEqual(['sum by (a03) (rate({__name__="http_requests_total"}[4m]))']);
+    });
+
+    it("cancels the grid's unfinished charts when a label is selected", async () => {
+      fieldValues.mockImplementation(echoFields);
+      runQuery.mockImplementation(() => new Promise(() => {}));
+      wrapper = mountBreakdown({ card: WIDE });
+      await flushPromises();
+      for (const label of ["a00", "a01"])
+        lazy.setVisible(
+          wrapper.find(`[data-test="metrics-breakdown-card-${label}"]`).element,
+          true,
+        );
+      await flushPromises();
+
+      await wrapper.setProps({ selectedLabel: "a05" });
+      await flushPromises();
+      const cancelled = cancelQueries.mock.calls.flatMap(([list]) => list);
+      expect(cancelled).toEqual(
+        expect.arrayContaining([
+          'sum by (a00) (rate({__name__="http_requests_total"}[4m]))',
+          'sum by (a01) (rate({__name__="http_requests_total"}[4m]))',
+        ]),
+      );
+    });
+
+    it("cancels the grid's unfinished charts when the view closes", async () => {
+      runQuery.mockImplementation(() => new Promise(() => {}));
+      wrapper = mountBreakdown();
+      await flushPromises();
+      lazy.setVisible(wrapper.find('[data-test="metrics-breakdown-card-method"]').element, true);
+      await flushPromises();
+
+      wrapper.unmount();
+      expect(cancelQueries).toHaveBeenCalledWith([
+        'sum by (method) (rate({__name__="http_requests_total"}[4m]))',
+      ]);
+    });
+  });
+
+  describe("a selected label", () => {
+    it("replaces the grid with its large chart, its values and a way back", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-grid"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-breakdown-chart"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-breakdown-values"]').exists()).toBe(true);
+
+      await wrapper.find('[data-test="metrics-breakdown-back"]').trigger("click");
+      expect(wrapper.emitted("update:selectedLabel")).toEqual([[null]]);
+    });
+
+    it("returns to the grid once the label is cleared", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      await wrapper.setProps({ selectedLabel: null });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-grid"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-breakdown-chart"]').exists()).toBe(false);
+    });
+
+    it("lists the label's values with sample counts, up to 20", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "instance" });
+      await flushPromises();
+      const list = wrapper.find('[data-test="metrics-breakdown-values"]');
+      expect(list.findAll('[data-test^="metrics-breakdown-value-instance-"]')).toHaveLength(20);
+      expect(list.text()).toContain("samples");
+      expect(list.find('[data-test="metrics-breakdown-distinct-instance"]').text()).toBe(
+        "20+ values",
+      );
     });
 
     it("adds a value to the filters, or excludes it", async () => {
-      wrapper = mountBreakdown();
+      wrapper = mountBreakdown({ selectedLabel: "status" });
       await flushPromises();
 
       await wrapper.find('[data-test="metrics-breakdown-add-status-500"]').trigger("click");
@@ -218,27 +428,14 @@ describe("MetricBreakdown", () => {
         [{ label: "status", operator: "=", value: "500" }],
         [{ label: "status", operator: "!=", value: "500" }],
       ]);
-      // Adding a filter is not selecting the row.
       expect(wrapper.emitted("update:selectedLabel")).toBeFalsy();
     });
 
-    it("selects a label from its row", async () => {
-      wrapper = mountBreakdown();
-      await flushPromises();
-      await wrapper.find('[data-test="breakdown-row-route"]').trigger("click");
-      expect(wrapper.emitted("update:selectedLabel")).toEqual([["route"]]);
-    });
-  });
-
-  describe("chart for the selected label", () => {
     it("charts a label with few values without topk", async () => {
       wrapper = mountBreakdown({ selectedLabel: "method" });
       await flushPromises();
 
-      expect(runQuery).toHaveBeenCalledTimes(1);
-      expect(runQuery).toHaveBeenCalledWith(
-        'sum by (method) (rate({__name__="http_requests_total"}[4m]))',
-      );
+      expect(exprs()).toEqual(['sum by (method) (rate({__name__="http_requests_total"}[4m]))']);
       expect(wrapper.find('[data-test="metrics-breakdown-topk"]').exists()).toBe(false);
     });
 
@@ -262,13 +459,14 @@ describe("MetricBreakdown", () => {
       );
     });
 
-    it("ignores a deep-linked label the table does not offer", async () => {
-      // `le` is never a breakdown label, so it has no row and no topk guard.
+    it("ignores a deep-linked label the breakdown does not offer, showing the grid", async () => {
+      // `le` is never a breakdown label.
       wrapper = mountBreakdown({ selectedLabel: "le" });
       await flushPromises();
 
-      expect(runQuery).not.toHaveBeenCalled();
       expect(wrapper.find('[data-test="metrics-breakdown-chart"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-breakdown-grid"]').exists()).toBe(true);
+      expect(exprs().some((e) => e.includes("by (le)"))).toBe(false);
     });
 
     it("renders exactly one chart", async () => {
@@ -278,6 +476,7 @@ describe("MetricBreakdown", () => {
     });
 
     it("cancels the previous chart query when another label is selected", async () => {
+      runQuery.mockImplementationOnce(() => new Promise(() => {}));
       wrapper = mountBreakdown({ selectedLabel: "method" });
       await flushPromises();
       const first = runQuery.mock.calls[0][0];
@@ -292,6 +491,7 @@ describe("MetricBreakdown", () => {
     });
 
     it("cancels the chart query when the view closes", async () => {
+      runQuery.mockImplementation(() => new Promise(() => {}));
       wrapper = mountBreakdown({ selectedLabel: "route" });
       await flushPromises();
       const expr = runQuery.mock.calls[0][0];
@@ -315,220 +515,118 @@ describe("MetricBreakdown", () => {
       expect(chart.props("queries")[0].expr).toContain("by (route)");
       expect(chart.props("results")).toEqual([SERIES]);
     });
-  });
-});
 
-// The real OTable renders only `#cell-<id>` slots, so a wrong slot name leaves cells empty here.
-describe("MetricBreakdown with the real OTable", () => {
-  let wrapper: VueWrapper<any>;
+    it("titles the chart with the measure it plots: p90 for a histogram, rate for a counter", async () => {
+      wrapper = mountBreakdown({
+        card: { ...CARD, name: "lat_bucket", cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS },
+        selectedLabel: "method",
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
+        "p90 by method",
+      );
+      wrapper.unmount();
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    fieldValues.mockResolvedValue({ data: { hits: HITS } });
-    runQuery.mockResolvedValue(SERIES);
-  });
-
-  afterEach(() => wrapper?.unmount());
-
-  const mountReal = (props: Record<string, any> = {}) =>
-    mount(MetricBreakdown, {
-      props: {
-        card: CARD,
-        labelsByStream: {},
-        filters: [],
-        timeRange: { start_time: 1_000, end_time: 2_000 },
-        selectedLabel: null,
-        rateWindow: "4m",
-        nanGuard: false,
-        color: "#000",
-        runQuery,
-        cancelQueries,
-        ...props,
-      },
-      global: { plugins: [i18n, store], stubs: { MetricCardChart: MetricCardChartStub } },
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
+        "Rate by method",
+      );
     });
 
-  it("renders each label's top values with their Add to filter and Exclude actions", async () => {
-    wrapper = mountReal();
-    await flushPromises();
-
-    // Wait out OTable's loading skeleton; the cells are what is under test.
-    await vi.waitFor(() => expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(4));
-    expect(wrapper.find('[data-test="metrics-breakdown-value-method-m0"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="metrics-breakdown-distinct-instance"]').text()).toBe("20+");
-
-    await wrapper.find('[data-test="metrics-breakdown-add-status-500"]').trigger("click");
-    await wrapper.find('[data-test="metrics-breakdown-exclude-status-500"]').trigger("click");
-    expect(wrapper.emitted("add-filter")).toEqual([
-      [{ label: "status", operator: "=", value: "500" }],
-      [{ label: "status", operator: "!=", value: "500" }],
-    ]);
-  });
-
-  // 20 labels: `tenant_id` sorts past the first 15, whose values are counted.
-  const WIDE_LABELS = [
-    ...Array.from({ length: 18 }, (_, i) => `a${String(i).padStart(2, "0")}`),
-    "service_name",
-    "tenant_id",
-  ];
-  const WIDE: any = { ...CARD, labels: WIDE_LABELS };
-
-  it("offers every label, and honours a deep-linked label past the value-count cap", async () => {
-    fieldValues.mockResolvedValue({
-      data: { hits: [{ field: "tenant_id", values: values("t", 3) }] },
-    });
-    wrapper = mountReal({ card: WIDE, selectedLabel: "tenant_id" });
-    await flushPromises();
-
-    await vi.waitFor(() =>
-      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(20),
-    );
-    expect(fieldValues.mock.calls.map(([req]) => req.fields)).toEqual([
-      WIDE_LABELS.slice(0, 15),
-      ["tenant_id"],
-    ]);
-    expect(runQuery).toHaveBeenCalledWith(
-      'sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))',
-    );
-    expect(wrapper.find('[data-test="metrics-breakdown-value-tenant_id-t0"]').exists()).toBe(true);
-    // An uncounted label is still a row to pick, not a silent absence.
-    expect(wrapper.find('[data-test="metrics-breakdown-distinct-service_name"]').text()).toBe("–");
-  });
-
-  const echoFields = ({ fields }: any) =>
-    Promise.resolve({
-      data: { hits: fields.map((field: string) => ({ field, values: values(`${field}-`, 3) })) },
+    it("charts the selected window with a legend, like the overview above it", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("timeRange")).toEqual({ start_time: 1_000, end_time: 2_000 });
+      expect(chart.props("legend")).toBe(true);
     });
 
-  it("shows a label added past the cap once the labels change", async () => {
-    fieldValues.mockImplementation(echoFields);
-    wrapper = mountReal({ card: WIDE });
-    await vi.waitFor(() =>
-      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(20),
-    );
+    it("queries once per window, not again when the card is rebuilt unchanged", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(fieldValues).toHaveBeenCalledTimes(1);
+      expect(runQuery).toHaveBeenCalledTimes(1);
 
-    await wrapper.setProps({ card: { ...WIDE, labels: [...WIDE_LABELS, "zone"] } });
-    await flushPromises();
+      // A refresh reloads the stream list first, rebuilding every card before the window moves.
+      await wrapper.setProps({ card: { ...CARD }, labelsByStream: {}, filters: [] });
+      await flushPromises();
+      expect(fieldValues).toHaveBeenCalledTimes(1);
+      expect(runQuery).toHaveBeenCalledTimes(1);
 
-    await vi.waitFor(() =>
-      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(21),
-    );
-    expect(wrapper.find('[data-test="metrics-breakdown-distinct-zone"]').text()).toBe("–");
-  });
-
-  it("asks for a selected label past the cap alone, never re-scanning the first 15", async () => {
-    fieldValues.mockImplementation(echoFields);
-    wrapper = mountReal({ card: WIDE });
-    await flushPromises();
-    expect(fieldValues).toHaveBeenCalledTimes(1);
-
-    await wrapper.setProps({ selectedLabel: "tenant_id" });
-    await flushPromises();
-    expect(fieldValues).toHaveBeenCalledTimes(2);
-    expect(lastRequest().fields).toEqual(["tenant_id"]);
-    expect(runQuery).toHaveBeenLastCalledWith(
-      'sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))',
-    );
-    await vi.waitFor(() =>
-      expect(
-        wrapper.find('[data-test="metrics-breakdown-value-tenant_id-tenant_id-0"]').exists(),
-      ).toBe(true),
-    );
-
-    await wrapper.setProps({ selectedLabel: "a03" });
-    await flushPromises();
-    expect(fieldValues).toHaveBeenCalledTimes(2);
-    expect(runQuery).toHaveBeenLastCalledWith(
-      'sum by (a03) (rate({__name__="http_requests_total"}[4m]))',
-    );
-  });
-
-  it("caps a 20+ label past the cap from its own counts, without waiting for the first 15", async () => {
-    fieldValues.mockImplementation(({ fields }: any) =>
-      fields.length === 1
-        ? Promise.resolve({ data: { hits: [{ field: "tenant_id", values: values("t", 21) }] } })
-        : new Promise(() => {}),
-    );
-    wrapper = mountReal({ card: WIDE, selectedLabel: "tenant_id" });
-    await flushPromises();
-
-    expect(runQuery).toHaveBeenCalledTimes(1);
-    expect(runQuery).toHaveBeenCalledWith(
-      'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
-    );
-  });
-
-  it("shows a failed count for a label past the cap as the table error, and retries it alone", async () => {
-    fieldValues.mockImplementation((req: any) =>
-      req.fields.length === 1
-        ? Promise.reject(new Error("tenant values unavailable"))
-        : echoFields(req),
-    );
-    wrapper = mountReal({ card: WIDE, selectedLabel: "tenant_id" });
-    await flushPromises();
-
-    await vi.waitFor(() =>
-      expect(wrapper.find('[data-test="o2-table-error"]').text()).toContain(
-        "tenant values unavailable",
-      ),
-    );
-
-    fieldValues.mockImplementation(echoFields);
-    await wrapper.find('[data-test="o2-table-error-retry-btn"]').trigger("click");
-    await flushPromises();
-
-    expect(fieldValues.mock.calls.map(([req]) => req.fields).slice(1)).toEqual([
-      ["tenant_id"],
-      ["tenant_id"],
-    ]);
-    await vi.waitFor(() =>
-      expect(
-        wrapper.find('[data-test="metrics-breakdown-value-tenant_id-tenant_id-0"]').exists(),
-      ).toBe(true),
-    );
-    expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(false);
-  });
-
-  it("titles the chart with the measure it plots: p90 for a histogram, rate for a counter", async () => {
-    wrapper = mountReal({
-      card: { ...CARD, name: "lat_bucket", cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS },
-      selectedLabel: "method",
+      await wrapper.setProps({ timeRange: { start_time: 3_000, end_time: 4_000 } });
+      await flushPromises();
+      expect(fieldValues).toHaveBeenCalledTimes(2);
+      expect(lastRequest().start_time).toBe(3_000);
+      expect(runQuery).toHaveBeenCalledTimes(2);
     });
-    await flushPromises();
-    expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain("p90 by method");
-    wrapper.unmount();
 
-    wrapper = mountReal({ selectedLabel: "method" });
-    await flushPromises();
-    expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
-      "Rate by method",
-    );
-  });
+    describe("past the value-count cap", () => {
+      it("asks for its values alone, never re-scanning the first 15", async () => {
+        fieldValues.mockImplementation(echoFields);
+        wrapper = mountBreakdown({ card: WIDE });
+        await flushPromises();
+        expect(fieldValues).toHaveBeenCalledTimes(1);
+        runQuery.mockClear();
 
-  it("charts the selected window with a legend, like the overview above it", async () => {
-    wrapper = mountReal({ selectedLabel: "method" });
-    await flushPromises();
-    const chart = wrapper.findComponent({ name: "MetricCardChart" });
-    expect(chart.props("timeRange")).toEqual({ start_time: 1_000, end_time: 2_000 });
-    expect(chart.props("legend")).toBe(true);
-  });
+        await wrapper.setProps({ selectedLabel: "tenant_id" });
+        await flushPromises();
+        expect(fieldValues).toHaveBeenCalledTimes(2);
+        expect(lastRequest().fields).toEqual(["tenant_id"]);
+        expect(exprs()).toEqual([
+          'sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))',
+        ]);
+        expect(
+          wrapper.find('[data-test="metrics-breakdown-value-tenant_id-tenant_id-0"]').exists(),
+        ).toBe(true);
 
-  it("queries once per window, not again when the card is rebuilt unchanged", async () => {
-    wrapper = mountReal({ selectedLabel: "method" });
-    await flushPromises();
-    expect(fieldValues).toHaveBeenCalledTimes(1);
-    expect(runQuery).toHaveBeenCalledTimes(1);
+        await wrapper.setProps({ selectedLabel: "a03" });
+        await flushPromises();
+        expect(fieldValues).toHaveBeenCalledTimes(2);
+        expect(runQuery).toHaveBeenLastCalledWith(
+          'sum by (a03) (rate({__name__="http_requests_total"}[4m]))',
+        );
+      });
 
-    // A refresh reloads the stream list first, rebuilding every card before the window moves.
-    await wrapper.setProps({ card: { ...CARD }, labelsByStream: {}, filters: [] });
-    await flushPromises();
-    expect(fieldValues).toHaveBeenCalledTimes(1);
-    expect(runQuery).toHaveBeenCalledTimes(1);
+      it("caps a 20+ label from its own counts, without waiting for the first 15", async () => {
+        fieldValues.mockImplementation(({ fields }: any) =>
+          fields.length === 1
+            ? Promise.resolve({ data: { hits: [{ field: "tenant_id", values: values("t", 21) }] } })
+            : new Promise(() => {}),
+        );
+        wrapper = mountBreakdown({ card: WIDE, selectedLabel: "tenant_id" });
+        await flushPromises();
 
-    await wrapper.setProps({ timeRange: { start_time: 3_000, end_time: 4_000 } });
-    await flushPromises();
-    expect(fieldValues).toHaveBeenCalledTimes(2);
-    expect(lastRequest().start_time).toBe(3_000);
-    expect(runQuery).toHaveBeenCalledTimes(2);
+        expect(exprs()).toEqual([
+          'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
+        ]);
+      });
+
+      it("shows its failed count and retries it alone", async () => {
+        fieldValues.mockImplementation((req: any) =>
+          req.fields.length === 1
+            ? Promise.reject(new Error("tenant values unavailable"))
+            : echoFields(req),
+        );
+        wrapper = mountBreakdown({ card: WIDE, selectedLabel: "tenant_id" });
+        await flushPromises();
+
+        const error = wrapper.find('[data-test="metrics-breakdown-values-error"]');
+        expect(error.text()).toContain("tenant values unavailable");
+
+        fieldValues.mockImplementation(echoFields);
+        await error.find('[data-test="metrics-breakdown-values-retry"]').trigger("click");
+        await flushPromises();
+
+        expect(fieldValues.mock.calls.map(([req]) => req.fields).slice(1)).toEqual([
+          ["tenant_id"],
+          ["tenant_id"],
+        ]);
+        expect(
+          wrapper.find('[data-test="metrics-breakdown-value-tenant_id-tenant_id-0"]').exists(),
+        ).toBe(true);
+        expect(wrapper.find('[data-test="metrics-breakdown-values-error"]').exists()).toBe(false);
+      });
+    });
   });
 });

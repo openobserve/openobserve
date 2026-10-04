@@ -190,47 +190,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @add-filter="$emit('add-filter', $event)"
           />
 
-          <div v-else class="min-w-0 overflow-x-auto" data-test="metrics-detail-related">
+          <div v-else data-test="metrics-detail-related">
             <OEmptyState
               v-if="!related.length"
               size="inline"
               icon="search-off"
               :title="t('metrics.explorer.detail.related.empty')"
+              data-test="metrics-detail-related-empty"
             />
-            <OTable
+            <div
               v-else
-              :data="related"
-              :columns="relatedColumns"
-              row-key="name"
-              pagination="none"
-              sorting="none"
-              :show-global-filter="false"
-              :fill-height="false"
-              row-class="cursor-pointer"
-              @row-click="(row: RelatedRow) => $emit('open-related', row.name)"
+              class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1"
+              data-test="metrics-detail-related-grid"
             >
-              <template #cell-name="{ row }">
-                <span class="font-mono text-xs">{{ row.name }}</span>
-              </template>
-              <template #cell-type="{ row }">
-                <OTag type="metricType" :value="row.typeFilterBucket" />
-              </template>
-              <template #cell-unit="{ row }">
-                <span class="text-text-secondary text-xs">{{ row.unitLabel }}</span>
-              </template>
-              <template #cell-shared="{ row }">
-                <span
-                  class="text-text-secondary block truncate text-xs"
-                  :title="row.sharedLabels.join(', ')"
-                  :data-test="`metrics-detail-related-shared-${row.name}`"
-                  >{{
-                    row.sharedLabels.length
-                      ? row.sharedLabels.join(", ")
-                      : t("metrics.explorer.detail.related.noSharedLabels")
-                  }}</span
-                >
-              </template>
-            </OTable>
+              <MetricChartTile
+                v-for="row in related"
+                :key="row.name"
+                class="hover:border-primary h-56 cursor-pointer"
+                :queries="row.chart.queries"
+                :chart-type="row.chart.chartType"
+                :unit="row.chart.unit"
+                :bucket-unit="row.chart.bucketUnit"
+                :color="row.color"
+                :time-range="timeRange"
+                :run-query="row.runQuery"
+                :cancel-queries="cancelQueries"
+                :data-test="`metrics-detail-related-card-${row.name}`"
+                @click="$emit('open-related', row.name)"
+              >
+                <template #header>
+                  <div class="flex min-w-0 flex-1 flex-col py-0.5">
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <OButton
+                        variant="ghost"
+                        size="chip"
+                        class="min-w-0"
+                        :aria-label="t('metrics.explorer.card.detailsAria', { name: row.name })"
+                        :data-test="`metrics-detail-related-open-${row.name}`"
+                        @click.stop="$emit('open-related', row.name)"
+                      >
+                        <span class="truncate" :title="row.name">{{ row.name }}</span>
+                      </OButton>
+                      <OTag type="metricType" :value="row.typeFilterBucket" class="shrink-0" />
+                    </div>
+                    <span
+                      class="text-2xs text-text-secondary block truncate px-1.5 font-normal"
+                      :title="row.sharedLabels.join(', ')"
+                      :data-test="`metrics-detail-related-shared-${row.name}`"
+                      >{{
+                        row.sharedLabels.length
+                          ? t("metrics.explorer.detail.related.sharedLabels", {
+                              labels: row.sharedLabels.join(", "),
+                            })
+                          : t("metrics.explorer.detail.related.noSharedLabels")
+                      }}</span
+                    >
+                  </div>
+                </template>
+              </MetricChartTile>
+            </div>
           </div>
         </OContent>
       </div>
@@ -243,12 +261,12 @@ import { computed, defineComponent, onBeforeUnmount, ref, watch, type PropType }
 import { raw, useI18nTyped } from "@/types/i18n";
 import MetricCardChart from "./MetricCardChart.vue";
 import MetricBreakdown from "./MetricBreakdown.vue";
+import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -256,10 +274,10 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { parseSearchError } from "@/utils/query/searchError";
 import { supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
-import { UNIT_LABELS } from "@/utils/metrics/metricPalette";
+import { UNIT_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
+import useTheme from "@/composables/useTheme";
 import { rankRelatedMetrics, relatedCandidates } from "@/utils/metrics/relatedMetrics";
 import type { DetailTab } from "@/utils/metrics/explorerUrlState";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
@@ -268,11 +286,21 @@ import { hasSamples, type LabelFilter } from "@/composables/metrics/useMetricsEx
 
 const RELATED_LIMIT = 12;
 
+/** A metric's chart as its explorer card draws it. */
+export interface DetailChart {
+  queries: TileQuery[];
+  chartType: string;
+  unit: string;
+  bucketUnit: string | null;
+}
+
 interface RelatedRow {
   name: string;
   sharedLabels: string[];
   typeFilterBucket: string;
-  unitLabel: string;
+  chart: DetailChart;
+  color: string;
+  runQuery: (expr: string) => Promise<any>;
 }
 
 interface OverviewState {
@@ -288,12 +316,12 @@ export default defineComponent({
   components: {
     MetricCardChart,
     MetricBreakdown,
+    MetricChartTile,
     OPageHeader,
     OContent,
     OButton,
     OIcon,
     OTag,
-    OTable,
     OTabs,
     OTab,
     OEmptyState,
@@ -311,13 +339,10 @@ export default defineComponent({
     tab: { type: String as PropType<DetailTab | null>, default: null },
     breakdownLabel: { type: String as PropType<string | null>, default: null },
     /** The card's current query — its ⚙ override included — resolved by the grid. */
-    overview: {
-      type: Object as PropType<{
-        queries: any[];
-        chartType: string;
-        unit: string;
-        bucketUnit: string | null;
-      }>,
+    overview: { type: Object as PropType<DetailChart>, required: true },
+    /** Any metric's chart as the grid would draw it, for the Related cards. */
+    chartOf: {
+      type: Function as PropType<(card: MetricCardModel) => DetailChart>,
       required: true,
     },
     isFavorite: { type: Boolean, default: false },
@@ -340,7 +365,11 @@ export default defineComponent({
     rateWindow: { type: String, required: true },
     nanGuard: { type: Boolean, default: false },
     color: { type: String, required: true },
-    runQuery: { type: Function as PropType<(expr: string) => Promise<any>>, required: true },
+    /** Runs one PromQL query on the scheduler, stepped for `card` (default: this view's metric). */
+    runQuery: {
+      type: Function as PropType<(expr: string, card?: MetricCardModel) => Promise<any>>,
+      required: true,
+    },
     cancelQueries: { type: Function as PropType<(exprs: string[]) => void>, required: true },
   },
   emits: [
@@ -354,6 +383,7 @@ export default defineComponent({
   ],
   setup(props) {
     const { t } = useI18nTyped();
+    const { isDark } = useTheme();
 
     const unitLabel = computed(() => raw(UNIT_LABELS[props.card?.unit ?? ""] ?? ""));
 
@@ -446,28 +476,21 @@ export default defineComponent({
       const candidates = relatedCandidates(card.name, [...byName.keys()], props.prefixOf);
       return rankRelatedMetrics(card.name, candidates, props.labelsByStream, props.familyOf)
         .slice(0, RELATED_LIMIT)
-        .map(({ name, sharedLabels }) => {
+        .flatMap(({ name, sharedLabels }, index) => {
           const other = byName.get(name);
-          return {
-            name,
-            sharedLabels,
-            typeFilterBucket: other?.typeFilterBucket ?? "other",
-            unitLabel: UNIT_LABELS[other?.unit ?? ""] ?? "",
-          };
+          if (!other) return [];
+          return [
+            {
+              name,
+              sharedLabels,
+              typeFilterBucket: other.typeFilterBucket ?? "other",
+              chart: props.chartOf(other),
+              color: cardColorForIndex(index, isDark.value),
+              runQuery: (expr: string) => props.runQuery(expr, other),
+            },
+          ];
         });
     });
-
-    const relatedColumns = computed<OTableColumnDef<RelatedRow>[]>(() => [
-      {
-        id: "name",
-        header: t("metrics.explorer.detail.related.name"),
-        size: 360,
-        meta: { isName: true },
-      },
-      { id: "type", header: t("metrics.explorer.detail.related.type"), size: 120 },
-      { id: "unit", header: t("metrics.explorer.detail.related.unit"), size: 100 },
-      { id: "shared", header: t("metrics.explorer.detail.related.sharedLabels"), size: 320 },
-    ]);
 
     return {
       raw,
@@ -483,7 +506,6 @@ export default defineComponent({
       loadOverview,
       onOverviewRenderError,
       related,
-      relatedColumns,
     };
   },
 });

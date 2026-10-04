@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { CARD_KIND, baseNameOf } from "@/utils/metrics/metricDefaults";
 import { MISC_GROUP_ID } from "@/utils/metrics/prefixGrouping";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 
 const card = (name: string, over: Record<string, any> = {}): any => ({
   name,
@@ -49,26 +50,6 @@ const ALL = [
 
 const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] };
 
-const OTableStub = {
-  name: "OTable",
-  props: ["data", "columns"],
-  emits: ["row-click"],
-  template: `
-    <div>
-      <div
-        v-for="row in data"
-        :key="row.name"
-        :data-test="'related-row-' + row.name"
-        @click="$emit('row-click', row, $event)"
-      >
-        <div v-for="col in columns" :key="col.id">
-          <slot :name="'cell-' + col.id" :row="row" :column="col" :value="row[col.id]" />
-        </div>
-      </div>
-    </div>
-  `,
-};
-
 const OPageHeaderStub = {
   name: "OPageHeader",
   props: ["title", "subtitle", "back"],
@@ -85,10 +66,15 @@ const OPageHeaderStub = {
 const runQuery = vi.fn();
 const cancelQueries = vi.fn();
 
-const mountView = (
-  props: Record<string, any> = {},
-  { realTable = false, realHeader = false } = {},
-) =>
+/** The grid's default query for a metric, as the explorer resolves it. */
+const chartOf = (c: any) => ({
+  queries: [{ expr: `rate(${c.name}[4m])` }],
+  chartType: "line",
+  unit: c.unit,
+  bucketUnit: null,
+});
+
+const mountView = (props: Record<string, any> = {}, { realHeader = false } = {}) =>
   mount(MetricDetailView, {
     props: {
       card: SELECTED,
@@ -114,20 +100,20 @@ const mountView = (
       color: "#000",
       runQuery,
       cancelQueries,
+      chartOf,
       ...props,
     },
     global: {
       plugins: [i18n, store],
       stubs: {
         ...(realHeader ? {} : { OPageHeader: OPageHeaderStub }),
-        ...(realTable ? {} : { OTable: OTableStub }),
         MetricBreakdown: {
           name: "MetricBreakdown",
           template: "<div data-test='breakdown-stub' />",
         },
         MetricCardChart: {
           name: "MetricCardChart",
-          props: ["results", "queries"],
+          props: ["results", "queries", "color", "chartType", "unit"],
           template: "<div />",
         },
       },
@@ -236,19 +222,38 @@ describe("MetricDetailView", () => {
   });
 
   describe("related", () => {
-    it("lists twelve metrics of the prefix group, never the selected metric's family", () => {
+    const RELATED_CARD = '[data-test="metrics-detail-related-grid"] > [data-test]';
+    const relatedNames = (w: VueWrapper<any>) =>
+      w
+        .findAll(RELATED_CARD)
+        .map((c) => c.attributes("data-test")!.replace("metrics-detail-related-card-", ""));
+    const relatedExprs = () =>
+      runQuery.mock.calls.map(([expr]) => expr).filter((e) => e !== "sum by (le) (rate(x[4m]))");
+
+    let io: ReturnType<typeof installFakeIntersectionObserver>;
+    beforeEach(() => {
+      io = installFakeIntersectionObserver({ autoVisible: true });
+    });
+    afterEach(() => io.restore());
+
+    it("shows a card for each of twelve metrics of the prefix group, never the selected metric's family", async () => {
       wrapper = mountView({ tab: "related" });
-      const names = wrapper
-        .findAll('[data-test^="related-row-"]')
-        .map((row) => row.attributes("data-test")!.replace("related-row-", ""));
+      await flushPromises();
+      const names = relatedNames(wrapper);
 
       expect(names).toHaveLength(12);
       expect(names).toContain("http_server_active_requests");
       expect(names).not.toContain("http_server_request_duration_seconds_sum");
       expect(names).not.toContain("http_server_request_duration_seconds_count");
       expect(names).not.toContain("node_load1");
-      // Ranked lists, no charts: nothing was queried for them.
-      expect(runQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it("lays the cards out three across, two on a tablet, one on a phone", () => {
+      wrapper = mountView({ tab: "related" });
+      const grid = wrapper.find('[data-test="metrics-detail-related-grid"]');
+      expect(grid.classes()).toEqual(
+        expect.arrayContaining(["grid", "grid-cols-3", "max-lg:grid-cols-2", "max-md:grid-cols-1"]),
+      );
     });
 
     it("ranks only metrics the active filters apply to", () => {
@@ -256,46 +261,100 @@ describe("MetricDetailView", () => {
         tab: "related",
         isLabelEligible: (c: any) => c.name !== "http_server_active_requests",
       });
-      const names = wrapper
-        .findAll('[data-test^="related-row-"]')
-        .map((row) => row.attributes("data-test")!.replace("related-row-", ""));
+      const names = relatedNames(wrapper);
       expect(names).toHaveLength(12);
       expect(names).not.toContain("http_server_active_requests");
     });
 
-    // The real OTable renders `#cell-<id>` slots and ignores a generic `#cell`.
-    it("renders each related metric's cells in the real OTable", async () => {
-      wrapper = mountView(
-        {
-          tab: "related",
-          labelsByStream: {
-            [SELECTED.name]: ["job", "route"],
-            http_server_active_requests: ["job", "route"],
-          },
+    it("heads each card with the metric's name, type and the labels it shares", () => {
+      wrapper = mountView({
+        tab: "related",
+        labelsByStream: {
+          [SELECTED.name]: ["job", "route"],
+          http_server_active_requests: ["job", "route"],
         },
-        { realTable: true },
+      });
+      const cardEl = wrapper.find(
+        '[data-test="metrics-detail-related-card-http_server_active_requests"]',
       );
-      await vi.waitFor(() =>
-        expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(12),
-      );
-      const names = wrapper.findAll('[data-test="o2-table-cell-name"]').map((c) => c.text());
-      expect(names).toContain("http_server_active_requests");
-      const shared = wrapper.findAll('[data-test="o2-table-cell-shared"]').map((c) => c.text());
-      expect(shared).toContain("job, route");
-      const cell = wrapper.find(
+      expect(cardEl.text()).toContain("http_server_active_requests");
+      expect(cardEl.findComponent({ name: "OTag" }).props("value")).toBe("gauge");
+      const shared = cardEl.find(
         '[data-test="metrics-detail-related-shared-http_server_active_requests"]',
       );
-      expect(cell.classes()).toContain("truncate");
-      expect(cell.attributes("title")).toBe("job, route");
-      expect(
-        wrapper.findAll('[data-test="o2-table-cell-type"]').every((c) => c.text() !== ""),
-      ).toBe(true);
+      expect(shared.classes()).toContain("truncate");
+      expect(shared.attributes("title")).toBe("job, route");
+      expect(shared.text()).toContain("job, route");
     });
 
-    it("opens a related metric's detail view on click", async () => {
+    it("charts each related metric with the grid's default query, on its own card's scheduler slot", async () => {
       wrapper = mountView({ tab: "related" });
-      await wrapper.find('[data-test="related-row-http_server_active_requests"]').trigger("click");
-      expect(wrapper.emitted("open-related")).toEqual([["http_server_active_requests"]]);
+      await flushPromises();
+      expect(relatedExprs()).toContain("rate(http_server_active_requests[4m])");
+      const call = runQuery.mock.calls.find(
+        ([expr]) => expr === "rate(http_server_active_requests[4m])",
+      )!;
+      expect(call[1].name).toBe("http_server_active_requests");
+    });
+
+    it("says so on a card whose metric has no chartable query", async () => {
+      wrapper = mountView({
+        tab: "related",
+        chartOf: (c: any) => ({ ...chartOf(c), queries: [] }),
+      });
+      await flushPromises();
+      expect(
+        wrapper
+          .find('[data-test="metrics-detail-related-card-http_server_active_requests-nopreview"]')
+          .exists(),
+      ).toBe(true);
+      expect(relatedExprs()).toEqual([]);
+    });
+
+    it("charts a related metric only once its card scrolls into view", async () => {
+      const lazy = installFakeIntersectionObserver();
+      try {
+        wrapper = mountView({ tab: "related" });
+        await flushPromises();
+        expect(relatedExprs()).toEqual([]);
+
+        const cardEl = wrapper.find(
+          '[data-test="metrics-detail-related-card-http_server_active_requests"]',
+        );
+        lazy.setVisible(cardEl.element, true);
+        await flushPromises();
+        expect(relatedExprs()).toEqual(["rate(http_server_active_requests[4m])"]);
+      } finally {
+        lazy.restore();
+      }
+    });
+
+    it("cancels the related charts still running when the view closes", async () => {
+      runQuery.mockImplementation(() => new Promise(() => {}));
+      wrapper = mountView({ tab: "related" });
+      await flushPromises();
+      wrapper.unmount();
+      const cancelled = cancelQueries.mock.calls.flatMap(([list]) => list);
+      expect(cancelled).toContain("rate(http_server_active_requests[4m])");
+    });
+
+    it("says so when nothing is related", () => {
+      wrapper = mountView({ tab: "related", allCards: [SELECTED] });
+      expect(wrapper.find('[data-test="metrics-detail-related-empty"]').exists()).toBe(true);
+    });
+
+    it("opens a related metric's detail view from its card or its title", async () => {
+      wrapper = mountView({ tab: "related" });
+      await wrapper
+        .find('[data-test="metrics-detail-related-card-http_server_active_requests"]')
+        .trigger("click");
+      await wrapper
+        .find('[data-test="metrics-detail-related-open-http_server_active_requests"]')
+        .trigger("click");
+      expect(wrapper.emitted("open-related")).toEqual([
+        ["http_server_active_requests"],
+        ["http_server_active_requests"],
+      ]);
     });
   });
 

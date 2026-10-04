@@ -1275,6 +1275,43 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.cancelDetailQueries).toHaveBeenCalledWith(["sum(up)"]);
     });
 
+    it("runs a related metric's chart on that metric's own step", () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const OTHER = { ...CARD, name: "http_responses_total" };
+
+      detailView(wrapper).props("runQuery")("sum(other)", OTHER);
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(other)", OTHER);
+    });
+
+    it("charts a related metric with the query its explorer card would run", () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const OTHER = { ...CARD, name: "http_responses_total", chartType: "line", unit: "count" };
+      grid.effectiveVariant.mockReturnValueOnce({
+        defaults: { variants: [] },
+        resolved: { queries: [{ expr: "sum(rate(http_responses_total[4m]))" }], unit: "count" },
+      } as any);
+
+      const chart = detailView(wrapper).props("chartOf")(OTHER);
+      expect(grid.effectiveVariant).toHaveBeenLastCalledWith(OTHER, undefined, expect.any(Object));
+      expect(chart.queries).toEqual([{ expr: "sum(rate(http_responses_total[4m]))" }]);
+      expect(chart.chartType).toBe("line");
+    });
+
+    it("Back to the label grid clears the breakdown label, replacing the entry", async () => {
+      routerState.query = { metric: CARD.name, tab: "breakdown", breakdown_label: "route" };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+      routerState.replace.mockClear();
+
+      (wrapper.vm as any).onBreakdownLabel(null);
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("breakdownLabel")).toBeNull();
+      expect(routerState.replace.mock.calls.at(-1)[0].query.breakdown_label).toBeUndefined();
+      expect(routerState.push).not.toHaveBeenCalled();
+    });
+
     it("still cancels the view's queries when it is closed before it unmounts", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();

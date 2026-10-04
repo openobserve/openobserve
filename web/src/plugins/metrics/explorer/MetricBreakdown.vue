@@ -16,68 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex min-h-0 flex-col gap-3" data-test="metrics-breakdown">
-    <section
-      v-if="activeLabel"
-      class="border-border-default rounded-surface flex flex-col border"
-      data-test="metrics-breakdown-chart"
-    >
-      <div class="flex items-center gap-2 px-3 pt-2">
-        <span class="text-text-heading truncate text-sm font-medium">
-          {{ t(breakdownTitleKey(card.cardKind), { label: activeLabel }) }}
-        </span>
-        <OTag
-          v-if="topkApplied"
-          variant="default-outline"
-          size="sm"
-          class="shrink-0"
-          data-test="metrics-breakdown-topk"
-          >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
-        >
-      </div>
-
-      <div class="relative h-60">
-        <div
-          v-if="chart.status === 'error'"
-          class="text-text-secondary flex h-full flex-col items-center justify-center gap-1 text-xs"
-          :title="chart.error"
-          data-test="metrics-breakdown-chart-error"
-        >
-          <OIcon name="error" size="sm" class="text-error-600" />
-          <span>{{ t("metrics.explorer.queryFailed") }}</span>
-          <OButton variant="ghost-primary" size="xs" @click="loadChart">
-            {{ t("metrics.explorer.retry") }}
-          </OButton>
-        </div>
-
-        <div
-          v-else-if="chart.status === 'done' && !chartHasSamples"
-          class="text-text-secondary flex h-full items-center justify-center text-xs"
-          data-test="metrics-breakdown-chart-nodata"
-        >
-          {{ t("metrics.explorer.noData") }}
-        </div>
-
-        <MetricCardChart
-          v-else-if="chart.status === 'done'"
-          :results="chart.results"
-          :queries="chartQueries"
-          chart-type="line"
-          :unit="o2Unit.unit"
-          :unit-custom="o2Unit.unitCustom ?? undefined"
-          :color="color"
-          :time-range="timeRange"
-          legend
-          @error="onRenderError"
-        />
-
-        <OSkeleton v-else class="h-full" animation="wave" />
-      </div>
-    </section>
-
-    <p v-else-if="labels.length" class="text-text-secondary text-xs">
-      {{ t("metrics.explorer.detail.breakdown.selectHint") }}
-    </p>
-
     <OEmptyState
       v-if="!labels.length"
       size="inline"
@@ -86,43 +24,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="metrics-breakdown-no-labels"
     />
 
-    <div v-else class="min-w-0 overflow-x-auto" data-test="metrics-breakdown-table">
-      <OTable
-        :data="rows"
-        :columns="columns"
-        row-key="label"
-        pagination="none"
-        sorting="none"
-        :show-global-filter="false"
-        :fill-height="false"
-        horizontal-scroll
-        :loading="tableLoading"
-        :error="tableError || extraCounts.error || null"
-        :row-class="rowClass"
-        @pagination-change="retryCounts"
-        @row-click="(row: BreakdownRow) => $emit('update:selectedLabel', row.label)"
+    <template v-else-if="activeLabel">
+      <div>
+        <OButton
+          variant="ghost"
+          size="sm"
+          icon-left="arrow-back"
+          data-test="metrics-breakdown-back"
+          @click="$emit('update:selectedLabel', null)"
+        >
+          {{ t("metrics.explorer.detail.breakdown.allLabels") }}
+        </OButton>
+      </div>
+
+      <MetricChartTile
+        class="h-60"
+        :queries="queriesByLabel[activeLabel]"
+        :unit="card.unit"
+        :color="color"
+        :time-range="timeRange"
+        :run-query="runQuery"
+        :cancel-queries="cancelQueries"
+        legend
+        data-test="metrics-breakdown-chart"
       >
-        <template #cell-label="{ row }">
-          <span
-            class="font-mono text-xs"
-            :class="row.label === selectedLabel ? 'text-text-heading font-semibold' : ''"
-            >{{ row.label }}</span
+        <template #header>
+          <span class="truncate">{{
+            t(breakdownTitleKey(card.cardKind), { label: activeLabel })
+          }}</span>
+          <OTag
+            v-if="topkByLabel[activeLabel]"
+            variant="default-outline"
+            size="sm"
+            class="shrink-0"
+            data-test="metrics-breakdown-topk"
+            >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
           >
         </template>
+      </MetricChartTile>
 
-        <template #cell-values="{ row }">
-          <span v-if="!row.counted" class="text-text-secondary text-xs">{{
-            t("metrics.explorer.detail.breakdown.notCounted")
+      <section
+        class="border-border-default rounded-surface flex flex-col overflow-hidden border"
+        data-test="metrics-breakdown-values"
+      >
+        <PanelBar class="min-w-0 gap-2">
+          <span class="truncate">{{
+            t("metrics.explorer.detail.breakdown.valuesOf", { label: activeLabel })
           }}</span>
-          <div v-else class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span
-              v-for="entry in row.top"
+          <span
+            v-if="distinctText(activeLabel)"
+            class="text-2xs text-text-secondary shrink-0 font-normal tabular-nums"
+            :data-test="`metrics-breakdown-distinct-${activeLabel}`"
+            >{{ distinctText(activeLabel) }}</span
+          >
+        </PanelBar>
+
+        <div class="p-2">
+          <OBanner
+            v-if="activeCounts.failed"
+            variant="error-soft"
+            dense
+            inline-actions
+            :content="
+              t('metrics.explorer.detail.breakdown.countsFailed', {
+                error: raw(activeCounts.error),
+              })
+            "
+            data-test="metrics-breakdown-values-error"
+          >
+            <template #actions>
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                data-test="metrics-breakdown-values-retry"
+                @click="retryCounts"
+              >
+                {{ t("metrics.explorer.retry") }}
+              </OButton>
+            </template>
+          </OBanner>
+
+          <OSkeleton
+            v-else-if="!activeCounts.ready"
+            class="h-16"
+            animation="wave"
+            data-test="metrics-breakdown-values-loading"
+          />
+
+          <p
+            v-else-if="!activeValues.length"
+            class="text-text-secondary px-1 text-xs"
+            data-test="metrics-breakdown-values-empty"
+          >
+            {{ t("metrics.explorer.noData") }}
+          </p>
+
+          <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-6">
+            <li
+              v-for="entry in activeValues"
               :key="entry.value"
-              class="inline-flex items-center gap-1"
-              :data-test="`metrics-breakdown-value-${row.label}-${entry.value}`"
+              class="flex min-w-0 items-center gap-2 px-1 py-0.5"
+              :data-test="`metrics-breakdown-value-${activeLabel}-${entry.value}`"
             >
-              <span class="text-text-body font-mono text-xs">{{ entry.value }}</span>
-              <span class="text-text-secondary text-2xs tabular-nums">{{
+              <span
+                class="text-text-body min-w-0 flex-1 truncate font-mono text-xs"
+                :title="entry.value"
+                >{{ entry.value }}</span
+              >
+              <span class="text-text-secondary text-2xs shrink-0 tabular-nums">{{
                 t(
                   "metrics.explorer.detail.breakdown.samples",
                   { count: entry.count.toLocaleString() },
@@ -135,12 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="add-circle-outline"
                 :aria-label="
                   t('metrics.explorer.detail.breakdown.addToFilterAria', {
-                    label: row.label,
+                    label: activeLabel,
                     value: entry.value,
                   })
                 "
-                :data-test="`metrics-breakdown-add-${row.label}-${entry.value}`"
-                @click.stop="addFilter(row.label, entry.value, '=')"
+                :data-test="`metrics-breakdown-add-${activeLabel}-${entry.value}`"
+                @click="addFilter(activeLabel, entry.value, '=')"
               >
                 <OTooltip :content="t('metrics.explorer.detail.breakdown.addToFilter')" />
               </OButton>
@@ -150,28 +159,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="block"
                 :aria-label="
                   t('metrics.explorer.detail.breakdown.excludeAria', {
-                    label: row.label,
+                    label: activeLabel,
                     value: entry.value,
                   })
                 "
-                :data-test="`metrics-breakdown-exclude-${row.label}-${entry.value}`"
-                @click.stop="addFilter(row.label, entry.value, '!=')"
+                :data-test="`metrics-breakdown-exclude-${activeLabel}-${entry.value}`"
+                @click="addFilter(activeLabel, entry.value, '!=')"
               >
                 <OTooltip :content="t('metrics.explorer.detail.breakdown.exclude')" />
               </OButton>
-            </span>
-          </div>
-        </template>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </template>
 
-        <template #cell-distinct="{ row }">
-          <span
-            class="text-xs tabular-nums"
-            :data-test="`metrics-breakdown-distinct-${row.label}`"
-            >{{ distinctLabel(row) }}</span
+    <template v-else>
+      <OBanner
+        v-if="headError"
+        variant="error-soft"
+        dense
+        inline-actions
+        :content="t('metrics.explorer.detail.breakdown.countsFailed', { error: raw(headError) })"
+        data-test="metrics-breakdown-counts-error"
+      >
+        <template #actions>
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            data-test="metrics-breakdown-counts-retry"
+            @click="retryCounts"
           >
+            {{ t("metrics.explorer.retry") }}
+          </OButton>
         </template>
-      </OTable>
-    </div>
+      </OBanner>
+
+      <p class="text-text-secondary text-xs">
+        {{ t("metrics.explorer.detail.breakdown.selectHint") }}
+      </p>
+
+      <div
+        class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1"
+        data-test="metrics-breakdown-grid"
+      >
+        <MetricChartTile
+          v-for="label in labels"
+          :key="label"
+          class="hover:border-primary h-56 cursor-pointer"
+          :queries="queriesByLabel[label]"
+          :unit="card.unit"
+          :color="color"
+          :time-range="timeRange"
+          :run-query="runQuery"
+          :cancel-queries="cancelQueries"
+          :data-test="`metrics-breakdown-card-${label}`"
+          @click="select(label)"
+        >
+          <template #header>
+            <span class="min-w-0 truncate font-mono" :title="label">{{ label }}</span>
+            <span
+              v-if="distinctText(label)"
+              class="text-2xs text-text-secondary shrink-0 font-normal tabular-nums"
+              :data-test="`metrics-breakdown-distinct-${label}`"
+              >{{ distinctText(label) }}</span
+            >
+            <OTag
+              v-if="topkByLabel[label]"
+              variant="default-outline"
+              size="sm"
+              class="shrink-0"
+              :data-test="`metrics-breakdown-topk-${label}`"
+              >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
+            >
+            <div class="flex-1" />
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              class="shrink-0"
+              :aria-label="t('metrics.explorer.detail.breakdown.selectAria', { label })"
+              :data-test="`metrics-breakdown-select-${label}`"
+              @click.stop="select(label)"
+            >
+              {{ t("metrics.explorer.detail.breakdown.select") }}
+            </OButton>
+          </template>
+        </MetricChartTile>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -179,15 +254,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeUnmount, ref, watch, type PropType } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import MetricCardChart from "./MetricCardChart.vue";
+import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import streamService from "@/services/stream";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { parseSearchError } from "@/utils/query/searchError";
@@ -198,41 +272,48 @@ import {
   breakdownTitleKey,
   buildBreakdownQuery,
   CARD_KIND,
-  toO2Unit,
 } from "@/utils/metrics/metricDefaults";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
-import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
-import { hasSamples, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
 /** 21, not 20: a 21st value is how "more than 20" is known. */
 const VALUES_SIZE = 21;
-const TOP_VALUES = 5;
 /** Series kept for a label with "20+" values — beyond it the chart is a smear. */
 const TOPK = 10;
 
-interface BreakdownRow {
-  label: string;
-  top: Array<{ value: string; count: number }>;
-  distinct: number;
-  /** The endpoint hit its cap: there are more than `VALUES_SIZE - 1` values. */
-  more: boolean;
+/** One label's value counts, as far as they are known. */
+interface LabelCounts {
+  /** Its counts have answered, or will never be asked for. */
+  ready: boolean;
   /** Its values were requested; past `BREAKDOWN_LABEL_LIMIT` only the selected label's are. */
   counted: boolean;
-}
-
-interface ChartState {
-  status: "idle" | "loading" | "done" | "error";
-  results: any[];
+  failed: boolean;
   error: string;
-  expr: string;
+  values: any[];
 }
 
-const IDLE: ChartState = { status: "idle", results: [], error: "", expr: "" };
+const PENDING: LabelCounts = { ready: false, counted: true, failed: false, error: "", values: [] };
+const UNCOUNTED: LabelCounts = {
+  ready: true,
+  counted: false,
+  failed: false,
+  error: "",
+  values: [],
+};
 
 export default defineComponent({
   name: "MetricBreakdown",
-  components: { MetricCardChart, OButton, OIcon, OTag, OTable, OEmptyState, OSkeleton, OTooltip },
+  components: {
+    MetricChartTile,
+    PanelBar,
+    OButton,
+    OTag,
+    OEmptyState,
+    OBanner,
+    OSkeleton,
+    OTooltip,
+  },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
     labelsByStream: { type: Object as PropType<Record<string, string[]>>, required: true },
@@ -275,7 +356,7 @@ export default defineComponent({
       return breakdownLabelsOf(own, alsoOn);
     });
 
-    /** The selected label, if the table offers it: a deep link can name any label. */
+    /** The selected label, if the breakdown offers it: a deep link can name any label. */
     const activeLabel = computed(() =>
       props.selectedLabel && labels.value.includes(props.selectedLabel)
         ? props.selectedLabel
@@ -290,11 +371,10 @@ export default defineComponent({
       return known ? props.filters.filter((f) => known.includes(String(f.label))) : props.filters;
     });
 
-    const tableLoading = ref(false);
-    const tableLoaded = ref(false);
-    const tableError = ref("");
+    const headLoaded = ref(false);
+    const headError = ref("");
     const headCounts = ref<{ fields: string[]; hits: any[] } | null>(null);
-    let tableGeneration = 0;
+    let headGeneration = 0;
 
     const headLabels = computed(() => labels.value.slice(0, BREAKDOWN_LABEL_LIMIT));
 
@@ -306,8 +386,8 @@ export default defineComponent({
       label: string;
       status: "loading" | "done" | "error";
       values: any[];
-      error?: string;
-    }>({ label: "", status: "done", values: [] });
+      error: string;
+    }>({ label: "", status: "done", values: [], error: "" });
     let extraGeneration = 0;
 
     const fetchValues = (fields: string[]) =>
@@ -323,30 +403,26 @@ export default defineComponent({
           b64EncodeUnicode(labelFiltersToSql(valuesStream.value, applicableFilters.value)) ?? "",
       });
 
-    const loadTable = async () => {
-      const generation = ++tableGeneration;
+    const loadHead = async () => {
+      const generation = ++headGeneration;
       const fields = headLabels.value;
-      tableError.value = "";
-      tableLoaded.value = false;
+      headError.value = "";
+      headLoaded.value = false;
       if (!fields.length) {
         headCounts.value = { fields, hits: [] };
-        tableLoaded.value = true;
+        headLoaded.value = true;
         return;
       }
-      tableLoading.value = true;
       try {
         const response = await fetchValues(fields);
-        if (generation !== tableGeneration) return;
+        if (generation !== headGeneration) return;
         headCounts.value = { fields, hits: response?.data?.hits ?? [] };
       } catch (error: any) {
-        if (generation !== tableGeneration) return;
+        if (generation !== headGeneration) return;
         headCounts.value = null;
-        tableError.value = parseSearchError(error).message;
+        headError.value = parseSearchError(error).message;
       } finally {
-        if (generation === tableGeneration) {
-          tableLoading.value = false;
-          tableLoaded.value = true;
-        }
+        if (generation === headGeneration) headLoaded.value = true;
       }
     };
 
@@ -354,16 +430,16 @@ export default defineComponent({
       const generation = ++extraGeneration;
       const label = pastCapLabel.value;
       if (!label) {
-        extraCounts.value = { label: "", status: "done", values: [] };
+        extraCounts.value = { label: "", status: "done", values: [], error: "" };
         return;
       }
-      extraCounts.value = { label, status: "loading", values: [] };
+      extraCounts.value = { label, status: "loading", values: [], error: "" };
       try {
         const response = await fetchValues([label]);
         if (generation !== extraGeneration) return;
         const hits: any[] = response?.data?.hits ?? [];
         const values = hits.find((hit) => hit?.field === label)?.values ?? [];
-        extraCounts.value = { label, status: "done", values };
+        extraCounts.value = { label, status: "done", values, error: "" };
       } catch (error: any) {
         if (generation !== extraGeneration) return;
         extraCounts.value = {
@@ -375,9 +451,9 @@ export default defineComponent({
       }
     };
 
-    // OTable's error banner retries through `pagination-change`; only the failed request is repeated.
+    /** Repeats only the failed request. */
     const retryCounts = () => {
-      if (tableError.value) loadTable();
+      if (headError.value) loadHead();
       if (extraCounts.value.status === "error") loadExtra();
     };
 
@@ -387,83 +463,46 @@ export default defineComponent({
       () => JSON.stringify(applicableFilters.value),
       () => props.timeRange,
     ];
-    watch([() => headLabels.value.join(","), ...countSources], loadTable, { immediate: true });
+    watch([() => headLabels.value.join(","), ...countSources], loadHead, { immediate: true });
     watch([pastCapLabel, ...countSources], loadExtra, { immediate: true });
 
-    const toRow = (label: string, values: any[], counted: boolean): BreakdownRow => ({
-      label,
-      top: values.slice(0, TOP_VALUES).map((v) => ({
-        value: String(v?.zo_sql_key ?? ""),
-        count: Number(v?.zo_sql_num ?? 0),
-      })),
-      distinct: values.length,
-      more: values.length >= VALUES_SIZE,
-      counted,
-    });
-
-    // Built from the full label list, so a label past the cap appears without a re-scan.
-    const rows = computed<BreakdownRow[]>(() => {
-      const head = headCounts.value;
-      if (!head) return [];
-      const extra = extraCounts.value;
-      return labels.value.map((label) => {
-        if (extra.label === label && extra.status === "done")
-          return toRow(label, extra.values, true);
-        const values = head.hits.find((hit) => hit?.field === label)?.values ?? [];
-        return toRow(label, values, head.fields.includes(label));
-      });
-    });
-
-    const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => [
-      { id: "label", header: t("metrics.explorer.detail.breakdown.label"), size: 180 },
-      { id: "values", header: t("metrics.explorer.detail.breakdown.topValues"), size: 560 },
-      {
-        id: "distinct",
-        header: t("metrics.explorer.detail.breakdown.distinct"),
-        size: 120,
-        meta: { align: "right" },
-      },
-    ]);
-
-    const distinctLabel = (row: BreakdownRow) =>
-      !row.counted
-        ? raw("–")
-        : row.more
-          ? t("metrics.explorer.detail.breakdown.distinctMany", { count: VALUES_SIZE - 1 })
-          : raw(String(row.distinct));
-
-    const rowClass = (row: BreakdownRow) =>
-      row.label === activeLabel.value ? "bg-accent/10 cursor-pointer" : "cursor-pointer";
-
-    const addFilter = (label: string, value: string, operator: "=" | "!=") =>
-      emit("add-filter", { label: raw(label), operator, value });
-
-    const selectedRow = computed(
-      () => rows.value.find((row) => row.label === activeLabel.value) ?? null,
-    );
-    /** The selected label's counts, from whichever request carries them, so the chart waits on that one only. */
-    const selectedCounts = computed(() => {
-      const extra = extraCounts.value;
-      if (!pastCapLabel.value) {
+    const countsFor = (label: string): LabelCounts => {
+      if (label === pastCapLabel.value) {
+        const extra = extraCounts.value;
+        if (extra.label !== label || extra.status === "loading") return PENDING;
         return {
-          ready: tableLoaded.value,
-          failed: !!tableError.value,
-          more: !!selectedRow.value?.more,
+          ready: true,
+          counted: true,
+          failed: extra.status === "error",
+          error: extra.error,
+          values: extra.values,
         };
       }
-      return {
-        ready: extra.label === pastCapLabel.value && extra.status !== "loading",
-        failed: extra.status === "error",
-        more: extra.values.length >= VALUES_SIZE,
-      };
-    });
-    // Without counts a label's cardinality is unknown, so it gets the conservative cap.
-    const topkApplied = computed(() => selectedCounts.value.more || selectedCounts.value.failed);
+      if (!headLabels.value.includes(label)) return UNCOUNTED;
+      if (!headLoaded.value) return PENDING;
+      if (headError.value)
+        return { ready: true, counted: true, failed: true, error: headError.value, values: [] };
+      const values = headCounts.value?.hits.find((hit) => hit?.field === label)?.values ?? [];
+      return { ready: true, counted: true, failed: false, error: "", values };
+    };
 
-    /** Built once the selected label's counts have answered: only they know whether to cap at top 10. */
-    const chartExpr = computed(() => {
-      if (!activeLabel.value || !selectedCounts.value.ready) return null;
-      return buildBreakdownQuery(
+    const countsByLabel = computed(() =>
+      Object.fromEntries(labels.value.map((label) => [label, countsFor(label)])),
+    );
+
+    // Without counts a label's cardinality is unknown, so it gets the conservative cap.
+    const topkByLabel = computed<Record<string, boolean>>(() =>
+      Object.fromEntries(
+        Object.entries(countsByLabel.value).map(([label, c]) => [
+          label,
+          c.ready && (!c.counted || c.failed || c.values.length >= VALUES_SIZE),
+        ]),
+      ),
+    );
+
+    const queriesFor = (label: string): TileQuery[] | null => {
+      if (!countsByLabel.value[label].ready) return null;
+      const expr = buildBreakdownQuery(
         props.card.cardKind,
         {
           metricName: props.card.name,
@@ -471,93 +510,65 @@ export default defineComponent({
           rateWindow: props.rateWindow,
           applyNanGuard: props.nanGuard,
         },
-        activeLabel.value,
-        topkApplied.value ? { topk: TOPK } : undefined,
+        label,
+        topkByLabel.value[label] ? { topk: TOPK } : undefined,
       );
-    });
-
-    const chartQueries = computed(() => [
-      { expr: chart.value.expr, legendTemplate: `{${activeLabel.value ?? ""}}` },
-    ]);
-    const o2Unit = computed(() => toO2Unit(props.card.unit));
-
-    const chart = ref<ChartState>(IDLE);
-    const chartHasSamples = computed(() => chart.value.results.some(hasSamples));
-
-    /** Bumped per load, so a superseded label's late result never lands. */
-    let chartGeneration = 0;
-    let activeExpr: string | null = null;
-
-    const cancelActive = () => {
-      if (activeExpr) props.cancelQueries([activeExpr]);
-      activeExpr = null;
+      return expr ? [{ expr, legendTemplate: `{${label}}` }] : [];
     };
 
-    const loadChart = async () => {
-      const generation = ++chartGeneration;
-      cancelActive();
-      const expr = chartExpr.value;
-      if (!expr) {
-        chart.value = IDLE;
-        return;
-      }
-      activeExpr = expr;
-      chart.value = { status: "loading", results: [], error: "", expr };
-      try {
-        const result = await props.runQuery(expr);
-        if (generation !== chartGeneration) return;
-        chart.value = { status: "done", results: [result], error: "", expr };
-      } catch (error: any) {
-        if (generation !== chartGeneration || isCancelled(error)) return;
-        chart.value = {
-          status: "error",
-          results: [],
-          error: parseSearchError(error).message,
-          expr,
-        };
-      }
+    /** `null` until the label's counts answer: only they know whether to cap at top 10. */
+    const queriesByLabel = computed<Record<string, TileQuery[] | null>>(() =>
+      Object.fromEntries(labels.value.map((label) => [label, queriesFor(label)])),
+    );
+
+    const distinctText = (label: string) => {
+      const c = countsByLabel.value[label];
+      if (!c?.ready || !c.counted || c.failed) return null;
+      return c.values.length >= VALUES_SIZE
+        ? t("metrics.explorer.detail.breakdown.distinctMany", { count: VALUES_SIZE - 1 })
+        : t(
+            "metrics.explorer.detail.breakdown.distinctCount",
+            { count: c.values.length },
+            c.values.length,
+          );
     };
 
-    watch([chartExpr, () => props.timeRange], loadChart, { immediate: true });
+    const activeCounts = computed(() =>
+      activeLabel.value ? countsByLabel.value[activeLabel.value] : PENDING,
+    );
+    const activeValues = computed(() =>
+      activeCounts.value.values.slice(0, VALUES_SIZE - 1).map((v) => ({
+        value: String(v?.zo_sql_key ?? ""),
+        count: Number(v?.zo_sql_num ?? 0),
+      })),
+    );
 
-    const onRenderError = (error: any) => {
-      chart.value = {
-        ...chart.value,
-        status: "error",
-        results: [],
-        error: String(error || t("metrics.functionConfigDialog.failedToRenderChart")),
-      };
-    };
+    const select = (label: string) => emit("update:selectedLabel", label);
+
+    const addFilter = (label: string, value: string, operator: "=" | "!=") =>
+      emit("add-filter", { label: raw(label), operator, value });
 
     onBeforeUnmount(() => {
-      tableGeneration += 1;
+      headGeneration += 1;
       extraGeneration += 1;
-      chartGeneration += 1;
-      cancelActive();
     });
 
     return {
       t,
+      raw,
       breakdownTitleKey,
       TOPK,
       labels,
       activeLabel,
-      rows,
-      columns,
-      tableLoading,
-      tableError,
-      extraCounts,
+      headError,
       retryCounts,
-      distinctLabel,
-      rowClass,
+      topkByLabel,
+      queriesByLabel,
+      distinctText,
+      activeCounts,
+      activeValues,
+      select,
       addFilter,
-      topkApplied,
-      chart,
-      chartQueries,
-      chartHasSamples,
-      o2Unit,
-      loadChart,
-      onRenderError,
     };
   },
 });

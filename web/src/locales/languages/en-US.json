@@ -9332,32 +9332,31 @@
         "tabBreakdown": "Breakdown",
         "tabRelated": "Related",
         "breakdown": {
-          "label": "Label",
-          "topValues": "Top values",
-          "distinct": "Distinct values",
           "samples": "{count} sample | {count} samples",
-          "distinctMany": "{count}+",
+          "distinctCount": "{count} value | {count} values",
+          "distinctMany": "{count}+ values",
           "addToFilter": "Add to filter",
           "addToFilterAria": "Add {label} = {value} to the filters",
           "exclude": "Exclude",
           "excludeAria": "Exclude {label} = {value}",
           "noLabels": "No labels to break this metric down by",
-          "selectHint": "Select a label to chart this metric by it.",
+          "selectHint": "Each chart splits this metric by one label. Select a label to see its values and filter by them.",
+          "select": "Select",
+          "selectAria": "Select {label} to see its values",
+          "allLabels": "All labels",
+          "valuesOf": "Values of {label}",
+          "countsFailed": "Could not count label values: {error}",
           "titleP90": "p90 by {label}",
           "titleRate": "Rate by {label}",
           "titleAvg": "Average by {label}",
           "titleMedian": "Median by {label}",
           "titleCount": "Count by {label}",
-          "notCounted": "Select to count its values",
           "topk": "top {count}"
         },
         "related": {
           "empty": "No related metrics",
-          "name": "Metric",
-          "type": "Type",
-          "unit": "Unit",
-          "sharedLabels": "Shared labels",
-          "noSharedLabels": "None"
+          "sharedLabels": "Shares {labels}",
+          "noSharedLabels": "No shared labels"
         }
       },
       "variants": {

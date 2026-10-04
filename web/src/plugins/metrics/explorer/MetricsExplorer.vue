@@ -575,6 +575,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tab="detailTab"
       :breakdown-label="breakdownLabel"
       :overview="detailOverview"
+      :chart-of="chartOf"
       :is-favorite="!!detailMetric && grid.favorites.value.includes(detailMetric)"
       :all-cards="grid.cards.value"
       :labels-by-stream="grid.labelsByStream.value"
@@ -1381,10 +1382,8 @@ export default defineComponent({
       () => (grid.loading.value && !grid.cards.value.length) || detailSchemasPending.value,
     );
 
-    /** The card's current query, its ⚙ override and any NaN-guard / widening included. */
-    const detailOverview = computed(() => {
-      const card = detailCard.value;
-      if (!card) return { queries: [], chartType: "line", unit: "", bucketUnit: null };
+    /** A card's current query, its ⚙ override and any NaN-guard / widening included. */
+    const chartOf = (card: MetricCardModel) => {
       const preview = grid.previews.value[card.name];
       const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
         applyNanGuard: preview?.nanGuardApplied,
@@ -1398,15 +1397,21 @@ export default defineComponent({
         unit: resolved?.unit ?? card.unit,
         bucketUnit: chartType === "heatmap" ? (defaults?.bucketUnit ?? null) : null,
       };
-    });
+    };
+
+    const detailOverview = computed(() =>
+      detailCard.value
+        ? chartOf(detailCard.value)
+        : { queries: [], chartType: "line", unit: "", bucketUnit: null },
+    );
 
     const detailColor = computed(() => {
       const index = visibleCards.value.findIndex((c) => c.name === detailMetric.value);
       return cardColorForIndex(Math.max(0, index), isDark.value);
     });
 
-    const runDetailPreview = (expr: string) =>
-      detailCard.value ? grid.runDetailQuery(expr, detailCard.value) : Promise.resolve(null);
+    const runDetailPreview = (expr: string, card = detailCard.value) =>
+      card ? grid.runDetailQuery(expr, card) : Promise.resolve(null);
     const cancelDetailPreviews = (exprs: string[]) => grid.cancelDetailQueries(exprs);
 
     const showDetail = (name: string) => {
@@ -2142,6 +2147,7 @@ export default defineComponent({
       detailCard,
       detailLoading,
       detailOverview,
+      chartOf,
       detailColor,
       runDetailPreview,
       cancelDetailPreviews,
