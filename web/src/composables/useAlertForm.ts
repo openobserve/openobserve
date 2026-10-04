@@ -917,7 +917,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isSyncingStreamFromSql = ref(false);
 
   const debouncedSyncStreamFromSql = debounce(async (sql: string) => {
-    if (!sql || !parser || isSyncingStreamFromSql.value) return;
+    // An edit keeps its stream: the field is locked and the backend never updates it.
+    if (!sql || !parser || isSyncingStreamFromSql.value || beingUpdated.value) return;
     // parse() is exponential in paren nesting depth — skip a pathologically
     // nested query rather than freeze the tab. Losing this convenience sync
     // is fine; the user can still pick the stream from the dropdown.
@@ -927,9 +928,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
       if (fromStream && fromStream !== formData.value.stream_name) {
         isSyncingStreamFromSql.value = true;
-        setF("stream_name", fromStream);
-        await updateStreamFields(fromStream);
-        isSyncingStreamFromSql.value = false;
+        try {
+          setF("stream_name", fromStream);
+          await updateStreamFields(fromStream);
+        } finally {
+          // updateStreamFields throws for a stream that does not exist; a flag
+          // left set would skip every later sync.
+          isSyncingStreamFromSql.value = false;
+        }
       }
     } catch {
       // ignore parse errors while user is mid-typing

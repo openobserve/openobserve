@@ -31,14 +31,23 @@ import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 
+// Shared so the SQL → stream-name sync tests can parse a FROM clause and fail a
+// stream lookup; the defaults match the old per-call mocks.
+const { getStreamMock, sqlParseMock } = vi.hoisted(() => ({
+  getStreamMock: vi.fn(),
+  sqlParseMock: vi.fn(),
+}));
+const STREAM_SCHEMA = {
+  schema: [
+    { name: "field1", type: "string" },
+    { name: "field2", type: "int" },
+  ],
+};
+getStreamMock.mockResolvedValue(STREAM_SCHEMA);
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStream: vi.fn().mockResolvedValue({
-      schema: [
-        { name: "field1", type: "string" },
-        { name: "field2", type: "int" },
-      ],
-    }),
+    getStream: getStreamMock,
     getStreams: vi.fn().mockResolvedValue({ list: [] }),
   }),
 }));
@@ -56,7 +65,7 @@ vi.mock("@/composables/useParser", () => ({
   default: () => ({
     sqlParser: async () => ({
       astify: vi.fn(() => ({ columns: [] })),
-      parse: vi.fn(),
+      parse: sqlParseMock,
       sqlify: vi.fn(),
     }),
   }),
@@ -1774,6 +1783,84 @@ describe("AddAlert (OForm owner)", () => {
 
       expect(wrapper.vm.saveModeDialogOpen).toBe(false);
       expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // The stream-name field follows the FROM table of the SQL query, debounced
+  // 600 ms in useAlertForm. The clock is fake from before mount: a debounce
+  // timer started on real time would swallow later calls, and the no-change
+  // assertion would then pass without the sync ever running.
+  describe("SQL → stream-name sync", () => {
+    const fromTable = (sql: string) => ({
+      ast: { from: [{ table: /FROM "([^"]+)"/i.exec(sql)?.[1] }] },
+    });
+    // Runs pending promises and any debounced sync (flushPromises would wait
+    // on the fake clock).
+    const settle = () => vi.advanceTimersByTimeAsync(700);
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      sqlParseMock.mockImplementation(fromTable);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      sqlParseMock.mockReset();
+      getStreamMock.mockReset();
+      getStreamMock.mockResolvedValue(STREAM_SCHEMA);
+    });
+
+    it("follows the FROM table again after a stream that does not exist", async () => {
+      wrapper = mountAlert();
+      await settle();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      getStreamMock.mockImplementation((name: string) =>
+        name === "missing_stream"
+          ? Promise.reject(new Error("Stream not found"))
+          : Promise.resolve(STREAM_SCHEMA),
+      );
+
+      form.setFieldValue("query_condition.sql", 'SELECT count(*) FROM "missing_stream"');
+      await settle();
+      expect(form.state.values.stream_name).toBe("missing_stream");
+
+      form.setFieldValue("query_condition.sql", 'SELECT count(*) FROM "other_stream"');
+      await settle();
+      expect(form.state.values.stream_name).toBe("other_stream");
+    });
+
+    it("keeps the saved stream when an edit changes the FROM table", async () => {
+      wrapper = mountAlert({
+        isUpdated: true,
+        modelValue: {
+          name: "existing_sql_alert",
+          description: "",
+          stream_type: "logs",
+          stream_name: "default",
+          is_real_time: false,
+          query_condition: { type: "sql", sql: 'SELECT count(*) FROM "default"' },
+          trigger_condition: {
+            period: 10,
+            operator: ">=",
+            frequency: 10,
+            cron: "",
+            threshold: 5,
+            silence: 10,
+            frequency_type: "minutes",
+            timezone: "UTC",
+          },
+          destinations: ["email"],
+        },
+        destinations: [{ name: "email" }],
+      });
+      await settle();
+      const form = wrapper.vm.form;
+
+      form.setFieldValue("query_condition.sql", 'SELECT count(*) FROM "other_stream"');
+      await settle();
+
+      expect(form.state.values.stream_name).toBe("default");
     });
   });
 });
