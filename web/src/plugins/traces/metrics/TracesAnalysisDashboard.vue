@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="traces-analysis-dashboard-drawer"
     v-bind="fullPage ? {} : { bleed: true, width: 80 }"
     v-model:open="isOpen"
-    :title="raw(drawerTitle)"
+    :title="fullPage ? t('traces.drillDown') : raw(drawerTitle)"
     @update:open="(v: boolean) => !v && onClose()"
   >
     <template #header-left>
@@ -373,7 +373,7 @@ interface Props {
   availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
-  fullPage?: boolean; // Render in-page with a Back button instead of as a drawer
+  fullPage?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {

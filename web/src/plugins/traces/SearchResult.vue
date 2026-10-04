@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-search-result" class="h-full overflow-hidden">
     <div class="bg-card-glass-bg flex h-full flex-col overflow-hidden">
-      <!-- Section header: title + count badge + pagination -->
       <div
         v-if="
           searchObj.data.stream.selectedStream.value &&
@@ -99,7 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex-1" />
 
-        <!-- Right: Refresh → rows per page → pagination (same sequence as logs) -->
         <div
           class="border-card-glass-border rounded-default me-1 inline-flex h-6 items-center overflow-hidden border px-1"
         >

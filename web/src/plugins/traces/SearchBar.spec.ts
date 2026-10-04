@@ -805,6 +805,15 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
     });
 
+    it("should be hidden while a search is loading", async () => {
+      applySearch();
+      searchObjInstance.loading = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+    });
+
     it("should be hidden when the org has no trace streams", async () => {
       applySearch();
       searchObjInstance.data.stream.streamLists = [];

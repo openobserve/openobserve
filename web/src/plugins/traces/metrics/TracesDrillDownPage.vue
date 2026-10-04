@@ -91,8 +91,13 @@ onMounted(() => {
   backBtnRef.value?.$el?.focus?.();
 });
 onBeforeUnmount(() => {
+  // Only a Back/Escape close leaves focus here; a close caused by a new search must not steal it.
+  const active = document.activeElement;
+  const focusWasOnPage = active === document.body || !!rootRef.value?.contains(active);
   setCoveredInert(false);
   document.removeEventListener("keydown", onKeydown);
-  document.querySelector<HTMLElement>('[data-test="insights-button"]')?.focus();
+  if (focusWasOnPage) {
+    document.querySelector<HTMLElement>('[data-test="insights-button"]')?.focus();
+  }
 });
 </script>

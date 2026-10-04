@@ -110,12 +110,10 @@ export class TracesPage {
     this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-    // The Drill down button kept the old Insights data-test so existing specs still find it.
     this.insightsButton = '[data-test="insights-button"]';
     // SearchResult.vue: error-count badge doubles as the error-only toggle
     this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    // The full-page Drill down view kept the drawer's data-test so existing selectors still match.
     this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
     this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-drill-down-back-btn"]';
     // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)

@@ -1103,6 +1103,7 @@ export default defineComponent({
         searchObj.meta.searchMode !== "service-graph" &&
         searchObj.meta.searchMode !== "services-catalog" &&
         !searchObj.loadingStream &&
+        !searchObj.loading &&
         searchObj.data.stream.streamLists.length > 0 &&
         !!searchObj.data.stream.selectedStream?.value &&
         !searchObj.data.errorMsg?.trim()?.length &&

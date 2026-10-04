@@ -58,7 +58,7 @@ describe("TracesDrillDownPage", () => {
     );
   });
 
-  it("should return focus to the Drill down button on close", () => {
+  it("should return focus to the Drill down button when focus was on the page at close", () => {
     const drillDown = document.createElement("button");
     drillDown.setAttribute("data-test", "insights-button");
     document.body.appendChild(drillDown);
@@ -68,6 +68,21 @@ describe("TracesDrillDownPage", () => {
 
     expect(document.activeElement).toBe(drillDown);
     drillDown.remove();
+  });
+
+  it("should leave focus alone when it was outside the page at close", () => {
+    const drillDown = document.createElement("button");
+    drillDown.setAttribute("data-test", "insights-button");
+    const editor = document.createElement("input");
+    document.body.append(drillDown, editor);
+    wrapper = mountPage();
+    editor.focus();
+
+    wrapper.unmount();
+
+    expect(document.activeElement).toBe(editor);
+    drillDown.remove();
+    editor.remove();
   });
 
   it("should make the content it covers inert while open, and restore it on close", () => {
