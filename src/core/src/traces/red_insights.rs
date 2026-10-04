@@ -35,8 +35,7 @@ const DESTRUCTIVE_KEYWORDS: [&str; 4] = ["update", "delete", "drop", "insert"];
 /// Mirrors G4's `ERROR_VOCABULARY` in anomaly_detection.rs; the gated validator test pins it.
 const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5xx", "50x"];
 const SERVICE_MARKER: &str = " WHERE service_name = '";
-/// An OR, not `IN ('2','5')`: the IN list's `[` in the aggregate name panics the top-k rule.
-const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
+const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) IN ('2','5')";
 /// Any root span is a request, whatever its kind: a trace starting at a client span entered there.
 const ROOT_ARM: &str = "OR (reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 
@@ -718,7 +717,7 @@ mod tests {
             sql_of(RedSignal::Rate, &ALL_COLS),
             format!(
                 "SELECT histogram(_timestamp, '5m') AS time_bucket, COUNT(*) AS value FROM \"default\" \
-                 WHERE service_name = 'checkout' AND (CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5' {ROOT_ARM}) \
+                 WHERE service_name = 'checkout' AND (CAST(span_kind AS VARCHAR) IN ('2','5') {ROOT_ARM}) \
                  GROUP BY time_bucket"
             )
         );
@@ -751,7 +750,7 @@ mod tests {
         };
         let sql = sql_of(RedSignal::Rate, &cols);
         assert!(
-            sql.contains("AND (CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5') GROUP BY"),
+            sql.contains("AND (CAST(span_kind AS VARCHAR) IN ('2','5')) GROUP BY"),
             "{sql}"
         );
         assert!(!sql.contains("reference_parent_span_id"));
@@ -972,7 +971,7 @@ mod tests {
         assert_eq!(
             volume_sql("my\"stream", &ALL_COLS),
             format!(
-                "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5' {ROOT_ARM}) \
+                "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) IN ('2','5') {ROOT_ARM}) \
                  AS requests FROM \"my\"\"stream\" GROUP BY service_name ORDER BY requests DESC LIMIT 40"
             )
         );
@@ -982,12 +981,12 @@ mod tests {
         };
         assert_eq!(
             volume_sql("default", &cols),
-            "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5') \
+            "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) IN ('2','5')) \
              AS requests FROM \"default\" GROUP BY service_name ORDER BY requests DESC LIMIT 40"
         );
     }
 
-    /// The top-k rule panics when the aggregate's name holds an IN list's `[`.
+    /// The kind IN list puts `[` in the aggregate's name; the top-k rule must still match it.
     #[tokio::test]
     async fn volume_sql_plans_through_the_topk_rule() {
         use std::sync::Arc;
