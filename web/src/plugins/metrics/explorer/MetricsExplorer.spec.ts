@@ -72,6 +72,12 @@ const grid = vi.hoisted(() => {
     ensureSchemas: vi.fn(),
     setOverride: vi.fn(),
     toggleFavorite: vi.fn(),
+    exemplarEligible: vi.fn(() => false),
+    exemplarsEnabled: vi.fn(() => false),
+    exemplarSwapsVariant: vi.fn(() => false),
+    exemplarStateOf: vi.fn(() => undefined),
+    toggleExemplars: vi.fn(),
+    retryExemplars: vi.fn(),
     requestPreview: vi.fn(async () => {}),
     refreshCard: vi.fn(),
     cancelPreview: vi.fn(),
@@ -1042,6 +1048,41 @@ describe("MetricsExplorer wiring", () => {
         "metrics_explorer_detail_opened",
         expect.objectContaining({ card_kind: CARD.cardKind }),
       );
+    });
+
+    it("wires the actions moved off the card to what the card's icons did", async () => {
+      grid.exemplarEligible.mockReturnValue(true);
+      grid.exemplarsEnabled.mockReturnValue(true);
+      grid.exemplarSwapsVariant.mockReturnValue(true);
+      const state = { status: "ready", markers: [], errorMessage: "" };
+      grid.exemplarStateOf.mockReturnValue(state);
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      const view = detailView(wrapper);
+      expect(view.props()).toMatchObject({
+        exemplarsEligible: true,
+        exemplarsOn: true,
+        exemplarsSwapsVariant: true,
+        exemplars: state,
+      });
+
+      view.vm.$emit("toggle-exemplars");
+      view.vm.$emit("retry-exemplars");
+      view.vm.$emit("toggle-favorite");
+      view.vm.$emit("configure");
+      await wrapper.vm.$nextTick();
+      expect(grid.toggleExemplars).toHaveBeenCalledWith(CARD);
+      expect(grid.retryExemplars).toHaveBeenCalledWith(CARD);
+      expect(grid.toggleFavorite).toHaveBeenCalledWith(CARD.name);
+      // The ⚙ dialog opens on this metric, over the detail view.
+      expect((wrapper.vm as any).dialogOpen).toBe(true);
+      expect((wrapper.vm as any).dialogCard).toEqual(CARD);
+
+      grid.exemplarEligible.mockReturnValue(false);
+      grid.exemplarsEnabled.mockReturnValue(false);
+      grid.exemplarSwapsVariant.mockReturnValue(false);
+      grid.exemplarStateOf.mockReturnValue(undefined);
     });
 
     it("hands the view the panel rate window Convert to dashboard would use", async () => {

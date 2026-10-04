@@ -527,7 +527,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :preview="grid.previews.value[card.name]"
                 :queries="queriesFor(card)"
                 :index="row.index * columns + offset"
-                :is-favorite="grid.favorites.value.includes(card.name)"
                 :time-range="grid.timeRange.value"
                 :exemplars-eligible="grid.exemplarEligible(card)"
                 :exemplars-on="grid.exemplarsEnabled(card.name)"
@@ -538,10 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @visible="onCardVisible"
                 @hidden="onCardHidden"
                 @refresh="grid.refreshCard"
-                @select="onSelect"
-                @configure="onConfigure"
                 @open-detail="openDetail"
-                @toggle-favorite="grid.toggleFavorite($event.name)"
                 @zoom="onCardZoom"
               />
             </div>
@@ -592,9 +588,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :color="detailColor"
       :color-of="colorOf"
       :run-query="runDetailPreview"
+      :exemplars-eligible="!!detailCard && grid.exemplarEligible(detailCard)"
+      :exemplars-on="!!detailMetric && grid.exemplarsEnabled(detailMetric)"
+      :exemplars-swaps-variant="!!detailCard && grid.exemplarSwapsVariant(detailCard)"
+      :exemplars="detailMetric ? grid.exemplarStateOf(detailMetric) : undefined"
       @close="closeDetail"
       @open-visualize="onDetailOpenVisualize"
       @toggle-favorite="detailMetric && grid.toggleFavorite(detailMetric)"
+      @configure="detailCard && onConfigure(detailCard)"
+      @toggle-exemplars="detailCard && grid.toggleExemplars(detailCard)"
+      @retry-exemplars="detailCard && grid.retryExemplars(detailCard)"
       @update:tab="onDetailTab"
       @update:breakdown-label="onBreakdownLabel"
       @open-related="onOpenRelated"
@@ -1469,7 +1472,7 @@ export default defineComponent({
       await onAddLabelFilter(filter);
     };
 
-    /** "Open in Visualize": the same drill-in as the card's ✎. */
+    /** "Open in Visualize" seeds the editor with this metric's chart. */
     const onDetailOpenVisualize = () => {
       const card = detailCard.value;
       if (!card) return;

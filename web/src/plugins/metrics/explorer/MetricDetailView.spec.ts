@@ -77,7 +77,10 @@ const chartOf = (c: any) => ({
   bucketUnit: null,
 });
 
-const mountView = (props: Record<string, any> = {}, { realHeader = false } = {}) =>
+const mountView = (
+  props: Record<string, any> = {},
+  { realHeader = false, stubs = {} as Record<string, any> } = {},
+) =>
   mount(MetricDetailView, {
     props: {
       card: SELECTED,
@@ -111,13 +114,22 @@ const mountView = (props: Record<string, any> = {}, { realHeader = false } = {})
       plugins: [i18n, store],
       stubs: {
         ...(realHeader ? {} : { OPageHeader: OPageHeaderStub }),
+        ...stubs,
         MetricBreakdown: {
           name: "MetricBreakdown",
           template: "<div data-test='breakdown-stub' />",
         },
         MetricCardChart: {
           name: "MetricCardChart",
-          props: ["results", "queries", "color", "chartType", "unit", "timeRange"],
+          props: [
+            "results",
+            "queries",
+            "color",
+            "chartType",
+            "unit",
+            "timeRange",
+            "injectedExemplars",
+          ],
           template: "<div />",
         },
       },
@@ -440,6 +452,99 @@ describe("MetricDetailView", () => {
       expect(wrapper.emitted("close")).toHaveLength(1);
       expect(wrapper.emitted("open-visualize")).toHaveLength(1);
       expect(wrapper.emitted("toggle-favorite")).toHaveLength(1);
+    });
+  });
+
+  describe("actions moved from the grid card", () => {
+    const NAME = SELECTED.name;
+    const sel = (action: string) => `[data-test="metrics-explorer-card-${action}-${NAME}"]`;
+    const HELP = "Time spent serving one request, by bucket.";
+
+    it("shows the metric's full help text from an info button, announced in full", () => {
+      wrapper = mountView({ card: { ...SELECTED, help: HELP } });
+      const help = wrapper.find(sel("help"));
+      expect(help.element.tagName).toBe("BUTTON");
+      expect(help.attributes("aria-label")).toContain(HELP);
+    });
+
+    it("has no info button for a metric without help text", () => {
+      wrapper = mountView();
+      expect(wrapper.find(sel("help")).exists()).toBe(false);
+    });
+
+    it("offers a labelled Configure function button on a configurable metric", async () => {
+      wrapper = mountView({ card: { ...SELECTED, configurable: true } });
+      const configure = wrapper.find(sel("fn"));
+      expect(configure.text()).toBe("Configure function");
+      expect(configure.attributes("aria-label")).toBe(`Configure function for ${NAME}`);
+      await configure.trigger("click");
+      expect(wrapper.emitted("configure")).toHaveLength(1);
+    });
+
+    it("has no Configure function button on a metric that cannot be configured", () => {
+      wrapper = mountView({ card: { ...SELECTED, configurable: false } });
+      expect(wrapper.find(sel("fn")).exists()).toBe(false);
+    });
+
+    it("offers a labelled Exemplars toggle on an eligible metric", async () => {
+      wrapper = mountView({ exemplarsEligible: true, exemplarsOn: false });
+      const toggle = wrapper.find(sel("exemplars"));
+      expect(toggle.text()).toBe("Exemplars");
+      expect(toggle.attributes("aria-pressed")).toBe("false");
+      await toggle.trigger("click");
+      expect(wrapper.emitted("toggle-exemplars")).toHaveLength(1);
+    });
+
+    it("has no Exemplars toggle on an ineligible metric", () => {
+      wrapper = mountView({ exemplarsEligible: false });
+      expect(wrapper.find(sel("exemplars")).exists()).toBe(false);
+    });
+
+    it("says a heatmap metric's toggle swaps it to percentiles", () => {
+      wrapper = mountView({ exemplarsEligible: true, exemplarsSwapsVariant: true });
+      expect(wrapper.find(sel("exemplars")).attributes("data-swaps-variant")).toBe("percentiles");
+    });
+
+    it("shows the exemplar status while on: loading, empty, and a failure with Retry", async () => {
+      wrapper = mountView({
+        exemplarsEligible: true,
+        exemplarsOn: true,
+        exemplars: { status: "loading", markers: [], errorMessage: "" },
+      });
+      expect(wrapper.find(sel("exemplars")).attributes("aria-pressed")).toBe("true");
+      expect(wrapper.find(sel("exemplars-loading")).exists()).toBe(true);
+
+      await wrapper.setProps({ exemplars: { status: "empty", markers: [], errorMessage: "" } });
+      expect(wrapper.find(sel("exemplars-empty")).exists()).toBe(true);
+
+      await wrapper.setProps({ exemplars: { status: "error", markers: [], errorMessage: "boom" } });
+      expect(wrapper.find(sel("exemplars-error")).exists()).toBe(true);
+    });
+
+    it("retries a failed exemplar fetch from the failure's tooltip", async () => {
+      // The tooltip mounts its content only while open, so render it inline.
+      wrapper = mountView(
+        {
+          exemplarsEligible: true,
+          exemplarsOn: true,
+          exemplars: { status: "error", markers: [], errorMessage: "boom" },
+        },
+        { stubs: { OTooltip: { template: "<div><slot name='content' /></div>" } } },
+      );
+      expect(wrapper.find(sel("exemplars-error")).text()).toContain("boom");
+      await wrapper.find('[data-test="dashboard-panel-exemplars-retry"]').trigger("click");
+      expect(wrapper.emitted("retry-exemplars")).toHaveLength(1);
+    });
+
+    it("draws the exemplars on the overview chart only while on", async () => {
+      const exemplars = { status: "ready", markers: [], errorMessage: "" };
+      wrapper = mountView({ exemplarsEligible: true, exemplarsOn: true, exemplars });
+      await flushPromises();
+      const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart().props("injectedExemplars")).toEqual(exemplars);
+
+      await wrapper.setProps({ exemplarsOn: false });
+      expect(chart().props("injectedExemplars")).toBeUndefined();
     });
   });
 });

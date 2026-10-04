@@ -60,8 +60,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-detail-unit"
             >{{ unitLabel }}</span
           >
+          <!-- The subtitle truncates and hides on a phone; this always holds the whole sentence. -->
+          <OButton
+            v-if="card.help"
+            variant="ghost"
+            size="icon"
+            icon-left="info-outline"
+            class="shrink-0"
+            :aria-label="t('metrics.explorer.card.helpAria', { name: card.name, help: card.help })"
+            :data-test="`metrics-explorer-card-help-${card.name}`"
+          >
+            <OTooltip side="bottom" max-width="22.5rem">
+              <template #content
+                ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
+              >
+            </OTooltip>
+          </OButton>
         </template>
         <template #actions>
+          <!-- An on toggle keeps its status beside it, so the viewer can see why markers are drawn. -->
+          <template v-if="exemplarsEligible">
+            <OSpinner
+              v-if="exemplarsOn && exemplars?.status === 'loading'"
+              size="xs"
+              :data-test="`metrics-explorer-card-exemplars-loading-${card.name}`"
+            />
+            <OTag
+              v-if="exemplarsOn && exemplars?.status === 'empty'"
+              variant="default-soft"
+              size="sm"
+              :data-test="`metrics-explorer-card-exemplars-empty-${card.name}`"
+              >{{ t("dashboard.exemplars.empty") }}</OTag
+            >
+            <OButton
+              v-if="exemplarsOn && exemplars?.status === 'error'"
+              variant="ghost-warning"
+              size="icon-toolbar"
+              icon-left="warning"
+              :aria-label="t('dashboard.exemplars.loadFailed')"
+              :data-test="`metrics-explorer-card-exemplars-error-${card.name}`"
+            >
+              <OTooltip side="bottom" align="end" max-width="22.5rem" hoverable>
+                <template #content>
+                  <div class="flex flex-col gap-1.5">
+                    <div class="font-medium">{{ t("dashboard.exemplars.loadFailed") }}</div>
+                    <div
+                      class="whitespace-pre-wrap"
+                      data-test="dashboard-panel-exemplars-error-message"
+                    >
+                      {{ exemplars?.errorMessage }}
+                    </div>
+                    <div>
+                      <OButton
+                        variant="outline"
+                        size="xs"
+                        icon-left="replay"
+                        data-test="dashboard-panel-exemplars-retry"
+                        @click="$emit('retry-exemplars')"
+                      >
+                        {{ t("dashboard.exemplars.retry") }}
+                      </OButton>
+                    </div>
+                  </div>
+                </template>
+              </OTooltip>
+            </OButton>
+            <OButton
+              variant="outline"
+              size="sm-toolbar"
+              icon-left="account-tree"
+              :active="exemplarsOn"
+              :aria-pressed="String(exemplarsOn)"
+              :aria-label="exemplarsTooltip"
+              :data-swaps-variant="exemplarsSwapsVariant ? 'percentiles' : undefined"
+              :data-test="`metrics-explorer-card-exemplars-${card.name}`"
+              @click="$emit('toggle-exemplars')"
+            >
+              <span class="max-md:hidden">{{ t("metrics.explorer.detail.exemplars") }}</span>
+              <OTooltip :content="exemplarsTooltip" />
+            </OButton>
+          </template>
+          <OButton
+            v-if="card.configurable"
+            variant="outline"
+            size="sm-toolbar"
+            icon-left="settings"
+            :aria-label="t('metrics.explorer.card.configureAria', { name: card.name })"
+            :data-test="`metrics-explorer-card-fn-${card.name}`"
+            @click="$emit('configure')"
+          >
+            <span class="max-md:hidden">{{ t("metrics.explorer.card.configureTooltip") }}</span>
+            <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
+          </OButton>
           <OButton
             variant="outline"
             size="sm-toolbar"
@@ -159,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :bucket-unit-custom="overviewBucketUnit.unitCustom ?? undefined"
               :color="color"
               :time-range="overviewState.timeRange"
+              :injected-exemplars="exemplarsOn ? exemplars : undefined"
               @error="onOverviewRenderError"
             />
             <OSkeleton v-else class="h-full" animation="wave" />
@@ -287,6 +378,7 @@ import type { DetailTab } from "@/utils/metrics/explorerUrlState";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { hasSamples, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 
 const RELATED_LIMIT = 12;
 
@@ -375,6 +467,14 @@ export default defineComponent({
     color: { type: String, required: true },
     /** A metric's colour on its grid card, so a Related card matches it. */
     colorOf: { type: Function as PropType<(name: string) => string>, required: true },
+    exemplarsEligible: { type: Boolean, default: false },
+    exemplarsOn: { type: Boolean, default: false },
+    /** A heatmap metric charts its percentiles variant while exemplars are on. */
+    exemplarsSwapsVariant: { type: Boolean, default: false },
+    exemplars: {
+      type: Object as PropType<InjectedExemplars | undefined>,
+      default: undefined,
+    },
     /** Runs one PromQL query on the scheduler, stepped for `card` (default: this view's metric). */
     runQuery: {
       type: Function as PropType<
@@ -387,6 +487,9 @@ export default defineComponent({
     "close",
     "open-visualize",
     "toggle-favorite",
+    "configure",
+    "toggle-exemplars",
+    "retry-exemplars",
     "update:tab",
     "update:breakdownLabel",
     "open-related",
@@ -396,6 +499,18 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     const unitLabel = computed(() => raw(UNIT_LABELS[props.card?.unit ?? ""] ?? ""));
+
+    const exemplarsTooltip = computed(() => {
+      const count = props.exemplars?.markers?.length ?? 0;
+      if (props.exemplarsSwapsVariant) {
+        return props.exemplarsOn
+          ? t("metrics.explorer.card.exemplarsHideHeatmap", { count })
+          : t("metrics.explorer.card.exemplarsShowHeatmap");
+      }
+      return props.exemplarsOn
+        ? t("dashboard.exemplars.hide", { count })
+        : t("dashboard.exemplars.show");
+    });
 
     const inapplicableFiltersText = computed(() =>
       props.inapplicableFilters.map((f) => `${f.label}${f.operator ?? "="}"${f.value}"`).join(", "),
@@ -522,6 +637,7 @@ export default defineComponent({
       raw,
       t,
       unitLabel,
+      exemplarsTooltip,
       inapplicableFiltersText,
       breakdownSupported,
       activeTab,

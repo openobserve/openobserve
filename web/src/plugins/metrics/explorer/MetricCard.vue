@@ -29,11 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Deliberately NOT a button. Making the whole card clickable meant any
          attempt to select the metric name — or drag across the help text —
-         navigated away to the editor instead. The open-in-editor icon is the
-         only affordance that navigates, so this is a plain container and its
-         text stays selectable. Still fully keyboard reachable: the action bar
-         reveals on `focus-within`, so tabbing lands on Refresh / Configure /
-         Pin / Open. -->
+         navigated away instead, so this is a plain container and its text stays
+         selectable. Still fully keyboard reachable: Drill down reveals on
+         `focus-within`. -->
     <!-- The SAME bar the dashboard panels use — box, tint and title type all
          come from PanelBar; only this card's layout is added on top. -->
     <PanelBar class="@container/panelbar relative min-w-0 gap-2">
@@ -72,14 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            spacer, then the action row). -->
       <div class="flex-1" />
 
-      <!-- The right-hand cluster. At rest: the query function · unit, then the
-           freshness clock. On hover/focus the query · unit swap out for the
-           action row (Help → Configure → Open → Pin); the clock stays either
-           way, and Refresh joins on the far right. -->
+      <!-- The right-hand cluster: the query function · unit, then Drill down
+           (revealed on hover/focus), then the freshness clock. The function,
+           unit and clock are status and stay put on hover; the metric name is
+           what gives way when the row runs short. -->
       <div class="flex shrink-0 flex-nowrap items-center">
         <span
           v-if="restInfo"
-          class="text-2xs text-text-secondary max-w-40 truncate opacity-70 group-focus-within:hidden group-hover:hidden"
+          class="text-2xs text-text-secondary max-w-40 truncate opacity-70"
           :title="restInfo"
           :data-test="`metrics-explorer-card-rest-info-${card.name}`"
           >{{ restInfo }}</span
@@ -87,110 +85,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Revealed by width+opacity, NOT display — a display:none control
              leaves the tab order, and this reveal is focus-driven too: tabbing
-             into the first (invisible) action expands the row for keyboards. -->
+             onto the (invisible) button expands it for keyboards. -->
         <div
           class="flex w-0 flex-nowrap items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100 max-md:w-auto max-md:opacity-100"
           :data-test="`metrics-explorer-card-actions-${card.name}`"
         >
-          <ExemplarToggle
-            v-if="exemplarsEligible && !exemplarsOn"
-            :on="false"
-            :swaps-variant="exemplarsSwapsVariant ? 'percentiles' : undefined"
-            :data-test="`metrics-explorer-card-exemplars-${card.name}`"
-            @toggle="$emit('toggle-exemplars', card)"
-          />
-          <!-- Help — the SAME element the dashboard panel bar uses for its panel
-             description (PanelContainer `dashboard-panel-description-info`): an
-             info-outline icon with a width-capped, pre-wrapped OTooltip. NOT a
-             dropdown item — a full help sentence in an unbounded menu item blew
-             the menu out to full-page width. -->
-          <OButton
-            v-if="card.help"
-            variant="ghost"
-            size="icon"
-            icon-left="info-outline"
-            :aria-label="
-              t('metrics.explorer.card.helpAria', {
-                name: card.name,
-                help: card.help,
-              })
-            "
-            :data-test="`metrics-explorer-card-help-${card.name}`"
-            @click.stop
-          >
-            <OTooltip side="bottom" align="end" max-width="13.75rem">
-              <template #content
-                ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
-              >
-            </OTooltip>
-          </OButton>
-
-          <!-- Configure — visible icon button (only when the card is configurable). -->
-          <OButton
-            v-if="card.configurable"
-            variant="ghost"
-            size="icon"
-            icon-left="settings"
-            :aria-label="t('metrics.explorer.card.configureAria', { name: card.name })"
-            :data-test="`metrics-explorer-card-fn-${card.name}`"
-            @click="$emit('configure', card)"
-          >
-            <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
-          </OButton>
-
+          <!-- One labelled entry instead of a row of unlabelled icons: help,
+               ⚙, exemplars, Open in Visualize and the star all live in the
+               detail view this opens. -->
           <OButton
             variant="ghost"
-            size="icon"
-            icon-left="query-stats"
+            size="xs"
+            icon-left="open-in-full"
+            class="ms-1"
             :aria-label="t('metrics.explorer.card.detailsAria', { name: card.name })"
             :data-test="`metrics-explorer-card-details-${card.name}`"
             @click="$emit('open-detail', card)"
           >
-            <OTooltip :content="t('metrics.explorer.card.detailsTooltip')" />
-          </OButton>
-
-          <!-- The drill-in. The ONLY thing that navigates; the chart and card are
-             not click targets, so the metric name stays selectable.
-
-             `edit`, not `open-in-new`: this opens the metric in the in-page
-             Visualize workspace to CHANGE it (query, chart type, functions), and
-             open-in-new is the web's idiom for "leaves this page / new tab",
-             which this does not do. -->
-          <OButton
-            variant="ghost"
-            size="icon"
-            icon-left="edit"
-            :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
-            :data-test="`metrics-explorer-card-select-${card.name}`"
-            @click="$emit('select', card)"
-          >
-            <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
-          </OButton>
-
-          <!-- Pin (star). Always visible. Filled gold star when favorited. -->
-          <OButton
-            variant="ghost"
-            size="icon"
-            :icon-left="isFavorite ? 'star' : 'star-outline'"
-            :class="isFavorite ? 'text-favorite' : ''"
-            :aria-label="
-              isFavorite
-                ? t('metrics.explorer.card.favoriteRemoveAria', {
-                    name: card.name,
-                  })
-                : t('metrics.explorer.card.favoriteAddAria', { name: card.name })
-            "
-            :aria-pressed="String(isFavorite)"
-            :data-test="`metrics-explorer-card-favorite-${card.name}`"
-            @click="$emit('toggle-favorite', card)"
-          >
-            <OTooltip
-              :content="
-                isFavorite
-                  ? t('metrics.explorer.card.favoriteRemoveTooltip')
-                  : t('metrics.explorer.card.favoriteAddTooltip')
-              "
-            />
+            {{ t("metrics.explorer.card.drillDown") }}
           </OButton>
         </div>
 
@@ -255,42 +167,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- Refresh — revealed with the actions, just LEFT of the freshness
-             clock (the clock is always the rightmost element). Re-runs this
-             card's query, dropping the cached response so a metric that has
-             started emitting shows up. Goes `warning` when the shown data was
-             fetched for a different window than the one selected — the same
-             treatment the dashboard refresh button gives unapplied variable
-             changes — and a warning nobody can see says nothing, so that state
-             forces the button visible at rest. While loading it is disabled,
-             not spinnered: the body's LoadingProgress bar is the loading
-             signal. -->
-        <div
-          :class="
-            preview?.cachedDataDiffersFromTimeRange
-              ? 'flex items-center'
-              : 'flex w-0 items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100 max-md:w-auto max-md:opacity-100'
-          "
+        <!-- Shown only when the data was fetched for a different window than
+             the one selected (a card painted from the persisted cache): the
+             same warning the dashboard refresh button gives unapplied variable
+             changes. Otherwise the toolbar Refresh covers a card. -->
+        <OButton
+          v-if="preview?.cachedDataDiffersFromTimeRange && !card.unsupported"
+          variant="warning"
+          size="icon"
+          icon-left="refresh"
+          :disabled="preview?.status === 'loading'"
+          :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
+          :data-test="`metrics-explorer-card-refresh-${card.name}`"
+          @click="$emit('refresh', card)"
         >
-          <OButton
-            v-if="!card.unsupported"
-            :variant="preview?.cachedDataDiffersFromTimeRange ? 'warning' : 'ghost'"
-            size="icon"
-            icon-left="refresh"
-            :disabled="preview?.status === 'loading'"
-            :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
-            :data-test="`metrics-explorer-card-refresh-${card.name}`"
-            @click="$emit('refresh', card)"
-          >
-            <OTooltip
-              :content="
-                preview?.cachedDataDiffersFromTimeRange
-                  ? t('metrics.explorer.card.refreshToApplyTimeRange')
-                  : t('metrics.explorer.card.refreshTooltip')
-              "
-            />
-          </OButton>
-        </div>
+          <OTooltip :content="t('metrics.explorer.card.refreshToApplyTimeRange')" />
+        </OButton>
 
         <!-- Last Refreshed — always the rightmost element, the SAME element the
              dashboard panel bar carries (PanelErrorButtons): 🕑 with the
@@ -610,7 +502,6 @@ export default defineComponent({
     queries: { type: Array as PropType<any[]>, default: () => [] },
     /** Position in the FULL filtered+sorted set, so colours are scroll-stable. */
     index: { type: Number, required: true },
-    isFavorite: { type: Boolean, default: false },
     /** The queried window (µs). Handed to the chart so its axis says the truth. */
     timeRange: {
       type: Object as PropType<{ start_time: number; end_time: number }>,
@@ -628,10 +519,7 @@ export default defineComponent({
   emits: [
     "toggle-exemplars",
     "retry-exemplars",
-    "select",
     "open-detail",
-    "configure",
-    "toggle-favorite",
     "visible",
     "hidden",
     // `refresh`, not `retry`: both the header button and the no-data card's
