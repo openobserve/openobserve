@@ -317,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="dashboardDialogOpen"
       :dashboard-panel-data="dashboardPanel"
       :default-panel-title="dashboardPanelTitle"
+      @save="dashboardDialogOpen = false"
     />
   </div>
 </template>

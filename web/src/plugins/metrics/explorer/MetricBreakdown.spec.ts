@@ -1202,6 +1202,16 @@ describe("MetricBreakdown", () => {
         'count by (method) ({__name__="build_info"})',
       ],
       [
+        "a gauge",
+        { name: "mem_bytes", cardKind: CARD_KIND.GAUGE },
+        'avg by (method) ({__name__="mem_bytes"})',
+      ],
+      [
+        "a summary",
+        { name: "rpc_seconds", cardKind: CARD_KIND.SUMMARY_QUANTILES },
+        'avg by (method) ({__name__="rpc_seconds",quantile="0.5"})',
+      ],
+      [
         "a mean pair",
         { name: "lat_sum", cardKind: CARD_KIND.MEAN_PAIR },
         'sum by (method) (rate({__name__="lat_sum"}[$__rate_interval])) / sum by (method) (rate({__name__="lat_count"}[$__rate_interval]))',
@@ -1271,6 +1281,17 @@ describe("MetricBreakdown", () => {
       resolve(SERIES);
       await flushPromises();
       expect(button(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    it("closes the dialog once the panel is saved", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      await button(wrapper).trigger("click");
+      expect(dialog(wrapper).props("open")).toBe(true);
+
+      dialog(wrapper).vm.$emit("save");
+      await flushPromises();
+      expect(dialog(wrapper).props("open")).toBe(false);
     });
 
     it("waits again for the chart when another label is focused", async () => {
