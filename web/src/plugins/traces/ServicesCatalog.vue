@@ -1059,7 +1059,7 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
 
 // Same request definition as red_insights.rs request_predicate; the service graph counts only internal roots.
 function requestPredicate(hasParentColumn: boolean): string {
-  // An OR, not IN ('2','5'): an IN list in a sole ORDER BY aggregate panics the engine's top-k rule.
+  // Spelled exactly as red_insights.rs request_predicate, which must avoid IN lists.
   const kinds = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
   if (!hasParentColumn) return `(${kinds})`;
   // Any root counts, whatever its kind: a trace that starts at a client span still entered the system there.
