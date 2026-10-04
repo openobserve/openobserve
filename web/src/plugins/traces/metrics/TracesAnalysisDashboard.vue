@@ -205,6 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </span>
                       </div>
+                      <span
+                        v-if="dimensionCounts[dimension.value] !== undefined"
+                        class="text-text-muted shrink-0 text-xs tabular-nums"
+                        :data-test="`dimension-count-${dimension.value}`"
+                      >
+                        {{ formatEventCount(dimensionCounts[dimension.value]) }}
+                      </span>
                     </li>
                   </ul>
 
@@ -325,9 +332,12 @@ import {
   defineAsyncComponent,
   nextTick,
   h,
+  onBeforeUnmount,
   type FunctionalComponent,
 } from "vue";
 import { useStore } from "vuex";
+import searchService from "@/services/search";
+import { formatEventCount } from "@/utils/formatters";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -555,6 +565,7 @@ const availableDimensions = computed(() => {
   const timestampField = store.state.zoConfig?.timestamp_column || "_timestamp";
 
   return (props.streamFields || [])
+    .filter((f: any) => f?.label !== true) // field-group headers (e.g. "AWS"), not fields
     .map((f: any) => ({
       label: f.name || f,
       value: f.name || f,
@@ -573,19 +584,71 @@ const filteredDimensions = computed(() => {
     dimensions = dimensions.filter((dim) => dim.label.toLowerCase().includes(searchLower));
   }
 
-  // Sort: selected dimensions first, then unselected
-  return dimensions.sort((a, b) => {
-    const aSelected = selectedDimensions.value.includes(a.value);
-    const bSelected = selectedDimensions.value.includes(b.value);
-
-    // If one is selected and other is not, selected comes first
-    if (aSelected && !bSelected) return -1;
-    if (!aSelected && bSelected) return 1;
-
-    // If both selected or both unselected, maintain original order (alphabetical)
+  // With value counts (Drill down page): by count, descending. Without them:
+  // selected dimensions first. Ties are alphabetical.
+  const counts = dimensionCounts.value;
+  const hasCounts = Object.keys(counts).length > 0;
+  return [...dimensions].sort((a, b) => {
+    if (hasCounts) {
+      const countDiff = (counts[b.value] ?? -1) - (counts[a.value] ?? -1);
+      if (countDiff) return countDiff;
+    } else {
+      const aSelected = selectedDimensions.value.includes(a.value);
+      const bSelected = selectedDimensions.value.includes(b.value);
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
+    }
     return a.label.localeCompare(b.label);
   });
 });
+
+// Non-null value count per dimension, for the Drill down page's sidebar. One
+// count(field) query covers every field in a single scan; the _values API would
+// run a GROUP BY per field and returns top values, not a field's total.
+const dimensionCounts = ref<Record<string, number>>({});
+let dimensionCountsAbort: AbortController | null = null;
+
+const loadDimensionCounts = async () => {
+  dimensionCountsAbort?.abort();
+  dimensionCountsAbort = null;
+  dimensionCounts.value = {};
+  const fields = availableDimensions.value.map((d) => d.value);
+  if (!props.embedded || !props.streamName || fields.length === 0) return;
+
+  const columns = fields.map((f, i) => `count("${f.replace(/"/g, '""')}") AS c${i}`).join(", ");
+  // Drill down is unavailable in SQL mode, so the base filter is a WHERE clause
+  const filter = props.baseFilter?.trim();
+  const where = filter ? ` WHERE ${filter}` : "";
+
+  // A histogram brush narrows the search; count the brushed window when present
+  const range = selectedTimeRangeDisplay.value ?? baselineTimeRange.value;
+
+  const controller = new AbortController();
+  dimensionCountsAbort = controller;
+  try {
+    const res: any = await searchService.search({
+      org_identifier: store.state.selectedOrganization.identifier,
+      query: {
+        query: {
+          sql: `SELECT ${columns} FROM "${props.streamName}"${where}`,
+          start_time: range.startTime,
+          end_time: range.endTime,
+          size: 1,
+        },
+      },
+      page_type: props.streamType || "logs",
+      signal: controller.signal,
+    });
+    const row = res?.data?.hits?.[0] ?? {};
+    if (controller.signal.aborted) return;
+    dimensionCounts.value = Object.fromEntries(
+      fields.map((f, i) => [f, Number(row[`c${i}`] ?? 0)]),
+    );
+  } catch {
+    // Counts are a sorting aid only; the list stays alphabetical without them
+  }
+};
+
+onBeforeUnmount(() => dimensionCountsAbort?.abort());
 
 const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
@@ -1047,6 +1110,21 @@ watch(
       loadAnalysis();
     }
   },
+);
+
+watch(
+  () => [
+    props.embedded,
+    props.streamName,
+    props.baseFilter,
+    baselineTimeRange.value.startTime,
+    baselineTimeRange.value.endTime,
+    selectedTimeRangeDisplay.value?.startTime,
+    selectedTimeRangeDisplay.value?.endTime,
+    availableDimensions.value.map((d) => d.value).join(","),
+  ],
+  loadDimensionCounts,
+  { immediate: true },
 );
 
 // Watch for changes in props

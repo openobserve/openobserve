@@ -108,6 +108,12 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// search service — dimension value counts on the Drill down page
+// ---------------------------------------------------------------------------
+const mockSearch = vi.hoisted(() => vi.fn());
+vi.mock("@/services/search", () => ({ default: { search: mockSearch } }));
+
+// ---------------------------------------------------------------------------
 // zincutils
 // ---------------------------------------------------------------------------
 vi.mock("@/utils/zincutils", () => ({
@@ -1457,5 +1463,97 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
     const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
     expect(page.attributes("width")).toBeUndefined();
     expect(page.attributes("title")).toBeUndefined();
+  });
+
+  describe("dimension value counts", () => {
+    const fields = [
+      { name: "alert_id" },
+      { name: "service_name" },
+      { name: "span_status" },
+      { name: "zone" },
+    ];
+
+    const remount = async (props: Record<string, unknown> = {}) => {
+      wrapper.unmount();
+      wrapper = mountComponent({
+        embedded: true,
+        streamType: "logs",
+        streamName: "app_logs",
+        analysisType: "volume",
+        availableAnalysisTypes: ["volume"],
+        streamFields: fields,
+        ...props,
+      });
+      await flushPromises();
+    };
+
+    it("counts every field in one count(field) query scoped to the search filter", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{ c0: 5, c1: 900, c2: 900, c3: 40 }] } });
+      await remount({ baseFilter: "severity = 'ERROR'" });
+
+      expect(mockSearch).toHaveBeenCalledTimes(1);
+      const { query, page_type } = mockSearch.mock.calls[0][0];
+      expect(page_type).toBe("logs");
+      expect(query.query.sql).toBe(
+        'SELECT count("alert_id") AS c0, count("service_name") AS c1, count("span_status") AS c2, count("zone") AS c3 FROM "app_logs" WHERE severity = \'ERROR\'',
+      );
+      expect(query.query.start_time).toBe(defaultProps.timeRange.startTime);
+      expect(query.query.end_time).toBe(defaultProps.timeRange.endTime);
+      expect(wrapper.find('[data-test="dimension-count-zone"]').text()).toBe("40");
+    });
+
+    it("counts the brushed window when the histogram has a selection", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{}] } });
+      await remount({
+        rateFilter: { start: 0, end: 10, timeStart: 1_200_000_000, timeEnd: 1_300_000_000 },
+      });
+
+      const { query } = mockSearch.mock.calls[0][0].query;
+      expect(query.start_time).toBe(1_200_000_000);
+      expect(query.end_time).toBe(1_300_000_000);
+    });
+
+    it("sorts by count descending regardless of selection", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{ c0: 5, c1: 900, c2: 900, c3: 40 }] } });
+      await remount();
+      wrapper.vm.selectedDimensions = ["alert_id"];
+      await flushPromises();
+
+      expect(wrapper.vm.filteredDimensions.map((d: any) => d.value)).toEqual([
+        "service_name",
+        "span_status",
+        "zone",
+        "alert_id",
+      ]);
+    });
+
+    it("keeps the alphabetical list without counts when the query fails", async () => {
+      mockSearch.mockRejectedValue(new Error("boom"));
+      await remount();
+
+      expect(wrapper.find('[data-test^="dimension-count-"]').exists()).toBe(false);
+      expect(wrapper.vm.filteredDimensions.map((d: any) => d.value)).toEqual([
+        "service_name",
+        "span_status",
+        "alert_id",
+        "zone",
+      ]);
+    });
+
+    it("leaves field-group headers out of the dimensions and the count query", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{}] } });
+      await remount({ streamFields: [{ name: "AWS", label: true }, ...fields] });
+
+      expect(wrapper.vm.availableDimensions.map((d: any) => d.value)).not.toContain("AWS");
+      expect(mockSearch.mock.calls[0][0].query.query.sql).not.toContain('"AWS"');
+    });
+
+    it("does not query counts outside the Drill down page", async () => {
+      wrapper.unmount();
+      mockSearch.mockClear();
+      wrapper = mountComponent({ streamFields: fields });
+      await flushPromises();
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
   });
 });
