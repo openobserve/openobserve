@@ -222,6 +222,7 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
             applyPanelData: visualizeApplyPanelData,
             dashboardPanelData: visualizePanel,
           }),
+          emits: ["run"],
           template: '<div data-test="metrics-explorer-visualize">visualize</div>',
         },
         ExplorerSavedViews: {
@@ -1446,6 +1447,18 @@ describe("MetricsExplorer wiring", () => {
       (wrapper.vm as any).onRefreshTick();
       expect(visualizeOnUserRun).toHaveBeenCalledTimes(2);
       expect(visualizeRunQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it("a Run from inside the Visualize editor is the same explicit run as the button", async () => {
+      const wrapper = withButtons();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      wrapper.findComponent('[data-test="metrics-explorer-visualize"]').vm.$emit("run");
+      expect(visualizeOnUserRun).toHaveBeenCalledTimes(1);
+      expect(visualizeOnUserRun).toHaveBeenCalledWith(
+        expect.objectContaining({ relativeTimePeriod: "15m" }),
+      );
     });
 
     it("Visualize keeps the Refresh button beside Run; Refresh re-runs without recording", async () => {

@@ -98,11 +98,13 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ["seed-consumed", "update:time-range"],
+  emits: ["seed-consumed", "update:time-range", "run"],
   setup(props, { emit }) {
     // The PanelEditor family keys its shared state off this provide — "metrics"
     // gives us the metrics defaults and the promql query bar, matching Index.vue.
     provide("dashboardPanelDataPageKey", "metrics");
+    // The editor's ⌘/Ctrl+Enter calls this; the parent's Run owns the range and the history write.
+    provide("runQuery", () => emit("run"));
 
     const store = useStore();
     const { showErrorNotification } = useNotifications();

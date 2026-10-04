@@ -16,10 +16,8 @@
 import { describe, it, expect } from "vitest";
 import {
   CARD_KIND,
-  BREAKDOWN_LABEL_LIMIT,
   baseNameOf,
   breakdownLabelsOf,
-  breakdownQueryLabels,
   breakdownTitleKey,
   buildBreakdownQuery,
   buildSelector,
@@ -1008,24 +1006,6 @@ describe("breakdownLabelsOf", () => {
 
   it("returns nothing when the labels are unknown", () => {
     expect(breakdownLabelsOf(undefined)).toEqual([]);
-  });
-});
-
-describe("breakdownQueryLabels", () => {
-  const many = Array.from({ length: 30 }, (_, i) => `l${String(i).padStart(2, "0")}`);
-
-  it("counts values for the first labels only, because each costs the server one scan", () => {
-    expect(BREAKDOWN_LABEL_LIMIT).toBe(15);
-    expect(breakdownQueryLabels(many, null)).toEqual(many.slice(0, BREAKDOWN_LABEL_LIMIT));
-  });
-
-  it("also counts a selected label past the cap, so its chart can pick topk", () => {
-    expect(breakdownQueryLabels(many, "l20")).toEqual([...many.slice(0, 15), "l20"]);
-    expect(breakdownQueryLabels(many, "l03")).toEqual(many.slice(0, 15));
-  });
-
-  it("ignores a selected label the metric does not carry", () => {
-    expect(breakdownQueryLabels(many, "tenant_id")).toEqual(many.slice(0, 15));
   });
 });
 

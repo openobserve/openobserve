@@ -113,7 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <ODropdownItem
                   :icon-left="row.starred ? 'star' : 'star-outline'"
-                  class="md:hidden"
                   :data-test="`metrics-history-star-${row.id}-menu`"
                   @select="toggleStar(row)"
                 >
@@ -124,7 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdownItem
                   variant="destructive"
                   icon-left="delete"
-                  class="md:hidden"
                   :data-test="`metrics-history-delete-${row.id}-menu`"
                   @select="deleteEntry.mutate(row.id)"
                 >

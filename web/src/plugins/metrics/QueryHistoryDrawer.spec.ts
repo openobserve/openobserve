@@ -252,20 +252,46 @@ describe("QueryHistoryDrawer with the real OTable", () => {
     );
   });
 
-  it("folds the row actions into a kebab on a phone, so none is clipped", async () => {
+  it("folds the row actions into a kebab on a phone, whose Star and Delete reach the entry routes", async () => {
     breakpoint.mobile = true;
     api.list.mockResolvedValue({ data: ENTRIES });
-    const wrapper = mountReal();
+    api.star.mockResolvedValue({ data: {} });
+    api.remove.mockResolvedValue({ data: {} });
+    const wrapper = mount(QueryHistoryDrawer, {
+      attachTo: document.body,
+      global: { plugins: [i18n, store], stubs: { ODrawer: DrawerStub } },
+    });
     await open(wrapper);
-    await vi.waitFor(() =>
-      expect(wrapper.find('[data-test="metrics-history-more-e1"]').exists()).toBe(true),
-    );
-    expect(wrapper.find('[data-test="metrics-history-more-e1"]').classes()).toContain("md:hidden");
+    const more = () => wrapper.find('[data-test="metrics-history-more-e1"]');
+    await vi.waitFor(() => expect(more().exists()).toBe(true));
+    expect(more().classes()).toContain("md:hidden");
     expect(wrapper.find('[data-test="metrics-history-delete-e1"]').classes()).toContain(
       "max-md:hidden",
     );
     expect(wrapper.find('[data-test="metrics-history-star-e1"]').classes()).toContain(
       "max-md:hidden",
     );
+
+    // The menu is portalled to <body>; only its trigger is hidden on desktop.
+    const pick = async (dataTest: string) => {
+      await more().trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      const item = await vi.waitFor(() => {
+        const el = document.querySelector<HTMLElement>(`[data-test="${dataTest}"]`);
+        expect(el).not.toBeNull();
+        return el!;
+      });
+      expect(item.classList.contains("md:hidden")).toBe(false);
+      item.click();
+      await flushPromises();
+    };
+
+    await pick("metrics-history-star-e1-menu");
+    expect(api.star).toHaveBeenCalledWith("default", "e1", true);
+
+    await pick("metrics-history-delete-e1-menu");
+    expect(api.remove).toHaveBeenCalledWith("default", "e1");
+    expect(wrapper.emitted("load")).toBeUndefined();
+    wrapper.unmount();
   });
 });

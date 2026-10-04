@@ -383,14 +383,80 @@ describe("MetricBreakdown with the real OTable", () => {
     await vi.waitFor(() =>
       expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(20),
     );
-    expect(fieldValues).toHaveBeenCalledTimes(1);
-    expect(lastRequest().fields).toEqual([...WIDE_LABELS.slice(0, 15), "tenant_id"]);
+    expect(fieldValues.mock.calls.map(([req]) => req.fields)).toEqual([
+      WIDE_LABELS.slice(0, 15),
+      ["tenant_id"],
+    ]);
     expect(runQuery).toHaveBeenCalledWith(
       'sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))',
     );
     expect(wrapper.find('[data-test="metrics-breakdown-value-tenant_id-t0"]').exists()).toBe(true);
     // An uncounted label is still a row to pick, not a silent absence.
     expect(wrapper.find('[data-test="metrics-breakdown-distinct-service_name"]').text()).toBe("–");
+  });
+
+  /** Answers each request with three values for every field it asked for. */
+  const echoFields = ({ fields }: any) =>
+    Promise.resolve({
+      data: { hits: fields.map((field: string) => ({ field, values: values(`${field}-`, 3) })) },
+    });
+
+  it("shows a label added past the cap once the labels change", async () => {
+    fieldValues.mockImplementation(echoFields);
+    wrapper = mountReal({ card: WIDE });
+    await vi.waitFor(() =>
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(20),
+    );
+
+    await wrapper.setProps({ card: { ...WIDE, labels: [...WIDE_LABELS, "zone"] } });
+    await flushPromises();
+
+    await vi.waitFor(() =>
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(21),
+    );
+    expect(wrapper.find('[data-test="metrics-breakdown-distinct-zone"]').text()).toBe("–");
+  });
+
+  it("asks for a selected label past the cap alone, never re-scanning the first 15", async () => {
+    fieldValues.mockImplementation(echoFields);
+    wrapper = mountReal({ card: WIDE });
+    await flushPromises();
+    expect(fieldValues).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({ selectedLabel: "tenant_id" });
+    await flushPromises();
+    expect(fieldValues).toHaveBeenCalledTimes(2);
+    expect(lastRequest().fields).toEqual(["tenant_id"]);
+    expect(runQuery).toHaveBeenLastCalledWith(
+      'sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))',
+    );
+    await vi.waitFor(() =>
+      expect(
+        wrapper.find('[data-test="metrics-breakdown-value-tenant_id-tenant_id-0"]').exists(),
+      ).toBe(true),
+    );
+
+    await wrapper.setProps({ selectedLabel: "a03" });
+    await flushPromises();
+    expect(fieldValues).toHaveBeenCalledTimes(2);
+    expect(runQuery).toHaveBeenLastCalledWith(
+      'sum by (a03) (rate({__name__="http_requests_total"}[4m]))',
+    );
+  });
+
+  it("caps a 20+ label past the cap from its own counts, without waiting for the first 15", async () => {
+    fieldValues.mockImplementation(({ fields }: any) =>
+      fields.length === 1
+        ? Promise.resolve({ data: { hits: [{ field: "tenant_id", values: values("t", 21) }] } })
+        : new Promise(() => {}),
+    );
+    wrapper = mountReal({ card: WIDE, selectedLabel: "tenant_id" });
+    await flushPromises();
+
+    expect(runQuery).toHaveBeenCalledTimes(1);
+    expect(runQuery).toHaveBeenCalledWith(
+      'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
+    );
   });
 
   it("titles the chart with the measure it plots: p90 for a histogram, rate for a counter", async () => {

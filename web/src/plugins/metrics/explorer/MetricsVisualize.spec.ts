@@ -44,25 +44,31 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 
 /** The stub's runQuery — the real PanelEditor exposes one, so the stub must too. */
 const editorRunQuery = vi.hoisted(() => vi.fn());
+/** What the query editor inside PanelEditor injects as `runQuery` for ⌘/Ctrl+Enter. */
+const injectedRunQuery = vi.hoisted(() => ({ current: null as any }));
 
 // The real PanelEditor pulls in ECharts + the whole dashboard config surface;
 // none of that is what this container's own logic needs. Stub it, but keep its
 // emit so the add-to-dashboard handshake can be driven, and EXPOSE runQuery —
 // the container drives the chart through `panelEditorRef.runQuery()`, so a stub
 // without it makes the auto-run silently no-op and the test prove nothing.
-vi.mock("@/components/dashboards/PanelEditor", () => ({
-  PanelEditor: {
-    name: "PanelEditor",
-    props: ["allowedChartTypes"],
-    emits: ["add-to-dashboard", "chart-api-error"],
-    setup: (_: any, { expose }: any) => {
-      expose({ runQuery: editorRunQuery });
-      return {};
+vi.mock("@/components/dashboards/PanelEditor", async () => {
+  const { inject } = await import("vue");
+  return {
+    PanelEditor: {
+      name: "PanelEditor",
+      props: ["allowedChartTypes"],
+      emits: ["add-to-dashboard", "chart-api-error"],
+      setup: (_: any, { expose }: any) => {
+        injectedRunQuery.current = inject("runQuery", null);
+        expose({ runQuery: editorRunQuery });
+        return {};
+      },
+      template:
+        '<div data-test="panel-editor-stub"><button data-test="stub-add" @click="$emit(\'add-to-dashboard\')" /></div>',
     },
-    template:
-      '<div data-test="panel-editor-stub"><button data-test="stub-add" @click="$emit(\'add-to-dashboard\')" /></div>',
-  },
-}));
+  };
+});
 
 vi.mock("../AddToDashboard.vue", () => ({
   default: {
@@ -270,6 +276,19 @@ describe("MetricsVisualize", () => {
           context: expect.objectContaining({ time_range: { period: "1h" }, chart_type: "line" }),
         }),
       );
+    });
+
+    it("the editor's ⌘/Ctrl+Enter asks the parent for the same Run as the button", async () => {
+      const wrapper = mountVisualize({ selectedDateTime: { startTime: 1000, endTime: 2000 } });
+      await flushPromises();
+      expect(injectedRunQuery.current).toBeTypeOf("function");
+
+      injectedRunQuery.current(false);
+
+      // The parent's Run handler owns the range and the history write; nothing runs here first.
+      expect(wrapper.emitted("run")).toHaveLength(1);
+      expect(editorRunQuery).not.toHaveBeenCalled();
+      expect(historyApi.record).not.toHaveBeenCalled();
     });
 
     it("does not record a query that fails validation", async () => {

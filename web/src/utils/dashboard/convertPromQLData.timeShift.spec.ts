@@ -326,6 +326,26 @@ describe("convertPromQLData with time-shifted results", () => {
       expect(shifted.itemStyle.color).toBe("#123456");
     });
 
+    it("lets a mapping on the shifted series' own name win, and ties the unmapped ones", async () => {
+      const mapped: any = panel("line");
+      mapped.config = {
+        color: {
+          colorBySeries: [
+            { value: "api-1", color: "#123456" },
+            { value: "api-1 (1 day ago)", color: "#abcdef" },
+          ],
+        },
+      };
+      const result = await convert(mapped, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
+
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.itemStyle.color).toBe("#123456");
+      expect(shifted.itemStyle.color).toBe("#abcdef");
+      const [otherPrimary, otherShifted] = pair(result, "api-2");
+      expect(otherShifted.itemStyle.color).toBeTruthy();
+      expect(otherShifted.itemStyle.color).toBe(otherPrimary.itemStyle.color);
+    });
+
     it("takes the primary's colour when the colour depends on the values", async () => {
       const shaded: any = panel("line");
       shaded.config = { color: { mode: "continuous-green-yellow-red" } };

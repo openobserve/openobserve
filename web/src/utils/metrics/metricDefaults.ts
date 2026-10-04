@@ -1444,14 +1444,6 @@ export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[
     .sort();
 }
 
-/** The labels whose values are counted: the first few, plus the selected one wherever it sorts. */
-export function breakdownQueryLabels(labels: string[], selected: string | null): string[] {
-  const head = labels.slice(0, BREAKDOWN_LABEL_LIMIT);
-  return selected && !head.includes(selected) && labels.includes(selected)
-    ? [...head, selected]
-    : head;
-}
-
 const BREAKDOWN_TITLE_KEYS: Record<string, I18nKey> = {
   [CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS]: "metrics.explorer.detail.breakdown.titleP90",
   [CARD_KIND.COUNTER_RATE]: "metrics.explorer.detail.breakdown.titleRate",

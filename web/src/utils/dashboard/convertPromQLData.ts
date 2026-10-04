@@ -1232,7 +1232,14 @@ export const convertPromQLData = async (
     store.state.theme,
   );
   // Mapped and value-based colours are final only now, and a mapping would otherwise recolour a twin.
+  const mappedNames = new Set(
+    (panelSchema?.config?.color?.colorBySeries ?? [])
+      .filter((mapping: any) => mapping?.value && mapping?.color)
+      .map((mapping: any) => String(mapping.value)),
+  );
   for (const [twin, metric] of shiftedTwins) {
+    // A mapping on the twin's own name is the user's choice and outranks the primary's colour.
+    if (mappedNames.has(twin.name)) continue;
     const color = primaryByMetric.get(metric)?.itemStyle?.color;
     if (color) twin.itemStyle.color = color;
   }

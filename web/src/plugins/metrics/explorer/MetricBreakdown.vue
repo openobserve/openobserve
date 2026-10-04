@@ -193,7 +193,7 @@ import { parseSearchError } from "@/utils/query/searchError";
 import {
   baseNameOf,
   breakdownLabelsOf,
-  breakdownQueryLabels,
+  BREAKDOWN_LABEL_LIMIT,
   breakdownTitleKey,
   buildBreakdownQuery,
   CARD_KIND,
@@ -289,55 +289,55 @@ export default defineComponent({
       return known ? props.filters.filter((f) => known.includes(String(f.label))) : props.filters;
     });
 
-    const rows = ref<BreakdownRow[]>([]);
     const tableLoading = ref(false);
     const tableLoaded = ref(false);
     const tableError = ref("");
+    /** The first labels' counts, with the fields they were asked for. */
+    const headCounts = ref<{ fields: string[]; hits: any[] } | null>(null);
     let tableGeneration = 0;
 
-    const queryLabels = computed(() => breakdownQueryLabels(labels.value, props.selectedLabel));
+    const headLabels = computed(() => labels.value.slice(0, BREAKDOWN_LABEL_LIMIT));
+
+    /** A selected label past the cap: its counts come from a request of its own. */
+    const pastCapLabel = computed(() =>
+      activeLabel.value && !headLabels.value.includes(activeLabel.value) ? activeLabel.value : null,
+    );
+    const extraCounts = ref<{ label: string; status: "loading" | "done" | "error"; values: any[] }>(
+      { label: "", status: "done", values: [] },
+    );
+    let extraGeneration = 0;
+
+    const fetchValues = (fields: string[]) =>
+      streamService.fieldValues({
+        org_identifier: store.state.selectedOrganization?.identifier,
+        stream_name: valuesStream.value,
+        fields,
+        size: VALUES_SIZE,
+        start_time: props.timeRange.start_time,
+        end_time: props.timeRange.end_time,
+        type: "metrics",
+        query_context:
+          b64EncodeUnicode(labelFiltersToSql(valuesStream.value, applicableFilters.value)) ?? "",
+      });
 
     const loadTable = async () => {
       const generation = ++tableGeneration;
-      const fields = queryLabels.value;
+      const fields = headLabels.value;
       tableError.value = "";
       tableLoaded.value = false;
       if (!fields.length) {
-        rows.value = [];
+        headCounts.value = { fields, hits: [] };
         tableLoaded.value = true;
         return;
       }
       tableLoading.value = true;
       try {
-        const response = await streamService.fieldValues({
-          org_identifier: store.state.selectedOrganization?.identifier,
-          stream_name: valuesStream.value,
-          fields,
-          size: VALUES_SIZE,
-          start_time: props.timeRange.start_time,
-          end_time: props.timeRange.end_time,
-          type: "metrics",
-          query_context:
-            b64EncodeUnicode(labelFiltersToSql(valuesStream.value, applicableFilters.value)) ?? "",
-        });
+        const response = await fetchValues(fields);
         if (generation !== tableGeneration) return;
-        const hits: any[] = response?.data?.hits ?? [];
-        rows.value = labels.value.map((label) => {
-          const values: any[] = hits.find((hit) => hit?.field === label)?.values ?? [];
-          return {
-            label,
-            top: values.slice(0, TOP_VALUES).map((v) => ({
-              value: String(v?.zo_sql_key ?? ""),
-              count: Number(v?.zo_sql_num ?? 0),
-            })),
-            distinct: values.length,
-            more: values.length >= VALUES_SIZE,
-            counted: fields.includes(label),
-          };
-        });
+        headCounts.value = { fields, hits: response?.data?.hits ?? [] };
       } catch (error: any) {
         if (generation !== tableGeneration) return;
-        rows.value = [];
+        headCounts.value = null;
         tableError.value = parseSearchError(error).message;
       } finally {
         if (generation === tableGeneration) {
@@ -347,17 +347,58 @@ export default defineComponent({
       }
     };
 
+    const loadExtra = async () => {
+      const generation = ++extraGeneration;
+      const label = pastCapLabel.value;
+      if (!label) {
+        extraCounts.value = { label: "", status: "done", values: [] };
+        return;
+      }
+      extraCounts.value = { label, status: "loading", values: [] };
+      try {
+        const response = await fetchValues([label]);
+        if (generation !== extraGeneration) return;
+        const hits: any[] = response?.data?.hits ?? [];
+        const values = hits.find((hit) => hit?.field === label)?.values ?? [];
+        extraCounts.value = { label, status: "done", values };
+      } catch {
+        if (generation !== extraGeneration) return;
+        extraCounts.value = { label, status: "error", values: [] };
+      }
+    };
+
     // Sources compared one by one: a getter returning a fresh array re-fires on every card rebuild.
-    watch(
-      [
-        valuesStream,
-        () => queryLabels.value.join(","),
-        () => JSON.stringify(applicableFilters.value),
-        () => props.timeRange,
-      ],
-      loadTable,
-      { immediate: true },
-    );
+    const countSources = [
+      valuesStream,
+      () => JSON.stringify(applicableFilters.value),
+      () => props.timeRange,
+    ];
+    watch([() => headLabels.value.join(","), ...countSources], loadTable, { immediate: true });
+    watch([pastCapLabel, ...countSources], loadExtra, { immediate: true });
+
+    const toRow = (label: string, values: any[], counted: boolean): BreakdownRow => ({
+      label,
+      top: values.slice(0, TOP_VALUES).map((v) => ({
+        value: String(v?.zo_sql_key ?? ""),
+        count: Number(v?.zo_sql_num ?? 0),
+      })),
+      distinct: values.length,
+      more: values.length >= VALUES_SIZE,
+      counted,
+    });
+
+    // Built from the full label list, so a label past the cap appears without a re-scan.
+    const rows = computed<BreakdownRow[]>(() => {
+      const head = headCounts.value;
+      if (!head) return [];
+      const extra = extraCounts.value;
+      return labels.value.map((label) => {
+        if (extra.label === label && extra.status === "done")
+          return toRow(label, extra.values, true);
+        const values = head.hits.find((hit) => hit?.field === label)?.values ?? [];
+        return toRow(label, values, head.fields.includes(label));
+      });
+    });
 
     const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => [
       { id: "label", header: t("metrics.explorer.detail.breakdown.label"), size: 180 },
@@ -386,12 +427,28 @@ export default defineComponent({
     const selectedRow = computed(
       () => rows.value.find((row) => row.label === activeLabel.value) ?? null,
     );
+    /** The selected label's counts, from whichever request carries them, so the chart waits on that one only. */
+    const selectedCounts = computed(() => {
+      const extra = extraCounts.value;
+      if (!pastCapLabel.value) {
+        return {
+          ready: tableLoaded.value,
+          failed: !!tableError.value,
+          more: !!selectedRow.value?.more,
+        };
+      }
+      return {
+        ready: extra.label === pastCapLabel.value && extra.status !== "loading",
+        failed: extra.status === "error",
+        more: extra.values.length >= VALUES_SIZE,
+      };
+    });
     // Without counts a label's cardinality is unknown, so it gets the conservative cap.
-    const topkApplied = computed(() => !!selectedRow.value?.more || !!tableError.value);
+    const topkApplied = computed(() => selectedCounts.value.more || selectedCounts.value.failed);
 
-    /** Built once the table has answered: only it knows whether to cap at top 10. */
+    /** Built once the selected label's counts have answered: only they know whether to cap at top 10. */
     const chartExpr = computed(() => {
-      if (!activeLabel.value || !tableLoaded.value) return null;
+      if (!activeLabel.value || !selectedCounts.value.ready) return null;
       return buildBreakdownQuery(
         props.card.cardKind,
         {
@@ -460,6 +517,7 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       tableGeneration += 1;
+      extraGeneration += 1;
       chartGeneration += 1;
       cancelActive();
     });

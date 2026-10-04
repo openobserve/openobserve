@@ -611,6 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :seed="visualizeSeed"
       @seed-consumed="visualizeSeed = null"
       @update:time-range="onVisualizeTimeRange"
+      @run="onVisualizeRun"
     />
 
     <FunctionConfigDialog
