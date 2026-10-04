@@ -912,6 +912,23 @@ describe("MetricBreakdown", () => {
         await flushPromises();
       };
       const stroke = (value: string) => cell("trend", value).find("path").attributes("stroke");
+      /** Queues animation frames until `release`, so "before the chart is read" is not a race. */
+      const holdFrames = () => {
+        const queued = new Map<number, FrameRequestCallback>();
+        let id = 0;
+        const raf = vi
+          .spyOn(window, "requestAnimationFrame")
+          .mockImplementation((cb) => (queued.set(++id, cb), id));
+        const caf = vi
+          .spyOn(window, "cancelAnimationFrame")
+          .mockImplementation((handle) => void queued.delete(handle));
+        return async () => {
+          raf.mockRestore();
+          caf.mockRestore();
+          for (const cb of queued.values()) cb(0);
+          await flushPromises();
+        };
+      };
 
       it("drops the previous result's colours the moment a new result lands", async () => {
         runQuery.mockResolvedValue(TWO);
@@ -922,13 +939,13 @@ describe("MetricBreakdown", () => {
         expect(stroke("m1")).toBe("#111111");
 
         fakeChart.getVisual.mockReturnValue("#333333");
+        const release = holdFrames();
         await wrapper.setProps({ timeRange: { start_time: 1_000, end_time: 3_000 } });
         await flushPromises();
         // Landed, but its chart not yet read: no colour rather than the old one.
         expect(stroke("m1")).toBe("currentColor");
 
-        await nextFrame();
-        await flushPromises();
+        await release();
         expect(stroke("m1")).toBe("#333333");
       });
 
@@ -945,11 +962,12 @@ describe("MetricBreakdown", () => {
         rebuilt.getVisual.mockReturnValue("#444444");
         liveChart.current = rebuilt;
         const theme = store.state.theme;
+        const release = holdFrames();
         try {
           store.commit("appTheme", theme === "dark" ? "light" : "dark");
           await flushPromises();
           expect(stroke("m1")).toBe("currentColor");
-          await settle();
+          await release();
 
           const handler = fakeChart.on.mock.calls.find(([e]) => e === "finished")![1];
           expect(fakeChart.off).toHaveBeenCalledWith("finished", handler);
@@ -958,6 +976,48 @@ describe("MetricBreakdown", () => {
         } finally {
           store.commit("appTheme", theme);
         }
+      });
+
+      it("colours and highlights every row even when one value is the empty string", async () => {
+        runQuery.mockResolvedValue({
+          ...TWO,
+          result: [
+            ...TWO.result,
+            {
+              metric: { method: "" },
+              values: [
+                [1, "1"],
+                [2, "1"],
+              ],
+            },
+          ],
+        });
+        // The chart leaves an empty value's legend placeholder in place as the series name.
+        fakeChart.getOption.mockReturnValue({
+          series: [{ name: "m1" }, { name: "m0" }, { name: "{method}" }],
+        });
+        fakeChart.getVisual.mockImplementation(({ seriesName }: any) => {
+          const colors: Record<string, string> = {
+            m1: "#111111",
+            m0: "#222222",
+            "{method}": "#555555",
+          };
+          if (!(seriesName in colors)) throw new Error(`no series model ${seriesName}`);
+          return colors[seriesName];
+        });
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await settle();
+
+        expect(stroke("m1")).toBe("#111111");
+        expect(stroke("m0")).toBe("#222222");
+        expect(stroke("")).toBe("#555555");
+
+        const row = cell("value", "").element.closest("tr")!;
+        row.dispatchEvent(new MouseEvent("mouseenter"));
+        expect(fakeChart.dispatchAction).toHaveBeenLastCalledWith({
+          type: "highlight",
+          seriesName: "{method}",
+        });
       });
 
       it("reads the series colours once per result, not on every chart render", async () => {

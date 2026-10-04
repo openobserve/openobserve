@@ -684,6 +684,8 @@ export default defineComponent({
     let boundChart: ECharts | undefined;
     /** Set once the drawn chart carries this result's series; reset by a new result or theme. */
     let colorsRead = false;
+    /** A value's series name as the chart draws it: an empty value keeps its `{label}` placeholder. */
+    const chartNameOf = (value: string) => value || `{${activeLabel.value}}`;
     const readColors = () => {
       // "finished" fires on every render, hover highlights included; getOption copies all data.
       if (colorsRead || !boundChart) return;
@@ -692,7 +694,7 @@ export default defineComponent({
         (r?.result ?? [])
           .map((s: any) => s?.metric?.[label ?? ""])
           .filter((v: unknown) => v !== undefined)
-          .map(String),
+          .map((v: unknown) => chartNameOf(String(v))),
       );
       const series: any[] = (boundChart.getOption() as any)?.series ?? [];
       const names = series.map((s) => String(s.name));
@@ -733,7 +735,8 @@ export default defineComponent({
     });
 
     const highlight = (row: BreakdownRow, type: "highlight" | "downplay") => {
-      if (row.avg !== null) focusedChart()?.dispatchAction({ type, seriesName: row.value });
+      if (row.avg !== null)
+        focusedChart()?.dispatchAction({ type, seriesName: chartNameOf(row.value) });
     };
 
     const rows = computed<BreakdownRow[]>(() => {
@@ -759,7 +762,7 @@ export default defineComponent({
           latest: s ? format(s.latest, s.decimals) : null,
           share: s && total > 0 ? `${((s.sum / total) * 100).toFixed(1)}%` : null,
           trend: s ? trendOf(s.points) : null,
-          color: seriesColors.value[value] ?? null,
+          color: seriesColors.value[chartNameOf(value)] ?? null,
         };
       });
       // Stable: values without a series keep their count order, after the rest.
