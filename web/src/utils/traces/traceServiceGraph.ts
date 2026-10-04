@@ -61,8 +61,9 @@ export function buildTraceServiceGraph(
   const nodes = new Map<string, TraceServiceGraphNode>();
   const edges = new Map<string, TraceServiceGraphEdge>();
 
-  spans.forEach((span) => {
-    const id = resolveSpanIdentity(span as Span) || unknownServiceLabel;
+  const identities = spans.map((span) => resolveSpanIdentity(span as Span) || unknownServiceLabel);
+  spans.forEach((span, i) => {
+    const id = identities[i];
     if (span.span_id) identityBySpanId.set(span.span_id, id);
     const node = nodes.get(id) ?? {
       id,
@@ -71,18 +72,21 @@ export function buildTraceServiceGraph(
       errors: 0,
       service_type: undefined,
     };
-    node.requests += 1;
-    if (isSpanError(span)) node.errors += 1;
     if (!node.service_type && (span.infer_service_name || span.infer_service_system)) {
       node.service_type = span.infer_service_type || undefined;
     }
     nodes.set(id, node);
   });
 
-  spans.forEach((span) => {
+  spans.forEach((span, i) => {
+    const to = identities[i];
     const from = identityBySpanId.get(span.reference_parent_span_id ?? "");
-    const to = identityBySpanId.get(span.span_id ?? "");
-    if (!from || !to || from === to) return;
+    if (from === to) return;
+    // Only entries into a service count as its requests; its internal child spans do not.
+    const node = nodes.get(to)!;
+    node.requests += 1;
+    if (isSpanError(span)) node.errors += 1;
+    if (!from) return;
     const key = `${from}\u0000${to}`;
     const edge = edges.get(key) ?? {
       from,
@@ -119,15 +123,17 @@ export function filterTraceServiceGraph(
   };
 }
 
-/** Keeps matching nodes with their whole subtree, plus their ancestors so the tree stays connected. */
 export function filterTraceTree<T extends NamedTreeNode>(nodes: T[], search: string): T[] {
   const trimmed = search.trim().toLowerCase();
   if (!trimmed) return nodes;
-  const prune = (list: T[]): T[] =>
+  const prune = (list: T[], parentMatched: boolean): T[] =>
     list.flatMap((node) => {
-      if (node.name.toLowerCase().includes(trimmed)) return [node];
-      const children = prune((node.children ?? []) as T[]);
-      return children.length ? [{ ...node, children }] : [];
+      const matched = node.name.toLowerCase().includes(trimmed);
+      const children = prune((node.children ?? []) as T[], matched);
+      if (matched || children.length) {
+        return [{ ...node, children: children.length ? children : undefined }];
+      }
+      return parentMatched ? [{ ...node, children: undefined }] : [];
     });
-  return prune(nodes);
+  return prune(nodes, false);
 }

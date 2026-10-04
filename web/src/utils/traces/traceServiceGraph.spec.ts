@@ -38,7 +38,7 @@ describe("buildTraceServiceGraph", () => {
         {
           id: "api",
           label: "api",
-          requests: 2,
+          requests: 1,
           errors: 0,
           service_type: undefined,
         },
@@ -71,15 +71,30 @@ describe("buildTraceServiceGraph", () => {
     expect(graph.nodes.find((n) => n.id === "api")?.requests).toBe(3);
   });
 
-  it("counts error spans on nodes", () => {
+  it("counts only entries into a service as its requests", () => {
+    const graph = buildTraceServiceGraph([
+      span("a", "web"),
+      span("b", "api", "a"),
+      span("c", "api", "b"),
+      span("d", "api", "c"),
+    ]);
+    expect(graph.nodes.map((n) => [n.id, n.requests])).toEqual([
+      ["api", 1],
+      ["web", 1],
+    ]);
+  });
+
+  it("counts errored entry spans as node errors, ignoring internal spans", () => {
     const graph = buildTraceServiceGraph([
       span("a", "web"),
       span("b", "api", "a", { span_status: "ERROR" }),
       span("c", "api", "a", { status_code: 2 }),
       span("d", "api", "a"),
       span("e", "api", "a"),
+      span("f", "api", "b", { span_status: "ERROR" }),
     ]);
     const api = graph.nodes.find((n) => n.id === "api")!;
+    expect(api.requests).toBe(4);
     expect(api.errors).toBe(2);
     expect(graph.edges[0]).toEqual({
       from: "web",
@@ -171,24 +186,51 @@ describe("filterTraceTree", () => {
   const tree = [
     {
       name: "web",
-      children: [{ name: "api", children: [{ name: "db" }] }, { name: "cache" }],
+      children: [
+        { name: "api", children: [{ name: "db", children: [{ name: "disk" }] }] },
+        { name: "cache" },
+      ],
     },
-    { name: "batch" },
+    { name: "queue" },
   ];
 
   it("returns the tree unchanged for an empty search", () => {
     expect(filterTraceTree(tree, "")).toEqual(tree);
   });
 
-  it("keeps a match together with its ancestors and drops other branches", () => {
+  it("keeps a match with its ancestors and direct children and drops other branches", () => {
     expect(filterTraceTree(tree, "DB")).toEqual([
-      { name: "web", children: [{ name: "api", children: [{ name: "db" }] }] },
+      {
+        name: "web",
+        children: [{ name: "api", children: [{ name: "db", children: [{ name: "disk" }] }] }],
+      },
     ]);
   });
 
-  it("keeps a matching node's whole subtree", () => {
+  it("drops a match's unmatched descendants beyond its direct children", () => {
     expect(filterTraceTree(tree, "api")).toEqual([
-      { name: "web", children: [{ name: "api", children: [{ name: "db" }] }] },
+      { name: "web", children: [{ name: "api", children: [{ name: "db", children: undefined }] }] },
+    ]);
+    expect(filterTraceTree(tree, "web")).toEqual([
+      {
+        name: "web",
+        children: [
+          { name: "api", children: undefined },
+          { name: "cache", children: undefined },
+        ],
+      },
+    ]);
+  });
+
+  it("applies the rule again to a matching descendant of a match", () => {
+    expect(filterTraceTree(tree, "b")).toEqual([
+      {
+        name: "web",
+        children: [
+          { name: "api", children: [{ name: "db", children: [{ name: "disk" }] }] },
+          { name: "cache", children: undefined },
+        ],
+      },
     ]);
   });
 

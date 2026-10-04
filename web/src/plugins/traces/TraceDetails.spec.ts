@@ -842,6 +842,21 @@ describe("TraceDetails", () => {
       expect(fakeChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
     });
 
+    it("detaches the tree tooltip when switching from Tree View to Graph View", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      await mountMap();
+      await graphBtn().trigger("click");
+      await treeBtn().trigger("click");
+      await tooltipSetupDelay();
+      expect(fakeChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
+      expect(fakeChart.off).not.toHaveBeenCalled();
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+
+      expect(fakeChart.off).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
     it("does not attach the tree tooltip when Graph View is chosen during the setup delay", async () => {
       const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
       await mountMap();
