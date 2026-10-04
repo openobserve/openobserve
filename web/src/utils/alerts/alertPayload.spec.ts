@@ -332,6 +332,32 @@ describe("alertPayload", () => {
       expect(payload.query_condition.sql).toBe("");
     });
 
+    // Compare-with-Past windows only run with SQL; the form keeps them on other tabs.
+    describe("multi_time_range", () => {
+      const windows = [{ offSet: "1h" }];
+      const withWindows = (type: string) => {
+        const formData = createBaseFormData();
+        return {
+          ...formData,
+          query_condition: { ...formData.query_condition, type, multi_time_range: windows },
+        };
+      };
+
+      it.each(["custom", "promql"])("sends no windows for a %s alert", (type) => {
+        const context = createBaseContext({ getSelectedTab: { value: type } });
+
+        const payload = getAlertPayload(withWindows(type), context);
+
+        expect(payload.query_condition.multi_time_range).toEqual([]);
+      });
+
+      it("keeps the windows for a sql alert", () => {
+        const payload = getAlertPayload(withWindows("sql"), createBaseContext());
+
+        expect(payload.query_condition.multi_time_range).toEqual(windows);
+      });
+    });
+
     it("should base64 encode vrl_function when present", () => {
       const formData = createBaseFormData();
       formData.query_condition.vrl_function = '  .message = "test"  ';

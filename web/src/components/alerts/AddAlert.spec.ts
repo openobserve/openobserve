@@ -1143,4 +1143,585 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
   });
+
+  // ── Query mode at Save ─────────────────────────────────────────────────────
+  // Only the selected mode runs. A Builder alert with no conditions matches
+  // every row, so SQL kept in the other tab must not save silently as Builder.
+  // These drive the real footer Save button and the real Alert Type toggle.
+  describe("query mode at Save", () => {
+    const SQL = `SELECT level FROM "default" WHERE level='CRITICAL'`;
+    const emptyTree = { filterType: "group", logicalOperator: "AND", groupId: "", conditions: [] };
+
+    const seedEmptyBuilder = (form: any, sql: string) => {
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.conditions", emptyTree);
+      form.setFieldValue("query_condition.sql", sql);
+    };
+
+    // Await the handler the footer Save button runs, so each save settles inside
+    // its own test. `form.state` read here does not follow the submit (its
+    // submissionAttempts stays 0 while the save runs), so polling isSubmitting
+    // passed at once and let a slow save leak into the next test.
+    const clickSave = async () => {
+      expect(wrapper.find('[data-test="add-alert-submit-btn"]').exists()).toBe(true);
+      await wrapper.vm.handleSave();
+      await flushPromises();
+    };
+
+    // Control for the next test: the same form saves once the SQL is gone, so
+    // the dialog is the only thing that can hold the save back.
+    it("saves an empty Builder alert when no other mode has content", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedEmptyBuilder(wrapper.vm.form, "");
+
+      await clickSave();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks which mode to use instead of saving an empty Builder over stored SQL", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedEmptyBuilder(wrapper.vm.form, SQL);
+
+      // The real footer button. The dialog opens once the schema passes.
+      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
+      await vi.waitFor(() => expect(wrapper.vm.saveModeDialogOpen).toBe(true), { timeout: 4000 });
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      // ODialog teleports to document.body, outside the wrapper.
+      expect(document.querySelector('[data-test="alert-save-mode-dialog"]')).not.toBeNull();
+    });
+
+    // Enter in the alert name field calls form.requestSubmit() (OInlineEdit),
+    // which goes straight to the form's submit and never through handleSave.
+    it("asks which mode to use when the form is submitted with Enter", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedEmptyBuilder(wrapper.vm.form, SQL);
+
+      await wrapper.find("form").trigger("submit");
+      await vi.waitFor(() => expect(wrapper.vm.saveModeDialogOpen).toBe(true), { timeout: 4000 });
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(document.querySelector('[data-test="alert-save-mode-dialog"]')).not.toBeNull();
+    });
+
+    it("falls back to Builder and keeps the SQL when Alert Type switches to Realtime", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      await flushPromises();
+
+      await wrapper.find('[data-test="add-alert-type-tab-true"]').trigger("click");
+      await flushPromises();
+
+      expect(form.state.values.is_real_time).toBe("true");
+      expect(form.state.values.query_condition.type).toBe("custom");
+      expect(form.state.values.query_condition.sql).toBe(SQL);
+    });
+
+    it("stays on Builder with the SQL kept when Alert Type switches back to Scheduled", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      await flushPromises();
+
+      await wrapper.find('[data-test="add-alert-type-tab-true"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-test="add-alert-type-tab-false"]').trigger("click");
+      await flushPromises();
+
+      expect(form.state.values.is_real_time).toBe("false");
+      expect(form.state.values.query_condition.type).toBe("custom");
+      expect(form.state.values.query_condition.sql).toBe(SQL);
+    });
+
+    it("clears the Compare-with-Past windows when a SQL alert switches to Realtime", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.multi_time_range", [{ offSet: "1h" }]);
+      await flushPromises();
+
+      await wrapper.find('[data-test="add-alert-type-tab-true"]').trigger("click");
+      await flushPromises();
+
+      expect(form.state.values.query_condition.multi_time_range).toEqual([]);
+    });
+
+    const builderTree = {
+      ...emptyTree,
+      conditions: [
+        {
+          filterType: "condition",
+          column: "field1",
+          operator: "=",
+          value: "x",
+          logicalOperator: "AND",
+        },
+      ],
+    };
+
+    const dialogEl = (name: string) =>
+      document.querySelector<HTMLElement>(`[data-test="alert-save-mode-${name}"]`);
+
+    const dialogButton = (which: "primary" | "secondary") =>
+      document.querySelector<HTMLElement>(
+        `[data-test="alert-save-mode-dialog"] [data-test="o-dialog-${which}-btn"]`,
+      );
+
+    // Primary awaits the handler the dialog's Save runs (see clickSave); Cancel
+    // only closes the dialog.
+    const clickDialog = async (which: "primary" | "secondary") => {
+      expect(dialogButton(which)).not.toBeNull();
+      if (which === "primary") await wrapper.vm.saveWithPickedMode();
+      else dialogButton(which)!.click();
+      await flushPromises();
+    };
+
+    const savedPayload = () => (alertsService.create_by_alert_id as any).mock.calls[0][1];
+
+    const noteText = () =>
+      dialogEl("dialog")?.querySelector('[data-test="alert-save-mode-note"]')?.textContent?.trim();
+
+    it("saves with SQL mode from the dialog when Builder is empty", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, SQL);
+      let tabAtSave: unknown;
+      (alertsService.create_by_alert_id as any).mockImplementationOnce(() => {
+        tabAtSave = form.state.values._meta.tab;
+        return Promise.resolve({ data: { code: 200, message: "Alert saved" } });
+      });
+
+      await clickSave();
+      expect(dialogEl("dialog")?.textContent).toContain("Choose Query Mode");
+      expect(dialogEl("lead")?.textContent?.trim()).toBe(
+        "Builder is selected but empty. SQL is set up.",
+      );
+      expect(dialogEl("dialog")?.textContent).not.toContain("-line query");
+      // The dialog opens on the mode selected in the form; only a click changes it.
+      expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+      expect(dialogEl("warning")?.textContent).toContain("No filters, so every row in");
+      expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
+
+      dialogEl("option-sql")!.click();
+      await flushPromises();
+      expect(dialogButton("primary")?.textContent).toContain("Save with SQL Mode");
+      // SQL holds a query, so the picked mode needs no warning.
+      expect(dialogEl("warning")).toBeNull();
+      expect(noteText()).toBe("Only SQL mode runs.");
+
+      // The real dialog button, waiting for the save it starts.
+      dialogButton("primary")!.click();
+      await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalled(), {
+        timeout: 4000,
+      });
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(savedPayload().query_condition.type).toBe("sql");
+      expect(tabAtSave).toBe("sql");
+      expect(dialogEl("dialog")).toBeNull();
+    });
+
+    it("saves as Builder when the dialog is saved without changing the pick", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedEmptyBuilder(wrapper.vm.form, SQL);
+
+      await clickSave();
+      await clickDialog("primary");
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(savedPayload().query_condition.type).toBe("custom");
+    });
+
+    it("opens with SQL picked when SQL is selected and Builder also has a condition", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+
+      await clickSave();
+
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(dialogEl("dialog")?.textContent).toContain("Builder and SQL are both set up.");
+      expect(dialogEl("option-sql")?.getAttribute("data-state")).toBe("on");
+    });
+
+    it("saves as Builder when Builder is picked in the dialog", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+
+      await clickSave();
+      expect(noteText()).toBe("Only SQL mode runs. Builder mode is not used.");
+      dialogEl("option-custom")!.click();
+      await flushPromises();
+      expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
+      expect(dialogEl("dialog")?.textContent).not.toContain("filter condition");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+
+      await clickDialog("primary");
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(savedPayload().query_condition.type).toBe("custom");
+    });
+
+    // SQL selected with a query, plus a Builder condition: the dialog asks.
+    const seedSqlAndBuilder = (form: any) => {
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+    };
+
+    it("does not ask again after the user retries a save that failed with their pick", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedSqlAndBuilder(wrapper.vm.form);
+      (alertsService.create_by_alert_id as any).mockRejectedValueOnce(new Error("save failed"));
+
+      await clickSave();
+      dialogEl("option-custom")!.click();
+      await flushPromises();
+      await clickDialog("primary");
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+
+      await clickSave();
+
+      expect(dialogEl("dialog")).toBeNull();
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(2);
+      expect((alertsService.create_by_alert_id as any).mock.calls[1][1].query_condition.type).toBe(
+        "custom",
+      );
+    });
+
+    // The schema runs first: a form with field errors shows them, not the dialog.
+    it("shows the invalid-form toast and no dialog when the form has field errors", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, SQL);
+      form.setFieldValue("destinations", []);
+
+      await clickSave();
+
+      expect(dialogEl("dialog")).toBeNull();
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: i18n.global.t("alerts.messages.fixHighlightedFields"),
+        }),
+      );
+    });
+
+    // "avg of took >= 500" over every row is a working Builder alert.
+    it("counts a Builder aggregation with no filters as content", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, SQL);
+      form.setFieldValue("query_condition.aggregation", {
+        function: "avg",
+        group_by: [],
+        having: { column: "took", operator: ">=", value: 500 },
+      });
+      wrapper.vm.isAggregationEnabled = true;
+
+      await clickSave();
+
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(dialogEl("dialog")?.textContent).toContain("Builder and SQL are both set up.");
+      expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
+    });
+
+    // The Compare-with-Past windows are SQL-only; the backend still runs them
+    // for a Builder alert, and the UI cannot show them off the SQL tab.
+    it("sends no Compare-with-Past windows when Builder is picked in the dialog", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+      form.setFieldValue("query_condition.multi_time_range", [{ offSet: "1h" }]);
+
+      await clickSave();
+      dialogEl("option-custom")!.click();
+      await flushPromises();
+      await clickDialog("primary");
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(savedPayload().query_condition.type).toBe("custom");
+      expect(savedPayload().query_condition.multi_time_range).toEqual([]);
+    });
+
+    it("keeps the Compare-with-Past windows in the form when a Builder save fails", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedSqlAndBuilder(form);
+      form.setFieldValue("query_condition.multi_time_range", [{ offSet: "1h" }]);
+      (alertsService.create_by_alert_id as any).mockRejectedValueOnce(new Error("save failed"));
+
+      await clickSave();
+      dialogEl("option-custom")!.click();
+      await flushPromises();
+      await clickDialog("primary");
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(form.state.values.query_condition.multi_time_range).toEqual([{ offSet: "1h" }]);
+    });
+
+    it("lists all three modes when Builder, SQL and PromQL all have content", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("stream_type", "metrics");
+      form.setFieldValue("query_condition.type", "promql");
+      form.setFieldValue("query_condition.promql", "up");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+
+      await clickSave();
+
+      expect(dialogEl("option-custom")).not.toBeNull();
+      expect(dialogEl("option-sql")).not.toBeNull();
+      expect(dialogEl("option-promql")).not.toBeNull();
+      expect(dialogEl("dialog")?.textContent).toContain("Builder, SQL and PromQL are all set up.");
+      expect(noteText()).toBe("Only PromQL mode runs. Builder and SQL modes are not used.");
+    });
+
+    // The reported alert, as the GET returns it: Builder with no conditions
+    // over the SQL that was meant to run.
+    it("asks on Save when a loaded Builder alert has no conditions but stores SQL", async () => {
+      wrapper = mountAlert({
+        isUpdated: true,
+        modelValue: {
+          name: "existing_alert",
+          stream_type: "logs",
+          stream_name: "default",
+          is_real_time: false,
+          query_condition: {
+            type: "custom",
+            conditions: { version: 2, conditions: { ...emptyTree, groupId: "g" } },
+            sql: SQL,
+          },
+          trigger_condition: {
+            period: 10,
+            operator: ">=",
+            frequency: 10,
+            cron: "",
+            threshold: 5,
+            silence: 10,
+            frequency_type: "minutes",
+            timezone: "UTC",
+          },
+          destinations: ["email"],
+        },
+        destinations: [{ name: "email" }],
+      });
+      await flushPromises();
+
+      await clickSave();
+
+      expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
+      expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
+    });
+
+    it("says no query is written when the picked SQL mode is empty", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", "");
+      form.setFieldValue("query_condition.conditions", builderTree);
+
+      await clickSave();
+      expect(dialogEl("option-sql")?.getAttribute("data-state")).toBe("on");
+
+      expect(dialogEl("dialog")?.textContent).toContain("No query written yet");
+    });
+
+    it("warns that every row counts when Builder is picked with no filters", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedEmptyBuilder(wrapper.vm.form, SQL);
+
+      await clickSave();
+      expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
+
+      expect(dialogEl("dialog")?.textContent).toContain("No filters, so every row in");
+    });
+
+    // The dialog content stays mounted through its exit animation, so a quick
+    // second click can land on Save after the first save is done. jsdom drops
+    // the content at once, so the second click calls the button's handler.
+    it("saves once when the dialog Save is clicked twice quickly", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedEmptyBuilder(wrapper.vm.form, SQL);
+
+      await clickSave();
+      await clickDialog("primary");
+      await wrapper.vm.saveWithPickedMode();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      // The saved form is reset, so a second submit would fail with this toast.
+      expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("saves a SQL alert without asking when only SQL has content", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, SQL);
+      form.setFieldValue("query_condition.type", "sql");
+
+      await clickSave();
+
+      expect(dialogEl("dialog")).toBeNull();
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+
+    it("saves nothing and changes nothing when the dialog is cancelled", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, SQL);
+
+      await clickSave();
+      await clickDialog("secondary");
+
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(form.state.values.query_condition.type).toBe("custom");
+      expect(dialogEl("dialog")).toBeNull();
+    });
+
+    it("does not ask when the SQL tab holds only the starter query", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedEmptyBuilder(wrapper.vm.form, `SELECT * FROM "_rundata"`);
+
+      await clickSave();
+
+      expect(dialogEl("dialog")).toBeNull();
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not count the default metrics aggregation as Builder content", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, "");
+      form.setFieldValue("stream_type", "metrics");
+      form.setFieldValue("query_condition.aggregation", {
+        function: "avg",
+        group_by: [],
+        having: { column: "value", operator: ">=", value: 1 },
+      });
+      form.setFieldValue("query_condition.type", "promql");
+      form.setFieldValue("query_condition.promql", "up");
+      form.setFieldValue("query_condition.promql_condition", { operator: ">=", value: 1 });
+
+      await clickSave();
+
+      expect(dialogEl("dialog")).toBeNull();
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not ask for a Realtime alert that keeps SQL text", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, SQL);
+      form.setFieldValue("is_real_time", "true");
+
+      await clickSave();
+
+      expect(dialogEl("dialog")).toBeNull();
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+
+    // Anomaly and composite alerts have no query mode, so leftover query text never asks.
+    it("does not ask for an anomaly alert that keeps SQL and a Builder condition", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      form.setFieldValue("name", "anom_alert");
+      form.setFieldValue("stream_type", "logs");
+      form.setFieldValue("stream_name", "_rundata");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+      await flushPromises();
+      wrapper.vm.anomalyConfig.alert_enabled = false;
+      wrapper.vm.anomalyConfig.query_mode = "filters";
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      expect(wrapper.vm.saveModeDialogOpen).toBe(false);
+      expect(anomalyDetectionService.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not ask for a composite alert that keeps SQL and a Builder condition", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      form.setFieldValue("is_real_time", "composite");
+      form.setFieldValue("name", "checkout_degraded");
+      form.setFieldValue("stream_type", "");
+      form.setFieldValue("stream_name", "");
+      form.setFieldValue("destinations", ["pager"]);
+      form.setFieldValue("trigger_condition", { silence: 15 });
+      form.setFieldValue("composite_condition", {
+        expression: "{id-a} && {id-b}",
+        warning_counts_as_firing: true,
+        stale_child_policy: "use_last_state",
+      });
+      form.setFieldValue("children", [
+        { alert_id: "id-a", name: "Error alert", accessible: true },
+        { alert_id: "id-b", name: "Latency alert", accessible: true },
+      ]);
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      expect(wrapper.vm.saveModeDialogOpen).toBe(false);
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+    });
+  });
 });
