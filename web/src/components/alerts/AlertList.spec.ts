@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { http, HttpResponse } from "msw";
 // Mock aws-exports so isEnterprise / isCloud can be controlled per-test
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -23,6 +24,12 @@ vi.mock("@/aws-exports", () => ({
     isEnterprise: "false",
   },
 }));
+
+// Passthrough spy: real toasts still render, and specs can read what was raised.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, toast: vi.fn((...args: unknown[]) => actual.toast(...args)) };
+});
 
 // Mock services before importing component (follow reference style)
 vi.mock("@/services/oncall", () => ({
@@ -70,6 +77,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 
@@ -1414,6 +1422,51 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(wrapper.vm.showForm).toBe(false);
   });
 
+  it("duplicateAlert pre-fills stream type and name from the source row", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(wrapper.vm.toBeClonestreamType).toBe(row.stream_type);
+    expect(wrapper.vm.toBeClonestreamName).toBe(row.stream_name);
+  });
+
+  it("duplicateAlert leaves stream type and name blank for the '--' placeholder", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = { ...wrapper.vm.filteredResults[0], stream_type: "--", stream_name: "--" };
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(wrapper.vm.toBeClonestreamType).toBe("");
+    expect(wrapper.vm.toBeClonestreamName).toBe("");
+  });
+
+  it("duplicateAlert still fetches the alert to clone when the stream list fails to load", async () => {
+    global.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/streams`,
+        () => HttpResponse.error(),
+      ),
+    );
+
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    // A failed stream-list load must not skip fetching the alert being
+    // cloned — otherwise Save would silently copy whatever alert was
+    // cloned previously instead of this one.
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(expect.anything(), row.alert_id);
+  });
+
   it("clone dialog emits click:primary -> invokes submitForm", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1762,5 +1815,38 @@ describe("AlertList - on-call owner column", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     expect(String(wrapper.vm.oncallTeamName("t_gone"))).toBe("t_gone");
+  });
+});
+
+describe("AlertList - trigger", () => {
+  const triggerWith = async (data: Record<string, unknown>) => {
+    const spy = vi.spyOn(AlertService, "trigger_alert").mockResolvedValue({ data } as any);
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    vi.mocked(toast).mockClear();
+    await wrapper.vm.triggerAlert(wrapper.vm.filteredResults[0]);
+    await flushPromises();
+    spy.mockRestore();
+    return vi.mocked(toast).mock.calls.map((call) => call[0]);
+  };
+
+  it("reports success when the run happened", async () => {
+    const calls = await triggerWith({ claim_lost: false, anomalies_found: 0 });
+    expect(calls).toEqual([
+      { variant: "success", message: i18n.global.t("alerts.alertTriggeredSuccess") },
+    ]);
+  });
+
+  it("warns with the server's reason when the detector may not run", async () => {
+    const message = "Anomaly detection config is not enabled";
+    const calls = await triggerWith({ claim_lost: false, ineligible: true, message });
+    expect(calls).toEqual([{ variant: "warning", message }]);
+  });
+
+  it("warns instead of claiming success when a detection run already holds the claim", async () => {
+    const calls = await triggerWith({ claim_lost: true, message: "already running" });
+    expect(calls).toEqual([
+      { variant: "warning", message: i18n.global.t("alerts.anomaly.detectionAlreadyRunning") },
+    ]);
   });
 });

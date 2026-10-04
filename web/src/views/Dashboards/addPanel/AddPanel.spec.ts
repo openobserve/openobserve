@@ -5,9 +5,12 @@ import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory, onBeforeRouteLeave, useRoute } from "vue-router";
 import { isEqual } from "lodash-es";
-import { getDashboard, updatePanel } from "@/utils/commons";
+import { addPanel, getDashboard, updatePanel } from "@/utils/commons";
+import analytics from "@/services/product_analytics";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { createI18n } from "vue-i18n";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock external dependencies
 vi.mock("@/utils/commons", () => ({
@@ -4734,6 +4737,68 @@ describe("AddPanel.vue", () => {
       expect(updatePanel).toHaveBeenCalled();
       expect(window.sessionStorage.getItem(key)).toBeNull();
       vi.mocked(useRoute).mockReset();
+    });
+  });
+
+  describe("product analytics on save", () => {
+    const mountWithRoute = async (query: Record<string, string>) => {
+      vi.mocked(useRoute).mockReturnValue({ query, params: {} } as any);
+      vi.mocked(getDashboard).mockResolvedValue({
+        title: "d",
+        tabs: [{ tabId: "t1", panels: [] }],
+      });
+      wrapper = shallowMount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: { PanelEditor: true, DateTimePickerDashboard: true, QueryInspector: true },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      wrapper.vm.dashboardPanelData.data.id = "p1";
+      wrapper.vm.dashboardPanelData.data.title = "Latency";
+      wrapper.vm.dashboardPanelData.data.type = "bar";
+      vi.mocked(analytics.track).mockClear();
+    };
+
+    afterEach(() => {
+      vi.mocked(useRoute).mockReset();
+    });
+
+    it("tracks dashboard_panel_saved as an existing panel once updatePanel resolves", async () => {
+      vi.mocked(updatePanel).mockResolvedValue(undefined as any);
+      await mountWithRoute({ dashboard: "d1", panelId: "p1", tab: "t1", folder: "f1" });
+
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_panel_saved", {
+        chart_type: "bar",
+        is_new: false,
+      });
+    });
+
+    it("tracks dashboard_panel_saved as a new panel once addPanel resolves", async () => {
+      vi.mocked(addPanel).mockResolvedValue(undefined as any);
+      await mountWithRoute({ dashboard: "d1", tab: "t1", folder: "f1" });
+
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_panel_saved", {
+        chart_type: "bar",
+        is_new: true,
+      });
+    });
+
+    it("does not track dashboard_panel_saved when the save rejects", async () => {
+      vi.mocked(updatePanel).mockRejectedValue(new Error("boom"));
+      await mountWithRoute({ dashboard: "d1", panelId: "p1", tab: "t1", folder: "f1" });
+
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(updatePanel).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 

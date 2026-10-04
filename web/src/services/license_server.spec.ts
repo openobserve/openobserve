@@ -15,6 +15,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import licenseServer from "./license_server";
 import http from "./http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./http", () => ({
   default: vi.fn(() => ({
@@ -234,5 +237,25 @@ describe("license_server service", () => {
 
       expect(http).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe("license_server product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after update_license succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await licenseServer.update_license("key");
+    expect(analytics.track).toHaveBeenCalledWith("license_updated");
+  });
+
+  it("does not track when update_license fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(licenseServer.update_license("key")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

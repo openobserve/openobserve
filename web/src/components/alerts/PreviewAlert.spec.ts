@@ -49,6 +49,9 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
+// Imported after the mock above so it resolves to the mocked module.
+import searchService from "@/services/search";
+
 const baseFormData = () => ({
   stream_name: "test-stream",
   stream_type: "logs",
@@ -455,6 +458,77 @@ describe("PreviewAlert - refreshData method", () => {
     await nextTick();
 
     expect(w.vm.chartData).not.toBe(w.vm.dashboardPanelData?.data);
+    w.unmount();
+  });
+});
+
+describe("PreviewAlert - fetchQuerySchema stream guard", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  // Reproduces the production 400: the alert editor can mount (and this
+  // watcher fire) before the user has picked a stream, firing result_schema
+  // with no real stream/stream_type behind the query.
+  it("does not call result_schema when stream_name is missing", async () => {
+    const formData = baseFormData() as any;
+    formData.stream_name = "";
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "sql",
+      formData,
+    });
+
+    w.vm.refreshData();
+    await flushPromises();
+
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("does not call result_schema when stream_type is missing", async () => {
+    const formData = baseFormData() as any;
+    formData.stream_type = "";
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "sql",
+      formData,
+    });
+
+    w.vm.refreshData();
+    await flushPromises();
+
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("calls result_schema once the form has a real stream", async () => {
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "sql",
+      formData: baseFormData(),
+    });
+
+    await flushPromises();
+
+    expect(searchService.result_schema).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("applies the same guard to the custom+aggregation path", async () => {
+    const formData = baseFormData() as any;
+    formData.stream_name = "";
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "custom",
+      isAggregationEnabled: true,
+      formData,
+    });
+
+    expect(() => w.vm.refreshData()).not.toThrow();
+    await flushPromises();
+
+    // The aggregation branch builds the chart locally and never reaches
+    // result_schema regardless, but it must not throw or leave stale state.
+    expect(searchService.result_schema).not.toHaveBeenCalled();
     w.unmount();
   });
 });

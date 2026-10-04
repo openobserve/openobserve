@@ -162,7 +162,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^traces-pipeline-/,            // traces-pipeline-* (scheduled pipeline tests)
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
         /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
-        /^e2e_backfill_test_\d+$/       // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^e2e_backfill_test_\d+$/,      // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^fn_e2e_pl_/                   // functions-import-export.spec.js (pipeline holding an imported function)
       ]
     );
 
@@ -197,6 +198,16 @@ test.describe("Pre-Test Cleanup", () => {
       /^default_vrl_fn_/             // Default org VRL function tests
     ];
 
+    // Patterns from the function import/export specs
+    // (Functions/functions-import-export.spec.js and
+    //  RegressionSet/Pipelines/function-import-non-object-entry.spec.js)
+    const importExportFunctionPatterns = [
+      /^fn_e2e_/,                    // imported, round-tripped and renamed functions
+      /^fn_export_/,                 // single, bulk and narrow-viewport export fixtures
+      /^fn_clash_/,                  // seeded functions used to provoke a name clash
+      /^fn_regr_nonobj_/             // non-object entry repaired by the inline fixers
+    ];
+
     // Patterns from Functions folder tests (row-expansion.spec.js)
     const rowExpansionPatterns = [
       /^vrl_row_expand_/,            // VRL row expansion tests
@@ -216,7 +227,8 @@ test.describe("Pre-Test Cleanup", () => {
     const defaultOrgPatterns = [
       ...sanityFunctionPatterns,
       ...jsFunctionPatterns,         // default_vrl_fn_* created in default org
-      ...rowExpansionPatterns        // vrl_* patterns created in default org
+      ...rowExpansionPatterns,       // vrl_* patterns created in default org
+      ...importExportFunctionPatterns // fn_* patterns from the import/export specs
     ];
     await pm.apiCleanup.cleanupFunctionsInOrg('default', defaultOrgPatterns);
 
@@ -443,6 +455,20 @@ test.describe("Pre-Test Cleanup", () => {
       'E2E Pricing Verifier ',              // cost-verification models (Journeys 12/13)
       /^.+\s\(Copy\)$/                      // cloned built-in models (source=org, name ends with " (Copy)")
     ]);
+
+    // IAM leftovers from a CRASHED run: roles, groups, users and service accounts under
+    // the `ui_auto` prefix the IAM specs use.
+    //
+    // This is the ONLY place that sweeps them. Each IAM spec now deletes exactly what it
+    // created (makeTracker in IAM/iam-fixtures.js) rather than everything matching the
+    // prefix — doing the latter in every spec's beforeAll is what had them deleting each
+    // other's fixtures mid-test and flaking the ENT crosscheck gate. A sweep is still
+    // needed for artifacts an aborted run orphaned, but it belongs here, once, before
+    // anything else starts.
+    //
+    // Enterprise-only (rbac_enabled): on an OSS build /roles answers 4xx, so this skips
+    // quietly rather than failing the cleanup every other suite depends on.
+    await pm.apiCleanup.cleanupIamArtifacts('ui_auto');
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

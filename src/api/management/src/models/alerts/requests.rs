@@ -142,7 +142,7 @@ pub struct AnomalyAlertFields {
     pub training_window_days: Option<i32>,
     /// 0 = never retrain automatically; otherwise days between retrains
     pub retrain_interval_days: Option<i32>,
-    /// Percentile threshold (50.0–99.9), default 97.0; also accepts `threshold` as an integer.
+    /// Legacy percentile; no longer selects the trained k outside budget mode. Alias `threshold`.
     #[serde(
         default,
         alias = "threshold",
@@ -153,12 +153,31 @@ pub struct AnomalyAlertFields {
     /// Delivered-alert budget per day; mutually exclusive with `percentile`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_budget_per_day: Option<f64>,
-    /// Half-width of the level window in seconds; absent keeps the one-day default.
+    /// Accepted and stored, but ignored by the band model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(deprecated)]
     pub level_half_width_seconds: Option<i64>,
+    #[schema(deprecated)]
     pub rcf_num_trees: Option<i32>,
+    #[schema(deprecated)]
     pub rcf_tree_size: Option<i32>,
+    #[schema(deprecated)]
     pub rcf_shingle_size: Option<i32>,
+    /// Manual band half-width k in sigmas, 1 to 10; absent uses the trained k (Auto, 3 to 6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_width: Option<f64>,
+    /// `both`, `above` or `below`; absent means both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_direction: Option<String>,
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; absent means 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_buckets: Option<i32>,
+    /// Percent of the window out of band that fires; absent means 100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_fire_pct: Option<f64>,
+    /// Percent of the window out of band below which it recovers; absent means the fire percent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_recover_pct: Option<f64>,
     pub alert_enabled: Option<bool>,
 }
 
@@ -341,7 +360,7 @@ pub struct UpdateAnomalyAlertFields {
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
-    /// Also accepts the name `threshold`, matching the create body.
+    /// Legacy percentile; no longer selects the trained k outside budget mode. Alias `threshold`.
     #[serde(
         default,
         alias = "threshold",
@@ -349,12 +368,58 @@ pub struct UpdateAnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
-    /// Set-only through this endpoint: clearing a budget goes through the direct anomaly API.
+    /// Absent leaves the stored budget; `null` clears it, back to the trained k.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_budget_per_day: Option<Option<f64>>,
+    /// Accepted and stored, but ignored by the band model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alert_budget_per_day: Option<f64>,
-    /// Set-only here; clearing back to the default goes through the direct anomaly API.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(deprecated)]
     pub level_half_width_seconds: Option<i64>,
+    /// Absent leaves the stored value, so pause/resume keeps it; `null` clears to auto.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub band_width: Option<Option<f64>>,
+    /// `both`, `above` or `below`; `null` clears to both.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub alert_direction: Option<Option<String>>,
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; `null` clears to 1.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<i32>)]
+    pub alert_window_buckets: Option<Option<i32>>,
+    /// Percent of the window out of band that fires; `null` clears to 100.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_window_fire_pct: Option<Option<f64>>,
+    /// Out-of-band percent below which the window recovers; `null` clears to the fire percent.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_window_recover_pct: Option<Option<f64>>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,
     /// Moves the config to this folder. Naming a folder you cannot write to
@@ -546,6 +611,15 @@ fn parse_priority_filter(
         return None; // genuinely no filter
     }
     Some(tokens.iter().filter_map(|t| t.parse().ok()).collect())
+}
+
+/// `#[serde(default)]` alone decodes an explicit `null` to the outer `None`, losing "clear".
+fn double_option<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Deserialize::deserialize(de).map(Some)
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -807,6 +881,54 @@ mod tests {
         .unwrap();
         let fields = req.anomaly_fields();
         assert_eq!(fields.detection_function, Some("avg(memory)".to_string()));
+    }
+
+    #[test]
+    fn test_update_alert_band_settings_keep_absent_and_null_apart() {
+        let toggle: UpdateAlertRequestBody = serde_json::from_value(serde_json::json!({
+            "anomaly_config": { "enabled": false }
+        }))
+        .unwrap();
+        let fields = toggle.anomaly_fields();
+        assert_eq!(fields.band_width, None);
+        assert_eq!(fields.alert_direction, None);
+        assert_eq!(fields.alert_window_recover_pct, None);
+
+        let full: UpdateAlertRequestBody = serde_json::from_value(serde_json::json!({
+            "anomaly_config": {
+                "band_width": null,
+                "alert_direction": "above",
+                "alert_window_buckets": 5,
+                "alert_window_fire_pct": 80.0,
+                "alert_window_recover_pct": null
+            }
+        }))
+        .unwrap();
+        let fields = full.anomaly_fields();
+        assert_eq!(fields.band_width, Some(None));
+        assert_eq!(fields.alert_direction, Some(Some("above".to_string())));
+        assert_eq!(fields.alert_window_buckets, Some(Some(5)));
+        assert_eq!(fields.alert_window_fire_pct, Some(Some(80.0)));
+        assert_eq!(fields.alert_window_recover_pct, Some(None));
+    }
+
+    #[test]
+    fn test_update_alert_budget_keeps_absent_and_null_apart() {
+        let parse = |body: serde_json::Value| {
+            serde_json::from_value::<UpdateAlertRequestBody>(body)
+                .unwrap()
+                .anomaly_fields()
+                .alert_budget_per_day
+        };
+        assert_eq!(parse(serde_json::json!({ "anomaly_config": {} })), None);
+        assert_eq!(
+            parse(serde_json::json!({ "anomaly_config": { "alert_budget_per_day": null } })),
+            Some(None)
+        );
+        assert_eq!(
+            parse(serde_json::json!({ "anomaly_config": { "alert_budget_per_day": 2.5 } })),
+            Some(Some(2.5))
+        );
     }
 
     #[test]

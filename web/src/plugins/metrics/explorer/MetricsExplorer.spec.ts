@@ -125,7 +125,7 @@ vi.mock("vue-router", () => ({
   }),
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: () =>
     computed(() => ({

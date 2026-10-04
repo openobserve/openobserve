@@ -212,34 +212,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <template #bottom>
-              <div class="flex w-full items-center justify-between py-2">
-                <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
-                  {{ resultTotal }} {{ t("function.header") }}
-                </div>
-                <div v-if="selectedFunctions.length > 0" class="flex items-center gap-2">
-                  <OButton
-                    data-test="function-list-export-functions-btn"
-                    variant="outline"
-                    size="sm"
-                    :loading="exportLoading"
-                    @click="exportSelectedFunctions"
-                    icon-left="download"
-                  >
-                    {{ t("common.export") }}
-                  </OButton>
-                  <OButton
-                    data-test="function-list-delete-functions-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                    icon-left="delete"
-                  >
-                    {{ t("common.delete") }}
-                  </OButton>
-                </div>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="function-list-export-functions-btn"
+                variant="outline"
+                size="sm"
+                :loading="exportLoading"
+                @click="exportSelectedFunctions"
+                icon-left="download"
+              >
+                {{ t("common.export") }}
+              </OButton>
+              <OButton
+                data-test="function-list-delete-functions-btn"
+                variant="outline-destructive"
+                size="sm"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+                icon-left="delete"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -311,7 +304,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
@@ -513,7 +506,6 @@ export default defineComponent({
     // Bound to the refresh button: always reaches the server.
     const refreshJSTransforms = () => functions.refetch();
 
-    const resultTotal = ref<number>(0);
     const pageSize = ref(20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
 
@@ -574,7 +566,7 @@ export default defineComponent({
       }
       addTransform();
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -647,7 +639,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Delete Function",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -711,15 +703,6 @@ export default defineComponent({
       return filterData(jsTransforms.value || [], filterQuery.value);
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -953,7 +936,6 @@ export default defineComponent({
       lastUpdatedAt,
       refreshJSTransforms,
       forbidden,
-      resultTotal,
       refreshList,
       pageSize,
       pageSizeOptions,

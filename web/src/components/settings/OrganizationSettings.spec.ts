@@ -28,6 +28,9 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "false" },
 }));
@@ -403,6 +406,48 @@ describe("OrganizationSettings", () => {
           cross_links: [{ sourceField: "trace_id", targetOrg: "other-org" }],
         }),
       );
+    });
+
+    describe("cross_link_saved", () => {
+      const value = {
+        traceIdFieldName: "trace_id",
+        spanIdFieldName: "span_id",
+        toggleIngestionLogs: false,
+        usageStreamEnabled: false,
+      };
+      const link = { sourceField: "trace_id", targetOrg: "other-org" };
+
+      it("tracks once a save with changed cross-links succeeds", async () => {
+        const wrapper = createWrapper();
+        wrapper.vm.crossLinks = [link];
+
+        await wrapper.vm.saveOrgSettings(value);
+
+        expect(analytics.track).toHaveBeenCalledWith("cross_link_saved", { scope: "org" });
+      });
+
+      it("does not track when the cross-links are unchanged", async () => {
+        mockStore.state.organizationData.organizationSettings = {
+          ...mockStore.state.organizationData.organizationSettings,
+          cross_links: [link],
+        };
+        const wrapper = createWrapper();
+
+        await wrapper.vm.saveOrgSettings(value);
+
+        expect(mockPostOrganizationSettings).toHaveBeenCalled();
+        expect(analytics.track).not.toHaveBeenCalled();
+      });
+
+      it("does not track when the save fails", async () => {
+        mockPostOrganizationSettings.mockRejectedValue({ message: "Error" });
+        const wrapper = createWrapper();
+        wrapper.vm.crossLinks = [link];
+
+        await wrapper.vm.saveOrgSettings(value);
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      });
     });
   });
 

@@ -60,6 +60,7 @@ pub mod prompts;
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
+pub mod rum_analytics;
 #[cfg(feature = "enterprise")]
 pub mod score_configs;
 #[cfg(feature = "enterprise")]

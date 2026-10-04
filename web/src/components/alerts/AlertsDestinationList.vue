@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
           :current-page="currentPage"
-          :footer-title="t('alert_destinations.header')"
           sorting="client"
           :default-columns="false"
           :enable-column-resize="true"
@@ -121,12 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #bottom="{ totalRows }">
-            <span class="text-xs font-normal max-md:hidden">
-              {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
-            </span>
+          <template #selection-actions>
             <OButton
-              v-if="selectedDestinations.length > 0"
               data-test="destination-list-delete-destinations-btn"
               variant="outline-destructive"
               size="sm"
@@ -508,7 +503,6 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const filterQuery = ref("");
-    const resultTotal = ref(0);
     const deletingDestinations = ref(new Set<string>());
     const oTableRef: any = ref(null);
 
@@ -623,7 +617,6 @@ export default defineComponent({
         const rows = list.filter(
           (destination: any) => destination.type == "http" || destination.type == "email",
         );
-        resultTotal.value = rows.length;
         destinations.value = rows;
         updateRoute();
       };
@@ -974,14 +967,6 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
@@ -1028,7 +1013,6 @@ export default defineComponent({
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      resultTotal,
       routeTo,
       exportDestination,
       showImportDestination,

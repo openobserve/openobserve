@@ -406,9 +406,13 @@ export default defineComponent({
 
     // One path from every fix-up control to the document, so the JSON pane never disagrees.
     const writeField = (index: number, field: string, value: unknown) => {
-      const item = baseImportRef.value?.jsonArrayOfObj?.[index];
-      if (!item) return;
-      item[field] = value;
+      const items: any[] = baseImportRef.value?.jsonArrayOfObj;
+      if (!Array.isArray(items) || index < 0 || index >= items.length) return;
+      // Non-object entries get the same fix-up controls, so give them something writable.
+      if (typeof items[index] !== "object" || items[index] === null) {
+        items[index] = {};
+      }
+      items[index][field] = value;
       writeBackToEditor();
     };
 

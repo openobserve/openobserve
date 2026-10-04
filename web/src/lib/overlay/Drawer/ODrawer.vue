@@ -20,6 +20,8 @@ import {
   provide,
   nextTick,
   useAttrs,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -78,6 +80,36 @@ watch(
     if (v !== undefined) internalOpen.value = v;
   },
 );
+
+// A kept-alive view's portal stays in <body> when the view is away, so it hides then and returns open.
+const hostAway = ref(false);
+// An inline drawer's DOM moves with its host, so only a portaled one needs hiding.
+const shown = computed(() => internalOpen.value && (props.inline || !hostAway.value));
+
+// Remounting on return re-records focus from wherever navigation left it, so keep the opener.
+let openedFrom: HTMLElement | null = null;
+let awaySinceOpen = false;
+watch(
+  internalOpen,
+  (open) => {
+    if (!open) return;
+    openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    awaySinceOpen = false;
+  },
+  { immediate: true },
+);
+onDeactivated(() => {
+  hostAway.value = true;
+  if (internalOpen.value && !shown.value) awaySinceOpen = true;
+});
+onActivated(() => (hostAway.value = false));
+
+function handleCloseAutoFocus(event: Event) {
+  if (hostAway.value || awaySinceOpen) event.preventDefault();
+  if (hostAway.value || !awaySinceOpen) return;
+  awaySinceOpen = false;
+  if (openedFrom?.isConnected) openedFrom.focus();
+}
 
 function handleOpenChange(v: boolean) {
   internalOpen.value = v;
@@ -211,7 +243,7 @@ function measureAnchor() {
 }
 watchEffect(
   (cleanup) => {
-    if (!internalOpen.value || !props.anchor) {
+    if (!shown.value || !props.anchor) {
       anchorTop.value = 0;
       return;
     }
@@ -291,7 +323,7 @@ function handleOpenAutoFocus(event: Event) {
 // body is below document in the DOM, this prevents the events from reaching
 // FocusScope's document-level handlers.
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
 
   function isPortalElement(el: Element | null): boolean {
     return !!el?.closest("[data-reka-popper-content-wrapper]");
@@ -329,7 +361,8 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
-watch(internalOpen, (open) => {
+// The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
+watch(shown, (open) => {
   if (open) {
     nextTick(() => {
       attachShadow();
@@ -342,7 +375,7 @@ watch(internalOpen, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="internalOpen" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -407,6 +440,7 @@ watch(internalOpen, (open) => {
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @close-auto-focus="handleCloseAutoFocus"
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">

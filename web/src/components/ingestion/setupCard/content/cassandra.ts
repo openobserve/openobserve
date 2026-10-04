@@ -52,6 +52,7 @@ service:
 export default function cassandraCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "cassandra",
       name: raw("Cassandra"),
       tagline: t("ingestion.setupCard.cassandraTagline"),
       logo: getImageURL("images/ingestion/cassandra.png"),

@@ -65,11 +65,14 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 // ---------------------------------------------------------------------------
 // Import the component AFTER all mocks are registered
 // ---------------------------------------------------------------------------
 import AddToDashboard from "./AddToDashboard.vue";
 import OFormReal from "@/lib/forms/Form/OForm.vue";
+import analytics from "@/services/product_analytics";
 
 // ---------------------------------------------------------------------------
 // Shared mock store
@@ -929,5 +932,80 @@ describe("AddToDashboard — schema gates submit (real OForm)", () => {
 
     expect(form.state.isValid).toBe(true);
     expect(mockAddPanel).toHaveBeenCalled();
+  });
+});
+
+describe("AddToDashboard — product analytics", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("tracks panel_added_to_dashboard once the panel is added", async () => {
+    mockAddPanel.mockResolvedValueOnce({});
+    const wrapper = createWrapper();
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("panel_added_to_dashboard", { panel_count: 1 });
+  });
+
+  it("counts every panel in multi-panel mode", async () => {
+    mockAddPanel.mockResolvedValue({});
+    const wrapper = createWrapper({
+      panels: [
+        { title: "cpu", queries: [] },
+        { title: "mem", queries: [] },
+      ],
+    });
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("panel_added_to_dashboard", { panel_count: 2 });
+  });
+
+  it("counts the panels already written when a later one fails", async () => {
+    mockAddPanel
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("Server error"));
+    const wrapper = createWrapper({
+      panels: [
+        { title: "cpu", queries: [] },
+        { title: "mem", queries: [] },
+        { title: "disk", queries: [] },
+      ],
+    });
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    expect(mockAddPanel).toHaveBeenCalledTimes(3);
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("panel_added_to_dashboard", { panel_count: 2 });
+  });
+
+  it("does not track when adding the panel fails", async () => {
+    mockAddPanel.mockRejectedValueOnce(new Error("Server error"));
+    const wrapper = createWrapper();
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
+    await flushPromises();
+
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

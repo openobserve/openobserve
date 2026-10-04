@@ -13,8 +13,10 @@ const scrollRef = ref<HTMLElement | null>(null);
 const tablistRef = ref<HTMLElement | null>(null);
 
 function handleFocusin(event: FocusEvent): void {
-  const target = event.target as HTMLElement;
-  if (target.getAttribute("role") !== "tab") return;
+  const target = event.target as HTMLElement | null;
+  // event.target can be null if focus moves away from an element that was
+  // removed from the DOM in the same tick (e.g. a tab unmounted on click).
+  if (!target || target.getAttribute("role") !== "tab") return;
   // Scroll into view: arrow keys move focus without activating, so modelValue watch doesn't fire
   const el = scrollRef.value;
   if (!el) return;

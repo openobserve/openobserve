@@ -60,6 +60,7 @@ service:
 export default function oracleCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "oracle",
       name: raw("Oracle"),
       tagline: t("ingestion.setupCard.oracleTagline"),
       logo: getImageURL("images/ingestion/oracle.svg"),
