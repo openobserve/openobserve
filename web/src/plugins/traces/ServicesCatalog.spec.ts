@@ -2242,7 +2242,7 @@ describe("ServicesCatalog", () => {
   });
 
   describe("request-scoped RED", () => {
-    const KIND_PRED = "CAST(span_kind AS VARCHAR) IN ('2','5')";
+    const KIND_PRED = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
     const ROOT_ARM =
       "(CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
     const INFER_ARM =
@@ -2283,12 +2283,13 @@ describe("ServicesCatalog", () => {
       expect(requests).toContain("COUNT(*) FILTER (WHERE");
       expect(requests).toContain(KIND_PRED);
       expect(requests).toContain(ROOT_ARM);
+      expect(sql).not.toContain("IN ('2','5')");
       expect(sql.replace(/FILTER \(WHERE/g, "")).not.toContain("WHERE");
     });
 
     it("omits the root arm when the schema lacks reference_parent_span_id", async () => {
       const sql = await loadWithSchema(schemaWith("service_name"));
-      expect(selectItem(sql, "total_requests")).toContain(KIND_PRED);
+      expect(selectItem(sql, "total_requests")).toContain(`(WHERE (${KIND_PRED}))`);
       expect(sql).not.toContain("reference_parent_span_id");
     });
 

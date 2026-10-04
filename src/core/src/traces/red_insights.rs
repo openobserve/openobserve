@@ -35,7 +35,8 @@ const DESTRUCTIVE_KEYWORDS: [&str; 4] = ["update", "delete", "drop", "insert"];
 /// Mirrors G4's `ERROR_VOCABULARY` in anomaly_detection.rs; the gated validator test pins it.
 const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5xx", "50x"];
 const SERVICE_MARKER: &str = " WHERE service_name = '";
-const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) IN ('2','5')";
+/// An OR, not `IN ('2','5')`: the IN list's `[` in the aggregate name panics the top-k rule.
+const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
 const ROOT_ARM: &str = "OR (CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -716,7 +717,7 @@ mod tests {
             sql_of(RedSignal::Rate, &ALL_COLS),
             format!(
                 "SELECT histogram(_timestamp, '5m') AS time_bucket, COUNT(*) AS value FROM \"default\" \
-                 WHERE service_name = 'checkout' AND (CAST(span_kind AS VARCHAR) IN ('2','5') {ROOT_ARM}) \
+                 WHERE service_name = 'checkout' AND (CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5' {ROOT_ARM}) \
                  GROUP BY time_bucket"
             )
         );
@@ -749,7 +750,7 @@ mod tests {
         };
         let sql = sql_of(RedSignal::Rate, &cols);
         assert!(
-            sql.contains("AND (CAST(span_kind AS VARCHAR) IN ('2','5')) GROUP BY"),
+            sql.contains("AND (CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5') GROUP BY"),
             "{sql}"
         );
         assert!(!sql.contains("reference_parent_span_id"));
@@ -970,7 +971,7 @@ mod tests {
         assert_eq!(
             volume_sql("my\"stream", &ALL_COLS),
             format!(
-                "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) IN ('2','5') {ROOT_ARM}) \
+                "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5' {ROOT_ARM}) \
                  AS requests FROM \"my\"\"stream\" GROUP BY service_name ORDER BY requests DESC LIMIT 40"
             )
         );
@@ -980,8 +981,56 @@ mod tests {
         };
         assert_eq!(
             volume_sql("default", &cols),
-            "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) IN ('2','5')) \
+            "SELECT service_name, COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5') \
              AS requests FROM \"default\" GROUP BY service_name ORDER BY requests DESC LIMIT 40"
         );
+    }
+
+    /// The top-k rule panics when the aggregate's name holds an IN list's `[`.
+    #[tokio::test]
+    async fn volume_sql_plans_through_the_topk_rule() {
+        use std::sync::Arc;
+
+        use arrow_schema::{DataType, Field, Schema};
+        use datafusion::{
+            config::ConfigOptions,
+            physical_optimizer::PhysicalOptimizerRule,
+            physical_plan::displayable,
+            prelude::{SessionConfig, SessionContext},
+        };
+        use search::datafusion::{
+            optimizer::physical_optimizer::aggregate_topk::AggregateTopkRule,
+            table_provider::empty_table::NewEmptyTable,
+        };
+
+        unsafe { std::env::set_var("ZO_AGGREGATION_TOPK_ENABLED", "true") };
+        config::refresh_config().unwrap();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("service_name", DataType::Utf8, true),
+            Field::new("span_kind", DataType::Utf8, true),
+            Field::new("reference_parent_span_id", DataType::Utf8, true),
+        ]));
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
+        ctx.register_table("default", Arc::new(NewEmptyTable::new("default", schema)))
+            .unwrap();
+        for has_parent in [true, false] {
+            let cols = StreamColumns {
+                has_parent,
+                ..ALL_COLS
+            };
+            let sql = volume_sql("default", &cols);
+            let plan = ctx
+                .sql(&sql)
+                .await
+                .unwrap()
+                .create_physical_plan()
+                .await
+                .unwrap();
+            let plan = AggregateTopkRule::new(MAX_SERVICES as i64 * 2)
+                .optimize(plan, &ConfigOptions::default())
+                .unwrap();
+            let shown = displayable(plan.as_ref()).indent(true).to_string();
+            assert!(shown.contains("AggregateTopkExec"), "{sql}\n{shown}");
+        }
     }
 }

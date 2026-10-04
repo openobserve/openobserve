@@ -1047,7 +1047,8 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
 
 // Same request definition as the service graph (service_graph/v4/sql.rs kind_pred).
 function requestPredicate(hasParentColumn: boolean): string {
-  const kinds = "CAST(span_kind AS VARCHAR) IN ('2','5')";
+  // An OR, not IN ('2','5'): an IN list in a sole ORDER BY aggregate panics the engine's top-k rule.
+  const kinds = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
   if (!hasParentColumn) return `(${kinds})`;
   return `(${kinds} OR (CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = '')))`;
 }
