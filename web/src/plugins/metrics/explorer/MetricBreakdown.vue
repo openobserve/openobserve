@@ -358,7 +358,7 @@ import {
   PANEL_RATE_WINDOW,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
-import { seriesStatsByValue } from "@/utils/metrics/breakdownStats";
+import { adaptiveDecimals, seriesStatsByValue } from "@/utils/metrics/breakdownStats";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
