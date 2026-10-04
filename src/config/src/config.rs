@@ -2944,7 +2944,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_TIMECHART_ENABLED",
         help = "Show timechart tab on logs page",
-        default = true
+        default = false
     )]
     pub timechart_enabled: bool,
     #[env_config(
