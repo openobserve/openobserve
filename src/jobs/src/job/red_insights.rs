@@ -160,17 +160,22 @@ fn config_str<'a>(config: &'a serde_json::Value, key: &str) -> &'a str {
 
 /// An unparseable managed detector maps to `None`, so the plan leaves it alone.
 fn managed_detector(config: &serde_json::Value) -> Option<ManagedDetector> {
-    let (service, signal) =
-        red_insights::parse_managed(&config_tags(config), config_str(config, "custom_sql"))?;
+    let stream = config_str(config, "stream_name");
+    let (service, signal, current) = red_insights::parse_managed(
+        &config_tags(config),
+        config_str(config, "custom_sql"),
+        stream,
+    )?;
     Some(ManagedDetector {
         id: config_str(config, "anomaly_id").to_string(),
-        stream: config_str(config, "stream_name").to_string(),
+        stream: stream.to_string(),
         service,
         signal,
         enabled: config
             .get("enabled")
             .and_then(|v| v.as_bool())
             .unwrap_or(true),
+        current,
     })
 }
 

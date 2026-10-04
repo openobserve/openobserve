@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use config::utils::sql::{quote_identifier, quote_sql_string};
+use regex::Regex;
 
 pub const MANAGED_TAG: &str = "auto:red-insights";
 pub const FOLDER_NAME: &str = "RED insights";
@@ -34,10 +38,14 @@ const NAME_SLASH: char = '\u{2215}';
 const DESTRUCTIVE_KEYWORDS: [&str; 4] = ["update", "delete", "drop", "insert"];
 /// Mirrors G4's `ERROR_VOCABULARY` in anomaly_detection.rs; the gated validator test pins it.
 const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5xx", "50x"];
-const SERVICE_MARKER: &str = " WHERE service_name = '";
 const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) IN ('2','5')";
 /// Any root span is a request, whatever its kind: a trace starting at a client span entered there.
 const ROOT_ARM: &str = "OR (reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+
+/// Tolerates reformatting, not rewrites: a condition before `service_name` stays unrecognised.
+static IDENTITY: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)\bFROM\s+("(?:[^"]|"")*")\s+WHERE\s+service_name\s*=\s*'"#).unwrap()
+});
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RedSignal {
@@ -98,6 +106,8 @@ pub struct ManagedDetector {
     pub service: String,
     pub signal: RedSignal,
     pub enabled: bool,
+    /// SQL equal to today's template; a non-current detector is deleted only by setting-off.
+    pub current: bool,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -218,8 +228,13 @@ pub fn plan(
         })
         .collect();
 
+    // Older-template or user-edited SQL keeps its triple: never duplicated, never overwritten.
+    let occupied: HashSet<(&str, &str, RedSignal)> = existing
+        .iter()
+        .map(|d| (d.stream.as_str(), d.service.as_str(), d.signal))
+        .collect();
     let mut by_triple: BTreeMap<(&str, &str, RedSignal), Vec<&ManagedDetector>> = BTreeMap::new();
-    for d in existing {
+    for d in existing.iter().filter(|d| d.current) {
         by_triple
             .entry((d.stream.as_str(), d.service.as_str(), d.signal))
             .or_default()
@@ -240,7 +255,7 @@ pub fn plan(
         .iter()
         .filter(|v| kept.get(&(v.stream.as_str(), v.service.as_str())) == Some(&true))
         .flat_map(|v| RedSignal::ALL.map(|s| (v, s)))
-        .filter(|(v, s)| !by_triple.contains_key(&(v.stream.as_str(), v.service.as_str(), *s)))
+        .filter(|(v, s)| !occupied.contains(&(v.stream.as_str(), v.service.as_str(), *s)))
         .take(max_creates)
         .map(|(v, s)| (v.stream.clone(), v.service.clone(), s))
         .collect();
@@ -329,19 +344,24 @@ pub fn template(
     })
 }
 
-/// Recovers `(service, signal)` from the tag and the exact template SQL, never the editable name.
-pub fn parse_managed(tags: &[String], custom_sql: &str) -> Option<(String, RedSignal)> {
+/// Recovers `(service, signal, current)` from the tag and the SQL, never the editable name.
+pub fn parse_managed(
+    tags: &[String],
+    custom_sql: &str,
+    stream_name: &str,
+) -> Option<(String, RedSignal, bool)> {
     let signal = tags.iter().find_map(|t| RedSignal::from_tag(t))?;
-    let (head, rest) = custom_sql.split_once(SERVICE_MARKER)?;
-    let quoted_stream = head.split_once(" AS value FROM ")?.1;
-    let service = leading_sql_literal(rest)?;
+    let caps = IDENTITY.captures(custom_sql)?;
+    let quoted_stream = quote_identifier(stream_name);
+    if caps[1] != quoted_stream {
+        return None;
+    }
+    let service = leading_sql_literal(&custom_sql[caps.get(0)?.end()..])?;
     let quoted_service = quote_sql_string(&service);
-    [true, false]
-        .into_iter()
-        .any(|has_parent| {
-            detector_sql(quoted_stream, &quoted_service, signal, has_parent) == custom_sql
-        })
-        .then_some((service, signal))
+    let current = [true, false].into_iter().any(|has_parent| {
+        detector_sql(&quoted_stream, &quoted_service, signal, has_parent) == custom_sql
+    });
+    Some((service, signal, current))
 }
 
 /// Per-service request counts on one trace stream; the caller sets the 24h window.
@@ -364,6 +384,7 @@ fn request_predicate(has_parent: bool) -> String {
     }
 }
 
+/// Changing this template leaves stored detectors on their old SQL until a migration is added.
 fn detector_sql(
     quoted_stream: &str,
     quoted_service: &str,
@@ -460,6 +481,36 @@ mod tests {
             service: service.to_string(),
             signal,
             enabled,
+            current: true,
+        }
+    }
+
+    fn edited(id: &str, service: &str, signal: RedSignal, enabled: bool) -> ManagedDetector {
+        ManagedDetector {
+            current: false,
+            ..det(id, service, signal, enabled)
+        }
+    }
+
+    fn old_template_sql(service: &str, signal: RedSignal) -> String {
+        sql_of_service(service, signal).replace(
+            "CAST(span_kind AS VARCHAR) IN ('2','5')",
+            "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'",
+        )
+    }
+
+    fn sql_of_service(service: &str, signal: RedSignal) -> String {
+        template("default", service, signal, &ALL_COLS)
+            .unwrap()
+            .custom_sql
+    }
+
+    fn parsed(id: &str, signal: RedSignal, sql: &str) -> ManagedDetector {
+        let tags = vec![MANAGED_TAG.to_string(), signal.tag().to_string()];
+        let (service, signal, current) = parse_managed(&tags, sql, "default").unwrap();
+        ManagedDetector {
+            current,
+            ..det(id, &service, signal, true)
         }
     }
 
@@ -483,6 +534,20 @@ mod tests {
 
     fn plan_default(volumes: &[ServiceVolume], existing: &[ManagedDetector]) -> Plan {
         plan(true, volumes, existing, 20, 10_000, usize::MAX)
+    }
+
+    fn apply(existing: &mut Vec<ManagedDetector>, p: &Plan) {
+        existing.retain(|d| !p.delete.contains(&d.id));
+        for (i, (stream, service, signal)) in p.create.iter().enumerate() {
+            existing.push(ManagedDetector {
+                id: format!("new{i:03}"),
+                stream: stream.clone(),
+                service: service.clone(),
+                signal: *signal,
+                enabled: true,
+                current: true,
+            });
+        }
     }
 
     #[test]
@@ -681,16 +746,7 @@ mod tests {
         existing.push(det("dupf", "svc00", RedSignal::Rate, true));
         let first = plan_default(&volumes, &existing);
         assert!(!first.create.is_empty());
-        existing.retain(|d| !first.delete.contains(&d.id));
-        for (i, (stream, service, signal)) in first.create.iter().enumerate() {
-            existing.push(ManagedDetector {
-                id: format!("new{i:03}"),
-                stream: stream.clone(),
-                service: service.clone(),
-                signal: *signal,
-                enabled: true,
-            });
-        }
+        apply(&mut existing, &first);
         let second = plan_default(&volumes, &existing);
         assert!(second.create.is_empty(), "{:?}", second.create);
         assert!(second.delete.is_empty(), "{:?}", second.delete);
@@ -940,8 +996,8 @@ mod tests {
                 for signal in RedSignal::ALL {
                     let t = template("my\"stream", service, signal, &cols).unwrap();
                     assert_eq!(
-                        parse_managed(&t.tags, &t.custom_sql),
-                        Some((service.to_string(), signal)),
+                        parse_managed(&t.tags, &t.custom_sql, "my\"stream"),
+                        Some((service.to_string(), signal, true)),
                         "{}",
                         t.custom_sql
                     );
@@ -951,19 +1007,183 @@ mod tests {
     }
 
     #[test]
-    fn parse_managed_rejects_edited_sql_and_missing_tags() {
+    fn parse_managed_marks_edited_sql_non_current_and_needs_a_tag_and_service() {
         let t = template("default", "checkout", RedSignal::P95Latency, &ALL_COLS).unwrap();
-        let edited = t.custom_sql.replace("0.95", "0.99");
-        assert_eq!(parse_managed(&t.tags, &edited), None);
-        let other_service = t.custom_sql.replace("= 'checkout'", "= 'cart' OR 1=1");
-        assert_eq!(parse_managed(&t.tags, &other_service), None);
-        let rate_tags = vec![MANAGED_TAG.to_string(), RedSignal::Rate.tag().to_string()];
-        assert_eq!(parse_managed(&rate_tags, &t.custom_sql), None);
+        let edited_sql = t.custom_sql.replace("0.95", "0.99");
         assert_eq!(
-            parse_managed(&[MANAGED_TAG.to_string()], &t.custom_sql),
+            parse_managed(&t.tags, &edited_sql, "default"),
+            Some(("checkout".to_string(), RedSignal::P95Latency, false))
+        );
+        let other_service = t.custom_sql.replace("= 'checkout'", "= 'cart' OR 1=1");
+        assert_eq!(
+            parse_managed(&t.tags, &other_service, "default"),
+            Some(("cart".to_string(), RedSignal::P95Latency, false))
+        );
+        let rate_tags = vec![MANAGED_TAG.to_string(), RedSignal::Rate.tag().to_string()];
+        assert_eq!(
+            parse_managed(&rate_tags, &t.custom_sql, "default"),
+            Some(("checkout".to_string(), RedSignal::Rate, false))
+        );
+        assert_eq!(
+            parse_managed(&[MANAGED_TAG.to_string()], &t.custom_sql, "default"),
             None
         );
-        assert_eq!(parse_managed(&t.tags, ""), None);
+        assert_eq!(parse_managed(&t.tags, "", "default"), None);
+        let no_literal = t.custom_sql.replace("= 'checkout'", "IN ('checkout')");
+        assert_eq!(parse_managed(&t.tags, &no_literal, "default"), None);
+    }
+
+    #[test]
+    fn parse_managed_recognises_the_old_template_as_non_current() {
+        for signal in RedSignal::ALL {
+            assert_eq!(
+                parse_managed(
+                    &[MANAGED_TAG.to_string(), signal.tag().to_string()],
+                    &old_template_sql("o'brien", signal),
+                    "default"
+                ),
+                Some(("o'brien".to_string(), signal, false))
+            );
+        }
+    }
+
+    #[test]
+    fn parse_managed_needs_the_from_stream_to_be_the_stream_name() {
+        let t = template("default", "checkout", RedSignal::Rate, &ALL_COLS).unwrap();
+        assert_eq!(parse_managed(&t.tags, &t.custom_sql, "other"), None);
+        let old = old_template_sql("checkout", RedSignal::Rate);
+        assert_eq!(parse_managed(&t.tags, &old, "other"), None);
+    }
+
+    #[test]
+    fn an_old_template_detector_blocks_creation_for_its_triple() {
+        let volumes = [vol("default", "svc", 50_000)];
+        let existing = vec![parsed(
+            "o",
+            RedSignal::Rate,
+            &old_template_sql("svc", RedSignal::Rate),
+        )];
+        let p = plan_default(&volumes, &existing);
+        assert!(p.delete.is_empty(), "{:?}", p.delete);
+        assert_eq!(
+            p.create,
+            vec![
+                (
+                    "default".to_string(),
+                    "svc".to_string(),
+                    RedSignal::ErrorRatio
+                ),
+                (
+                    "default".to_string(),
+                    "svc".to_string(),
+                    RedSignal::P95Latency
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_old_and_a_current_detector_for_one_triple_are_both_kept() {
+        let volumes = [vol("default", "svc", 50_000)];
+        let mut existing = Vec::new();
+        for (i, signal) in RedSignal::ALL.into_iter().enumerate() {
+            existing.push(parsed(
+                &format!("1old{i}"),
+                signal,
+                &old_template_sql("svc", signal),
+            ));
+            existing.push(parsed(
+                &format!("2new{i}"),
+                signal,
+                &sql_of_service("svc", signal),
+            ));
+        }
+        assert_eq!(plan_default(&volumes, &existing), Plan::default());
+    }
+
+    #[test]
+    fn a_user_edited_detector_is_never_duplicated_or_deleted_by_rank() {
+        let user_edited = [edited("e", "svc", RedSignal::Rate, true)];
+        let kept = plan_default(&[vol("default", "svc", 50_000)], &user_edited);
+        assert!(
+            !kept.create.iter().any(|(_, _, s)| *s == RedSignal::Rate),
+            "{:?}",
+            kept.create
+        );
+        assert!(kept.delete.is_empty());
+        let dropped = plan_default(&[vol("default", "svc", 100)], &user_edited);
+        assert_eq!(dropped, Plan::default());
+        assert_eq!(plan_default(&[], &user_edited), Plan::default());
+    }
+
+    #[test]
+    fn an_edited_clone_and_its_original_are_both_kept() {
+        let volumes = [vol("default", "svc", 50_000)];
+        let mut existing: Vec<_> = RedSignal::ALL
+            .into_iter()
+            .enumerate()
+            .map(|(i, s)| parsed(&format!("c{i}"), s, &sql_of_service("svc", s)))
+            .collect();
+        let clone_sql = sql_of_service("svc", RedSignal::P95Latency).replace("0.95", "0.99");
+        existing.push(parsed("clone", RedSignal::P95Latency, &clone_sql));
+        assert_eq!(plan_default(&volumes, &existing), Plan::default());
+    }
+
+    #[test]
+    fn a_parsed_edited_detector_is_stable_across_cycles() {
+        let volumes = [vol("default", "svc", 50_000)];
+        let sql = sql_of_service("svc", RedSignal::P95Latency).replace("0.95", "0.99");
+        let mut existing = vec![parsed("e", RedSignal::P95Latency, &sql)];
+        assert!(!existing[0].current);
+        let first = plan_default(&volumes, &existing);
+        assert!(first.delete.is_empty(), "{:?}", first.delete);
+        apply(&mut existing, &first);
+        let second = plan_default(&volumes, &existing);
+        assert_eq!(second, Plan::default());
+        assert_eq!(
+            existing
+                .iter()
+                .filter(|d| d.service == "svc" && d.signal == RedSignal::P95Latency)
+                .map(|d| d.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["e"]
+        );
+    }
+
+    #[test]
+    fn parse_managed_tolerates_whitespace_keyword_case_and_spacing_edits() {
+        for signal in RedSignal::ALL {
+            let sql = sql_of_service("svc", signal);
+            let tags = vec![MANAGED_TAG.to_string(), signal.tag().to_string()];
+            assert_eq!(
+                parse_managed(&tags, &sql, "default"),
+                Some(("svc".to_string(), signal, true))
+            );
+            let reformatted = sql
+                .replace(" FROM ", "\n  FROM\n    ")
+                .replace(" WHERE ", "\n  WHERE\t")
+                .replace(" AND (", "\n    AND (");
+            let lower_case = sql
+                .replace(" FROM ", " from ")
+                .replace(" WHERE ", " where ");
+            let tight = sql.replace("service_name = 'svc'", "service_name='svc'");
+            let spaced = sql
+                .replace(" FROM ", "   FROM  ")
+                .replace(" = 'svc'", "  =   'svc'");
+            for variant in [reformatted, lower_case, tight, spaced] {
+                assert_eq!(
+                    parse_managed(&tags, &variant, "default"),
+                    Some(("svc".to_string(), signal, false)),
+                    "{variant}"
+                );
+                let p = plan_default(
+                    &[vol("default", "svc", 50_000)],
+                    &[parsed("v", signal, &variant)],
+                );
+                assert!(!p.create.iter().any(|(_, _, s)| *s == signal), "{p:?}");
+                assert!(p.delete.is_empty(), "{p:?}");
+            }
+        }
     }
 
     #[test]
