@@ -2571,6 +2571,53 @@ describe("ServicesCatalog", () => {
       expect(cell("slow").attributes("data-tooltip")).toBe(`${(1_500_000).toLocaleString()} µs`);
     });
 
+    it("shows a dash instead of latencies and a Healthy status for zero-traffic rows", async () => {
+      const row = (name: string, requests: number) => ({
+        id: name,
+        service_name: name,
+        status: "healthy",
+        total_requests: requests,
+        error_count: 0,
+        error_rate: 0,
+        avg_duration_ns: requests ? 1000 : 0,
+        max_duration_ns: requests ? 1000 : 0,
+        p50_latency_ns: requests ? 1000 : 0,
+        p95_latency_ns: requests ? 1000 : 0,
+        p99_latency_ns: requests ? 1000 : 0,
+      });
+      const cols = [
+        "status",
+        "p50_latency_ns",
+        "p95_latency_ns",
+        "p99_latency_ns",
+        "avg_duration_ns",
+        "max_duration_ns",
+      ];
+      wrapper = mountServicesCatalog({
+        stubs: {
+          OTable: {
+            template: `<div><div v-for="row in data" :key="row.id"><span v-for="c in cols" :key="c" :data-test="'cell-' + c + '-' + row.service_name"><slot :name="'cell-' + c" :row="row" /></span></div></div>`,
+            props: ["data", "columns", "loading"],
+            setup: () => ({ cols }),
+          },
+          ServiceCatalogBarCell: {
+            template: `<span data-test="latency-cell">{{ label }}</span>`,
+            props: ["value", "max", "label", "tooltip", "variant"],
+          },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.services = [row("idle", 0), row("busy", 10)];
+      wrapper.vm.isLoading = false;
+      await flushPromises();
+
+      for (const c of cols) {
+        expect(wrapper.find(`[data-test="cell-${c}-idle"]`).text()).toBe("—");
+        expect(wrapper.find(`[data-test="cell-${c}-busy"]`).text()).not.toBe("—");
+      }
+      expect(wrapper.find('[data-test="cell-status-busy"]').text()).toBe("Healthy");
+    });
+
     it("explains the request definition in the Requests header tooltip", async () => {
       wrapper = mountServicesCatalog();
       await flushPromises();

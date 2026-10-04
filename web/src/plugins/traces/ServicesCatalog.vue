@@ -356,9 +356,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-click="(row) => handleRowClick(row)"
             @sort-change="(p) => handleSortChange(p.column)"
           >
-            <!-- Status badge -->
+            <!-- Status badge; a row with no requests has no health to report -->
             <template #cell-status="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <OTag
+                v-else
                 type="serviceStatus"
                 :value="row.status"
                 :data-test="`services-catalog-status-${row.service_name}`"
@@ -407,7 +409,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Latency / duration columns -->
             <template #cell-p50_latency_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.p50_latency_ns"
                 :max="columnMaxes.p50_latency_ns"
                 :label="raw(formatLat(row.p50_latency_ns))"
@@ -416,7 +420,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-p95_latency_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.p95_latency_ns"
                 :max="columnMaxes.p95_latency_ns"
                 :label="raw(formatLat(row.p95_latency_ns))"
@@ -425,7 +431,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-p99_latency_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.p99_latency_ns"
                 :max="columnMaxes.p99_latency_ns"
                 :label="raw(formatLat(row.p99_latency_ns))"
@@ -435,7 +443,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-avg_duration_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.avg_duration_ns"
                 :max="columnMaxes.avg_duration_ns"
                 :label="raw(formatLat(row.avg_duration_ns))"
@@ -444,7 +454,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-max_duration_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.max_duration_ns"
                 :max="columnMaxes.max_duration_ns"
                 :label="raw(formatLat(row.max_duration_ns))"
