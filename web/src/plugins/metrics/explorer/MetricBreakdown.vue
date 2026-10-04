@@ -65,15 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Only once the chart has drawn: the panel's decimals come from its values. -->
           <OButton
             variant="ghost"
-            size="icon-xs"
+            size="xs"
             icon-left="dashboard-customize"
             class="shrink-0"
             :disabled="focused.status !== 'done'"
-            :aria-label="t('metrics.explorer.detail.breakdown.addToDashboard')"
             data-test="metrics-breakdown-add-to-dashboard"
             @click="openAddToDashboard"
           >
-            <OTooltip :content="t('metrics.explorer.detail.breakdown.addToDashboard')" />
+            {{ t("metrics.explorer.detail.breakdown.addToDashboard") }}
           </OButton>
         </template>
       </MetricChartTile>

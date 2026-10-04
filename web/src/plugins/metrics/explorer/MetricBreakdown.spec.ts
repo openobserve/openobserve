@@ -1142,6 +1142,12 @@ describe("MetricBreakdown", () => {
     const button = (w: VueWrapper<any>) =>
       w.find('[data-test="metrics-breakdown-add-to-dashboard"]');
 
+    it("names itself on the button, not only through an icon", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(button(wrapper).text()).toBe("Add to dashboard");
+    });
+
     it("hands the dialog a panel that reproduces the focused chart", async () => {
       const results = byMethod(
         [
