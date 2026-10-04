@@ -494,6 +494,8 @@ let lastRunSeeded = false;
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier as string | undefined,
 );
+// A newer initPage (org or route change) supersedes every request started before it.
+const isStaleRun = (run: number, org: string) => run !== initRunSeq || org !== orgIdentifier.value;
 
 const serviceOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.services ?? []).map((value) => ({ label: raw(value), value })),
@@ -880,7 +882,9 @@ const loadTagValues = async () => {
 const loadStreams = async () => {
   const org = orgIdentifier.value;
   if (!org) return;
+  const run = initRunSeq;
   const response = await streamService.nameList(org, "profiles", false);
+  if (isStaleRun(run, org)) return;
   const list = Array.isArray(response?.data?.list) ? response.data.list : [];
   streamOptions.value = list
     .map((item: Record<string, unknown>) => String(item.name ?? item.stream_name ?? ""))
@@ -904,12 +908,13 @@ const loadMeta = async () => {
   const range = resolveTimeRange();
   if (!org || !stream || !range) return;
   const requestSeq = ++metaRequestSeq;
+  const run = initRunSeq;
   try {
     const response = await profilesService.meta(org, stream, {
       start_time: range.startTime,
       end_time: range.endTime,
     });
-    if (requestSeq !== metaRequestSeq) return;
+    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
     metaResponse.value = response.data;
     const firstService = serviceOptions.value[0]?.value ?? null;
     const firstProfileType = profileTypeOptions.value[0]?.value ?? null;
@@ -933,7 +938,7 @@ const loadMeta = async () => {
       clearDraftTag();
     }
   } catch (error) {
-    if (requestSeq !== metaRequestSeq) return;
+    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);
   }
 };
@@ -945,6 +950,7 @@ const runQuery = async () => {
   const payload = queryPayload(range);
   if (!org || !stream || !payload) return;
   const requestSeq = ++queryRequestSeq;
+  const run = initRunSeq;
   queryLoading.value = true;
   errorMessage.value = "";
   try {
@@ -952,12 +958,12 @@ const runQuery = async () => {
       profilesService.series(org, stream, payload),
       profilesService.merge(org, stream, { ...payload, max_nodes: 4096 }),
     ]);
-    if (requestSeq !== queryRequestSeq) return;
+    if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     seriesResponse.value = seriesResult.data;
     mergeResult.value = mergeResponseValue.data;
     resetStackExpansion(mergeResponseValue.data.root);
   } catch (error) {
-    if (requestSeq !== queryRequestSeq) return;
+    if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);
   } finally {
     if (requestSeq === queryRequestSeq) {

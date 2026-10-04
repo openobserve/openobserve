@@ -3241,6 +3241,25 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
     });
 
+    it("applies only the latest view when an earlier apply finishes last", async () => {
+      await mountPage();
+      let resolveStreamA!: (value: unknown) => void;
+      mockGetStream.mockImplementationOnce(
+        () => new Promise((resolve) => (resolveStreamA = resolve)),
+      );
+      const streamA = { label: "test-stream", value: "test-stream" };
+      const searchBar = wrapper.findComponent({ name: "search-bar" });
+
+      searchBar.vm.$emit("apply-saved-view", savedView({ stream: streamA, editorValue: "a" }));
+      await flushPromises();
+      await applyViewAndWaitForSearch(savedView({ stream: streamA, editorValue: "b" }));
+      resolveStreamA(mockStreamList.list.find((s: any) => s.name === "test-stream"));
+      await drain();
+
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      expect(mockSearchObj.data.editorValue).toBe("b");
+    });
+
     it("rebuilds the columns even when the search returns no hits", async () => {
       await mountPage();
 

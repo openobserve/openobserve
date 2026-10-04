@@ -1928,7 +1928,9 @@ const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
   }
 };
 
+let savedViewApplySeq = 0;
 const onApplySavedView = async (view: TracesSavedView) => {
+  const seq = ++savedViewApplySeq;
   if (view.version !== undefined && view.version !== 1) {
     toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
     return;
@@ -1949,11 +1951,13 @@ const onApplySavedView = async (view: TracesSavedView) => {
     searchObj.data.stream.selectedStream = { label: streamName, value: streamName };
     // Not onChangeStream: it runs a search of its own before the view is restored.
     await extractFields();
+    if (seq !== savedViewApplySeq) return;
   }
 
   searchObj.meta.searchMode = view.searchMode;
   searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
   await syncSavedViewDateTime(view.datetime);
+  if (seq !== savedViewApplySeq) return;
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;
@@ -1969,6 +1973,7 @@ const onApplySavedView = async (view: TracesSavedView) => {
   delete query.trace_id;
   delete query.span_id;
   await router.replace({ query });
+  if (seq !== savedViewApplySeq) return;
 
   if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
     restoreFilters(view.editorValue);

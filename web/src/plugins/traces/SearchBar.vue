@@ -1047,12 +1047,16 @@ export default defineComponent({
       }
     };
 
+    let applySavedViewSeq = 0;
     const applySavedView = async (view) => {
+      const seq = ++applySavedViewSeq;
       try {
         // Uncached on purpose, as in logs: applying must use the server's current copy.
         const res = await savedViewsService.getViewDetail(orgId.value, view.view_id);
+        if (seq !== applySavedViewSeq) return;
         emit("apply-saved-view", res.data.data);
       } catch (err) {
+        if (seq !== applySavedViewSeq) return;
         toast({ message: t("search.errorWhileApplyingSavedView"), variant: "error" });
       }
     };

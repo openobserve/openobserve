@@ -620,4 +620,74 @@ describe("Profiles page", () => {
       expect(wrapper.find('[data-test="profiles-view-top"]').attributes("variant")).toBe("primary");
     });
   });
+
+  describe("superseded by an org switch", () => {
+    const originalOrg = { ...store.state.selectedOrganization };
+    const otherOrg = { ...originalOrg, id: 160, identifier: "other-org" };
+
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    const selectedStreamValue = (wrapper: ReturnType<typeof mountPage>) =>
+      (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
+        .value;
+
+    afterEach(() => {
+      store.dispatch("setSelectedOrganization", originalOrg);
+    });
+
+    it("drops the older org's merge when it lands after the switch", async () => {
+      const oldMerge = deferred<ReturnType<typeof mergeFor>>();
+      mocks.merge.mockReturnValue(oldMerge.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(mocks.merge).toHaveBeenCalledWith(orgIdentifier, "profiles-a", expect.anything());
+
+      const newNames = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(newNames.promise);
+      store.dispatch("setSelectedOrganization", otherOrg);
+      await flushPromises();
+      oldMerge.resolve(mergeFor("fn-old-org"));
+      await flushPromises();
+
+      expect(wrapper.text()).not.toContain("fn-old-org");
+
+      mocks.merge.mockResolvedValue(mergeFor("fn-new-org"));
+      newNames.resolve(streamResponse);
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenLastCalledWith("other-org", "profiles-a", expect.anything());
+      expect(wrapper.text()).toContain("fn-new-org");
+      expect(wrapper.text()).not.toContain("fn-old-org");
+    });
+
+    it("keeps the newer org's stream when the older stream list resolves last", async () => {
+      const oldNames = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(oldNames.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      mocks.nameList.mockResolvedValueOnce({ data: { list: [{ name: "profiles-c" }] } });
+      store.dispatch("setSelectedOrganization", otherOrg);
+      await flushPromises();
+      expect(selectedStreamValue(wrapper)).toBe("profiles-c");
+
+      oldNames.resolve(streamResponse);
+      await flushPromises();
+
+      expect(selectedStreamValue(wrapper)).toBe("profiles-c");
+      expect(wrapper.find('[data-test="profiles-stream-select"]').text()).not.toContain(
+        "profiles-a",
+      );
+      expect(new Set(mocks.meta.mock.calls.map((call) => call[1]))).toEqual(
+        new Set(["profiles-c"]),
+      );
+      expect(new Set(mocks.merge.mock.calls.map((call) => `${call[0]}/${call[1]}`))).toEqual(
+        new Set(["other-org/profiles-c"]),
+      );
+    });
+  });
 });

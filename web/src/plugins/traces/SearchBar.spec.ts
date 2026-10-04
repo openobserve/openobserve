@@ -1508,6 +1508,26 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("apply-saved-view")?.[0]).toEqual([expectedData()]);
     });
 
+    it("emits only the latest view when an earlier detail resolves last", async () => {
+      let resolveA!: (value: unknown) => void;
+      mockGetViewDetail
+        .mockReturnValueOnce(new Promise((resolve) => (resolveA = resolve)))
+        .mockResolvedValueOnce({ data: { data: { ...expectedData(), editorValue: "view-b" } } });
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const applyA = (wrapper.vm as any).applySavedView({ view_id: "a" });
+      const applyB = (wrapper.vm as any).applySavedView({ view_id: "b" });
+      await applyB;
+      resolveA({ data: { data: { ...expectedData(), editorValue: "view-a" } } });
+      await applyA;
+      await flushPromises();
+
+      const emitted = wrapper.emitted("apply-saved-view") ?? [];
+      expect(emitted).toHaveLength(1);
+      expect((emitted[0][0] as any).editorValue).toBe("view-b");
+    });
+
     it("update overwrites the view with the current state", async () => {
       wrapper = mountSearchBar();
       await flushPromises();

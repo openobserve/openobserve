@@ -125,8 +125,6 @@ pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Check if a saved view of the given type and name already exists in the org.
-/// Returns `Some(view_id)` if found, `None` otherwise.
 async fn view_exists_with_name(org_id: &str, view_name: &str, view_type: &str) -> Option<String> {
     let views = get_views_list_only(org_id).await.ok()?;
     views

@@ -1987,12 +1987,17 @@ export default defineComponent({
       // approx_percentile_cont returns 0 when the column type is not inferred.
       if (!stats || !(stats.n >= OPERATION_STATS_MIN_SAMPLES) || !(stats.p50 > 0)) return null;
       if (!Number.isFinite(duration)) return null;
-      let band = "> p99";
+      let band = t("traces.traceDetailsSidebar.operationBandAboveP99");
       let variant: BadgeVariant = "error-soft";
-      if (duration < stats.p50) [band, variant] = ["< p50", "default-soft"];
-      else if (duration < stats.p75) [band, variant] = ["p50–p75", "default-soft"];
-      else if (duration < stats.p90) [band, variant] = ["p75–p90", "default-soft"];
-      else if (duration <= stats.p99) [band, variant] = ["p90–p99", "warning-soft"];
+      if (duration < stats.p50) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandBelowP50"), "default-soft"];
+      } else if (duration < stats.p75) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP50ToP75"), "default-soft"];
+      } else if (duration < stats.p90) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP75ToP90"), "default-soft"];
+      } else if (duration <= stats.p99) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP90ToP99"), "warning-soft"];
+      }
       const tooltip = t("traces.traceDetailsSidebar.operationPercentilesTooltip", {
         p50: formatTimeWithSuffix(stats.p50),
         p75: formatTimeWithSuffix(stats.p75),

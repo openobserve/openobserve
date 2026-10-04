@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 use config::utils::sql::{quote_identifier, quote_sql_string};
 
@@ -110,6 +110,16 @@ pub struct StreamColumns {
     pub has_parent: bool,
     pub has_status: bool,
     pub has_duration: bool,
+}
+
+/// What this cycle learned about a stream; a stream absent from the map counts as unread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StreamRead {
+    Read(StreamColumns),
+    /// Its schema or volume read failed, so its detectors are left alone this cycle.
+    Unread,
+    /// Removed, or readable but unrankable, so its detectors are deleted.
+    Retired,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -237,16 +247,32 @@ pub fn plan(
     Plan { create, delete }
 }
 
-/// An unread stream keeps its detectors unless its schema lookup confirmed the stream removed.
+/// Only a fully read or retired stream's detectors enter the plan, which may delete them.
 pub fn on_read_streams(
     existing: Vec<ManagedDetector>,
-    streams: &BTreeMap<String, StreamColumns>,
-    removed_streams: &BTreeSet<String>,
+    reads: &BTreeMap<String, StreamRead>,
 ) -> Vec<ManagedDetector> {
     existing
         .into_iter()
-        .filter(|d| streams.contains_key(&d.stream) || removed_streams.contains(&d.stream))
+        .filter(|d| {
+            matches!(
+                reads.get(&d.stream),
+                Some(StreamRead::Read(_) | StreamRead::Retired)
+            )
+        })
         .collect()
+}
+
+/// Classifies a stream whose schema read succeeded, `has` testing for a field.
+pub fn read_stream(has: impl Fn(&str) -> bool) -> StreamRead {
+    if !has("service_name") || !has("span_kind") {
+        return StreamRead::Retired;
+    }
+    StreamRead::Read(StreamColumns {
+        has_parent: has("reference_parent_span_id"),
+        has_status: has("span_status"),
+        has_duration: has("duration"),
+    })
 }
 
 pub fn template(
@@ -826,26 +852,80 @@ mod tests {
 
     #[test]
     fn detectors_on_unread_streams_are_left_out_of_the_plan() {
-        let streams = BTreeMap::from([("default".to_string(), ALL_COLS)]);
+        let reads = BTreeMap::from([
+            ("default".to_string(), StreamRead::Read(ALL_COLS)),
+            ("flaky".to_string(), StreamRead::Unread),
+        ]);
         let mut cold = det("b", "svc", RedSignal::Rate, false);
         cold.stream = "cold".to_string();
+        let mut flaky = det("f", "svc", RedSignal::Rate, true);
+        flaky.stream = "flaky".to_string();
         let read = det("a", "svc", RedSignal::Rate, true);
-        let existing = on_read_streams(vec![read.clone(), cold], &streams, &BTreeSet::new());
+        let existing = on_read_streams(vec![read.clone(), cold, flaky], &reads);
         assert_eq!(existing, vec![read]);
         assert_eq!(plan_default(&[], &existing).delete, vec!["a".to_string()]);
     }
 
     #[test]
-    fn detectors_on_confirmed_removed_streams_are_deleted() {
-        let streams = BTreeMap::from([("default".to_string(), ALL_COLS)]);
+    fn a_failed_volume_search_spares_only_its_own_stream() {
+        let reads = BTreeMap::from([
+            ("default".to_string(), StreamRead::Read(ALL_COLS)),
+            ("flaky".to_string(), StreamRead::Unread),
+        ]);
+        let mut flaky = det("f", "svc", RedSignal::Rate, true);
+        flaky.stream = "flaky".to_string();
+        let stale = det("s", "old", RedSignal::Rate, true);
+        let existing = on_read_streams(vec![flaky, stale.clone()], &reads);
+        assert_eq!(existing, vec![stale]);
+        let p = plan_default(&[vol("default", "checkout", 50_000)], &existing);
+        assert_eq!(p.delete, vec!["s".to_string()]);
+        assert_eq!(created_services(&p), vec!["checkout".to_string()]);
+    }
+
+    #[test]
+    fn detectors_on_retired_streams_are_deleted() {
+        let reads = BTreeMap::from([
+            ("default".to_string(), StreamRead::Read(ALL_COLS)),
+            ("gone".to_string(), StreamRead::Retired),
+        ]);
         let mut gone = det("g", "svc", RedSignal::Rate, true);
         gone.stream = "gone".to_string();
         let mut cold = det("c", "svc", RedSignal::Rate, true);
         cold.stream = "cold".to_string();
-        let removed = BTreeSet::from(["gone".to_string()]);
-        let existing = on_read_streams(vec![gone.clone(), cold], &streams, &removed);
+        let existing = on_read_streams(vec![gone.clone(), cold], &reads);
         assert_eq!(existing, vec![gone]);
         assert_eq!(plan_default(&[], &existing).delete, vec!["g".to_string()]);
+    }
+
+    #[test]
+    fn a_stream_without_service_name_or_span_kind_is_retired() {
+        let full = [
+            "service_name",
+            "span_kind",
+            "reference_parent_span_id",
+            "span_status",
+            "duration",
+        ];
+        assert_eq!(
+            read_stream(|name| full.contains(&name)),
+            StreamRead::Read(ALL_COLS)
+        );
+        assert_eq!(
+            read_stream(|name| ["service_name", "span_kind"].contains(&name)),
+            StreamRead::Read(StreamColumns {
+                has_parent: false,
+                has_status: false,
+                has_duration: false,
+            })
+        );
+        assert_eq!(
+            read_stream(|name| name != "service_name" && full.contains(&name)),
+            StreamRead::Retired
+        );
+        assert_eq!(
+            read_stream(|name| name != "span_kind" && full.contains(&name)),
+            StreamRead::Retired
+        );
     }
 
     #[test]

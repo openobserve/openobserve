@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    time::Duration,
-};
+use std::{collections::BTreeMap, time::Duration};
 
 use config::meta::{
     folder::{Folder, FolderType},
@@ -28,7 +25,7 @@ use openobserve_core::{
     anomaly_detection,
     traces::red_insights::{
         self, FOLDER_NAME, MANAGED_TAG, MAX_CREATES, MAX_SERVICES, MIN_REQUESTS_24H,
-        ManagedDetector, ServiceVolume, StreamColumns,
+        ManagedDetector, ServiceVolume, StreamRead,
     },
 };
 
@@ -95,11 +92,11 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
         return Ok(());
     }
 
-    let streams = stream_columns(org_id).await?;
-    let volumes = service_volumes(org_id, &streams).await?;
+    let mut reads = read_streams(org_id).await;
+    let volumes = service_volumes(org_id, &mut reads).await;
     let detectors: Vec<_> = configs.iter().filter_map(managed_detector).collect();
-    let removed = removed_streams(org_id, &detectors, &streams).await;
-    let existing = red_insights::on_read_streams(detectors, &streams, &removed);
+    retire_removed_streams(org_id, &detectors, &mut reads).await;
+    let existing = red_insights::on_read_streams(detectors, &reads);
     // Uncapped here: a signal the template skips must not use up the per-cycle create budget.
     let plan = red_insights::plan(
         true,
@@ -116,8 +113,9 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     let templates: Vec<_> = plan
         .create
         .iter()
-        .filter_map(|(stream, service, signal)| {
-            red_insights::template(stream, service, *signal, streams.get(stream)?)
+        .filter_map(|(stream, service, signal)| match reads.get(stream)? {
+            StreamRead::Read(cols) => red_insights::template(stream, service, *signal, cols),
+            _ => None,
         })
         .take(MAX_CREATES)
         .collect();
@@ -215,45 +213,40 @@ async fn red_folder(org_id: &str, configs: &[serde_json::Value]) -> anyhow::Resu
     }
 }
 
-/// Rankable trace streams; a schema error fails the org, as a search error does.
-async fn stream_columns(org_id: &str) -> anyhow::Result<BTreeMap<String, StreamColumns>> {
-    let mut out = BTreeMap::new();
+async fn read_streams(org_id: &str) -> BTreeMap<String, StreamRead> {
+    let mut reads = BTreeMap::new();
     for stream in db::schema::list_streams_from_cache(org_id, StreamType::Traces).await {
-        let schema = infra::schema::get(org_id, &stream, StreamType::Traces)
-            .await
-            .map_err(|e| anyhow::anyhow!("schema read for {stream} failed: {e}"))?;
-        let has = |name: &str| schema.field_with_name(name).is_ok();
-        if !has("service_name") || !has("span_kind") {
-            log::info!("[RED insights] org {org_id}: {stream} has no service_name/span_kind");
-            continue;
-        }
-        let cols = StreamColumns {
-            has_parent: has("reference_parent_span_id"),
-            has_status: has("span_status"),
-            has_duration: has("duration"),
+        let read = match infra::schema::get(org_id, &stream, StreamType::Traces).await {
+            Ok(schema) => red_insights::read_stream(|name| schema.field_with_name(name).is_ok()),
+            Err(e) => {
+                log::warn!("[RED insights] org {org_id}: schema read for {stream} failed: {e}");
+                StreamRead::Unread
+            }
         };
-        out.insert(stream, cols);
+        if read == StreamRead::Retired {
+            log::info!("[RED insights] org {org_id}: {stream} has no service_name/span_kind");
+        }
+        reads.insert(stream, read);
     }
-    Ok(out)
+    reads
 }
 
-/// A lookup error leaves the stream out, so a transient failure never deletes its detectors.
-async fn removed_streams(
+/// A lookup error leaves the stream unread, so a transient failure never deletes its detectors.
+async fn retire_removed_streams(
     org_id: &str,
     detectors: &[ManagedDetector],
-    streams: &BTreeMap<String, StreamColumns>,
-) -> BTreeSet<String> {
-    let unread: BTreeSet<&str> = detectors
+    reads: &mut BTreeMap<String, StreamRead>,
+) {
+    let unlisted: Vec<String> = detectors
         .iter()
-        .map(|d| d.stream.as_str())
-        .filter(|s| !streams.contains_key(*s))
+        .filter(|d| !reads.contains_key(&d.stream))
+        .map(|d| d.stream.clone())
         .collect();
-    let mut removed = BTreeSet::new();
-    for stream in unread {
-        match infra::schema::get(org_id, stream, StreamType::Traces).await {
+    for stream in unlisted {
+        match infra::schema::get(org_id, &stream, StreamType::Traces).await {
             // A missing stream reads back as an empty schema, never as an error.
             Ok(schema) if schema.fields().is_empty() => {
-                removed.insert(stream.to_string());
+                reads.insert(stream, StreamRead::Retired);
             }
             Ok(_) => {}
             Err(e) => {
@@ -261,20 +254,22 @@ async fn removed_streams(
             }
         }
     }
-    removed
 }
 
-/// Fails on any stream error: a missing stream would read as zero traffic and lose its detectors.
+/// A failed or partial search marks its stream unread: zero traffic would cost it its detectors.
 async fn service_volumes(
     org_id: &str,
-    streams: &BTreeMap<String, StreamColumns>,
-) -> anyhow::Result<Vec<ServiceVolume>> {
+    reads: &mut BTreeMap<String, StreamRead>,
+) -> Vec<ServiceVolume> {
     let end_time = config::utils::time::now_micros();
     let mut volumes = Vec::new();
-    for (stream, cols) in streams {
+    for (stream, read) in reads.iter_mut() {
+        let StreamRead::Read(cols) = *read else {
+            continue;
+        };
         let req = Request {
             query: Query {
-                sql: red_insights::volume_sql(stream, cols),
+                sql: red_insights::volume_sql(stream, &cols),
                 from: 0,
                 size: (MAX_SERVICES * 2) as i64,
                 start_time: end_time - VOLUME_WINDOW_US,
@@ -297,12 +292,21 @@ async fn service_volumes(
             agent_options: None,
         };
         let trace_id = config::ider::generate_trace_id();
-        let resp = search_service::search(&trace_id, org_id, StreamType::Traces, None, &req)
+        let resp = match search_service::search(&trace_id, org_id, StreamType::Traces, None, &req)
             .await
-            .map_err(|e| anyhow::anyhow!("volume search on {stream} failed: {e}"))?;
-        if resp.is_partial {
-            anyhow::bail!("volume search on {stream} returned partial results");
-        }
+        {
+            Ok(resp) if !resp.is_partial => resp,
+            Ok(_) => {
+                log::warn!("[RED insights] org {org_id}: volume search on {stream} was partial");
+                *read = StreamRead::Unread;
+                continue;
+            }
+            Err(e) => {
+                log::warn!("[RED insights] org {org_id}: volume search on {stream} failed: {e}");
+                *read = StreamRead::Unread;
+                continue;
+            }
+        };
         volumes.extend(resp.hits.iter().filter_map(|hit| {
             let service = hit
                 .get("service_name")?
@@ -315,5 +319,5 @@ async fn service_volumes(
             })
         }));
     }
-    Ok(volumes)
+    volumes
 }

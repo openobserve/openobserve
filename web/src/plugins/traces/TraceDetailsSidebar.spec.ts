@@ -2395,13 +2395,14 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
   });
 
   it.each([
-    [500, "< p50", "default-soft"],
-    [1000, "p50–p75", "default-soft"],
-    [2000, "p75–p90", "default-soft"],
-    [4000, "p90–p99", "warning-soft"],
-    [8000, "p90–p99", "warning-soft"],
-    [8001, "> p99", "error-soft"],
-  ])("a %sµs span reads %s with the %s variant", async (duration, band, variant) => {
+    [500, "operationBandBelowP50", "< p50", "default-soft"],
+    [1000, "operationBandP50ToP75", "p50–p75", "default-soft"],
+    [2000, "operationBandP75ToP90", "p75–p90", "default-soft"],
+    [4000, "operationBandP90ToP99", "p90–p99", "warning-soft"],
+    [8000, "operationBandP90ToP99", "p90–p99", "warning-soft"],
+    [8001, "operationBandAboveP99", "> p99", "error-soft"],
+  ])("a %sµs span reads %s (%s) with the %s variant", async (duration, bandKey, band, variant) => {
+    expect(i18n.global.t(`traces.traceDetailsSidebar.${bandKey}`)).toBe(band);
     const w = await mountWith({ duration });
     const tag = percentileTag(w);
     expect(tag).toBeTruthy();
@@ -2438,11 +2439,15 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
 
   it("serves sibling spans from one cached call, each with its own band", async () => {
     const w = await mountWith({ duration: 500 });
-    expect(percentileTag(w)!.text()).toContain("< p50");
+    expect(percentileTag(w)!.text()).toContain(
+      i18n.global.t("traces.traceDetailsSidebar.operationBandBelowP50"),
+    );
     await w.setProps({ span: { ...mockSpan, span_id: "sibling", duration: 9000 } });
     await flushPromises();
     expect(mockSearch).toHaveBeenCalledTimes(1);
-    expect(percentileTag(w)!.text()).toContain("> p99");
+    expect(percentileTag(w)!.text()).toContain(
+      i18n.global.t("traces.traceDetailsSidebar.operationBandAboveP99"),
+    );
     w.unmount();
   });
 });
