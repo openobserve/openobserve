@@ -853,7 +853,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <!-- Chart Container -->
-              <div ref="traceGraphContainerRef" class="min-h-0 flex-1 overflow-hidden p-2.5">
+              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
                 <ChartRenderer
                   ref="chartRendererRef"
                   data-test="trace-details-service-map-chart"
@@ -1285,7 +1285,6 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
-    const traceGraphContainerRef = ref<HTMLElement | null>(null);
 
     // Tooltip lifecycle management
     let tooltipCleanup: (() => void) | null = null;
@@ -1333,8 +1332,9 @@ export default defineComponent({
             new Map(),
             isDarkMode.value,
             undefined,
-            traceGraphContainerRef.value?.clientWidth || 1200,
-            traceGraphContainerRef.value?.clientHeight || 700,
+            // computeForceLayout subtracts ~330×310 of padding; smaller sizes yield NaN positions.
+            Math.max(chartRendererRef.value?.$el?.clientWidth || 1200, 800),
+            Math.max(chartRendererRef.value?.$el?.clientHeight || 700, 500),
           ),
           notMerge: true,
           lazyUpdate: true,
@@ -1353,9 +1353,12 @@ export default defineComponent({
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
       });
+      const treeData = filterTraceTree(patternTreeData.value, traceGraphSearch.value);
+      // ECharts' tree series throws on empty data and leaves the chart stuck until reload.
+      if (!treeData.length) return { options: {}, notMerge: true };
       const chartOptions = generateEChartsOptions(
         {
-          treeData: filterTraceTree(patternTreeData.value, traceGraphSearch.value),
+          treeData,
           getNodeLabel: (node: EngineTreeNode) => getPatternNodeLabel(toPatternNode(node)),
           getNodeTooltip: (node: EngineTreeNode) => getPatternNodeTooltip(toPatternNode(node)),
           getNodeErrorRate: (node: EngineTreeNode) => getPatternNodeErrorRate(toPatternNode(node)),
@@ -3149,7 +3152,6 @@ export default defineComponent({
       traceGraphView,
       setTraceGraphView,
       traceGraphSearch,
-      traceGraphContainerRef,
       // Exposed for the template `v-if` gating the LLM Observability
       // surfaces (Thread tab toggle + ThreadView body) behind
       // `config.showLLMUI`.

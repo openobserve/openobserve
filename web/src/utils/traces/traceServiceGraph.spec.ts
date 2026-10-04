@@ -40,7 +40,6 @@ describe("buildTraceServiceGraph", () => {
           label: "api",
           requests: 2,
           errors: 0,
-          error_rate: 0,
           service_type: undefined,
         },
       ],
@@ -56,8 +55,8 @@ describe("buildTraceServiceGraph", () => {
     ]);
     expect(graph.nodes.map((n) => n.id)).toEqual(["api", "db", "web"]);
     expect(graph.edges).toEqual([
-      { from: "api", to: "db", total_requests: 1, failed_requests: 0, error_rate: 0 },
-      { from: "web", to: "api", total_requests: 1, failed_requests: 0, error_rate: 0 },
+      { from: "api", to: "db", total_requests: 1 },
+      { from: "web", to: "api", total_requests: 1 },
     ]);
   });
 
@@ -68,13 +67,11 @@ describe("buildTraceServiceGraph", () => {
       span("c", "api", "a"),
       span("d", "api", "a"),
     ]);
-    expect(graph.edges).toEqual([
-      { from: "web", to: "api", total_requests: 3, failed_requests: 0, error_rate: 0 },
-    ]);
+    expect(graph.edges).toEqual([{ from: "web", to: "api", total_requests: 3 }]);
     expect(graph.nodes.find((n) => n.id === "api")?.requests).toBe(3);
   });
 
-  it("counts error spans on nodes and edges", () => {
+  it("counts error spans on nodes", () => {
     const graph = buildTraceServiceGraph([
       span("a", "web"),
       span("b", "api", "a", { span_status: "ERROR" }),
@@ -84,13 +81,10 @@ describe("buildTraceServiceGraph", () => {
     ]);
     const api = graph.nodes.find((n) => n.id === "api")!;
     expect(api.errors).toBe(2);
-    expect(api.error_rate).toBe(50);
     expect(graph.edges[0]).toEqual({
       from: "web",
       to: "api",
       total_requests: 4,
-      failed_requests: 2,
-      error_rate: 50,
     });
   });
 
@@ -100,13 +94,12 @@ describe("buildTraceServiceGraph", () => {
       span("b", "api", "a", { infer_service_name: "postgres", infer_service_type: "database" }),
     ]);
     expect(graph.nodes).toEqual([
-      { id: "api", label: "api", requests: 1, errors: 0, error_rate: 0, service_type: undefined },
+      { id: "api", label: "api", requests: 1, errors: 0, service_type: undefined },
       {
         id: "postgres",
         label: "postgres",
         requests: 1,
         errors: 0,
-        error_rate: 0,
         service_type: "database",
       },
     ]);

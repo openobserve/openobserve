@@ -22,7 +22,6 @@ export interface TraceServiceGraphNode {
   label: string;
   requests: number;
   errors: number;
-  error_rate: number;
   service_type?: string;
 }
 
@@ -30,8 +29,6 @@ export interface TraceServiceGraphEdge {
   from: string;
   to: string;
   total_requests: number;
-  failed_requests: number;
-  error_rate: number;
 }
 
 export interface TraceServiceGraph {
@@ -55,8 +52,6 @@ interface NamedTreeNode {
   children?: NamedTreeNode[];
 }
 
-const toRate = (failed: number, total: number) => (total > 0 ? (failed / total) * 100 : 0);
-
 /** Aggregates a trace's spans into the service graph shape `convertServiceGraphToNetwork` draws. */
 export function buildTraceServiceGraph(
   spans: TraceGraphSpan[],
@@ -75,7 +70,6 @@ export function buildTraceServiceGraph(
       label: id,
       requests: 0,
       errors: 0,
-      error_rate: 0,
       service_type: undefined,
     };
     node.requests += 1;
@@ -95,16 +89,10 @@ export function buildTraceServiceGraph(
       from,
       to,
       total_requests: 0,
-      failed_requests: 0,
-      error_rate: 0,
     };
     edge.total_requests += 1;
-    if (isSpanError(span)) edge.failed_requests += 1;
     edges.set(key, edge);
   });
-
-  nodes.forEach((node) => (node.error_rate = toRate(node.errors, node.requests)));
-  edges.forEach((edge) => (edge.error_rate = toRate(edge.failed_requests, edge.total_requests)));
 
   return {
     nodes: [...nodes.values()].sort((a, b) => a.id.localeCompare(b.id)),

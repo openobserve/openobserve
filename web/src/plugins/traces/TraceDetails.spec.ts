@@ -686,13 +686,27 @@ describe("TraceDetails", () => {
     const series = () =>
       wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data").options
         .series?.[0];
+    const chartData = () =>
+      wrapper.findComponent('[data-test="trace-details-service-map-chart"]').props("data");
     const treeNames = (nodes: any[] = []): string[] =>
       nodes.flatMap((n) => [n.name, ...treeNames(n.children)]);
+
+    let fakeChart: any;
 
     async function mountMap() {
       wrapper.unmount();
       wrapper = mount(TraceDetails, {
         ...mountOptions,
+        global: {
+          ...mountOptions.global,
+          stubs: {
+            ...mountOptions.global.stubs,
+            "chart-renderer": {
+              ...mountOptions.global.stubs["chart-renderer"],
+              data: () => ({ chart: fakeChart }),
+            },
+          },
+        },
         props: {
           mode: "embedded",
           traceIdProp: "graph-trace-id",
@@ -705,7 +719,10 @@ describe("TraceDetails", () => {
       await flushPromises();
     }
 
-    beforeEach(() => localStorage.removeItem("o2_trace_graph_view"));
+    beforeEach(() => {
+      localStorage.removeItem("o2_trace_graph_view");
+      fakeChart = { getDom: () => document.createElement("div"), on: vi.fn(), off: vi.fn() };
+    });
 
     it("renders the toggle and service search only on the Trace Graph tab", async () => {
       await mountMap();
@@ -772,11 +789,45 @@ describe("TraceDetails", () => {
       await mountMap();
       wrapper.vm.traceGraphSearch = "nope";
       await flushPromises();
-      expect(treeNames(series().data)).toEqual([]);
+      expect(chartData()).toEqual({ options: {}, notMerge: true });
+
+      wrapper.vm.traceGraphSearch = "";
+      await flushPromises();
+      expect(series().type).toBe("tree");
+
+      await graphBtn().trigger("click");
+      wrapper.vm.traceGraphSearch = "nope";
+      await flushPromises();
+      expect(chartData()).toEqual({ options: {}, notMerge: true });
+    });
+
+    it("lays out a graph with finite positions in a tiny chart container", async () => {
+      await mountMap();
+      const el = wrapper.find('[data-test="trace-details-service-map-chart"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
+      Object.defineProperty(el, "clientHeight", { configurable: true, value: 100 });
 
       await graphBtn().trigger("click");
       await flushPromises();
-      expect(series()).toBeUndefined();
+
+      expect(series().data.length).toBe(4);
+      series().data.forEach((n: any) => {
+        expect(Number.isFinite(n.x)).toBe(true);
+        expect(Number.isFinite(n.y)).toBe(true);
+      });
+    });
+
+    it("skips the custom tree tooltip in Graph View and restores it in Tree View", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      await mountMap();
+
+      await graphBtn().trigger("click");
+      await tooltipSetupDelay();
+      expect(fakeChart.on).not.toHaveBeenCalled();
+
+      await treeBtn().trigger("click");
+      await tooltipSetupDelay();
+      expect(fakeChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
     });
   });
 
