@@ -2427,6 +2427,16 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
     w.unmount();
   });
 
+  it("formats a large sample count with thousands separators", async () => {
+    mockSearch.mockResolvedValue(statsResponse({ n: 45989 }));
+    const w = await mountWith();
+    const tooltip = w
+      .findAllComponents({ name: "OTooltip" })
+      .find((c) => String(c.props("content")).includes("p99"));
+    expect(String(tooltip!.props("content"))).toContain("45,989 samples");
+    w.unmount();
+  });
+
   it.each([
     ["n < 20", () => mockSearch.mockResolvedValue(statsResponse({ n: 19 }))],
     ["p50 == 0", () => mockSearch.mockResolvedValue(statsResponse({ p50: 0 }))],

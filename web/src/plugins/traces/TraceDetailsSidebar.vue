@@ -2007,7 +2007,7 @@ export default defineComponent({
         p75: formatTimeWithSuffix(stats.p75),
         p90: formatTimeWithSuffix(stats.p90),
         p99: formatTimeWithSuffix(stats.p99),
-        n: stats.n,
+        n: stats.n.toLocaleString(),
       });
       return { band, variant, tooltip };
     });
