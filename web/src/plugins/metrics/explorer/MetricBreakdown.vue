@@ -62,15 +62,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
           >
           <div class="flex-1" />
+          <!-- Only once the chart has drawn: the panel's decimals come from its values. -->
           <OButton
             variant="ghost"
             size="icon-xs"
             icon-left="dashboard-customize"
             class="shrink-0"
-            :disabled="!queriesByLabel[activeLabel]?.length"
+            :disabled="focused.status !== 'done'"
             :aria-label="t('metrics.explorer.detail.breakdown.addToDashboard')"
             data-test="metrics-breakdown-add-to-dashboard"
-            @click.stop="openAddToDashboard"
+            @click="openAddToDashboard"
           >
             <OTooltip :content="t('metrics.explorer.detail.breakdown.addToDashboard')" />
           </OButton>
@@ -355,7 +356,6 @@ import {
   breakdownTitleKey,
   buildBreakdownQuery,
   CARD_KIND,
-  PANEL_RATE_WINDOW,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
 import { adaptiveDecimals, seriesStatsByValue } from "@/utils/metrics/breakdownStats";
@@ -453,7 +453,7 @@ export default defineComponent({
     /** The card's concrete rate window, so the breakdown measures like the card. */
     rateWindow: { type: String, required: true },
     /** What the dashboard panel rates over: a widened card's concrete window, else `$__rate_interval`. */
-    panelRateWindow: { type: String, default: PANEL_RATE_WINDOW },
+    panelRateWindow: { type: String, required: true },
     /** The card's own query needed the NaN guard. */
     nanGuard: { type: Boolean, default: false },
     color: { type: String, required: true },

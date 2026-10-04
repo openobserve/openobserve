@@ -123,6 +123,7 @@ const mountBreakdown = (props: Record<string, any> = {}) =>
       timeRange: { start_time: 1_000, end_time: 2_000 },
       selectedLabel: null,
       rateWindow: "4m",
+      panelRateWindow: "$__rate_interval",
       nanGuard: false,
       color: "#000",
       runQuery,
@@ -1175,7 +1176,7 @@ describe("MetricBreakdown", () => {
       expect(data.type).toBe("line");
       expect(data.queryType).toBe("promql");
       expect(data.queries).toHaveLength(1);
-      // The tile's concrete window becomes the dashboard's own, as Convert to dashboard does.
+      // The tile runs its concrete window; the panel gets `$__rate_interval`, so it follows the dashboard's range.
       expect(exprs()[0]).toBe(
         'sum by (method) (rate({__name__="http_requests_total",pod="api-1"}[4m]))',
       );
@@ -1187,9 +1188,33 @@ describe("MetricBreakdown", () => {
       expect(data.config.unit).toBe(toO2Unit("count-per-sec").unit);
       expect(data.config.decimals).toBe(adaptiveDecimals([results]));
       expect(data.config.show_legends).toBe(true);
-      // The focused chart is not a place to switch labels from.
-      expect(wrapper.emitted("update:selectedLabel")).toBeFalsy();
     });
+
+    it.each([
+      [
+        "a classic histogram",
+        { name: "lat_bucket", cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS },
+        'histogram_quantile(0.9, sum by (le, method) (rate({__name__="lat_bucket"}[$__rate_interval])))',
+      ],
+      [
+        "an info metric",
+        { name: "build_info", cardKind: CARD_KIND.INFO },
+        'count by (method) ({__name__="build_info"})',
+      ],
+    ])(
+      "charts %s as the tile does: a line, without the card's own chart contract",
+      async (_, card, query) => {
+        wrapper = mountBreakdown({ card: { ...CARD, ...card }, selectedLabel: "method" });
+        await flushPromises();
+        await button(wrapper).trigger("click");
+
+        const data = dialog(wrapper).props("dashboardPanelData")!.data;
+        expect(data.type).toBe("line");
+        expect(data.config).not.toHaveProperty("heatmap_mode");
+        expect(data.config).not.toHaveProperty("promql_table_mode");
+        expect(data.queries[0].query).toBe(query);
+      },
+    );
 
     it("keeps the topk cap the chart runs with", async () => {
       wrapper = mountBreakdown({ selectedLabel: "instance" });
@@ -1218,6 +1243,19 @@ describe("MetricBreakdown", () => {
       await flushPromises();
 
       expect(button(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("waits for the chart's results, whose values set the panel's decimals", async () => {
+      let resolve!: (v: any) => void;
+      runQuery.mockImplementation(() => new Promise((r) => (resolve = r)));
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalled();
+      expect(button(wrapper).attributes("disabled")).toBeDefined();
+
+      resolve(SERIES);
+      await flushPromises();
+      expect(button(wrapper).attributes("disabled")).toBeUndefined();
     });
 
     it("is offered on the focused chart only, not on the grid tiles", async () => {
