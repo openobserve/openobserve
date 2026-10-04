@@ -9519,7 +9519,8 @@
         "deleteFailed": "Could not delete the view",
         "deleteTitle": "Delete view",
         "deleteMessage": "Delete \"{name}\" for everyone in this organization?",
-        "modified": "{name} (modified)"
+        "modified": "{name} (modified)",
+        "clear": "Clear view"
       }
     },
     "index": {

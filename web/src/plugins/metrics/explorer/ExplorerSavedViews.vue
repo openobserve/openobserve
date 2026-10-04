@@ -48,6 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("metrics.explorer.views.saveAs") }}
     </ODropdownItem>
     <template v-if="activeView">
+      <ODropdownItem icon-left="close" data-test="metrics-explorer-views-clear" @select="clearView">
+        {{ t("metrics.explorer.views.clear") }}
+      </ODropdownItem>
       <ODropdownItem
         icon-left="save"
         data-test="metrics-explorer-views-update"
@@ -143,6 +146,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   apply: [query: ExplorerViewState];
+  clear: [];
   saved: [action: "created" | "updated"];
 }>();
 
@@ -244,6 +248,13 @@ const deleteActive = async () => {
   } catch (err) {
     showError(err, t("metrics.explorer.views.deleteFailed"));
   }
+};
+
+// Clearing the search alone keeps a view's facets narrowing the grid, so this resets the whole slice.
+const clearView = () => {
+  activeViewId.value = null;
+  activeViewState.value = null;
+  emit("clear");
 };
 
 const applyView = async (view: ViewSummary) => {

@@ -404,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:active-view-state="activeViewState"
             :state="viewState"
             @apply="onApplyView"
+            @clear="onClearView"
             @saved="onViewSaved"
           />
 
@@ -1565,6 +1566,16 @@ export default defineComponent({
       track("metrics_explorer_view_applied", { key_count: Object.keys(query).length });
     };
 
+    // A bare URL is a fresh visit: the route watcher resets every absent key to its default.
+    const onClearView = () => {
+      router
+        .push({
+          name: "metrics",
+          query: { org_identifier: store.state.selectedOrganization?.identifier },
+        })
+        .catch(() => {});
+    };
+
     const onViewSaved = (action: "created" | "updated") =>
       track("metrics_explorer_view_saved", { action });
 
@@ -2183,6 +2194,7 @@ export default defineComponent({
       activeViewId,
       activeViewState,
       onApplyView,
+      onClearView,
       onViewSaved,
       onVisualizeRun,
       onHistoryLoad,

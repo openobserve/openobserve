@@ -155,6 +155,31 @@ describe("ExplorerSavedViews", () => {
     expect(fresh.emitted("update:activeViewId")?.at(-1)).toEqual(["m1"]);
   });
 
+  it("offers Clear view only while a view is applied, and clearing drops the view", async () => {
+    const saved = { search: "cache", prefix: "cache", sort: "z-a" };
+    api.getViewDetail.mockResolvedValue({
+      data: { view_id: "m1", view_name: "errors by job", data: { version: 1, state: saved } },
+    });
+    const wrapper: any = mountViews(saved, {
+      "onUpdate:activeViewId": (v: any) => wrapper.setProps({ activeViewId: v }),
+      "onUpdate:activeViewState": (v: any) => wrapper.setProps({ activeViewState: v }),
+    });
+    await flushPromises();
+    const CLEAR = '[data-test="metrics-explorer-views-clear"]';
+    expect(wrapper.find(CLEAR).exists()).toBe(false);
+
+    await wrapper.find('[data-test="metrics-explorer-view-m1"]').trigger("click");
+    await flushPromises();
+    await wrapper.find(CLEAR).trigger("click");
+    await flushPromises();
+
+    expect(wrapper.emitted("clear")).toHaveLength(1);
+    expect(wrapper.props("activeViewId")).toBeNull();
+    expect(wrapper.props("activeViewState")).toBeNull();
+    expect(wrapper.find('[data-test="metrics-explorer-views-btn"]').text()).toContain("Views");
+    expect(wrapper.find(CLEAR).exists()).toBe(false);
+  });
+
   it("marks the applied view modified once the grid moves off it, and clean again on update", async () => {
     const saved = { search: "http", labels: ["job=api"], sort: "z-a", period: "1h" };
     api.getViewDetail.mockResolvedValue({

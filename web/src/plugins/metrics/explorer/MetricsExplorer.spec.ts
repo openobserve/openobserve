@@ -231,7 +231,7 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
         },
         ExplorerSavedViews: {
           props: ["state", "activeViewId"],
-          emits: ["apply", "saved", "update:activeViewId"],
+          emits: ["apply", "saved", "clear", "update:activeViewId"],
           template: '<div data-test="metrics-explorer-views" />',
         },
         QueryHistoryDrawer: {
@@ -1482,6 +1482,32 @@ describe("MetricsExplorer wiring", () => {
         "metrics_explorer_view_applied",
         expect.any(Object),
       );
+    });
+
+    it("clearing a view lands on the default grid: no search, facets, labels, sort or period", async () => {
+      // A view that both searches and facets: clearing the search alone leaves its prefix narrowing the grid.
+      routerState.query = { search: "cache", prefix: "cache", sort: "z-a", period: "1h" };
+      grid.searchTerm.value = "cache";
+      grid.selectedPrefixes.value = new Set(["cache"]);
+      grid.labelFilters.value = [{ label: "job", operator: "=", value: "api" }];
+      grid.sortBy.value = "z-a";
+      const wrapper = mountExplorer();
+
+      wrapper.findComponent(VIEWS).vm.$emit("clear");
+      await flushPromises();
+      expect(routerState.push).toHaveBeenCalledWith({
+        name: "metrics",
+        query: { org_identifier: "org1" },
+      });
+
+      routerState.query = routerState.push.mock.calls.at(-1)[0].query;
+      (wrapper.vm as any).onRouteQueryChange();
+      await flushPromises();
+      expect(grid.searchTerm.value).toBe("");
+      expect(grid.selectedPrefixes.value.size).toBe(0);
+      expect(grid.labelFilters.value).toEqual([]);
+      expect(grid.sortBy.value).toBe("a-z");
+      expect((wrapper.vm as any).viewState).toEqual({});
     });
 
     it("keeps the applied view across the detail view, so Update/Delete still target it", async () => {
