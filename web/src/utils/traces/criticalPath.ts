@@ -104,7 +104,6 @@ export function toCriticalPathNode(span: TraceTreeSpan): CriticalPathNode {
   return root;
 }
 
-// A true root beats orphans; then the earliest start, then the longest span.
 function primaryRoot(roots: CriticalPathNode[]): CriticalPathNode | undefined {
   const trueRoots = roots.filter((r) => !r.parentId);
   const candidates = trueRoots.length ? trueRoots : roots;
