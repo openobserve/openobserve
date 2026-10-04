@@ -2243,8 +2243,7 @@ describe("ServicesCatalog", () => {
 
   describe("request-scoped RED", () => {
     const KIND_PRED = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
-    const ROOT_ARM =
-      "(CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
+    const ROOT_ARM = "OR (reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
     const INFER_ARM =
       "(NULLIF(infer_service_name, '') IS NOT NULL AND CAST(span_kind AS VARCHAR) IN ('3','4'))";
 
@@ -2282,7 +2281,8 @@ describe("ServicesCatalog", () => {
       const requests = selectItem(sql, "total_requests");
       expect(requests).toContain("COUNT(*) FILTER (WHERE");
       expect(requests).toContain(KIND_PRED);
-      expect(requests).toContain(ROOT_ARM);
+      expect(requests).toContain(`${KIND_PRED} ${ROOT_ARM}`);
+      expect(sql).not.toContain("= '1'");
       expect(sql).not.toContain("IN ('2','5')");
       expect(sql.replace(/FILTER \(WHERE/g, "")).not.toContain("WHERE");
     });

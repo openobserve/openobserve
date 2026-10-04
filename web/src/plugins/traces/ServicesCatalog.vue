@@ -1050,7 +1050,8 @@ function requestPredicate(hasParentColumn: boolean): string {
   // An OR, not IN ('2','5'): an IN list in a sole ORDER BY aggregate panics the engine's top-k rule.
   const kinds = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";
   if (!hasParentColumn) return `(${kinds})`;
-  return `(${kinds} OR (CAST(span_kind AS VARCHAR) = '1' AND (reference_parent_span_id IS NULL OR reference_parent_span_id = '')))`;
+  // Any root counts, whatever its kind: a trace that starts at a client span still entered the system there.
+  return `(${kinds} OR (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))`;
 }
 
 // Conditional aggregation, not WHERE, so services with no request spans still get a row.
