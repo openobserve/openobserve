@@ -399,6 +399,20 @@ describe("OrganizationSettings", () => {
         expect.objectContaining({ red_insights_enabled: false }),
       );
     });
+    it("keeps the help text in a hover tooltip on the info icon, under a Traces heading", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+      const section = wrapper.find('[data-test="settings-red-insights"]');
+      const help = String(i18n.global.t("settings.redInsightsEnabledHelp"));
+
+      expect(section.find('[data-test="settings-red-insights-btn-info"]').exists()).toBe(true);
+      expect(section.text()).not.toContain(help);
+      expect(section.findComponent({ name: "OTooltip" }).props("content")).toBe(help);
+      expect(section.find('[data-test="settings-traces-heading"]').text()).toBe(
+        String(i18n.global.t("settings.tracesHeading")),
+      );
+    });
   });
 
   describe("Usage stream settings", () => {

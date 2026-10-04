@@ -67,13 +67,18 @@
       </div>
 
       <div v-if="showRedInsights" data-test="settings-red-insights" class="o2-input">
+        <div data-test="settings-traces-heading" class="pt-4 pb-1 text-base font-bold">
+          {{ t("settings.tracesHeading") }}
+        </div>
         <OFormSwitch
           data-test="settings-red-insights-btn"
           name="redInsightsEnabled"
           :label="t('settings.redInsightsEnabledLabel')"
           class="mt-2"
         >
-          <template #tooltip>{{ t("settings.redInsightsEnabledHelp") }}</template>
+          <template #tooltip>
+            <OTooltip :content="t('settings.redInsightsEnabledHelp')" />
+          </template>
         </OFormSwitch>
       </div>
 
@@ -130,6 +135,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";

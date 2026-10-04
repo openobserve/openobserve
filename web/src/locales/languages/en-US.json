@@ -9625,6 +9625,7 @@
     "customLogoText": "Custom Logo Text",
     "orgLabel": "Organization Parameters",
     "logDetails": "Log Details",
+    "tracesHeading": "Traces",
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name",
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
