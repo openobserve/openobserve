@@ -213,7 +213,10 @@ describe("dataProcessor", () => {
       // Shifted series re-use their primaries' metric objects, reordered and with one missing.
       const metrics = ["a", "b", "c", "d", "e", "f", "g"].map((job) => ({ job }));
       const primary = metrics.map((metric) => ({ metric, values: [[1000, "1"]] }));
-      const shifted = [6, 5, 4, 3, 2, 1].map((i) => ({ metric: metrics[i], values: [[1000, "2"]] }));
+      const shifted = [6, 5, 4, 3, 2, 1].map((i) => ({
+        metric: metrics[i],
+        values: [[1000, "2"]],
+      }));
       const searchQueryData: PromQLResponse[] = [{ result: primary }, { result: shifted }] as any;
 
       const processed = await processPromQLData(

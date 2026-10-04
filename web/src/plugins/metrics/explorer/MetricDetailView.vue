@@ -352,9 +352,7 @@ export default defineComponent({
     const unitLabel = computed(() => raw(UNIT_LABELS[props.card?.unit ?? ""] ?? ""));
 
     const inapplicableFiltersText = computed(() =>
-      props.inapplicableFilters
-        .map((f) => `${f.label}${f.operator ?? "="}"${f.value}"`)
-        .join(", "),
+      props.inapplicableFilters.map((f) => `${f.label}${f.operator ?? "="}"${f.value}"`).join(", "),
     );
 
     const breakdownSupported = computed(

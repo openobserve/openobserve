@@ -41,9 +41,10 @@ export const buildHistoryEntry = (
   selectedDate: Partial<SelectedDate> | null | undefined,
 ): QueryHistoryRecord | null => {
   const hidden: number[] = dashboardPanelData?.layout?.hiddenQueries ?? [];
-  const queries: any[] = dashboardPanelData?.data?.queries ?? [];
-  const query = queries
-    .filter((_, index) => !hidden.includes(index))
+  const visible = ((dashboardPanelData?.data?.queries ?? []) as any[]).filter(
+    (_, index) => !hidden.includes(index),
+  );
+  const query = visible
     .map((q) => (typeof q?.query === "string" ? q.query.trim() : ""))
     .filter(Boolean)
     .join("\n");
@@ -55,7 +56,9 @@ export const buildHistoryEntry = (
       time_range: selectedDateToQueryParams(selectedDate as SelectedDate),
       step: dashboardPanelData?.data?.config?.step_value ?? null,
       chart_type: dashboardPanelData?.data?.type ?? "",
-      metrics_data: encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
+      metrics_data: encodeMetricsConfig(
+        getMetricsConfig({ data: { ...dashboardPanelData?.data, queries: visible } }),
+      ),
     },
   };
 };

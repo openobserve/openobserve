@@ -1276,6 +1276,11 @@ export default defineComponent({
     // metric's TYPE-BASED operation so Visualize opens on the card's own query.
     // Consumed once by MetricsVisualize, then cleared.
     const visualizeSeed = ref<Record<string, any> | null>(null);
+    const seedVisualizeFromUrl = (q: Record<string, any>) => {
+      if (!q.metrics_data) return;
+      const blob = decodeMetricsConfig(q.metrics_data);
+      if (blob?.data) visualizeSeed.value = blob.data;
+    };
 
     // The mounted Visualize pane — the toolbar's refresh drives its runQuery in
     // visualize mode.
@@ -1479,10 +1484,7 @@ export default defineComponent({
       // the URL blob into a seed so MetricsVisualize opens on it (its own mount
       // consumes `visualizeSeed`, exactly as a card drill-in does) instead of a
       // blank canvas. Only in Visualize — the blob is meaningless to the grid.
-      if (f.mode === "visualize" && q.metrics_data) {
-        const blob = decodeMetricsConfig(q.metrics_data);
-        if (blob?.data) visualizeSeed.value = blob.data;
-      }
+      if (f.mode === "visualize") seedVisualizeFromUrl(q);
 
       if (f.labelFilters) {
         grid.labelFilters.value = f.labelFilters;
@@ -1693,6 +1695,8 @@ export default defineComponent({
       };
       const q = route.query as Record<string, any>;
       const f = queryToExplorerFilters(q);
+      // Back/Forward into Visualize remounts it, which would open blank without the URL's chart.
+      if (f.mode === "visualize" && mode.value !== "visualize") seedVisualizeFromUrl(q);
       if (isEqual(withoutPageKeys(incoming), withoutPageKeys(current))) {
         mode.value = (incoming.mode as "explore" | "visualize" | "workspace") ?? "explore";
         applyDetailKeys(f);

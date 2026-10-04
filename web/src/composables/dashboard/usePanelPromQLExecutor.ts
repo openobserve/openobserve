@@ -113,7 +113,11 @@ export const usePanelPromQLExecutor = (ctx: {
       const queryMetadata: any[] = [];
       const completedQueries = new Set<number>(); // Track completed streams
       // Merged across streams so a later stream cannot hide an earlier one's truncation.
-      const streamStats: { totalMetricsReceived: number; uniqueSeriesSeen: number; metricsStored: number }[] = [];
+      const streamStats: {
+        totalMetricsReceived: number;
+        uniqueSeriesSeen: number;
+        metricsStored: number;
+      }[] = [];
 
       // Shifted streams follow every primary, so index i < queries.length stays panel query i.
       let nextShiftedIndex = panelSchema.value.queries.length;
@@ -127,6 +131,7 @@ export const usePanelPromQLExecutor = (ctx: {
           })),
       );
       const totalStreams = nextShiftedIndex;
+      const chunkProcessors: ReturnType<typeof createPromQLChunkProcessor>[] = [];
 
       // Process all queries in parallel using streaming
       await Promise.all(
@@ -250,11 +255,16 @@ export const usePanelPromQLExecutor = (ctx: {
               // Get series limit from config
               const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
 
+              const isShifted = queryIndex !== panelQueryIndex;
               // Create chunk processor for efficient metric merging
               const chunkProcessor = createPromQLChunkProcessor({
                 maxSeries,
                 enableLogging: false,
+                keepFirst: isShifted
+                  ? () => (queryResults[panelQueryIndex]?.result ?? []).map((m: any) => m?.metric)
+                  : undefined,
               });
+              chunkProcessors[queryIndex] = chunkProcessor;
 
               // loadData() aborts the old run's controller but never cancels its stream, so a superseded run keeps delivering frames that would overwrite the newer run's results — an empty first partition then strands the panel on "No Data".
               const isSuperseded = () => !!abortControllerRef?.signal?.aborted;
@@ -333,6 +343,18 @@ export const usePanelPromQLExecutor = (ctx: {
                 }
                 // Mark this query as completed
                 completedQueries.add(queryIndex);
+
+                // A shifted stream that finished first chose its cap before this primary's series were known.
+                if (!isShifted) {
+                  for (const shift of shiftsByQuery[panelQueryIndex]) {
+                    if (queryResults[shift.index]?.result) {
+                      queryResults[shift.index] = {
+                        ...queryResults[shift.index],
+                        result: chunkProcessors[shift.index].select(),
+                      };
+                    }
+                  }
+                }
 
                 // Get statistics from chunk processor
                 const stats = chunkProcessor.getStats();

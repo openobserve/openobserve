@@ -1255,6 +1255,9 @@ export default defineComponent({
 
       if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
         const generation = ++conversionGeneration;
+        // A stream error set while awaiting is newer than this conversion's data.
+        const superseded = () =>
+          generation !== conversionGeneration || !!errorDetail?.value?.message;
         try {
           const result = await convertPanelData(
             filteredPanelSchema.value,
@@ -1270,7 +1273,7 @@ export default defineComponent({
             filteredSparklineData.value,
           );
           // Superseded while awaiting: its data is older than what is coming.
-          if (generation !== conversionGeneration) return;
+          if (superseded()) return;
 
           // Apply overlay BEFORE assigning to panelData.value.
           // This ensures a single watcher trigger with the overlaid options,
@@ -1383,7 +1386,7 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
-          if (generation !== conversionGeneration) return;
+          if (superseded()) return;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",

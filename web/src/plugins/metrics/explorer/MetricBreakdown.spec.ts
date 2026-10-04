@@ -145,6 +145,21 @@ describe("MetricBreakdown", () => {
       expect(lastRequest().stream_name).toBe("size_count");
     });
 
+    it("offers an exponential fallback the labels of the _count stream it measures", async () => {
+      wrapper = mountBreakdown({
+        card: {
+          ...CARD,
+          name: "size_bucket",
+          cardKind: CARD_KIND.EXP_HISTOGRAM_FALLBACK,
+          labels: ["a", "b", "le"],
+        },
+        labelsByStream: { size_bucket: ["a", "b", "le"], size_count: ["b", "c"] },
+      });
+      await flushPromises();
+      expect(lastRequest().stream_name).toBe("size_count");
+      expect(lastRequest().fields).toEqual(["b", "c"]);
+    });
+
     it("offers a mean pair only the labels both operands carry", async () => {
       wrapper = mountBreakdown({
         card: { ...CARD, name: "lat_sum", cardKind: CARD_KIND.MEAN_PAIR, labels: ["a", "b"] },
@@ -226,6 +241,16 @@ describe("MetricBreakdown", () => {
         'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
       );
       expect(wrapper.find('[data-test="metrics-breakdown-topk"]').text()).toContain("top 10");
+    });
+
+    it("caps a deep-linked label with topk(10) when its value counts failed to load", async () => {
+      fieldValues.mockRejectedValue(new Error("values unavailable"));
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+
+      expect(runQuery).toHaveBeenCalledWith(
+        'topk(10, sum by (method) (rate({__name__="http_requests_total"}[4m])))',
+      );
     });
 
     it("ignores a deep-linked label the table does not offer", async () => {
@@ -318,9 +343,7 @@ describe("MetricBreakdown with the real OTable", () => {
     await flushPromises();
 
     // Wait out OTable's loading skeleton; the cells are what is under test.
-    await vi.waitFor(() =>
-      expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(4),
-    );
+    await vi.waitFor(() => expect(wrapper.findAll('[data-test^="o2-table-row-"]')).toHaveLength(4));
     expect(wrapper.find('[data-test="metrics-breakdown-value-method-m0"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="metrics-breakdown-distinct-instance"]').text()).toBe("20+");
 

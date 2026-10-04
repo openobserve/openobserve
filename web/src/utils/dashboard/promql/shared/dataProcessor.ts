@@ -38,7 +38,12 @@ export async function processPromQLData(
 
   // Apply series limit
   const seriesLimit = panelSchema.config?.promql_series_limit || 100;
-  const limitedData = applySeriesLimit(searchQueryData, seriesLimit, queryIndexOf, shift.nameSuffixes);
+  const limitedData = applySeriesLimit(
+    searchQueryData,
+    seriesLimit,
+    queryIndexOf,
+    shift.nameSuffixes,
+  );
 
   // Named through the same builder the line/bar path uses, so a panel flipped
   // from Line to Stacked keeps its legend, its tooltip and its per-series colour
@@ -174,7 +179,9 @@ function applySeriesLimit(
 
   const limited = data.map((queryData, index) => {
     const result = resultOf(queryData);
-    return !result || nameSuffixes[index] ? queryData : withResult(queryData, result.slice(0, limit));
+    return !result || nameSuffixes[index]
+      ? queryData
+      : withResult(queryData, result.slice(0, limit));
   });
 
   const kept = new Map<number, Set<any>>();

@@ -1914,7 +1914,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     const step = dialogStepFor(card);
     const key = previewCacheKey(expr, step);
     detailKeys.set(expr, key);
-    return queue.run(key, PRIORITY.DIALOG, (signal) => streamQuery(expr, step, signal), DETAIL_OWNER);
+    return queue.run(
+      key,
+      PRIORITY.DIALOG,
+      (signal) => streamQuery(expr, step, signal),
+      DETAIL_OWNER,
+    );
   };
 
   /** Detail view closed, or its chart replaced: drop what it still has running. */

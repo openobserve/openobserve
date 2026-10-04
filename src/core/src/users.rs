@@ -1878,6 +1878,38 @@ mod tests {
         assert_eq!(history_count("other", email).await, 0);
     }
 
+    async fn drop_query_history_table() {
+        use sea_orm::ConnectionTrait;
+        get_orm_client_rw()
+            .await
+            .execute_unprepared("DROP TABLE query_history")
+            .await
+            .unwrap();
+    }
+
+    // History cleanup is non-fatal like the on-call offboarding beside it: the removal still lands.
+    #[tokio::test]
+    async fn test_user_removal_succeeds_when_query_history_cleanup_fails() {
+        let _guard = set_up().await;
+        let email = "history-cleanup-fails@example.com";
+        create_user_with_history(email).await;
+        drop_query_history_table().await;
+        assert!(
+            infra_table::query_history::delete_by_email(email)
+                .await
+                .is_err()
+        );
+
+        let removed = remove_user_from_org("dummy", email, "admin@zo.dev").await;
+        let deleted = delete_user(email).await;
+        create_query_history_table().await;
+
+        assert_eq!(removed.unwrap().status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        assert_eq!(deleted.unwrap().status(), http::StatusCode::OK);
+        assert!(infra_table::users::get(email).await.is_err());
+    }
+
     #[tokio::test]
     async fn test_root_user_exists_edge_cases() {
         let _guard = set_up().await;

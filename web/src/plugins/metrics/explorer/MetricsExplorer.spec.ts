@@ -1125,6 +1125,32 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.paused.value).toBe(false);
     });
 
+    it("Detail -> Visualize -> Back -> Forward reopens Visualize on the URL's chart", async () => {
+      const chart = { type: "bar", queries: [{ query: "up", fields: {} }] };
+      const visualizeUrl = {
+        mode: "visualize",
+        metrics_data: encodeMetricsConfig(getMetricsConfig({ data: chart })),
+      };
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+
+      routerState.query = visualizeUrl;
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      (wrapper.vm as any).visualizeSeed = null;
+
+      routerState.query = { metric: CARD.name };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).exists()).toBe(true);
+
+      routerState.query = visualizeUrl;
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      expect((wrapper.vm as any).visualizeSeed).toEqual(chart);
+    });
+
     it("opening a related metric pushes, and Back returns to the first metric's Related tab", async () => {
       routerState.query = { metric: CARD.name, tab: "related" };
       const wrapper = mountExplorer();

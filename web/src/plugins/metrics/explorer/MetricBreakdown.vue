@@ -251,7 +251,12 @@ export default defineComponent({
     const valuesStream = computed(() => operandStreamsOf(props.card)[0]);
 
     const labels = computed(() => {
-      const own = props.card.labels ?? props.labelsByStream[props.card.name];
+      // The exp fallback measures `_count`, whose labels can differ from the card's `_bucket`.
+      const measured =
+        valuesStream.value === props.card.name
+          ? undefined
+          : props.labelsByStream[valuesStream.value];
+      const own = measured ?? props.card.labels ?? props.labelsByStream[props.card.name];
       // A label on only one side of `_sum / _count` would split half the ratio.
       const alsoOn =
         props.card.cardKind === CARD_KIND.MEAN_PAIR
@@ -367,7 +372,8 @@ export default defineComponent({
     const selectedRow = computed(
       () => rows.value.find((row) => row.label === activeLabel.value) ?? null,
     );
-    const topkApplied = computed(() => !!selectedRow.value?.more);
+    // Without counts a label's cardinality is unknown, so it gets the conservative cap.
+    const topkApplied = computed(() => !!selectedRow.value?.more || !!tableError.value);
 
     /** Built once the table has answered: only it knows whether to cap at top 10. */
     const chartExpr = computed(() => {

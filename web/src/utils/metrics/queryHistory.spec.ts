@@ -48,6 +48,19 @@ describe("query history entries", () => {
     );
   });
 
+  it("leaves hidden queries out of the panel blob, so loading the entry runs only the visible ones", () => {
+    const p = panel({
+      queries: [
+        { query: "a", fields: {} },
+        { query: "b", fields: {} },
+      ],
+    });
+    p.layout.hiddenQueries = [1];
+    const entry = buildHistoryEntry(p, { valueType: "relative", relativeTimePeriod: "1h" });
+    const loaded = decodeMetricsConfig(historyEntryToLoad(entry!.context)!.metricsData);
+    expect(loaded?.data.queries.map((q: any) => q.query)).toEqual(["a"]);
+  });
+
   it("returns nothing when there is no query text", () => {
     const p = panel({ queries: [{ query: "" }] });
     expect(buildHistoryEntry(p, { valueType: "relative", relativeTimePeriod: "1h" })).toBeNull();

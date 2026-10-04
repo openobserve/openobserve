@@ -691,3 +691,52 @@ describe("time shift (compare to a previous period)", () => {
     expect(state.loading).toBe(false);
   });
 });
+
+describe("time shift keeps the shifted series of every shown primary under the series cap", () => {
+  const series = (labels: Record<string, string>, points: number) => ({
+    metric: labels,
+    values: Array.from({ length: points }, (_, t) => [t, "1"]),
+  });
+  const shown = Array.from({ length: 5 }, (_, i) => ({ host: `shown-${i}` }));
+  const pastOnly = Array.from({ length: 150 }, (_, i) => ({ host: `past-${i}` }));
+
+  it.each([
+    ["the shifted stream finishes first", true],
+    ["the primary finishes first", false],
+  ])("%s", async (_name, shiftedFirst) => {
+    const actual: any = await vi.importActual("./promqlChunkProcessor");
+    (createPromQLChunkProcessor as any)
+      .mockImplementationOnce(actual.createPromQLChunkProcessor)
+      .mockImplementationOnce(actual.createPromQLChunkProcessor);
+    const panelSchema = makePanelSchema([
+      { query: "a", config: { time_shift: [{ offSet: "1d" }] } },
+    ]);
+    const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    const handlers: any[] = [];
+    (fetchQueryDataWithHttpStream as any).mockImplementation((_p: any, h: any) => handlers.push(h));
+    await usePanelPromQLExecutor(ctx as any).executePromQL(1_000_000, 2_000_000, null);
+
+    const deliver = (i: number, result: any[]) => {
+      handlers[i].data({}, { type: "promql_response", content: { results: { result } } });
+      handlers[i].complete({}, {});
+    };
+    const primary = () =>
+      deliver(
+        0,
+        shown.map((m) => series(m, 10)),
+      );
+    const shifted = () =>
+      deliver(1, [...pastOnly.map((m) => series(m, 20)), ...shown.map((m) => series(m, 10))]);
+    if (shiftedFirst) {
+      shifted();
+      primary();
+    } else {
+      primary();
+      shifted();
+    }
+
+    const shiftedHosts = state.data[1].result.map((m: any) => m.metric.host);
+    expect(shiftedHosts).toHaveLength(100);
+    expect(shiftedHosts).toEqual(expect.arrayContaining(shown.map((m) => m.host)));
+  });
+});

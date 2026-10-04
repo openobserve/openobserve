@@ -2538,8 +2538,14 @@ describe("PanelSchemaRenderer", () => {
   // A chunk conversion landing after the final one must not overwrite it.
   describe("conversions finishing out of order", () => {
     const PAGE_KEY = "conversion-race";
-    const primary = { resultType: "matrix", result: [{ metric: { host: "a" }, values: [[1, "1"]] }] };
-    const shifted = { resultType: "matrix", result: [{ metric: { host: "a" }, values: [[1, "2"]] }] };
+    const primary = {
+      resultType: "matrix",
+      result: [{ metric: { host: "a" }, values: [[1, "1"]] }],
+    };
+    const shifted = {
+      resultType: "matrix",
+      result: [{ metric: { host: "a" }, values: [[1, "2"]] }],
+    };
     const optionsWith = (...names: string[]) => ({
       chartType: "line",
       options: { series: names.map((name) => ({ name, data: [[1, 1]] })) },
@@ -2557,7 +2563,10 @@ describe("PanelSchemaRenderer", () => {
         metadata: ref({
           queries: [
             { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
-            { panelQueryIndex: 0, timeRangeGap: { seconds: 600_000, periodAsStr: "10 Minutes ago" } },
+            {
+              panelQueryIndex: 0,
+              timeRangeGap: { seconds: 600_000, periodAsStr: "10 Minutes ago" },
+            },
           ],
         }),
         resultMetaData: ref([]),
@@ -2585,7 +2594,11 @@ describe("PanelSchemaRenderer", () => {
           provide: {
             hoveredSeriesState: { value: null },
             dashboardPanelDataPageKey: PAGE_KEY,
-            variablesAndPanelsDataLoadingState: { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
           },
           mocks: { $t: (key: string) => key },
           stubs: {
@@ -2666,6 +2679,22 @@ describe("PanelSchemaRenderer", () => {
       chunk.reject(new Error("stale failure"));
       await flushPromises();
       expect(errorDetail.value.message).toBe("");
+    });
+
+    it("keeps a stream error set while a conversion is still awaiting", async () => {
+      const { data, loading, errorDetail } = await mountRacing();
+      loading.value = true;
+      const chunk: { resolve: (v: any) => void } = {} as any;
+      vi.mocked(convertPanelData).mockImplementationOnce(
+        () => new Promise((resolve) => Object.assign(chunk, { resolve })),
+      );
+      data.value = [primary];
+      await flushPromises();
+
+      errorDetail.value = { message: "stream failed", code: "500" };
+      chunk.resolve(optionsWith("late"));
+      await flushPromises();
+      expect(errorDetail.value.message).toBe("stream failed");
     });
   });
 });
