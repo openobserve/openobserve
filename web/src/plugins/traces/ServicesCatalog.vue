@@ -1057,7 +1057,7 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
   }
 }
 
-// Same request definition as the service graph (service_graph/v4/sql.rs kind_pred).
+// Same request definition as red_insights.rs request_predicate; the service graph counts only internal roots.
 function requestPredicate(hasParentColumn: boolean): string {
   // An OR, not IN ('2','5'): an IN list in a sole ORDER BY aggregate panics the engine's top-k rule.
   const kinds = "CAST(span_kind AS VARCHAR) = '2' OR CAST(span_kind AS VARCHAR) = '5'";

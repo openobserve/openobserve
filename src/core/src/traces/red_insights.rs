@@ -356,7 +356,7 @@ pub fn volume_sql(stream: &str, cols: &StreamColumns) -> String {
     )
 }
 
-/// The service graph's request definition (service_graph/v4/sql.rs), shared with the catalog.
+/// Shared with the catalog's requestPredicate; unlike the service graph, roots of any kind count.
 fn request_predicate(has_parent: bool) -> String {
     if has_parent {
         format!("{KIND_PREDICATE} {ROOT_ARM}")
