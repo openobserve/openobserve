@@ -23,7 +23,7 @@ use utoipa::IntoParams;
 #[derive(Clone, Debug, Deserialize, IntoParams)]
 #[serde(deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
-pub struct QualitySummaryQuery {
+pub struct ListQualityQuery {
     /// Inclusive Score write-time lower bound, in microseconds.
     pub start_time: i64,
     /// Exclusive Score write-time upper bound, in microseconds.
@@ -37,8 +37,8 @@ pub struct QualitySummaryQuery {
     pub agent_version: Option<String>,
 }
 
-impl From<QualitySummaryQuery> for QualityFilter {
-    fn from(value: QualitySummaryQuery) -> Self {
+impl From<ListQualityQuery> for QualityFilter {
+    fn from(value: ListQualityQuery) -> Self {
         Self {
             start_time: value.start_time,
             end_time: value.end_time,
