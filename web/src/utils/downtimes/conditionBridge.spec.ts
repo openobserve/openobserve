@@ -36,7 +36,10 @@ const or = (...items: DimensionCondition[]): DimensionCondition => ({
   items,
 });
 
-const flow7 = and(or(eq("service", "payments"), eq("service", "checkout-api")), ne("env", "staging"));
+const flow7 = and(
+  or(eq("service", "payments"), eq("service", "checkout-api")),
+  ne("env", "staging"),
+);
 const resource = and(eq("service", "payments"), or(eq("host", "db-1"), eq("host", "db-2")));
 
 describe("condition bridges", () => {

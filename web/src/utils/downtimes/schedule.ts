@@ -104,10 +104,7 @@ const occursOn = (s: DowntimeSchedule, ymd: string): boolean => {
 };
 
 /** The window that is running at `nowMicros`, else the next one; recurring rows look 8 days ahead. */
-export function currentOrNextWindow(
-  s: DowntimeSchedule,
-  nowMicros: number,
-): DowntimeWindow | null {
+export function currentOrNextWindow(s: DowntimeSchedule, nowMicros: number): DowntimeWindow | null {
   if (s.repeat === "none") {
     if (!s.ends_at || s.ends_at <= nowMicros) return null;
     return { start: s.starts_at, end: s.ends_at };

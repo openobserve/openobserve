@@ -26,11 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t(preset.labelKey) }}
     </ODropdownItem>
-    <ODropdownItem
-      icon-left="event"
-      :data-test="`${dataTestPrefix}-until`"
-      @select="emit('until')"
-    >
+    <ODropdownItem icon-left="event" :data-test="`${dataTestPrefix}-until`" @select="emit('until')">
       {{ t("alerts.downtimes.mute.until") }}
     </ODropdownItem>
   </ODropdownGroup>

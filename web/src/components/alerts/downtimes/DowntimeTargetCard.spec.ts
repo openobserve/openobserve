@@ -56,7 +56,10 @@ describe("DowntimeTargetCard", () => {
     expect(form().state.values.targets.alerts.folders).toEqual(["payments"]);
     expect(form().state.values.targets.alerts.ids).toEqual(["a1"]);
     expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "info", message: expect.stringContaining("1 chosen item") }),
+      expect.objectContaining({
+        variant: "info",
+        message: expect.stringContaining("1 chosen item"),
+      }),
     );
     wrapper.unmount();
   });

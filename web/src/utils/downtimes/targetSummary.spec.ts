@@ -22,8 +22,7 @@ const or = (...items: DimensionCondition[]): DimensionCondition => ({
   items,
 });
 
-const folderName = (_module: string, id: string) =>
-  ({ "7Hq9infra": "Infra" })[id as "7Hq9infra"];
+const folderName = (_module: string, id: string) => ({ "7Hq9infra": "Infra" })[id as "7Hq9infra"];
 
 describe("conditionSummary", () => {
   it("lists one AND group of = pairs as key=value pairs", () => {

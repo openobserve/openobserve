@@ -341,9 +341,7 @@ const router = useRouter();
 const orgId = useOrgId();
 const { toast } = useToast();
 
-const editId = computed(() =>
-  route.name === "editDowntime" ? String(route.params.id ?? "") : "",
-);
+const editId = computed(() => (route.name === "editDowntime" ? String(route.params.id ?? "") : ""));
 const duplicateId = computed(() => String(route.query.duplicate ?? ""));
 const isEdit = computed(() => !!editId.value);
 const sourceId = computed(() => editId.value || duplicateId.value);
@@ -474,10 +472,7 @@ const folderLabel = computed<I18nText>(() =>
 );
 
 const targetFolderName: FolderNameFn = (module, id) =>
-  folderNameIn(
-    module === "synthetics" ? syntheticFolders.data.value : alertFolders.data.value,
-    id,
-  );
+  folderNameIn(module === "synthetics" ? syntheticFolders.data.value : alertFolders.data.value, id);
 
 const autoName = useAutoName({
   suggestion: computed(() => buildDowntimeAutoName(values.value, t, itemName, targetFolderName)),
@@ -487,9 +482,7 @@ const autoName = useAutoName({
 });
 
 // ── Modules and tabs ────────────────────────────────────────────────────────
-const chosenModules = computed(() =>
-  MODULE_ORDER.filter((m) => values.value.modules.includes(m)),
-);
+const chosenModules = computed(() => MODULE_ORDER.filter((m) => values.value.modules.includes(m)));
 const hasIdentityModule = computed(() => chosenModules.value.some(hasIdentity));
 
 const activeTab = ref<DowntimeTab>("targets");

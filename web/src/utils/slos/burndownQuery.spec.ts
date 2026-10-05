@@ -293,13 +293,7 @@ describe("downtime corrections on the burndown (WP11)", () => {
   it("merges a run of three corrected buckets into one range and keeps two runs apart", () => {
     const point = (ts: number, corrected: boolean) => ({ ts, remaining: 1, burn: 0, corrected });
     const ranges = correctedRanges(
-      [
-        point(0, true),
-        point(300, true),
-        point(600, true),
-        point(900, false),
-        point(1200, true),
-      ],
+      [point(0, true), point(300, true), point(600, true), point(900, false), point(1200, true)],
       300,
     );
     expect(ranges).toEqual([

@@ -151,7 +151,10 @@ const props = withDefaults(
   },
 );
 
-provide(CONDITION_OPERATORS_KEY, computed(() => props.operators));
+provide(
+  CONDITION_OPERATORS_KEY,
+  computed(() => props.operators),
+);
 
 const { t } = useI18nTyped();
 const filterGroupKey = ref(0);

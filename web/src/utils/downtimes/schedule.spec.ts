@@ -141,11 +141,9 @@ describe("scheduleSentence", () => {
 describe("recentWindows", () => {
   it("returns the last three weekly windows, oldest first", () => {
     const now = micros("2026-09-17T12:00:00Z");
-    const starts = [
-      "2026-08-30T00:00:00Z",
-      "2026-09-06T00:00:00Z",
-      "2026-09-13T00:00:00Z",
-    ].map(micros);
+    const starts = ["2026-08-30T00:00:00Z", "2026-09-06T00:00:00Z", "2026-09-13T00:00:00Z"].map(
+      micros,
+    );
     const withStart = { ...weekly, starts_at: micros("2026-08-01T00:00:00Z") };
     expect(recentWindows(withStart, now, 3).map((w) => w.start)).toEqual(starts);
   });

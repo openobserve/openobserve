@@ -419,9 +419,7 @@ const affectedColumns = computed<OTableColumnDef<PreviewMatch>[]>(() => [
     id: "matched_by",
     header: t("alerts.downtimes.detail.matchedByHeader"),
     accessorFn: (row) =>
-      row.matched_by && MATCHED_BY_KEYS[row.matched_by]
-        ? t(MATCHED_BY_KEYS[row.matched_by])
-        : "—",
+      row.matched_by && MATCHED_BY_KEYS[row.matched_by] ? t(MATCHED_BY_KEYS[row.matched_by]) : "—",
     size: 160,
   },
   {

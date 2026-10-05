@@ -46,9 +46,11 @@ export function buildQuickMuteRequest(
     folder_id: "default",
     targets: selection
       .filter((s) => s.ids.length > 0)
-      .map(
-        (s): DowntimeTarget => ({ module: s.module, folders: { kind: "all" }, ids: [...s.ids] }),
-      ),
+      .map((s): DowntimeTarget => ({
+        module: s.module,
+        folders: { kind: "all" },
+        ids: [...s.ids],
+      })),
     schedule: {
       repeat: "none",
       starts_at: startsAtMicros,
