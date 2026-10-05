@@ -817,7 +817,22 @@ describe("TraceDetails", () => {
       await mountMap();
       await graphBtn().trigger("click");
       await flushPromises();
-      expect(series()).toMatchObject({ top: 55, bottom: 79, left: 55, right: 175 });
+      expect(series()).toMatchObject({ top: 55, bottom: 79, left: 64, right: 175 });
+    });
+
+    it("caps the graph label insets in a narrow chart", async () => {
+      await mountMap();
+      const el = wrapper.find('[data-test="trace-details-service-map-chart"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 400 });
+
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(series()).toMatchObject({ left: 64, right: 100 });
+
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 200 });
+      wrapper.vm.traceGraphSearch = " ";
+      await flushPromises();
+      expect(series()).toMatchObject({ left: 55, right: 55 });
     });
 
     it("truncates graph labels and hides overlapping ones", async () => {

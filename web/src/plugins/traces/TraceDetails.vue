@@ -1326,6 +1326,7 @@ export default defineComponent({
           traceGraphSearch.value,
         );
         if (!graph.nodes.length) return { options: {}, notMerge: true };
+        const chartWidth = chartRendererRef.value?.$el?.clientWidth || 1200;
         const network = convertServiceGraphToNetwork(
           graph,
           "force",
@@ -1333,12 +1334,14 @@ export default defineComponent({
           isDarkMode.value,
           undefined,
           // computeForceLayout subtracts ~330×310 of padding; smaller sizes yield NaN positions.
-          Math.max(chartRendererRef.value?.$el?.clientWidth || 1200, 800),
+          Math.max(chartWidth, 800),
           Math.max(chartRendererRef.value?.$el?.clientHeight || 700, 500),
         );
         // ECharts fits node centres, not symbols, into the series box; inset by the largest radius.
         const inset = MAX_NETWORK_NODE_SYMBOL_SIZE / 2;
         const labelWidth = 120;
+        // Label reserves are capped at a quarter of the width so narrow charts keep room for nodes.
+        const labelReserve = (wanted: number) => Math.max(inset, Math.min(wanted, chartWidth / 4));
         const [graphSeries, ...otherSeries] = network.options.series;
         return {
           options: {
@@ -1347,10 +1350,11 @@ export default defineComponent({
               {
                 ...graphSeries,
                 top: inset,
-                left: inset,
+                // A bottom label is centred on its node, so half its width plus the text stroke overhangs left.
+                left: labelReserve(labelWidth / 2 + 4),
                 // Edge nodes still get labels below or to their right, so reserve a text line and a label width.
                 bottom: inset + 24,
-                right: inset + labelWidth,
+                right: labelReserve(inset + labelWidth),
                 label: { ...graphSeries.label, width: labelWidth, overflow: "truncate" },
                 labelLayout: { hideOverlap: true },
               },
