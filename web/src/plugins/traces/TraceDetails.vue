@@ -1338,12 +1338,22 @@ export default defineComponent({
         );
         // ECharts fits node centres, not symbols, into the series box; inset by the largest radius.
         const inset = MAX_NETWORK_NODE_SYMBOL_SIZE / 2;
+        const labelWidth = 120;
         const [graphSeries, ...otherSeries] = network.options.series;
         return {
           options: {
             ...network.options,
             series: [
-              { ...graphSeries, top: inset, bottom: inset, left: inset, right: inset },
+              {
+                ...graphSeries,
+                top: inset,
+                left: inset,
+                // Edge nodes still get labels below or to their right, so reserve a text line and a label width.
+                bottom: inset + 24,
+                right: inset + labelWidth,
+                label: { ...graphSeries.label, width: labelWidth, overflow: "truncate" },
+                labelLayout: { hideOverlap: true },
+              },
               ...otherSeries,
             ],
           },

@@ -813,11 +813,20 @@ describe("TraceDetails", () => {
       expect(chartData()).toEqual({ options: {}, notMerge: true });
     });
 
-    it("insets the graph series by the largest node radius so nodes stay inside the chart", async () => {
+    it("insets the graph series so nodes and their labels stay inside the chart", async () => {
       await mountMap();
       await graphBtn().trigger("click");
       await flushPromises();
-      expect(series()).toMatchObject({ top: 55, bottom: 55, left: 55, right: 55 });
+      expect(series()).toMatchObject({ top: 55, bottom: 79, left: 55, right: 175 });
+    });
+
+    it("truncates graph labels and hides overlapping ones", async () => {
+      await mountMap();
+      await graphBtn().trigger("click");
+      await flushPromises();
+      expect(series().label).toMatchObject({ show: true, width: 120, overflow: "truncate" });
+      expect(series().labelLayout).toEqual({ hideOverlap: true });
+      series().data.forEach((n: any) => expect(n.tooltip.formatter).toContain(n.name));
     });
 
     it("lays out a graph with finite positions in a tiny chart container", async () => {
