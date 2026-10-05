@@ -1468,10 +1468,7 @@ describe("saved funnel sql cap (G8, CR-24)", () => {
   });
 });
 
-// Regression for o2-enterprise#2798: pageKeyExpr's mobile fallback read the literal
-// column `view_name`, but every CTE-level call site only ever selected `url`/`fu`/`lu`
-// — never `view_name` itself — so Pages, Funnels and Paths broke in any org where a
-// mobile RUM app had added `view_name` to the shared `_rumdata` schema.
+// pageKeyExpr's mobile fallback read view_name directly, but CTE call sites only ever select url/fu/lu.
 describe("mobile view_name fallback reaches a column the CTE actually selects (o2-enterprise#2798)", () => {
   const s = scope({
     schema: { view_name: true, usr_email: true, action_id: true, action_target_name: true },
@@ -1507,7 +1504,7 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
 
   it("Q9 stepPicker carries vn", () => {
     const sql = stepPickerSql(s);
-    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("MIN(view_name) AS vn");
     expect(sql).toContain("NULLIF(vn, '')");
     expect(sql).not.toContain("NULLIF(view_name, '')");
   });
@@ -1523,7 +1520,7 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
       { steps, unit: "sessions", window: "session", breakdown: null },
       opts,
     );
-    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("MIN(view_name) AS vn");
     expect(sql).toContain("NULLIF(vn, '')");
     expect(sql).not.toContain("NULLIF(view_name, '')");
   });
@@ -1569,7 +1566,7 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
       breakdown: null,
     };
     const health = dropoffHealthSql(s, null, sessions, 1, opts);
-    expect(health).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(health).toContain("MIN(view_name) AS vn");
     expect(health).toContain("NULLIF(vn, '')");
     expect(health).not.toContain("NULLIF(view_name, '')");
     const cohort = cohortSessionsSql(
@@ -1592,7 +1589,7 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
       cohort: null,
     };
     const sql = pathsSql(s, null, def, opts);
-    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("MIN(view_name) AS vn");
     expect(sql).toContain("NULLIF(vn, '')");
     expect(sql).not.toContain("NULLIF(view_name, '')");
   });
@@ -1612,7 +1609,7 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
       },
     ];
     const sql = featuresSql(s, CS, id, events);
-    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("MIN(view_name) AS vn");
     expect(sql).toContain("NULLIF(vn, '')");
     expect(sql).not.toContain("NULLIF(view_name, '')");
   });
@@ -1633,7 +1630,13 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
       pathsSql(
         s,
         id,
-        { anchor: { kind: "p", key: "/web" }, direction: "next", depth: 3, include: "all", cohort: null },
+        {
+          anchor: { kind: "p", key: "/web" },
+          direction: "next",
+          depth: 3,
+          include: "all",
+          cohort: null,
+        },
         opts,
       ),
       featuresSql(s, CS, id, [

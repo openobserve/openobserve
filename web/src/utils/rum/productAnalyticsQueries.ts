@@ -154,9 +154,7 @@ const lits = (values: readonly unknown[]): string => values.map(lit).join(", ");
 
 const has = (scope: AnalyticsScope, field: string): boolean => scope.schema[field] === true;
 
-// action_target_name only enters the org-wide schema once an action (click) event is ingested.
-// An org with view-only RUM data never gets it, so every reference must fall back instead of
-// asking the backend to resolve a column its schema doesn't have.
+// action_target_name only exists once an action event is ingested, so every reference needs a fallback.
 const atnCol = (scope: AnalyticsScope): string =>
   has(scope, "action_target_name")
     ? "MIN(action_target_name) AS atn"
@@ -426,7 +424,7 @@ export function stepPickerSql(scope: AnalyticsScope, term?: string): string {
   const groupKey = has(scope, "action_target_name") ? "action_target_name" : actionKey(scope);
   return withCtes(
     [
-      `e0 AS (SELECT session_id AS sid, type AS ty, MIN(view_url) AS url, ${atnCol(scope)}${has(scope, "view_name") ? ", MIN(CASE WHEN type = 'view' THEN view_name END) AS vn" : ""} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id ELSE ${groupKey} END)`,
+      `e0 AS (SELECT session_id AS sid, type AS ty, MIN(view_url) AS url, ${atnCol(scope)}${has(scope, "view_name") ? ", MIN(view_name) AS vn" : ""} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id ELSE ${groupKey} END)`,
       `e AS (SELECT sid, CASE WHEN ty = 'view' THEN 'p' ELSE 'c' END AS kind, CASE WHEN ty = 'view' THEN ${pageKeyExpr("url", scope.schema, "vn")} ELSE ${clickKeyExpr("atn")} END AS k FROM e0)`,
     ],
     `SELECT kind, k, COUNT(DISTINCT sid) AS sessions FROM e WHERE k IS NOT NULL AND k <> ''${filter} GROUP BY kind, k ORDER BY sessions DESC, kind, k LIMIT ${term ? 50 : 200}`,
@@ -653,7 +651,7 @@ const funnelCtes = (
     atnCol(scope),
     ...(users && id ? identityGroupCols(id) : []),
     ...(dim ? [`MIN(${dim}) AS dim`] : []),
-    ...(vnAvail ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
+    ...(vnAvail ? ["MIN(view_name) AS vn"] : []),
   ];
   const rowFilter = [
     "type = 'view'",
@@ -843,7 +841,7 @@ const fullChainCtes = (
       ? ["MAX(CASE WHEN action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS fr"]
       : []),
     ...(idf && id ? identityGroupCols(id) : []),
-    ...(vnAvail ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
+    ...(vnAvail ? ["MIN(view_name) AS vn"] : []),
   ];
   const types = o.errors ? "'view', 'error'" : "'view'";
   const identityRows = idf && id ? ` OR ${identityExpr(id)} IS NOT NULL` : "";
@@ -1083,7 +1081,7 @@ const pathCtes = (
     "MIN(view_url) AS url",
     atnCol(scope),
     hrExpr(scope),
-    ...(has(scope, "view_name") ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
+    ...(has(scope, "view_name") ? ["MIN(view_name) AS vn"] : []),
   ];
   const ctes = [
     `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND ${types} GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} ELSE CAST(date AS VARCHAR) END)`,
@@ -1091,8 +1089,9 @@ const pathCtes = (
   const pk = pageKeyExpr("url", scope.schema, "vn");
   const ck = clickKeyExpr("atn");
   if (anchor.kind === "e") {
+    const keepVn = has(scope, "view_name") ? ", vn" : "";
     ctes.push(
-      `e1 AS (SELECT sid, t, ty, hr, url, CASE WHEN ty = 'view' THEN ${pk} WHEN ty = 'action' THEN ${ck} END AS k FROM e0)`,
+      `e1 AS (SELECT sid, t, ty, hr, url${keepVn}, CASE WHEN ty = 'view' THEN ${pk} WHEN ty = 'action' THEN ${ck} END AS k FROM e0)`,
       `e AS (SELECT sid, t, ty, hr, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key, CASE WHEN ${stepPredicateGrouped(anchor, scope, opts.events)} THEN 1 ELSE 0 END AS am FROM e1)`,
     );
     return [...ctes, ...pathTail(def, attrs, "MIN(CASE WHEN am = 1 THEN n END)")];
@@ -1241,7 +1240,7 @@ export function featuresSql(
     `${c} AS cur`,
     "MIN(view_url) AS url",
     atnCol(scope),
-    ...(has(scope, "view_name") ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
+    ...(has(scope, "view_name") ? ["MIN(view_name) AS vn"] : []),
     ...(id ? identityGroupCols(id) : []),
   ];
   const extra = id ? ` OR ${identityExpr(id)} IS NOT NULL` : "";
