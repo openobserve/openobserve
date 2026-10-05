@@ -2902,8 +2902,10 @@ async fn process_destination_node(
         }
         Module::Pipeline { endpoint } => {
             if let Err(e) =
-                common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
-                    .await
+                common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+                    &endpoint.url,
+                )
+                .await
             {
                 return drain_destination_node_with_error(
                     &metadata,
@@ -5111,6 +5113,48 @@ mod tests {
         assert!(
             !result.outputs.contains_key("d1"),
             "a blocked destination must not report an output"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_destination_the_allowlist_admits_is_sent() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::test_a_destination_the_allowlist_admits_is_sent"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let base = crate::ssrf_test_support::secret_server().await;
+                seed_pipeline_destination_with_url("org-1", "allowlisted", &format!("{base}/ok"));
+                let workflow = destination_workflow("allowlisted");
+                let executable = ExecutablePipeline::new_from_workflow(&workflow)
+                    .await
+                    .expect("workflow must build");
+
+                let result = executable
+                    .process_workflow(
+                        "org-1",
+                        vec![json::json!({"severity": "high"})],
+                        None,
+                        WorkflowRunOptions {
+                            suppress_destinations: false,
+                        },
+                    )
+                    .await
+                    .expect("run must complete");
+
+                let messages: Vec<String> = result
+                    .errors
+                    .get("d1")
+                    .map(|e| e.errors.iter().map(|(m, _)| m.clone()).collect())
+                    .unwrap_or_default();
+                assert!(
+                    messages.is_empty(),
+                    "an allowlisted destination must be sent, got {messages:?}"
+                );
+            },
         );
     }
 
