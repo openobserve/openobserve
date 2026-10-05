@@ -33,10 +33,11 @@ use config::{
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        triggers::ScheduledTriggerData,
     },
     utils::{
         flatten,
-        json::*,
+        json::{self, *},
         schema::format_partition_key,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
     },
@@ -268,15 +269,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                     // After the notification is sent successfully, we need to update
                     // the silence period of the trigger
                     if let Err(e) = db::scheduler::update_trigger(
-                        db::scheduler::Trigger {
-                            org: alert.org_id.to_string(),
-                            module: db::scheduler::TriggerModule::Alert,
-                            module_key,
-                            is_silenced: true,
-                            is_realtime: true,
-                            next_run_at,
-                            ..Default::default()
-                        },
+                        silenced_realtime_trigger(&alert.org_id, module_key, next_run_at, now),
                         false,
                         "",
                     )
@@ -813,6 +806,29 @@ pub fn refactor_map(
     new_map
 }
 
+fn silenced_realtime_trigger(
+    org: &str,
+    module_key: String,
+    next_run_at: i64,
+    fired_at: i64,
+) -> db::scheduler::Trigger {
+    db::scheduler::Trigger {
+        org: org.to_string(),
+        module: db::scheduler::TriggerModule::Alert,
+        module_key,
+        is_silenced: true,
+        is_realtime: true,
+        next_run_at,
+        // Realtime rows carry no other data, and the wakeup clones it forward.
+        data: json::to_string(&ScheduledTriggerData {
+            last_satisfied_at: Some(fired_at),
+            ..Default::default()
+        })
+        .unwrap_or_default(),
+        ..Default::default()
+    }
+}
+
 /// The span of one write partition, which a record's time bucket is counted in.
 fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
     match time_level {
@@ -829,6 +845,15 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_silenced_realtime_trigger_records_when_it_fired() {
+        let trigger = silenced_realtime_trigger("org1", "key1".to_string(), 2_000, 1_000);
+        assert!(trigger.is_silenced && trigger.is_realtime);
+        assert_eq!(trigger.next_run_at, 2_000);
+        let data: ScheduledTriggerData = json::from_str(&trigger.data).unwrap();
+        assert_eq!(data.last_satisfied_at, Some(1_000));
+    }
 
     #[test]
     fn test_format_partition_key() {

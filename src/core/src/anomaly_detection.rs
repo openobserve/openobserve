@@ -6483,4 +6483,60 @@ mod tests {
         // An untagged request yields no role group at all, which is the bug this pins.
         assert_ne!(RoleGroup::from(SearchEventType::UI), RoleGroup::Background);
     }
+
+    #[test]
+    fn red_insights_templates_pass_create_validation() {
+        use crate::traces::red_insights::{RedSignal, StreamColumns, template};
+
+        for has_parent in [true, false] {
+            let cols = StreamColumns {
+                has_parent,
+                has_status: true,
+                has_duration: true,
+            };
+            for (stream, service) in [
+                ("default", "checkout"),
+                ("a\"b", "o'brien"),
+                ("t/x", "api/v1"),
+            ] {
+                for signal in RedSignal::ALL {
+                    let req = template(stream, service, signal, &cols)
+                        .expect("every signal is eligible here")
+                        .into_request("default");
+                    validate_config_request(&req)
+                        .unwrap_or_else(|e| panic!("{signal:?} on {stream}/{service}: {e}"));
+                    config::meta::alerts::tags::normalize_tags(&req.tags).unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn red_insights_skips_exactly_the_rate_detectors_g4_rejects() {
+        use crate::traces::red_insights::{RedSignal, StreamColumns, template};
+
+        let cols = StreamColumns {
+            has_parent: true,
+            has_status: true,
+            has_duration: true,
+        };
+        for word in ERROR_VOCABULARY {
+            let stream = format!("app-{word}");
+            assert!(
+                template(&stream, "svc", RedSignal::Rate, &cols).is_none(),
+                "{stream}"
+            );
+            let mut req = template("default", "svc", RedSignal::Rate, &cols)
+                .unwrap()
+                .into_request("default");
+            req.stream_name = stream.clone();
+            assert!(validate_config_request(&req).is_err(), "{stream}");
+            for signal in [RedSignal::ErrorRatio, RedSignal::P95Latency] {
+                let req = template(&stream, "svc", signal, &cols)
+                    .unwrap()
+                    .into_request("default");
+                validate_config_request(&req).unwrap_or_else(|e| panic!("{signal:?}: {e}"));
+            }
+        }
+    }
 }

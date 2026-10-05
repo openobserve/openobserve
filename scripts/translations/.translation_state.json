@@ -16711,6 +16711,8 @@
     "queryManagement": "e804e3542cae3915",
     "queryManagementDesc": "f1bc895b2f1da57e",
     "recommendedByFieldCoverage": "a109c01355662af8",
+    "redInsightsEnabledHelp": "766c0400c24ccc99",
+    "redInsightsEnabledLabel": "4a18f94f3f6afd29",
     "regexPatternList": {
       "bulkDeleteFailed": "36c7f0d7791212dd",
       "bulkDeleteMessage": "af717a4ac4d27610",
@@ -16824,6 +16826,7 @@
     "themeManagementDescription": "5024019f661fc3dd",
     "toggleIngestionLogsLabel": "d62acc58665cf9bb",
     "traceIdFieldName": "f1fbe93390eb5290",
+    "tracesHeading": "998741a58ed2b411",
     "trialExtensionMinWeek": "e174ca7c2a4417c5",
     "trial_expiry": "03378fba7bf9c9ae",
     "updateAiCreditsFailed": "5754421c67124875",
@@ -19662,6 +19665,7 @@
     "applyAndSearch": "c7de18087c748cfb",
     "applyPendingFilters": "ce1202e0d05abe3b",
     "backToLogs": "ed627b7ddd4e0cca",
+    "backToResults": "c7ef0e278b1e08c0",
     "backToTraces": "f03da00bbeb8113f",
     "clearErrorFilter": "b634835f3e3a5324",
     "collapseFields": "166bd3007d204cc4",
@@ -19691,6 +19695,7 @@
     },
     "correlationFailed": "47638dd4bdeaee84",
     "correlationServiceNotFound": "77ea7bc4d298d205",
+    "criticalPath": "bfbcf6ab87bc0dc6",
     "dbSpanDetails": {
       "batchSize": "c4857cd1742f94da",
       "database": "fa7fe67124e94375",
@@ -19707,6 +19712,7 @@
       "user": "b512d97e7cbf97c2",
       "viewQueryTrend": "df5dc6da572cfc5a"
     },
+    "drillDown": "682c25289fd57604",
     "errLabel": "af440ad05977eb32",
     "error": "d98ee0e5f9399db9",
     "errorCount": "6b8c59fe228558f0",
@@ -19879,7 +19885,9 @@
     "operation": "0f044feb6ca7d676",
     "p50Median": "76661f0c8ac6ce54",
     "previousMatch": "daa2f8c3fc897cc7",
+    "redMetrics": "a9d1ab9a2d6d4dac",
     "reviewAndApplyFilters": "28a6fd8929f1ffa5",
+    "savedViewStreamMissing": "d9d331cfdc12f282",
     "searchBar": {
       "streamNotFound": "b46fc36172de7113"
     },
@@ -20004,10 +20012,22 @@
         "errors": "cb702378f31507ef",
         "maxDuration": "e5b10d63b3485042",
         "requests": "ada27592c9578e90",
+        "requestsTooltip": "e5d6ed86bca68fdd",
         "serviceName": "d677190e0a9990e7",
         "status": "920e413c7d411b61"
       },
       "filterPlaceholder": "6c403ddc8a77c64c",
+      "insights": {
+        "scoreAbove": "6015543c308e3576",
+        "signals": {
+          "errors": "e4fe6202728fa010",
+          "p95": "a81f378f0a8b5949",
+          "rate": "9535754daaf07fae"
+        },
+        "title": "2a932f90172e99ea",
+        "viewCharts": "f91cf6c6263dc004",
+        "viewTraces": "998741a58ed2b411"
+      },
       "legend": {
         "title": "bf7d539c44f17179"
       },
@@ -20254,6 +20274,13 @@
       "modelParameters": "166cfbd5b6effb00",
       "noDataAvailable": "d2d2d48c815b0539",
       "notScoredYet": "a83f5a22f4cccac3",
+      "operationBandAboveP99": "f9bf10b75fbbdee7",
+      "operationBandBelowP50": "39d15e603495c20f",
+      "operationBandP50ToP75": "24c88939d8a0ecb1",
+      "operationBandP75ToP90": "1a83ac65f5b53949",
+      "operationBandP90ToP99": "832d86d902fc75cf",
+      "operationPercentileBand": "8367057943fd3f77",
+      "operationPercentilesTooltip": "3ccec31a0be1b901",
       "out": "9a3c5460432ba66a",
       "output": "b2439bcb8dee14b6",
       "outputTokens": "a0a1074faa44dfa0",
@@ -20314,6 +20341,7 @@
     "viewFilters": "6fae22556dc2d946",
     "viewLogs": "e087f046dc3cda9a",
     "viewLogsUnavailable": "e2468fc4f70cc910",
+    "viewProfile": "d4788f256f730423",
     "waterfall": "6b53bc225e0aae1d"
   },
   "user": {
