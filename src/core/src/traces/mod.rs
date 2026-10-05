@@ -56,6 +56,7 @@ use serde_json::Map;
 pub mod agent_signals;
 pub mod inferred;
 pub mod otel;
+pub mod red_insights;
 pub mod service_graph;
 pub mod session;
 #[cfg(test)]

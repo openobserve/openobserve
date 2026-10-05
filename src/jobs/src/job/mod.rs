@@ -65,6 +65,8 @@ mod pipeline_error_cleanup;
 mod prompt_webhook_delivery;
 mod promql;
 mod promql_self_consume;
+#[cfg(feature = "enterprise")]
+mod red_insights;
 mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
@@ -1099,6 +1101,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .disabled
     {
         tokio::task::spawn(anomaly_claim_supervisor());
+        // Here because create_config does not check the anomaly kill switch itself.
+        tokio::task::spawn(red_insights::run());
     }
     // Every node that serves writes publishes them, not only the scheduler.
     openobserve_synthetics::service::start_publish_queue();

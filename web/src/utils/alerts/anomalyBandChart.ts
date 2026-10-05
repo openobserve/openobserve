@@ -25,6 +25,7 @@ import {
 } from "@/utils/alerts/anomalyChartQuery";
 import { histogramKeyToMicros } from "@/utils/rum/errorIssueUtils";
 import { anomalyIntervalSeconds } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 /** One metric-query bucket; every reading is `null` where the bucket has none. */
 export interface AnomalyBandRow {
@@ -67,7 +68,10 @@ const BAND_STACK = "band";
 
 const ISOLATED_SYMBOL_SIZE = 6;
 
-const MAX_FRACTION_DIGITS = 6;
+const MAX_FRACTION_DIGITS = 12;
+
+// toFixed's ceiling, so the scaled reading keeps every digit the double carries.
+const EXACT_DIGITS = 100;
 
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -94,16 +98,45 @@ export function formatReading(value: number, fractionDigits?: number): string {
   return value.toLocaleString(undefined, { maximumSignificantDigits: 3 });
 }
 
+function formatTick(value: number): string {
+  const magnitude = Math.abs(value);
+  if (magnitude >= 1) {
+    return value.toLocaleString(undefined, { maximumFractionDigits: magnitude >= 100 ? 0 : 2 });
+  }
+  return value.toLocaleString(undefined, { maximumSignificantDigits: 3 });
+}
+
+function formatUnitReading(
+  value: number,
+  unit: string,
+  fmt: (n: number) => string = formatReading,
+): string {
+  const scaled = getUnitValue(value, unit, "", EXACT_DIGITS);
+  const n = Number(scaled.value);
+  if (!Number.isFinite(n)) return formatUnitValue(scaled);
+  const sign = Math.sign(n);
+  if (sign !== 0 && fmt(n) === fmt(sign * 1000)) {
+    const next = getUnitValue(sign * (value / n) * 1001, unit, "", 0).unit;
+    // Only x1000 steps (μs, ms, K, M…) reach 1,000, which is then exactly 1 of the next; s/m/h/D switch lower.
+    if (next !== scaled.unit) return formatUnitValue({ value: fmt(sign), unit: next });
+  }
+  return formatUnitValue({ value: fmt(n), unit: scaled.unit });
+}
+
 /** One precision for a value and its bounds: the magnitude default, unless a differing pair would read equal. */
-function readingFormatter(value: number | null, bounds: number[]): (x: number) => string {
+function readingFormatter(
+  value: number | null,
+  bounds: number[],
+  unit: string,
+): (x: number) => string {
   const clash = (fmt: (x: number) => string) =>
     value !== null && bounds.some((b) => b !== value && fmt(b) === fmt(value));
-  if (!clash((x) => formatReading(x))) return (x) => formatReading(x);
+  if (!clash((x) => formatUnitReading(x, unit))) return (x) => formatUnitReading(x, unit);
   for (let digits = 0; digits < MAX_FRACTION_DIGITS; digits++) {
-    const fmt = (x: number) => formatReading(x, digits);
+    const fmt = (x: number) => formatUnitReading(x, unit, (n) => formatReading(n, digits));
     if (!clash(fmt)) return fmt;
   }
-  return (x) => formatReading(x, MAX_FRACTION_DIGITS);
+  return (x) => formatUnitReading(x, unit, (n) => formatReading(n, MAX_FRACTION_DIGITS));
 }
 
 /** Milliseconds of a `histogram_interval` such as "5m"; null when it does not parse. */
@@ -174,7 +207,7 @@ export function bandHeight(row: AnomalyBandRow): number | null {
   return row.lower === null || row.upper === null ? null : row.upper - row.lower;
 }
 
-function tooltipFormatter(rows: AnomalyBandRow[], labels: AnomalyBandLabels) {
+function tooltipFormatter(rows: AnomalyBandRow[], labels: AnomalyBandLabels, unit: string) {
   const byTs = new Map(rows.map((row) => [row.tsMs, row]));
   return (params: any) => {
     const first = Array.isArray(params) ? params[0] : params;
@@ -189,13 +222,15 @@ function tooltipFormatter(rows: AnomalyBandRow[], labels: AnomalyBandLabels) {
       lines.push(`${marker}<b>${anomalyLine(row, labels)}</b>`);
     }
     const bounds = [row.lower, row.upper].filter((b): b is number => b !== null);
-    const reading = readingFormatter(row.value, bounds);
+    const reading = readingFormatter(row.value, bounds, unit);
     if (row.value !== null) lines.push(`${labels.value}: ${reading(row.value)}`);
     if (row.lower !== null && row.upper !== null) {
       lines.push(`${labels.range}: [${reading(row.lower)}, ${reading(row.upper)}]`);
     }
-    if (row.expected !== null) lines.push(`${labels.expected}: ${formatReading(row.expected)}`);
-    if (row.event !== null) lines.push(`${labels.event}: ${formatReading(row.event)}`);
+    if (row.expected !== null) {
+      lines.push(`${labels.expected}: ${formatUnitReading(row.expected, unit)}`);
+    }
+    if (row.event !== null) lines.push(`${labels.event}: ${formatUnitReading(row.event, unit)}`);
     return lines.join("<br/>");
   };
 }
@@ -206,6 +241,7 @@ export function buildAnomalyBandOptions(
   colors: AnomalyBandColors,
   span: AnomalyBandWindow,
   intervalMs: number | null = null,
+  unit = "numbers",
 ) {
   const rows = withGapBreaks(bucketRows, intervalMs);
   // Stacking is by data index, so every series keeps one entry per row, nulls included.
@@ -227,7 +263,7 @@ export function buildAnomalyBandOptions(
     tooltip: {
       trigger: "axis",
       axisPointer: { type: "line" },
-      formatter: tooltipFormatter(rows, labels),
+      formatter: tooltipFormatter(rows, labels, unit),
     },
     xAxis: {
       type: "time",
@@ -240,7 +276,10 @@ export function buildAnomalyBandOptions(
     yAxis: {
       type: "value",
       scale: true,
-      axisLabel: { color: colors.axis },
+      axisLabel: {
+        color: colors.axis,
+        formatter: (value: number) => formatUnitReading(value, unit, formatTick),
+      },
       splitLine: { lineStyle: { color: colors.grid, type: "dashed" } },
     },
     series: [

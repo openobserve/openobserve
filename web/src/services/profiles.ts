@@ -84,6 +84,33 @@ export interface ProfilesQueryBody {
   timeout?: number;
 }
 
+const decodeFilterPart = (part: string) => {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    // Matches the backend, which keeps a malformed escape verbatim.
+    return part;
+  }
+};
+
+/** Encodes filters as the backend's `k=v,k2=v2`, percent-encoding each side so a comma inside a value is not a pair separator. */
+export const encodeProfileFilters = (filters: ProfileFilter[]): string =>
+  filters
+    .filter((f) => f.key && f.value && f.op === "=")
+    .map((f) => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`)
+    .join(",");
+
+export const parseProfileFilters = (raw: string): ProfileFilter[] =>
+  raw
+    .split(",")
+    .map((pair) => pair.split("="))
+    .filter(([key, value]) => key && value)
+    .map(([key, value]) => ({
+      key: decodeFilterPart(key),
+      op: "=" as const,
+      value: decodeFilterPart(value),
+    }));
+
 const appendProfilesQuery = (
   query: URLSearchParams,
   payload: Omit<ProfilesQueryBody, "filters" | "step" | "max_nodes"> & {
@@ -99,11 +126,7 @@ const appendProfilesQuery = (
   if (payload.profile_unit) query.set("profile_unit", payload.profile_unit);
   if (payload.tag) query.set("tag", payload.tag);
   if (payload.filters?.length) {
-    // Percent-encode each side so a comma inside a value is not a pair separator.
-    const filters = payload.filters
-      .filter((f) => f.key && f.value && f.op === "=")
-      .map((f) => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`)
-      .join(",");
+    const filters = encodeProfileFilters(payload.filters);
     if (filters) query.set("filters", filters);
   }
 };

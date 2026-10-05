@@ -15,14 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- `embedded` renders the same header and body in place as a page (Logs Drill down). -->
+  <!-- `embedded` renders in place as a Logs mode; `fullPage` is the traces overlay page. -->
   <component
-    :is="embedded ? AnalysisPage : ODrawer"
+    :is="embedded ? AnalysisPage : fullPage ? TracesDrillDownPage : ODrawer"
     data-test="traces-analysis-dashboard-drawer"
-    bleed
+    v-bind="embedded || fullPage ? {} : { bleed: true, width: 80 }"
     v-model:open="isOpen"
-    :width="80"
-    :title="raw(drawerTitle)"
+    :title="fullPage ? t('traces.drillDown') : raw(drawerTitle)"
     @update:open="(v: boolean) => !v && onClose()"
   >
     <template #header-left>
@@ -325,6 +324,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import TracesDrillDownPage from "./TracesDrillDownPage.vue";
 import {
   ref,
   computed,
@@ -404,6 +404,7 @@ interface Props {
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
   embedded?: boolean; // Render as a page in place instead of a drawer
+  fullPage?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {

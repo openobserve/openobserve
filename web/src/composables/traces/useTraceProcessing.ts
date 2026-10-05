@@ -11,7 +11,6 @@ import {
   SpanKind,
   SpanStatus,
 } from "@/ts/interfaces/traces/span.types";
-import { type TraceMetadata, type ServiceBreakdown } from "@/ts/interfaces/traces/trace.types";
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useSpanServiceDetection } from "@/utils/traces/useSpanServiceDetection";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
@@ -67,7 +66,6 @@ export function useTraceProcessing(
         hasChildren: !!(node.spans && node.spans.length > 0),
         isExpanded: true,
         isSelected: false,
-        isOnCriticalPath: false,
         resolvedIdentity,
         color: getOrSetServiceColor(resolvedIdentity),
         durationMs: node.durationMs || 0,
@@ -124,7 +122,6 @@ export function useTraceProcessing(
         hasChildren: false,
         isExpanded: true,
         isSelected: false,
-        isOnCriticalPath: false,
         resolvedIdentity,
         color: getOrSetServiceColor(resolvedIdentity),
         durationMs: span.duration / 1000, // Convert from microseconds to milliseconds
@@ -185,143 +182,6 @@ export function useTraceProcessing(
 
     roots.forEach(traverse);
     return result;
-  };
-
-  /**
-   * Find critical path
-   */
-  const findCriticalPath = (rootSpans: EnrichedSpan[]): string[] => {
-    let longestPath: string[] = [];
-    let longestDuration = 0;
-
-    const traverse = (span: EnrichedSpan, path: string[], duration: number) => {
-      const newPath = [...path, span.span_id];
-      const newDuration = duration + span.durationMs;
-
-      if (span.children.length === 0) {
-        if (newDuration > longestDuration) {
-          longestDuration = newDuration;
-          longestPath = newPath;
-        }
-      } else {
-        span.children.forEach((child) => traverse(child, newPath, newDuration));
-      }
-    };
-
-    rootSpans.forEach((span) => traverse(span, [], 0));
-    return longestPath;
-  };
-
-  /**
-   * Calculate trace metadata
-   */
-  const calculateMetadata = (traceId: string, spanTree: EnrichedSpan[]): TraceMetadata => {
-    const allSpans = flattenSpanTree(spanTree);
-
-    if (allSpans.length === 0) {
-      throw new Error("Cannot calculate metadata for empty trace");
-    }
-
-    const services = new Set<string>();
-    const serviceSpans = new Map<string, number>();
-    const serviceDurations = new Map<string, number>();
-    const spanKinds = new Map<string, number>();
-    const errorServices = new Set<string>();
-    const errorMessages = new Set<string>();
-
-    let errorCount = 0;
-    let okCount = 0;
-    let unsetCount = 0;
-    let minTime = Infinity;
-    let maxTime = 0;
-
-    allSpans.forEach((span) => {
-      services.add(span.service_name);
-      serviceSpans.set(span.service_name, (serviceSpans.get(span.service_name) || 0) + 1);
-      serviceDurations.set(
-        span.service_name,
-        (serviceDurations.get(span.service_name) || 0) + span.durationMs,
-      );
-
-      const kind = span.span_kind || SpanKind.UNSPECIFIED;
-      spanKinds.set(kind, (spanKinds.get(kind) || 0) + 1);
-
-      if (span.span_status === SpanStatus.ERROR) {
-        errorCount++;
-        errorServices.add(span.service_name);
-        if (span.attributes?.["error.message"]) {
-          errorMessages.add(span.attributes["error.message"]);
-        }
-      } else if (span.span_status === SpanStatus.OK) {
-        okCount++;
-      } else {
-        unsetCount++;
-      }
-
-      minTime = Math.min(minTime, span.start_time);
-      maxTime = Math.max(maxTime, span.end_time);
-    });
-
-    const sorted = [...allSpans].sort((a, b) => b.durationMs - a.durationMs);
-    const slowestSpans = sorted.slice(0, 5);
-
-    const criticalPathIds = findCriticalPath(spanTree);
-    const criticalPathDuration = criticalPathIds.reduce((sum, id) => {
-      const span = allSpans.find((s) => s.span_id === id);
-      return sum + (span?.durationMs || 0);
-    }, 0);
-
-    const totalDuration = (maxTime - minTime) / 1000000;
-
-    return {
-      trace_id: traceId,
-      root_service: spanTree[0]?.service_name || "unknown",
-      root_operation: spanTree[0]?.operation_name || "unknown",
-      start_time: minTime,
-      end_time: maxTime,
-      duration_ms: totalDuration,
-      total_spans: allSpans.length,
-      error_spans: errorCount,
-      service_count: services.size,
-      services: Array.from(services),
-      service_spans: serviceSpans,
-      service_durations: serviceDurations,
-      span_kinds: spanKinds,
-      status_counts: { ok: okCount, error: errorCount, unset: unsetCount },
-      critical_path_duration: criticalPathDuration,
-      critical_path_percent: (criticalPathDuration / totalDuration) * 100,
-      slowest_spans: slowestSpans,
-      has_errors: errorCount > 0,
-      error_services: Array.from(errorServices),
-      error_messages: Array.from(errorMessages),
-    };
-  };
-
-  /**
-   * Calculate service breakdown
-   */
-  const calculateServiceBreakdown = (metadata: TraceMetadata): ServiceBreakdown[] => {
-    const breakdown: ServiceBreakdown[] = [];
-
-    metadata.services.forEach((serviceName) => {
-      const spanCount = metadata.service_spans.get(serviceName) || 0;
-      const totalDuration = metadata.service_durations.get(serviceName) || 0;
-      const percentage = (totalDuration / metadata.duration_ms) * 100;
-      const hasErrors = metadata.error_services.includes(serviceName);
-
-      breakdown.push({
-        service_name: serviceName,
-        span_count: spanCount,
-        total_duration_ms: totalDuration,
-        percentage,
-        color: getOrSetServiceColor(serviceName),
-        has_errors: hasErrors,
-        error_count: hasErrors ? metadata.error_spans : 0,
-      });
-    });
-
-    breakdown.sort((a, b) => b.total_duration_ms - a.total_duration_ms);
-    return breakdown;
   };
 
   /**
@@ -406,9 +266,6 @@ export function useTraceProcessing(
     // Methods
     buildSpanTree,
     flattenSpanTree,
-    findCriticalPath,
-    calculateMetadata,
-    calculateServiceBreakdown,
     filterSpans,
 
     // Computed

@@ -101,7 +101,7 @@ export const useSearchBar = (t: TranslateFn) => {
       )
         .then((views: any[]) => {
           searchObj.loadingSavedView = false;
-          searchObj.data.savedViews = views;
+          searchObj.data.savedViews = views.filter((v) => v.view_type !== "traces");
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;

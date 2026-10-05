@@ -4197,6 +4197,7 @@ export default defineComponent({
         const viewObj: any = {
           data: getSearchObj(),
           view_name: viewName,
+          view_type: "logs",
         };
 
         return createSavedView

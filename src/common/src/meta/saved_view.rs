@@ -25,6 +25,10 @@ pub struct CreateViewRequest {
 
     /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
+
+    /// View kind, `logs` or `traces`; absent means `logs`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -44,6 +48,8 @@ pub struct View {
     pub data: serde_json::Value,
     pub view_id: String,
     pub view_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_type: Option<String>,
 }
 
 /// Save the bandwidth for a given view, without sending the actual data
@@ -53,6 +59,8 @@ pub struct ViewWithoutData {
     pub org_id: String,
     pub view_id: String,
     pub view_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -86,6 +94,7 @@ mod tests {
         let request = CreateViewRequest {
             data: serde_json::json!({"key": "value", "number": 42}),
             view_name: "test-view".to_string(),
+            view_type: None,
         };
 
         let serialized = serde_json::to_string(&request);
@@ -134,6 +143,7 @@ mod tests {
             data: serde_json::json!({"dashboard": "main"}),
             view_id: "view456".to_string(),
             view_name: "main-dashboard".to_string(),
+            view_type: None,
         };
 
         let serialized = serde_json::to_string(&view);
@@ -159,6 +169,7 @@ mod tests {
             org_id: "org123".to_string(),
             view_id: "view456".to_string(),
             view_name: "main-dashboard".to_string(),
+            view_type: None,
         };
 
         let serialized = serde_json::to_string(&view);
@@ -185,11 +196,13 @@ mod tests {
                     org_id: "org123".to_string(),
                     view_id: "view1".to_string(),
                     view_name: "dashboard1".to_string(),
+                    view_type: None,
                 },
                 ViewWithoutData {
                     org_id: "org123".to_string(),
                     view_id: "view2".to_string(),
                     view_name: "dashboard2".to_string(),
+                    view_type: None,
                 },
             ],
         };
@@ -272,5 +285,51 @@ mod tests {
         assert_eq!(deserialized.org_id, "org123");
         assert_eq!(deserialized.view_id, "view456");
         assert_eq!(deserialized.view_name, "new-dashboard");
+    }
+
+    #[test]
+    fn test_view_type_round_trips_when_set() {
+        let request = CreateViewRequest {
+            data: serde_json::json!({}),
+            view_name: "v".to_string(),
+            view_type: Some("traces".to_string()),
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["view_type"], "traces");
+        let back: CreateViewRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(back.view_type.as_deref(), Some("traces"));
+
+        let view = View {
+            org_id: "o".to_string(),
+            data: serde_json::json!({}),
+            view_id: "id".to_string(),
+            view_name: "v".to_string(),
+            view_type: Some("traces".to_string()),
+        };
+        let back: ViewWithoutData =
+            serde_json::from_str(&serde_json::to_string(&view).unwrap()).unwrap();
+        assert_eq!(back.view_type.as_deref(), Some("traces"));
+    }
+
+    #[test]
+    fn test_view_type_omitted_when_unset() {
+        let view = ViewWithoutData {
+            org_id: "o".to_string(),
+            view_id: "id".to_string(),
+            view_name: "v".to_string(),
+            view_type: None,
+        };
+        let json = serde_json::to_value(&view).unwrap();
+        assert!(json.get("view_type").is_none());
+    }
+
+    #[test]
+    fn test_legacy_json_without_view_type_deserialises_as_none() {
+        let legacy = r#"{"org_id":"o","data":{},"view_id":"id","view_name":"v"}"#;
+        let view: View = serde_json::from_str(legacy).unwrap();
+        assert!(view.view_type.is_none());
+        let request: CreateViewRequest =
+            serde_json::from_str(r#"{"data":{},"view_name":"v"}"#).unwrap();
+        assert!(request.view_type.is_none());
     }
 }

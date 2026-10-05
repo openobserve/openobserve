@@ -389,5 +389,6 @@ export const usePanelSearchHandlers = ({
     handleSearchClose,
     handleSearchReset,
     handleSearchError,
+    clearHitsBuffer,
   };
 };

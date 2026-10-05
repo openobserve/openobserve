@@ -297,6 +297,32 @@ describe("TracesAnalysisDashboard", () => {
       expect(drawer.props("width")).toBe(80);
     });
 
+    it("should render the full-page shell instead of ODrawer when fullPage is set", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ fullPage: true });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(false);
+      const page = wrapper.findComponent({ name: "TracesDrillDownPage" });
+      expect(page.exists()).toBe(true);
+      expect(page.attributes("data-test")).toBe("traces-analysis-dashboard-drawer");
+      expect(page.props("title")).toBe("Drill down");
+    });
+
+    it("should emit close when the full-page Back button is clicked", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ fullPage: true });
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-drill-down-back-btn"]').trigger("click");
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
+    it("should keep the analysis-type title on the drawer (logs) rather than Drill down", () => {
+      const drawer = wrapper.findComponent({ name: "ODrawer" });
+      expect(drawer.props("title")).not.toBe("Drill down");
+    });
+
     it("should pass a non-empty title to ODrawer for the 'duration' analysisType", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
       expect(drawer.props("title")).toBeTruthy();
