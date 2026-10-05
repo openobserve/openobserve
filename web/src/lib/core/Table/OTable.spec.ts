@@ -32,6 +32,7 @@ import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
+import { raw } from "@/types/i18n";
 
 interface TestRow {
   id: number;
@@ -1296,6 +1297,112 @@ describe("OTable", () => {
       await nextTick();
 
       expect(bubbles()).toHaveLength(0);
+    });
+  });
+
+  describe("cut-off header text", () => {
+    const setWidths = (el: Element, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    };
+    const bubbles = () => document.body.querySelectorAll('[data-test="o-tooltip-content"]');
+    const hoverPastDelay = async (el: Element) => {
+      el.dispatchEvent(new MouseEvent("mouseenter"));
+      vi.advanceTimersByTime(700);
+      await nextTick();
+      await nextTick();
+    };
+    const withHelp = (subLabel?: string) =>
+      makeColumns().map((c) =>
+        c.id === "email"
+          ? {
+              ...c,
+              // Without row reorder, only a sortable header draws its sub-label.
+              sortable: !!subLabel,
+              meta: {
+                headerTooltip: raw("Where we send alerts"),
+                ...(subLabel ? { headerSubLabel: raw(subLabel) } : {}),
+              },
+            }
+          : c,
+      );
+    const th = () => wrapper.find('[data-test="o2-table-th-email"]').element;
+    const label = () => th().querySelector("[data-o2-th-label]")!;
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("shows a cut column name in a cut-only tooltip instead of an always-on title", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      expect(label().getAttribute("title")).toBeNull();
+      expect(label().getAttribute("data-o-tooltip-trigger")).toBe("overflow");
+
+      setWidths(label(), 400, 120);
+      await hoverPastDelay(label());
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].textContent).toContain("Email");
+    });
+
+    it("opens nothing on a column name that fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+
+      await hoverPastDelay(label());
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("starts the help bubble with a cut name, so only one bubble opens", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp() },
+        attachTo: document.body,
+      });
+      expect(label().hasAttribute("data-o-tooltip-off")).toBe(true);
+      setWidths(label(), 400, 120);
+
+      await hoverPastDelay(th());
+
+      expect(bubbles()).toHaveLength(1);
+      const name = bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]');
+      expect(name?.textContent).toBe("Email");
+      expect(bubbles()[0].textContent).toContain("Where we send alerts");
+    });
+
+    it("leaves the help bubble unchanged when the name fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp() },
+        attachTo: document.body,
+      });
+
+      await hoverPastDelay(th());
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]')).toBeNull();
+      expect(bubbles()[0].textContent).toContain("Where we send alerts");
+      expect(bubbles()[0].textContent).not.toContain("Email");
+    });
+
+    it("adds a cut sub-label under the name in the help bubble", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp("delivery address") },
+        attachTo: document.body,
+      });
+      setWidths(th().querySelector("[data-o2-th-sublabel]")!, 400, 120);
+
+      await hoverPastDelay(th());
+
+      expect(
+        bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]')?.textContent,
+      ).toBe("Email");
+      expect(
+        bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-sublabel"]')?.textContent,
+      ).toBe("delivery address");
     });
   });
 
