@@ -125,8 +125,18 @@ macro_rules! enterprise_value {
 
 #[cfg(feature = "enterprise")]
 const LOGIN_STATE_COOKIE: &str = "o2_login_state";
+// 30 minutes: long enough to survive a slow IdP interaction (MFA, approval step, or filling out
+// Dex's "create account" form from an invite) without the browser dropping the cookie before the
+// user gets back to us.
 #[cfg(feature = "enterprise")]
-const LOGIN_STATE_MAX_AGE_SECS: i64 = 600;
+const LOGIN_STATE_MAX_AGE_SECS: i64 = 1800;
+// A browser can have more than one login attempt in flight at once (e.g. the same invite link
+// opened in two tabs, or a retry after going back). States are kept as a list in one cookie
+// rather than overwriting a single value, so a second attempt doesn't invalidate the first.
+#[cfg(feature = "enterprise")]
+const LOGIN_STATE_SEPARATOR: char = ',';
+#[cfg(feature = "enterprise")]
+const MAX_CONCURRENT_LOGIN_STATES: usize = 5;
 
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
@@ -1283,6 +1293,16 @@ pub async fn redirect(
             }
             log::info!("Redirecting user after processing token");
 
+            // Only drop this attempt's state, not the whole cookie — another tab may still have
+            // a login in flight and share this same cookie.
+            let remaining_states =
+                remove_login_state(state_cookie, query.get("state").map_or("", |s| s.as_str()));
+            let state_cookie_max_age = if remaining_states.is_empty() {
+                0
+            } else {
+                LOGIN_STATE_MAX_AGE_SECS
+            };
+
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Response::builder()
@@ -1291,7 +1311,7 @@ pub async fn redirect(
                 .header(header::SET_COOKIE, auth_cookie.to_string())
                 .header(
                     header::SET_COOKIE,
-                    login_state_cookie("", 0, &cfg).to_string(),
+                    login_state_cookie(&remaining_states, state_cookie_max_age, &cfg).to_string(),
                 )
                 .body(Body::empty())
                 .unwrap()
@@ -1310,7 +1330,7 @@ pub async fn redirect(
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn dex_login() -> impl IntoResponse {
+pub async fn dex_login(cookies: CookieJar) -> impl IntoResponse {
     use o2_dex::meta::auth::PreLoginData;
 
     if block_feature_for_report_failure().await {
@@ -1323,16 +1343,21 @@ pub async fn dex_login() -> impl IntoResponse {
     let state = login_data.state.clone();
     let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
+    let existing = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
+    let cookie_value = add_login_state(existing, &state);
+
     with_login_state_cookie(
         common::meta::http::HttpResponse::json(login_data.url),
-        &state,
+        &cookie_value,
     )
 }
 
 /// Binds the login `state` to this browser so `/config/redirect` rejects a code started elsewhere.
+/// `value` is the full cookie value (see `add_login_state`/`remove_login_state`), not a single
+/// state, since one browser can have more than one login attempt in flight at a time.
 #[cfg(feature = "enterprise")]
-pub fn with_login_state_cookie(mut resp: Response, state: &str) -> Response {
-    let cookie = login_state_cookie(state, LOGIN_STATE_MAX_AGE_SECS, &get_config());
+pub fn with_login_state_cookie(mut resp: Response, value: &str) -> Response {
+    let cookie = login_state_cookie(value, LOGIN_STATE_MAX_AGE_SECS, &get_config());
     match header::HeaderValue::from_str(&cookie.to_string()) {
         Ok(v) => {
             resp.headers_mut().append(header::SET_COOKIE, v);
@@ -1579,18 +1604,55 @@ fn login_state_cookie(state: &str, max_age_secs: i64, conf: &Config) -> Cookie<'
 }
 
 #[cfg(feature = "enterprise")]
+fn states_equal(a: &str, a_state: &str) -> bool {
+    if a.is_empty() || a.len() != a_state.len() {
+        return false;
+    }
+    a.bytes()
+        .zip(a_state.bytes())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
+}
+
+/// Appends `state` to the cookie's list of in-flight login states, dropping the oldest entries
+/// past `MAX_CONCURRENT_LOGIN_STATES` so the cookie can't grow unbounded.
+#[cfg(feature = "enterprise")]
+fn add_login_state(existing: Option<&str>, state: &str) -> String {
+    let mut states: Vec<&str> = existing
+        .map(|c| c.split(LOGIN_STATE_SEPARATOR).filter(|s| !s.is_empty()))
+        .into_iter()
+        .flatten()
+        .collect();
+    states.push(state);
+    if states.len() > MAX_CONCURRENT_LOGIN_STATES {
+        let drop = states.len() - MAX_CONCURRENT_LOGIN_STATES;
+        states.drain(0..drop);
+    }
+    states.join(&LOGIN_STATE_SEPARATOR.to_string())
+}
+
+/// Removes `state` from the cookie's list, leaving any other still-in-flight attempts (e.g. a
+/// second tab) untouched. Returns an empty string once no attempt remains.
+#[cfg(feature = "enterprise")]
+fn remove_login_state(existing: Option<&str>, state: &str) -> String {
+    existing
+        .map(|c| {
+            c.split(LOGIN_STATE_SEPARATOR)
+                .filter(|s| !s.is_empty() && !states_equal(s, state))
+                .collect::<Vec<_>>()
+                .join(&LOGIN_STATE_SEPARATOR.to_string())
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(feature = "enterprise")]
 fn login_state_matches(cookie: Option<&str>, state: &str) -> bool {
     let Some(cookie) = cookie else {
         return false;
     };
-    if cookie.is_empty() || cookie.len() != state.len() {
-        return false;
-    }
     cookie
-        .bytes()
-        .zip(state.bytes())
-        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
-        == 0
+        .split(LOGIN_STATE_SEPARATOR)
+        .any(|candidate| states_equal(candidate, state))
 }
 
 #[cfg(feature = "enterprise")]
@@ -1601,11 +1663,20 @@ async fn consume_login_state(
     let Some(state) = state else {
         return Err("no state in request");
     };
-    if !login_state_matches(cookie, state)
-        || openobserve_core::kv::get(PKCE_STATE_ORG, state)
-            .await
-            .is_err()
-    {
+    if !login_state_matches(cookie, state) {
+        log::warn!(
+            "[SSO] login state cookie missing or did not contain the state from the dex \
+             redirect (cookie present: {}); this browser likely never completed /config/login, \
+             or its o2_login_state cookie expired/was dropped before the user returned",
+            cookie.is_some()
+        );
+        return Err("invalid state in request");
+    }
+    if openobserve_core::kv::get(PKCE_STATE_ORG, state).await.is_err() {
+        log::warn!(
+            "[SSO] login state cookie matched but the state was not found in the PKCE store \
+             (already consumed, or never written)"
+        );
         return Err("invalid state in request");
     }
     let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
@@ -2390,7 +2461,10 @@ mod tests {
         assert_eq!(cookie.secure(), Some(true));
         assert_eq!(cookie.same_site(), Some(SameSite::Lax));
         assert_eq!(cookie.path(), Some("/"));
-        assert_eq!(cookie.max_age(), Some(time::Duration::seconds(600)));
+        assert_eq!(
+            cookie.max_age(),
+            Some(time::Duration::seconds(LOGIN_STATE_MAX_AGE_SECS))
+        );
 
         conf.auth.cookie_secure_only = false;
         conf.auth.cookie_same_site_lax = false;
@@ -2417,5 +2491,55 @@ mod tests {
             consume_login_state(Some(&state), Some("abd")).await,
             Err("invalid state in request")
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_add_login_state_keeps_other_in_flight_attempts() {
+        // A second tab's login must not clobber a first tab's still-pending one.
+        let value = add_login_state(None, "state-a");
+        assert_eq!(value, "state-a");
+        let value = add_login_state(Some(&value), "state-b");
+        assert_eq!(value, "state-a,state-b");
+        assert!(login_state_matches(Some(&value), "state-a"));
+        assert!(login_state_matches(Some(&value), "state-b"));
+        assert!(!login_state_matches(Some(&value), "state-c"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_add_login_state_caps_list_size() {
+        let mut value: Option<String> = None;
+        for i in 0..(MAX_CONCURRENT_LOGIN_STATES + 2) {
+            value = Some(add_login_state(value.as_deref(), &format!("state-{i}")));
+        }
+        let value = value.unwrap();
+        assert_eq!(
+            value.split(LOGIN_STATE_SEPARATOR).count(),
+            MAX_CONCURRENT_LOGIN_STATES
+        );
+        // oldest entries were dropped
+        assert!(!login_state_matches(Some(&value), "state-0"));
+        // the most recent entry survived
+        assert!(login_state_matches(
+            Some(&value),
+            &format!("state-{}", MAX_CONCURRENT_LOGIN_STATES + 1)
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_remove_login_state_only_drops_the_consumed_entry() {
+        let value = add_login_state(None, "state-a");
+        let value = add_login_state(Some(&value), "state-b");
+        let remaining = remove_login_state(Some(&value), "state-a");
+        assert_eq!(remaining, "state-b");
+        assert!(login_state_matches(Some(&remaining), "state-b"));
+        assert!(!login_state_matches(Some(&remaining), "state-a"));
+
+        let remaining = remove_login_state(Some(&remaining), "state-b");
+        assert_eq!(remaining, "");
+
+        assert_eq!(remove_login_state(None, "state-a"), "");
     }
 }
