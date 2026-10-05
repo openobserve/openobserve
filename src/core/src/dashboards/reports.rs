@@ -1286,7 +1286,8 @@ mod tests {
     #[tokio::test]
     async fn update_by_id_rejects_the_schedules_that_save_rejects() {
         let saved = config::CONFIG.load_full();
-        let mut cfg = config::Config::init().unwrap();
+        // Raw Config::init() skips limit defaults, leaving the postgres pool zero-sized.
+        let mut cfg = config::config::init();
         cfg.common.report_server_url = "http://report-server.example".to_string();
         config::CONFIG.store(std::sync::Arc::new(cfg));
         let mut outcomes = vec![];
