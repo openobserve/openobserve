@@ -248,6 +248,35 @@ class FunctionsImportExportPage {
     ).toContainText(text, { timeout: 15000 });
   }
 
+  /**
+   * Wait for a started import to finish writing.
+   *
+   * The Import button is disabled for the duration of the run, so its
+   * re-enabling is the only signal every result line has been pushed. Absence
+   * assertions are meaningless before this: `toHaveCount(0)` is satisfied
+   * immediately, before the controls have rendered.
+   */
+  async waitForImportSettled() {
+    await expect(this.importJsonButton).toBeEnabled({ timeout: 60000 });
+  }
+
+  /** Assert an item was NOT offered as an inline-fixable error. */
+  async expectNoImportError(itemIndex, errorIndex) {
+    await expect(
+      this.page.locator(`[data-test="function-import-error-${itemIndex}-${errorIndex}"]`),
+    ).toHaveCount(0);
+  }
+
+  /** Assert neither the language control nor the body editor is offered for an item. */
+  async expectNoInlineFixControls(itemIndex) {
+    await expect(
+      this.page.locator(`[data-test="function-import-trans-type-input-${itemIndex}"]`),
+    ).toHaveCount(0);
+    await expect(
+      this.page.locator(`[data-test="function-import-body-input-${itemIndex}"]`),
+    ).toHaveCount(0);
+  }
+
   /** Assert the import screen is still mounted (no redirect back to the list). */
   async expectStillOnImportScreen() {
     await expect(this.importJsonButton).toBeVisible({ timeout: 10000 });

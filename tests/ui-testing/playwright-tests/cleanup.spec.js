@@ -206,6 +206,7 @@ test.describe("Pre-Test Cleanup", () => {
       /^fn_export_/,                 // single, bulk and narrow-viewport export fixtures
       /^fn_clash_/,                  // seeded functions used to provoke a name clash
       /^fn_regr_nonobj_/             // non-object entry repaired by the inline fixers
+      /^fn_regr_reject_/             // rejections that cannot be fixed inline (#15069)
     ];
 
     // Patterns from Functions folder tests (row-expansion.spec.js)
