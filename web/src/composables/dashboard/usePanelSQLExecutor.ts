@@ -750,7 +750,9 @@ export const usePanelSQLExecutor = (ctx: {
 
             // Wait for annotations to complete
             if (annotationsPromise) {
-              state.annotations = await annotationsPromise;
+              const annotations = await annotationsPromise;
+              if (runToken !== sqlRunToken) return;
+              state.annotations = annotations;
             }
 
             // set loading to false
@@ -879,7 +881,9 @@ export const usePanelSQLExecutor = (ctx: {
         },
       ];
 
-      state.annotations = await annotationsPromise;
+      const annotations = await annotationsPromise;
+      if (runToken !== sqlRunToken) return;
+      state.annotations = annotations;
       state.loading = false;
       return;
     }
@@ -1240,5 +1244,11 @@ export const usePanelSQLExecutor = (ctx: {
     state.annotations = await annotationsPromise;
   };
 
-  return { executeSQL, executeMultiSQL };
+  // Lets the loader supersede the running stream as soon as it schedules a rerun, not after its debounce.
+  const invalidateRun = () => {
+    sqlRunToken++;
+    clearHitsBuffer();
+  };
+
+  return { executeSQL, executeMultiSQL, invalidateRun };
 };

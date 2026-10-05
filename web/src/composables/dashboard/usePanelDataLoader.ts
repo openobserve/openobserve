@@ -365,6 +365,8 @@ export const usePanelDataLoader = (
         abortController.abort();
       }
 
+      invalidateRun();
+
       // Create a new AbortController for the new operation
       abortController = new AbortController();
       // Checking if there are queries to execute
@@ -634,7 +636,7 @@ export const usePanelDataLoader = (
     removeTraceId,
   });
 
-  const { executeSQL, executeMultiSQL } = usePanelSQLExecutor({
+  const { executeSQL, executeMultiSQL, invalidateRun } = usePanelSQLExecutor({
     state,
     panelSchema,
     store,

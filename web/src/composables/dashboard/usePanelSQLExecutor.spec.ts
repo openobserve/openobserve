@@ -727,6 +727,41 @@ describe("usePanelSQLExecutor", () => {
       expect(state.isPartialData).toBe(false);
     });
 
+    it.each([
+      { name: "single query", queries: [query("SELECT * FROM logs")], multi: false },
+      { name: "multi-query", queries: cases[1].queries, multi: true },
+    ])(
+      "$name: a prefetched run superseded while awaiting annotations does not complete",
+      async ({ queries, multi }) => {
+        let resolveAnnotations!: (v: any) => void;
+        const { ctx, state } = makeCtx({
+          panelSchema: makePanelSchema(queries),
+          shouldFetchAnnotations: vi.fn(() => true),
+          refreshAnnotations: vi
+            .fn()
+            .mockImplementationOnce(() => new Promise((r) => (resolveAnnotations = r)))
+            .mockResolvedValue([]),
+        });
+        const executor = usePanelSQLExecutor(ctx);
+        const run = () =>
+          multi
+            ? executor.executeMultiSQL(0, 300_000_000, null, "logs")
+            : executor.executeSQL(0, 300_000_000, null);
+        ctx.searchResponse.value = { hits: [{ value: "prefetched" }] };
+        const runA = run();
+        await vi.waitFor(() => expect(ctx.refreshAnnotations).toHaveBeenCalled());
+        ctx.searchResponse.value = null;
+        await run();
+        state.loading = true;
+
+        resolveAnnotations([{ id: "stale-annotation" }]);
+        await runA;
+
+        expect(state.loading).toBe(true);
+        expect(state.annotations).toEqual([]);
+      },
+    );
+
     it("multi-query: the searchResponse early return still supersedes an in-flight stream", async () => {
       const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({
         panelSchema: makePanelSchema(cases[1].queries),
