@@ -317,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :def="def"
               :result="result"
               :suggestions="suggestions"
+              :suggestions-state="suggestionsState"
               :state="funnelPanel"
               :sampled="1"
               :events="events"
@@ -326,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-time="!!def.breakdown"
               @update:def="(d) => (pa.funnel.value = d)"
               @dropoff="openDropoff"
+              @suggestions-retry="compute(true)"
             />
           </template>
           <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
@@ -403,7 +405,7 @@ import useFunnelDraft, {
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
-import useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
+import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
@@ -571,6 +573,19 @@ const suggestions = computed(() =>
           units: Number(r.units),
         }))
     : [],
+);
+// A failed suggestions fetch must not look the same as "nothing to suggest" — only surface the
+// error once it belongs to the funnel currently on screen, same key guard as `suggestions` above.
+const idleSuggestionsState: PanelState<unknown> = {
+  status: "idle",
+  rows: [],
+  error: null,
+  partial: null,
+  key: null,
+  sampled: 1,
+};
+const suggestionsState = computed(() =>
+  nextPanel.value.key === funnelKey.value ? nextPanel.value : idleSuggestionsState,
 );
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
