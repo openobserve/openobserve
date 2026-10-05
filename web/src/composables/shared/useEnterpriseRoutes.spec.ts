@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import enLocale from "@/locales/languages/en-US.json";
+import store from "@/stores";
 
 /** Every `meta.titleKey` in a route tree, children included. */
 const collectTitleKeys = (routes: any[]): string[] =>
@@ -521,6 +522,11 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "false";
+      // These guards now check feature access (via `withFeatureGate`) before
+      // ever reaching `routeGuard` — the groups/roles/quota routes below need
+      // RBAC unlocked too, or they'd redirect to the locked page instead,
+      // and `routeGuard` would never be reached at all.
+      store.state.zoConfig = { ...store.state.zoConfig, rbac_enabled: true };
     });
 
     // Test 45: Should call routeGuard for groups route

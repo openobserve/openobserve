@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
        and submenu-group triggers (<button>, used by ONavGroup) all share the
        exact same tile markup and styling — a group tile is literally a MenuLink. -->
-  <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
+  <component
+    :is="rootComponent"
+    v-bind="{ ...$attrs, ...rootProps }"
+    :class="rootClass"
+    @click="onRootClick"
+  >
     <div
       class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5 max-md:flex-row max-md:items-center max-md:gap-3 max-md:px-1"
     >
@@ -88,6 +93,13 @@ import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
+  // The template now has two root-level nodes (the tile + the sibling locked
+  // tooltip), so Vue's automatic $attrs/listener inheritance is disabled
+  // UNCONDITIONALLY for a fragment-rooted component — flag or not, it only
+  // ever applies to a single root. `inheritAttrs: false` just silences the
+  // dev warning for what's already true; the real fix is binding `$attrs`
+  // explicitly onto the tile below, which is the only place it can land.
+  inheritAttrs: false,
   components: { OIcon, LockedFeatureTooltip },
   props: {
     title: {

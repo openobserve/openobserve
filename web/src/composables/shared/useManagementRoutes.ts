@@ -9,15 +9,29 @@ import {
 const Settings = () => import("@/components/settings/index.vue");
 
 /**
- * Real component when the edition unlocks `key`, else the shared locked
- * placeholder — resolved on EACH navigation (not once at router-build time),
- * so a key that depends on async-loaded state never freezes a stale verdict.
- * None of this file's keys need `rbac`, so an edition-only context is enough.
+ * Wraps a route guard so navigation redirects to the shared locked-feature
+ * page instead of proceeding, when the edition doesn't unlock `key`.
+ *
+ * This has to be a GUARD, not a choice of `component:` — vue-router
+ * permanently overwrites a route record's resolved component with whatever
+ * its lazy loader first resolves to (see `extractComponentsGuards` in its
+ * source: `record.components[name] = resolvedComponent`), so a key decided
+ * by picking between two components freezes at whichever one resolved on the
+ * FIRST navigation, for the rest of the session. A guard has no such cache —
+ * it re-runs on every navigation — so it's the only place this can safely
+ * depend on state that might still be loading (not an issue for the
+ * build-time-only keys below, but the same helper is shared with
+ * useEnterpriseRoutes.ts, where "rbac" does depend on such state).
  */
-const gatedComponent = (key: FeatureKey, real: () => Promise<any>) => () =>
-  checkFeatureAccess(key, buildFeatureGateContext()).allowed
-    ? real()
-    : import("@/components/EnterpriseFeatureLocked.vue");
+const withFeatureGate =
+  (key: FeatureKey, guard: (to: any, from: any, next: any) => void) =>
+  (to: any, from: any, next: any) => {
+    if (!checkFeatureAccess(key, buildFeatureGateContext()).allowed) {
+      next({ name: "enterpriseFeatureLocked", query: { feature: key } });
+      return;
+    }
+    guard(to, from, next);
+  };
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -84,6 +98,18 @@ const useManagementRoutes = () => {
     },
   ];
 
+  // Shared stand-in page for any enterprise/cloud-only route this build
+  // doesn't unlock — every `withFeatureGate` redirect lands here.
+  routes.push({
+    path: "enterprise-locked",
+    name: "enterpriseFeatureLocked",
+    component: () => import("@/components/EnterpriseFeatureLocked.vue"),
+    meta: { titleKey: "enterpriseFeature.lockedTitle" },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
   // Public synthetics locations are the registry the Lambda venue dispatches
   // against, and synthetics ships in OSS — so this registers in every build. The
   // page itself lists public rows only; private locations stay enterprise.
@@ -102,73 +128,48 @@ const useManagementRoutes = () => {
     },
   });
 
-  // LLM Model Pricing, LLM Providers and GenAI Agent Mapping (used by the AI
+  // LLM Model Pricing, LLM Providers, GenAI Agent Mapping (used by the AI
   // Observability / Online Evals flows), and the enterprise-only operations/
-  // security pages below, are always registered now — the component resolves
-  // to the shared locked placeholder (see `gatedComponent`) when the edition
-  // doesn't unlock them, so the section is reachable (nav + direct URL) but
-  // inert rather than absent.
+  // security pages below are all always registered; a direct URL redirects
+  // to the shared locked page (see `withFeatureGate`) when the edition
+  // doesn't unlock them, instead of landing on the real page or a 404.
   routes[0].children.push({
     path: "model_pricing",
     name: "modelPricing",
     meta: {
       keepAlive: true,
       titleKey: "settings.llmModelPricing",
-      featureKey: "modelPricing",
     },
-    component: gatedComponent(
-      "modelPricing",
-      () => import("@/components/settings/ModelPricingList.vue"),
-    ),
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
+    component: () => import("@/components/settings/ModelPricingList.vue"),
+    beforeEnter: withFeatureGate("modelPricing", routeGuard),
   });
   routes[0].children.push({
     path: "model_pricing/edit",
     name: "modelPricingEditor",
     meta: {
       titleKey: "routeTitles.modelPricingEditor",
-      featureKey: "modelPricing",
     },
-    component: gatedComponent(
-      "modelPricing",
-      () => import("@/components/settings/ModelPricingEditor.vue"),
-    ),
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
+    component: () => import("@/components/settings/ModelPricingEditor.vue"),
+    beforeEnter: withFeatureGate("modelPricing", routeGuard),
   });
   routes[0].children.push({
     path: "llm_providers",
     name: "llmProviders",
-    component: gatedComponent(
-      "llmProviders",
-      () => import("@/components/settings/LlmProvidersSettings.vue"),
-    ),
+    component: () => import("@/components/settings/LlmProvidersSettings.vue"),
     meta: {
       titleKey: "llmProviders.title",
-      featureKey: "llmProviders",
     },
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
+    beforeEnter: withFeatureGate("llmProviders", routeGuard),
   });
   routes[0].children.push({
     path: "gen_ai_agent_mapping",
     name: "genAiAgentMapping",
-    component: gatedComponent(
-      "genAiAgentMapping",
-      () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
-    ),
+    component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
     meta: {
       keepAlive: true,
       titleKey: "settings.genAiAgentMapping.title",
-      featureKey: "genAiAgentMapping",
     },
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
+    beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
   });
   // Alert Sources moved to a flat top-level route (router.ts, name
   // "alertSources") — no longer pushed here. It used to be conditional on
@@ -178,174 +179,115 @@ const useManagementRoutes = () => {
   // This batch is self-hosted-only — it does not exist on Cloud at all (not
   // even locked): Cloud users can't "upgrade" into managing their own nodes,
   // license, or cipher keys, so a pure-cloud build keeps excluding it
-  // entirely, exactly as it did before `gatedComponent` existed. OSS keeps
-  // registering it (locked); self-hosted enterprise gets the real pages.
+  // entirely, exactly as it did before this gating existed. OSS keeps
+  // registering it (redirects to the locked page); self-hosted enterprise
+  // gets the real pages.
   if (config.isEnterprise == "true" || config.isCloud != "true") {
     routes[0].children.push(
       ...[
         {
           path: "query_management",
           name: "query_management",
-          component: gatedComponent(
-            "queryManagement",
-            () => import("@/components/queries/RunningQueries.vue"),
-          ),
+          component: () => import("@/components/queries/RunningQueries.vue"),
           meta: {
             keepAlive: true,
             titleKey: "settings.queryManagement",
-            featureKey: "queryManagement",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("queryManagement", routeGuard),
         },
         {
           path: "cipher_keys",
           name: "cipherKeys",
-          component: gatedComponent(
-            "cipherKeys",
-            () => import("@/components/settings/CipherKeys.vue"),
-          ),
+          component: () => import("@/components/settings/CipherKeys.vue"),
           meta: {
             keepAlive: true,
             titleKey: "settings.cipherKeys",
-            featureKey: "cipherKeys",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
         {
           path: "ai_toolsets",
           name: "aiToolsets",
-          component: gatedComponent(
-            "aiToolsets",
-            () => import("@/components/settings/AiToolsets.vue"),
-          ),
+          component: () => import("@/components/settings/AiToolsets.vue"),
           meta: {
             keepAlive: true,
             titleKey: "aiToolset.header",
-            featureKey: "aiToolsets",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("aiToolsets", routeGuard),
         },
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
           meta: {
             titleKey: "pipeline_destinations.header",
-            featureKey: "pipelineDestinations",
           },
-          component: gatedComponent(
-            "pipelineDestinations",
-            () => import("@/components/alerts/PipelinesDestinationList.vue"),
-          ),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
+          beforeEnter: withFeatureGate("pipelineDestinations", routeGuard),
         },
         {
           path: "storage_settings",
           name: "storageSettings",
-          component: gatedComponent(
-            "storageSettings",
-            () => import("@/components/settings/OrgStorageSettings.vue"),
-          ),
+          component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             titleKey: "routeTitles.storageSettings",
-            featureKey: "storageSettings",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("storageSettings", routeGuard),
         },
         {
           path: "nodes",
           name: "nodes",
-          component: gatedComponent("nodes", () => import("@/components/settings/Nodes.vue")),
+          component: () => import("@/components/settings/Nodes.vue"),
           meta: {
             keepAlive: true,
             titleKey: "settings.nodes",
-            featureKey: "nodes",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("nodes", routeGuard),
         },
         {
           path: "domain_management",
           name: "domainManagement",
-          component: gatedComponent(
-            "domainManagement",
-            () => import("@/components/settings/DomainManagement.vue"),
-          ),
+          component: () => import("@/components/settings/DomainManagement.vue"),
           meta: {
             keepAlive: true,
             titleKey: "routeTitles.domainManagement",
-            featureKey: "domainManagement",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("domainManagement", routeGuard),
         },
         {
           path: "regex_patterns",
           name: "regexPatterns",
-          component: gatedComponent(
-            "regexPatterns",
-            () => import("@/components/settings/RegexPatternList.vue"),
-          ),
+          component: () => import("@/components/settings/RegexPatternList.vue"),
           meta: {
             keepAlive: true,
             titleKey: "routeTitles.regexPatterns",
-            featureKey: "regexPatterns",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("regexPatterns", routeGuard),
         },
         {
           path: "password_policy",
           name: "passwordPolicy",
-          component: gatedComponent(
-            "passwordPolicy",
-            () => import("@/components/settings/PasswordPolicy.vue"),
-          ),
+          component: () => import("@/components/settings/PasswordPolicy.vue"),
           meta: {
             keepAlive: true,
             titleKey: "routeTitles.passwordPolicy",
-            featureKey: "passwordPolicy",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("passwordPolicy", routeGuard),
         },
         {
           path: "correlation/:tab?",
           name: "correlationSettings",
-          component: gatedComponent(
-            "correlationSettings",
-            () => import("@/components/settings/CorrelationSettings.vue"),
-          ),
+          component: () => import("@/components/settings/CorrelationSettings.vue"),
           meta: {
             keepAlive: true,
             titleKey: "settings.correlationSettings",
-            featureKey: "correlationSettings",
           },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          beforeEnter: withFeatureGate("correlationSettings", routeGuard),
         },
         {
           path: "license",
           name: "license",
-          component: gatedComponent("license", () => import("@/components/settings/License.vue")),
-          meta: { featureKey: "license" },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          component: () => import("@/components/settings/License.vue"),
+          beforeEnter: withFeatureGate("license", routeGuard),
         },
       ],
     );

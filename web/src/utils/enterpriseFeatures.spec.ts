@@ -68,15 +68,43 @@ describe("enterpriseFeatures", () => {
       const result = checkFeatureAccess("cipherKeys", buildFeatureGateContext());
       expect(result.allowed).toBe(false);
     });
+
+    // Cloud never offers this batch at all — a self-hosted admin's own node/
+    // cipher-key/license management has no Cloud equivalent to "upgrade"
+    // into, so pure Cloud must hide it entirely rather than show a false
+    // upsell (a real bug caught in review: Service Graph — same shape as
+    // this batch — was showing locked on Cloud before `cloudOffers` existed).
+    it.each(["cipherKeys", "enterprise", "nodes", "license"] as const)(
+      "hides %s entirely (not locked) on a pure cloud build",
+      (key) => {
+        config.isCloud = "true";
+        const result = checkFeatureAccess(key, buildFeatureGateContext());
+        expect(result.allowed).toBe(false);
+        expect(result.visible).toBe(false);
+        expect(result.message).toBe("");
+      },
+    );
+
+    it("stays visible-but-locked on OSS (not hidden) — only pure Cloud hides it", () => {
+      const result = checkFeatureAccess("cipherKeys", buildFeatureGateContext());
+      expect(result.allowed).toBe(false);
+      expect(result.visible).toBe(true);
+      expect(result.message).not.toBe("");
+    });
+
+    it("is visible (not hidden) on an enterprise+cloud hybrid build", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      const result = checkFeatureAccess("cipherKeys", buildFeatureGateContext());
+      expect(result.allowed).toBe(true);
+      expect(result.visible).toBe(true);
+    });
   });
 
   describe("checkFeatureAccess — isEnterprise-or-isCloud keys", () => {
-    it.each(["incidents", "workflows", "oncall"] as const)(
-      "locks %s in OSS",
-      (key) => {
-        expect(checkFeatureAccess(key, buildFeatureGateContext()).allowed).toBe(false);
-      },
-    );
+    it.each(["incidents", "workflows", "oncall"] as const)("locks %s in OSS", (key) => {
+      expect(checkFeatureAccess(key, buildFeatureGateContext()).allowed).toBe(false);
+    });
 
     it("unlocks workflows in a pure cloud build", () => {
       config.isCloud = "true";
@@ -87,6 +115,18 @@ describe("enterpriseFeatures", () => {
       config.isEnterprise = "true";
       expect(checkFeatureAccess("workflows", buildFeatureGateContext()).allowed).toBe(true);
     });
+
+    // Cloud DOES offer these (the predicate includes isCloud), so locked
+    // never implies "pure cloud with nothing to offer" here — always
+    // visible, unlike the isEnterprise-only batch above.
+    it.each(["incidents", "workflows", "oncall", "rbac"] as const)(
+      "stays visible when locked in OSS (%s)",
+      (key) => {
+        const result = checkFeatureAccess(key, buildFeatureGateContext({ rbac_enabled: true }));
+        expect(result.allowed).toBe(false);
+        expect(result.visible).toBe(true);
+      },
+    );
   });
 
   describe("checkFeatureAccess — rbac", () => {

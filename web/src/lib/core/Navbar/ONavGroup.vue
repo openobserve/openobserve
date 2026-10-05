@@ -106,12 +106,20 @@ const gateContext = useNavGateContext();
 
 // A child shows only when (a) its route is registered in this build and (b)
 // custom_hide_menus does not name it — exactly as the target page would
-// decide. Its `gate` (if any) decides WHETHER it's locked, not whether it
-// shows: when the gate is a registered enterprise/cloud FeatureKey, a failing
-// gate keeps the child (dimmed, inert, with a message) rather than dropping
-// it, so the feature stays discoverable in a build that doesn't unlock it. A
-// `gate` that ISN'T a FeatureKey (e.g. a plain on/off section flag) keeps the
-// old hide-on-fail behavior.
+// decide. Its `gate` (if any) then decides WHETHER it's locked, not whether
+// it shows: when the gate is a registered enterprise/cloud FeatureKey, a
+// failing gate keeps the child (dimmed, inert, with a message) rather than
+// dropping it, so the feature stays discoverable in a build that doesn't
+// unlock it — UNLESS `checkFeatureAccess` itself says the feature isn't
+// `visible` at all (a self-hosted-only feature on a pure-Cloud build has no
+// "upgrade" story, so it's dropped like before, not shown locked). A `gate`
+// that ISN'T a FeatureKey (e.g. a plain on/off section flag) keeps the old
+// hide-on-fail behavior — and even for a FeatureKey gate, that SAME
+// non-FeatureKey check still runs once the edition allows it, so a child
+// whose gate happens to ALSO be a runtime on/off flag (On-Call's `oncall`,
+// gated on the backend flag in GATE_PREDICATES as well as edition here)
+// still hides when the admin has turned it off, rather than rendering
+// unlocked-but-broken.
 //
 // The custom_hide_menus check is by route NAME so a child with no top-level
 // rail entry of its own is hideable at all: `requires` only tracks the parent,
@@ -123,7 +131,12 @@ const visibleChildren = computed<SubnavChild[]>(() =>
       if (!c.gate) return [{ ...c, locked: false }];
       if (isFeatureKey(c.gate)) {
         const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
-        return [{ ...c, locked: !access.allowed, lockedMessage: access.message }];
+        if (!access.visible) return [];
+        if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
+        // Edition allows it — the gate might ALSO name a runtime on/off flag
+        // (not every FeatureKey does); defer to that before calling it fully
+        // unlocked.
+        return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
       }
       return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
     }),
@@ -421,7 +434,11 @@ function onDocumentPointerDown(event: PointerEvent) {
   // flyout on the spot, and the click event that was about to fire next has
   // nothing left to land on. `pointerdown` fires before `click`, so this has
   // to be checked here, not just guarded in a click handler.
-  if (target instanceof Element && target.closest('[data-test="o-tooltip-content"]')) {
+  //
+  // Scoped to the Upgrade CTA specifically (not every open `o-tooltip-content`
+  // in the app) — an unrelated tooltip open elsewhere while this flyout is
+  // also open must not exempt clicks on IT from closing this flyout too.
+  if (target instanceof Element && target.closest('[data-test="locked-feature-upgrade-cta"]')) {
     return;
   }
   close();
