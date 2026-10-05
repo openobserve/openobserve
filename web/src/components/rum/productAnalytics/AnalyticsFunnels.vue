@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-time="!!def.breakdown"
               @update:def="(d) => (pa.funnel.value = d)"
               @dropoff="openDropoff"
-              @suggestions-retry="compute(true)"
+              @suggestions-retry="retrySuggestions"
             />
           </template>
           <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
@@ -424,6 +424,7 @@ import {
   funnelSql,
   nextStepsSql,
   type BreakdownDim,
+  type BuildOpts,
   type FunnelCohort,
   type FunnelDef,
   type FunnelWindow,
@@ -574,8 +575,7 @@ const suggestions = computed(() =>
         }))
     : [],
 );
-// A failed suggestions fetch must not look the same as "nothing to suggest" — only surface the
-// error once it belongs to the funnel currently on screen, same key guard as `suggestions` above.
+// Only surfaces the error once it belongs to the funnel on screen, same key guard as `suggestions`.
 const idleSuggestionsState: PanelState<unknown> = {
   status: "idle",
   rows: [],
@@ -740,6 +740,15 @@ const compute = async (force = false) => {
     key,
   );
   if (res.status !== "ok" || key !== lastKey) return;
+  runSuggestions(d, key, cur, opts);
+};
+
+const runSuggestions = (
+  d: FunnelDef,
+  key: string,
+  cur: { startUs: number; endUs: number },
+  opts: BuildOpts,
+) => {
   const sampled = usersMode.value ? 1 : pa.sampleRatio.value;
   void runner.run(
     "next",
@@ -756,6 +765,15 @@ const compute = async (force = false) => {
     },
     key,
   );
+};
+
+// Cheaper than compute(true): the funnel counts haven't changed, only the suggestions query failed.
+const retrySuggestions = () => {
+  if (funnelPanel.value.status !== "ok") return;
+  runSuggestions(effectiveDef.value, funnelKey.value, pa.resolveRange(), {
+    events: events.value,
+    sample: pa.sampleRatio.value,
+  });
 };
 
 const schedule = () => {

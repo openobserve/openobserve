@@ -209,10 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="emit('suggestions-retry')"
       />
       <template v-else>
-        <span
-          v-if="suggestions.length"
-          class="text-text-secondary flex items-center gap-1 text-xs"
-        >
+        <span v-if="suggestions.length" class="text-text-secondary flex items-center gap-1 text-xs">
           <OIcon name="auto-awesome" size="sm" />{{
             t("rum.analytics.funnel.nextStep", { step: def.steps.length })
           }}

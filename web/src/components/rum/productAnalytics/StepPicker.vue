@@ -137,6 +137,7 @@ const load = async () => {
 
 // The server is asked only when the first rows did not already hold every key.
 const onSearch = async (term: string) => {
+  failed.value = false;
   if (!term || rows.value.length < FULL_LIST) return;
   const scope = pa.scopeKey.value;
   loading.value = true;

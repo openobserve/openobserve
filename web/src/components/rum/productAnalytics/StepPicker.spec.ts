@@ -116,4 +116,18 @@ describe("StepPicker", () => {
     await flushPromises();
     expect(select(w).props("errorMessage")).toBeTruthy();
   });
+
+  it("clears a stale search failure once the term is cleared instead of keeping 'load failed' stuck on an empty result", async () => {
+    mockPa.loadPicker.mockResolvedValue(full(200));
+    mockPa.searchPicker.mockResolvedValue({ status: "error", options: [] });
+    const w = mountPicker();
+    select(w).vm.$emit("open");
+    await flushPromises();
+    select(w).vm.$emit("search", "deep");
+    await flushPromises();
+    expect(select(w).props("errorMessage")).toBeTruthy();
+    select(w).vm.$emit("search", "");
+    await flushPromises();
+    expect(select(w).props("errorMessage")).toBeFalsy();
+  });
 });

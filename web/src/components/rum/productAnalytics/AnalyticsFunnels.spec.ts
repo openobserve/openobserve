@@ -846,14 +846,20 @@ describe("AnalyticsFunnels", () => {
     await setSteps([["p", "/web/logs"]]);
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(false);
     expect(text("rum-analytics-funnel-suggestions-error")).toContain("400");
+    const funnelCallsBeforeRetry = funnelSqls().length;
     routes = baseRoutes();
     respond();
-    await wrapper!.find('[data-test="rum-analytics-funnel-suggestions-retry-btn"]').trigger("click");
+    await wrapper!
+      .find('[data-test="rum-analytics-funnel-suggestions-retry-btn"]')
+      .trigger("click");
     await settle();
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestions-error"]').exists()).toBe(
       false,
     );
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(true);
+    // Retrying the suggestions row is cheaper than a full recompute: the funnel counts
+    // are already known good, so only the "next" panel's query should run again.
+    expect(funnelSqls().length).toBe(funnelCallsBeforeRetry);
   });
 
   it("returning while a run was cut short reloads the funnel and its suggestions", async () => {
