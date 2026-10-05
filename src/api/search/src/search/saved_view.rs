@@ -346,6 +346,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_metrics_explorer_view_type_is_stored_and_listed() {
+        infra::db::create_table().await.unwrap();
+        let org = new_org();
+        assert_eq!(create(&org, "grid", None).await.0, StatusCode::OK);
+        let (status, _) = create(&org, "grid", Some("metrics_explorer")).await;
+        assert_eq!(status, StatusCode::OK);
+        let views = list(&org).await;
+        assert_eq!(views.len(), 2);
+        assert!(views.iter().any(|v| v["view_type"] == "metrics_explorer"));
+    }
+
+    #[tokio::test]
     async fn test_create_view_rejects_unknown_type() {
         infra::db::create_table().await.unwrap();
         let org = new_org();

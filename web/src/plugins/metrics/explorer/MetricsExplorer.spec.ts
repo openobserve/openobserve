@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { reactive, computed } from "vue";
+import { reactive, computed, ref } from "vue";
 import {
   getMetricsConfig,
   encodeMetricsConfig,
@@ -72,6 +72,13 @@ const grid = vi.hoisted(() => {
     ensureSchemas: vi.fn(),
     setOverride: vi.fn(),
     toggleFavorite: vi.fn(),
+    exemplarEligible: vi.fn(() => false),
+    exemplarsEnabled: vi.fn(() => false),
+    exemplarSwapsVariant: vi.fn(() => false),
+    exemplarStateOf: vi.fn(() => undefined),
+    toggleExemplars: vi.fn(),
+    retryExemplars: vi.fn(),
+    ensureExemplars: vi.fn(),
     requestPreview: vi.fn(async () => {}),
     refreshCard: vi.fn(),
     cancelPreview: vi.fn(),
@@ -81,7 +88,15 @@ const grid = vi.hoisted(() => {
     effectiveVariant: vi.fn(() => ({ defaults: { variants: [] }, resolved: { queries: [] } })),
     runDialogQuery: vi.fn(),
     cancelDialogQueries: vi.fn(),
+    runDetailQuery: vi.fn(),
+    rateWindowFor: vi.fn(() => "4m"),
+    labelsByStream: { value: {} },
+    prefixAssignment: { value: { groupOf: new Map() } },
+    prefixOf: vi.fn(() => "misc"),
+    familyOf: vi.fn((name: string) => name),
     loadStreams: vi.fn(async () => {}),
+    isLabelEligible: vi.fn(() => true),
+    inapplicableLabelFilters: vi.fn(() => []),
     setTimeRange: vi.fn(),
     setRefreshInterval: vi.fn(),
     onOrgChange: vi.fn(),
@@ -90,7 +105,9 @@ const grid = vi.hoisted(() => {
   return g;
 });
 
-vi.mock("@/composables/metrics/useMetricsExplorerGrid", () => ({
+vi.mock("@/composables/metrics/useMetricsExplorerGrid", async (importOriginal) => ({
+  // The real helpers (`hasSamples`) for the detail view's charts; only the grid is faked.
+  ...(await importOriginal<any>()),
   default: () => grid,
   INITIAL_PAGE_SIZE: 8,
   PAGE_SIZE_INCREMENT: 6,
@@ -134,13 +151,28 @@ vi.mock("@tanstack/vue-virtual", () => ({
     })),
 }));
 
+// Captures the registered handlers so a test can fire a shortcut directly.
+const shortcuts = vi.hoisted(() => ({ handlers: {} as Record<string, () => void> }));
+vi.mock("@/lib/vue-shortcut-manager", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  useShortcuts: (list: Array<{ id: string; handler: () => void }>) =>
+    list.forEach((s) => (shortcuts.handlers[s.id] = s.handler)),
+}));
+
 import MetricsExplorer from "./MetricsExplorer.vue";
+import analytics from "@/services/product_analytics";
+import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
+import { cardColorForIndex } from "@/utils/metrics/metricPalette";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 
 const CARD = { name: "http_requests_total", unsupported: false, cardKind: "counterRate" };
 
 /** The Visualize pane's runQuery — the toolbar refresh must drive this in
  *  visualize mode instead of sweeping the Explore grid. */
 const visualizeRunQuery = vi.fn();
+/** The pane's explicit-run (records history) and live-apply entry points. */
+const visualizeOnUserRun = vi.fn();
+const visualizeApplyPanelData = vi.fn();
 
 /** The panel state the stubbed Visualize pane exposes to its parent — the parent
  *  reads it to build the `metrics_data` blob. Set per test before entering
@@ -158,6 +190,7 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
         PrefixFilterPanel: true,
         LabelFilterBar: true,
         FunctionConfigDialog: true,
+        MetricDetailView: true,
         OButton: true,
         OIcon: true,
         OCheckbox: true,
@@ -196,9 +229,21 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
           // encode the shareable blob.
           setup: () => ({
             runQuery: visualizeRunQuery,
+            onUserRun: visualizeOnUserRun,
+            applyPanelData: visualizeApplyPanelData,
             dashboardPanelData: visualizePanel,
           }),
+          emits: ["run"],
           template: '<div data-test="metrics-explorer-visualize">visualize</div>',
+        },
+        ExplorerSavedViews: {
+          props: ["state", "activeViewId"],
+          emits: ["apply", "saved", "clear", "update:activeViewId"],
+          template: '<div data-test="metrics-explorer-views" />',
+        },
+        QueryHistoryDrawer: {
+          emits: ["load"],
+          template: '<div data-test="metrics-history" />',
         },
         ...stubOverrides,
       },
@@ -963,6 +1008,548 @@ describe("MetricsExplorer wiring", () => {
     });
   });
 
+  describe("the metric detail view", () => {
+    const DETAIL = '[data-test="metrics-explorer-scroll"]';
+    const detailView = (wrapper: any) => wrapper.findComponent({ name: "MetricDetailView" });
+
+    beforeEach(() => {
+      grid.cards.value = [CARD];
+      grid.paused.value = false;
+      // Fast-path tests need a URL differing from leftover grid state ONLY in the detail keys.
+      grid.searchTerm.value = "";
+      grid.selectedPrefixes.value = new Set();
+      grid.selectedSuffixes.value = new Set();
+      grid.selectedTypes.value = new Set();
+      grid.labelFilters.value = [];
+      grid.hideEmptyPanels.value = true;
+      grid.sortBy.value = "a-z";
+      grid.viewMode.value = "grid";
+    });
+    afterEach(() => {
+      grid.cards.value = [];
+      grid.exemplarEligible.mockReturnValue(false);
+      grid.exemplarsEnabled.mockReturnValue(false);
+      grid.exemplarSwapsVariant.mockReturnValue(false);
+      grid.exemplarStateOf.mockReturnValue(undefined);
+      grid.runDetailQuery.mockReset();
+      grid.effectiveVariant.mockImplementation(() => ({
+        defaults: { variants: [] },
+        resolved: { queries: [] },
+      }));
+    });
+
+    it("opens from a card: pushes a history entry, pauses the grid, loads the schemas", async () => {
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+
+      (wrapper.vm as any).openDetail(CARD);
+      // Paused synchronously, before the grid unmounts and its cards report in.
+      expect(grid.paused.value).toBe(true);
+      await wrapper.vm.$nextTick();
+
+      expect(routerState.push).toHaveBeenCalled();
+      expect(routerState.push.mock.calls.at(-1)[0].query.metric).toBe(CARD.name);
+      expect(grid.ensureSchemas).toHaveBeenCalled();
+      expect(wrapper.find(DETAIL).exists()).toBe(false);
+      expect(detailView(wrapper).exists()).toBe(true);
+      // The mode is untouched — closing returns to whichever grid was showing.
+      expect((wrapper.vm as any).mode).toBe("explore");
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_detail_opened",
+        expect.objectContaining({ card_kind: CARD.cardKind }),
+      );
+    });
+
+    it("wires the actions moved off the card to what the card's icons did", async () => {
+      grid.exemplarEligible.mockReturnValue(true);
+      grid.exemplarsEnabled.mockReturnValue(true);
+      grid.exemplarSwapsVariant.mockReturnValue(true);
+      const state = { status: "ready", markers: [], errorMessage: "" };
+      grid.exemplarStateOf.mockReturnValue(state);
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      const view = detailView(wrapper);
+      expect(view.props()).toMatchObject({
+        exemplarsEligible: true,
+        exemplarsOn: true,
+        exemplarsSwapsVariant: true,
+        exemplars: state,
+      });
+
+      view.vm.$emit("toggle-exemplars");
+      view.vm.$emit("retry-exemplars");
+      view.vm.$emit("toggle-favorite");
+      view.vm.$emit("configure");
+      await wrapper.vm.$nextTick();
+      expect(grid.toggleExemplars).toHaveBeenCalledWith(CARD);
+      expect(grid.retryExemplars).toHaveBeenCalledWith(CARD);
+      expect(grid.toggleFavorite).toHaveBeenCalledWith(CARD.name);
+      // The ⚙ dialog opens on this metric, over the detail view.
+      expect((wrapper.vm as any).dialogOpen).toBe(true);
+      expect((wrapper.vm as any).dialogCard).toEqual(CARD);
+    });
+
+    it("asks for the metric's exemplars again once its overview settles, even with a preview already in", async () => {
+      // Hiding the card on the way in cancels an exemplar fetch in flight and drops its
+      // state; a preview already exists, so the preview path never re-asks for them.
+      grid.previews.value[CARD.name] = { status: "done" };
+      grid.runDetailQuery.mockResolvedValueOnce({ result: [] });
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      grid.ensureExemplars.mockClear();
+      grid.requestPreview.mockClear();
+
+      await (wrapper.vm as any).runDetailPreview("rate(x[4m])", new AbortController().signal);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.ensureExemplars).toHaveBeenCalledWith(CARD);
+
+      // Not for a Related metric's tile, whose chart draws no exemplars.
+      grid.ensureExemplars.mockClear();
+      const other = { ...CARD, name: "other_metric" };
+      grid.previews.value[other.name] = { status: "done" };
+      await (wrapper.vm as any).runDetailPreview(
+        "rate(y[4m])",
+        new AbortController().signal,
+        other,
+      );
+      expect(grid.ensureExemplars).not.toHaveBeenCalled();
+      delete grid.previews.value[CARD.name];
+      delete grid.previews.value[other.name];
+    });
+
+    it("still asks for the exemplars when a refresh rebuilds the cards mid-query", async () => {
+      grid.previews.value[CARD.name] = { status: "done" };
+      let answer!: (value: any) => void;
+      grid.runDetailQuery.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      // Reactive here, as the real grid's is, so the view sees the rebuilt card.
+      const plainCards = grid.cards;
+      grid.cards = ref([CARD]);
+      onTestFinished(() => {
+        grid.cards = plainCards;
+      });
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      grid.ensureExemplars.mockClear();
+
+      const pending = (wrapper.vm as any).runDetailPreview(
+        "rate(x[4m])",
+        new AbortController().signal,
+      );
+      // `loadStreams(true)` rebuilds every card as a new object.
+      grid.cards.value = [{ ...CARD }];
+      answer({ result: [] });
+      await pending;
+      expect(grid.ensureExemplars).toHaveBeenCalledTimes(1);
+      expect(grid.ensureExemplars.mock.calls[0][0].name).toBe(CARD.name);
+      delete grid.previews.value[CARD.name];
+    });
+
+    it("hands the detail view the function in effect and its queries for a dashboard panel", async () => {
+      grid.effectiveVariant.mockImplementation((_card: any, _points: any, opts: any) => ({
+        defaults: { variants: [], bucketUnit: null },
+        resolved: {
+          queries: [{ expr: `avg(rate(x[${opts?.rateWindow ?? "4m"}]))` }],
+          chartType: "line",
+          unit: "count-per-sec",
+          footerLabel: "avg(rate)",
+        },
+      }));
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      const view = detailView(wrapper);
+      expect(view.props("overview")).toMatchObject({
+        queries: [{ expr: "avg(rate(x[4m]))" }],
+        footerLabel: "avg(rate)",
+      });
+      expect(view.props("panelQueries")).toEqual([{ expr: "avg(rate(x[$__rate_interval]))" }]);
+    });
+
+    it("hands the view the panel rate window Convert to dashboard would use", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("panelRateWindow")).toBe("$__rate_interval");
+
+      grid.previews.value[CARD.name] = { widenedRateWindow: "30m" };
+      await wrapper.vm.$forceUpdate();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("panelRateWindow")).toBe("30m");
+      delete grid.previews.value[CARD.name];
+    });
+
+    it("keeps the grid paused when the mode changes underneath an open view", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(grid.paused.value).toBe(true);
+    });
+
+    it("REPLACES the entry on a tab or breakdown-label change", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+      routerState.replace.mockClear();
+
+      (wrapper.vm as any).onDetailTab("related");
+      await wrapper.vm.$nextTick();
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        tab: "related",
+      });
+
+      routerState.query = { metric: CARD.name, tab: "related" };
+      (wrapper.vm as any).onDetailTab("breakdown");
+      (wrapper.vm as any).onBreakdownLabel("route");
+      await wrapper.vm.$nextTick();
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        tab: "breakdown",
+        breakdown_label: "route",
+      });
+      expect(routerState.push).not.toHaveBeenCalled();
+    });
+
+    it("restores a deep link: metric, tab and breakdown label", () => {
+      routerState.query = {
+        metric: "http_requests_total",
+        tab: "breakdown",
+        breakdown_label: "route",
+      };
+      const wrapper = mountExplorer();
+
+      const view = detailView(wrapper);
+      expect(view.exists()).toBe(true);
+      expect(view.props("metricName")).toBe("http_requests_total");
+      expect(view.props("tab")).toBe("breakdown");
+      expect(view.props("breakdownLabel")).toBe("route");
+      expect(grid.paused.value).toBe(true);
+    });
+
+    it("a metric-only URL change takes the fast path — no filter re-apply, no grid re-query", async () => {
+      const wrapper = mountExplorer();
+      const prefixes = grid.selectedPrefixes.value;
+      const labels = grid.labelFilters.value;
+      grid.requestPreview.mockClear();
+
+      routerState.query = { metric: CARD.name, tab: "related" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+
+      expect(detailView(wrapper).props("tab")).toBe("related");
+      // Identical identities: the grid's watchers never saw a "new" filter.
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.labelFilters.value).toBe(labels);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+    });
+
+    it("Back closes the view on the fast path, so returning re-queries no card", async () => {
+      routerState.query = { metric: CARD.name, tab: "related" };
+      const wrapper = mountExplorer();
+      const prefixes = grid.selectedPrefixes.value;
+      grid.requestPreview.mockClear();
+
+      routerState.query = {};
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+
+      expect(detailView(wrapper).exists()).toBe(false);
+      expect(wrapper.find(DETAIL).exists()).toBe(true);
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+      expect(grid.paused.value).toBe(false);
+    });
+
+    it("Detail -> Visualize -> Back -> Forward reopens Visualize on the URL's chart", async () => {
+      const chart = { type: "bar", queries: [{ query: "up", fields: {} }] };
+      const visualizeUrl = {
+        mode: "visualize",
+        metrics_data: encodeMetricsConfig(getMetricsConfig({ data: chart })),
+      };
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+
+      routerState.query = visualizeUrl;
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      (wrapper.vm as any).visualizeSeed = null;
+
+      routerState.query = { metric: CARD.name };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).exists()).toBe(true);
+
+      routerState.query = visualizeUrl;
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      expect((wrapper.vm as any).visualizeSeed).toEqual(chart);
+    });
+
+    it("opening a related metric pushes, and Back returns to the first metric's Related tab", async () => {
+      routerState.query = { metric: CARD.name, tab: "related" };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+
+      (wrapper.vm as any).onOpenRelated("http_responses_total");
+      await wrapper.vm.$nextTick();
+      expect(routerState.push.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: "http_responses_total",
+      });
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_related_opened",
+        expect.any(Object),
+      );
+
+      // Back: the router restores the first metric's entry.
+      routerState.query = { metric: "http_responses_total" };
+      routerState.query = { metric: CARD.name, tab: "related" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("metricName")).toBe(CARD.name);
+      expect(detailView(wrapper).props("tab")).toBe("related");
+    });
+
+    it("closing pushes the bare grid URL and unpauses the grid", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+
+      (wrapper.vm as any).closeDetail();
+      await wrapper.vm.$nextTick();
+
+      expect(routerState.push.mock.calls.at(-1)[0].query.metric).toBeUndefined();
+      expect(grid.paused.value).toBe(false);
+    });
+
+    it("a filter added from Breakdown goes through onAddLabelFilter and is tracked", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+
+      await (wrapper.vm as any).onBreakdownAddFilter({
+        label: "status",
+        operator: "=",
+        value: "500",
+      });
+      expect(grid.addLabelFilter).toHaveBeenCalledWith({
+        label: "status",
+        operator: "=",
+        value: "500",
+      });
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_breakdown_filter_added",
+        expect.objectContaining({ operator: "=" }),
+      );
+    });
+
+    it("hands the detail view the filters its metric cannot apply, and the eligibility rule", () => {
+      const JOB = { label: "job", operator: "=", value: "api" };
+      grid.inapplicableLabelFilters.mockReturnValue([JOB]);
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const view = detailView(wrapper);
+
+      expect(grid.inapplicableLabelFilters).toHaveBeenCalledWith(CARD);
+      expect(view.props("inapplicableFilters")).toEqual([JOB]);
+      expect(view.props("isLabelEligible")).toBe(grid.isLabelEligible);
+      grid.inapplicableLabelFilters.mockReturnValue([]);
+    });
+
+    it("a manual refresh's stream reload does not put the open view back on a spinner", async () => {
+      // loadStreams(true) flips grid.loading while the cards are still there.
+      grid.loading.value = true;
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      await flushPromises();
+      expect((wrapper.vm as any).detailLoading).toBe(false);
+      grid.loading.value = false;
+    });
+
+    it("waits on the first stream load, when there are no cards yet", async () => {
+      grid.loading.value = true;
+      grid.cards.value = [];
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      await flushPromises();
+      expect((wrapper.vm as any).detailLoading).toBe(true);
+      grid.loading.value = false;
+    });
+
+    it("a Visualize URL carries no detail view into a later switch to Explore", async () => {
+      routerState.query = { mode: "visualize", metric: CARD.name, tab: "related" };
+      const wrapper = mountExplorer();
+      expect((wrapper.vm as any).detailMetric).toBeNull();
+      expect((wrapper.vm as any).viewState).not.toHaveProperty("metric");
+
+      (wrapper.vm as any).setMode("explore");
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).exists()).toBe(false);
+    });
+
+    it("entering Visualize from an open view clears it, in state and in the URL", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect((wrapper.vm as any).viewState).not.toHaveProperty("metric");
+
+      (wrapper.vm as any).setMode("explore");
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).exists()).toBe(false);
+    });
+
+    it("hands the detail view the grid's detail-query plumbing, cancellable by the caller's signal", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const { signal } = new AbortController();
+
+      await detailView(wrapper).props("runQuery")("sum(up)", signal);
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD, signal, undefined);
+
+      await detailView(wrapper).props("runQuery")("sum(le)", signal, undefined, {
+        maxSeries: Infinity,
+      });
+      expect(grid.runDetailQuery).toHaveBeenLastCalledWith("sum(le)", CARD, signal, {
+        maxSeries: Infinity,
+      });
+    });
+
+    it("runs a related metric's chart as that metric, not the open one", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const OTHER = { ...CARD, name: "http_responses_total" };
+      const { signal } = new AbortController();
+
+      await detailView(wrapper).props("runQuery")("sum(other)", signal, OTHER);
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(other)", OTHER, signal, undefined);
+    });
+
+    it("never starts the query of a chart abandoned while its metric's preview settled", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const OTHER = { ...CARD, name: "http_responses_total" };
+      let settle!: () => void;
+      grid.requestPreview.mockImplementationOnce(
+        () => new Promise<void>((resolve) => (settle = resolve)),
+      );
+      const controller = new AbortController();
+
+      const pending = detailView(wrapper).props("runQuery")("sum(other)", controller.signal, OTHER);
+      controller.abort();
+      settle();
+      await expect(pending).rejects.toSatisfy(isCancelled);
+      expect(grid.runDetailQuery).not.toHaveBeenCalled();
+    });
+
+    it("charts an unpreviewed sparse related metric with the window its preview widened to", async () => {
+      const OTHER = { ...CARD, name: "http_responses_total", typeFilterBucket: "counter" };
+      const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] };
+      const EMPTY = { resultType: "matrix", result: [] };
+      const previews = grid.previews;
+      grid.previews = ref<Record<string, any>>({});
+      grid.cards.value = [CARD, OTHER];
+      grid.prefixOf.mockImplementation(() => "http");
+      grid.effectiveVariant.mockImplementation((card: any, _points: any, opts: any) => ({
+        defaults: { variants: [] },
+        resolved: {
+          queries: [{ expr: `sum(rate(${card.name}[${opts?.rateWindow ?? "4m"}]))` }],
+          chartType: "line",
+          unit: "count",
+        },
+      }));
+      // The grid's own preview finds the counter too sparse for 4m and widens it.
+      grid.requestPreview.mockImplementation(async (card: any) => {
+        grid.previews.value[card.name] = {
+          status: "done",
+          widenedRateWindow: card.name === OTHER.name ? "30m" : null,
+        };
+      });
+      grid.runDetailQuery.mockImplementation(async (expr: string) =>
+        expr.includes("[30m]") ? SERIES : EMPTY,
+      );
+      const io = installFakeIntersectionObserver({ autoVisible: true });
+      try {
+        routerState.query = { metric: CARD.name, tab: "related" };
+        const wrapper = mountExplorer({
+          MetricDetailView: false,
+          MetricCardChart: {
+            name: "MetricCardChart",
+            props: ["results", "queries", "timeRange"],
+            template: "<div />",
+          },
+        });
+        await flushPromises();
+
+        const exprs = grid.runDetailQuery.mock.calls.map(([expr]: any[]) => expr);
+        expect(exprs).toContain("sum(rate(http_responses_total[30m]))");
+        expect(exprs).not.toContain("sum(rate(http_responses_total[4m]))");
+        const tile = wrapper.find(`[data-test="metrics-detail-related-card-${OTHER.name}"]`);
+        expect(tile.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
+      } finally {
+        io.restore();
+        grid.previews = previews;
+        grid.prefixOf.mockImplementation(() => "misc");
+        grid.effectiveVariant.mockImplementation(() => ({
+          defaults: { variants: [] },
+          resolved: { queries: [] },
+        }));
+        grid.requestPreview.mockImplementation(async () => {});
+        grid.runDetailQuery.mockImplementation(() => undefined);
+      }
+    });
+
+    it("colours a related metric past the first page as its grid card will be", () => {
+      routerState.query = { metric: CARD.name };
+      const OTHER = { ...CARD, name: "http_responses_total" };
+      grid.sortedCards.value = [CARD, { ...CARD, name: "b" }, OTHER];
+      try {
+        const wrapper = mountExplorer();
+        const colorOf = detailView(wrapper).props("colorOf");
+        expect([cardColorForIndex(2, false), cardColorForIndex(2, true)]).toContain(
+          colorOf(OTHER.name),
+        );
+        expect(colorOf(OTHER.name)).not.toBe(colorOf(CARD.name));
+      } finally {
+        grid.sortedCards.value = [];
+      }
+    });
+
+    it("charts a related metric with the query its explorer card would run", () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      const OTHER = { ...CARD, name: "http_responses_total", chartType: "line", unit: "count" };
+      grid.effectiveVariant.mockReturnValueOnce({
+        defaults: { variants: [] },
+        resolved: { queries: [{ expr: "sum(rate(http_responses_total[4m]))" }], unit: "count" },
+      } as any);
+
+      const chart = detailView(wrapper).props("chartOf")(OTHER);
+      expect(grid.effectiveVariant).toHaveBeenLastCalledWith(OTHER, undefined, expect.any(Object));
+      expect(chart.queries).toEqual([{ expr: "sum(rate(http_responses_total[4m]))" }]);
+      expect(chart.chartType).toBe("line");
+    });
+
+    it("Back to the label grid clears the breakdown label, replacing the entry", async () => {
+      routerState.query = { metric: CARD.name, tab: "breakdown", breakdown_label: "route" };
+      const wrapper = mountExplorer();
+      routerState.push.mockClear();
+      routerState.replace.mockClear();
+
+      (wrapper.vm as any).onBreakdownLabel(null);
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("breakdownLabel")).toBeNull();
+      expect(routerState.replace.mock.calls.at(-1)[0].query.breakdown_label).toBeUndefined();
+      expect(routerState.push).not.toHaveBeenCalled();
+    });
+  });
+
   /**
    * The "No metrics match" empty state offers one action card per remedy, gated
    * on that remedy actually being able to change the result. Favorites ignores
@@ -993,6 +1580,235 @@ describe("MetricsExplorer wiring", () => {
 
       grid.showFavoritesOnly.value = false; // reset shared mock
       grid.selectedPrefixes.value = new Set();
+    });
+  });
+
+  describe("saved views", () => {
+    const VIEWS = '[data-test="metrics-explorer-views"]';
+
+    it("offers the Views menu on the grid, never in Visualize or the detail view", async () => {
+      const wrapper = mountExplorer();
+      expect(wrapper.find(VIEWS).exists()).toBe(true);
+
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(true);
+
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(false);
+
+      (wrapper.vm as any).setMode("explore");
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(false);
+    });
+
+    it("hands the menu the grid's URL slice", () => {
+      routerState.query = { sort: "z-a", period: "1h" };
+      grid.sortBy.value = "z-a";
+      const wrapper = mountExplorer();
+      const state = wrapper.findComponent(VIEWS).props("state");
+      expect(state).toMatchObject({ sort: "z-a", period: "1h" });
+      grid.sortBy.value = "a-z";
+    });
+
+    it("applying a view navigates to /metrics with its query and is tracked", async () => {
+      const wrapper = mountExplorer();
+      wrapper.findComponent(VIEWS).vm.$emit("apply", { sort: "z-a", prefix: "node" });
+      await flushPromises();
+
+      expect(routerState.push).toHaveBeenCalledWith({
+        name: "metrics",
+        query: { org_identifier: "org1", sort: "z-a", prefix: "node" },
+      });
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_view_applied",
+        expect.any(Object),
+      );
+    });
+
+    it("clearing a view lands on the default grid: no search, facets, labels, sort or period, but auto-refresh kept", async () => {
+      // A view that both searches and facets: clearing the search alone leaves its prefix narrowing the grid.
+      routerState.query = {
+        search: "cache",
+        prefix: "cache",
+        sort: "z-a",
+        period: "1h",
+        refresh: "30s",
+      };
+      grid.searchTerm.value = "cache";
+      grid.selectedPrefixes.value = new Set(["cache"]);
+      grid.labelFilters.value = [{ label: "job", operator: "=", value: "api" }];
+      grid.sortBy.value = "z-a";
+      const wrapper = mountExplorer();
+
+      wrapper.findComponent(VIEWS).vm.$emit("clear");
+      await flushPromises();
+      expect(routerState.push).toHaveBeenCalledWith({
+        name: "metrics",
+        query: { org_identifier: "org1", refresh: "30s" },
+      });
+
+      routerState.query = routerState.push.mock.calls.at(-1)[0].query;
+      (wrapper.vm as any).onRouteQueryChange();
+      await flushPromises();
+      expect(grid.searchTerm.value).toBe("");
+      expect(grid.selectedPrefixes.value.size).toBe(0);
+      expect(grid.labelFilters.value).toEqual([]);
+      expect(grid.sortBy.value).toBe("a-z");
+      expect((wrapper.vm as any).viewState).toEqual({ refresh: "30s" });
+    });
+
+    it("keeps the applied view across the detail view, so Update/Delete still target it", async () => {
+      const wrapper = mountExplorer();
+      wrapper.findComponent(VIEWS).vm.$emit("update:activeViewId", "m1");
+      await wrapper.vm.$nextTick();
+
+      (wrapper.vm as any).openDetail(CARD);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(VIEWS).exists()).toBe(false);
+      (wrapper.vm as any).closeDetail();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.findComponent(VIEWS).props("activeViewId")).toBe("m1");
+    });
+
+    it("tracks a saved view", async () => {
+      const wrapper = mountExplorer();
+      wrapper.findComponent(VIEWS).vm.$emit("saved", "created");
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_view_saved",
+        expect.objectContaining({ action: "created" }),
+      );
+    });
+
+    it("a URL change with a new range sets the picker, not just the model", async () => {
+      const setSavedDate = vi.fn();
+      const wrapper = mountExplorer({
+        DateTimePickerDashboard: {
+          setup: (_: any, { expose }: any) => {
+            expose({ setSavedDate, getConsumableDateTime: () => ({ startTime: 1, endTime: 2 }) });
+            return {};
+          },
+          template: "<div />",
+        },
+      });
+      routerState.query = { sort: "z-a", period: "6h" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await flushPromises();
+
+      expect(setSavedDate).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "6h" });
+      expect(grid.setTimeRange).toHaveBeenCalled();
+    });
+  });
+
+  describe("query history in Visualize", () => {
+    const RUN = '[data-test="metrics-explorer-run"]';
+    const withButtons = () =>
+      mountExplorer({ OButton: { template: '<button v-bind="$attrs"><slot /></button>' } });
+
+    beforeEach(() => {
+      shortcuts.handlers = {};
+    });
+
+    it("Visualize has a Run button and History; the grid modes do not", async () => {
+      const wrapper = withButtons();
+      expect(wrapper.find(RUN).exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-history"]').exists()).toBe(false);
+
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(RUN).exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-history"]').exists()).toBe(true);
+    });
+
+    it("Run and the run shortcut are explicit runs; refresh and auto-refresh are not", async () => {
+      const wrapper = withButtons();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      await wrapper.find(RUN).trigger("click");
+      shortcuts.handlers.metricsRunQuery();
+      expect(visualizeOnUserRun).toHaveBeenCalledTimes(2);
+      expect(visualizeOnUserRun).toHaveBeenCalledWith(
+        expect.objectContaining({ relativeTimePeriod: "15m" }),
+      );
+
+      shortcuts.handlers.metricsRefresh();
+      (wrapper.vm as any).onRefreshTick();
+      expect(visualizeOnUserRun).toHaveBeenCalledTimes(2);
+      expect(visualizeRunQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it("a Run from inside the Visualize editor is the same explicit run as the button", async () => {
+      const wrapper = withButtons();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      wrapper.findComponent('[data-test="metrics-explorer-visualize"]').vm.$emit("run");
+      expect(visualizeOnUserRun).toHaveBeenCalledTimes(1);
+      expect(visualizeOnUserRun).toHaveBeenCalledWith(
+        expect.objectContaining({ relativeTimePeriod: "15m" }),
+      );
+    });
+
+    it("Visualize keeps the Refresh button beside Run; Refresh re-runs without recording", async () => {
+      const wrapper = withButtons();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(RUN).exists()).toBe(true);
+      const refresh = wrapper.find('[data-test="metrics-explorer-refresh"]');
+      expect(refresh.exists()).toBe(true);
+      await refresh.trigger("click");
+      expect(visualizeRunQuery).toHaveBeenCalledTimes(1);
+      expect(visualizeOnUserRun).not.toHaveBeenCalled();
+    });
+
+    it("the run shortcut in Explore refreshes the grid and records nothing", async () => {
+      mountExplorer();
+      shortcuts.handlers.metricsRunQuery();
+      await flushPromises();
+      expect(visualizeOnUserRun).not.toHaveBeenCalled();
+      expect(grid.loadStreams).toHaveBeenCalled();
+    });
+
+    it("loading an entry applies it to the pane and is tracked", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
+      wrapper
+        .findComponent('[data-test="metrics-history"]')
+        .vm.$emit("load", { metricsData: "blob", timeRange });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange);
+      expect(analytics.track).toHaveBeenCalledWith(
+        "metrics_explorer_history_loaded",
+        expect.any(Object),
+      );
+    });
+
+    it("the pane's range change sets the toolbar picker", async () => {
+      const setSavedDate = vi.fn();
+      const wrapper = mountExplorer({
+        DateTimePickerDashboard: {
+          setup: (_: any, { expose }: any) => {
+            expose({ setSavedDate, getConsumableDateTime: () => ({ startTime: 1, endTime: 2 }) });
+            return {};
+          },
+          template: "<div />",
+        },
+      });
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      wrapper
+        .findComponent('[data-test="metrics-explorer-visualize"]')
+        .vm.$emit("update:time-range", { valueType: "absolute", startTime: 5, endTime: 9 });
+      expect(setSavedDate).toHaveBeenCalledWith({ type: "absolute", startTime: 5, endTime: 9 });
+      expect((wrapper.vm as any).selectedDate).toMatchObject({ startTime: 5, endTime: 9 });
     });
   });
 });

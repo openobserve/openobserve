@@ -23,7 +23,7 @@ use crate as db;
 
 pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";
 const DEFAULT_VIEW_TYPE: &str = "logs";
-const VIEW_TYPES: [&str; 2] = ["logs", "traces"];
+const VIEW_TYPES: [&str; 3] = ["logs", "traces", "metrics_explorer"];
 
 pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Error> {
     let view_type = view.view_type.as_deref().unwrap_or(DEFAULT_VIEW_TYPE);

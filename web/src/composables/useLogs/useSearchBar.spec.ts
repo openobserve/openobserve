@@ -321,13 +321,14 @@ describe("useSearchBar Composable", () => {
       // Loading state is set before the async call
     });
 
-    it("drops traces views from the logs list", async () => {
+    it("lists only logs views: untyped ones and view_type logs", async () => {
       mockSavedViewsGet.mockResolvedValue({
         data: {
           views: [
             { view_id: "1", view_name: "legacy" },
             { view_id: "2", view_name: "logs", view_type: "logs" },
             { view_id: "3", view_name: "traces", view_type: "traces" },
+            { view_id: "4", view_name: "grid", view_type: "metrics_explorer" },
           ],
         },
       });

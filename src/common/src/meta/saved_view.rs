@@ -26,7 +26,7 @@ pub struct CreateViewRequest {
     /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
 
-    /// View kind, `logs` or `traces`; absent means `logs`.
+    /// View kind, `logs`, `traces` or `metrics_explorer`; absent means `logs`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view_type: Option<String>,
 }
@@ -309,6 +309,15 @@ mod tests {
         let back: ViewWithoutData =
             serde_json::from_str(&serde_json::to_string(&view).unwrap()).unwrap();
         assert_eq!(back.view_type.as_deref(), Some("traces"));
+    }
+
+    #[test]
+    fn test_metrics_explorer_view_type_round_trips() {
+        let stored = r#"{"org_id":"o","data":{},"view_id":"v","view_name":"n","view_type":"metrics_explorer"}"#;
+        let view: View = serde_json::from_str(stored).unwrap();
+        assert_eq!(view.view_type.as_deref(), Some("metrics_explorer"));
+        let listed: ViewWithoutData = serde_json::from_str(stored).unwrap();
+        assert_eq!(listed.view_type.as_deref(), Some("metrics_explorer"));
     }
 
     #[test]
