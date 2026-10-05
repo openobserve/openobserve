@@ -106,7 +106,10 @@ export const PAGE_LIMIT = 200;
 const DAY_US = 86400000000;
 const WHOLE = "ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING";
 const ROOT_URL_RE = "^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*/?(?:[?#].*)?$";
-const HR = "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS hr";
+const hrExpr = (scope: AnalyticsScope): string =>
+  has(scope, "session_has_replay")
+    ? "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS hr"
+    : "0 AS hr";
 const ID_HEAD = String.raw`[0-9]+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{16,}`;
 const SLUG = "[a-z0-9]+(?:-[a-z0-9]+){2,}";
 const ID_TAIL = [
@@ -816,7 +819,7 @@ const fullChainCtes = (
     "MIN(date) AS t",
     "MIN(view_url) AS url",
     "MIN(action_target_name) AS atn",
-    HR,
+    hrExpr(scope),
     ...(frustration
       ? ["MAX(CASE WHEN action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS fr"]
       : []),
@@ -1058,7 +1061,7 @@ const pathCtes = (
     "MIN(date) AS t",
     "MIN(view_url) AS url",
     "MIN(action_target_name) AS atn",
-    HR,
+    hrExpr(scope),
     ...(has(scope, "view_name") ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
   ];
   const ctes = [

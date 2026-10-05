@@ -510,7 +510,12 @@ describe("funnel builders (G4, AC-12, AC-14, AC-15, AC-47)", () => {
     { kind: "p" as const, key: "/web/logs" },
   ];
   const s = scope({
-    schema: { action_id: true, usr_email: true, user_agent_user_agent_family: true },
+    schema: {
+      action_id: true,
+      usr_email: true,
+      user_agent_user_agent_family: true,
+      session_has_replay: true,
+    },
   });
   const id = { field: "usr_email" as const, excluded: [] };
   const opts = { events: [], sample: 1 as const };
@@ -684,7 +689,7 @@ describe("drop-off builders (G5, AC-16, AC-17, AC-59)", () => {
     { kind: "c" as const, key: "menu-link-/logs-item" },
     { kind: "p" as const, key: "/web/logs" },
   ];
-  const s = scope({ schema: { action_id: true, usr_email: true } });
+  const s = scope({ schema: { action_id: true, usr_email: true, session_has_replay: true } });
   const id = { field: "usr_email" as const, excluded: [] };
   const sessions = {
     steps,
@@ -723,6 +728,13 @@ describe("drop-off builders (G5, AC-16, AC-17, AC-59)", () => {
       "MAX(CASE WHEN action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS fr",
     );
     expect(f).toContain("SUM(f) AS with_frustration");
+  });
+
+  it("Q12 falls back to a constant hr instead of referencing session_has_replay when the org has no replay data", () => {
+    const noReplay = scope({ schema: { action_id: true, usr_email: true } });
+    const sql = dropoffHealthSql(noReplay, null, sessions, 1, opts);
+    expect(sql).not.toContain("session_has_replay");
+    expect(sql).toContain("0 AS hr");
   });
 
   it("Q13 cohortSessions (Sessions, page 0) swaps the chain for the sequence functions, with a user label", () => {
@@ -776,7 +788,7 @@ describe("drop-off builders (G5, AC-16, AC-17, AC-59)", () => {
 });
 
 describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
-  const s = scope({ schema: { action_id: true, usr_email: true } });
+  const s = scope({ schema: { action_id: true, usr_email: true, session_has_replay: true } });
   const opts = { events: [], sample: 1 as const };
   const def = {
     anchor: { kind: "p" as const, key: "/web/logs" },
@@ -918,6 +930,13 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
       "SELECT sid, t0 AS step_t",
     );
     expect(branchSessionsSql(s, null, def, "TRUE", 0, 1, opts)).toMatch(/LIMIT 200 OFFSET 200$/);
+  });
+
+  it("falls back to a constant hr instead of referencing session_has_replay when the org has no replay data", () => {
+    const noReplay = scope({ schema: { action_id: true, usr_email: true } });
+    const sql = pathsSql(noReplay, null, def, opts);
+    expect(sql).not.toContain("session_has_replay");
+    expect(sql).toContain("0 AS hr");
   });
 
   it("the branch drawer numbers path steps exactly as the flow does, error rows included (AC-26)", () => {
