@@ -323,13 +323,16 @@ describe("alertPayload", () => {
       expect(payload.query_condition.promql_condition).toBeNull();
     });
 
-    it("should clear sql for promql tab", () => {
+    // A PromQL alert never runs its SQL (the backend reads `sql` only for SQL
+    // alerts), so the stored query survives the save, as it does for Builder.
+    it("keeps the stored sql for promql tab", () => {
       const formData = createBaseFormData();
+      formData.query_condition.sql = 'SELECT count(*) FROM "cpu_usage"';
       const context = createBaseContext({ getSelectedTab: { value: "promql" } });
 
       const payload = getAlertPayload(formData, context);
 
-      expect(payload.query_condition.sql).toBe("");
+      expect(payload.query_condition.sql).toBe('SELECT count(*) FROM "cpu_usage"');
     });
 
     // Compare-with-Past windows only run with SQL; the form keeps them on other tabs.

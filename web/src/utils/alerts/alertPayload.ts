@@ -216,10 +216,6 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     payload.query_condition.promql_condition = null;
   }
 
-  if (getSelectedTab.value === "promql") {
-    payload.query_condition.sql = "";
-  }
-
   // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF
   // `slo_condition` is present, in BOTH directions, so the two must be kept in
   // lockstep here:
