@@ -212,10 +212,10 @@ describe("SettingsIndex", () => {
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
 
-      // visible=true when isEnterprise=true
-      expect(cipherItem?.visible).toBe(true);
-      expect(regexItem?.visible).toBe(true);
-      expect(pipelineItem?.visible).toBe(true);
+      // Always present now — unlocked (not just "visible") when isEnterprise=true.
+      expect(cipherItem?.locked).toBe(false);
+      expect(regexItem?.locked).toBe(false);
+      expect(pipelineItem?.locked).toBe(false);
     });
 
     it("should include meta org items when isMetaOrg is true and enterprise", () => {
@@ -326,9 +326,12 @@ describe("SettingsIndex", () => {
       return groups.flatMap((g: any) => g.items ?? []);
     };
 
-    it("should mark enterprise-only items as not visible when not enterprise", async () => {
+    it("should mark enterprise-only items as locked (not hidden) in a true OSS build", async () => {
       const config = await import("@/aws-exports");
       vi.mocked(config.default).isEnterprise = "false";
+      // Not just "not enterprise" — this batch doesn't exist on Cloud at all
+      // (see the next test), so OSS means neither flag is set.
+      vi.mocked(config.default).isCloud = "false";
 
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
@@ -337,10 +340,34 @@ describe("SettingsIndex", () => {
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
 
+      // Present but locked — not hidden — in OSS, so the feature stays discoverable.
+      expect(cipherItem?.visible).not.toBe(false);
+      expect(nodesItem?.visible).not.toBe(false);
+      expect(pipelineItem?.visible).not.toBe(false);
+      expect(regexItem?.visible).not.toBe(false);
+      expect(cipherItem?.locked).toBe(true);
+      expect(nodesItem?.locked).toBe(true);
+      expect(pipelineItem?.locked).toBe(true);
+      expect(regexItem?.locked).toBe(true);
+    });
+
+    // Cloud never offers this batch at all — not even locked — because a
+    // Cloud customer can't "upgrade" into self-hosted node/license/cipher-key
+    // management. Pure cloud (isEnterprise=false, isCloud=true) must hide it.
+    it("should hide (not lock) enterprise-only items in a pure cloud build", async () => {
+      const config = await import("@/aws-exports");
+      vi.mocked(config.default).isEnterprise = "false";
+      vi.mocked(config.default).isCloud = "true";
+
+      const wrapper = createWrapper();
+      const items = getAllItems(wrapper);
+      const cipherItem = items.find((i: any) => i.dataTest === "management-cipher-key-tab");
+      const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
+      const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
+
       expect(cipherItem?.visible).toBe(false);
       expect(nodesItem?.visible).toBe(false);
       expect(pipelineItem?.visible).toBe(false);
-      expect(regexItem?.visible).toBe(false);
     });
 
     // Synthetics ships in OSS: the locations hub card stays visible on an OSS

@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
   </OTooltip>
+  <LockedFeatureTooltip v-if="locked && lockedMessage" :message="lockedMessage" />
 </template>
 
 <script lang="ts">
@@ -100,6 +101,7 @@ import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 // A disabled reka tooltip drops its trigger listeners but keeps a pending hover-open timer; onClose() is the only way to cancel it.
@@ -125,7 +127,7 @@ const TooltipSilencer = defineComponent({
 
 export default defineComponent({
   name: "MenuLink",
-  components: { OIcon, OTooltip, TooltipSilencer },
+  components: { OIcon, OTooltip, TooltipSilencer, LockedFeatureTooltip },
   // Attrs are re-bound onto the tile element by hand: the tooltip wrapper is a fragment.
   inheritAttrs: false,
   props: {
@@ -200,6 +202,17 @@ export default defineComponent({
     paywalled: {
       type: Boolean,
       default: false,
+    },
+    // Present but unreachable — an enterprise/cloud-only item in a build that
+    // doesn't unlock it (see utils/enterpriseFeatures.ts). Dimmed, inert on
+    // click, and shows `lockedMessage` as a tooltip instead of navigating.
+    locked: {
+      type: Boolean,
+      default: false,
+    },
+    lockedMessage: {
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
   },
   emits: ["trigger"],
@@ -301,7 +314,7 @@ export default defineComponent({
 
     // A group tile never gets a tooltip: its flyout opens on the same edge and shows the title.
     const tooltipText = computed<I18nText | "">(() => {
-      if (props.asTrigger || props.submenu) return "";
+      if (props.asTrigger || props.submenu || props.locked) return "";
       if (props.paywalled) return paywallText.value;
       return isTruncated.value ? props.title : "";
     });
@@ -314,19 +327,32 @@ export default defineComponent({
       return !!c && (typeof c === "function" || Object.keys(c).length > 0);
     });
 
-    // Resolve the root element/component for the current mode.
+    // Resolve the root element/component for the current mode. Locked wins
+    // over everything else: rendering a REAL `RouterLink` and relying on
+    // `onRootClick`'s preventDefault to stop it does NOT work — RouterLink's
+    // own click handler is merged onto the root BEFORE the parent's `@click`
+    // fallthrough listener (confirmed in vue-router's source: the two land in
+    // a listener array, RouterLink's own `navigate` first), so by the time
+    // our handler calls preventDefault, `router.push()` has already run. A
+    // plain, non-navigating `div` is the only way to guarantee no navigation.
     const rootComponent = computed(() =>
-      props.external ? "a" : props.asTrigger ? "button" : RouterLink,
+      props.locked ? "div" : props.external ? "a" : props.asTrigger ? "button" : RouterLink,
     );
 
     // Attributes bound to the root, per mode. Kept in one place so the three
     // modes can never drift apart visually.
     const rootProps = computed<Record<string, any>>(() => {
       const common: Record<string, any> = {
-        "data-test": `menu-link-${props.link}-item`,
+        "data-test": props.locked
+          ? `menu-link-${props.link}-item-locked`
+          : `menu-link-${props.link}-item`,
         "aria-label": ariaLabel.value,
         "data-truncated": isTruncated.value ? "true" : undefined,
+        "aria-disabled": props.locked || undefined,
       };
+      if (props.locked) {
+        return { ...common, role: "link" };
+      }
       // Set only when present: an explicit undefined would erase the tooltip's own describedby.
       if (props.paywalled) {
         common["data-paywalled"] = "true";
@@ -367,9 +393,11 @@ export default defineComponent({
       "max-md:flex max-md:min-h-11 max-md:items-center max-md:px-2 max-md:py-2",
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
-      isActive.value
-        ? activePillClass.value
-        : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
+      props.locked
+        ? "cursor-not-allowed opacity-60 text-tabs-inactive-text border-s-2 border-transparent bg-transparent"
+        : isActive.value
+          ? activePillClass.value
+          : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.
@@ -383,6 +411,10 @@ export default defineComponent({
     ]);
 
     const onRootClick = (event: MouseEvent) => {
+      if (props.locked) {
+        event.preventDefault();
+        return;
+      }
       if (props.external) {
         event.preventDefault();
         openWebPage(props.link);

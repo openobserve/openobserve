@@ -67,6 +67,12 @@ import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import {
+  checkFeatureAccess,
+  buildFeatureGateContext,
+  isFeatureKey,
+} from "@/utils/enterpriseFeatures";
 
 const props = defineProps<{
   groupKey: string;
@@ -111,20 +117,29 @@ const flyoutStyle = ref<Record<string, string>>({});
 // group is worth collapsing into at all.
 const gateContext = useNavGateContext();
 
-// A child shows only when (a) its route is registered in this build, (b)
-// custom_hide_menus does not name it, AND (c) its visibility gate (if any)
-// passes — exactly as the target page would decide.
+// A child shows only when (a) its route is registered in this build and (b)
+// custom_hide_menus does not name it — exactly as the target page would
+// decide. Its `gate` (if any) decides WHETHER it's locked, not whether it
+// shows: when the gate is a registered enterprise/cloud FeatureKey, a failing
+// gate keeps the child (dimmed, inert, with a message) rather than dropping
+// it, so the feature stays discoverable in a build that doesn't unlock it. A
+// `gate` that ISN'T a FeatureKey (e.g. a plain on/off section flag) keeps the
+// old hide-on-fail behavior.
 //
 // The custom_hide_menus check is by route NAME so a child with no top-level
 // rail entry of its own is hideable at all: `requires` only tracks the parent,
 // and MainLayout's filter only ever sees top-level links.
-const visibleChildren = computed(() =>
-  props.children.filter((c) => {
-    if (!router.hasRoute(c.name)) return false;
-    if (gateContext.value.hiddenMenus.has(c.name)) return false;
-    if (c.gate && !isGateOpen(gateContext.value, c.gate)) return false;
-    return true;
-  }),
+const visibleChildren = computed<SubnavChild[]>(() =>
+  props.children
+    .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
+    .flatMap((c): SubnavChild[] => {
+      if (!c.gate) return [{ ...c, locked: false }];
+      if (isFeatureKey(c.gate)) {
+        const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
+        return [{ ...c, locked: !access.allowed, lockedMessage: access.message }];
+      }
+      return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
+    }),
 );
 
 // A group with no surviving child is not a group — it is an empty tile that
@@ -262,8 +277,12 @@ const activeChild = computed<SubnavChild | null>(
   () => resolveActiveChild(props.children) ?? resolveActiveChild(props.filteredChildren ?? []),
 );
 
+// By KEY, not reference: `visibleChildren` (what actually renders) maps each
+// child through a `{ ...c, locked }` spread to attach the locked state
+// computed at render time, so a rendered child is never the SAME object
+// `activeChild` (derived from `props.children`) resolved to.
 function isChildActive(child: SubnavChild): boolean {
-  return activeChild.value === child;
+  return activeChild.value !== null && childKey(activeChild.value) === childKey(child);
 }
 const isGroupActive = computed(() => activeChild.value !== null);
 
@@ -290,7 +309,9 @@ const tileLink = computed(() => {
   if (!parent) return "";
   const declared = [...props.children, ...(props.filteredChildren ?? [])];
   const anchor = declared.find((c) => childPath(c.name) === parent.link);
-  if (!anchor || visibleChildren.value.includes(anchor)) return parent.link;
+  if (!anchor || visibleChildren.value.some((c) => childKey(c) === childKey(anchor))) {
+    return parent.link;
+  }
   const first = visibleChildren.value[0];
   return first ? (childPath(first.name) ?? parent.link) : parent.link;
 });
@@ -490,6 +511,15 @@ function onDocumentPointerDown(event: PointerEvent) {
   if (wrapperRef.value?.contains(target) || flyoutRef.value?.contains(target)) {
     return;
   }
+  // A locked child's tooltip (LockedFeatureTooltip) is ALSO teleported to
+  // <body>, outside flyoutRef's own subtree — without this, pointerdown on
+  // its Upgrade button reads as an outside click, closes (and unmounts) the
+  // flyout on the spot, and the click event that was about to fire next has
+  // nothing left to land on. `pointerdown` fires before `click`, so this has
+  // to be checked here, not just guarded in a click handler.
+  if (target instanceof Element && target.closest('[data-test="o-tooltip-content"]')) {
+    return;
+  }
   close();
 }
 
@@ -593,7 +623,11 @@ function onFlyoutKeydown(event: KeyboardEvent) {
 const markRailNavigation = inject(RailNavigationMarkKey, null);
 
 // Keyboard choice (detail 0) returns focus to the tile; a mouse choice leaves it to the page.
-function onChildClick(event: MouseEvent) {
+function onChildClick(event: MouseEvent, child: SubnavChild & { locked?: boolean }) {
+  if (child.locked) {
+    event.preventDefault();
+    return;
+  }
   markRailNavigation?.(event);
   close();
   if (event.detail === 0) nextTick(() => focusTile());
@@ -678,92 +712,128 @@ function onChildMouseenter(event: MouseEvent) {
           >
             {{ t(block.labelKey) }}
           </div>
-          <router-link
-            v-for="child in block.children"
-            :key="childKey(child)"
-            :data-test="childDataTest(child)"
+          <template v-for="child in block.children" :key="childKey(child)">
+            <!-- `div` when locked, never `router-link`: RouterLink's own click
+                 handler runs BEFORE onChildClick's preventDefault (it's merged
+                 first in the fallthrough listener array), so it navigates
+                 regardless — only not rendering a RouterLink at all stops it. -->
+            <component
+              :is="child.locked ? 'div' : 'router-link'"
+              :data-test="child.locked ? `${childDataTest(child)}-locked` : childDataTest(child)"
+              role="menuitem"
+              :to="child.locked ? undefined : childTo(child)"
+              class="nav-group-item rounded-default flex items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+              :class="[
+                flyoutTextClass,
+                child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                isChildActive(child) ? 'bg-select-item-selected-bg font-medium' : '',
+              ]"
+              :aria-current="isChildActive(child) ? 'page' : undefined"
+              :aria-disabled="child.locked || undefined"
+              :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
+              :aria-describedby="
+                isChildPaywalled(child) ? itemDescriptionId(child, 'inline-') : undefined
+              "
+              @click="onChildClick($event, child)"
+            >
+              <OIcon
+                :name="child.icon"
+                size="sm"
+                class="shrink-0"
+                :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
+              />
+              <span class="leading-tight">{{ childLabel(child) }}</span>
+              <BetaBadge v-if="child.beta" size="xs" />
+              <OIcon
+                v-if="isChildPaywalled(child)"
+                name="lock"
+                size="xs"
+                class="text-text-secondary ms-auto shrink-0"
+                :data-test="`${childDataTest(child)}-lock`"
+                aria-hidden="true"
+              />
+              <span
+                v-if="isChildPaywalled(child)"
+                :id="itemDescriptionId(child, 'inline-')"
+                class="sr-only"
+                >{{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}</span
+              >
+            </component>
+            <!-- Sibling, NOT nested inside the link above: child-mode OTooltip
+                 anchors to the element immediately before it, so nesting it
+                 would shrink the hoverable region to whatever element happens
+                 to precede it inside the link (the label span) instead of the
+                 whole tile — the pointer would leave that tiny region well
+                 before reaching the bubble and the tooltip would snap shut.
+                 mouseenter/leave reuse the flyout's own close-timer handlers
+                 so hovering the tooltip (teleported outside the flyout's own
+                 DOM) doesn't let the flyout's close timer run out from under
+                 it — without this, moving onto the tooltip's Upgrade link
+                 closed the whole flyout (and the tooltip with it). -->
+            <LockedFeatureTooltip
+              v-if="child.locked && child.lockedMessage"
+              :message="child.lockedMessage"
+              @mouseenter="clearTimers"
+              @mouseleave="scheduleClose"
+            />
+          </template>
+        </div>
+
+        <template v-else>
+          <component
+            :is="block.child.locked ? 'div' : 'router-link'"
+            :data-test="
+              block.child.locked
+                ? `${childDataTest(block.child)}-locked`
+                : childDataTest(block.child)
+            "
             role="menuitem"
-            :to="childTo(child)"
-            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+            :to="block.child.locked ? undefined : childTo(block.child)"
+            class="nav-group-item rounded-default flex items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
             :class="[
               flyoutTextClass,
-              isChildActive(child) ? 'bg-select-item-selected-bg font-medium' : '',
+              block.child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+              block.spaced ? 'mt-2' : '',
+              isChildActive(block.child) ? 'bg-select-item-selected-bg font-medium' : '',
             ]"
-            :aria-current="isChildActive(child) ? 'page' : undefined"
-            :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
+            :aria-current="isChildActive(block.child) ? 'page' : undefined"
+            :aria-disabled="block.child.locked || undefined"
+            :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
             :aria-describedby="
-              isChildPaywalled(child) ? itemDescriptionId(child, 'inline-') : undefined
+              isChildPaywalled(block.child) ? itemDescriptionId(block.child, 'inline-') : undefined
             "
-            @click="onChildClick"
+            @click="onChildClick($event, block.child)"
           >
             <OIcon
-              :name="child.icon"
+              :name="block.child.icon"
               size="sm"
               class="shrink-0"
-              :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
+              :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
             />
-            <span class="leading-tight">{{ childLabel(child) }}</span>
-            <BetaBadge v-if="child.beta" size="xs" />
+            <span class="leading-tight">{{ childLabel(block.child) }}</span>
+            <BetaBadge v-if="block.child.beta" size="xs" />
             <OIcon
-              v-if="isChildPaywalled(child)"
+              v-if="isChildPaywalled(block.child)"
               name="lock"
               size="xs"
               class="text-text-secondary ms-auto shrink-0"
-              :data-test="`${childDataTest(child)}-lock`"
+              :data-test="`${childDataTest(block.child)}-lock`"
               aria-hidden="true"
             />
             <span
-              v-if="isChildPaywalled(child)"
-              :id="itemDescriptionId(child, 'inline-')"
+              v-if="isChildPaywalled(block.child)"
+              :id="itemDescriptionId(block.child, 'inline-')"
               class="sr-only"
+              >{{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}</span
             >
-              {{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}
-            </span>
-          </router-link>
-        </div>
-
-        <router-link
-          v-else
-          :data-test="childDataTest(block.child)"
-          role="menuitem"
-          :to="childTo(block.child)"
-          class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
-          :class="[
-            flyoutTextClass,
-            block.spaced ? 'mt-2' : '',
-            isChildActive(block.child) ? 'bg-select-item-selected-bg font-medium' : '',
-          ]"
-          :aria-current="isChildActive(block.child) ? 'page' : undefined"
-          :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
-          :aria-describedby="
-            isChildPaywalled(block.child) ? itemDescriptionId(block.child, 'inline-') : undefined
-          "
-          @click="onChildClick"
-        >
-          <OIcon
-            :name="block.child.icon"
-            size="sm"
-            class="shrink-0"
-            :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
+          </component>
+          <LockedFeatureTooltip
+            v-if="block.child.locked && block.child.lockedMessage"
+            :message="block.child.lockedMessage"
+            @mouseenter="clearTimers"
+            @mouseleave="scheduleClose"
           />
-          <span class="leading-tight">{{ childLabel(block.child) }}</span>
-          <BetaBadge v-if="block.child.beta" size="xs" />
-          <OIcon
-            v-if="isChildPaywalled(block.child)"
-            name="lock"
-            size="xs"
-            class="text-text-secondary ms-auto shrink-0"
-            :data-test="`${childDataTest(block.child)}-lock`"
-            aria-hidden="true"
-          />
-          <span
-            v-if="isChildPaywalled(block.child)"
-            :id="itemDescriptionId(block.child, 'inline-')"
-            class="sr-only"
-          >
-            {{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}
-          </span>
-        </router-link>
+        </template>
       </template>
     </div>
 
@@ -823,97 +893,132 @@ function onChildMouseenter(event: MouseEvent) {
             >
               {{ t(block.labelKey) }}
             </div>
-            <router-link
-              v-for="(child, childIndex) in block.children"
-              :key="childKey(child)"
-              :data-test="childDataTest(child)"
+            <template v-for="(child, childIndex) in block.children" :key="childKey(child)">
+              <!-- `div` when locked, never `router-link` — see the comment on
+                   the mobile block above (RouterLink's own click handler runs
+                   before onChildClick's preventDefault). -->
+              <component
+                :is="child.locked ? 'div' : 'router-link'"
+                :data-test="child.locked ? `${childDataTest(child)}-locked` : childDataTest(child)"
+                role="menuitem"
+                :to="child.locked ? undefined : childTo(child)"
+                class="nav-group-item rounded-default focus-visible:ring-accent flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                :class="[
+                  flyoutTextClass,
+                  child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                  childIndex > 0 ? 'mt-0.5' : '',
+                  isChildActive(child)
+                    ? 'bg-select-item-selected-bg font-medium'
+                    : child.locked
+                      ? ''
+                      : 'hover:bg-dropdown-item-hover-bg',
+                ]"
+                :aria-current="isChildActive(child) ? 'page' : undefined"
+                :aria-disabled="child.locked || undefined"
+                :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
+                :aria-describedby="isChildPaywalled(child) ? itemDescriptionId(child) : undefined"
+                @click="onChildClick($event, child)"
+                @mouseenter="onChildMouseenter"
+              >
+                <!-- Icon color is locked to the text color so it never picks up a
+                     primary tint via currentColor inheritance. -->
+                <OIcon
+                  :name="child.icon"
+                  size="sm"
+                  class="shrink-0"
+                  :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
+                />
+                <span class="leading-none">{{ childLabel(child) }}</span>
+                <BetaBadge v-if="child.beta" size="xs" />
+                <OIcon
+                  v-if="isChildPaywalled(child)"
+                  name="lock"
+                  size="xs"
+                  class="text-text-secondary ms-auto shrink-0"
+                  :data-test="`${childDataTest(child)}-lock`"
+                  aria-hidden="true"
+                />
+                <span
+                  v-if="isChildPaywalled(child)"
+                  :id="itemDescriptionId(child)"
+                  class="sr-only"
+                  >{{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}</span
+                >
+              </component>
+              <!-- Sibling, not nested — see the comment on the mobile block
+                   above. mouseenter/leave keep the flyout's close timer paused
+                   while hovering the teleported tooltip — see that comment too. -->
+              <LockedFeatureTooltip
+                v-if="child.locked && child.lockedMessage"
+                :message="child.lockedMessage"
+                @mouseenter="clearTimers"
+                @mouseleave="scheduleClose"
+              />
+            </template>
+          </div>
+
+          <template v-else>
+            <component
+              :is="block.child.locked ? 'div' : 'router-link'"
+              :data-test="
+                block.child.locked
+                  ? `${childDataTest(block.child)}-locked`
+                  : childDataTest(block.child)
+              "
               role="menuitem"
-              :to="childTo(child)"
-              class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+              :to="block.child.locked ? undefined : childTo(block.child)"
+              class="nav-group-item rounded-default focus-visible:ring-accent flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
               :class="[
                 flyoutTextClass,
-                childIndex > 0 ? 'mt-0.5' : '',
-                isChildActive(child)
+                block.child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                // Matches the pt-4 a header gets, so leaving a run and starting
+                // one look like the same size of break.
+                block.spaced ? 'mt-3' : '',
+                isChildActive(block.child)
                   ? 'bg-select-item-selected-bg font-medium'
-                  : 'hover:bg-dropdown-item-hover-bg',
+                  : block.child.locked
+                    ? ''
+                    : 'hover:bg-dropdown-item-hover-bg',
               ]"
-              :aria-current="isChildActive(child) ? 'page' : undefined"
-              :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
-              :aria-describedby="isChildPaywalled(child) ? itemDescriptionId(child) : undefined"
-              @click="onChildClick"
+              :aria-current="isChildActive(block.child) ? 'page' : undefined"
+              :aria-disabled="block.child.locked || undefined"
+              :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
+              :aria-describedby="
+                isChildPaywalled(block.child) ? itemDescriptionId(block.child) : undefined
+              "
+              @click="onChildClick($event, block.child)"
               @mouseenter="onChildMouseenter"
             >
-              <!-- Icon color is locked to the text color so it never picks up a
-                   primary tint via currentColor inheritance. -->
               <OIcon
-                :name="child.icon"
+                :name="block.child.icon"
                 size="sm"
                 class="shrink-0"
-                :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
+                :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
               />
-              <span class="leading-none">{{ childLabel(child) }}</span>
-              <BetaBadge v-if="child.beta" size="xs" />
+              <span class="leading-none">{{ childLabel(block.child) }}</span>
+              <BetaBadge v-if="block.child.beta" size="xs" />
               <OIcon
-                v-if="isChildPaywalled(child)"
+                v-if="isChildPaywalled(block.child)"
                 name="lock"
                 size="xs"
                 class="text-text-secondary ms-auto shrink-0"
-                :data-test="`${childDataTest(child)}-lock`"
+                :data-test="`${childDataTest(block.child)}-lock`"
                 aria-hidden="true"
               />
-              <span v-if="isChildPaywalled(child)" :id="itemDescriptionId(child)" class="sr-only">
-                {{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}
-              </span>
-            </router-link>
-          </div>
-
-          <router-link
-            v-else
-            :data-test="childDataTest(block.child)"
-            role="menuitem"
-            :to="childTo(block.child)"
-            class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
-            :class="[
-              flyoutTextClass,
-              // Matches the pt-4 a header gets, so leaving a run and starting
-              // one look like the same size of break.
-              block.spaced ? 'mt-3' : '',
-              isChildActive(block.child)
-                ? 'bg-select-item-selected-bg font-medium'
-                : 'hover:bg-dropdown-item-hover-bg',
-            ]"
-            :aria-current="isChildActive(block.child) ? 'page' : undefined"
-            :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
-            :aria-describedby="
-              isChildPaywalled(block.child) ? itemDescriptionId(block.child) : undefined
-            "
-            @click="onChildClick"
-            @mouseenter="onChildMouseenter"
-          >
-            <OIcon
-              :name="block.child.icon"
-              size="sm"
-              class="shrink-0"
-              :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
+              <span
+                v-if="isChildPaywalled(block.child)"
+                :id="itemDescriptionId(block.child)"
+                class="sr-only"
+                >{{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}</span
+              >
+            </component>
+            <LockedFeatureTooltip
+              v-if="block.child.locked && block.child.lockedMessage"
+              :message="block.child.lockedMessage"
+              @mouseenter="clearTimers"
+              @mouseleave="scheduleClose"
             />
-            <span class="leading-none">{{ childLabel(block.child) }}</span>
-            <BetaBadge v-if="block.child.beta" size="xs" />
-            <OIcon
-              v-if="isChildPaywalled(block.child)"
-              name="lock"
-              size="xs"
-              class="text-text-secondary ms-auto shrink-0"
-              :data-test="`${childDataTest(block.child)}-lock`"
-              aria-hidden="true"
-            />
-            <span
-              v-if="isChildPaywalled(block.child)"
-              :id="itemDescriptionId(block.child)"
-              class="sr-only"
-            >
-              {{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}
-            </span>
-          </router-link>
+          </template>
         </template>
       </div>
     </Teleport>

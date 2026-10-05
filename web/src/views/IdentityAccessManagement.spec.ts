@@ -241,7 +241,7 @@ describe("IdentityAccessManagement.vue Component", () => {
       w.unmount();
     });
 
-    it("should hide groups and roles when rbac_enabled is false", async () => {
+    it("should lock (not hide) groups and roles when rbac_enabled is false", async () => {
       store.state.zoConfig.rbac_enabled = false;
 
       const w = mount(IdentityAccessManagement, {
@@ -253,9 +253,12 @@ describe("IdentityAccessManagement.vue Component", () => {
       });
       await flushPromises();
 
+      // Present but locked — not hidden — so the feature stays discoverable.
       const items = visibleItems(w.vm.sectionGroups);
-      expect(items.some((i: any) => i.key === "groups")).toBe(false);
-      expect(items.some((i: any) => i.key === "roles")).toBe(false);
+      const groups = items.find((i: any) => i.key === "groups");
+      const roles = items.find((i: any) => i.key === "roles");
+      expect(groups?.locked).toBe(true);
+      expect(roles?.locked).toBe(true);
       w.unmount();
     });
   });
@@ -524,7 +527,7 @@ describe("IdentityAccessManagement.vue Component", () => {
         w.unmount();
       });
 
-      it("should not include groups/roles in open source (non-enterprise)", async () => {
+      it("should show groups/roles locked, not hidden, in open source (non-enterprise)", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.rbac_enabled = true;
@@ -538,10 +541,13 @@ describe("IdentityAccessManagement.vue Component", () => {
         });
         await flushPromises();
 
+        // Present (discoverable) but locked — OSS can't unlock RBAC regardless
+        // of the backend's rbac_enabled flag.
         const items = visibleItems(w.vm.sectionGroups);
-        const keys = items.map((i: any) => i.key);
-        expect(keys).not.toContain("groups");
-        expect(keys).not.toContain("roles");
+        const groups = items.find((i: any) => i.key === "groups");
+        const roles = items.find((i: any) => i.key === "roles");
+        expect(groups?.locked).toBe(true);
+        expect(roles?.locked).toBe(true);
         w.unmount();
       });
 
