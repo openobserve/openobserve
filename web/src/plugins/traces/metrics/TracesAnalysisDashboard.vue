@@ -431,7 +431,7 @@ const AnalysisPage: FunctionalComponent = (_, { slots, attrs }) =>
           h(
             "span",
             {
-              class: "text-text-primary me-3 shrink-0 text-sm font-semibold",
+              class: "text-text-heading me-3 shrink-0 text-sm font-semibold",
               "data-test": "traces-analysis-dashboard-page-title",
             },
             attrs.title as string,
