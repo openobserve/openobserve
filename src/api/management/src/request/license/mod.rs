@@ -148,7 +148,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let (key, license, installation_id) = viewer_license_fields(
         is_root,
         is_license_admin,
-        &config::get_config().grpc.internal_grpc_token,
+        &config::meta::cluster::get_internal_grpc_token(),
         o2_cfg.common.redact_license_key,
         key,
         license,
@@ -311,6 +311,17 @@ mod tests {
         let root = response_json_with_token(true, true, "");
         let root: json::Value = json::from_str(&root).unwrap();
         assert_eq!(root["installation_id"], INSTANCE_ID);
+    }
+
+    #[test]
+    fn test_license_admins_get_the_installation_id_once_a_stored_token_replaces_it() {
+        config::cache_instance_id(INSTANCE_ID);
+        config::cache_stored_grpc_token("stored-random-token");
+        let token = config::meta::cluster::get_internal_grpc_token();
+        config::cache_stored_grpc_token("");
+        let admin = response_json_with_token(false, true, &token);
+        let admin: json::Value = json::from_str(&admin).unwrap();
+        assert_eq!(admin["installation_id"], INSTANCE_ID);
     }
 
     #[test]

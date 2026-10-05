@@ -63,11 +63,6 @@ pub async fn run(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
-    if get_config().grpc.internal_grpc_token.is_empty() {
-        log::warn!(
-            "ZO_INTERNAL_GRPC_TOKEN is not set, the internal gRPC token falls back to the instance id"
-        );
-    }
     if config::cluster::LOCAL_NODE.is_router() {
         run_router(init_tx, shutdown_rx, stopped_tx).await
     } else {

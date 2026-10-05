@@ -410,6 +410,7 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+static STORED_GRPC_TOKEN: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
 
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
@@ -564,6 +565,15 @@ pub fn get_instance_id() -> String {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
+}
+
+/// Caches the internal gRPC token stored in the meta db; empty means none is stored.
+pub fn cache_stored_grpc_token(token: &str) {
+    STORED_GRPC_TOKEN.store(Arc::new(token.to_owned()));
+}
+
+pub fn get_stored_grpc_token() -> String {
+    STORED_GRPC_TOKEN.load().to_string()
 }
 
 pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
