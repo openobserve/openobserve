@@ -1356,3 +1356,188 @@ describe("saved funnel sql cap (G8, CR-24)", () => {
     expect(Math.max(...sizes("'", "é"))).toBeGreaterThan(65536);
   });
 });
+
+// Regression for o2-enterprise#2798: pageKeyExpr's mobile fallback read the literal
+// column `view_name`, but every CTE-level call site only ever selected `url`/`fu`/`lu`
+// — never `view_name` itself — so Pages, Funnels and Paths broke in any org where a
+// mobile RUM app had added `view_name` to the shared `_rumdata` schema.
+describe("mobile view_name fallback reaches a column the CTE actually selects (o2-enterprise#2798)", () => {
+  const s = scope({ schema: { view_name: true, usr_email: true, action_id: true } });
+  const id = { field: "usr_email" as const, excluded: [] };
+  const opts = { events: [], sample: 1 as const };
+
+  it("pageKeyExpr lets a caller name the real backing column instead of the raw 'view_name'", () => {
+    expect(pageKeyExpr("url", { view_name: true }, "vn")).toContain("THEN NULLIF(vn, '') ELSE");
+    expect(pageKeyExpr("url", { view_name: true })).toContain("THEN NULLIF(view_name, '') ELSE");
+  });
+
+  it("Q4 pages (Overview -> Pages) carries vn through v0/v1 and reads it, not the raw column", () => {
+    const sql = pagesSql(s, CS, id);
+    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("v1 AS (SELECT sid, ty, cur, vid, url, vn,");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q6 entryExit carries fvn/lvn for the first and last view", () => {
+    const sql = entryExitSql(s, CS, id);
+    expect(sql).toContain(
+      "substr(MIN(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS fvn",
+    );
+    expect(sql).toContain(
+      "substr(MAX(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS lvn",
+    );
+    expect(sql).toContain("NULLIF(fvn, '')");
+    expect(sql).toContain("NULLIF(lvn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q9 stepPicker carries vn", () => {
+    const sql = stepPickerSql(s);
+    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q7 funnel (Funnels panel) carries vn through x00/x0 for the page key", () => {
+    const steps = [
+      { kind: "p" as const, key: "/web" },
+      { kind: "p" as const, key: "/web/logs" },
+    ];
+    const sql = funnelSql(
+      s,
+      id,
+      { steps, unit: "sessions", window: "session", breakdown: null },
+      opts,
+    );
+    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("an on-page action rule forwards vn alongside url so the step flag resolves it inside x1", () => {
+    const events = [
+      {
+        id: "ev1",
+        app: "web",
+        name: "Save",
+        rules: [{ t: "action" as const, targets: ["save"], onPage: "/web" }],
+        version: 1,
+        createdBy: "",
+        createdAt: 0,
+        updatedBy: "",
+        updatedAt: 0,
+      },
+    ];
+    const sql = funnelSql(
+      s,
+      null,
+      {
+        steps: [{ kind: "e" as const, key: "ev1" }],
+        unit: "sessions",
+        window: "session",
+        breakdown: null,
+      },
+      { events, sample: 1 },
+    );
+    expect(sql).toMatch(/ AS k, url, vn FROM x00/);
+    expect(sql).toContain(`k IN ('save') AND ${pageKeyExpr("url", s.schema, "vn")} = '/web'`);
+    expect(sql).toContain("NULLIF(view_name, '')"); // the raw-level onPage scan filter in x00, unaffected
+  });
+
+  it("Q12 dropoffHealth and Q13 cohortSessions carry vn through fullChainCtes", () => {
+    const sessions = {
+      steps: [
+        { kind: "p" as const, key: "/web" },
+        { kind: "c" as const, key: "menu-link-/logs-item" },
+      ],
+      unit: "sessions" as const,
+      window: "session" as const,
+      breakdown: null,
+    };
+    const health = dropoffHealthSql(s, null, sessions, 1, opts);
+    expect(health).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(health).toContain("NULLIF(vn, '')");
+    expect(health).not.toContain("NULLIF(view_name, '')");
+    const cohort = cohortSessionsSql(
+      s,
+      id,
+      { funnel: sessions, stepIndex: 1, side: "dropped" },
+      0,
+      opts,
+    );
+    expect(cohort).toContain("NULLIF(vn, '')");
+    expect(cohort).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q14 paths carries vn", () => {
+    const def = {
+      anchor: { kind: "p" as const, key: "/web/logs" },
+      direction: "next" as const,
+      depth: 3,
+      include: "all" as const,
+      cohort: null,
+    };
+    const sql = pathsSql(s, null, def, opts);
+    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q23 features carries vn", () => {
+    const events = [
+      {
+        id: "e0",
+        app: "web",
+        name: "E0",
+        rules: [{ t: "view" as const, op: "eq" as const, value: "/web/logs" }],
+        version: 1,
+        createdBy: "",
+        createdAt: 0,
+        updatedBy: "",
+        updatedAt: 0,
+      },
+    ];
+    const sql = featuresSql(s, CS, id, events);
+    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("every builder still runs join-free with view_name in the schema", () => {
+    const steps = [
+      { kind: "p" as const, key: "/web" },
+      { kind: "c" as const, key: "menu-link-/logs-item" },
+      { kind: "p" as const, key: "/web/logs" },
+    ];
+    const def = { steps, unit: "sessions" as const, window: "session" as const, breakdown: null };
+    for (const sql of [
+      pagesSql(s, CS, id),
+      entryExitSql(s, CS, id),
+      stepPickerSql(s),
+      funnelSql(s, id, def, opts),
+      funnelPanelSql(s, def, opts),
+      pathsSql(
+        s,
+        id,
+        { anchor: { kind: "p", key: "/web" }, direction: "next", depth: 3, include: "all", cohort: null },
+        opts,
+      ),
+      featuresSql(s, CS, id, [
+        {
+          id: "e0",
+          app: "web",
+          name: "E0",
+          rules: [{ t: "view", op: "eq", value: "/web" }],
+          version: 1,
+          createdBy: "",
+          createdAt: 0,
+          updatedBy: "",
+          updatedAt: 0,
+        },
+      ]),
+    ]) {
+      expect(() => assertJoinFree(sql)).not.toThrow();
+    }
+  });
+});
