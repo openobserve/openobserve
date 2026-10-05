@@ -536,6 +536,101 @@ pub fn schema_records_to_entries(
         .collect()
 }
 
+/// All streams while the pattern manager is down, else those whose pattern failed to build.
+#[cfg(any(feature = "vectorscan", test))]
+fn unscannable_streams<'a>(
+    streams: &[(&'a str, u64)],
+    manager_up: bool,
+    unbuilt: impl Fn(&str) -> bool,
+) -> Vec<(&'a str, u64)> {
+    streams
+        .iter()
+        .copied()
+        .filter(|(stream, _)| !manager_up || unbuilt(stream))
+        .collect()
+}
+
+/// Each stream plus its pipelines' fixed same-type destinations, with the source's record count.
+#[cfg(feature = "vectorscan")]
+pub async fn with_pipeline_destinations(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+) -> Vec<(String, u64)> {
+    let mut all: Vec<(String, u64)> = streams.iter().map(|(s, n)| (s.to_string(), *n)).collect();
+    // Walking pipelines clones each compiled one, so skip it when nothing would be refused.
+    if !config::get_config().common.sdr_fail_closed {
+        return all;
+    }
+    for (stream, records) in streams {
+        let params = StreamParams::new(org_id, stream, stream_type);
+        for pipeline in get_stream_executable_pipelines(&params).await {
+            for dest in pipeline.get_all_destination_streams() {
+                let same_scope = dest.org_id == org_id && dest.stream_type == stream_type;
+                if same_scope && !all.iter().any(|(s, _)| *s == dest.stream_name) {
+                    all.push((dest.stream_name.to_string(), *records));
+                }
+            }
+        }
+    }
+    all
+}
+
+/// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
+#[cfg(feature = "vectorscan")]
+pub async fn sdr_fail_closed_refusal(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+    exempt: impl Fn(&str) -> bool,
+) -> Option<String> {
+    use config::meta::self_reporting::redaction::{
+        DataWindow, EvidenceScope, FailPosture, fail_closed_rejection,
+    };
+    if !config::get_config().common.sdr_fail_closed {
+        return None;
+    }
+    let unscannable = match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(mgr) => unscannable_streams(streams, true, |stream| {
+            mgr.has_unbuilt_patterns(
+                org_id,
+                stream_type,
+                stream,
+                o2_enterprise::enterprise::re_patterns::ApplyTime::Ingestion,
+            )
+        }),
+        Err(e) => {
+            log::error!("[SDR] pattern manager unavailable for org {org_id}: {e}");
+            unscannable_streams(streams, false, |_| true)
+        }
+    };
+    let reason = fail_closed_rejection(
+        true,
+        org_id,
+        stream_type,
+        unscannable.iter().map(|(stream, _)| *stream),
+        &exempt,
+    )?;
+    for (stream, records) in unscannable.iter().filter(|(stream, _)| !exempt(stream)) {
+        crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+            &EvidenceScope::new(org_id, stream, stream_type),
+            FailPosture::Closed,
+            *records,
+            DataWindow::default(),
+        )
+        .await;
+    }
+    log::error!("[SDR] {reason}");
+    Some(reason)
+}
+
+/// The fail-closed redaction refusal, as opposed to an overload or another resource error.
+#[cfg(any(feature = "vectorscan", test))]
+pub fn is_sdr_fail_closed_refusal(e: &Error) -> bool {
+    matches!(e, Error::ResourceError(reason)
+        if config::meta::self_reporting::redaction::is_fail_closed_rejection(reason))
+}
+
 /// Only a server fault is 500: a batch the client must fix is 400 and an overload is 503.
 pub fn write_error_status(e: &Error) -> http::StatusCode {
     match e {
@@ -845,6 +940,44 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_only_the_fail_closed_refusal_is_recognised() {
+        let reason = config::meta::self_reporting::redaction::fail_closed_rejection(
+            true,
+            "acme",
+            StreamType::Logs,
+            ["app"].into_iter(),
+            |_| false,
+        )
+        .expect("refused");
+        assert!(is_sdr_fail_closed_refusal(&Error::ResourceError(
+            reason.clone()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::ResourceError(
+            "memtable is full".to_string()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::IngestionError(reason)));
+    }
+
+    #[test]
+    fn test_unscannable_streams_is_every_stream_while_the_manager_is_down() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, false, |_| false),
+            vec![("app", 3), ("audit", 1)]
+        );
+    }
+
+    #[test]
+    fn test_unscannable_streams_is_only_unbuilt_streams_once_the_manager_is_up() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, true, |stream| stream == "audit"),
+            vec![("audit", 1)]
+        );
+        assert!(unscannable_streams(&streams, true, |_| false).is_empty());
+    }
 
     #[test]
     fn test_silenced_realtime_trigger_records_when_it_fired() {

@@ -1151,6 +1151,8 @@
     "redirect_to_logs_page": "ログページに戻る",
     "visualize": "視覚化",
     "enableSqlModeOrSelectSingleStream": "SQL モードを有効にして視覚化してください",
+    "drillDown": "ドリルダウン",
+    "drillDownUnavailableInSqlMode": "ドリルダウンは SQL モードでは使用できません",
     "buildQuery": "ビルド",
     "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません",
     "transformType": "変換タイプ",
@@ -4236,6 +4238,7 @@
     "dashboardTitleLatency": "レイテンシインサイト",
     "dashboardTitleVolume": "ボリュームインサイト",
     "dimensionsSelected": "ディメンションが選択されました",
+    "noDimensionsSelected": "分析するディメンションを選択してください",
     "durationLabel": "所要時間:",
     "failedToLoad": "分析を読み込めませんでした",
     "panelDescErrorComparison": "ディメンション {dimension} のエラー率比較。選択バーが高いほど、このディメンション値がエラースパイク期間中に多くのエラーを持つことを示します。",
@@ -4250,7 +4253,6 @@
   "volumeInsights": {
     "title": "インサイト",
     "tabLabel": "レート",
-    "analyzeTooltipLogs": "現在の時間範囲のディメンション分布を分析",
     "analyzeTooltipTraces": "レート、レイテンシ、エラーパターンについてトレースディメンションを分析",
     "rateLabel": "レート:",
     "searchInspectionsLabel": "検索ジョブの実行詳細を検査する",
@@ -10430,6 +10432,7 @@
     "loadingStream": "ストリームをロード中...",
     "noLogsAvailableForService": "このサービスで利用できるログはありません",
     "noCorrelatedLogsFound": "このスパンに関連するログは見つかりませんでした",
+    "spanHasNoLogsShowingTrace": "このスパンにはログがありません。トレース全体のログを表示しています。",
     "noData": {
       "title": "{product} へのトレース送信を始めましょう",
       "description": "この組織にはまだトレースストリームが見つかりません。サービスを計装すると、トレースがここに自動的に表示されます。",

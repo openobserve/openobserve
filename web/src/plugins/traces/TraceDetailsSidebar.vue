@@ -1875,7 +1875,10 @@ export default defineComponent({
 
     const viewSpanLogs = async () => {
       if (config.isEnterprise === "true") {
+        const clickedSpan = spanKey(props.span);
         await loadCorrelation();
+        // The user moved to another span while this lookup ran: do nothing.
+        if (spanKey(props.span) !== clickedSpan) return;
         if (correlationProps.value?.logStreams?.length) {
           navigateToCorrelatedLogs(correlationProps.value);
         } else {
@@ -2365,12 +2368,31 @@ export default defineComponent({
       return normalizeSeverity(span.severity_text ?? span.severity);
     };
 
+    // Keyed by span so a mid-load View Logs awaits this span's lookup and never reuses another's.
+    let correlationRequest: { key: string; promise: Promise<void> } | null = null;
+    const spanKey = (span: any) => `${span?.trace_id ?? ""}/${span?.span_id ?? ""}`;
+
     /**
      * Load correlation data for this span (called when user clicks on correlation tabs)
      */
-    const loadCorrelation = async () => {
-      // Skip if already loaded or loading
-      if (correlationProps.value || correlationLoading.value) {
+    const loadCorrelation = (): Promise<void> => {
+      if (correlationProps.value) return Promise.resolve();
+      const key = spanKey(props.span);
+      if (correlationRequest?.key !== key) {
+        const promise: Promise<void> = fetchCorrelation(key).finally(() => {
+          if (correlationRequest?.promise === promise) correlationRequest = null;
+        });
+        correlationRequest = { key, promise };
+      }
+      return correlationRequest.promise;
+    };
+
+    const fetchCorrelation = async (key: string) => {
+      // A lookup whose span is no longer shown must not write its result.
+      const isStale = () => spanKey(props.span) !== key;
+
+      // Skip if already loaded
+      if (correlationProps.value) {
         return;
       }
 
@@ -2418,6 +2440,7 @@ export default defineComponent({
           5, // 5 minute time window
           props.streamName,
         );
+        if (isStale()) return;
 
         if (result && result.correlationData) {
           const correlationData = result.correlationData;
@@ -2426,6 +2449,8 @@ export default defineComponent({
           const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
           const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
           const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
+          // Microseconds, from the trace's own spans (TraceDetails).
+          const selectedTrace = searchObj.data?.traceDetails?.selectedTrace;
 
           // Build availableDimensions from raw span attributes (actual field names)
           // This is critical for log queries to use the correct field names (e.g., k8s_pod_name)
@@ -2499,16 +2524,28 @@ export default defineComponent({
               startTime: spanStartUs - bufferUs,
               endTime: spanEndUs + bufferUs,
             },
+            // Fallback window for when View Logs widens from the span to the trace.
+            traceTimeRange:
+              selectedTrace?.trace_start_time && selectedTrace?.trace_end_time
+                ? {
+                    startTime: selectedTrace.trace_start_time - bufferUs,
+                    endTime: selectedTrace.trace_end_time + bufferUs,
+                  }
+                : undefined,
           };
         } else {
           correlationError.value = t("correlation.noDataFound");
         }
       } catch (err: any) {
+        if (isStale()) return;
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
         correlationError.value = err.message || t("correlation.failedToLoad");
         correlationFailed.value = true;
       } finally {
-        correlationLoading.value = false;
+        // A newer span's lookup owns the loading flag while it runs.
+        if (!correlationRequest || correlationRequest.key === key) {
+          correlationLoading.value = false;
+        }
       }
     };
 

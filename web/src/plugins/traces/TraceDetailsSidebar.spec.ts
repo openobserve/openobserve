@@ -25,11 +25,13 @@ const {
   mockNavigateToCorrelatedLogs,
   mockToast,
   mockPromptResolve,
+  mockFindRelatedTelemetry,
   mockSearch,
   mockSearchObj,
   mockStreamNameList,
   mockStreamSchema,
 } = vi.hoisted(() => ({
+  mockFindRelatedTelemetry: vi.fn().mockResolvedValue(null),
   mockStreamNameList: vi.fn().mockResolvedValue({ data: { list: [] } }),
   mockStreamSchema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
@@ -39,7 +41,10 @@ const {
   mockPromptResolve: vi.fn(),
   mockToast: vi.fn(),
   mockSearch: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  mockSearchObj: { meta: { serviceColors: { scheduler: "#1ab8be" } } } as Record<string, any>,
+  mockSearchObj: {
+    meta: { serviceColors: { scheduler: "#1ab8be" } },
+    data: { traceDetails: {} as Record<string, any> },
+  } as Record<string, any>,
 }));
 
 vi.mock("@/services/search", () => ({
@@ -83,8 +88,9 @@ vi.mock("@/aws-exports", () => ({
 
 vi.mock("@/composables/useServiceCorrelation", () => ({
   useServiceCorrelation: () => ({
-    findRelatedTelemetry: vi.fn().mockResolvedValue(null),
+    findRelatedTelemetry: mockFindRelatedTelemetry,
     loadSemanticGroups: mockLoadSemanticGroups,
+    semanticGroups: { value: [] },
   }),
 }));
 
@@ -515,6 +521,111 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+      });
+
+      it("waits for an in-flight correlation lookup instead of reporting nothing", async () => {
+        let resolveLookup: (v: any) => void = () => {};
+        mockFindRelatedTelemetry.mockImplementationOnce(
+          () => new Promise((resolve) => (resolveLookup = resolve)),
+        );
+        // The first View Logs starts the lookup; the second arrives mid-flight.
+        const inFlight = viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+
+        const viewing = viewLogsWrapper.vm.viewSpanLogs();
+        resolveLookup({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        await Promise.all([inFlight, viewing]);
+        await flushPromises();
+
+        expect(mockFindRelatedTelemetry).toHaveBeenCalledTimes(1);
+        // Both callers navigate with the loaded data; neither reports "none".
+        expect(mockNavigateToCorrelatedLogs).toHaveBeenCalledTimes(2);
+        expect(mockNavigateToCorrelatedLogs.mock.calls[1][0].logStreams[0].stream_name).toBe(
+          "app_logs",
+        );
+        expect(mockToast).not.toHaveBeenCalled();
+      });
+
+      it("passes the whole trace's window (padded) for the trace-level fallback", async () => {
+        mockSearchObj.data.traceDetails.selectedTrace = {
+          trace_id: "t",
+          trace_start_time: 1_000_000_000,
+          trace_end_time: 1_002_000_000,
+        };
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+
+        await viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+        mockSearchObj.data.traceDetails.selectedTrace = undefined;
+
+        const bufferUs = 5 * 60 * 1000000;
+        expect(mockNavigateToCorrelatedLogs.mock.calls[0][0].traceTimeRange).toEqual({
+          startTime: 1_000_000_000 - bufferUs,
+          endTime: 1_002_000_000 + bufferUs,
+        });
+      });
+
+      it("never reuses, applies or navigates with another span's lookup", async () => {
+        const lookupFor = (stream: string) => ({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: stream, filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        let resolveA: (v: any) => void = () => {};
+        mockFindRelatedTelemetry
+          .mockImplementationOnce(() => new Promise((resolve) => (resolveA = resolve)))
+          .mockImplementationOnce(async () => lookupFor("b_logs"));
+
+        // Span A's lookup is in flight when the user moves to span B.
+        const viewingA = viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+        await viewLogsWrapper.setProps({ span: { ...mockSpan, span_id: "span-b" } });
+
+        await viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+        // A resolves late; its result must not replace B's.
+        resolveA(lookupFor("a_logs"));
+        await viewingA;
+        await flushPromises();
+
+        expect(mockFindRelatedTelemetry).toHaveBeenCalledTimes(2);
+        expect(viewLogsWrapper.vm.correlationProps.logStreams[0].stream_name).toBe("b_logs");
+        const navigatedStreams = mockNavigateToCorrelatedLogs.mock.calls.map(
+          (call: any[]) => call[0].logStreams[0].stream_name,
+        );
+        // A's click is dropped because the displayed span changed while its lookup ran.
+        expect(navigatedStreams).toEqual(["b_logs"]);
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(viewLogsWrapper.vm.correlationLoading).toBe(false);
       });
 
       it("should toast the lookup failure reason when correlation could not be loaded", async () => {

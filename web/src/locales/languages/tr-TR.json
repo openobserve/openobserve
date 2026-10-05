@@ -1151,6 +1151,8 @@
     "redirect_to_logs_page": "Günlükler sayfasına geri dön",
     "visualize": "Görselleştirin",
     "enableSqlModeOrSelectSingleStream": "Lütfen görselleştirmek için SQL modunu etkinleştirin",
+    "drillDown": "Ayrıntıya in",
+    "drillDownUnavailableInSqlMode": "Ayrıntıya inme SQL modunda kullanılamaz",
     "buildQuery": "İnşa",
     "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz",
     "transformType": "Dönüştürme Türü",
@@ -4236,6 +4238,7 @@
     "dashboardTitleLatency": "Gecikme İçgörüleri",
     "dashboardTitleVolume": "Hacim İçgörüleri",
     "dimensionsSelected": "Seçilen boyutlar",
+    "noDimensionsSelected": "Analiz etmek için bir boyut seçin",
     "durationLabel": "Süre:",
     "failedToLoad": "Analiz yüklenemedi",
     "panelDescErrorComparison": "Boyut için hata yüzdesi karşılaştırması: {dimension}. Daha yüksek Seçili çubuklar, bu boyut değerinin hata artışı döneminde daha fazla hataya sahip olduğunu gösterir.",
@@ -4250,7 +4253,6 @@
   "volumeInsights": {
     "title": "İçgörüler",
     "tabLabel": "Oranı",
-    "analyzeTooltipLogs": "Geçerli zaman aralığı için boyut dağılımını analiz edin",
     "analyzeTooltipTraces": "Oran, gecikme ve hata modelleri için iz boyutlarını analiz edin.",
     "rateLabel": "Oranı:",
     "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin",
@@ -10430,6 +10432,7 @@
     "loadingStream": "Akış Yükleniyor...",
     "noLogsAvailableForService": "Bu hizmet için günlük yok",
     "noCorrelatedLogsFound": "Bu Span için ilişkili günlük bulunamadı",
+    "spanHasNoLogsShowingTrace": "Bu Span'ın günlüğü yok. Günlükler tüm iz için gösteriliyor.",
     "noData": {
       "title": "{product} ürününe iz göndermeye başlayın",
       "description": "Bu organizasyonda henüz iz akışı bulunamadı. Hizmetlerinizi enstrümante edin, izler otomatik olarak burada görünecek.",

@@ -1151,6 +1151,8 @@
     "redirect_to_logs_page": "ارجع إلى صفحة السجلات",
     "visualize": "الجدول الزمني",
     "enableSqlModeOrSelectSingleStream": "يرجى تفعيل SQL الوضع لاستخدام مخطط الوقت",
+    "drillDown": "التعمق",
+    "drillDownUnavailableInSqlMode": "التعمق غير متاح في وضع SQL",
     "buildQuery": "تصور",
     "nlpModeDisabledForVisualization": "لا يمكن تعطيل وضع اللغة الطبيعية أثناء الوضع على مخطط الوقت مع عدة تدفقات",
     "transformType": "نوع التحويل",
@@ -4236,6 +4238,7 @@
     "dashboardTitleLatency": "رؤى الكمون",
     "dashboardTitleVolume": "رؤى المجلد",
     "dimensionsSelected": "الأبعاد المختارة",
+    "noDimensionsSelected": "اختر بُعدًا لتحليله",
     "durationLabel": "المدة:",
     "failedToLoad": "فشل في تحميل التحليل",
     "panelDescErrorComparison": "مقارنة نسبة الخطأ للبعد: {dimension}. تشير الأشرطة المختارة الأعلى إلى أن قيمة البعد هذه تحتوي على أخطاء أكثر في فترة ارتفاع الخطأ.",
@@ -4250,7 +4253,6 @@
   "volumeInsights": {
     "title": "رؤى",
     "tabLabel": "السعر",
-    "analyzeTooltipLogs": "عرض رؤى حول النطاق الزمني الحالي",
     "analyzeTooltipTraces": "تحليل أبعاد الأثر لأنماط المعدل والكمون والخطأ",
     "rateLabel": "السعر:",
     "searchInspectionsLabel": "فحص تفاصيل تنفيذ وظيفة البحث",
@@ -10430,6 +10432,7 @@
     "loadingStream": "جار تحميل البث...",
     "noLogsAvailableForService": "لا توجد سجلات متاحة لهذه الخدمة",
     "noCorrelatedLogsFound": "لم يتم العثور على سجلات مرتبطة لهذه الفترة",
+    "spanHasNoLogsShowingTrace": "لا تحتوي هذه الفترة على سجلات. يتم عرض السجلات لكامل التتبع.",
     "noData": {
       "title": "ابدأ بإرسال الآثار إلى {product}",
       "description": "لم يتم العثور على أي تدفقات أثر في هذه المنظمة حتى الآن. قم بتسجيل خدماتك وستظهر الآثار تلقائيا هنا.",

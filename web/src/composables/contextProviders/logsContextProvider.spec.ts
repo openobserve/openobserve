@@ -99,6 +99,34 @@ describe("createLogsContextProvider", () => {
     expect(context.request_timestamp).toBe(1_900_000_000_000_000);
   });
 
+  it("uses the selected logs stream, not the panel stream, in drill down mode", async () => {
+    const searchObj: any = {
+      meta: { logsVisualizeToggle: "drilldown" },
+      data: {
+        query: "",
+        stream: {
+          selectedStream: ["app_logs"],
+          streamType: "logs",
+          selectedInterestingStreamFields: [],
+        },
+        datetime: { type: "relative", relativeTimePeriod: "15m" },
+      },
+    };
+    const dashboardPanelData = {
+      layout: { currentQueryIndex: 0 },
+      data: { queries: [{ fields: { stream: "panel_stream", stream_type: "metrics" } }] },
+    };
+
+    const context = await createLogsContextProvider(
+      searchObj,
+      store,
+      dashboardPanelData,
+    ).getContext();
+
+    expect(context.selectedStreams).toEqual(["app_logs"]);
+    expect(context.streamType).toBe("logs");
+  });
+
   it("creates dashboard mode context and keeps absolute range fields", async () => {
     const searchObj: any = {
       meta: {

@@ -643,6 +643,12 @@ pub async fn search_http2_stream(
                             }
                         }
                     }
+                    // A server-side refusal (e.g. ZO_SDR_FAIL_CLOSED) keeps its 503.
+                    infra::errors::Error::ResourceError(_) => StreamResponses::Error {
+                        code: err.http_status(),
+                        message: err.to_string(),
+                        error_detail: None,
+                    },
                     _ => StreamResponses::Error {
                         code: 500,
                         message: err.to_string(),
@@ -991,6 +997,13 @@ pub async fn values_http2_stream(
                             code: http_response.status().into(),
                             message,
                             error_detail: Some(error_detail),
+                        }
+                    }
+                    infra::errors::Error::ResourceError(_) => {
+                        config::meta::search::StreamResponses::Error {
+                            code: err.http_status(),
+                            message: err.to_string(),
+                            error_detail: None,
                         }
                     }
                     _ => config::meta::search::StreamResponses::Error {

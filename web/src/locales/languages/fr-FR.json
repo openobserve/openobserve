@@ -1151,6 +1151,8 @@
     "redirect_to_logs_page": "Retourner à la page des journaux",
     "visualize": "Visualisez",
     "enableSqlModeOrSelectSingleStream": "Veuillez activer le mode SQL pour visualiser",
+    "drillDown": "Exploration détaillée",
+    "drillDownUnavailableInSqlMode": "L'exploration détaillée n'est pas disponible en mode SQL",
     "buildQuery": "Construisez",
     "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux",
     "transformType": "Type de transformation",
@@ -4236,6 +4238,7 @@
     "dashboardTitleLatency": "Analyse de la latence",
     "dashboardTitleVolume": "Analyse du volume",
     "dimensionsSelected": "Dimensions sélectionnées",
+    "noDimensionsSelected": "Sélectionnez une dimension à analyser",
     "durationLabel": "Durée :",
     "failedToLoad": "Impossible de charger l'analyse",
     "panelDescErrorComparison": "Comparaison du pourcentage d'erreurs pour la dimension : {dimension}. Des barres sélectionnées plus hautes indiquent que cette valeur de dimension présente plus d'erreurs pendant la période de pic d'erreurs.",
@@ -4250,7 +4253,6 @@
   "volumeInsights": {
     "title": "Perspectives",
     "tabLabel": "Tarif",
-    "analyzeTooltipLogs": "Analyser la distribution des dimensions pour la plage de temps actuelle",
     "analyzeTooltipTraces": "Analyser les dimensions des traces pour les taux, la latence et les modèles d'erreurs",
     "rateLabel": "Tarif :",
     "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche",
@@ -10430,6 +10432,7 @@
     "loadingStream": "Chargement du flux...",
     "noLogsAvailableForService": "Aucun journal disponible pour ce service",
     "noCorrelatedLogsFound": "Aucun log corrélé trouvé pour ce span",
+    "spanHasNoLogsShowingTrace": "Ce span n'a aucun log. Affichage des logs pour toute la trace.",
     "noData": {
       "title": "Commencez à envoyer des traces à {product}",
       "description": "Aucun flux de traces trouvé dans cette organisation pour le moment. Instrumentez vos services et les traces apparaîtront ici automatiquement.",

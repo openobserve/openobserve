@@ -1151,6 +1151,8 @@
     "redirect_to_logs_page": "Quay lại trang Logs",
     "visualize": "Biểu đồ thời gian",
     "enableSqlModeOrSelectSingleStream": "Vui lòng bật chế độ SQL để sử dụng biểu đồ thời gian",
+    "drillDown": "Đi sâu",
+    "drillDownUnavailableInSqlMode": "Không thể đi sâu ở chế độ SQL",
     "buildQuery": "Trực quan hóa",
     "nlpModeDisabledForVisualization": "Không thể tắt chế độ Ngôn ngữ tự nhiên khi đang ở biểu đồ thời gian với nhiều luồng",
     "transformType": "Loại biến đổi",
@@ -4236,6 +4238,7 @@
     "dashboardTitleLatency": "Thông tin chi tiết về độ trễ",
     "dashboardTitleVolume": "Thông tin chi tiết về lưu lượng",
     "dimensionsSelected": "Các thứ nguyên đã chọn",
+    "noDimensionsSelected": "Chọn một chiều để phân tích",
     "durationLabel": "Thời lượng:",
     "failedToLoad": "Không tải được phân tích",
     "panelDescErrorComparison": "So sánh tỷ lệ lỗi cho chiều: {dimension}. Các thanh Đã chọn cao hơn cho thấy giá trị chiều này có nhiều lỗi hơn trong giai đoạn đột biến lỗi.",
@@ -4250,7 +4253,6 @@
   "volumeInsights": {
     "title": "Thông tin chi tiết",
     "tabLabel": "Tỷ lệ",
-    "analyzeTooltipLogs": "Xem thông tin chi tiết cho khoảng thời gian hiện tại",
     "analyzeTooltipTraces": "Phân tích các thứ nguyên trace để phát hiện các mẫu tốc độ, độ trễ và lỗi.",
     "rateLabel": "Tỷ lệ:",
     "searchInspectionsLabel": "Xem chi tiết thực thi công việc tìm kiếm",
@@ -10430,6 +10432,7 @@
     "loadingStream": "Đang tải Luồng...",
     "noLogsAvailableForService": "Không có Nhật ký nào cho dịch vụ này",
     "noCorrelatedLogsFound": "Không tìm thấy nhật ký tương quan nào cho span này",
+    "spanHasNoLogsShowingTrace": "Span này không có nhật ký. Đang hiển thị nhật ký cho toàn bộ trace.",
     "noData": {
       "title": "Bắt đầu gửi trace tới {product}",
       "description": "Chưa tìm thấy stream trace nào trong tổ chức này. Hãy tích hợp trace vào các dịch vụ của bạn và trace sẽ tự động xuất hiện ở đây.",
