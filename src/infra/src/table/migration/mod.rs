@@ -194,12 +194,8 @@ mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_add_env_to_synthetics_jobs;
-mod m20260917_000001_create_downtimes;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
-mod m20260917_000002_add_muted_by_downtime_id_to_alert_incidents;
-mod m20260917_000003_add_last_downtime_id_to_alert_states;
-mod m20260917_000004_add_kind_to_slo_backfill_jobs;
 mod m20260918_000001_create_oncall_response_reports;
 mod m20260920_000001_add_anomaly_level_half_width;
 mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
@@ -211,6 +207,10 @@ mod m20260924_000001_add_recovery_episode_columns;
 mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
+mod m20261005_000001_create_downtimes;
+mod m20261005_000002_add_muted_by_downtime_id_to_alert_incidents;
+mod m20261005_000003_add_last_downtime_id_to_alert_states;
+mod m20261005_000004_add_kind_to_slo_backfill_jobs;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -315,7 +315,7 @@ pub(crate) async fn create_slo_tables_for_test(
     m20260727_000001_create_slo_tables::Migration
         .up(&manager)
         .await?;
-    m20260917_000004_add_kind_to_slo_backfill_jobs::Migration
+    m20261005_000004_add_kind_to_slo_backfill_jobs::Migration
         .up(&manager)
         .await
 }
@@ -524,10 +524,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260908_000001_create_synthetics_refs::Migration),
             Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
             Box::new(m20261003_000001_create_rum_pa_tables::Migration),
-            Box::new(m20260917_000001_create_downtimes::Migration),
-            Box::new(m20260917_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
-            Box::new(m20260917_000003_add_last_downtime_id_to_alert_states::Migration),
-            Box::new(m20260917_000004_add_kind_to_slo_backfill_jobs::Migration),
+            Box::new(m20261005_000001_create_downtimes::Migration),
+            Box::new(m20261005_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
+            Box::new(m20261005_000003_add_last_downtime_id_to_alert_states::Migration),
+            Box::new(m20261005_000004_add_kind_to_slo_backfill_jobs::Migration),
         ]
     }
 }
@@ -583,7 +583,7 @@ mod tests {
         (94, "m20260908_000001_create_synthetics_refs"),
         (95, "m20261001_000001_add_anomaly_band_settings"),
         (96, "m20261003_000001_create_rum_pa_tables"),
-        (97, "m20260917_000004_add_kind_to_slo_backfill_jobs"),
+        (97, "m20261005_000004_add_kind_to_slo_backfill_jobs"),
     ];
 
     #[test]
@@ -665,19 +665,19 @@ mod tests {
             ),
             (
                 "m20250109_092400_recreate_tables_with_ksuids",
-                "m20260917_000001_create_downtimes",
+                "m20261005_000001_create_downtimes",
             ),
             (
                 "m20251204_000001_create_alert_incidents_table",
-                "m20260917_000002_add_muted_by_downtime_id_to_alert_incidents",
+                "m20261005_000002_add_muted_by_downtime_id_to_alert_incidents",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",
-                "m20260917_000003_add_last_downtime_id_to_alert_states",
+                "m20261005_000003_add_last_downtime_id_to_alert_states",
             ),
             (
                 "m20260727_000001_create_slo_tables",
-                "m20260917_000004_add_kind_to_slo_backfill_jobs",
+                "m20261005_000004_add_kind_to_slo_backfill_jobs",
             ),
         ] {
             assert!(
