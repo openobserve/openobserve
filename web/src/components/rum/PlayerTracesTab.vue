@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed } from "vue";
+import { ref, watch, onMounted, onUnmounted, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
@@ -226,7 +226,7 @@ import {
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
-import { traceQueryWindow } from "@/utils/rum/traceWindow";
+import { arrivalTraceWindowUs, traceQueryWindow } from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
@@ -262,6 +262,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  rumWindowUs: {
+    type: Object as PropType<{ start: number; end: number } | null>,
+    default: null,
+  },
 });
 
 const emit = defineEmits(["event-emitted"]);
@@ -277,6 +281,7 @@ const traceDetailsRef = ref<any>(null);
 const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
+const traceSearchWindow = ref<{ start: number; end: number } | null>(null);
 
 const totalErrorCount = computed(
   () => correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
@@ -530,6 +535,7 @@ async function fetchTraces() {
 
   loading.value = true;
   error.value = null;
+  traceSearchWindow.value = null;
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
@@ -564,6 +570,10 @@ async function fetchTraces() {
       aggOrNull("max", "type", "_type"),
       aggOrNull("min", "date", "_date"),
     ];
+    if (props.rumWindowUs) {
+      const ts = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
+      selectParts.push(`min(${ts}) as _first_ts`, `max(${ts}) as _last_ts`);
+    }
     const whereParts = [sqlEquals("session_id", props.sessionId), traceIdSet];
     const having = has("resource_url")
       ? " HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0"
@@ -572,8 +582,11 @@ async function fetchTraces() {
     const rumQuery = {
       query: {
         sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC`,
-        start_time: searchStartTime,
-        end_time: searchEndTime,
+        start_time: props.rumWindowUs?.start ?? searchStartTime,
+        // Rows keep arriving after the last device-clock event, so a re-fetch must reach "now".
+        end_time: props.rumWindowUs
+          ? Math.max(props.rumWindowUs.end, Date.now() * 1000)
+          : searchEndTime,
         from: 0,
         size: 250,
       },
@@ -594,6 +607,13 @@ async function fetchTraces() {
       correlatedViews.value = [];
       return;
     }
+
+    // `_timestamp` is server arrival, which trails the device-clock session window.
+    const searchWindow = (props.rumWindowUs && arrivalTraceWindowUs(rumHits)) || {
+      start: searchStartTime,
+      end: searchEndTime,
+    };
+    if (props.rumWindowUs) traceSearchWindow.value = searchWindow;
 
     // Deduplicate by trace_id, keep first occurrence for view context.
     // Canonicalize the id: SDK 0.4.x stored it zero-stripped, while the traces
@@ -630,8 +650,8 @@ async function fetchTraces() {
         // the default correlation stream — today's behavior.
         const locationById = await resolveTraceLocationsBulk(
           views.map((v) => v.traceId),
-          searchStartTime,
-          searchEndTime,
+          searchWindow.start,
+          searchWindow.end,
         );
         for (const view of views as any[]) {
           const location = locationById[view.traceId];
@@ -656,8 +676,8 @@ async function fetchTraces() {
               stream,
               unionTraceWindow(
                 ids.map((id) => rangeById.get(id)),
-                searchStartTime,
-                searchEndTime,
+                searchWindow.start,
+                searchWindow.end,
               ),
             ),
           ),
@@ -698,8 +718,9 @@ function openTraceDetail(view: any) {
   selectedTrace.value = view;
 
   const nowMs = Date.now();
-  const fallbackStart = (props.startTime || nowMs - 86400000) * 1000;
-  const fallbackEnd = (props.endTime || nowMs) * 1000;
+  const fallbackStart =
+    traceSearchWindow.value?.start ?? (props.startTime || nowMs - 86400000) * 1000;
+  const fallbackEnd = traceSearchWindow.value?.end ?? (props.endTime || nowMs) * 1000;
 
   const meta = traceMetadata.value[view.traceId];
   if (meta?.start_time && meta?.end_time) {
