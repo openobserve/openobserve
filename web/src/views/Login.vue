@@ -15,7 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <Login v-if="user.email == '' && !showInvitations" />
+  <Login v-if="user.email == '' && !showInvitations && !isDexCallback" />
+  <div
+    v-else-if="isDexCallback && !showInvitations"
+    data-test="dex-callback-loading"
+    class="bg-card-glass-bg flex h-[100vh] w-[100vw] flex-col items-center justify-center gap-4 max-md:h-dvh max-md:w-full"
+  >
+    <OSpinner size="lg" />
+    <div class="text-text-secondary text-base">
+      {{ t("login.signingIn") }}
+    </div>
+  </div>
   <div v-if="showInvitations && config.isCloud == 'true'">
     <div class="relative-position flex px-3 pt-2">
       <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
@@ -46,6 +56,7 @@ import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -71,6 +82,7 @@ export default defineComponent({
   components: {
     Login,
     InvitationList,
+    OSpinner,
   },
   setup() {
     const store = useStore();
@@ -288,6 +300,10 @@ export default defineComponent({
   },
   data() {
     return {
+      // True while we're on the Dex (OIDC) redirect-back callback and still
+      // resolving the token in the URL hash. Shows a spinner instead of the
+      // login form so it doesn't flash before the user lands in the app.
+      isDexCallback: !!this.$route.hash,
       user: {
         email: "",
         cognito_sub: "",
@@ -349,6 +365,9 @@ export default defineComponent({
         })
         .catch((err) => {
           console.error("Error while fetching config:", err);
+          // Fall back to the login form instead of stranding the user on
+          // the spinner with no way to proceed.
+          this.isDexCallback = false;
         });
     }
   },
