@@ -19,6 +19,8 @@ import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ImportPipeline from "@/components/pipeline/ImportPipeline.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { functionKeys } from "@/services/jstransform.querykeys";
 
 // --------------------------------------------------------------------------
 // Module mocks
@@ -1411,6 +1413,117 @@ describe("ImportPipeline.vue", () => {
           { function: BODY, params: "row", transType: 1 },
         ),
       ).toBe(false);
+    });
+
+    it("gives up after the suffix cap instead of looping or overwriting", async () => {
+      // The base name and every `_1`..`_50` are taken by DIFFERENT logic, so no
+      // candidate is free and none may be reused. The loop has to stop and say so
+      // rather than run past the cap or write over someone else's function.
+      withExistingFunctions([
+        { name: "parse_nginx", function: ".other = 0", params: "row", transType: 0 },
+        ...Array.from({ length: 50 }, (_, i) => ({
+          name: `parse_nginx_${i + 1}`,
+          function: `.other = ${i + 1}`,
+          params: "row",
+          transType: 0,
+        })),
+      ]);
+      await mountReady();
+
+      expect(await wrapper.vm.createPipeline(bundledPipeline(), 1)).toBe(false);
+
+      // Nothing was written: no new function, and no pipeline pointing at the wrong logic.
+      expect(jstransform.create).not.toHaveBeenCalled();
+      expect(pipelinesService.createPipeline).not.toHaveBeenCalled();
+
+      const failure = wrapper.vm.pipelineCreators.at(-1);
+      expect(failure.success).toBe(false);
+      expect(failure.message).toContain("No free name");
+      // The cap is named so the user knows this was a limit, not a server error.
+      expect(failure.message).toContain("50");
+    });
+
+    it("invalidates the functions cache once when a bundle created one", async () => {
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue(undefined);
+      await mountReady();
+
+      await wrapper.vm.importJson({ jsonStr: JSON.stringify([bundledPipeline()]) });
+
+      // Without this the Functions page keeps showing the pre-import list for the
+      // hour the functions tier stays fresh.
+      const functionInvalidations = invalidate.mock.calls.filter(
+        (call: any[]) =>
+          JSON.stringify(call[0]?.queryKey) === JSON.stringify(functionKeys.all("default")),
+      );
+      expect(functionInvalidations).toHaveLength(1);
+    });
+
+    it("leaves the functions cache alone when nothing was created", async () => {
+      // A file that bundles nothing must not drop a cache it never changed.
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue(undefined);
+      await mountReady();
+
+      await wrapper.vm.importJson({
+        jsonStr: JSON.stringify([bundledPipeline({ functions: [], nodes: [] })]),
+      });
+
+      expect(
+        invalidate.mock.calls.filter(
+          (call: any[]) =>
+            JSON.stringify(call[0]?.queryKey) === JSON.stringify(functionKeys.all("default")),
+        ),
+      ).toHaveLength(0);
+    });
+
+    it("names the functions the export file left out, as a warning", async () => {
+      // The pipeline still imports, but it will run against whatever those names
+      // mean in THIS org — the drift the bundling exists to remove. Green would
+      // read as "nothing to see".
+      await mountReady();
+
+      const input = bundledPipeline({
+        nodes: [
+          { id: "n1", io_type: "default", data: { node_type: "function", name: "parse_nginx" } },
+          { id: "n2", io_type: "default", data: { node_type: "function", name: "left_behind" } },
+        ],
+      });
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(true);
+
+      const line = wrapper.vm.pipelineCreators.find((c: any) =>
+        c.message.includes("not included in the export file"),
+      );
+      expect(line).toBeDefined();
+      expect(line.message).toContain("left_behind");
+      // Only the unbundled one is named; the bundled one is not a problem.
+      expect(line.message).not.toContain("parse_nginx");
+      expect(line.warning).toBe(true);
+      expect(line.success).toBe(true);
+    });
+
+    it("says which copy it reused, as a warning", async () => {
+      // The base name holds different logic and `_1` already holds this one, so the
+      // import silently points at `_1`. That line is the only sign the pipeline is
+      // not running under the name it was exported with.
+      withExistingFunctions([
+        { name: "parse_nginx", function: ".other = 0", params: "row", transType: 0 },
+        { name: "parse_nginx_1", function: BODY, params: "row", transType: 0 },
+      ]);
+      await mountReady();
+
+      const input = bundledPipeline();
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(true);
+
+      // Reused, not re-created.
+      expect(jstransform.create).not.toHaveBeenCalled();
+      expect(input.nodes[0].data.name).toBe("parse_nginx_1");
+
+      const line = wrapper.vm.pipelineCreators.find((c: any) =>
+        c.message.includes("reused the matching copy"),
+      );
+      expect(line).toBeDefined();
+      expect(line.message).toContain("parse_nginx_1");
+      expect(line.warning).toBe(true);
+      expect(line.success).toBe(true);
     });
   });
 
