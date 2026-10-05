@@ -10,30 +10,7 @@ const org = process.env.ORGNAME || 'default';
 
 const JS_BODY = 'function transform(row){ row.guarded = true; return row; }';
 
-/**
- * Regression: the function import screen mishandled the language key and every
- * failure it could not fix.
- *
- * Three defects, all fixed in openobserve#15069:
- *
- *   1. Validation and the payload builder read only `item.transType`, so a file
- *      spelling it `trans_type` — the natural guess, since the rest of the
- *      product's payloads are snake_case — was ignored. A JavaScript body went
- *      out declared as VRL and failed to compile, with nothing on screen saying
- *      why.
- *   2. Any failure that was not `already exist` was offered a language dropdown
- *      and a body editor. For a 403, a 500 or a dropped connection those fix
- *      nothing: the user was told to retype a body that was never the problem.
- *   3. Worst of the three, and only reachable once (2) was fixed: the import loop
- *      decided success by counting failures that carried fix-up controls. A
- *      failure with no controls contributed no group, so a run where EVERY item
- *      was refused toasted success and navigated to the list — telling the user
- *      the import worked when nothing had been written.
- *
- * (2) and (3) are driven by intercepting the create call, which is the only way
- * to reach a 403 on an OSS build. The unit tests assert the pushed values; these
- * assert what the user is actually shown, which is where (3) hid.
- */
+// Regression guards for openobserve#15069. A 403 is unreachable on OSS, so the create call is intercepted.
 test.describe(
   'Function import — rejections that cannot be fixed inline',
   { tag: ['@functions', '@regression', '@all'] },

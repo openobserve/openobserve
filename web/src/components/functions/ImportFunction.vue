@@ -456,21 +456,7 @@ export default defineComponent({
       writeField(index, "params", params);
     };
 
-    /**
-     * The language the file declared, in either spelling.
-     *
-     * The wire format is camelCase — `Transform` carries
-     * `#[serde(rename_all = "camelCase")]` — so `trans_type` is a key the server
-     * ignores, leaving `transType` at its default of 0 and a JS body to be
-     * compiled as VRL. This screen reads the snake_case spelling too, because a
-     * hand-written file is the common way in and the rest of the product's
-     * payloads (pipeline `node_type`, `stream_name`) are snake_case, so it is the
-     * natural guess. camelCase wins when both are present: it is what the fix-up
-     * control writes and what is actually sent.
-     *
-     * Note this makes the screen more forgiving than `POST /functions` itself,
-     * which still ignores `trans_type`.
-     */
+    // The server reads only camelCase, so a snake_case file would import as VRL; camelCase wins when both are present.
     const declaredTransType = (item: any) => item?.transType ?? item?.trans_type ?? 0;
 
     // A control over a rejected item opens on that item, not on a blank.
@@ -479,9 +465,7 @@ export default defineComponent({
 
     // Absent is VRL (what gets sent); unusable is nothing, or picking VRL emits no change.
     const currentTransType = (index: number) => {
-      const declared = declaredTransType(baseImportRef.value?.jsonArrayOfObj?.[index]);
-      if (declared === undefined || declared === null) return "0";
-      const text = String(declared);
+      const text = String(declaredTransType(baseImportRef.value?.jsonArrayOfObj?.[index]));
       return text === "0" || text === "1" ? text : "";
     };
 
@@ -632,16 +616,7 @@ export default defineComponent({
         if (/already exist/i.test(String(reason))) {
           return [conflictError(item, index, itemIndex)];
         }
-        // A 400 is the server judging this function: a compile error, or a body
-        // that trips the enterprise security patterns. Both are fixed by changing
-        // the language or the body, so those controls are worth offering.
-        //
-        // Anything else — a 403 with no create permission, a 500, a dropped
-        // connection — is not about the function at all. Offering to retype the
-        // body there tells the user to do something that cannot work, so the
-        // failure line carries the server's own words and nothing else. The empty
-        // group still counts as a failure, which is what keeps the run off the
-        // success toast.
+        // Only a 400 means the server judged this function, so only a 400 is worth a retype.
         return error?.response?.status === 400 ? rejectionErrors(item, index, itemIndex) : [];
       }
     };

@@ -248,14 +248,7 @@ class FunctionsImportExportPage {
     ).toContainText(text, { timeout: 15000 });
   }
 
-  /**
-   * Wait for a started import to finish writing.
-   *
-   * The Import button is disabled for the duration of the run, so its
-   * re-enabling is the only signal every result line has been pushed. Absence
-   * assertions are meaningless before this: `toHaveCount(0)` is satisfied
-   * immediately, before the controls have rendered.
-   */
+  /** The Import button is disabled for the run, so its re-enabling is the only "finished" signal. */
   async waitForImportSettled() {
     await expect(this.importJsonButton).toBeEnabled({ timeout: 60000 });
   }

@@ -828,9 +828,7 @@ describe("ImportFunction", () => {
     expect(push).not.toHaveBeenCalled();
   });
   describe("a file that spells the language snake_case", () => {
-    // The wire format is camelCase, so the server ignores `trans_type`, leaves the
-    // language at its default of VRL, and answers a JS body with a VRL syntax
-    // error. This screen reads the snake_case spelling so the file imports.
+    // The server ignores `trans_type`, so without this the file imports as VRL.
 
     it("sends a snake_case trans_type as the language it declares", async () => {
       const wrapper = mountScreen();
