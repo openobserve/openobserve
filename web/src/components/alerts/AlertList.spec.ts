@@ -77,6 +77,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
+import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
@@ -916,6 +918,23 @@ describe("AlertList - router query behaviors", () => {
     expect(pushedQuery.page).toBe("3");
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.alert_id).toBeUndefined();
+  });
+
+  // The editor opens an alert from its detail cache (getAlertById), and a save
+  // reaches the list through update:list → refreshList.
+  it("refreshList marks cached alert copies stale so reopening the editor shows the save", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const key = alertKeys.detail(store.state.selectedOrganization.identifier, "a1");
+    queryClient.setQueryData(key, { id: "a1", name: "Alert 1" });
+
+    try {
+      await wrapper.vm.refreshList("default");
+
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    } finally {
+      queryClient.removeQueries({ queryKey: key, exact: true });
+    }
   });
 });
 
