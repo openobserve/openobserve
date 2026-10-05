@@ -21,6 +21,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OTag from "./OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { dimensionVariant } from "./badgeGroups";
 import type { BadgeVariant } from "./OBadge.types";
 
@@ -72,10 +73,11 @@ const emit = defineEmits<{ (e: "remove"): void }>();
         <span class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90">{{
           keyLabel ?? dimKey
         }}</span>
-        <span
-          class="min-w-0 truncate py-1.5 ps-1 font-semibold"
+        <OTruncatedText
+          class="py-1.5 ps-1 font-semibold"
           :class="removable ? 'pe-1' : 'pe-2.5'"
-          >{{ value }}</span
+          :tooltip="tooltip ? false : undefined"
+          >{{ value }}</OTruncatedText
         >
         <button
           v-if="removable"

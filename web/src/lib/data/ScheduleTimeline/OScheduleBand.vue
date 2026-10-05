@@ -6,6 +6,7 @@
 // content of the screen, not decoration around it.
 
 import { computed } from "vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type {
   ScheduleBandProps,
   ScheduleBandTone,
@@ -54,7 +55,7 @@ const VARIANT_MAP: Record<ScheduleBandVariant, Partial<Record<ScheduleBandTone, 
   outline: OUTLINE_CLASS,
 };
 
-const props = defineProps<ScheduleBandProps>();
+const props = withDefaults(defineProps<ScheduleBandProps>(), { tooltip: undefined });
 
 /// `gap` has exactly one treatment. It is the alarming value, and painting it
 /// solid or hollow on request would let a call site make "nobody is on call"
@@ -86,7 +87,7 @@ const geometry = computed(() => ({
     :aria-label="band.ariaLabel"
     :class="[
       'absolute inset-y-0 flex items-center overflow-hidden',
-      'rounded-default text-2xs px-1.5 leading-none font-medium text-ellipsis whitespace-nowrap',
+      'rounded-default text-2xs px-1.5 leading-none font-medium whitespace-nowrap',
       'focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none',
       toneClass,
     ]"
@@ -95,6 +96,7 @@ const geometry = computed(() => ({
     :data-tone="String(band.tone)"
     :data-variant="band.variant ?? 'soft'"
   >
-    {{ band.label }}
+    <!-- A flex band clips its text with no "…", so the label cuts inside its own box; the band's fixed height leaves room for leading-normal. -->
+    <OTruncatedText class="leading-normal" :tooltip="tooltip">{{ band.label }}</OTruncatedText>
   </div>
 </template>

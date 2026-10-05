@@ -2,14 +2,15 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // OCodeCell — monospace rendering for identifiers / SQL / tokens with an
-// optional copy-on-hover affordance. Truncates with ellipsis and
-// exposes the full value via a native title tooltip.
+// optional copy-on-hover affordance. Truncates with ellipsis and shows
+// the full value on hover only when it is cut.
 //
 //   <OCodeCell :value="row.trace_id" />
 //   <OCodeCell :value="row.query" :copy="false" />
 
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = withDefaults(
@@ -49,11 +50,7 @@ const { t } = useI18nTyped();
 <template>
   <span v-if="text === null" class="text-text-muted text-xs">{{ emptyLabel }}</span>
   <span v-else class="group/code inline-flex max-w-full min-w-0 items-center gap-1">
-    <span
-      class="min-w-0 truncate font-mono text-xs"
-      :title="tooltip === false ? undefined : (tooltip ?? text)"
-      >{{ text }}</span
-    >
+    <OTruncatedText class="font-mono text-xs" :tooltip="tooltip">{{ text }}</OTruncatedText>
     <button
       v-if="copy"
       type="button"

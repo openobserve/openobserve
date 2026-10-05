@@ -21,6 +21,22 @@ describe("ODimensionChip", () => {
     expect(wrapper.findComponent(OTag).props("variant")).toBe("warning-soft");
   });
 
+  it("gives a cut value its own cut-only tooltip when the chip has none", () => {
+    const wrapper = mount(ODimensionChip, { props: { dimKey: "service", value: "api" } });
+    const value = wrapper.find('[data-test="o-truncated-text"]');
+    expect(value.text()).toBe("api");
+    expect(value.attributes("data-o-tooltip-trigger")).toBe("overflow");
+  });
+
+  it("leaves the value without a tooltip of its own when the chip shows key=value", () => {
+    const wrapper = mount(ODimensionChip, {
+      props: { dimKey: "service", value: "api", tooltip: true },
+    });
+    expect(wrapper.find('[data-test="o-truncated-text"]').attributes("data-o-tooltip-off")).toBe(
+      "",
+    );
+  });
+
   it("renders no dismiss affordance unless removable", () => {
     const wrapper = mount(ODimensionChip, { props: { dimKey: "service", value: "api" } });
     expect(wrapper.find("button").exists()).toBe(false);
