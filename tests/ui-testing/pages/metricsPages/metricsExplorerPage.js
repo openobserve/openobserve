@@ -77,13 +77,10 @@ export class MetricsExplorerPage {
         this.detailTitle = '[data-test="metrics-detail-title"]';
         this.detailClose = '[data-test="metrics-detail-close"]';
         this.detailOpenVisualize = '[data-test="metrics-detail-open-visualize"]';
-        this.breakdownTable = '[data-test="metrics-breakdown-table"]';
         this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
         this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
-        this.relatedList = '[data-test="metrics-detail-related"]';
+        this.breakdownBack = '[data-test="metrics-breakdown-back"]';
         this.labelChipPrefix = 'metrics-explorer-label-chip-';
-        // OTable rows / cells, scoped by the table they sit in.
-        this.tableRow = '[data-test^="o2-table-row-"]';
 
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
@@ -573,20 +570,21 @@ export class MetricsExplorerPage {
         await expect.poll(() => this.getQueryParam('tab'), { timeout: 15000 }).toBe(name);
     }
 
-    /** A label row of the Breakdown table, matched on its label cell exactly. */
-    breakdownRow(label) {
-        return this.page
-            .locator(`${this.breakdownTable} ${this.tableRow}`)
-            .filter({
-                has: this.page.locator('[data-test="o2-table-cell-label"]', {
-                    hasText: new RegExp(`^\\s*${label}\\s*$`),
-                }),
-            });
+    /** A label's chart card in the Breakdown grid. */
+    breakdownCard(label) {
+        return this.page.locator(`[data-test="metrics-breakdown-card-${label}"]`);
     }
 
+    /** The card's Drill down focuses that label: its chart plus its value table. */
     async selectBreakdownLabel(label) {
-        await this.breakdownRow(label).locator('[data-test="o2-table-cell-label"]').click();
+        await this.page.locator(`[data-test="metrics-breakdown-select-${label}"]`).click();
         await expect.poll(() => this.getQueryParam('breakdown_label'), { timeout: 15000 }).toBe(label);
+    }
+
+    /** "All labels" — back from a focused label to the Breakdown grid. */
+    async backToBreakdownGrid() {
+        await this.page.locator(this.breakdownBack).click();
+        await expect.poll(() => this.getQueryParam('breakdown_label'), { timeout: 15000 }).toBeNull();
     }
 
     breakdownValue(label, value) {
@@ -607,15 +605,13 @@ export class MetricsExplorerPage {
         return this.page.locator(`[data-test="${this.labelChipPrefix}${label}"]`);
     }
 
-    /** A related metric's row, matched on its name cell exactly. */
-    relatedRow(metric) {
-        return this.page
-            .locator(`${this.relatedList} ${this.tableRow}`)
-            .filter({
-                has: this.page.locator('[data-test="o2-table-cell-name"]', {
-                    hasText: new RegExp(`^\\s*${metric}\\s*$`),
-                }),
-            });
+    /** A related metric's chart card in the Related grid. */
+    relatedCard(metric) {
+        return this.page.locator(`[data-test="metrics-detail-related-card-${metric}"]`);
+    }
+
+    async openRelated(metric) {
+        await this.page.locator(`[data-test="metrics-detail-related-open-${metric}"]`).click();
     }
 
     async closeDetail() {

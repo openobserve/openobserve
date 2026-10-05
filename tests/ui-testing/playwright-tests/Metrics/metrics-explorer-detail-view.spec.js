@@ -40,7 +40,7 @@ test.describe('Metrics Explorer detail view', () => {
     const explorer = await openDetail(page, testInfo);
 
     await explorer.selectDetailTab('breakdown');
-    await expect(explorer.breakdownRow('method')).toBeVisible({ timeout: 30000 });
+    await expect(explorer.breakdownCard('method')).toBeVisible({ timeout: 30000 });
 
     // method has two values, so its chart needs no topk guard.
     await explorer.selectBreakdownLabel('method');
@@ -50,10 +50,14 @@ test.describe('Metrics Explorer detail view', () => {
 
     await expect(explorer.breakdownValue('method', 'GET')).toBeVisible();
     await expect(explorer.breakdownValue('method', 'POST')).toBeVisible();
-    await expect(explorer.breakdownDistinct('method')).toHaveText('2');
+    await expect(explorer.breakdownDistinct('method')).toHaveText('2 values');
+
+    // The value table shows only the focused label, so go back and focus status.
+    await explorer.backToBreakdownGrid();
+    await explorer.selectBreakdownLabel('status');
 
     // Add status = 500: a chip appears, and the table re-queries under the filter.
-    await expect(explorer.breakdownValue('status', '200')).toBeVisible();
+    await expect(explorer.breakdownValue('status', '200')).toBeVisible({ timeout: 30000 });
     await explorer.addBreakdownFilter('status', '500');
     await expect(explorer.labelChip('status')).toBeVisible({ timeout: 15000 });
     await expect(explorer.labelChip('status')).toContainText('500');
@@ -73,11 +77,11 @@ test.describe('Metrics Explorer detail view', () => {
     const explorer = await openDetail(page, testInfo);
 
     await explorer.selectDetailTab('related');
-    await expect(explorer.relatedRow(RELATED_METRIC)).toBeVisible({ timeout: 30000 });
+    await expect(explorer.relatedCard(RELATED_METRIC)).toBeVisible({ timeout: 30000 });
     // The metric never lists itself.
-    await expect(explorer.relatedRow(DETAIL_METRIC)).toHaveCount(0);
+    await expect(explorer.relatedCard(DETAIL_METRIC)).toHaveCount(0);
 
-    await explorer.relatedRow(RELATED_METRIC).locator('[data-test="o2-table-cell-name"]').click();
+    await explorer.openRelated(RELATED_METRIC);
     await explorer.expectDetailOpen(RELATED_METRIC);
 
     // Opening a related metric pushed a history entry.
