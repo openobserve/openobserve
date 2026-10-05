@@ -439,6 +439,23 @@ use crate::{
             config::meta::downtimes::ResourcesResponse,
             config::meta::downtimes::MoveDowntimesRequest,
             config::meta::downtimes::CreateDowntimeResponse,
+            config::meta::downtimes::DowntimeTarget,
+            config::meta::downtimes::TargetFolders,
+            config::meta::downtimes::DimensionCondition,
+            config::meta::downtimes::LogicalOp,
+            config::meta::downtimes::PairOperator,
+            config::meta::downtimes::TargetModule,
+            config::meta::downtimes::DowntimeSchedule,
+            config::meta::downtimes::Repeat,
+            config::meta::downtimes::DowntimeStatus,
+            config::meta::downtimes::DowntimeWindow,
+            config::meta::downtimes::ResourceValue,
+            config::meta::downtimes::SloCorrectionMode,
+            config::meta::downtimes::PreviewMatch,
+            config::meta::downtimes::ActiveDowntime,
+            config::meta::downtimes::CorrectionRef,
+            config::meta::downtimes::DowntimeStatusCounts,
+            config::meta::downtimes::AffectedItems,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -973,5 +990,36 @@ mod tests {
             .collect();
         assert!(tags.contains(&"Product Analytics"), "{tags:?}");
         assert!(!tags.contains(&"RUM"), "{tags:?}");
+    }
+
+    #[test]
+    fn every_schema_ref_resolves() {
+        fn collect_refs<'a>(value: &'a serde_json::Value, refs: &mut Vec<&'a str>) {
+            match value {
+                serde_json::Value::Object(map) => {
+                    if let Some(r) = map.get("$ref").and_then(|r| r.as_str()) {
+                        refs.push(r);
+                    }
+                    map.values().for_each(|v| collect_refs(v, refs));
+                }
+                serde_json::Value::Array(items) => items.iter().for_each(|v| collect_refs(v, refs)),
+                _ => {}
+            }
+        }
+
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        let mut refs = Vec::new();
+        collect_refs(&spec, &mut refs);
+        let mut unresolved = refs
+            .into_iter()
+            .filter(|r| {
+                r.strip_prefix("#/components/schemas/")
+                    .is_some_and(|name| !schemas.contains_key(name))
+            })
+            .collect::<Vec<_>>();
+        unresolved.sort_unstable();
+        unresolved.dedup();
+        assert!(unresolved.is_empty(), "unresolved refs: {unresolved:?}");
     }
 }

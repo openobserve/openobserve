@@ -79,10 +79,11 @@ pub enum TargetFolders {
 /// A tree of dimension tests (D17); one AND group of `=` pairs is an on-call `OwnershipRule`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[schema(no_recursion)]
 pub enum DimensionCondition {
     Group {
         op: LogicalOp,
+        // An opaque item keeps the schema acyclic: the MCP tool generator rejects self-references.
+        #[schema(value_type = Vec<Object>)]
         items: Vec<DimensionCondition>,
     },
     /// `value` may end in `*`, a prefix, as in ownership rules.
