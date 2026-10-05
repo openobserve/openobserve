@@ -359,7 +359,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 :class="{
                   'py-1.25 text-sm font-bold': true,
-                  'text-green': val.success,
+                  'text-green': val.success && !val.warning,
+                  'text-status-warning-text': val.warning,
                   'text-status-negative': !val.success,
                 }"
                 class="whitespace-pre-wrap"
@@ -407,6 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { functionsQuery } from "@/services/jstransform.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { functionKeys } from "@/services/jstransform.querykeys";
@@ -467,6 +469,8 @@ export default defineComponent({
     type pipelineCreator = {
       message: I18nText;
       success: boolean;
+      /** A result the user has to notice: a copy was made, or a function was not bundled. */
+      warning?: boolean;
     }[];
 
     type PipelineErrors = (ErrorMessage | string)[][];
@@ -505,7 +509,6 @@ export default defineComponent({
     });
 
     // The endpoint paginates; every consumer here wants the whole list.
-    const ALL_FUNCTIONS = 100000;
     // How far the copy search walks before giving up. A name that needs more than
     // this has a problem the import cannot name its way out of.
     const MAX_FUNCTION_COPY_SUFFIX = 50;
@@ -654,18 +657,13 @@ export default defineComponent({
     });
 
     const getFunctions = async () => {
-      const functions = await jstransform.list(
-        1,
-        // Every function in the org, not the first page: a name missing from this
-        // list answers the create with 400 `already exist`, which the bundled
-        // resolver reads as "taken" and works around with a needless copy.
-        ALL_FUNCTIONS,
-        "created_at",
-        true,
-        "",
-        store.state.selectedOrganization.identifier,
-      );
-      const list = functions.data.list ?? [];
+      // The declared query already reads every function in the org; staleTime 0
+      // because a name missing from this list answers the create with 400
+      // `already exist`, which the resolver reads as "taken" and copies around.
+      const list = await queryClient.fetchQuery({
+        ...functionsQuery(store.state.selectedOrganization.identifier),
+        staleTime: 0,
+      });
       functionsByName.value = new Map(list.map((fun: any) => [fun.name, fun]));
       existingFunctions.value = list.map((fun: any) => {
         return fun.name;
@@ -1305,9 +1303,19 @@ export default defineComponent({
      * Returns false when a function could not be resolved — the caller abandons the
      * pipeline rather than create it against the wrong logic.
      */
+    /** The four keys the server reads, spelled and typed the way it expects. */
+    const bundledFunctionPayload = (fn: any, name: string) => ({
+      name,
+      function: String(fn.function).trim(),
+      params: typeof fn.params === "string" && fn.params.trim() ? fn.params : "row",
+      transType: parseInt(String(fn.transType ?? 0)),
+    });
+
     const resolveBundledFunctions = async (input: any, index: any) => {
       const { byName, conflicting } = bundledFunctionsByName(input);
 
+      // Validation already refuses this file; this is the guard that stops any write
+      // if the resolver is ever reached without it.
       if (conflicting.length) {
         pipelineCreators.value.push({
           message: t("pipeline.importErrors.functionBundleConflict", {
@@ -1327,6 +1335,7 @@ export default defineComponent({
             names: unbundled.join(", "),
           }),
           success: true,
+          warning: true,
         });
       }
 
@@ -1351,16 +1360,17 @@ export default defineComponent({
                   copy: candidate,
                 }),
                 success: true,
+                warning: true,
               });
             }
             break;
           }
 
           try {
-            await jstransform.create(store.state.selectedOrganization.identifier, {
-              ...fn,
-              name: candidate,
-            });
+            await jstransform.create(
+              store.state.selectedOrganization.identifier,
+              bundledFunctionPayload(fn, candidate),
+            );
           } catch (error: any) {
             // Under enterprise RBAC the list is filtered per user, so a name this
             // user cannot read is free as far as the map knows and taken as far as
@@ -1395,6 +1405,8 @@ export default defineComponent({
                     copy: candidate,
                   }),
             success: true,
+            // A copy is the only signal a duplicate now exists, so it cannot read as plain success.
+            warning: n > 0,
           });
           break;
         }

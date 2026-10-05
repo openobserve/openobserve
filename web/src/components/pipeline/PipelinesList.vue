@@ -339,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-export-pipelines-btn"
               variant="outline"
               size="sm"
+              :loading="exportLoading"
               @click="exportBulkPipelines"
               icon-left="download"
             >
@@ -504,6 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { pipelinesQuery } from "@/services/pipelines.queries";
+import { downloadFile } from "@/utils/dom";
 import { functionsQuery } from "@/services/jstransform.queries";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -687,6 +689,9 @@ const filteredPipelines = computed<any[]>(() =>
 const columns: any = ref([]);
 
 const selectedPipelineIds = ref<string[]>([]);
+// Export fetches the function list before it writes the file, so a second press
+// mid-flight would download twice.
+const exportLoading = ref(false);
 const bulkDeleteLoading = ref(false);
 const selectedPipelines = computed(() =>
   filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id)),
@@ -1224,9 +1229,12 @@ const bundleFunctions = async (pipelines: any[]) => {
   // GET /functions already returns every body, so one read covers the whole file.
   let available: any[] = [];
   try {
-    available = await queryClient.fetchQuery(
-      functionsQuery(store.state.selectedOrganization.identifier),
-    );
+    // staleTime 0: the functions tier caches for an hour, and a stale body would
+    // export logic the org no longer runs -- the drift this bundling removes.
+    available = await queryClient.fetchQuery({
+      ...functionsQuery(store.state.selectedOrganization.identifier),
+      staleTime: 0,
+    });
   } catch {
     // The pipeline itself is still worth exporting; the import falls back to remap.
     return { pipelines, missing: wanted };
@@ -1246,16 +1254,6 @@ const bundleFunctions = async (pipelines: any[]) => {
   return { pipelines: bundled, missing: wanted.filter((name) => !byName.has(name)) };
 };
 
-const downloadJson = (payload: unknown, filename: string) => {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
 // Names a node calls but the file cannot carry. Said out loud, because the import
 // will stop on them and the user is the only one who can grant the read.
 const warnAboutMissingFunctions = (missing: string[]) => {
@@ -1270,28 +1268,44 @@ const warnAboutMissingFunctions = (missing: string[]) => {
 };
 
 const exportPipeline = async (row: any) => {
-  const { pipelines, missing } = await bundleFunctions([row]);
-  downloadJson(pipelines[0], `${row.name}.json`);
-  warnAboutMissingFunctions(missing);
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    const { pipelines, missing } = await bundleFunctions([row]);
+    downloadFile(`${row.name}.json`, JSON.stringify(pipelines[0], null, 2), "application/json");
+    warnAboutMissingFunctions(missing);
+  } finally {
+    exportLoading.value = false;
+  }
 };
 
 const exportBulkPipelines = async () => {
-  // Stays an array of pipelines, each carrying its own `functions` key, so the
-  // import loop keeps its shape.
-  const selected = selectedPipelines.value;
-  const { pipelines, missing } = await bundleFunctions(selected);
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    // Stays an array of pipelines, each carrying its own `functions` key, so the
+    // import loop keeps its shape.
+    const selected = selectedPipelines.value;
+    const { pipelines, missing } = await bundleFunctions(selected);
 
-  const date = new Date().toISOString().split("T")[0];
-  downloadJson(pipelines, `pipelines_export_${date}.json`);
+    const date = new Date().toISOString().split("T")[0];
+    downloadFile(
+      `pipelines_export_${date}.json`,
+      JSON.stringify(pipelines, null, 2),
+      "application/json",
+    );
 
-  selectedPipelineIds.value = [];
-  toast({
-    message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
-      count: selected.length,
-    }),
-    variant: "success",
-  });
-  warnAboutMissingFunctions(missing);
+    selectedPipelineIds.value = [];
+    toast({
+      message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
+        count: selected.length,
+      }),
+      variant: "success",
+    });
+    warnAboutMissingFunctions(missing);
+  } finally {
+    exportLoading.value = false;
+  }
 };
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
 const handleResumePipeline = () => {

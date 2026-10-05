@@ -986,10 +986,15 @@ describe("ImportPipeline.vue", () => {
       expect(wrapper.vm.existingFunctions).toEqual(["fn-a", "fn-b"]);
     });
 
-    it("calls jstransform.list with the selected organization identifier", async () => {
+    it("reads every function in the selected organization, not just the first page", async () => {
+      // A name missing from this list answers the create with 400 `already exist`,
+      // which the resolver reads as "taken" and works around with a needless copy.
       wrapper = createWrapper();
       await flushPromises();
-      expect(jstransform.list).toHaveBeenCalledWith(1, 100000, "created_at", true, "", "default");
+      const [page, size, , , , org] = (jstransform.list as MockedFunction<any>).mock.calls[0];
+      expect(page).toBe(1);
+      expect(size).toBeGreaterThanOrEqual(100000);
+      expect(org).toBe("default");
     });
   });
 
@@ -1090,22 +1095,39 @@ describe("ImportPipeline.vue", () => {
       expect(wrapper.find('[data-test="pipeline-import-creation-title"]').exists()).toBe(true);
     });
 
+    it("renders a warning result in warning colour, not success green", async () => {
+      // A copy or a skipped function is the only signal the user gets that the org
+      // changed in a way they did not ask for; green reads as "nothing to see".
+      wrapper = createWrapper();
+      wrapper.vm.pipelineCreators = [
+        { message: 'Pipeline - 1: "p" created successfully', success: true },
+        { message: 'Pipeline - 1: Function "f" already exists', success: true, warning: true },
+        { message: 'Pipeline - 1: "p" creation failed', success: false },
+      ];
+      await nextTick();
+
+      const classesAt = (i: number) =>
+        wrapper.find(`[data-test="pipeline-import-creation-${i}-message"]`).classes();
+
+      expect(classesAt(0)).toContain("text-green");
+      expect(classesAt(1)).toContain("text-status-warning-text");
+      expect(classesAt(1)).not.toContain("text-green");
+      expect(classesAt(2)).toContain("text-status-negative");
+    });
+
     it("colours a plain-string error like the ones with an inline fix-up", async () => {
       // Asserting the pushed value cannot catch a missing colour class; only the render can.
       wrapper = createWrapper();
       wrapper.vm.pipelineErrorsToDisplay = [
         [
           { field: "pipeline_name", message: "Pipeline - 1: Name is required" },
-          "Pipeline - 1: the file carries two different bodies for the same function name: fn",
+          "Pipeline - 1: The file carries two different bodies for the same function name: fn",
         ],
       ];
       await nextTick();
 
       const classesOf = (errorIndex: number) =>
-        wrapper
-          .find(`[data-test="pipeline-import-error-0-${errorIndex}"]`)
-          .find("span")
-          .classes();
+        wrapper.find(`[data-test="pipeline-import-error-0-${errorIndex}"]`).find("span").classes();
 
       expect(classesOf(1)).toContain("text-status-negative");
       // Same colour as the branch that does have an inline control.
@@ -1118,7 +1140,7 @@ describe("ImportPipeline.vue", () => {
   // -----------------------------------------------------------------------
 
   // -----------------------------------------------------------------------
-  // 22. Bundled functions (Phase 2)
+  // 23. Bundled functions (Phase 2)
   // -----------------------------------------------------------------------
 
   describe("bundled functions", () => {
@@ -1179,9 +1201,7 @@ describe("ImportPipeline.vue", () => {
     });
 
     it("reuses an existing function with the same logic and writes nothing", async () => {
-      withExistingFunctions([
-        { name: "parse_nginx", function: BODY, params: "row", transType: 0 },
-      ]);
+      withExistingFunctions([{ name: "parse_nginx", function: BODY, params: "row", transType: 0 }]);
       await mountReady();
 
       expect(await wrapper.vm.createPipeline(bundledPipeline(), 1)).toBe(true);
@@ -1360,9 +1380,7 @@ describe("ImportPipeline.vue", () => {
       await mountReady();
 
       await wrapper.vm.validatePipelineInputs(bundledPipeline(), 1);
-      expect(JSON.stringify(wrapper.vm.pipelineErrorsToDisplay)).not.toContain(
-        "function_name_0",
-      );
+      expect(JSON.stringify(wrapper.vm.pipelineErrorsToDisplay)).not.toContain("function_name_0");
     });
 
     it("still demands a remap for a file that bundles nothing", async () => {

@@ -391,7 +391,7 @@ test.describe(
         );
 
         const lines = await pm.pipelineImportExport.getCreationMessages();
-        expect(lines[0]).toContain(`function "${fnName}" created`);
+        expect(lines[0]).toContain(`Function "${fnName}" created`);
         expect(lines[1]).toContain('creation failed');
 
         // The function stays: it has no dependents, so the user can delete it,
@@ -461,7 +461,7 @@ test.describe(
         );
 
         const lines = await pm.pipelineImportExport.getCreationMessages();
-        expect(lines[0]).toContain('functions not included in the export file');
+        expect(lines[0]).toContain('Functions not included in the export file');
         expect(lines[0]).toContain(calls);
 
         // A bundled function no node calls is never created — creating it would be
@@ -523,6 +523,8 @@ test.describe(
         );
 
         await pm.pipelineImportExport.navigateToList(org);
+        // Both seeded names carry the stamp, so this leaves only them selectable.
+        await pm.pipelineImportExport.searchPipelines(String(stamp));
         await pm.pipelineImportExport.selectAllRows();
         const file = await readDownload(await pm.pipelineImportExport.clickBulkExport());
 

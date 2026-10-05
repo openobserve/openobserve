@@ -260,8 +260,17 @@ def _second_org(client: OpenObserveClient) -> str | None:
     return created.json().get("identifier")
 
 
-def _pipeline_using_function(pipeline_name: str, function_name: str) -> dict:
-    """A minimal realtime pipeline whose middle node calls a function."""
+def _pipeline_using_function(
+    pipeline_name: str, function_name: str, *, source_stream: str | None = None
+) -> dict:
+    """A minimal realtime pipeline whose middle node calls a function.
+
+    `source_stream` defaults to one derived from the pipeline name: a realtime source
+    stream may feed only ONE pipeline, so sharing it makes the server answer "a realtime
+    pipeline with same source stream already exists" -- also a 400, and nothing to do
+    with the rule under test.
+    """
+    stream = source_stream or f"s_{pipeline_name}"[:60]
     input_id, fn_id, output_id = f"in-{pipeline_name}", f"fn-{pipeline_name}", f"out-{pipeline_name}"
 
     def edge(source: str, target: str) -> dict:
@@ -283,7 +292,7 @@ def _pipeline_using_function(pipeline_name: str, function_name: str) -> dict:
         "org": "default",
         "name": pipeline_name,
         "description": f"api test pipeline using {function_name}",
-        "source": {"source_type": "realtime"},
+        "source": {"source_type": "realtime", "stream_name": stream, "stream_type": "logs"},
         "paused_at": None,
         "nodes": [
             {
@@ -293,7 +302,7 @@ def _pipeline_using_function(pipeline_name: str, function_name: str) -> dict:
                 "data": {
                     "node_type": "stream",
                     "stream_type": "logs",
-                    "stream_name": "default",
+                    "stream_name": stream,
                     "org_id": "default",
                 },
             },
@@ -342,6 +351,9 @@ def test_pipeline_create_is_refused_when_the_function_does_not_exist(
             "a pipeline calling a function that does not exist should be refused; "
             f"got {resp.status_code} {resp.text}"
         )
+        # The reason matters: a shared source stream is also a 400, so a bare status
+        # assertion would pass even if the server dropped this rule entirely.
+        assert missing in resp.text, f"the refusal should name the function; got {resp.text}"
     finally:
         if pipeline_id:
             client.delete(f"pipelines/{pipeline_id}")
@@ -370,6 +382,9 @@ def test_pipeline_create_is_refused_when_the_function_is_javascript(
         assert resp.status_code == 400, (
             "a function node calling a JS function should be refused; "
             f"got {resp.status_code} {resp.text}"
+        )
+        assert re.search(r"javascript", resp.text, re.IGNORECASE), (
+            f"the refusal should say the function is JavaScript; got {resp.text}"
         )
     finally:
         if pipeline_id:

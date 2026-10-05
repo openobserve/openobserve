@@ -26,6 +26,7 @@ class PipelineImportExportPage {
     // List page
     this.bulkExportButton = this.page.locator('[data-test="pipeline-list-export-pipelines-btn"]');
     this.selectAllRowsCheckbox = this.page.locator('[data-test="o2-table-select-all"]');
+    this.listSearchInput = this.page.locator('[data-test="pipeline-list-search-input"] input');
 
     // Toast
     this.toastMessage = this.page.locator('[data-test="o-toast-message"]');
@@ -78,6 +79,22 @@ class PipelineImportExportPage {
     const downloadPromise = this.page.waitForEvent('download', { timeout: 30000 });
     await this.page.locator(this.rowExportActionSelector(name)).click();
     return await downloadPromise;
+  }
+
+  /**
+   * Narrow the list to rows matching `term`.
+   *
+   * select-all only ticks the current page, and the list pages at 20, so a shard
+   * with enough pipelines can push the rows under test onto page two.
+   */
+  async searchPipelines(term) {
+    await this.listSearchInput.fill(term);
+    await expect
+      .poll(async () => await this.page.locator('[data-test^="pipeline-list-"]').count(), {
+        timeout: 15000,
+        intervals: [250, 500],
+      })
+      .toBeGreaterThan(0);
   }
 
   /** Tick the header select-all box and wait for the bulk action to appear. */
@@ -141,6 +158,11 @@ class PipelineImportExportPage {
         { timeout: 60000, intervals: [250, 500, 1000] },
       )
       .toBeGreaterThan(0);
+
+    // The first line appears before the pipeline POST, so the list is still growing
+    // here. The button is disabled for the duration, so its re-enabling is the only
+    // signal that every line has been pushed.
+    await expect(this.importJsonButton).toBeEnabled({ timeout: 60000 });
   }
 
   /**

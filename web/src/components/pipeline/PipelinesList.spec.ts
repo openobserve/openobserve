@@ -25,6 +25,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { createStore } from "vuex";
 
 // Mock services
+const mockDownloadFile = vi.fn();
+vi.mock("@/utils/dom", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, downloadFile: (...args: any[]) => mockDownloadFile(...args) };
+});
+
 vi.mock("@/services/pipelines", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -582,8 +588,11 @@ describe("PipelinesList", () => {
     it("exportPipeline triggers a download for a single pipeline", async () => {
       await wrapper.vm.exportPipeline(mockRealtimePipeline);
 
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
-      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+      expect(mockDownloadFile).toHaveBeenCalledTimes(1);
+      const [name, body, mime] = mockDownloadFile.mock.calls[0];
+      expect(name).toBe(`${mockRealtimePipeline.name}.json`);
+      expect(mime).toBe("application/json");
+      expect(JSON.parse(body).name).toBe(mockRealtimePipeline.name);
     });
 
     it("exportBulkPipelines downloads all selected pipelines and clears selection", async () => {
@@ -597,7 +606,8 @@ describe("PipelinesList", () => {
 
       await wrapper.vm.exportBulkPipelines();
 
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
+      expect(mockDownloadFile).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(mockDownloadFile.mock.calls[0][1])).toHaveLength(2);
       expect(wrapper.vm.selectedPipelineIds).toEqual([]);
     });
   });
@@ -627,31 +637,16 @@ describe("PipelinesList", () => {
       ],
     };
 
-    let blobParts: any[] = [];
-    let realBlob: any;
-
-    const exportedFile = () => JSON.parse(String(blobParts[0]));
+    // The component hands the file text to downloadFile, which is mocked.
+    const exportedFile = () => JSON.parse(String(mockDownloadFile.mock.calls.at(-1)?.[1]));
 
     beforeEach(() => {
-      blobParts = [];
-      realBlob = global.Blob;
-      // The only way to read what was written: the anchor is a stub and the blob
-      // URL is a mock.
-      global.Blob = class {
-        constructor(parts: any[]) {
-          blobParts = parts;
-        }
-      } as any;
-
+      mockDownloadFile.mockClear();
       // fetchQuery caches, and these tests hand it different lists.
       queryClient.clear();
       (jstransform.list as MockedFunction<any>).mockResolvedValue({
         data: { list: [parseNginx] },
       });
-    });
-
-    afterEach(() => {
-      global.Blob = realBlob;
     });
 
     it("bundles the functions a single exported pipeline calls", async () => {
@@ -718,7 +713,7 @@ describe("PipelinesList", () => {
       await wrapper.vm.exportPipeline(fnPipeline);
 
       expect(exportedFile().name).toBe("fn-pipeline");
-      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+      expect(mockDownloadFile).toHaveBeenCalledTimes(1);
     });
 
     it("does not touch the cached row it exported", async () => {
