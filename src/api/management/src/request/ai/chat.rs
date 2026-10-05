@@ -987,6 +987,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 .as_ref()
                 .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()))
                 .cloned();
+            if query_req.query.trim().is_empty()
+                && query_req.images.as_ref().is_none_or(|i| i.is_empty())
+            {
+                return MetaHttpResponse::bad_request("The message is empty");
+            }
             let admitted = match super::chats::admit_turn(
                 &org_id_str,
                 session_id.as_deref(),

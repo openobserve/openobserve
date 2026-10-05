@@ -947,6 +947,11 @@ pub async fn delete_stream_data_by_time_range(
             "Cannot delete the audit stream".to_string(),
         ));
     }
+    if is_protected_ai_chat_stream(stream_name) {
+        return Err(infra::errors::Error::Message(format!(
+            "stream '{stream_name}' is reserved and cannot be deleted"
+        )));
+    }
 
     if time_range.start > time_range.end {
         return Err(infra::errors::Error::Message(
