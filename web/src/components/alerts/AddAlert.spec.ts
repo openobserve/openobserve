@@ -1255,7 +1255,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(form.state.values.query_condition.sql).toBe(SQL);
     });
 
-    it("clears the Compare-with-Past windows when a SQL alert switches to Realtime", async () => {
+    it("keeps the Compare-with-Past windows through a Realtime round trip", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
@@ -1267,8 +1267,32 @@ describe("AddAlert (OForm owner)", () => {
 
       await wrapper.find('[data-test="add-alert-type-tab-true"]').trigger("click");
       await flushPromises();
+      await wrapper.find('[data-test="add-alert-type-tab-false"]').trigger("click");
+      await flushPromises();
 
-      expect(form.state.values.query_condition.multi_time_range).toEqual([]);
+      expect(form.state.values.query_condition.multi_time_range).toEqual([{ offSet: "1h" }]);
+    });
+
+    // The windows stay in the form; the payload is what keeps them off a Realtime alert.
+    it("sends no Compare-with-Past windows when a SQL alert is saved as Realtime", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", SQL);
+      form.setFieldValue("query_condition.conditions", builderTree);
+      form.setFieldValue("query_condition.multi_time_range", [{ offSet: "1h" }]);
+      await flushPromises();
+
+      await wrapper.find('[data-test="add-alert-type-tab-true"]').trigger("click");
+      await flushPromises();
+      await clickSave();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(savedPayload().is_real_time).toBe(true);
+      expect(savedPayload().query_condition.type).toBe("custom");
+      expect(savedPayload().query_condition.multi_time_range).toEqual([]);
     });
 
     const builderTree = {

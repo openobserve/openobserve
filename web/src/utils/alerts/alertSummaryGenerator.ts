@@ -137,8 +137,9 @@ export function generateAlertSummary(
     if (formData.trigger_condition?.period) {
       let period: string;
       let fieldId: string;
-      // Check if multi-time range comparison is enabled
+      // Compare-with-Past windows are saved only with SQL (getAlertPayload).
       if (
+        formData.query_condition?.type === "sql" &&
         formData.query_condition?.multi_time_range &&
         formData.query_condition.multi_time_range.length > 0
       ) {

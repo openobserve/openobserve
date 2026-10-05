@@ -941,10 +941,10 @@ export default defineComponent({
     // anomaly/composite tab switch.
     const onAlertTypeChange = (value: unknown) => {
       alertForm.setF("is_real_time", value);
-      // Realtime runs Builder only; keep the query text, drop the SQL-only windows.
+      // Realtime runs Builder only. The query text and Compare-with-Past windows
+      // stay in the form for a switch back; the payload never sends windows here.
       if (value === "true" && alertForm.formData.value.query_condition?.type !== "custom") {
         alertForm.setF("query_condition.type", "custom");
-        alertForm.clearMultiWindows();
       }
     };
 
