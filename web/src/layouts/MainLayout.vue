@@ -226,6 +226,7 @@ import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
@@ -766,45 +767,66 @@ export default defineComponent({
       }
     });
 
-    const updateIncidentsMenu = () => {
-      if (isIncidentsEnabled.value) {
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+    // Shows the entry — locked, if this edition doesn't unlock `featureKey` —
+    // whenever `enabledByRuntimeFlag` is true OR the edition flat-out doesn't
+    // unlock it (so the locked entry stays discoverable rather than only
+    // appearing once an admin has also flipped the runtime flag on). Hides it
+    // only when the edition allows the feature but the runtime flag is off —
+    // that's a deployment choice, not something to upsell.
+    const syncGatedMenuEntry = (
+      name: string,
+      featureKey: "incidents" | "workflows",
+      enabledByRuntimeFlag: boolean,
+      anchorName: string,
+      entry: Omit<NavItem, "locked" | "lockedMessage">,
+    ) => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === name);
+      const access = checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig));
+      const shouldShow = enabledByRuntimeFlag || !access.allowed;
 
-        const incidentExists = linksList.value.some((link) => link.name === "incidentList");
-
-        if (alertIndex !== -1 && !incidentExists) {
-          linksList.value.splice(alertIndex + 1, 0, {
-            title: t("menu.incidents"),
-            icon: "notifications-active",
-            link: "/incidents",
-            name: "incidentList",
-          });
-        }
+      if (!shouldShow) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
       }
+
+      if (existingIndex !== -1) {
+        linksList.value[existingIndex].locked = !access.allowed;
+        linksList.value[existingIndex].lockedMessage = access.message;
+        return;
+      }
+
+      const anchor = linksList.value.findIndex((link) => link.name === anchorName);
+      if (anchor === -1) return;
+      linksList.value.splice(anchor + 1, 0, {
+        ...entry,
+        locked: !access.allowed,
+        lockedMessage: access.message,
+      });
+    };
+
+    const updateIncidentsMenu = () => {
+      syncGatedMenuEntry(
+        "incidentList",
+        "incidents",
+        Boolean(isIncidentsEnabled.value),
+        "alertList",
+        {
+          title: t("menu.incidents"),
+          icon: "notifications-active",
+          link: "/incidents",
+          name: "incidentList",
+        },
+      );
     };
 
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
-      const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
-
-      if (isWorkflowsEnabled.value) {
-        if (existingIndex !== -1) return;
-
-        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
-        if (anchor === -1) return;
-
-        linksList.value.splice(anchor + 1, 0, {
-          title: t("menu.workflows"),
-          icon: "schema",
-          link: "/workflows",
-          name: "workflows",
-        });
-      } else if (existingIndex !== -1) {
-        // The entry must be REMOVED, not just skipped: the menu is rebuilt on
-        // org switch and `workflows_enabled` can differ per deployment, so an
-        // add-only guard would leave a stale entry behind.
-        linksList.value.splice(existingIndex, 1);
-      }
+      syncGatedMenuEntry("workflows", "workflows", isWorkflowsEnabled.value, "alertList", {
+        title: t("menu.workflows"),
+        icon: "schema",
+        link: "/workflows",
+        name: "workflows",
+      });
     };
 
     // If `/config` resolves after this component mounted (or the flag flips),

@@ -451,6 +451,7 @@ import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
@@ -577,8 +578,11 @@ export default defineComponent({
       }).href;
     });
 
-    // Enterprise upgrade dialog state
-    const showEnterpriseDialog = ref(false);
+    // Enterprise upgrade dialog state — a module-level singleton (see the
+    // composable) so a locked feature's tooltip link elsewhere in the app can
+    // open the SAME dialog instance this header button does.
+    const { isOpen: showEnterpriseDialog, open: openEnterpriseDialog } =
+      useEnterpriseUpgradeDialog();
 
     // Language sub-menu state (nested submenu pattern matching original UX)
     const showLanguageSubmenu = ref(false);
@@ -667,11 +671,6 @@ export default defineComponent({
     const handleOrgSelection = (org: any) => {
       emit("update:selectedOrg", org);
       emit("updateOrganization");
-    };
-
-    // Open enterprise upgrade dialog
-    const openEnterpriseDialog = () => {
-      showEnterpriseDialog.value = true;
     };
 
     return {

@@ -69,6 +69,7 @@ import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 export default defineComponent({
   name: "AppSettings",
@@ -189,9 +190,9 @@ export default defineComponent({
     // Feature-flag visibility stays declarative here (one array, not per-tab v-ifs).
     const settingsItems = computed<SectionHubItem[]>(() => {
       const org = store.state.selectedOrganization?.identifier;
-      const isEnt = config.isEnterprise == "true";
       const isCloud = config.isCloud == "true";
       const meta = isMetaOrg.value;
+      const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
       const z = store.state.zoConfig;
       const items: (SectionHubItem & { group: string })[] = [
         {
@@ -218,7 +219,11 @@ export default defineComponent({
           description: t("settings.cipherKeysDesc"),
           icon: "key",
           to: { name: "cipherKeys", query: { org_identifier: org } },
-          visible: isEnt,
+          // This whole batch is self-hosted-only — it doesn't exist on Cloud at
+          // all (not even locked); Cloud users can't "upgrade" into it.
+          visible: (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("cipherKeys", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("cipherKeys", featureGateCtx).message,
           dataTest: "management-cipher-key-tab",
           group: "Access & Security",
         },
@@ -228,7 +233,9 @@ export default defineComponent({
           description: t("settings.regexPatternsDesc"),
           icon: `img:${regexIcon.value}`,
           to: { name: "regexPatterns", query: { org_identifier: org } },
-          visible: isEnt,
+          visible: (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("regexPatterns", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("regexPatterns", featureGateCtx).message,
           dataTest: "regex-patterns-tab",
           group: "Access & Security",
         },
@@ -238,7 +245,12 @@ export default defineComponent({
           description: t("settings.domainManagementDesc"),
           icon: "dns",
           to: { name: "domainManagement", query: { org_identifier: org } },
-          visible: isEnt && meta,
+          // Meta-org is a cluster-topology restriction, not an edition upsell
+          // (upgrading wouldn't fix it); Cloud doesn't offer this at all — both
+          // stay a hide, not a lock.
+          visible: meta && (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("domainManagement", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("domainManagement", featureGateCtx).message,
           dataTest: "domain-management-tab",
           group: "Access & Security",
         },
@@ -248,7 +260,9 @@ export default defineComponent({
           description: t("settings.passwordPolicyDesc"),
           icon: "lock",
           to: { name: "passwordPolicy", query: { org_identifier: org } },
-          visible: isEnt && meta,
+          visible: meta && (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("passwordPolicy", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("passwordPolicy", featureGateCtx).message,
           dataTest: "password-policy-tab",
           group: "Access & Security",
         },
@@ -262,7 +276,9 @@ export default defineComponent({
           description: t("settings.pipelineDestinationsDesc"),
           icon: "person-pin-circle",
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
-          visible: isEnt,
+          visible: (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("pipelineDestinations", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("pipelineDestinations", featureGateCtx).message,
           dataTest: "pipeline-destinations-tab",
           group: "Destinations",
         },
@@ -272,10 +288,16 @@ export default defineComponent({
           description: t("settings.storageSettingsDesc"),
           icon: "cloud",
           to: { name: "storageSettings", query: { org_identifier: org } },
+          // Cloud org-storage enablement is a separate runtime toggle, not an
+          // edition upsell: in a pure-cloud build it's the only way in (no
+          // enterprise to unlock); in an enterprise+cloud build it's an extra
+          // condition on top of being unlocked.
           visible:
-            isEnt &&
-            (!isCloud ||
+            !isCloud ||
+            (featureGateCtx.isEnterprise &&
               store.state.organizationData.organizationSettings.org_storage_enabled === true),
+          locked: !checkFeatureAccess("storageSettings", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("storageSettings", featureGateCtx).message,
           dataTest: "storage-settings-tab",
           group: "Data & AI",
         },
@@ -285,7 +307,9 @@ export default defineComponent({
           description: t("settings.modelPricingDesc"),
           icon: "paid",
           to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: (isEnt || isCloud) && !!z.model_pricing_enabled,
+          visible: !!z.model_pricing_enabled,
+          locked: !checkFeatureAccess("modelPricing", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("modelPricing", featureGateCtx).message,
           dataTest: "model-pricing-tab",
           group: "Data & AI",
         },
@@ -295,7 +319,9 @@ export default defineComponent({
           description: t("settings.correlationSettingsDesc"),
           icon: "group-work",
           to: { name: "correlationSettings", query: { org_identifier: org } },
-          visible: isEnt && z.service_streams_enabled !== false,
+          visible: z.service_streams_enabled !== false && (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("correlationSettings", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("correlationSettings", featureGateCtx).message,
           dataTest: "correlation-settings-tab",
           group: "Data & AI",
         },
@@ -305,7 +331,9 @@ export default defineComponent({
           description: t("settings.llmProvidersDesc"),
           icon: "smart-toy",
           to: { name: "llmProviders", query: { org_identifier: org } },
-          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
+          visible: !!z.online_evals_enabled,
+          locked: !checkFeatureAccess("llmProviders", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("llmProviders", featureGateCtx).message,
           dataTest: "llm-providers-tab",
           group: "Data & AI",
         },
@@ -315,7 +343,9 @@ export default defineComponent({
           description: t("settings.index.genAiAgentMappingDesc"),
           icon: "smart-toy",
           to: { name: "genAiAgentMapping", query: { org_identifier: org } },
-          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
+          visible: !!z.online_evals_enabled,
+          locked: !checkFeatureAccess("genAiAgentMapping", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("genAiAgentMapping", featureGateCtx).message,
           dataTest: "gen-ai-agent-mapping-tab",
           group: "Data & AI",
         },
@@ -325,7 +355,9 @@ export default defineComponent({
           description: t("settings.queryManagementDesc"),
           icon: "query-stats",
           to: `/settings/query_management?org_identifier=${org}`,
-          visible: isEnt && meta,
+          visible: meta && (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("queryManagement", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("queryManagement", featureGateCtx).message,
           dataTest: "query-management-tab",
           group: "Operations",
         },
@@ -335,7 +367,9 @@ export default defineComponent({
           description: t("settings.nodesDesc"),
           icon: "hub",
           to: { name: "nodes", query: { org_identifier: org } },
-          visible: isEnt && meta,
+          visible: meta && (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("nodes", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("nodes", featureGateCtx).message,
           dataTest: "nodes-tab",
           group: "Operations",
         },
@@ -357,7 +391,9 @@ export default defineComponent({
           description: t("settings.licenseDesc"),
           icon: "card-membership",
           to: { name: "license", query: { org_identifier: org } },
-          visible: isEnt && meta,
+          visible: meta && (featureGateCtx.isEnterprise || !isCloud),
+          locked: !checkFeatureAccess("license", featureGateCtx).allowed,
+          lockedMessage: checkFeatureAccess("license", featureGateCtx).message,
           dataTest: "license-tab",
           group: "Account",
         },

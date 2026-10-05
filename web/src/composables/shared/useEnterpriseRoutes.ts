@@ -17,6 +17,23 @@ import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
+import {
+  checkFeatureAccess,
+  buildFeatureGateContext,
+  type FeatureKey,
+} from "@/utils/enterpriseFeatures";
+
+/**
+ * Real component when the edition unlocks `key`, else the shared locked
+ * placeholder — resolved on EACH navigation (not once at router-build time).
+ * "rbac" depends on the async-loaded `rbac_enabled` flag, read fresh every
+ * time from the same raw store singleton the route guards above already
+ * import directly, so a cold-load snapshot never freezes a stale verdict.
+ */
+const gatedComponent = (key: FeatureKey, real: any) => () =>
+  checkFeatureAccess(key, buildFeatureGateContext(store.state.zoConfig)).allowed
+    ? real()
+    : import("@/components/EnterpriseFeatureLocked.vue");
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
@@ -282,229 +299,242 @@ const useEnterpriseRoutes = () => {
   //the below are the routes that we support for enterprise and cloud
   //the above are the routes that we support for oss including both enterprise and cloud
 
-  if (config.isCloud == "true" || config.isEnterprise == "true") {
-    // On-call is configured before any data flows, so every route here stays open on an empty org.
-    routes.push(
-      {
-        path: "oncall/responses",
-        name: "onCallResponses",
-        component: OnCallResponses,
-        meta: { titleKey: "oncall.responsesTitle", allowOnEmptyData: true },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+  // On-call, Incidents, Workflows, RBAC (groups/roles/quota) are always
+  // registered now — the component resolves to the shared locked placeholder
+  // (see `gatedComponent`) when the edition doesn't unlock them, so the
+  // section is reachable (nav + direct URL) but inert rather than absent.
+  // On-call is configured before any data flows, so every route here stays open on an empty org.
+  routes.push(
+    {
+      path: "oncall/responses",
+      name: "onCallResponses",
+      component: gatedComponent("oncall", OnCallResponses),
+      meta: { titleKey: "oncall.responsesTitle", allowOnEmptyData: true, featureKey: "oncall" },
+      beforeEnter(to: any, from: any, next: any) {
+        oncallRouteGuard(to, from, next);
       },
-      {
-        path: "oncall/responses/:responseId",
-        name: "onCallResponseDetail",
-        component: OnCallResponseDetail,
-        meta: { titleKey: "oncall.responseDetail", allowOnEmptyData: true },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+    },
+    {
+      path: "oncall/responses/:responseId",
+      name: "onCallResponseDetail",
+      component: gatedComponent("oncall", OnCallResponseDetail),
+      meta: { titleKey: "oncall.responseDetail", allowOnEmptyData: true, featureKey: "oncall" },
+      beforeEnter(to: any, from: any, next: any) {
+        oncallRouteGuard(to, from, next);
       },
-      {
-        // A page again. It was retired to a redirect for being a stub that
-        // hardcoded "You are not on an on-call team yet" without asking the
-        // server anything — but two endpoints exist that only make sense here:
-        // `my/teams` answers duty in one request instead of one per team, and
-        // `my/deliveries` is the only thing in the product that answers "did my
-        // phone actually ring", which no per-team screen can ask.
-        //
-        // "What needs somebody" still belongs to the Pages list; this page
-        // links to it narrowed rather than rendering a second copy.
-        path: "oncall/me",
-        name: "onCallMine",
-        component: OnCallMine,
-        meta: { titleKey: "oncall.mineTitle", allowOnEmptyData: true },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+    },
+    {
+      // A page again. It was retired to a redirect for being a stub that
+      // hardcoded "You are not on an on-call team yet" without asking the
+      // server anything — but two endpoints exist that only make sense here:
+      // `my/teams` answers duty in one request instead of one per team, and
+      // `my/deliveries` is the only thing in the product that answers "did my
+      // phone actually ring", which no per-team screen can ask.
+      //
+      // "What needs somebody" still belongs to the Pages list; this page
+      // links to it narrowed rather than rendering a second copy.
+      path: "oncall/me",
+      name: "onCallMine",
+      component: gatedComponent("oncall", OnCallMine),
+      meta: { titleKey: "oncall.mineTitle", allowOnEmptyData: true, featureKey: "oncall" },
+      beforeEnter(to: any, from: any, next: any) {
+        oncallRouteGuard(to, from, next);
       },
-      {
-        path: "oncall/teams",
-        name: "onCallTeams",
-        component: OnCallTeams,
-        meta: { titleKey: "oncall.teamsTitle", allowOnEmptyData: true },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+    },
+    {
+      path: "oncall/teams",
+      name: "onCallTeams",
+      component: gatedComponent("oncall", OnCallTeams),
+      meta: { titleKey: "oncall.teamsTitle", allowOnEmptyData: true, featureKey: "oncall" },
+      beforeEnter(to: any, from: any, next: any) {
+        oncallRouteGuard(to, from, next);
       },
-      {
-        // The tab is part of the URL, so a schedule somebody sends is the
-        // schedule the recipient lands on. Defaults to `schedule`.
-        //
-        // `escalation` and `routing` are what the tabs are CALLED; `policy` and
-        // `ownership` are what they were called when the routes were written,
-        // and links to them are already in Slack threads and setup checklists.
-        // Both are accepted, the view canonicalises to the visible word — a
-        // shared link and the tab it lands on should not use two vocabularies
-        // for one thing.
-        path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|escalation|ownership|routing)?",
-        name: "onCallTeamDetail",
-        component: OnCallTeamDetail,
-        meta: { titleKey: "oncall.teamDetail", allowOnEmptyData: true },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+    },
+    {
+      // The tab is part of the URL, so a schedule somebody sends is the
+      // schedule the recipient lands on. Defaults to `schedule`.
+      //
+      // `escalation` and `routing` are what the tabs are CALLED; `policy` and
+      // `ownership` are what they were called when the routes were written,
+      // and links to them are already in Slack threads and setup checklists.
+      // Both are accepted, the view canonicalises to the visible word — a
+      // shared link and the tab it lands on should not use two vocabularies
+      // for one thing.
+      path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|escalation|ownership|routing)?",
+      name: "onCallTeamDetail",
+      component: gatedComponent("oncall", OnCallTeamDetail),
+      meta: { titleKey: "oncall.teamDetail", allowOnEmptyData: true, featureKey: "oncall" },
+      beforeEnter(to: any, from: any, next: any) {
+        oncallRouteGuard(to, from, next);
       },
-      {
-        path: "oncall/policies",
-        name: "onCallPolicies",
-        component: OnCallPolicies,
-        meta: { titleKey: "oncall.policiesTitle", allowOnEmptyData: true },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+    },
+    {
+      path: "oncall/policies",
+      name: "onCallPolicies",
+      component: gatedComponent("oncall", OnCallPolicies),
+      meta: { titleKey: "oncall.policiesTitle", allowOnEmptyData: true, featureKey: "oncall" },
+      beforeEnter(to: any, from: any, next: any) {
+        oncallRouteGuard(to, from, next);
       },
-      {
-        path: "oncall/routing",
-        name: "onCallRouting",
-        component: OnCallRouting,
-        meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+    },
+    {
+      path: "oncall/routing",
+      name: "onCallRouting",
+      component: gatedComponent("oncall", OnCallRouting),
+      meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true, featureKey: "oncall" },
+      beforeEnter(to: any, from: any, next: any) {
+        oncallRouteGuard(to, from, next);
       },
-    );
+    },
+  );
 
-    routes.push(
-      {
-        path: "incidents",
-        name: "incidentList",
-        component: IncidentList,
-        meta: {
-          titleKey: "menu.incidents",
-        },
-        beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
-        },
-      },
-      {
-        path: "incidents/:id",
-        name: "incidentDetail",
-        component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
-        meta: {
-          titleKey: "routeTitles.incidentDetail",
-        },
-        beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
-        },
-      },
-    );
-
-    // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
-    // renders in its <router-view> for add/edit.
-    routes.push({
-      path: "workflows",
-      name: "workflows",
-      component: WorkflowsList,
+  routes.push(
+    {
+      path: "incidents",
+      name: "incidentList",
+      component: gatedComponent("incidents", IncidentList),
       meta: {
-        titleKey: "menu.workflows",
+        titleKey: "menu.incidents",
+        featureKey: "incidents",
       },
       beforeEnter(to: any, from: any, next: any) {
-        workflowsRouteGuard(to, from, next);
+        routeGuard(to, from, next);
       },
-      children: [
-        {
-          path: "add",
-          name: "createWorkflow",
-          component: WorkflowEditor,
-          meta: { titleKey: "workflow.create" },
-          beforeEnter(to: any, from: any, next: any) {
-            workflowsRouteGuard(to, from, next);
-          },
-        },
-        {
-          path: "edit",
-          name: "workflowEditor",
-          component: WorkflowEditor,
-          meta: { titleKey: "workflow.editMode" },
-          beforeEnter(to: any, from: any, next: any) {
-            workflowsRouteGuard(to, from, next);
-          },
-        },
-        {
-          // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
-          // from the editor so viewing a past run never drops the user into the
-          // builder; deep-linkable by ?run_id.
-          path: "runs",
-          name: "workflowRuns",
-          component: WorkflowRuns,
-          meta: { titleKey: "workflow.runs.title" },
-          beforeEnter(to: any, from: any, next: any) {
-            workflowsRouteGuard(to, from, next);
-          },
-        },
-      ],
-    });
-    routes[0].children.push(
-      ...[
-        {
-          path: "groups",
-          name: "groups",
-          meta: {
-            titleKey: "routeTitles.groups",
-          },
-          component: AppGroups,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "groups/edit/:group_name",
-          name: "editGroup",
-          meta: {
-            titleKey: "routeTitles.editGroup",
-          },
-          component: EditGroup,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "roles",
-          name: "roles",
-          meta: {
-            titleKey: "iam.roles",
-          },
-          component: AppRoles,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "roles/edit/:role_name",
-          name: "editRole",
-          meta: {
-            titleKey: "routeTitles.editRole",
-          },
-          component: EditRole,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "quota",
-          name: "quota",
-          component: Quota,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-      ],
-    );
+    },
+    {
+      path: "incidents/:id",
+      name: "incidentDetail",
+      component: gatedComponent(
+        "incidents",
+        () => import("@/components/alerts/IncidentDetailDrawer.vue"),
+      ),
+      meta: {
+        titleKey: "routeTitles.incidentDetail",
+        featureKey: "incidents",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+  );
 
-    if (config.isCloud == "true") {
-      routes[0].children.push({
-        path: "invitations",
-        name: "invitations",
-        component: Invitations,
+  // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
+  // renders in its <router-view> for add/edit.
+  routes.push({
+    path: "workflows",
+    name: "workflows",
+    component: gatedComponent("workflows", WorkflowsList),
+    meta: {
+      titleKey: "menu.workflows",
+      featureKey: "workflows",
+    },
+    beforeEnter(to: any, from: any, next: any) {
+      workflowsRouteGuard(to, from, next);
+    },
+    children: [
+      {
+        path: "add",
+        name: "createWorkflow",
+        component: gatedComponent("workflows", WorkflowEditor),
+        meta: { titleKey: "workflow.create", featureKey: "workflows" },
+        beforeEnter(to: any, from: any, next: any) {
+          workflowsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "edit",
+        name: "workflowEditor",
+        component: gatedComponent("workflows", WorkflowEditor),
+        meta: { titleKey: "workflow.editMode", featureKey: "workflows" },
+        beforeEnter(to: any, from: any, next: any) {
+          workflowsRouteGuard(to, from, next);
+        },
+      },
+      {
+        // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
+        // from the editor so viewing a past run never drops the user into the
+        // builder; deep-linkable by ?run_id.
+        path: "runs",
+        name: "workflowRuns",
+        component: gatedComponent("workflows", WorkflowRuns),
+        meta: { titleKey: "workflow.runs.title", featureKey: "workflows" },
+        beforeEnter(to: any, from: any, next: any) {
+          workflowsRouteGuard(to, from, next);
+        },
+      },
+    ],
+  });
+  routes[0].children.push(
+    ...[
+      {
+        path: "groups",
+        name: "groups",
+        meta: {
+          titleKey: "routeTitles.groups",
+          featureKey: "rbac",
+        },
+        component: gatedComponent("rbac", AppGroups),
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
-      });
-    }
+      },
+      {
+        path: "groups/edit/:group_name",
+        name: "editGroup",
+        meta: {
+          titleKey: "routeTitles.editGroup",
+          featureKey: "rbac",
+        },
+        component: gatedComponent("rbac", EditGroup),
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "roles",
+        name: "roles",
+        meta: {
+          titleKey: "iam.roles",
+          featureKey: "rbac",
+        },
+        component: gatedComponent("rbac", AppRoles),
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "roles/edit/:role_name",
+        name: "editRole",
+        meta: {
+          titleKey: "routeTitles.editRole",
+          featureKey: "rbac",
+        },
+        component: gatedComponent("rbac", EditRole),
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "quota",
+        name: "quota",
+        meta: { featureKey: "rbac" },
+        component: gatedComponent("rbac", Quota),
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+    ],
+  );
+
+  if (config.isCloud == "true") {
+    routes[0].children.push({
+      path: "invitations",
+      name: "invitations",
+      component: Invitations,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
   }
 
   return routes;

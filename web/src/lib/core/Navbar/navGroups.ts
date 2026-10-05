@@ -194,6 +194,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "notifications-active",
         name: "incidentList",
         requires: "incidentList",
+        gate: "incidents",
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
       // same workflow tile rather than as its own rail entry. Pages, Teams and
@@ -325,9 +326,17 @@ export const NAV_GROUPS: NavGroupDef[] = [
       },
       // Sits with Pipelines — the two are the same kind of thing (a flow canvas)
       // and share the canvas code. `requires` keys off the top-level entry
-      // MainLayout adds/removes from `workflows_enabled`, so the flag still owns
-      // visibility and no gate is duplicated here.
-      { titleKey: "menu.workflows", icon: "schema", name: "workflows", requires: "workflows" },
+      // MainLayout always keeps present now (locked when the edition doesn't
+      // unlock it, hidden only when an allowed edition's own runtime flag is
+      // off) — `gate: "workflows"` mirrors that locked state here too, so the
+      // flyout child dims instead of silently navigating to the placeholder.
+      {
+        titleKey: "menu.workflows",
+        icon: "schema",
+        name: "workflows",
+        requires: "workflows",
+        gate: "workflows",
+      },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
       {
         titleKey: "function.enrichmentTables",

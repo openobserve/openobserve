@@ -37,6 +37,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -66,11 +67,10 @@ const routeToIamTab: Record<string, string> = {
 const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {
-  const isEnt = config.isEnterprise == "true" || config.isCloud == "true";
   const isCloud = config.isCloud == "true";
   const meta = isMetaOrg.value;
-  const rbac = !!store.state.zoConfig.rbac_enabled;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
+  const rbacAccess = checkFeatureAccess("rbac", buildFeatureGateContext(store.state.zoConfig));
 
   const groups: SectionHubGroup[] = [
     {
@@ -141,7 +141,8 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.groupsDesc"),
           icon: "group",
           to: { name: "groups", query: orgQuery.value },
-          visible: isEnt && rbac,
+          locked: !rbacAccess.allowed,
+          lockedMessage: rbacAccess.message,
           dataTest: "iam-groups-tab",
         },
         {
@@ -150,7 +151,8 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.rolesDesc"),
           icon: "shield",
           to: { name: "roles", query: orgQuery.value },
-          visible: isEnt && rbac,
+          locked: !rbacAccess.allowed,
+          lockedMessage: rbacAccess.message,
           dataTest: "iam-roles-tab",
         },
         {
@@ -159,7 +161,11 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.quotaDesc"),
           icon: "speed",
           to: { name: "quota", query: orgQuery.value },
-          visible: isEnt && rbac && meta,
+          // Meta-org is a cluster-topology restriction, not an edition
+          // upsell — stays a hide, not a lock.
+          visible: meta,
+          locked: !rbacAccess.allowed,
+          lockedMessage: rbacAccess.message,
           dataTest: "iam-quota-tab",
         },
       ],

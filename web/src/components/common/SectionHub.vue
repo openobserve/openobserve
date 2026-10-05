@@ -50,38 +50,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ group.label }}
         </h2>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <button
-            v-for="item in group.items"
-            :key="item.key"
-            type="button"
-            class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-accent hover:bg-surface-subtle focus-visible:ring-accent flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
-            :data-test="item.dataTest || `section-hub-card-${item.key}`"
-            @click="router.push(item.to)"
-          >
-            <span
-              class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-tabs-hover-bg group-hover:text-accent mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
+          <template v-for="item in group.items" :key="item.key">
+            <button
+              type="button"
+              class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-accent hover:bg-surface-subtle focus-visible:ring-accent flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
+              :class="
+                item.locked
+                  ? 'hover:border-border-default hover:bg-surface-panel cursor-not-allowed opacity-60'
+                  : ''
+              "
+              :disabled="item.locked"
+              :aria-disabled="item.locked || undefined"
+              :data-test="item.dataTest || `section-hub-card-${item.key}`"
+              @click="!item.locked && router.push(item.to)"
             >
-              <img
-                v-if="item.icon && isImg(item.icon)"
-                :src="item.icon.slice(4)"
-                class="h-4 w-4 object-contain"
-                aria-hidden="true"
-                alt=""
-              />
-              <OIcon v-else-if="item.icon" :name="item.icon as any" size="sm" />
-            </span>
-            <span class="flex min-w-0 flex-col">
               <span
-                class="text-text-heading group-hover:text-accent text-sm font-semibold transition-colors"
-                >{{ item.label }}</span
+                class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-tabs-hover-bg group-hover:text-accent mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
               >
-              <span
-                v-if="item.description"
-                class="text-text-secondary mt-0.5 text-xs leading-snug"
-                >{{ item.description }}</span
-              >
-            </span>
-          </button>
+                <img
+                  v-if="item.icon && isImg(item.icon)"
+                  :src="item.icon.slice(4)"
+                  class="h-4 w-4 object-contain"
+                  aria-hidden="true"
+                  alt=""
+                />
+                <OIcon v-else-if="item.icon" :name="item.icon as any" size="sm" />
+              </span>
+              <span class="flex min-w-0 flex-col">
+                <span
+                  class="text-text-heading group-hover:text-accent text-sm font-semibold transition-colors"
+                  >{{ item.label }}</span
+                >
+                <span
+                  v-if="item.description"
+                  class="text-text-secondary mt-0.5 text-xs leading-snug"
+                  >{{ item.description }}</span
+                >
+              </span>
+            </button>
+            <!-- Sibling, not nested — see the comment on this pattern in
+               MenuLink.vue / ONavGroup.vue: child-mode OTooltip anchors to the
+               element immediately before it, so it must follow the whole card,
+               not sit inside it. -->
+            <LockedFeatureTooltip
+              v-if="item.locked && item.lockedMessage"
+              :message="item.lockedMessage"
+            />
+          </template>
         </div>
       </section>
     </div>
@@ -93,6 +108,7 @@ import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 
 const router = useRouter();
@@ -104,6 +120,14 @@ export interface SectionHubItem {
   icon?: string;
   to: RouteLocationRaw;
   visible?: boolean;
+  /**
+   * Present but unreachable — an enterprise/cloud-only section in a build
+   * that doesn't unlock it. Shown dimmed with `lockedMessage` as a tooltip
+   * instead of being filtered out (see `visible`). Set from
+   * `checkFeatureAccess()` in utils/enterpriseFeatures.ts.
+   */
+  locked?: boolean;
+  lockedMessage?: I18nText;
   dataTest?: string;
 }
 
