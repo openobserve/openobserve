@@ -35,7 +35,13 @@ export class AlertSaveQueryModePage {
       conditionValue: '[data-test="alert-conditions-value-input-field"]',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
+      scheduledTab: '[data-test="add-alert-type-tab-false"]',
       alertRulesTab: '[data-test="add-alert-tab-condition"]',
+      advancedTab: '[data-test="add-alert-tab-advanced"]',
+      streamTypeTrigger: '[data-test="add-alert-stream-type-select-dropdown-trigger"]',
+      // Compare-with-Past lives on the Advanced tab, not Alert Rules.
+      multiWindowAdd: '[data-test="multi-time-range-alerts-add-btn"]',
+      multiWindowDelete: '[data-test="multi-time-range-alerts-delete-btn"]',
       modeToggle: '[data-test="step2-query-tabs"]',
       // Two nodes carry this: the visible query editor and the hidden anomaly preview.
       queryEditor: '[data-test="query-editor"]:visible',
@@ -124,6 +130,34 @@ export class AlertSaveQueryModePage {
 
   async selectRealtime() {
     await this.page.locator(this.locators.realtimeTab).click();
+  }
+
+  async selectScheduled() {
+    await this.page.locator(this.locators.scheduledTab).click();
+  }
+
+  async selectStreamType(streamType) {
+    await this.#pickFromDropdown(this.locators.streamTypeTrigger, streamType);
+  }
+
+  async openAdvancedTab() {
+    await this.page.locator(this.locators.advancedTab).click();
+    await expect(this.page.locator(this.locators.multiWindowAdd)).toBeVisible({ timeout: 20000 });
+  }
+
+  /** Compare-with-Past reference window. Requires the Advanced tab to be open. */
+  async addCompareWithPastWindow() {
+    const before = await this.page.locator(this.locators.multiWindowDelete).count();
+    await this.page.locator(this.locators.multiWindowAdd).click();
+    await expect(this.page.locator(this.locators.multiWindowDelete)).toHaveCount(before + 1, {
+      timeout: 20000,
+    });
+  }
+
+  async expectCompareWithPastWindowCount(count) {
+    await expect(this.page.locator(this.locators.multiWindowDelete)).toHaveCount(count, {
+      timeout: 20000,
+    });
   }
 
   async clickSave() {
