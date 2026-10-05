@@ -592,11 +592,7 @@ const rumSessionStreamName = "_rumdata";
 // cannot edit would show there as permanently ticked.
 // The health/type/device segments stay out — they filter the fetched rows
 // client-side (see tableRows), not the underlying query.
-// `session_has_replay` only enters an org's shared _rumdata schema once some app in
-// that org has recorded a replay, so referencing it before schemaMapping confirms it
-// exists would 400 "unknown field" for every app in an org with no replay data yet.
-// No replay data means no session can match the "has a replay" filter this page
-// applies, so the fallback is an always-false predicate, not an unfiltered list.
+// session_has_replay may not exist yet, and no replay data means no session can match it, so the fallback is always-false, not unfiltered.
 const fieldListBaseFilter = computed(() =>
   schemaMapping.value["session_has_replay"] ? "session_has_replay IS NOT NULL" : "1 = 0",
 );

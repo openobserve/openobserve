@@ -522,14 +522,11 @@ describe("AppSessions.vue", () => {
     });
 
     it("falls back to an always-false filter instead of referencing session_has_replay when the org's schema lacks it (o2-enterprise#2799)", async () => {
-      // getStream was destructured once at component setup, so swapping in a whole new
-      // vi.fn() here would never be seen by the mounted component — reconfigure the
-      // same mock instance instead.
+      // getStream was destructured at setup, so reconfigure the same mock instance, not a new vi.fn().
       mockStreams.getStream.mockResolvedValueOnce({
         schema: mockStreamData.schema.filter((f) => f.name !== "session_has_replay"),
       });
-      // schemaMapping only ever adds keys it sees, so a stale true from the first fetch
-      // (made before this override) must be cleared, or this run would still see it.
+      // schemaMapping only adds keys, so a stale true from the first fetch must be cleared first.
       wrapper.vm.schemaMapping = {};
       await wrapper.vm.getStreamFields();
       await nextTick();
