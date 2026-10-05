@@ -1493,6 +1493,44 @@ describe("AddAlert (OForm owner)", () => {
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
     });
 
+    // The warning and the lead line judge "empty" the same way.
+    it("does not warn about filters when the picked Builder has an Alert if aggregation", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedEmptyBuilder(form, SQL);
+      form.setFieldValue("query_condition.aggregation", {
+        function: "min",
+        group_by: [],
+        having: { column: "_timestamp", operator: ">=", value: 3 },
+      });
+      wrapper.vm.isAggregationEnabled = true;
+
+      await clickSave();
+
+      expect(dialogEl("lead")?.textContent?.trim()).toBe("Builder and SQL are both set up.");
+      expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
+      expect(dialogEl("warning")).toBeNull();
+    });
+
+    it("warns that no query is written when the picked SQL holds only the starter query", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("query_condition.sql", 'SELECT * FROM "_rundata"');
+      form.setFieldValue("query_condition.conditions", builderTree);
+
+      await clickSave();
+
+      expect(dialogEl("lead")?.textContent?.trim()).toBe(
+        "SQL is selected but empty. Builder is set up.",
+      );
+      expect(dialogEl("option-sql")?.getAttribute("data-state")).toBe("on");
+      expect(dialogEl("warning")?.textContent?.trim()).toBe("No query written yet");
+    });
+
     // The Compare-with-Past windows are SQL-only; the backend still runs them
     // for a Builder alert, and the UI cannot show them off the SQL tab.
     it("sends no Compare-with-Past windows when Builder is picked in the dialog", async () => {

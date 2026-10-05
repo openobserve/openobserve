@@ -659,7 +659,6 @@ import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { countCompleteConditions } from "@/utils/alerts/alertCondition";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
@@ -978,18 +977,15 @@ export default defineComponent({
           });
     });
 
-    // Only warns: the picked mode has no filters or no query.
+    // Only warns, and only when the picked mode is empty by the same rule as the lead.
     const saveModeInfo = computed(() => {
-      const qc = alertForm.formData.value.query_condition ?? {};
       const pick = alertForm.saveModePick.value;
-      if (pick === "custom")
-        return countCompleteConditions(qc.conditions)
-          ? null
-          : alertForm.t("alerts.saveModeDialog.noFilters", {
-              stream: alertForm.formData.value.stream_name,
-            });
-      const query = String((pick === "sql" ? qc.sql : qc.promql) ?? "").trim();
-      return query ? null : alertForm.t("alerts.saveModeDialog.noQuery");
+      if (alertForm.queryModesWithContent.value.includes(pick)) return null;
+      return pick === "custom"
+        ? alertForm.t("alerts.saveModeDialog.noFilters", {
+            stream: alertForm.formData.value.stream_name,
+          })
+        : alertForm.t("alerts.saveModeDialog.noQuery");
     });
 
     // Says what runs: the picked mode only. Names the other modes that hold content.
