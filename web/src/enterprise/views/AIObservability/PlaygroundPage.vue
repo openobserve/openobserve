@@ -251,7 +251,7 @@
             :can-remove="draft.variants.length > 1"
             :can-duplicate="draft.variants.length < MAX_VARIANTS"
             @change="updateVariant"
-            @run="runVariant(variant.id)"
+            @run="onRunVariant(variant.id)"
             @cancel="cancelVariant(variant.id)"
             @duplicate="duplicate(variant.id)"
             @reset="resetVariant(variant.id)"
@@ -311,6 +311,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import { copyToClipboard } from "@/utils/clipboard";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/PlaygroundExpectedBar.vue";
@@ -704,20 +705,28 @@ async function onRunAll() {
   if (runDisabled.value) return;
   runningAll.value = true;
   try {
-    await Promise.allSettled(draft.variants.map((variant) => runVariant(variant.id, true)));
+    const outcomes = await Promise.allSettled(
+      draft.variants.map((variant) => runVariant(variant.id, true)),
+    );
+    const completed = outcomes.filter((o) => o.status === "fulfilled" && o.value).length;
+    if (completed > 0) analytics.track("llm_playground_run_completed", { count: completed });
   } finally {
     runningAll.value = false;
   }
 }
 
-function runVariant(variantId: string, skipGate = false) {
-  if (!skipGate && variantRunDisabled(variantId)) return Promise.resolve();
+async function onRunVariant(variantId: string) {
+  if (await runVariant(variantId)) analytics.track("llm_playground_run_completed", { count: 1 });
+}
+
+function runVariant(variantId: string, skipGate = false): Promise<boolean> {
+  if (!skipGate && variantRunDisabled(variantId)) return Promise.resolve(false);
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
-  if (!variant) return Promise.resolve();
+  if (!variant) return Promise.resolve(false);
   return runCell(variant, SINGLE_ROW_KEY);
 }
 
-async function runCell(variant: PlaygroundVariant, rowKey: string) {
+async function runCell(variant: PlaygroundVariant, rowKey: string): Promise<boolean> {
   const key = `${variant.id}:${rowKey}`;
   controllers.get(key)?.abort();
   const controller = new AbortController();
@@ -775,9 +784,10 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
     });
 
     if (draft.autoScore) void scoreVariant(variant);
+    return true;
   } catch (error) {
     // An abort is a user action, not a failure — leave the cell as it was.
-    if (error instanceof DOMException && error.name === "AbortError") return;
+    if (error instanceof DOMException && error.name === "AbortError") return false;
     setCell(variant.id, rowKey, {
       status: "error",
       error: {
@@ -788,6 +798,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
         retryable: error instanceof PlaygroundRunError ? error.retryable : true,
       },
     });
+    return false;
   } finally {
     controllers.delete(key);
   }

@@ -17,6 +17,11 @@ vi.mock("@/services/dashboards", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+import dashboardService from "@/services/dashboards";
+import { deleteDashboardById } from "@/utils/commons";
+
 vi.mock("@/utils/commons", () => ({
   deleteDashboardById: vi.fn().mockResolvedValue({}),
   deleteFolderById: vi.fn().mockResolvedValue({}),
@@ -236,7 +241,7 @@ const buildGlobalConfig = (
     OTable: {
       name: "OTable",
       template:
-        '<div data-test-stub="o-table"><slot name="toolbar" /><slot name="toolbar-trailing" /><slot name="empty" /><slot name="bottom" /></div>',
+        '<div data-test-stub="o-table"><slot name="toolbar" /><slot name="toolbar-trailing" /><slot name="empty" /><slot name="selection-actions" /></div>',
     },
     OEmptyState: true,
     OInput: true,
@@ -561,7 +566,7 @@ describe("Dashboards.vue", () => {
       expect(Array.isArray(wrapper.vm.dashboards)).toBe(true);
     });
 
-    it("should compute resultTotal correctly", async () => {
+    it("should list every dashboard of the active folder", async () => {
       // Create a store with dashboard data
       const testStore = createMockStore();
       testStore.state.organizationData.allDashboardList = {
@@ -597,7 +602,30 @@ describe("Dashboards.vue", () => {
       await nextTick();
       await nextTick();
 
-      expect(wrapper.vm.resultTotal).toBe(3);
+      expect(wrapper.vm.dashboards).toHaveLength(3);
+    });
+  });
+
+  describe("Table footer", () => {
+    it("hands the bulk actions to the table's selection footer", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      // Read from the component tree: this suite mocks document.createElement, so there is no DOM to query.
+      const actions = wrapper
+        .findComponent({ name: "OTable" })
+        .findAllComponents({ name: "OButton" })
+        .map((button: any) => button.vm.$attrs["data-test"]);
+      expect(actions).toEqual(
+        expect.arrayContaining([
+          "dashboard-list-move-across-folders-btn",
+          "dashboard-list-export-dashboards-btn",
+          "dashboard-list-delete-dashboards-btn",
+        ]),
+      );
     });
   });
 
@@ -653,7 +681,6 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showFavoritesOnly).toBe(true);
       expect(wrapper.vm.dashboards).toHaveLength(1);
       expect(wrapper.vm.dashboards[0].id).toBe("dash2");
-      expect(wrapper.vm.resultTotal).toBe(1);
 
       wrapper.vm.updateActiveFolderId("default");
       await nextTick();
@@ -1187,6 +1214,75 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
+    });
+  });
+
+  describe("product analytics", () => {
+    const mountDashboards = async () => {
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+    };
+
+    it("tracks dashboard_created once a duplicate is created", async () => {
+      await mountDashboards();
+
+      await wrapper.vm.duplicateDashboard("d1", "default");
+
+      expect(dashboardService.create).toHaveBeenCalled();
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("does not track dashboard_created when the duplicate fails", async () => {
+      vi.mocked(dashboardService.create).mockRejectedValueOnce(new Error("boom"));
+      await mountDashboards();
+
+      await wrapper.vm.duplicateDashboard("d1", "default");
+
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("tracks dashboard_deleted once a single delete succeeds", async () => {
+      await mountDashboards();
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", folder_id: "default" } });
+
+      await wrapper.vm.deleteDashboard();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_deleted", { count: 1 });
+    });
+
+    it("does not track dashboard_deleted when a single delete fails", async () => {
+      vi.mocked(deleteDashboardById).mockRejectedValueOnce(new Error("boom"));
+      await mountDashboards();
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", folder_id: "default" } });
+
+      await wrapper.vm.deleteDashboard();
+
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
+    });
+
+    it("tracks dashboard_deleted with the server-confirmed bulk count", async () => {
+      vi.mocked(dashboardService.bulkDelete).mockResolvedValueOnce({
+        data: { successful: ["d1"], unsuccessful: ["d2"] },
+      } as any);
+      await mountDashboards();
+      wrapper.vm.selectedIds = ["d1", "d2"];
+
+      await wrapper.vm.bulkDeleteDashboards();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_deleted", { count: 1 });
+    });
+
+    it("does not track dashboard_deleted when the bulk delete removed nothing", async () => {
+      vi.mocked(dashboardService.bulkDelete).mockResolvedValueOnce({
+        data: { successful: [], unsuccessful: ["d1"] },
+      } as any);
+      await mountDashboards();
+      wrapper.vm.selectedIds = ["d1"];
+
+      await wrapper.vm.bulkDeleteDashboards();
+
+      expect(dashboardService.bulkDelete).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
     });
   });
 });

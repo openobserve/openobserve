@@ -404,7 +404,7 @@ describe("ModulePane - empty module", () => {
   it("drops the pagination bar and explains what the scope still covers", async () => {
     const wrapper = await mountPane([makeScope("enrichment_table", [], ["enrichment_table"])], []);
 
-    expect(wrapper.find('[data-test="o2-table-pagination-actions"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
     const note = wrapper.find('[data-test="edit-role-module-pane-no-resources"]');
     expect(note.text()).toContain(String(i18n.global.t("iam.editRole.moduleHasNoResources")));
     expect(note.text()).toContain(String(i18n.global.t("iam.editRole.moduleHasNoResourcesHint")));
@@ -432,7 +432,7 @@ describe("ModulePane - empty module", () => {
   it("keeps the pager once the module has resources", async () => {
     const wrapper = await mountPane([], [makeNode("cpu")]);
 
-    expect(wrapper.find('[data-test="o2-table-pagination-actions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(false);
   });
 });

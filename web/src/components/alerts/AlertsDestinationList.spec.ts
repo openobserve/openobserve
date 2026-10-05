@@ -97,7 +97,7 @@ const OTableStub = {
       <slot name="toolbar" />
       <slot name="empty" />
       <slot name="actions" />
-      <slot name="bottom" :totalRows="data ? data.length : 0" />
+      <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
         <div :data-test="'destination-url-' + row.name">
           <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>

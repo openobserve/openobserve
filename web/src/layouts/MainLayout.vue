@@ -156,7 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <router-view v-slot="{ Component }">
-                <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                <keep-alive :include="KEPT_ALIVE_VIEWS">
+                  <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                </keep-alive>
               </router-view>
             </div>
           </div>
@@ -285,6 +287,9 @@ import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
+// Product Analytics hands off to RUM's Session Viewer, and Back must land on the same panels without rerunning them.
+const KEPT_ALIVE_VIEWS = ["AppAnalytics"];
+
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
   mainLayoutMixin = MainLayoutCloudMixin;
@@ -342,6 +347,8 @@ export default defineComponent({
       // Stop session replay recording on logout
       if (this.store.state.zoConfig?.rum?.enabled) {
         openobserveRum.stopSessionReplayRecording();
+        openobserveRum.clearUser();
+        openobserveRum.clearAccount();
       }
 
       // Always call backend logout to clear auth cookies (auth_tokens, auth_ext)
@@ -513,6 +520,13 @@ export default defineComponent({
         icon: "devices",
         link: "/rum",
         name: "rum",
+      },
+      // Experience absorbs this tile; it stays here so custom_hide_menus and the group's `requires` can see it.
+      {
+        title: t("menu.productAnalytics"),
+        icon: "insights",
+        link: "/product-analytics",
+        name: "productAnalytics",
       },
       {
         title: t("menu.dashboard"),
@@ -711,6 +725,25 @@ export default defineComponent({
       },
     );
 
+    // main.ts mounts before the bootstrap config resolves, so rum.enabled can arrive after the org.
+    watch(
+      [
+        () => store.state.selectedOrganization?.identifier,
+        () => store.state.selectedOrganization?.label,
+        () => store.state.selectedOrganization?.subscription_type,
+        () => store.state.zoConfig?.rum?.enabled,
+      ],
+      ([identifier, name, subscriptionType, rumEnabled]) => {
+        if (!identifier || !rumEnabled) return;
+        openobserveRum.setAccount({
+          id: identifier,
+          name,
+          subscription_type: subscriptionType,
+        });
+      },
+      { immediate: true },
+    );
+
     onMounted(async () => {
       filterMenus();
 
@@ -875,6 +908,8 @@ export default defineComponent({
         store.state.zoConfig?.custom_hide_menus?.split(",")?.filter((val: string) => val?.trim()) ||
           [],
       );
+      // Product Analytics reads RUM's data and links to RUM setup; it can also be hidden on its own by name.
+      if (disableMenus.has("rum")) disableMenus.add("productAnalytics");
 
       store.dispatch("setHiddenMenus", disableMenus);
 
@@ -890,7 +925,8 @@ export default defineComponent({
       linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
       filterMenus();
     } else {
-      linksList.value.splice(7, 0, {
+      const streamsIndex = linksList.value.findIndex((l) => l.name === "streams");
+      linksList.value.splice(streamsIndex + 1, 0, {
         title: t("menu.report"),
         icon: "description",
         link: "/reports",
@@ -1335,6 +1371,7 @@ export default defineComponent({
         const userInfo = store.state.userInfo;
         // Set user information first
         openobserveRum.setUser({
+          id: userInfo.email,
           name: userInfo.given_name + " " + userInfo.family_name,
           email: userInfo.email,
         });
@@ -1508,6 +1545,7 @@ export default defineComponent({
       user,
       zoBackendUrl,
       isLoading,
+      KEPT_ALIVE_VIEWS,
       getImageURL,
       updateOrganization,
       setSelectedOrganization,

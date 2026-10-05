@@ -950,6 +950,7 @@ import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
@@ -2239,6 +2240,7 @@ export default defineComponent({
         updateSelectedTrace(data.trace_id, spanList.value);
         updateServiceColors();
         buildTracesTree();
+        analytics.track("trace_details_loaded", { mode: props.mode });
       } catch (error) {
         console.error("Error fetching trace details:", error);
         showTraceDetailsError();

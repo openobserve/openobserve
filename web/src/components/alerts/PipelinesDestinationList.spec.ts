@@ -74,7 +74,7 @@ const OTableStub = {
   template: `
     <div data-test="alert-destinations-list-table">
       <slot name="empty" />
-      <slot name="bottom" />
+      <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
         <slot name="cell-destination_type" :row="row" />
         <slot name="cell-output_format" :row="row" />
@@ -244,12 +244,6 @@ describe("PipelinesDestinationList", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect((wrapper.vm as any).destinations).toHaveLength(3);
-    });
-
-    it("sets resultTotal correctly", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect((wrapper.vm as any).resultTotal).toBe(3);
     });
 
     it("numbers destination entries starting at 01", async () => {

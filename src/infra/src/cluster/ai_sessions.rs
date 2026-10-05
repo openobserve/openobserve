@@ -15,20 +15,25 @@
 
 //! Read side of the o2-ai session->owner directory. o2-ai keeps each
 //! conversation node-local, claims it and heartbeats its liveness; both are read
-//! here via [`crate::db::get_coordinator`] (see o2-ai's `cluster/directory.py`).
+//! here straight from NATS (see o2-ai's `cluster/directory.py`).
 //!
-//! A routing *hint* only: every failure degrades to "unknown owner" and the
-//! caller falls back to the configured agent URL.
+//! Every failure degrades to "unknown owner"; the caller decides what that means.
 
 use std::{
-    sync::{Once, RwLock},
+    sync::{
+        LazyLock, Once, RwLock,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
 
 use config::utils::hash::Sum64;
 use serde::Deserialize;
 
-use crate::db::get_coordinator;
+use crate::{
+    db::{Db, nats},
+    errors::Result,
+};
 
 /// Bucket holding session->owner claims. Claims outlive a replica restart so a
 /// session stays pinned to its owner.
@@ -83,6 +88,16 @@ const EMPTY_REPLICAS_TTL: Duration = Duration::from_secs(30);
 /// serialising every caller. The critical section never awaits.
 static LIVE_REPLICAS_CACHE: RwLock<Option<(Instant, Vec<Replica>)>> = RwLock::new(None);
 
+static DIRECTORY: LazyLock<nats::NatsDb> = LazyLock::new(nats::NatsDb::default);
+
+static NEXT_REPLICA: AtomicUsize = AtomicUsize::new(0);
+
+/// NATS directly: the coordinator is SQLite in local mode, which o2-ai never writes to.
+async fn directory() -> Result<&'static nats::NatsDb> {
+    nats::try_get_nats_client().await?;
+    Ok(&DIRECTORY)
+}
+
 /// The o2-ai replicas currently heartbeating, or `None` if the registry could not
 /// be read. Not the same answer: an empty registry proves a claimed owner is
 /// gone, a failed read proves nothing.
@@ -116,11 +131,7 @@ fn ttl_for(replicas: &[Replica]) -> Duration {
 /// `None` when the registry could not be read; `Some(vec![])` when it was read
 /// and nobody is registered.
 async fn fetch_live_replicas() -> Option<Vec<Replica>> {
-    let values = match get_coordinator()
-        .await
-        .list_values(&replicas_prefix())
-        .await
-    {
+    let values = match list_replica_values().await {
         Ok(v) => v,
         Err(e) => {
             log::debug!("[AI_SESSIONS] cannot list replicas: {e}");
@@ -138,12 +149,22 @@ async fn fetch_live_replicas() -> Option<Vec<Replica>> {
     )
 }
 
+async fn list_replica_values() -> Result<Vec<bytes::Bytes>> {
+    directory().await?.list_values(&replicas_prefix()).await
+}
+
+async fn get_session_claim(session_id: &str) -> Result<Option<bytes::Bytes>> {
+    directory()
+        .await?
+        .get_if_exists(&session_key(session_id))
+        .await
+}
+
 /// Pick a live o2-ai replica to host a NEW session — never an existing one,
 /// which would land on a replica that has never seen it. Hashing the sorted live
 /// set makes every openobserve node place a session identically, uncoordinated.
 ///
-/// `None` when no replica is heartbeating; the caller falls back to the
-/// configured agent URL.
+/// `None` when no replica is heartbeating.
 pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
     // Unreadable and empty are the same answer here: nowhere to place it.
     let mut replicas = live_replicas().await.unwrap_or_default();
@@ -165,6 +186,18 @@ pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
         replicas.len()
     );
     Some(addr.clone())
+}
+
+/// Pick a live o2-ai replica, in rotation, for a request that belongs to no session.
+pub async fn pick_any_replica() -> Option<String> {
+    let mut replicas = live_replicas().await.unwrap_or_default();
+    if replicas.is_empty() {
+        log::debug!("[AI_SESSIONS] no live o2-ai replicas registered");
+        return None;
+    }
+    replicas.sort_by(|a, b| a.0.cmp(&b.0));
+    let idx = NEXT_REPLICA.fetch_add(1, Ordering::Relaxed) % replicas.len();
+    Some(replicas.swap_remove(idx).1)
 }
 
 /// Where a session should be routed.
@@ -197,11 +230,7 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
         return SessionRoute::Unknown;
     }
 
-    let entry = match get_coordinator()
-        .await
-        .get_if_exists(&session_key(session_id))
-        .await
-    {
+    let entry = match get_session_claim(session_id).await {
         Ok(Some(v)) => v,
         // The only "definitely no claim" answer, so the only placeable one.
         Ok(None) => return SessionRoute::Unclaimed,
@@ -217,8 +246,7 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
             // Claimed but not dialable (no O2_AI_ADVERTISE_URL). NOT `Unclaimed`:
             // the session belongs to someone we just can't reach.
             log::warn!(
-                "[AI_SESSIONS] session {session_id} is owned by {} but has no advertised address; \
-                 falling back to the configured agent URL",
+                "[AI_SESSIONS] session {session_id} is owned by {} but has no advertised address",
                 v.owner
             );
             return SessionRoute::Unknown;
@@ -243,8 +271,7 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
     };
 
     if live.iter().any(|(name, _)| name == &owner.owner) {
-        // Routing has no config flag, so this once-per-process line is the only
-        // signal an operator gets that session affinity is in effect.
+        // Logged once per process so an operator can see affinity took effect.
         static ROUTING_ENGAGED: Once = Once::new();
         ROUTING_ENGAGED.call_once(|| {
             log::info!(

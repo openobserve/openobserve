@@ -54,7 +54,6 @@ const OTableStub = {
     "loading",
     "showGlobalFilter",
     "defaultColumns",
-    "footerTitle",
     "showIndex",
     "enableColumnResize",
     "sortBy",

@@ -89,7 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             :loading="loading"
             show-index
-            :footer-title="t('aiObservability.datasets.detail.footerTitle')"
             :global-filter="search"
             :show-global-filter="false"
             pagination="server"

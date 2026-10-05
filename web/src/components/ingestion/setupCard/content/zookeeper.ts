@@ -43,6 +43,7 @@ service:
 export default function zookeeperCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "zookeeper",
       name: raw("Zookeeper"),
       tagline: t("ingestion.setupCard.zookeeperTagline"),
       logo: getImageURL("images/ingestion/zookeeper.png"),

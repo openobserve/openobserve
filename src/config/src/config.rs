@@ -91,7 +91,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 92: add recovery_destinations to alerts.
 // 93: create oncall_response_reports.
 // 94: create synthetics_refs.
-pub const DB_SCHEMA_VERSION: u64 = 94;
+// 95: add band settings to anomaly_detection_config.
+// 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
+pub const DB_SCHEMA_VERSION: u64 = 96;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1742,7 +1744,7 @@ pub struct Search {
     #[env_config(
         name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
-        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 5% of node memory clamped to 128-4096 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
     )]
     pub metrics_blocks_cache_max_size: usize,
     #[env_config(
@@ -4352,7 +4354,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
     match configured {
-        0 => (mem_total / SIZE_IN_MB as usize / 50).clamp(128, 1024),
+        0 => (mem_total / SIZE_IN_MB as usize / 20).clamp(128, 4096),
         1..=9 => 0,
         size => size,
     }
@@ -4862,9 +4864,11 @@ mod tests {
     #[test]
     fn metrics_blocks_cache_auto_budget_preserves_explicit_limits() {
         let gib = 1024 * 1024 * 1024;
-        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 128);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 983);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 64 * gib), 1024);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 2 * gib), 128);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 204);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 2457);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 80 * gib), 4096);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 128 * gib), 4096);
         assert_eq!(metrics_blocks_cache_size_mb(1, 48 * gib), 0);
         assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
         assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);

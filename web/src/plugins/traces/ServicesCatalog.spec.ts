@@ -368,7 +368,6 @@ function mountServicesCatalog(
             "pagination",
             "pageSize",
             "pageSizeOptions",
-            "footerTitle",
             "frame",
             "defaultColumns",
             "rowKey",
