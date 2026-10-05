@@ -205,9 +205,9 @@ mod m20260922_000003_create_user_auth_state_table;
 mod m20260923_000001_create_llm_prompts;
 mod m20260924_000001_add_recovery_episode_columns;
 mod m20260928_000001_add_alert_recovery_destinations;
-mod m20260928_000001_create_org_domain_ownership_table;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
+mod m20261005_000001_create_org_domain_ownership_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -518,7 +518,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260908_000001_create_synthetics_refs::Migration),
             Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
             Box::new(m20261003_000001_create_rum_pa_tables::Migration),
-            Box::new(m20260928_000001_create_org_domain_ownership_table::Migration),
+            Box::new(m20261005_000001_create_org_domain_ownership_table::Migration),
         ]
     }
 }
