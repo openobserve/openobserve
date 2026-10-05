@@ -77,9 +77,11 @@ describe("useManagementRoutes", () => {
       expect(Array.isArray(routes)).toBe(true);
     });
 
-    it("should return exactly one main route when no enterprise/cloud config", () => {
+    // Settings + the shared locked-feature redirect target (always registered
+    // — see "enterpriseFeatureLocked" below).
+    it("should return exactly two top-level routes", () => {
       const routes = useManagementRoutes();
-      expect(routes).toHaveLength(1);
+      expect(routes).toHaveLength(2);
     });
 
     it("should return routes with settings as the main route", () => {
@@ -188,21 +190,39 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    // Always registered now (nav + direct URL stay reachable); the component
-    // resolves to the shared locked placeholder in OSS instead of the real
-    // page — see `gatedComponent` / utils/enterpriseFeatures.ts.
-    it("should have llmProviders route in OSS builds too, locked", () => {
+    // Always registered now (nav + direct URL stay reachable); its
+    // beforeEnter redirects to the shared locked page in OSS instead of
+    // letting navigation reach the real page — see `withFeatureGate` /
+    // utils/enterpriseFeatures.ts.
+    it("should have llmProviders route in OSS builds too, and redirect when locked", () => {
       const llmRoute = routes[0].children.find((child: any) => child.name === "llmProviders");
       expect(llmRoute).toBeDefined();
-      expect(llmRoute.meta.featureKey).toBe("llmProviders");
+      const mockNext = vi.fn();
+      llmRoute.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "llmProviders" },
+      });
     });
 
-    it("should have genAiAgentMapping route in OSS builds too, locked", () => {
+    it("should have genAiAgentMapping route in OSS builds too, and redirect when locked", () => {
       const genAiRoute = routes[0].children.find(
         (child: any) => child.name === "genAiAgentMapping",
       );
       expect(genAiRoute).toBeDefined();
-      expect(genAiRoute.meta.featureKey).toBe("genAiAgentMapping");
+      const mockNext = vi.fn();
+      genAiRoute.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "genAiAgentMapping" },
+      });
+    });
+
+    it("should have an enterpriseFeatureLocked route registered", () => {
+      const lockedRoute = routes.find((r: any) => r.name === "enterpriseFeatureLocked");
+      expect(lockedRoute).toBeDefined();
+      expect(lockedRoute.path).toBe("enterprise-locked");
+      expect(lockedRoute.component).toBeDefined();
     });
 
     it("should have beforeEnter hook for general route", () => {
@@ -264,12 +284,17 @@ describe("useManagementRoutes", () => {
       expect(actualPaths).toEqual(expectedPaths);
     });
 
-    it("should have modelPricing route in OSS builds too, locked", () => {
+    it("should have modelPricing route in OSS builds too, and redirect when locked", () => {
       const modelPricingRoute = routes[0].children.find(
         (child: any) => child.name === "modelPricing",
       );
       expect(modelPricingRoute).toBeDefined();
-      expect(modelPricingRoute.meta.featureKey).toBe("modelPricing");
+      const mockNext = vi.fn();
+      modelPricingRoute.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "modelPricing" },
+      });
       const modelPricingEditor = routes[0].children.find(
         (child: any) => child.name === "modelPricingEditor",
       );
@@ -369,7 +394,6 @@ describe("useManagementRoutes", () => {
       expect(queryMgmtRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "settings.queryManagement",
-        featureKey: "queryManagement",
       });
     });
 
@@ -379,7 +403,6 @@ describe("useManagementRoutes", () => {
       expect(cipherRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "settings.cipherKeys",
-        featureKey: "cipherKeys",
       });
     });
 
@@ -389,7 +412,6 @@ describe("useManagementRoutes", () => {
       expect(nodesRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "settings.nodes",
-        featureKey: "nodes",
       });
     });
 
@@ -401,7 +423,6 @@ describe("useManagementRoutes", () => {
       expect(domainRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "routeTitles.domainManagement",
-        featureKey: "domainManagement",
       });
     });
 
@@ -411,7 +432,6 @@ describe("useManagementRoutes", () => {
       expect(regexRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "routeTitles.regexPatterns",
-        featureKey: "regexPatterns",
       });
     });
 
@@ -422,7 +442,6 @@ describe("useManagementRoutes", () => {
       );
       expect(pipelineRoute.meta).toEqual({
         titleKey: "pipeline_destinations.header",
-        featureKey: "pipelineDestinations",
       });
     });
 
@@ -733,15 +752,21 @@ describe("useManagementRoutes", () => {
       expect(findRoute(useManagementRoutes())).toBeDefined();
     });
 
-    // Registered (locked) rather than absent now, so the page is reachable and
-    // shows why instead of 404ing — see utils/enterpriseFeatures.ts.
-    it("is registered but locked in an OSS build", () => {
+    // Registered (redirects to the locked page) rather than absent now, so
+    // the route exists and shows why instead of 404ing — see
+    // utils/enterpriseFeatures.ts.
+    it("is registered, and redirects to the locked page, in an OSS build", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
 
       const route = findRoute(useManagementRoutes());
       expect(route).toBeDefined();
-      expect(route.meta.featureKey).toBe("passwordPolicy");
+      const mockNext = vi.fn();
+      route.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "passwordPolicy" },
+      });
     });
 
     // This whole batch is self-hosted-only — Cloud never gets it, not even

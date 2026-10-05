@@ -36,14 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              `enterpriseButtonText`'s OSS branch) — this tooltip only ever
              renders in a build where that branch is the one showing, so the
              two always agree without replicating the edition check here. -->
-        <button
-          type="button"
-          class="text-accent cursor-pointer appearance-none border-0 bg-transparent p-0 font-semibold underline"
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          class="h-auto! p-0! underline"
           data-test="locked-feature-upgrade-cta"
           @click.stop="open"
         >
           {{ t("about.header_button.get_enterprise_free") }}
-        </button>
+        </OButton>
       </div>
     </template>
   </OTooltip>
@@ -51,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 

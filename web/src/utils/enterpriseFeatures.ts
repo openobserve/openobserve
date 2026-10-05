@@ -99,49 +99,87 @@ interface FeatureGateDefinition {
    * nothing) — the Settings/IAM admin pages stay on the plain generic copy.
    */
   pitchKey?: I18nKey;
+  /**
+   * False for a feature Cloud never offers at all — self-hosted-only things
+   * like cipher keys or node management, which a Cloud customer can't
+   * "upgrade" into the way a self-hosted admin can. On a pure-Cloud build
+   * (isCloud, not isEnterprise) `checkFeatureAccess` reports it as NOT
+   * VISIBLE rather than locked, so callers hide it entirely instead of
+   * showing a false upsell. Omit (defaults to visible-when-locked) for a
+   * feature whose predicate already includes `isCloud` — there, failing the
+   * predicate already implies a pure-cloud-without-enterprise build has
+   * nothing to offer, so there's nothing extra to hide.
+   */
+  cloudOffers?: false;
 }
 
 const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
-  // Generic "this needs Enterprise or Cloud" gate — e.g. the Traces Service
-  // Graph tab, which has no settings/IAM label of its own to borrow.
+  // Generic "this needs Enterprise" gate — e.g. the Traces Service Graph tab,
+  // which has no settings/IAM label of its own to borrow. Self-hosted only,
+  // same as the Settings batch below — Cloud doesn't offer it either.
   enterprise: {
     predicate: (c) => c.isEnterprise,
     labelKey: "menu.serviceGraph",
     pitchKey: "enterpriseFeature.pitch.serviceGraph",
+    cloudOffers: false,
   },
   // Used for groups/roles AND quota — quota additionally requires meta-org,
   // applied as a separate `visible` hide at the call site (see the doc
-  // comment on FeatureGateContext).
+  // comment on FeatureGateContext). Cloud DOES offer RBAC, so no
+  // `cloudOffers: false` here — a locked-but-visible state is correct.
   rbac: {
     predicate: (c) => (c.isEnterprise || c.isCloud) && c.rbac,
     labelKey: "iam.sectionPermissions",
     pitchKey: "enterpriseFeature.pitch.rbac",
   },
-  cipherKeys: { predicate: (c) => c.isEnterprise, labelKey: "settings.cipherKeys" },
-  aiToolsets: { predicate: (c) => c.isEnterprise, labelKey: "aiToolset.header" },
-  regexPatterns: { predicate: (c) => c.isEnterprise, labelKey: "regex_patterns.title" },
+  // This whole batch is self-hosted-only: no self-serve "upgrade" story on
+  // Cloud exists for managing your own nodes, cipher keys, or license.
+  cipherKeys: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "settings.cipherKeys",
+    cloudOffers: false,
+  },
+  aiToolsets: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "aiToolset.header",
+    cloudOffers: false,
+  },
+  regexPatterns: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "regex_patterns.title",
+    cloudOffers: false,
+  },
   domainManagement: {
     predicate: (c) => c.isEnterprise,
     labelKey: "settings.ssoDomainRestrictions",
+    cloudOffers: false,
   },
   passwordPolicy: {
     predicate: (c) => c.isEnterprise,
     labelKey: "settings.passwordPolicy",
+    cloudOffers: false,
   },
   pipelineDestinations: {
     predicate: (c) => c.isEnterprise,
     labelKey: "pipeline_destinations.header",
+    cloudOffers: false,
   },
-  storageSettings: { predicate: (c) => c.isEnterprise, labelKey: "storage_settings.tabLabel" },
+  storageSettings: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "storage_settings.tabLabel",
+    cloudOffers: false,
+  },
   queryManagement: {
     predicate: (c) => c.isEnterprise,
     labelKey: "settings.queryManagement",
+    cloudOffers: false,
   },
-  nodes: { predicate: (c) => c.isEnterprise, labelKey: "settings.nodes" },
-  license: { predicate: (c) => c.isEnterprise, labelKey: "settings.license" },
+  nodes: { predicate: (c) => c.isEnterprise, labelKey: "settings.nodes", cloudOffers: false },
+  license: { predicate: (c) => c.isEnterprise, labelKey: "settings.license", cloudOffers: false },
   correlationSettings: {
     predicate: (c) => c.isEnterprise,
     labelKey: "settings.correlationSettings",
+    cloudOffers: false,
   },
   modelPricing: {
     predicate: (c) => c.isEnterprise || c.isCloud,
@@ -179,14 +217,20 @@ export function isFeatureKey(key: string): key is FeatureKey {
 
 export interface FeatureAccess {
   allowed: boolean;
-  /** Empty when `allowed` — nothing to tell the user. */
+  /**
+   * False means hide this feature ENTIRELY — not locked, not shown at all
+   * (a self-hosted-only feature on a pure-Cloud build; see `cloudOffers`).
+   * Always true when `allowed` is true.
+   */
+  visible: boolean;
+  /** Empty when `allowed` (or not `visible`) — nothing to tell the user. */
   message: I18nText;
 }
 
 /**
  * The one function every surface calls with a feature key to find out
- * whether it's available in this build, and — when it isn't — the message to
- * show instead of letting the user reach it.
+ * whether it's available in this build — and, when it isn't, whether to show
+ * it locked (with a message) or hide it entirely.
  *
  * `context` is required rather than defaulted so every call site is explicit
  * about where its build/runtime state comes from — see
@@ -195,9 +239,13 @@ export interface FeatureAccess {
 export function checkFeatureAccess(key: FeatureKey, context: FeatureGateContext): FeatureAccess {
   const gate = FEATURE_GATES[key];
   const allowed = gate.predicate(context);
-  if (allowed) return { allowed, message: raw("") };
+  if (allowed) return { allowed: true, visible: true, message: raw("") };
+  const pureCloud = context.isCloud && !context.isEnterprise;
+  if (gate.cloudOffers === false && pureCloud) {
+    return { allowed: false, visible: false, message: raw("") };
+  }
   const message = gate.pitchKey
     ? gt(gate.pitchKey)
     : gt("enterpriseFeature.locked", { feature: gt(gate.labelKey) });
-  return { allowed, message };
+  return { allowed: false, visible: true, message };
 }

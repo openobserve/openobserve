@@ -24,16 +24,29 @@ import {
 } from "@/utils/enterpriseFeatures";
 
 /**
- * Real component when the edition unlocks `key`, else the shared locked
- * placeholder — resolved on EACH navigation (not once at router-build time).
- * "rbac" depends on the async-loaded `rbac_enabled` flag, read fresh every
- * time from the same raw store singleton the route guards above already
- * import directly, so a cold-load snapshot never freezes a stale verdict.
+ * Wraps a route guard so navigation redirects to the shared locked-feature
+ * page instead of proceeding, when the edition doesn't unlock `key`.
+ *
+ * This has to be a GUARD, not a choice of `component:` — vue-router
+ * permanently overwrites a route record's resolved component with whatever
+ * its lazy loader first resolves to (see `extractComponentsGuards` in its
+ * source: `record.components[name] = resolvedComponent`), so picking a
+ * component based on current state freezes at whichever one resolved on the
+ * FIRST navigation, for the rest of the session. That's a real problem for
+ * "rbac": it depends on the async-loaded `rbac_enabled` flag, which can still
+ * be unset on a cold-load first visit — a guard has no such cache, since it
+ * re-runs on every navigation, so it's the only place this can safely depend
+ * on state that might still be loading.
  */
-const gatedComponent = (key: FeatureKey, real: any) => () =>
-  checkFeatureAccess(key, buildFeatureGateContext(store.state.zoConfig)).allowed
-    ? real()
-    : import("@/components/EnterpriseFeatureLocked.vue");
+const withFeatureGate =
+  (key: FeatureKey, guard: (to: any, from: any, next: any) => void) =>
+  (to: any, from: any, next: any) => {
+    if (!checkFeatureAccess(key, buildFeatureGateContext(store.state.zoConfig)).allowed) {
+      next({ name: "enterpriseFeatureLocked", query: { feature: key } });
+      return;
+    }
+    guard(to, from, next);
+  };
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
@@ -60,8 +73,8 @@ const privateLocationRouteGuard = (to: any, from: any, next: any) => {
 };
 
 // Workflows routes are gated on the backend /config flag `workflows_enabled`
-// (enterprise O2_WORKFLOWS_ENABLED). The enterprise/cloud build check is already
-// implicit — this whole block only runs for those builds.
+// (enterprise O2_WORKFLOWS_ENABLED); `withFeatureGate("workflows", ...)` at
+// each route below checks the edition separately.
 //
 // Checks `=== false`, NOT `!== true`, and that is deliberate: /config is fetched
 // without await, so the flag is briefly undefined at startup. Redirecting on
@@ -78,9 +91,11 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
 };
 
 // On-call routes are gated on the backend /config flag `oncall_enabled`
-// (enterprise O2_ONCALL_ENABLED). Same `=== false` stance as synthetics above:
-// the flag is briefly undefined on a cold load, and bouncing a bookmarked page
-// home on "not yet known" is worse than a moment of empty state.
+// (enterprise O2_ONCALL_ENABLED); `withFeatureGate("oncall", ...)` at each
+// route below checks the edition separately. Same `=== false` stance as
+// synthetics above: the flag is briefly undefined on a cold load, and
+// bouncing a bookmarked page home on "not yet known" is worse than a moment
+// of empty state.
 const oncallRouteGuard = (to: any, from: any, next: any) => {
   if (store.state.zoConfig?.oncall_enabled === false) {
     next("/");
@@ -300,28 +315,24 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   // On-call, Incidents, Workflows, RBAC (groups/roles/quota) are always
-  // registered now — the component resolves to the shared locked placeholder
-  // (see `gatedComponent`) when the edition doesn't unlock them, so the
-  // section is reachable (nav + direct URL) but inert rather than absent.
+  // registered now — a direct URL redirects to the shared locked page (see
+  // `withFeatureGate`) when the edition doesn't unlock them, instead of
+  // landing on the real page or a 404.
   // On-call is configured before any data flows, so every route here stays open on an empty org.
   routes.push(
     {
       path: "oncall/responses",
       name: "onCallResponses",
-      component: gatedComponent("oncall", OnCallResponses),
-      meta: { titleKey: "oncall.responsesTitle", allowOnEmptyData: true, featureKey: "oncall" },
-      beforeEnter(to: any, from: any, next: any) {
-        oncallRouteGuard(to, from, next);
-      },
+      component: OnCallResponses,
+      meta: { titleKey: "oncall.responsesTitle", allowOnEmptyData: true },
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/responses/:responseId",
       name: "onCallResponseDetail",
-      component: gatedComponent("oncall", OnCallResponseDetail),
-      meta: { titleKey: "oncall.responseDetail", allowOnEmptyData: true, featureKey: "oncall" },
-      beforeEnter(to: any, from: any, next: any) {
-        oncallRouteGuard(to, from, next);
-      },
+      component: OnCallResponseDetail,
+      meta: { titleKey: "oncall.responseDetail", allowOnEmptyData: true },
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       // A page again. It was retired to a redirect for being a stub that
@@ -335,20 +346,16 @@ const useEnterpriseRoutes = () => {
       // links to it narrowed rather than rendering a second copy.
       path: "oncall/me",
       name: "onCallMine",
-      component: gatedComponent("oncall", OnCallMine),
-      meta: { titleKey: "oncall.mineTitle", allowOnEmptyData: true, featureKey: "oncall" },
-      beforeEnter(to: any, from: any, next: any) {
-        oncallRouteGuard(to, from, next);
-      },
+      component: OnCallMine,
+      meta: { titleKey: "oncall.mineTitle", allowOnEmptyData: true },
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/teams",
       name: "onCallTeams",
-      component: gatedComponent("oncall", OnCallTeams),
-      meta: { titleKey: "oncall.teamsTitle", allowOnEmptyData: true, featureKey: "oncall" },
-      beforeEnter(to: any, from: any, next: any) {
-        oncallRouteGuard(to, from, next);
-      },
+      component: OnCallTeams,
+      meta: { titleKey: "oncall.teamsTitle", allowOnEmptyData: true },
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       // The tab is part of the URL, so a schedule somebody sends is the
@@ -362,29 +369,23 @@ const useEnterpriseRoutes = () => {
       // for one thing.
       path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|escalation|ownership|routing)?",
       name: "onCallTeamDetail",
-      component: gatedComponent("oncall", OnCallTeamDetail),
-      meta: { titleKey: "oncall.teamDetail", allowOnEmptyData: true, featureKey: "oncall" },
-      beforeEnter(to: any, from: any, next: any) {
-        oncallRouteGuard(to, from, next);
-      },
+      component: OnCallTeamDetail,
+      meta: { titleKey: "oncall.teamDetail", allowOnEmptyData: true },
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/policies",
       name: "onCallPolicies",
-      component: gatedComponent("oncall", OnCallPolicies),
-      meta: { titleKey: "oncall.policiesTitle", allowOnEmptyData: true, featureKey: "oncall" },
-      beforeEnter(to: any, from: any, next: any) {
-        oncallRouteGuard(to, from, next);
-      },
+      component: OnCallPolicies,
+      meta: { titleKey: "oncall.policiesTitle", allowOnEmptyData: true },
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
     {
       path: "oncall/routing",
       name: "onCallRouting",
-      component: gatedComponent("oncall", OnCallRouting),
-      meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true, featureKey: "oncall" },
-      beforeEnter(to: any, from: any, next: any) {
-        oncallRouteGuard(to, from, next);
-      },
+      component: OnCallRouting,
+      meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true },
+      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
   );
 
@@ -392,29 +393,20 @@ const useEnterpriseRoutes = () => {
     {
       path: "incidents",
       name: "incidentList",
-      component: gatedComponent("incidents", IncidentList),
+      component: IncidentList,
       meta: {
         titleKey: "menu.incidents",
-        featureKey: "incidents",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("incidents", routeGuard),
     },
     {
       path: "incidents/:id",
       name: "incidentDetail",
-      component: gatedComponent(
-        "incidents",
-        () => import("@/components/alerts/IncidentDetailDrawer.vue"),
-      ),
+      component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
       meta: {
         titleKey: "routeTitles.incidentDetail",
-        featureKey: "incidents",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("incidents", routeGuard),
     },
   );
 
@@ -423,32 +415,25 @@ const useEnterpriseRoutes = () => {
   routes.push({
     path: "workflows",
     name: "workflows",
-    component: gatedComponent("workflows", WorkflowsList),
+    component: WorkflowsList,
     meta: {
       titleKey: "menu.workflows",
-      featureKey: "workflows",
     },
-    beforeEnter(to: any, from: any, next: any) {
-      workflowsRouteGuard(to, from, next);
-    },
+    beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
     children: [
       {
         path: "add",
         name: "createWorkflow",
-        component: gatedComponent("workflows", WorkflowEditor),
-        meta: { titleKey: "workflow.create", featureKey: "workflows" },
-        beforeEnter(to: any, from: any, next: any) {
-          workflowsRouteGuard(to, from, next);
-        },
+        component: WorkflowEditor,
+        meta: { titleKey: "workflow.create" },
+        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
       },
       {
         path: "edit",
         name: "workflowEditor",
-        component: gatedComponent("workflows", WorkflowEditor),
-        meta: { titleKey: "workflow.editMode", featureKey: "workflows" },
-        beforeEnter(to: any, from: any, next: any) {
-          workflowsRouteGuard(to, from, next);
-        },
+        component: WorkflowEditor,
+        meta: { titleKey: "workflow.editMode" },
+        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
       },
       {
         // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
@@ -456,11 +441,9 @@ const useEnterpriseRoutes = () => {
         // builder; deep-linkable by ?run_id.
         path: "runs",
         name: "workflowRuns",
-        component: gatedComponent("workflows", WorkflowRuns),
-        meta: { titleKey: "workflow.runs.title", featureKey: "workflows" },
-        beforeEnter(to: any, from: any, next: any) {
-          workflowsRouteGuard(to, from, next);
-        },
+        component: WorkflowRuns,
+        meta: { titleKey: "workflow.runs.title" },
+        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
       },
     ],
   });
@@ -471,57 +454,42 @@ const useEnterpriseRoutes = () => {
         name: "groups",
         meta: {
           titleKey: "routeTitles.groups",
-          featureKey: "rbac",
         },
-        component: gatedComponent("rbac", AppGroups),
-        beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
-        },
+        component: AppGroups,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
       {
         path: "groups/edit/:group_name",
         name: "editGroup",
         meta: {
           titleKey: "routeTitles.editGroup",
-          featureKey: "rbac",
         },
-        component: gatedComponent("rbac", EditGroup),
-        beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
-        },
+        component: EditGroup,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
       {
         path: "roles",
         name: "roles",
         meta: {
           titleKey: "iam.roles",
-          featureKey: "rbac",
         },
-        component: gatedComponent("rbac", AppRoles),
-        beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
-        },
+        component: AppRoles,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
       {
         path: "roles/edit/:role_name",
         name: "editRole",
         meta: {
           titleKey: "routeTitles.editRole",
-          featureKey: "rbac",
         },
-        component: gatedComponent("rbac", EditRole),
-        beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
-        },
+        component: EditRole,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
       {
         path: "quota",
         name: "quota",
-        meta: { featureKey: "rbac" },
-        component: gatedComponent("rbac", Quota),
-        beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
-        },
+        component: Quota,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
     ],
   );

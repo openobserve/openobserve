@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Shared stand-in for an enterprise/cloud-only route in a build that doesn't
-  unlock it. Registered in place of the real component (see
-  `checkFeatureAccess` in utils/enterpriseFeatures.ts) so the real feature
-  never mounts and typing the URL directly lands here instead — same message
-  as the disabled nav entry, not a 404 or a silent redirect.
+  unlock it. `withFeatureGate` (in useManagementRoutes.ts / useEnterpriseRoutes.ts)
+  redirects here — with `?feature=<key>` — instead of letting navigation reach
+  the real page, so typing the URL directly lands here with the same message
+  as the disabled nav entry, not a 404 or the real feature.
 -->
 <template>
   <OPageLayout :title="title" icon="lock" constrained data-test="enterprise-feature-locked">
@@ -37,6 +37,7 @@ import { gt } from "@/types/i18n";
 import {
   checkFeatureAccess,
   buildFeatureGateContext,
+  isFeatureKey,
   type FeatureKey,
 } from "@/utils/enterpriseFeatures";
 
@@ -46,8 +47,8 @@ const store = useStore();
 const title = computed(() => gt("enterpriseFeature.lockedTitle"));
 
 const description = computed(() => {
-  const featureKey = route.meta?.featureKey as FeatureKey | undefined;
-  if (!featureKey) return title.value;
+  const featureKey = route.query.feature as FeatureKey | undefined;
+  if (!featureKey || !isFeatureKey(featureKey)) return title.value;
   return checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig)).message;
 });
 </script>
