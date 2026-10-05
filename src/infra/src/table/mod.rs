@@ -113,9 +113,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
-    check_migration_history(get_orm_client_ddl().await).await?;
     let locker = dist_lock::lock("/database/migration", 0).await?;
     let client = get_orm_client_ddl().await;
+    // read the history under the same lock the migrations write it under
+    check_migration_history(client).await?;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.
     // Otherwise, the `m20250109_092400_recreate_tables_with_ksuids` migration will fail.
