@@ -565,6 +565,10 @@ pub async fn with_pipeline_destinations(
     streams: &[(&str, u64)],
 ) -> Vec<(String, u64)> {
     let mut all: Vec<(String, u64)> = streams.iter().map(|(s, n)| (s.to_string(), *n)).collect();
+    // Walking pipelines clones each compiled one, so skip it when nothing would be refused.
+    if !config::get_config().common.sdr_fail_closed {
+        return all;
+    }
     for (stream, records) in streams {
         let params = StreamParams::new(org_id, stream, stream_type);
         for pipeline in get_stream_executable_pipelines(&params).await {

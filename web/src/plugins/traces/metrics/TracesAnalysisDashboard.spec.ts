@@ -1456,6 +1456,11 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
     expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
   });
 
+  it("shows the analysis title in the page header", () => {
+    const title = wrapper.find('[data-test="traces-analysis-dashboard-page-title"]');
+    expect(title.text()).toBe(gt("volumeInsights.title"));
+  });
+
   it("does not leak drawer-only attributes onto the page root", () => {
     const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
     expect(page.attributes("width")).toBeUndefined();

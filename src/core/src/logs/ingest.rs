@@ -136,8 +136,10 @@ pub async fn ingest(
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
+    // Usage counts only from a server-side identity; a user credential cannot claim it.
     #[cfg(feature = "vectorscan")]
-    let usage_request = matches!(in_req, IngestionRequest::Usage(_));
+    let usage_request =
+        matches!(in_req, IngestionRequest::Usage(_)) && matches!(user, IngestUser::SystemJob(_));
     let log_ingestion_errors = ingestion_log_enabled().await;
     // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]

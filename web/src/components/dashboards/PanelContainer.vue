@@ -239,8 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
         </OButton>
-        <!-- Direct delete icon (shown when simplifiedPanelView is true). Its panels are
-             ephemeral (Insights / Drill down), so it removes without a confirm. -->
+        <!-- simplifiedPanelView panels are ephemeral (Insights / Drill down): delete without a confirm -->
         <OButton
           v-if="!viewOnly && simplifiedPanelView"
           variant="ghost"

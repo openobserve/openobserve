@@ -21,7 +21,7 @@
  * Provides unified text processing for both visual styling and search highlighting.
  *
  * Features:
- * - Extracts keywords from SQL query patterns (match_all, fuzzy_match_all, str_match, re_match)
+ * - Extracts keywords from match_all/fuzzy_match_all and compiles str_match/re_match filters to RegExps
  * - Applies semantic colors to different text types (IPs, URLs, timestamps, etc.)
  * - Highlights matching keywords with background color
  * - Handles HTML escaping and safe rendering
@@ -407,8 +407,11 @@ function compileHighlightRegex(pattern: string): RegExp | null {
   }
 }
 
-/** Compiled patterns per (field-scoped) query string; cleared when it grows past 64 entries. */
+/** Compiled patterns per (field-scoped) query string, least recently used evicted past 64. */
 const patternCache = new Map<string, RegExp[]>();
+
+/** Field-scoped queries for the most recent query string; rendering asks once per key per hit. */
+let scopedQueries = { query: "", byField: new Map<string, string>() };
 
 // Quoted identifiers keep their case and unquoted ones are lowercased, as DataFusion resolves them.
 const resolveFilterField = (field: string) => {
@@ -422,11 +425,19 @@ const resolveFilterField = (field: string) => {
 /** Drops field filters naming another field, so each filter highlights only its own field. */
 export function scopeHighlightQuery(queryString: string, field: string): string {
   if (!queryString) return queryString;
-  return queryString.replace(
-    FIELD_FILTER_REGEX,
-    (filter: string, _name: string, filterField: string) =>
-      resolveFilterField(filterField) === field ? filter : "",
-  );
+  if (scopedQueries.query !== queryString) {
+    scopedQueries = { query: queryString, byField: new Map() };
+  }
+  let scoped = scopedQueries.byField.get(field);
+  if (scoped === undefined) {
+    scoped = queryString.replace(
+      FIELD_FILTER_REGEX,
+      (filter: string, _name: string, filterField: string) =>
+        resolveFilterField(filterField) === field ? filter : "",
+    );
+    scopedQueries.byField.set(field, scoped);
+  }
+  return scoped;
 }
 
 /**
@@ -476,7 +487,11 @@ export function useTextHighlighter() {
   function extractHighlightPatterns(queryString: string): RegExp[] {
     if (!queryString?.trim()) return [];
     const cached = patternCache.get(queryString);
-    if (cached) return cached;
+    if (cached) {
+      patternCache.delete(queryString);
+      patternCache.set(queryString, cached);
+      return cached;
+    }
 
     const patterns: RegExp[] = [];
     const seen = new Set<string>();
@@ -497,7 +512,7 @@ export function useTextHighlighter() {
       }
     }
 
-    if (patternCache.size >= 64) patternCache.clear();
+    if (patternCache.size >= 64) patternCache.delete(patternCache.keys().next().value!);
     patternCache.set(queryString, patterns);
     return patterns;
   }

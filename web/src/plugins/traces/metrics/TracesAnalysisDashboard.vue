@@ -416,7 +416,7 @@ const emit = defineEmits<{
 }>();
 
 // Page shell for `embedded`: lays out the drawer's slots in place, without drawer-only attrs.
-const AnalysisPage: FunctionalComponent = (_, { slots }) =>
+const AnalysisPage: FunctionalComponent = (_, { slots, attrs }) =>
   h(
     "div",
     { class: "flex h-full min-h-0 flex-col", "data-test": "traces-analysis-dashboard-page" },
@@ -426,7 +426,17 @@ const AnalysisPage: FunctionalComponent = (_, { slots }) =>
         {
           class: "border-card-glass-border px-page-edge flex shrink-0 items-center border-b py-1.5",
         },
-        slots["header-left"]?.(),
+        [
+          h(
+            "span",
+            {
+              class: "text-text-primary me-3 shrink-0 text-sm font-semibold",
+              "data-test": "traces-analysis-dashboard-page-title",
+            },
+            attrs.title as string,
+          ),
+          slots["header-left"]?.(),
+        ],
       ),
       slots.default?.(),
     ],
