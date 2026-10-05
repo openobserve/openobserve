@@ -24,6 +24,7 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
+use openobserve_core::org_domain_ownership;
 use stream::get_streams;
 
 use crate::{
@@ -42,6 +43,8 @@ const TRIAL_QUOTA_FLUSH_INTERVAL: u64 = 10;
 /// Interval for external contract expiry checks (1 hour).
 const EXTERNAL_CONTRACT_CHECK_INTERVAL: u64 = 3600;
 
+const ORG_DOMAIN_OWNERSHIP_CHECK_INTERVAL: u64 = 300;
+
 /// (days-remaining threshold, stage stored after the warning fires).
 /// Walked in descending-urgency order so we send at most one warning per tick.
 const EXPIRY_WARNING_STAGES: &[(
@@ -58,6 +61,7 @@ pub fn start() {
     tokio::spawn(async move { run_org_expiry_daily().await });
     tokio::spawn(async move { run_ai_quota_check().await });
     tokio::spawn(async move { run_external_contract_expiry_check().await });
+    tokio::spawn(async move { run_org_domain_ownership_validation().await });
 }
 
 /// Start trial quota background jobs (flush + cluster sync).
@@ -67,6 +71,51 @@ pub fn start_trial_quota_jobs() {
     tokio::spawn(async move {
         openobserve_core::trial_quota::subscribe_ha_queue().await;
     });
+}
+
+async fn run_org_domain_ownership_validation() {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+        ORG_DOMAIN_OWNERSHIP_CHECK_INTERVAL,
+    ));
+    loop {
+        interval.tick().await;
+        let records = match infra::table::org_domain_ownership::list_all().await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "error listing org domain ownership records for verification, skipping : {e}"
+                );
+                continue;
+            }
+        };
+        for record in records {
+            let original_state = record.verification_state;
+            let org_id = record.org_id.clone();
+            let domain = record.domain.clone();
+            let new_state = match org_domain_ownership::verify(record).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "error verifying org domain ownership record for {org_id} domain {domain} : {e}"
+                    );
+                    continue;
+                }
+            };
+            if new_state != original_state {
+                log::info!(
+                    "org domain ownership state for {org_id} domain {domain} changed from {original_state} to {new_state}"
+                );
+                if let Err(e) =
+                    org_domain_ownership::update_state(&org_id, &domain, new_state).await
+                {
+                    log::error!(
+                        "error updating in memory org domain ownership state for org {org_id} domain {domain} : {e}"
+                    );
+                    continue;
+                }
+            }
+        }
+    }
 }
 
 async fn run_no_ingestion_period() {

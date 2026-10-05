@@ -75,4 +75,7 @@ pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
 
+#[cfg(feature = "cloud")]
+pub mod org_domains;
+
 use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};

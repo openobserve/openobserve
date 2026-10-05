@@ -15,10 +15,14 @@
 
 use std::collections::HashMap;
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
+use config::utils::{rand::generate_random_string, time::now_micros};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    QuerySelect,
+};
 
 use super::entity::{org_domain_ownership::*, prelude::OrgDomainOwnership};
-use crate::db::get_orm_client_rw;
+use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
 pub enum OwnershipState {
     Pending = 0,
@@ -32,7 +36,7 @@ pub struct OwnershipRecord {
 }
 
 pub async fn list_active_domain_org_map() -> Result<HashMap<String, String>, anyhow::Error> {
-    let client = get_orm_client_rw().await;
+    let client = get_orm_client_ro().await;
     let records = OrgDomainOwnership::find()
         .select_only()
         .column(Column::OrgId)
@@ -45,7 +49,7 @@ pub async fn list_active_domain_org_map() -> Result<HashMap<String, String>, any
 }
 
 pub async fn get_org_for_domain(domain: &str) -> Result<Option<String>, anyhow::Error> {
-    let client = get_orm_client_rw().await;
+    let client = get_orm_client_ro().await;
     let record = OrgDomainOwnership::find()
         .select_only()
         .column(Column::OrgId)
@@ -56,14 +60,69 @@ pub async fn get_org_for_domain(domain: &str) -> Result<Option<String>, anyhow::
     Ok(record.map(|v| v.0))
 }
 
-pub async fn get_domains_for_org(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
-    let client = get_orm_client_rw().await;
+pub async fn get_domains_for_org(org_id: &str) -> Result<Vec<Model>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
     let records = OrgDomainOwnership::find()
-        .select_only()
-        .column(Column::Domain)
         .filter(Column::OrgId.eq(org_id))
-        .into_tuple::<(String,)>()
         .all(client)
         .await?;
-    Ok(records.into_iter().map(|v| v.0).collect())
+    Ok(records)
+}
+
+pub async fn save_org_domain_mapping(record: OwnershipRecord) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    let now = now_micros();
+    let token = format!("o2v_{}_{}", record.org_id, generate_random_string(32));
+
+    let m = ActiveModel {
+        id: Set(config::ider::generate()),
+        org_id: Set(record.org_id),
+        domain: Set(record.domain),
+        verification_token: Set(token),
+        verification_state: Set(0),
+        verification_failure_reason: Set(None),
+        verified_at: Set(None),
+        released_at: Set(None),
+        last_checked_at: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    OrgDomainOwnership::insert(m).exec(client).await?;
+    Ok(())
+}
+
+pub async fn delete_linked_domain(org_id: &str, domain: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    OrgDomainOwnership::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Domain.eq(domain))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_domain_org_record(
+    org_id: &str,
+    domain: &str,
+) -> Result<Option<Model>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let res = OrgDomainOwnership::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Domain.eq(domain))
+        .one(client)
+        .await?;
+    Ok(res)
+}
+
+pub async fn save_domain_org_record(model: Model) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    let am = model.clone().into_active_model().reset_all();
+    am.update(client).await?;
+    Ok(())
+}
+
+pub async fn list_all() -> Result<Vec<Model>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let res = OrgDomainOwnership::find().all(client).await?;
+    Ok(res)
 }
