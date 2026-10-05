@@ -30,6 +30,29 @@ use crate::{
     models::quality::{ListQualityQuery, ListQualityScoresQuery},
 };
 
+/// Same visibility as ListScoreConfigs, so Quality never shows a config the
+/// caller cannot open. The routes themselves only check the org-level trace
+/// grant.
+async fn visible_configs(org_id: &str, user_id: &str) -> Result<impl Fn(&str) -> bool, Response> {
+    let permitted_objects = openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET",
+        "score_config",
+    )
+    .await
+    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
+    let org_id = org_id.to_string();
+    Ok(move |entity_id: &str| {
+        is_ofga_object_visible(
+            &org_id,
+            "score_config",
+            entity_id,
+            permitted_objects.as_deref(),
+        )
+    })
+}
+
 fn quality_error_response(error: QualityError) -> Response {
     match error {
         QualityError::NotFound(_) => MetaHttpResponse::not_found(error),
@@ -82,28 +105,15 @@ pub async fn list_quality_summaries(
     Query(query): Query<ListQualityQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    // Same visibility as ListScoreConfigs, so the page never names a config
-    // the caller cannot open.
-    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
-        &org_id,
-        &user_email.user_id,
-        "GET",
-        "score_config",
-    )
+    let is_visible = match visible_configs(&org_id, &user_email.user_id).await {
+        Ok(is_visible) => is_visible,
+        Err(response) => return response,
+    };
+    match quality::list_summaries(&org_id, query.into(), |config: &ScoreConfig| {
+        is_visible(&config.entity_id)
+    })
     .await
     {
-        Ok(list) => list,
-        Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
-    };
-    let is_visible = |config: &ScoreConfig| {
-        is_ofga_object_visible(
-            &org_id,
-            "score_config",
-            &config.entity_id,
-            permitted_objects.as_deref(),
-        )
-    };
-    match quality::list_summaries(&org_id, query.into(), is_visible).await {
         Ok(list) => MetaHttpResponse::json(list),
         Err(error) => quality_error_response(error),
     }
@@ -127,6 +137,7 @@ pub async fn list_quality_summaries(
     responses(
         (status = 200, body = inline(QualityScorePage)),
         (status = 400, description = "Invalid request or search query", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Score Config not found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Quality query failed", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -135,7 +146,13 @@ pub async fn list_quality_summaries(
 pub async fn list_quality_scores(
     Path((org_id, entity_id)): Path<(String, String)>,
     Query(query): Query<ListQualityScoresQuery>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    match visible_configs(&org_id, &user_email.user_id).await {
+        Ok(is_visible) if is_visible(&entity_id) => {}
+        Ok(_) => return MetaHttpResponse::forbidden("Unauthorized Access"),
+        Err(response) => return response,
+    }
     match quality::list_scores(&org_id, &entity_id, query.into()).await {
         Ok(page) => MetaHttpResponse::json(page),
         Err(error) => quality_error_response(error),
