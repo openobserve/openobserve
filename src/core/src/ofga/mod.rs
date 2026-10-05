@@ -535,8 +535,7 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.prompt_folders {
         keys.push("prompt_folders");
     }
-    // Every org member reaches their own query history through `viewer`/`allowed_user
-    // from owningOrg`, which resolves to nothing without this tuple.
+    // Members reach their own query history via owningOrg, which needs this tuple.
     if pending.query_history {
         keys.push("query_history");
     }

@@ -21,6 +21,7 @@ use super::get_text_type;
 pub struct Migration;
 
 const ORG_USER_CREATED_AT_IDX: &str = "query_history_org_user_created_at_idx";
+const STARRED_CREATED_AT_IDX: &str = "query_history_starred_created_at_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -69,10 +70,30 @@ impl MigrationTrait for Migration {
                     .col(QueryHistory::CreatedAt)
                     .to_owned(),
             )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name(STARRED_CREATED_AT_IDX)
+                    .table(QueryHistory::Table)
+                    .col(QueryHistory::Starred)
+                    .col(QueryHistory::CreatedAt)
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .if_exists()
+                    .name(STARRED_CREATED_AT_IDX)
+                    .table(QueryHistory::Table)
+                    .to_owned(),
+            )
+            .await?;
         manager
             .drop_index(
                 Index::drop()
@@ -128,7 +149,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_up_creates_the_table_and_index_and_is_idempotent() {
+    async fn test_up_creates_the_table_and_indexes_and_is_idempotent() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let manager = SchemaManager::new(&db);
 
@@ -160,6 +181,15 @@ mod tests {
             )
             .await,
             vec!["org_id", "user_email", "created_at"]
+        );
+        assert_eq!(
+            names(
+                &db,
+                "SELECT name FROM pragma_index_info('query_history_starred_created_at_idx') \
+                 ORDER BY seqno"
+            )
+            .await,
+            vec!["starred", "created_at"]
         );
 
         db.execute(Statement::from_string(

@@ -14,13 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    Set, TransactionTrait,
     sea_query::{Expr, Func, LikeExpr, SimpleExpr},
 };
 
 use super::entity::query_history::{ActiveModel, Column, Entity, Model};
-use crate::{db::get_orm_client_rw, errors};
+use crate::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors,
+};
 
 pub const MAX_UNSTARRED_PER_USER: u64 = 1000;
 
@@ -86,30 +89,10 @@ pub async fn record_with<C: ConnectionTrait + TransactionTrait>(
             })
             .exec(&txn)
             .await?;
+            prune_unstarred_over_cap(&txn, org_id, user_email).await?;
             model
         }
     };
-
-    let unstarred = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::UserEmail.eq(user_email))
-        .filter(Column::Starred.eq(false));
-    let count = unstarred.clone().count(&txn).await?;
-    if count > MAX_UNSTARRED_PER_USER {
-        let oldest: Vec<String> = unstarred
-            .select_only()
-            .column(Column::Id)
-            .order_by_asc(Column::CreatedAt)
-            .order_by_asc(Column::Id)
-            .limit(count - MAX_UNSTARRED_PER_USER)
-            .into_tuple()
-            .all(&txn)
-            .await?;
-        Entity::delete_many()
-            .filter(Column::Id.is_in(oldest))
-            .exec(&txn)
-            .await?;
-    }
     txn.commit().await?;
     Ok(model)
 }
@@ -122,7 +105,7 @@ pub async fn list(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<Model>, errors::Error> {
-    let client = get_orm_client_rw().await;
+    let client = get_orm_client_ro().await;
     list_with(client, org_id, user_email, starred, q, limit, offset).await
 }
 
@@ -151,6 +134,43 @@ pub async fn list_with<C: ConnectionTrait>(
         .offset(offset)
         .all(conn)
         .await?)
+}
+
+/// Deletes the user's unstarred rows from the `MAX_UNSTARRED_PER_USER + 1`-th newest onward.
+async fn prune_unstarred_over_cap<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+) -> Result<(), errors::Error> {
+    let unstarred = Condition::all()
+        .add(Column::OrgId.eq(org_id))
+        .add(Column::UserEmail.eq(user_email))
+        .add(Column::Starred.eq(false));
+    let Some((created_at, id)) = Entity::find()
+        .filter(unstarred.clone())
+        .select_only()
+        .column(Column::CreatedAt)
+        .column(Column::Id)
+        .order_by_desc(Column::CreatedAt)
+        .order_by_desc(Column::Id)
+        .offset(MAX_UNSTARRED_PER_USER)
+        .into_tuple::<(i64, String)>()
+        .one(conn)
+        .await?
+    else {
+        return Ok(());
+    };
+    let at_or_before_boundary = Condition::any().add(Column::CreatedAt.lt(created_at)).add(
+        Condition::all()
+            .add(Column::CreatedAt.eq(created_at))
+            .add(Column::Id.lte(id)),
+    );
+    Entity::delete_many()
+        .filter(unstarred)
+        .filter(at_or_before_boundary)
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 /// Case-insensitive literal substring match: `%`, `_` and `\` match only themselves.
@@ -291,7 +311,7 @@ pub async fn delete_by_email_with<C: ConnectionTrait>(
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{Database, DatabaseConnection, Schema};
+    use sea_orm::{Database, DatabaseConnection, PaginatorTrait, Schema};
     use serde_json::json;
 
     use super::*;
@@ -378,6 +398,17 @@ mod tests {
         assert!(rows.iter().any(|r| r.query == "q2"));
         assert!(rows.iter().any(|r| r.id == starred.id && r.starred));
         assert_eq!(all(&db, B).await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_cap_holds_when_timestamps_tie() {
+        let db = db().await;
+        for i in 0..=MAX_UNSTARRED_PER_USER {
+            record_with(&db, "default", A, &format!("q{i}"), json!({}), 7)
+                .await
+                .unwrap();
+        }
+        assert_eq!(all(&db, A).await.len() as u64, MAX_UNSTARRED_PER_USER);
     }
 
     #[tokio::test]

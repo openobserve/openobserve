@@ -2652,9 +2652,15 @@ pub struct Limit {
     )]
     pub alert_eval_ledger_retention_days: i64,
     #[env_config(
+        name = "ZO_QUERY_HISTORY_ENABLED",
+        default = true,
+        help = "Records the queries users run in their query history. When false nothing is stored and the history lists empty; existing entries are kept until deleted or reaped."
+    )]
+    pub query_history_enabled: bool,
+    #[env_config(
         name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
         default = 14,
-        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less disables the reaper."
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds

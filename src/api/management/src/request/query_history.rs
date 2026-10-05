@@ -89,7 +89,7 @@ fn list_limit(limit: Option<u64>) -> u64 {
     tag = "Query History",
     operation_id = "RecordQueryHistory",
     summary = "Record a query history entry",
-    description = "Records a query the caller ran. Running the same query as the caller's latest entry refreshes that entry instead of adding one.",
+    description = "Records a query the caller ran. Running the same query as the caller's latest entry refreshes that entry instead of adding one. Stores nothing when ZO_QUERY_HISTORY_ENABLED is false.",
     security(
         ("Authorization"= [])
     ),
@@ -112,27 +112,13 @@ pub async fn record(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<QueryHistoryRequest>,
 ) -> Response {
-    if req.query.trim().is_empty() {
-        return MetaHttpResponse::bad_request("query is empty");
-    }
-    if req.query.len() > MAX_QUERY_BYTES {
-        return MetaHttpResponse::bad_request("query exceeds 16 KB");
-    }
-    if req.context.to_string().len() > MAX_CONTEXT_BYTES {
-        return MetaHttpResponse::bad_request("context exceeds 64 KB");
-    }
-    match query_history::record(
+    record_entry(
+        config::get_config().limit.query_history_enabled,
         &org_id,
         &user_email.user_id,
-        &req.query,
-        req.context,
-        config::utils::time::now_micros(),
+        req,
     )
     .await
-    {
-        Ok(entry) => MetaHttpResponse::json(QueryHistoryEntry::from(entry)),
-        Err(e) => MetaHttpResponse::internal_error(e),
-    }
 }
 
 /// ListQueryHistory
@@ -144,7 +130,7 @@ pub async fn record(
     tag = "Query History",
     operation_id = "ListQueryHistory",
     summary = "List query history",
-    description = "Lists the caller's query history, newest first.",
+    description = "Lists the caller's query history, newest first. Empty when ZO_QUERY_HISTORY_ENABLED is false.",
     security(
         ("Authorization"= [])
     ),
@@ -166,24 +152,13 @@ pub async fn list(
     Headers(user_email): Headers<UserEmail>,
     Query(params): Query<QueryHistoryListParams>,
 ) -> Response {
-    match query_history::list(
+    list_entries(
+        config::get_config().limit.query_history_enabled,
         &org_id,
         &user_email.user_id,
-        params.starred,
-        params.q.as_deref(),
-        list_limit(params.limit),
-        params.offset.unwrap_or(0),
+        params,
     )
     .await
-    {
-        Ok(entries) => MetaHttpResponse::json(
-            entries
-                .into_iter()
-                .map(QueryHistoryEntry::from)
-                .collect::<Vec<_>>(),
-        ),
-        Err(e) => MetaHttpResponse::internal_error(e),
-    }
 }
 
 /// StarQueryHistory
@@ -260,6 +235,67 @@ pub async fn delete(
     match query_history::delete(&org_id, &user_email.user_id, &id).await {
         Ok(true) => MetaHttpResponse::ok("query history entry deleted"),
         Ok(false) => MetaHttpResponse::not_found("query history entry not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+async fn record_entry(
+    enabled: bool,
+    org_id: &str,
+    user_email: &str,
+    req: QueryHistoryRequest,
+) -> Response {
+    if !enabled {
+        return MetaHttpResponse::ok("query history is disabled");
+    }
+    if req.query.trim().is_empty() {
+        return MetaHttpResponse::bad_request("query is empty");
+    }
+    if req.query.len() > MAX_QUERY_BYTES {
+        return MetaHttpResponse::bad_request("query exceeds 16 KB");
+    }
+    if req.context.to_string().len() > MAX_CONTEXT_BYTES {
+        return MetaHttpResponse::bad_request("context exceeds 64 KB");
+    }
+    match query_history::record(
+        org_id,
+        user_email,
+        &req.query,
+        req.context,
+        config::utils::time::now_micros(),
+    )
+    .await
+    {
+        Ok(entry) => MetaHttpResponse::json(QueryHistoryEntry::from(entry)),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+async fn list_entries(
+    enabled: bool,
+    org_id: &str,
+    user_email: &str,
+    params: QueryHistoryListParams,
+) -> Response {
+    if !enabled {
+        return MetaHttpResponse::json(Vec::<QueryHistoryEntry>::new());
+    }
+    match query_history::list(
+        org_id,
+        user_email,
+        params.starred,
+        params.q.as_deref(),
+        list_limit(params.limit),
+        params.offset.unwrap_or(0),
+    )
+    .await
+    {
+        Ok(entries) => MetaHttpResponse::json(
+            entries
+                .into_iter()
+                .map(QueryHistoryEntry::from)
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
@@ -428,6 +464,26 @@ mod tests {
             vec!["rate(http_total[5m])"]
         );
         assert!(get("default", &a, "starred=true").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_disabled_collection_stores_nothing_and_lists_nothing() {
+        setup().await;
+        let a = user();
+        post("default", &a, "up", json!({})).await;
+        let req = QueryHistoryRequest {
+            query: "rate(x[5m])".to_string(),
+            context: json!({}),
+        };
+        let (status, _) = parts(record_entry(false, "default", &a, req).await).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, body) =
+            parts(list_entries(false, "default", &a, parse_params("")).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, json!([]));
+        let stored = get("default", &a, "").await;
+        assert_eq!(stored.len(), 1, "the disabled record stored nothing");
+        assert_eq!(stored[0]["query"], "up");
     }
 
     #[test]
