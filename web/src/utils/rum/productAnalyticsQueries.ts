@@ -96,11 +96,6 @@ export const DIMENSIONS: Readonly<Record<BreakdownDim, string>> = {
   env: "env",
 };
 export const SAMPLE_CHARS = "0123456789abcdef" as const;
-export const INCLUDE: Readonly<Record<PathsInclude, string>> = {
-  all: "(type = 'view' OR (type = 'action' AND action_target_name <> ''))",
-  pages: "type = 'view'",
-  clicks: "(type = 'action' AND action_target_name <> '')",
-};
 export const MAX_FUNNEL_STEPS = 10;
 export const PAGE_LIMIT = 200;
 const DAY_US = 86400000000;
@@ -158,6 +153,27 @@ const lit = (value: unknown): string => sqlLiteral(value);
 const lits = (values: readonly unknown[]): string => values.map(lit).join(", ");
 
 const has = (scope: AnalyticsScope, field: string): boolean => scope.schema[field] === true;
+
+// action_target_name only enters the org-wide schema once an action (click) event is ingested.
+// An org with view-only RUM data never gets it, so every reference must fall back instead of
+// asking the backend to resolve a column its schema doesn't have.
+const atnCol = (scope: AnalyticsScope): string =>
+  has(scope, "action_target_name")
+    ? "MIN(action_target_name) AS atn"
+    : "CAST(NULL AS VARCHAR) AS atn";
+const atnRawRef = (scope: AnalyticsScope): string =>
+  has(scope, "action_target_name") ? "action_target_name" : "CAST(NULL AS VARCHAR)";
+const actionClickExpr = (scope: AnalyticsScope): string =>
+  has(scope, "action_target_name") ? "(type = 'action' AND action_target_name <> '')" : "FALSE";
+const actionClickAnd = (scope: AnalyticsScope): string =>
+  has(scope, "action_target_name") ? "type = 'action' AND action_target_name <> ''" : "FALSE";
+const pathsIncludeExpr = (scope: AnalyticsScope, include: PathsInclude): string => {
+  if (include === "pages") return "type = 'view'";
+  if (!has(scope, "action_target_name")) return include === "clicks" ? "FALSE" : "type = 'view'";
+  return include === "clicks"
+    ? "(type = 'action' AND action_target_name <> '')"
+    : "(type = 'view' OR (type = 'action' AND action_target_name <> ''))";
+};
 
 const passSql = (x: string, p: RegexPass): string =>
   `regexp_replace(${x}, '${p.pattern}', '${p.replacement}'${p.global ? ", 'g'" : ""})`;
@@ -221,6 +237,7 @@ const findEvent = (id: string, events: readonly NamedEvent[]): NamedEvent | unde
 const rawRule = (rule: NamedEventRule | NamedActionRule, scope: AnalyticsScope): string => {
   const pk = pageKeyExpr("view_url", scope.schema);
   if (rule.t === "action") {
+    if (!has(scope, "action_target_name")) return "(1 = 0)";
     const onPage = rule.onPage ? ` AND ${pk} = ${lit(rule.onPage)}` : "";
     return `(type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} IN (${lits(rule.targets)})${onPage})`;
   }
@@ -253,6 +270,7 @@ export function stepPredicateRaw(
     return `(type = 'view' AND ${urlPrefilter(step.key, "view_url")} AND ${pageKeyExpr("view_url", scope.schema)} = ${lit(step.key)})`;
   }
   if (step.kind === "c") {
+    if (!has(scope, "action_target_name")) return "(1 = 0)";
     return `(type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} = ${lit(step.key)})`;
   }
   const ev = findEvent(step.key, events);
@@ -405,9 +423,10 @@ export function entryExitSql(
 
 export function stepPickerSql(scope: AnalyticsScope, term?: string): string {
   const filter = term ? ` AND strpos(lower(k), ${lit(term.toLowerCase())}) > 0` : "";
+  const groupKey = has(scope, "action_target_name") ? "action_target_name" : actionKey(scope);
   return withCtes(
     [
-      `e0 AS (SELECT session_id AS sid, type AS ty, MIN(view_url) AS url, MIN(action_target_name) AS atn${has(scope, "view_name") ? ", MIN(CASE WHEN type = 'view' THEN view_name END) AS vn" : ""} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR (type = 'action' AND action_target_name <> '')) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id ELSE action_target_name END)`,
+      `e0 AS (SELECT session_id AS sid, type AS ty, MIN(view_url) AS url, ${atnCol(scope)}${has(scope, "view_name") ? ", MIN(CASE WHEN type = 'view' THEN view_name END) AS vn" : ""} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id ELSE ${groupKey} END)`,
       `e AS (SELECT sid, CASE WHEN ty = 'view' THEN 'p' ELSE 'c' END AS kind, CASE WHEN ty = 'view' THEN ${pageKeyExpr("url", scope.schema, "vn")} ELSE ${clickKeyExpr("atn")} END AS k FROM e0)`,
     ],
     `SELECT kind, k, COUNT(DISTINCT sid) AS sessions FROM e WHERE k IS NOT NULL AND k <> ''${filter} GROUP BY kind, k ORDER BY sessions DESC, kind, k LIMIT ${term ? 50 : 200}`,
@@ -462,7 +481,7 @@ export function clicksSql(
   id: IdentitySql | null,
 ): string {
   const c = `_timestamp >= ${Math.trunc(currentStartUs)}`;
-  const ck = clickKeyExpr("action_target_name");
+  const ck = clickKeyExpr(atnRawRef(scope));
   const cols = [
     `${ck} AS k`,
     `COUNT(DISTINCT CASE WHEN ${c} THEN session_id END) AS sessions`,
@@ -477,7 +496,7 @@ export function clicksSql(
   }
   return withCtes(
     [
-      `g AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND type = 'action' AND action_target_name <> '' GROUP BY ${ck})`,
+      `g AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND ${actionClickAnd(scope)} GROUP BY ${ck})`,
     ],
     `SELECT *, ${RANK_KEY} FROM g WHERE k <> '' ORDER BY rank_key DESC, k LIMIT 500`,
   );
@@ -488,9 +507,9 @@ export function clickPagesSql(
   currentStartUs: number,
   keys: string[],
 ): string {
-  const ck = clickKeyExpr("action_target_name");
+  const ck = clickKeyExpr(atnRawRef(scope));
   const pk = pageKeyExpr("view_url", scope.schema);
-  return `SELECT ${ck} AS k, ${pk} AS pg, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${scopeClause(scope)} AND _timestamp >= ${Math.trunc(currentStartUs)} AND type = 'action' AND action_target_name <> '' AND ${ck} IN (${lits(keys)}) GROUP BY ${ck}, ${pk} ORDER BY sessions DESC, k, pg LIMIT 2000`;
+  return `SELECT ${ck} AS k, ${pk} AS pg, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${scopeClause(scope)} AND _timestamp >= ${Math.trunc(currentStartUs)} AND ${actionClickAnd(scope)} AND ${ck} IN (${lits(keys)}) GROUP BY ${ck}, ${pk} ORDER BY sessions DESC, k, pg LIMIT 2000`;
 }
 
 export function trendSql(
@@ -631,7 +650,7 @@ const funnelCtes = (
     "type AS ty",
     "MIN(date) AS t",
     "MIN(view_url) AS url",
-    "MIN(action_target_name) AS atn",
+    atnCol(scope),
     ...(users && id ? identityGroupCols(id) : []),
     ...(dim ? [`MIN(${dim}) AS dim`] : []),
     ...(vnAvail ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
@@ -818,7 +837,7 @@ const fullChainCtes = (
     "type AS ty",
     "MIN(date) AS t",
     "MIN(view_url) AS url",
-    "MIN(action_target_name) AS atn",
+    atnCol(scope),
     hrExpr(scope),
     ...(frustration
       ? ["MAX(CASE WHEN action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS fr"]
@@ -833,7 +852,7 @@ const fullChainCtes = (
   const keepUrl = url ? ", url" : "";
   const keepVn = url && vnAvail ? ", vn" : "";
   const ctes = [
-    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, users ? 1 : o.sample)} AND (type IN (${types}) OR (type = 'action' AND action_target_name <> '')${identityRows}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END)`,
+    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, users ? 1 : o.sample)} AND (type IN (${types}) OR ${actionClickExpr(scope)}${identityRows}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END)`,
     idf
       ? `x0 AS (SELECT sid, ty, t, hr${fr}, u0, ut${keepUrl}${keepVn}, ${k} FROM x00)`
       : `x0 AS (SELECT sid, ty, t, hr${fr}${keepUrl}${keepVn}, ${k} FROM x00 WHERE ty IN ('view', 'action', 'error'))`,
@@ -1054,13 +1073,15 @@ const pathCtes = (
   if (def.cohort) return cohortPathCtes(scope, id, def, def.cohort, opts, attrs);
   const anchor = def.anchor;
   if (!anchor) throw new Error("Paths need an anchor or a funnel cohort");
-  const types = attrs ? `(${INCLUDE[def.include]} OR type = 'error')` : INCLUDE[def.include];
+  const types = attrs
+    ? `(${pathsIncludeExpr(scope, def.include)} OR type = 'error')`
+    : pathsIncludeExpr(scope, def.include);
   const cols = [
     "session_id AS sid",
     "type AS ty",
     "MIN(date) AS t",
     "MIN(view_url) AS url",
-    "MIN(action_target_name) AS atn",
+    atnCol(scope),
     hrExpr(scope),
     ...(has(scope, "view_name") ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
   ];
@@ -1219,7 +1240,7 @@ export function featuresSql(
     "type AS ty",
     `${c} AS cur`,
     "MIN(view_url) AS url",
-    "MIN(action_target_name) AS atn",
+    atnCol(scope),
     ...(has(scope, "view_name") ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
     ...(id ? identityGroupCols(id) : []),
   ];
@@ -1241,7 +1262,7 @@ export function featuresSql(
   });
   return withCtes(
     [
-      `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR (type = 'action' AND action_target_name <> '')${extra}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} END, ${c})`,
+      `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}${extra}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} END, ${c})`,
       `e1 AS (SELECT sid, ty, cur, ${pageKeyExpr("url", scope.schema, "vn")} AS pg, ${clickKeyExpr("atn")} AS k${id ? `, ${UID_WINDOW} AS u` : ""} FROM e0)`,
     ],
     `SELECT ${agg.join(", ")} FROM e1 LIMIT 1`,

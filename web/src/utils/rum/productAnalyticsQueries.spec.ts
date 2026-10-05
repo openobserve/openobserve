@@ -291,9 +291,14 @@ describe("step predicates (AC-3, AC-14, AC-45)", () => {
   });
 
   it("click raw predicate excludes empty names and goes through CK", () => {
-    expect(stepPredicateRaw({ kind: "c", key: "it's" }, scope(), [])).toBe(
+    const s = scope({ schema: { action_target_name: true } });
+    expect(stepPredicateRaw({ kind: "c", key: "it's" }, s, [])).toBe(
       `(type = 'action' AND action_target_name <> '' AND ${PROVEN_CK} = 'it''s')`,
     );
+  });
+
+  it("click raw predicate matches nothing when the org has no action_target_name (o2-enterprise#2800)", () => {
+    expect(stepPredicateRaw({ kind: "c", key: "it's" }, scope(), [])).toBe("(1 = 0)");
   });
 
   it("grouped predicates compare the grouped key", () => {
@@ -306,15 +311,20 @@ describe("step predicates (AC-3, AC-14, AC-45)", () => {
   });
 
   it("a named event is the OR of its rules", () => {
-    const g = stepPredicateGrouped({ kind: "e", key: "ev1" }, scope(), events);
+    const s = scope({ schema: { action_target_name: true } });
+    const g = stepPredicateGrouped({ kind: "e", key: "ev1" }, s, events);
     expect(g).toBe(
       `((ty = 'view' AND k = '/web/logs') OR (ty = 'view' AND starts_with(k, '/web/dash')) OR (ty = 'view' AND regexp_like(k, '^/web/(a|b)$')) OR (ty = 'action' AND k IN ('save', 'o''k') AND ${pageKeyExpr("url", {})} = '/web'))`,
     );
-    const r = stepPredicateRaw({ kind: "e", key: "ev1" }, scope(), events);
+    const r = stepPredicateRaw({ kind: "e", key: "ev1" }, s, events);
     expect(r).toContain(`starts_with(${pageKeyExpr("view_url", {})}, '/web/dash')`);
     expect(r).toContain(
       `${PROVEN_CK} IN ('save', 'o''k') AND ${pageKeyExpr("view_url", {})} = '/web'`,
     );
+  });
+
+  it("a named event's action rule matches nothing when the org has no action_target_name (o2-enterprise#2800)", () => {
+    expect(stepPredicateRaw({ kind: "e", key: "ev1" }, scope(), events)).toContain("(1 = 0)");
   });
 
   it("a deleted named event matches nothing", () => {
@@ -398,7 +408,7 @@ describe("scope-load builders (G2)", () => {
 });
 
 describe("entry/exit and step picker builders (G3, G4)", () => {
-  const s = scope({ schema: { usr_email: true } });
+  const s = scope({ schema: { usr_email: true, action_target_name: true } });
   const id = { field: "usr_email" as const, excluded: [] };
 
   it("Q6 entryExit equals the proven shape plus the key tie-break, one row per session", () => {
@@ -436,10 +446,18 @@ describe("entry/exit and step picker builders (G3, G4)", () => {
     expect(stepPickerSql(s)).not.toContain("strpos(lower(k)");
     expect(stepPickerSql(s)).toContain("ORDER BY sessions DESC, kind, k LIMIT 200");
   });
+
+  it("Q9 stepPicker never references action_target_name when the org has no click events (o2-enterprise#2800)", () => {
+    const noClicks = scope({ schema: { usr_email: true } });
+    const sql = stepPickerSql(noClicks);
+    expect(sql).not.toContain("action_target_name");
+    expect(sql).toContain("(type = 'view' OR FALSE)");
+    expect(() => assertJoinFree(sql)).not.toThrow();
+  });
 });
 
 describe("overview builders (G3)", () => {
-  const s = scope({ schema: { usr_email: true } });
+  const s = scope({ schema: { usr_email: true, action_target_name: true } });
   const id = { field: "usr_email" as const, excluded: [] };
 
   it("Q4 pages equals the proven shape plus the key tie-break (AC-2)", () => {
@@ -474,6 +492,17 @@ describe("overview builders (G3)", () => {
     expect(norm(clickPagesSql(s, CS, ["k1", "k2"]), s)).toBe(expected);
   });
 
+  it("Q5/Q5b render an empty result instead of a 400 when the org has no click events (o2-enterprise#2800)", () => {
+    const noClicks = scope({ schema: { usr_email: true } });
+    const clicks = clicksSql(noClicks, CS, id);
+    expect(clicks).not.toContain("action_target_name");
+    expect(clicks).toContain(`WHERE ${scopeClause(noClicks)} AND FALSE GROUP BY`);
+    expect(() => assertJoinFree(clicks)).not.toThrow();
+    const clickPages = clickPagesSql(noClicks, CS, ["k1", "k2"]);
+    expect(clickPages).not.toContain("action_target_name");
+    expect(clickPages).toContain("AND FALSE AND");
+  });
+
   it("Q21 app trend equals the proven shape with users", () => {
     expect(norm(trendSql(s, id, "1 day", "Asia/Kolkata", [], []), s)).toBe(PROVEN.Q21_TREND_APP);
     expect(trendSql(s, null, "1 week", "UTC", [], [])).not.toContain("y_axis_2");
@@ -485,9 +514,17 @@ describe("overview builders (G3)", () => {
       { kind: "c" as const, key: "menu-link-/logs-item" },
       { kind: "p" as const, key: "/web/logs" },
     ];
-    expect(norm(trendSql(scope(), null, "1 day", "UTC", series, []), scope())).toBe(
+    const withClicks = scope({ schema: { action_target_name: true } });
+    expect(norm(trendSql(withClicks, null, "1 day", "UTC", series, []), withClicks)).toBe(
       PROVEN.Q21_TREND_KEYS,
     );
+  });
+
+  it("Q21 a click series matches nothing, instead of referencing action_target_name, when the org has no click events (o2-enterprise#2800)", () => {
+    const series = [{ kind: "c" as const, key: "menu-link-/logs-item" }];
+    const sql = trendSql(scope(), null, "1 day", "UTC", series, []);
+    expect(sql).not.toContain("action_target_name");
+    expect(sql).toContain("COUNT(DISTINCT CASE WHEN (1 = 0) THEN session_id END) AS y_axis_1");
   });
 
   it("Q21 is time-relative: no range literal", () => {
@@ -515,6 +552,7 @@ describe("funnel builders (G4, AC-12, AC-14, AC-15, AC-47)", () => {
       usr_email: true,
       user_agent_user_agent_family: true,
       session_has_replay: true,
+      action_target_name: true,
     },
   });
   const id = { field: "usr_email" as const, excluded: [] };
@@ -689,7 +727,14 @@ describe("drop-off builders (G5, AC-16, AC-17, AC-59)", () => {
     { kind: "c" as const, key: "menu-link-/logs-item" },
     { kind: "p" as const, key: "/web/logs" },
   ];
-  const s = scope({ schema: { action_id: true, usr_email: true, session_has_replay: true } });
+  const s = scope({
+    schema: {
+      action_id: true,
+      usr_email: true,
+      session_has_replay: true,
+      action_target_name: true,
+    },
+  });
   const id = { field: "usr_email" as const, excluded: [] };
   const sessions = {
     steps,
@@ -788,7 +833,14 @@ describe("drop-off builders (G5, AC-16, AC-17, AC-59)", () => {
 });
 
 describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
-  const s = scope({ schema: { action_id: true, usr_email: true, session_has_replay: true } });
+  const s = scope({
+    schema: {
+      action_id: true,
+      usr_email: true,
+      session_has_replay: true,
+      action_target_name: true,
+    },
+  });
   const opts = { events: [], sample: 1 as const };
   const def = {
     anchor: { kind: "p" as const, key: "/web/logs" },
@@ -939,6 +991,20 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     expect(sql).toContain("0 AS hr");
   });
 
+  it("degrades Include to view-only, instead of referencing action_target_name, when the org has no click events (o2-enterprise#2800)", () => {
+    const noClicks = scope({ schema: { action_id: true, usr_email: true } });
+    const all = pathsSql(noClicks, null, def, opts);
+    expect(all).not.toContain("action_target_name");
+    expect(all).toContain("WHERE " + scopeClause(noClicks) + " AND type = 'view' GROUP BY");
+    const pages = pathsSql(noClicks, null, { ...def, include: "pages" }, opts);
+    expect(pages).not.toContain("action_target_name");
+    const clicks = pathsSql(noClicks, null, { ...def, include: "clicks" }, opts);
+    expect(clicks).not.toContain("action_target_name");
+    expect(clicks).toContain(`WHERE ${scopeClause(noClicks)} AND FALSE GROUP BY`);
+    expect(() => assertJoinFree(all)).not.toThrow();
+    expect(() => assertJoinFree(clicks)).not.toThrow();
+  });
+
   it("the branch drawer numbers path steps exactly as the flow does, error rows included (AC-26)", () => {
     const cte = (sql: string, name: string) =>
       sql.split("\n").find((l) => l.startsWith(`${name} AS (`)) ?? "";
@@ -1010,6 +1076,24 @@ describe("retention builders (G7, AC-31, AC-34, AC-35, AC-51)", () => {
   });
 
   it("narrows start and return to a page or click (AC-34)", () => {
+    const withClicks = scope({ schema: { usr_email: true, action_target_name: true } });
+    const sql = retentionSql(
+      withClicks,
+      id,
+      { ...any, start: { kind: "p", key: "/signup" }, ret: { kind: "c", key: "save" } },
+      [1, 2],
+      opts,
+    );
+    expect(sql).toContain(
+      `MAX(CASE WHEN (type = 'view' AND (strpos(view_url, '/signup') > 0) AND ${pageKeyExpr("view_url", withClicks.schema)} = '/signup') THEN 1 ELSE 0 END) AS s`,
+    );
+    expect(sql).toContain(
+      `MAX(CASE WHEN (type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} = 'save') THEN 1 ELSE 0 END) AS r`,
+    );
+    expect(sql).toMatch(/LIMIT 3$/);
+  });
+
+  it("a click return matches nothing, instead of referencing action_target_name, when the org has no click events (o2-enterprise#2800)", () => {
     const sql = retentionSql(
       s,
       id,
@@ -1017,13 +1101,8 @@ describe("retention builders (G7, AC-31, AC-34, AC-35, AC-51)", () => {
       [1, 2],
       opts,
     );
-    expect(sql).toContain(
-      `MAX(CASE WHEN (type = 'view' AND (strpos(view_url, '/signup') > 0) AND ${pageKeyExpr("view_url", s.schema)} = '/signup') THEN 1 ELSE 0 END) AS s`,
-    );
-    expect(sql).toContain(
-      `MAX(CASE WHEN (type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} = 'save') THEN 1 ELSE 0 END) AS r`,
-    );
-    expect(sql).toMatch(/LIMIT 3$/);
+    expect(sql).not.toContain("action_target_name");
+    expect(sql).toContain("MAX(CASE WHEN (1 = 0) THEN 1 ELSE 0 END) AS r");
   });
 
   it("samples users by a hash of the identity (AC-52)", () => {
@@ -1043,7 +1122,7 @@ describe("retention builders (G7, AC-31, AC-34, AC-35, AC-51)", () => {
 });
 
 describe("features builder (G8, AC-45)", () => {
-  const s = scope({ schema: { action_id: true, usr_email: true } });
+  const s = scope({ schema: { action_id: true, usr_email: true, action_target_name: true } });
   const id = { field: "usr_email" as const, excluded: [] };
   const ev = (i: number, rules: NamedEvent["rules"]): NamedEvent => ({
     id: `e${i}`,
@@ -1085,6 +1164,14 @@ describe("features builder (G8, AC-45)", () => {
       "((ty = 'view' AND starts_with(pg, '/web/')) OR (ty = 'view' AND regexp_like(pg, '^/a$')))",
     );
   });
+
+  it("never references action_target_name when the org has no click events (o2-enterprise#2800)", () => {
+    const noClicks = scope({ schema: { action_id: true, usr_email: true } });
+    const sql = featuresSql(noClicks, CS, id, events);
+    expect(sql).not.toContain("action_target_name");
+    expect(sql).toContain("(type = 'view' OR FALSE OR");
+    expect(() => assertJoinFree(sql)).not.toThrow();
+  });
 });
 
 describe("dashboard panel builder (G9, AC-53)", () => {
@@ -1093,7 +1180,7 @@ describe("dashboard panel builder (G9, AC-53)", () => {
     { kind: "c" as const, key: "menu-link-/logs-item" },
     { kind: "p" as const, key: "/web/logs" },
   ];
-  const s = scope({ schema: { action_id: true } });
+  const s = scope({ schema: { action_id: true, action_target_name: true } });
 
   it("pivots the unbroken Sessions funnel into one row per step", () => {
     const sql = funnelPanelSql(
@@ -1340,7 +1427,12 @@ describe("assertJoinFree over every builder (AC-55)", () => {
 
 describe("saved funnel sql cap (G8, CR-24)", () => {
   const s = scope({
-    schema: { action_id: true, usr_email: true, user_agent_user_agent_family: true },
+    schema: {
+      action_id: true,
+      usr_email: true,
+      user_agent_user_agent_family: true,
+      action_target_name: true,
+    },
   });
   const id = { field: "usr_email" as const, excluded: ["a'b@x.com"] };
   const key = (i: number, c: string) => `/${c.repeat(1023 - String(i).length)}${i}`;
@@ -1381,7 +1473,9 @@ describe("saved funnel sql cap (G8, CR-24)", () => {
 // — never `view_name` itself — so Pages, Funnels and Paths broke in any org where a
 // mobile RUM app had added `view_name` to the shared `_rumdata` schema.
 describe("mobile view_name fallback reaches a column the CTE actually selects (o2-enterprise#2798)", () => {
-  const s = scope({ schema: { view_name: true, usr_email: true, action_id: true } });
+  const s = scope({
+    schema: { view_name: true, usr_email: true, action_id: true, action_target_name: true },
+  });
   const id = { field: "usr_email" as const, excluded: [] };
   const opts = { events: [], sample: 1 as const };
 
