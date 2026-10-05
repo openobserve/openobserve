@@ -75,14 +75,8 @@ struct ReplicaEntry {
 /// A live o2-ai replica: its name in the directory, and the URL that reaches it.
 type Replica = (String, String);
 
-/// How long a non-empty live set may be reused. Replicas beat every 10s, so this
-/// adds no staleness the registry doesn't have while keeping a listing off every
-/// chat turn.
+/// How long a live set may be reused; an empty one is an HA outage, so it gets no longer window.
 const LIVE_REPLICAS_TTL: Duration = Duration::from_secs(2);
-
-/// How long a *confirmed-empty* registry may be reused. Longer: this is the
-/// steady state of every non-HA deployment, and nothing about it goes stale.
-const EMPTY_REPLICAS_TTL: Duration = Duration::from_secs(30);
 
 /// Two concurrent misses may both fetch — harmless, and cheaper than
 /// serialising every caller. The critical section never awaits.
@@ -104,7 +98,7 @@ async fn directory() -> Result<&'static nats::NatsDb> {
 async fn live_replicas() -> Option<Vec<Replica>> {
     if let Ok(guard) = LIVE_REPLICAS_CACHE.read()
         && let Some((fetched_at, replicas)) = guard.as_ref()
-        && fetched_at.elapsed() < ttl_for(replicas)
+        && fetched_at.elapsed() < LIVE_REPLICAS_TTL
     {
         return Some(replicas.clone());
     }
@@ -118,14 +112,6 @@ async fn live_replicas() -> Option<Vec<Replica>> {
     }
 
     Some(replicas)
-}
-
-fn ttl_for(replicas: &[Replica]) -> Duration {
-    if replicas.is_empty() {
-        EMPTY_REPLICAS_TTL
-    } else {
-        LIVE_REPLICAS_TTL
-    }
 }
 
 /// `None` when the registry could not be read; `Some(vec![])` when it was read
@@ -327,22 +313,6 @@ mod tests {
                 "{bucket} lost its TTL in get_bucket_by_key"
             );
         }
-    }
-
-    #[test]
-    fn test_a_confirmed_empty_registry_is_cached_far_longer() {
-        // A non-HA deployment reaches this path on every turn, so its empty
-        // registry must not cost a listing each time.
-        assert_eq!(ttl_for(&[]), EMPTY_REPLICAS_TTL);
-        assert!(EMPTY_REPLICAS_TTL > LIVE_REPLICAS_TTL);
-    }
-
-    #[test]
-    fn test_a_populated_registry_keeps_the_short_window() {
-        // A live set does go stale — a replica that dies has to drop out before
-        // new sessions stop being placed on it.
-        let replicas = vec![("o2ai-0".to_string(), "http://o2ai-0:8000".to_string())];
-        assert_eq!(ttl_for(&replicas), LIVE_REPLICAS_TTL);
     }
 
     #[test]

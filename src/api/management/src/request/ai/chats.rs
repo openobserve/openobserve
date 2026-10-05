@@ -156,9 +156,7 @@ pub async fn admit_turn(
             "[AI-CHAT] [trace_id:{trace_id}] {user_email} tried to continue session \
              {session_id} owned by another user"
         );
-        return Err(MetaHttpResponse::forbidden(
-            "This conversation belongs to another user",
-        ));
+        return Err(MetaHttpResponse::not_found("Unknown conversation"));
     }
     if row.status != STATUS_ACTIVE {
         return Err(MetaHttpResponse::not_found(

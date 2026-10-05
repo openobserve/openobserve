@@ -82,7 +82,13 @@ pub async fn schema(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let schema = stream_service::get_stream(&org_id, &stream_name, stream_type).await;
+    // Hidden like it is from listing and search: its schema is not for users.
+    let schema = if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&stream_name)
+    {
+        None
+    } else {
+        stream_service::get_stream(&org_id, &stream_name, stream_type).await
+    };
     let Some(mut schema) = schema else {
         return (
             StatusCode::NOT_FOUND,
