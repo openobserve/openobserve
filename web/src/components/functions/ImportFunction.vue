@@ -669,9 +669,7 @@ export default defineComponent({
 
       let written = 0;
       let failed = 0;
-      // What the server refused and this screen can offer a fix for; every item
-      // here was actually attempted. A failure with no inline fix is counted but
-      // contributes no control group.
+      // A failure with no inline fix is counted but contributes no control group.
       const rejected: ImportError[][] = [];
       for (const [itemIndex, item] of items.entries()) {
         const errors = await writeFunction(item, itemIndex + 1, itemIndex);
@@ -687,9 +685,7 @@ export default defineComponent({
         functionErrors.value = rejected;
       }
 
-      // Counted, not inferred from the control groups: a run where every failure
-      // was a 403 produces no groups, and reporting that as a success and
-      // navigating away is the bug this screen has already had three times.
+      // Counted, not inferred: an all-403 run produces no groups and would toast success.
       if (failed > 0) {
         isImporting.value = false;
         if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
