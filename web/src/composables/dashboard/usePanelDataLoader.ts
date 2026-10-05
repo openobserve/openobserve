@@ -597,14 +597,19 @@ export const usePanelDataLoader = (
 
   // Wire up search handlers composable (placed here so processApiError,
   // loadData, and removeTraceId are all already declared above).
-  const { handleSearchResponse, handleSearchClose, handleSearchReset, handleSearchError } =
-    usePanelSearchHandlers({
-      state,
-      processApiError,
-      saveCurrentStateToCache,
-      loadData,
-      removeTraceId,
-    });
+  const {
+    handleSearchResponse,
+    handleSearchClose,
+    handleSearchReset,
+    handleSearchError,
+    clearHitsBuffer,
+  } = usePanelSearchHandlers({
+    state,
+    processApiError,
+    saveCurrentStateToCache,
+    loadData,
+    removeTraceId,
+  });
 
   // Wire up PromQL and SQL executors (placed here so handleSearch* handlers,
   // processApiError, addTraceId, removeTraceId are all already declared above).
@@ -651,6 +656,7 @@ export const usePanelDataLoader = (
     handleSearchClose,
     handleSearchError,
     handleSearchReset,
+    clearHitsBuffer,
     processApiError,
     saveCurrentStateToCache,
     addTraceId,

@@ -46,6 +46,7 @@ export const usePanelSQLExecutor = (ctx: {
   handleSearchClose: any;
   handleSearchError: any;
   handleSearchReset: any;
+  clearHitsBuffer: () => void;
   processApiError: (error: any, type: any) => void;
   saveCurrentStateToCache: () => Promise<void>;
   addTraceId: (traceId: string) => void;
@@ -77,6 +78,7 @@ export const usePanelSQLExecutor = (ctx: {
     handleSearchClose,
     handleSearchError,
     handleSearchReset,
+    clearHitsBuffer,
     processApiError,
     saveCurrentStateToCache,
     addTraceId,
@@ -129,6 +131,7 @@ export const usePanelSQLExecutor = (ctx: {
     pageType: string,
     currentQueryIndex: number,
     abortControllerRef: any,
+    runToken: number,
   ) => {
     try {
       const { traceId } = generateTraceContext();
@@ -179,6 +182,7 @@ export const usePanelSQLExecutor = (ctx: {
         clear_cache: shouldRefreshWithoutCache?.value || false,
       };
 
+      if (runToken !== sqlRunToken) return;
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
         // Set partial data flag on abort
@@ -190,7 +194,7 @@ export const usePanelSQLExecutor = (ctx: {
 
       fetchQueryDataWithHttpStream(
         payload,
-        dropSupersededRunEvents({
+        dropSupersededRunEvents(runToken, {
           data: handleSearchResponse,
           error: handleSearchError,
           complete: handleSearchClose,
@@ -215,9 +219,9 @@ export const usePanelSQLExecutor = (ctx: {
 
   // A superseded run's stream keeps flowing; letting it write appends its hits to the new run's data.
   const dropSupersededRunEvents = (
+    runToken: number,
     handlers: Record<"data" | "error" | "complete" | "reset", (p: any, r: any) => any>,
   ) => {
-    const runToken = sqlRunToken;
     const isCurrentRun = (p: any, freeTraceId: boolean) => {
       if (runToken === sqlRunToken) return true;
       if (freeTraceId) removeTraceId(p?.traceId);
@@ -242,11 +246,10 @@ export const usePanelSQLExecutor = (ctx: {
     pageType: string,
     currentQueryIndex: number,
     abortControllerRef: any,
+    runToken: number,
   ) => {
     try {
-      if (abortControllerRef?.signal?.aborted) return;
-      // Snapshot the current run; a later run bumps this and invalidates our writes.
-      const runToken = sqlRunToken;
+      if (abortControllerRef?.signal?.aborted || runToken !== sqlRunToken) return;
       const { traceId } = generateTraceContext();
       const hits: any[] = [];
       const payload: any = {
@@ -340,7 +343,8 @@ export const usePanelSQLExecutor = (ctx: {
       };
       state.resultMetaData = [];
       // Supersede the previous run so its still-flowing streams drop their writes.
-      sqlRunToken++;
+      const runToken = ++sqlRunToken;
+      clearHitsBuffer();
       state.sparklineData = [];
       state.sparklineWarning = "";
       state.annotations = [];
@@ -386,6 +390,7 @@ export const usePanelSQLExecutor = (ctx: {
               query1,
               panelSchema.value.queryType,
             );
+            if (runToken !== sqlRunToken) return;
             const query = query2;
 
             // Validate that timestamp column is not used as an alias for other fields
@@ -399,6 +404,7 @@ export const usePanelSQLExecutor = (ctx: {
               addTraceId("tempTraceId");
               await nextTick();
               removeTraceId("tempTraceId");
+              if (runToken !== sqlRunToken) return;
               state.loading = false;
               // Skip this iteration and continue with next query/time shift
               continue;
@@ -503,7 +509,7 @@ export const usePanelSQLExecutor = (ctx: {
 
             fetchQueryDataWithHttpStream(
               payload,
-              dropSupersededRunEvents({
+              dropSupersededRunEvents(runToken, {
                 data: (payload: any, response: any) => {
                   // Handle streaming response for multi-query
                   if (response.type === "search_response_metadata") {
@@ -663,6 +669,7 @@ export const usePanelSQLExecutor = (ctx: {
             query1,
             panelSchema.value.queryType,
           );
+          if (runToken !== sqlRunToken) return;
 
           const query = query2;
 
@@ -678,6 +685,7 @@ export const usePanelSQLExecutor = (ctx: {
             addTraceId("tempTraceId");
             await nextTick();
             removeTraceId("tempTraceId");
+            if (runToken !== sqlRunToken) return;
             // Skip executing this query and move to next
             continue;
           }
@@ -780,6 +788,7 @@ export const usePanelSQLExecutor = (ctx: {
             pageType,
             panelQueryIndex,
             abortControllerRef,
+            runToken,
           );
 
           // Best-effort 2nd fetch for the metric sparkline trend (isolated).
@@ -792,6 +801,7 @@ export const usePanelSQLExecutor = (ctx: {
               pageType,
               panelQueryIndex,
               abortControllerRef,
+              runToken,
             );
           }
 
@@ -831,7 +841,8 @@ export const usePanelSQLExecutor = (ctx: {
     pageType: string,
   ) => {
     // Bumped before the pre-fetch early return so it also supersedes in-flight streams.
-    sqlRunToken++;
+    const runToken = ++sqlRunToken;
+    clearHitsBuffer();
     // Handle searchResponse pre-fetch early return
     if (searchResponse?.value?.hits?.length > 0) {
       state.loading = true;
@@ -919,6 +930,7 @@ export const usePanelSQLExecutor = (ctx: {
             query1,
             panelSchema.value.queryType,
           );
+          if (runToken !== sqlRunToken) return;
           const query = query2;
 
           if (!checkTimestampAlias(query)) {
@@ -931,6 +943,7 @@ export const usePanelSQLExecutor = (ctx: {
             addTraceId("tempTraceId");
             await nextTick();
             removeTraceId("tempTraceId");
+            if (runToken !== sqlRunToken) return;
             state.loading = false;
             continue;
           }
@@ -967,6 +980,7 @@ export const usePanelSQLExecutor = (ctx: {
           query1,
           panelSchema.value.queryType,
         );
+        if (runToken !== sqlRunToken) return;
         const query = query2;
 
         if (!checkTimestampAlias(query)) {
@@ -980,6 +994,7 @@ export const usePanelSQLExecutor = (ctx: {
           addTraceId("tempTraceId");
           await nextTick();
           removeTraceId("tempTraceId");
+          if (runToken !== sqlRunToken) return;
           continue;
         }
 
@@ -1032,6 +1047,7 @@ export const usePanelSQLExecutor = (ctx: {
           pageType,
           i,
           abortControllerRef,
+          runToken,
         );
       }
     }
@@ -1099,7 +1115,7 @@ export const usePanelSQLExecutor = (ctx: {
 
     fetchQueryDataWithHttpStream(
       payload,
-      dropSupersededRunEvents({
+      dropSupersededRunEvents(runToken, {
         data: (_payload: any, response: any) => {
           if (response.type === "search_response_metadata") {
             const results = response?.content?.results;

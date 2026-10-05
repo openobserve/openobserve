@@ -87,6 +87,7 @@ const makeCtx = (overrides: Partial<any> = {}) => {
   const handleSearchClose = vi.fn();
   const handleSearchError = vi.fn();
   const handleSearchReset = vi.fn();
+  const clearHitsBuffer = vi.fn();
   const processApiError = vi.fn();
   const saveCurrentStateToCache = vi.fn(async () => {});
   const addTraceId = vi.fn();
@@ -118,6 +119,7 @@ const makeCtx = (overrides: Partial<any> = {}) => {
     handleSearchClose,
     handleSearchError,
     handleSearchReset,
+    clearHitsBuffer,
     processApiError,
     saveCurrentStateToCache,
     addTraceId,
@@ -660,6 +662,69 @@ describe("usePanelSQLExecutor", () => {
       expect(handleSearchError).not.toHaveBeenCalled();
       expect(handleSearchReset).not.toHaveBeenCalled();
       expect(removeTraceId).toHaveBeenCalledWith(stalePayload.traceId);
+    });
+
+    it.each([
+      { name: "single query", queries: [query("SELECT * FROM logs")], multi: false },
+      {
+        name: "time-shift",
+        queries: [query("SELECT * FROM logs", [{ offSet: "1d" }])],
+        multi: false,
+      },
+      { name: "multi-query", queries: cases[1].queries, multi: true },
+    ])(
+      "$name: a run superseded while awaiting variables fires and writes nothing",
+      async ({ queries, multi }) => {
+        const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({
+          panelSchema: makePanelSchema(queries),
+        });
+        let resumeA!: () => void;
+        const gate = new Promise<void>((resolve) => (resumeA = resolve));
+        let calls = 0;
+        ctx.applyDynamicVariables = vi.fn(async (q: string) => {
+          if (calls++ === 0) await gate;
+          return { query: q, metadata: [] };
+        });
+        const executor = usePanelSQLExecutor(ctx);
+        const run = () =>
+          multi
+            ? executor.executeMultiSQL(0, 300_000_000, null, "logs")
+            : executor.executeSQL(0, 300_000_000, null);
+
+        const runA = run();
+        await run();
+        const afterB = JSON.stringify([state.data, state.metadata, state.resultMetaData]);
+        resumeA();
+        await runA;
+
+        expect(fetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify([state.data, state.metadata, state.resultMetaData])).toBe(afterB);
+      },
+    );
+
+    it("a re-run discards progress the previous run's stream buffered but had not flushed", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx();
+      const handlers = usePanelSearchHandlers({
+        state,
+        processApiError: vi.fn(),
+        saveCurrentStateToCache: vi.fn(),
+        loadData: vi.fn(),
+        removeTraceId: vi.fn(),
+      });
+      Object.assign(ctx, {
+        handleSearchResponse: handlers.handleSearchResponse,
+        clearHitsBuffer: handlers.clearHitsBuffer,
+      });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [[payloadA, streamA]] = fetchQueryDataWithHttpStream.mock.calls;
+      streamA.data(payloadA, { type: "event_progress", content: { percent: 42 } });
+      const runB = executeSQL(0, 300_000_000, null);
+      await runB;
+
+      expect(state.loadingProgressPercentage).toBe(0);
+      expect(state.isPartialData).toBe(false);
     });
 
     it("multi-query: the searchResponse early return still supersedes an in-flight stream", async () => {
