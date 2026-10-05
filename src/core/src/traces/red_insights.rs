@@ -47,6 +47,7 @@ static IDENTITY: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)\bFROM\s+("(?:[^"]|"")*")\s+WHERE\s+service_name\s*=\s*'"#).unwrap()
 });
 
+/// A RED signal; each managed service gets one detector per signal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RedSignal {
     Rate,
@@ -133,6 +134,7 @@ pub enum StreamRead {
     Retired,
 }
 
+/// A detector's create-request fields, engine-free so the planner is testable without enterprise.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DetectorTemplate {
     pub name: String,
@@ -193,6 +195,7 @@ impl DetectorTemplate {
     }
 }
 
+/// Off deletes all; on keeps a 2x hysteresis band and fills unoccupied triples up to `max_creates`.
 pub fn plan(
     enabled: bool,
     volumes: &[ServiceVolume],
@@ -291,6 +294,7 @@ pub fn read_stream(has: impl Fn(&str) -> bool) -> StreamRead {
     })
 }
 
+/// `None` when the stream lacks the signal's column or the SQL would fail create validation.
 pub fn template(
     stream: &str,
     service: &str,
