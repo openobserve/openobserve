@@ -16,9 +16,13 @@
 use axum::{
     Json,
     extract::{Path, Query},
-    response::Response,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
-use infra::table::{entity::query_history::Model, query_history};
+use infra::table::{
+    entity::query_history::Model,
+    query_history::{self, MAX_STARRED_PER_USER, SetStarred},
+};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
@@ -26,6 +30,8 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
+/// Route body limit for record and star, so oversized bodies are refused before they are parsed.
+pub const MAX_BODY_BYTES: usize = 128 * 1024;
 const MAX_QUERY_BYTES: usize = 16 * 1024;
 const MAX_CONTEXT_BYTES: usize = 64 * 1024;
 const DEFAULT_LIMIT: u64 = 50;
@@ -33,22 +39,29 @@ const MAX_LIMIT: u64 = 200;
 
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct QueryHistoryRequest {
+    /// The query text, at most 16 KB and not blank.
     pub query: String,
-    /// Time range, step, chart type and the panel data that reopens the query.
+    /// Time range, step, chart type and the panel data that reopens the query, at most 64 KB.
     pub context: serde_json::Value,
 }
 
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct QueryHistoryStarRequest {
+    /// `true` stars the entry, `false` unstars it.
     pub starred: bool,
 }
 
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct QueryHistoryEntry {
+    /// Entry id.
     pub id: String,
+    /// The query text.
     pub query: String,
+    /// Time range, step, chart type and the panel data that reopens the query.
     pub context: serde_json::Value,
+    /// Starred entries are kept until deleted.
     pub starred: bool,
+    /// When the query was last run, in microseconds since the epoch.
     pub created_at: i64,
 }
 
@@ -73,6 +86,7 @@ pub struct QueryHistoryListParams {
     pub q: Option<String>,
     /// Defaults to 50, at most 200.
     pub limit: Option<u64>,
+    /// Entries to skip, for paging. Defaults to 0.
     pub offset: Option<u64>,
 }
 
@@ -89,7 +103,7 @@ fn list_limit(limit: Option<u64>) -> u64 {
     tag = "Query History",
     operation_id = "RecordQueryHistory",
     summary = "Record a query history entry",
-    description = "Records a query the caller ran. Running the same query as the caller's latest entry refreshes that entry instead of adding one. Stores nothing when ZO_QUERY_HISTORY_ENABLED is false.",
+    description = "Records a query the caller ran. Running the same query as the caller's latest entry refreshes that entry instead of adding one. Stores nothing and answers 204 when ZO_QUERY_HISTORY_ENABLED is false.",
     security(
         ("Authorization"= [])
     ),
@@ -99,7 +113,9 @@ fn list_limit(limit: Option<u64>) -> u64 {
     request_body(content = QueryHistoryRequest, description = "Query and its context", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = QueryHistoryEntry),
+        (status = 204, description = "Query history is disabled; nothing was stored"),
         (status = 400, description = "Query empty, or query or context too large", content_type = "application/json", body = ()),
+        (status = 413, description = "Request body larger than 128 KB"),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -170,7 +186,7 @@ pub async fn list(
     tag = "Query History",
     operation_id = "StarQueryHistory",
     summary = "Star or unstar a query history entry",
-    description = "Starred entries are kept until deleted.",
+    description = "Starred entries are kept until deleted. A user can star at most 200 entries per organization.",
     security(
         ("Authorization"= [])
     ),
@@ -181,7 +197,9 @@ pub async fn list(
     request_body(content = QueryHistoryStarRequest, description = "Starred flag", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = QueryHistoryEntry),
+        (status = 400, description = "Starred entry limit reached", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 413, description = "Request body larger than 128 KB"),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -195,8 +213,11 @@ pub async fn star(
     Json(req): Json<QueryHistoryStarRequest>,
 ) -> Response {
     match query_history::set_starred(&org_id, &user_email.user_id, &id, req.starred).await {
-        Ok(Some(entry)) => MetaHttpResponse::json(QueryHistoryEntry::from(entry)),
-        Ok(None) => MetaHttpResponse::not_found("query history entry not found"),
+        Ok(SetStarred::Updated(entry)) => MetaHttpResponse::json(QueryHistoryEntry::from(entry)),
+        Ok(SetStarred::NotFound) => MetaHttpResponse::not_found("query history entry not found"),
+        Ok(SetStarred::StarredCapReached) => MetaHttpResponse::bad_request(format!(
+            "at most {MAX_STARRED_PER_USER} query history entries can be starred; unstar one first"
+        )),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
@@ -246,7 +267,7 @@ async fn record_entry(
     req: QueryHistoryRequest,
 ) -> Response {
     if !enabled {
-        return MetaHttpResponse::ok("query history is disabled");
+        return StatusCode::NO_CONTENT.into_response();
     }
     if req.query.trim().is_empty() {
         return MetaHttpResponse::bad_request("query is empty");
@@ -302,7 +323,6 @@ async fn list_entries(
 
 #[cfg(test)]
 mod tests {
-    use axum::http::StatusCode;
     use infra::table::entity::query_history::Entity;
     use sea_orm::{ConnectionTrait, Schema};
     use serde_json::{Value, json};
@@ -397,6 +417,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_starring_past_the_cap_is_a_bad_request() {
+        setup().await;
+        let a = user();
+        let mut last = String::new();
+        for i in 0..=MAX_STARRED_PER_USER {
+            let (_, entry) = post("default", &a, &format!("q{i}"), json!({})).await;
+            last = entry["id"].as_str().unwrap().to_string();
+            if i < MAX_STARRED_PER_USER {
+                assert_eq!(patch("default", &a, &last, true).await.0, StatusCode::OK);
+            }
+        }
+        let (status, body) = patch("default", &a, &last, true).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(body["message"].as_str().unwrap().contains("200"), "{body}");
+        assert_eq!(
+            get("default", &a, "starred=true&limit=200").await.len(),
+            200
+        );
+    }
+
+    #[tokio::test]
     async fn test_rerun_updates_the_latest_entry_context() {
         setup().await;
         let a = user();
@@ -475,8 +516,9 @@ mod tests {
             query: "rate(x[5m])".to_string(),
             context: json!({}),
         };
-        let (status, _) = parts(record_entry(false, "default", &a, req).await).await;
-        assert_eq!(status, StatusCode::OK);
+        let (status, body) = parts(record_entry(false, "default", &a, req).await).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert_eq!(body, Value::Null, "204 carries no body");
         let (status, body) =
             parts(list_entries(false, "default", &a, parse_params("")).await).await;
         assert_eq!(status, StatusCode::OK);
