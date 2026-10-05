@@ -45,7 +45,8 @@
       "alerts-from-dashboard-panel.spec.js",
       "alerts-query-editor-search-endpoint.spec.js",
       "alerts-13243-prebuilt-form-reuse.spec.js",
-      "alerts-14796-destination-usage.spec.js"
+      "alerts-14796-destination-usage.spec.js",
+      "alerts-15091-alert-edit-flow.spec.js"
     ],
     "disabled": []
   },
