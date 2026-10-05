@@ -16,10 +16,10 @@
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
-export interface TimezoneOption {
+export type TimezoneOption = {
   label: I18nText;
   value: string;
-}
+};
 
 export interface UseTimezoneOptionsConfig {
   /** Lead with a "Browser Time (<zone>)" entry, whose value callers resolve before saving. */

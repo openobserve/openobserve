@@ -285,7 +285,7 @@ watch(chosenFolders, (next, prev) => {
     form?.setFieldValue(path("folders"), fixed);
     return;
   }
-  const ids = values.value?.ids ?? [];
+  const ids: string[] = values.value?.ids ?? [];
   const known = new Map(items.value.map((item) => [item.id, item.folderId]));
   const kept = ids.filter((id) => !known.has(id) || inChosenFolders(known.get(id) as string));
   if (kept.length === ids.length) return;

@@ -82,9 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
-      <div
-        class="border-border-default flex items-center justify-between gap-2 border-t px-3 py-2"
-      >
+      <div class="border-border-default flex items-center justify-between gap-2 border-t px-3 py-2">
         <span class="text-text-secondary text-xs" data-test="downtime-resource-picker-footer">
           {{
             t("alerts.downtimes.resources.footer", {
@@ -187,7 +185,7 @@ const response = ref<ResourcesResponse | null>(null);
 const selected = ref<string[]>([]);
 
 const columns = computed<OTableColumnDef<ResourceValue>[]>(() => [
-  { id: "value", accessorKey: "value", header: refineBy.value, size: 160 },
+  { id: "value", accessorKey: "value", header: raw(refineBy.value), size: 160 },
   {
     id: "last_seen",
     accessorKey: "last_seen",

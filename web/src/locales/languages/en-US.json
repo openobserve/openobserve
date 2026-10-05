@@ -8824,8 +8824,6 @@
         "more": "More actions",
         "muteForHour": "Mute now for 1 h"
       },
-      "selectedCount": "{count} of {total} selected",
-      "totalCount": "{count} downtime | {count} downtimes",
       "confirmCancel": {
         "title": "Cancel downtime",
         "message": "Notifications resume at once. The downtime stays in the list for history.",

@@ -346,49 +346,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <template #bottom>
-                <div class="flex h-12 w-full items-center justify-between gap-2">
-                  <div class="flex min-w-25 items-center text-xs">
-                    <template v-if="selectedIds.length > 0">
-                      {{
-                        t("alerts.downtimes.selectedCount", {
-                          count: selectedIds.length,
-                          total: displayedRows.length,
-                        })
-                      }}
-                    </template>
-                    <span v-else class="max-md:hidden">
-                      {{
-                        t(
-                          "alerts.downtimes.totalCount",
-                          { count: displayedRows.length },
-                          displayedRows.length,
-                        )
-                      }}
-                    </span>
-                  </div>
-                  <div v-if="selectedIds.length > 0" class="flex items-center gap-2">
-                    <OButton
-                      variant="outline"
-                      size="sm"
-                      icon-left="drive-file-move"
-                      data-test="downtime-list-bulk-move"
-                      @click="openMove(selectedIds, activeFolderId)"
-                    >
-                      {{ t("alerts.downtimes.actions.moveToFolder") }}
-                    </OButton>
-                    <OButton
-                      variant="outline-destructive"
-                      size="sm"
-                      icon-left="cancel"
-                      :disabled="cancellableSelection.length === 0"
-                      data-test="downtime-list-bulk-cancel"
-                      @click="askCancel(cancellableSelection)"
-                    >
-                      {{ t("alerts.downtimes.actions.cancel") }}
-                    </OButton>
-                  </div>
-                </div>
+              <template #selection-actions>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  icon-left="drive-file-move"
+                  data-test="downtime-list-bulk-move"
+                  @click="openMove(selectedIds, activeFolderId)"
+                >
+                  {{ t("alerts.downtimes.actions.moveToFolder") }}
+                </OButton>
+                <OButton
+                  variant="outline-destructive"
+                  size="sm"
+                  icon-left="cancel"
+                  :disabled="cancellableSelection.length === 0"
+                  data-test="downtime-list-bulk-cancel"
+                  @click="askCancel(cancellableSelection)"
+                >
+                  {{ t("alerts.downtimes.actions.cancel") }}
+                </OButton>
               </template>
             </OTable>
           </div>
@@ -436,7 +413,7 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { queryClient } from "@/composables/query/queryClient";
 import { foldersQuery } from "@/services/common.queries";
@@ -531,8 +508,7 @@ const targetFolderName: FolderNameFn = (module: TargetModule, id: string) =>
     id,
   );
 
-const downtimeFolderName = (id: string) =>
-  folderNameIn(downtimeFoldersList.data.value, id) ?? id;
+const downtimeFolderName = (id: string) => folderNameIn(downtimeFoldersList.data.value, id) ?? id;
 
 // ── Filters ─────────────────────────────────────────────────────────────────
 const activeFolderId = ref<string>((route.query.folder as string) || "default");
@@ -747,7 +723,7 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     hideable: true,
     size: COL.owner,
   },
-  { id: "actions", header: "", isAction: true, size: 150, pinned: "right" },
+  { id: "actions", header: raw(""), isAction: true, size: 150, pinned: "right" },
 ]);
 
 const defaultColumnVisibility = { folder_id: false, created_by: false };
