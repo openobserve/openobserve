@@ -13,16 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use hashbrown::HashMap;
-use infra::table::{
-    entity::{org_domain_ownership::Model, status_page_custom_domains},
-    org_domain_ownership::{OwnershipRecord, OwnershipState},
+use infra::{
+    coordinator::get_coordinator,
+    db::Event,
+    table::{
+        entity::{org_domain_ownership::Model, status_page_custom_domains},
+        org_domain_ownership::{OwnershipRecord, OwnershipState},
+    },
 };
 
 static CACHE: LazyLock<config::RwAHashMap<String, String>> =
     LazyLock::new(|| tokio::sync::RwLock::new(HashMap::new()));
+
+pub const ODO_PREFIX: &str = "/org_domain_ownership/";
 
 pub async fn init() {
     let items = match infra::table::org_domain_ownership::list_active_domain_org_map().await {
@@ -77,6 +83,7 @@ pub async fn delete_linked_domain(org_id: &str, domain: &str) -> Result<(), anyh
     infra::table::org_domain_ownership::delete_linked_domain(org_id, domain).await?;
     let mut lock = CACHE.write().await;
     lock.remove(domain);
+    emit_sync_event(org_id, domain).await;
     Ok(())
 }
 
@@ -115,6 +122,7 @@ pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<(), anyhow:
             "no mapping for domain {domain} foung for org {org_id}"
         ));
     };
+    emit_sync_event(org_id, domain).await;
 
     if verify(record).await? == OwnershipState::Verfied as i32 {
         let mut lock = CACHE.write().await;
@@ -130,10 +138,98 @@ pub async fn update_state(org_id: &str, domain: &str, new_state: i32) -> Result<
     } else {
         lock.remove(domain);
     }
+    emit_sync_event(org_id, domain).await;
     Ok(())
 }
 
 pub async fn get_domains_for_org(org_id: &str) -> Result<Vec<Model>, anyhow::Error> {
     let records = infra::table::org_domain_ownership::get_domains_for_org(org_id).await?;
     Ok(records)
+}
+
+async fn emit_sync_event(org_id: &str, domain: &str) {
+    let cluster_coordinator = get_coordinator().await;
+    if let Err(e) = cluster_coordinator
+        .put(
+            &format!("{ODO_PREFIX}{org_id}/{domain}"),
+            "".into(),
+            true,
+            None,
+        )
+        .await
+    {
+        log::error!(
+            "error sending cluster sync message for org domain ownership sync for org {org_id} : {e}"
+        );
+    }
+}
+
+pub async fn watch() -> Result<(), anyhow::Error> {
+    let cluster_coordinator = ::infra::db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(ODO_PREFIX).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching org_domain_ownership");
+
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_org_domain_ownership: event channel closed");
+                return Ok(());
+            }
+        };
+
+        match ev {
+            Event::Put(ev) => {
+                let Some(key) = ev.key.strip_prefix(ODO_PREFIX) else {
+                    log::error!("unexpected key for org domain prefix watch : {}", ev.key);
+                    continue;
+                };
+                let Some((org, domain)) = key.split_once("/") else {
+                    log::error!(
+                        "invalid key received for org domain ownership sync : {}",
+                        ev.key
+                    );
+                    continue;
+                };
+                log::info!("received sync event for org domain ownership for org {org}");
+                let record = match infra::table::org_domain_ownership::get_domain_org_record(
+                    org, domain,
+                )
+                .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!(
+                            "error in retrieving org domain ownership record from db for {org} domain {domain} : {e}"
+                        );
+                        continue;
+                    }
+                };
+                let mut lock = CACHE.write().await;
+                match record {
+                    None => {
+                        log::info!(
+                            "removing org {org} domain {domain} from memory cache as record not found in db"
+                        );
+                        lock.remove(domain);
+                    }
+                    Some(v) => {
+                        if v.verification_state == OwnershipState::Verfied as i32 {
+                            log::info!(
+                                "added org {org} domain {domain} from memory cache as verified in db"
+                            );
+                            lock.insert(domain.to_owned(), org.to_owned());
+                        } else {
+                            log::info!(
+                                "removed org {org} domain {domain} from memory cache as not verified in db"
+                            );
+                            lock.remove(domain);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
