@@ -21,6 +21,7 @@ use config::meta::{
     downtimes::{Downtime, DowntimeTarget, TargetFolders, TargetModule},
     folder::FolderType,
 };
+use o2_openfga::authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation};
 
 use super::{
     DowntimeError,
@@ -79,12 +80,43 @@ pub async fn visibility(org: &str, user_id: &str) -> Result<Visibility, Downtime
     })
 }
 
-/// The downtime folders the user may list, for filtering the list endpoint.
+/// The downtime folders the user may list; the list route is org-level, so each folder is checked.
 pub async fn listable_downtime_folders(
     org: &str,
     user_id: &str,
 ) -> Result<HashSet<String>, DowntimeError> {
-    listable_folders(org, user_id, FolderType::Downtimes).await
+    let candidates = listable_folders(org, user_id, FolderType::Downtimes).await?;
+    let checks = candidates.into_iter().map(|folder_id| async move {
+        check_permissions(
+            &folder_id,
+            org,
+            user_id,
+            "downtime_folders",
+            "LIST",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        .then_some(folder_id)
+    });
+    Ok(futures::future::join_all(checks)
+        .await
+        .into_iter()
+        .flatten()
+        .collect())
+}
+
+/// Moves the folder tuple; writing a tuple that exists fails, so an unchanged folder is skipped.
+pub async fn reparent(id: &str, from: &str, to: &str) {
+    if from == to || !o2_openfga::config::get_config().enabled {
+        return;
+    }
+    let downtime = get_ofga_type("downtimes");
+    let folder = get_ofga_type("downtime_folders");
+    set_parent_relation(id, &downtime, to, &folder).await;
+    remove_parent_relation(id, &downtime, from, &folder).await;
 }
 
 async fn listable_folders(

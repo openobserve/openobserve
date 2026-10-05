@@ -417,8 +417,17 @@ pub async fn list(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    list_with(get_orm_client_ro().await, org_id, status, limit, offset).await
+}
 
+/// [`list`] on a given connection.
+pub async fn list_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    status: Option<&str>,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
     let mut query = alert_incidents::Entity::find()
         .select_only()
         // Select all columns EXCEPT topology_context for performance
@@ -436,6 +445,7 @@ pub async fn list(
         .column(alert_incidents::Column::AssignedTo)
         .column(alert_incidents::Column::CreatedAt)
         .column(alert_incidents::Column::UpdatedAt)
+        .column(alert_incidents::Column::MutedByDowntimeId)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .order_by_desc(alert_incidents::Column::LastAlertAt);
 
@@ -971,6 +981,16 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(row.muted_by_downtime_id.as_deref(), Some("dt-1"));
+    }
+
+    #[tokio::test]
+    async fn the_list_carries_the_muting_downtime_for_the_muted_chip() {
+        let db = incidents_db().await;
+        let muted = muted_incident(&db, "dt-1").await;
+        let rows = list_with(&db, "acme", None, 50, 0).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, muted.id);
+        assert_eq!(rows[0].muted_by_downtime_id.as_deref(), Some("dt-1"));
     }
 
     #[test]

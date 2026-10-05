@@ -197,6 +197,7 @@ pub async fn create(
         updated_at: now,
     };
     db::downtimes::set(&downtime).await?;
+    db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
     remeasure_slos(None, &downtime);
     Ok(downtime)
 }
@@ -259,6 +260,7 @@ pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeEr
     access::authorize_row(org, user_id, &row, "DELETE").await?;
     check_deletable(&row, now_micros())?;
     db::downtimes::delete(org, id).await?;
+    db::authz::remove_ownership(org, "downtimes", db::downtimes::ownership(&row)).await;
     Ok(())
 }
 
@@ -278,6 +280,7 @@ pub async fn move_to_folder(
     }
     let now = now_micros();
     for row in rows {
+        let from = row.folder_id.clone();
         let moved = Downtime {
             folder_id: folder_id.clone(),
             updated_by: user_id.to_string(),
@@ -285,6 +288,7 @@ pub async fn move_to_folder(
             ..row
         };
         db::downtimes::set(&moved).await?;
+        access::reparent(&moved.id, &from, &folder_id).await;
     }
     Ok(())
 }

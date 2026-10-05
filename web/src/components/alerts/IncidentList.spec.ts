@@ -293,6 +293,28 @@ describe("IncidentList.vue", () => {
     });
   });
 
+  describe("Muted chip", () => {
+    it("shows the chip on a list row that carries muted_by_downtime_id", async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", muted_by_downtime_id: "dt-1" }),
+            createIncident({ id: "2" }),
+          ],
+          total: 2,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="row-1"] [data-test="incident-list-muted"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="row-2"] [data-test="incident-list-muted"]').exists()).toBe(
+        false,
+      );
+    });
+  });
+
   // ── visibleIncidents computed ──────────────────────────────────────────────
 
   describe("visibleIncidents computed", () => {

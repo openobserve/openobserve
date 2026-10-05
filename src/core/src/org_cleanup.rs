@@ -373,7 +373,7 @@ async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Delete every downtime through the db layer, so every node cache and every region drops it.
+/// Delete every downtime through the db layer, so caches, regions and OpenFGA tuples drop it.
 async fn delete_org_downtimes(org_id: &str) -> Result<(), anyhow::Error> {
     crate::db::downtimes::delete_by_org(org_id).await
 }

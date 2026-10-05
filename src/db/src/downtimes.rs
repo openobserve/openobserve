@@ -20,6 +20,7 @@ use std::{
     sync::{Arc, LazyLock, RwLock},
 };
 
+use common::meta::authz::Authz;
 use config::meta::downtimes::Downtime;
 use infra::{coordinator::downtimes as coordinator, table::downtimes as table};
 
@@ -46,8 +47,9 @@ pub async fn delete(org: &str, id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Org deletion: every row, every node cache and every region.
+/// Org deletion: every row, every node cache, every region and every OpenFGA tuple.
 pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
+    let rows = table::list(org, None).await?;
     let ids = table::delete_by_org(org).await?;
     for id in &ids {
         coordinator::emit_delete_event(org, id).await?;
@@ -55,6 +57,9 @@ pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
         super_cluster::emit_delete(org, id).await;
     }
     remove_org(org);
+    for row in &rows {
+        crate::authz::remove_ownership(org, "downtimes", ownership(row)).await;
+    }
     Ok(())
 }
 
@@ -67,6 +72,10 @@ pub async fn delete_ended_before(cutoff: i64) -> Result<usize, anyhow::Error> {
     table::delete_ended_before(cutoff).await?;
     for (org, id) in &ended {
         coordinator::emit_delete_event(org, id).await?;
+        let row = list_cached(org).iter().find(|d| &d.id == id).cloned();
+        if let Some(row) = row {
+            crate::authz::remove_ownership(org, "downtimes", ownership(&row)).await;
+        }
         remove_cached(org, id);
     }
     Ok(ended.len())
@@ -101,6 +110,15 @@ pub fn list_cached(org: &str) -> Arc<Vec<Downtime>> {
         .get(org)
         .cloned()
         .unwrap_or_default()
+}
+
+/// The OpenFGA object of a downtime, parented by its folder so folder grants reach it.
+pub fn ownership(downtime: &Downtime) -> Authz {
+    Authz {
+        obj_id: downtime.id.clone(),
+        parent_type: "downtime_folders".to_string(),
+        parent: downtime.folder_id.clone(),
+    }
 }
 
 /// Reloads one org from the table so the cache never holds half a row.
@@ -253,5 +271,15 @@ mod tests {
         remove_org(a);
         assert!(list_cached(a).is_empty());
         assert_eq!(ids(b), ["y"]);
+    }
+
+    #[test]
+    fn ownership_parents_the_downtime_by_its_folder_public_id() {
+        let mut row = downtime("acme", "dt-1");
+        row.folder_id = "payments".to_string();
+        let owner = ownership(&row);
+        assert_eq!(owner.obj_id, "dt-1");
+        assert_eq!(owner.parent_type, "downtime_folders");
+        assert_eq!(owner.parent, "payments");
     }
 }
