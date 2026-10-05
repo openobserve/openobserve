@@ -2457,6 +2457,9 @@ export default defineComponent({
       // Axis start, not the root's: a RUM view root can begin minutes earlier.
       baseTracePosition.value["startTimeUs"] =
         traceTree.value[0].axisStartUs + timeRange.value.start * 1000;
+      // Span start offsets in the sidebar stay relative to the trace's root.
+      baseTracePosition.value["traceStartUs"] =
+        traceTree.value[0].startTimeUs + timeRange.value.start * 1000;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
       for (let i = 0; i <= 4; i++) {
