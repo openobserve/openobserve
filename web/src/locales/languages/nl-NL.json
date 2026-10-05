@@ -13253,6 +13253,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Waarom",
+      "noReasoning": "Geen redenering geregistreerd voor deze score.",
       "scoredAt": "Gescoord {time}",
       "moreCount": "+{count} meer",
       "allScores": "Alle scores ({count})"
@@ -13678,7 +13679,18 @@
         "usedByIntro": "Taken en experimenten die naar deze scorer verwijzen.",
         "usedByEmpty": "Er zijn nog geen taken of experimenten die naar deze scorer verwijzen.",
         "usedByExperiment": "Experiment",
-        "versionsIntro": "Versies zijn onveranderlijke momentopnamen van de scorerconfiguratie. De actieve versie is wat taken vandaag uitvoeren.",
+        "versions": {
+          "empty": "Geen versies gevonden voor deze scorer.",
+          "template": "Sjabloon",
+          "fields": {
+            "description": "Beschrijving",
+            "variables": "Variabelen",
+            "params": "Parameters",
+            "producesScoreConfig": "Scoreconfiguratie",
+            "referenceBased": "Referentiegebaseerd",
+            "outputSchema": "Uitvoerschema"
+          }
+        },
         "lastUpdated": "Laatst bijgewerkt",
         "metadataSection": "Metadata",
         "createdLabel": "Aangemaakt",

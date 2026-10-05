@@ -13253,6 +13253,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Tại sao",
+      "noReasoning": "Không có lý giải nào được ghi cho điểm này.",
       "scoredAt": "Đã chấm điểm lúc {time}",
       "moreCount": "+{count} nữa",
       "allScores": "Tất cả điểm số ({count})"
@@ -13678,7 +13679,18 @@
         "usedByIntro": "Các job và thử nghiệm tham chiếu đến bộ chấm điểm này.",
         "usedByEmpty": "Chưa có job hoặc thử nghiệm nào tham chiếu đến bộ chấm điểm này.",
         "usedByExperiment": "Thử nghiệm",
-        "versionsIntro": "Các phiên bản là ảnh chụp không thể thay đổi của cấu hình bộ chấm điểm. Phiên bản đang hoạt động là phiên bản mà các công việc chạy hôm nay.",
+        "versions": {
+          "empty": "Không tìm thấy phiên bản nào cho bộ chấm điểm này.",
+          "template": "Mẫu",
+          "fields": {
+            "description": "Mô tả",
+            "variables": "Biến",
+            "params": "Tham số",
+            "producesScoreConfig": "Cấu hình điểm",
+            "referenceBased": "Dựa trên tham chiếu",
+            "outputSchema": "Lược đồ đầu ra"
+          }
+        },
         "lastUpdated": "Cập nhật lần cuối",
         "metadataSection": "Siêu dữ liệu",
         "createdLabel": "Đã tạo",

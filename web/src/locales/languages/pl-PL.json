@@ -13253,6 +13253,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Dlaczego",
+      "noReasoning": "Brak zarejestrowanego uzasadnienia dla tego wyniku.",
       "scoredAt": "Oceniono {time}",
       "moreCount": "+{count} więcej",
       "allScores": "Wszystkie oceny ({count})"
@@ -13678,7 +13679,18 @@
         "usedByIntro": "Zadania i eksperymenty, które odwołują się do tego scorera.",
         "usedByEmpty": "Żadne zadania ani eksperymenty nie odwołują się jeszcze do tego scorera.",
         "usedByExperiment": "Eksperyment",
-        "versionsIntro": "Wersje są niezmiennymi migawkami konfiguracji skorera. Aktywna wersja to ta, którą zadania uruchamiają dzisiaj.",
+        "versions": {
+          "empty": "Nie znaleziono wersji dla tego oceniającego.",
+          "template": "Szablon",
+          "fields": {
+            "description": "Opis",
+            "variables": "Zmienne",
+            "params": "Parametry",
+            "producesScoreConfig": "Konfiguracja wyniku",
+            "referenceBased": "Oparte na referencji",
+            "outputSchema": "Schemat wyjściowy"
+          }
+        },
         "lastUpdated": "Ostatnia aktualizacja",
         "metadataSection": "Metadane",
         "createdLabel": "Utworzono",
