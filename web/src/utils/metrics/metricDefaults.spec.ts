@@ -20,6 +20,8 @@ import {
   breakdownLabelsOf,
   breakdownTitleKey,
   buildBreakdownQuery,
+  buildHeatmapBreakdownQuery,
+  buildHeatmapValueQuery,
   breakdownQueryOf,
   buildSelector,
   supportsBreakdown,
@@ -1029,6 +1031,57 @@ describe("breakdownTitleKey", () => {
       "metrics.explorer.detail.breakdown.titleMedian",
     );
     expect(breakdownTitleKey(CARD_KIND.INFO)).toBe("metrics.explorer.detail.breakdown.titleCount");
+  });
+});
+
+describe("heatmap breakdown queries", () => {
+  const ctx = {
+    metricName: "lat_bucket",
+    filters: [{ label: "pod", operator: "=", value: "api-1" }],
+    rateWindow: "4m",
+  };
+
+  it("splits the buckets by the label, in one query that keeps the filters and window", () => {
+    expect(buildHeatmapBreakdownQuery(ctx, "az")).toBe(
+      'sum by (le, az) (rate({__name__="lat_bucket",pod="api-1"}[4m]))',
+    );
+  });
+
+  it("keeps only the values busiest over the whole window when capped, by their +Inf bucket", () => {
+    expect(buildHeatmapBreakdownQuery(ctx, "az", { topk: 10, windowSeconds: 3600 })).toBe(
+      'sum by (le, az) (rate({__name__="lat_bucket",pod="api-1"}[4m]))' +
+        " and on (az) topk(10, sum by (az) " +
+        '(increase({__name__="lat_bucket",az!="",le=~"[+]?[Ii]nf",pod="api-1"}[1h] @ end())))',
+    );
+  });
+
+  it("ranks over the rate window when the displayed range is shorter, so one sample still counts", () => {
+    expect(
+      buildHeatmapBreakdownQuery({ ...ctx, rateWindow: "1m30s" }, "az", {
+        topk: 10,
+        windowSeconds: 30,
+      }),
+    ).toContain("[1m30s] @ end()");
+    expect(
+      buildHeatmapBreakdownQuery({ ...ctx, rateWindow: "1m30s" }, "az", {
+        topk: 10,
+        windowSeconds: 900,
+      }),
+    ).toContain("[15m] @ end()");
+  });
+
+  it("narrows the card's own heatmap to one value, beside the filters", () => {
+    expect(buildHeatmapValueQuery({ ...ctx, rateWindow: "$__rate_interval" }, "az", 'us-"1"')).toBe(
+      'sum by (le) (rate({__name__="lat_bucket",az="us-\\"1\\"",pod="api-1"}[$__rate_interval]))',
+    );
+  });
+
+  it("falls back to the default window, and refuses a label that is not a label name", () => {
+    expect(buildHeatmapBreakdownQuery({ metricName: "lat_bucket" }, "az")).toBe(
+      'sum by (le, az) (rate({__name__="lat_bucket"}[1m]))',
+    );
+    expect(buildHeatmapBreakdownQuery(ctx, "a-b")).toBeNull();
+    expect(buildHeatmapValueQuery(ctx, "a b", "x")).toBeNull();
   });
 });
 

@@ -1411,7 +1411,14 @@ describe("MetricsExplorer wiring", () => {
       const { signal } = new AbortController();
 
       await detailView(wrapper).props("runQuery")("sum(up)", signal);
-      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD, signal);
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(up)", CARD, signal, undefined);
+
+      await detailView(wrapper).props("runQuery")("sum(le)", signal, undefined, {
+        maxSeries: Infinity,
+      });
+      expect(grid.runDetailQuery).toHaveBeenLastCalledWith("sum(le)", CARD, signal, {
+        maxSeries: Infinity,
+      });
     });
 
     it("runs a related metric's chart as that metric, not the open one", async () => {
@@ -1421,7 +1428,7 @@ describe("MetricsExplorer wiring", () => {
       const { signal } = new AbortController();
 
       await detailView(wrapper).props("runQuery")("sum(other)", signal, OTHER);
-      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(other)", OTHER, signal);
+      expect(grid.runDetailQuery).toHaveBeenCalledWith("sum(other)", OTHER, signal, undefined);
     });
 
     it("never starts the query of a chart abandoned while its metric's preview settled", async () => {

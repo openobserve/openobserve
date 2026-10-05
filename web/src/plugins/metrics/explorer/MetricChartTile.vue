@@ -66,20 +66,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("metrics.explorer.noData") }}
       </div>
 
-      <MetricCardChart
+      <slot
         v-else-if="state.status === 'done'"
+        name="chart"
         :results="state.results"
-        :queries="queries ?? []"
-        :chart-type="chartType"
-        :unit="o2Unit.unit"
-        :unit-custom="o2Unit.unitCustom ?? undefined"
-        :bucket-unit="bucketO2Unit.unit ?? undefined"
-        :bucket-unit-custom="bucketO2Unit.unitCustom ?? undefined"
-        :color="color"
         :time-range="state.timeRange"
-        :legend="legend"
-        @error="onRenderError"
-      />
+        :on-render-error="onRenderError"
+      >
+        <MetricCardChart
+          :results="state.results"
+          :queries="queries ?? []"
+          :chart-type="chartType"
+          :unit="o2Unit.unit"
+          :unit-custom="o2Unit.unitCustom ?? undefined"
+          :bucket-unit="bucketO2Unit.unit ?? undefined"
+          :bucket-unit-custom="bucketO2Unit.unitCustom ?? undefined"
+          :color="color"
+          :time-range="state.timeRange"
+          :legend="legend"
+          @error="onRenderError"
+        />
+      </slot>
 
       <div v-else class="h-full p-2" :data-test="`${dataTest}-loading`">
         <OSkeleton class="h-full" animation="wave" />

@@ -153,11 +153,12 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
-vi.mock("@/composables/dashboard/promqlChunkProcessor", () => ({
-  createPromQLChunkProcessor: () => ({
+const { createPromQLChunkProcessor } = vi.hoisted(() => ({
+  createPromQLChunkProcessor: vi.fn((_options: { maxSeries: number }) => ({
     processChunk: (_acc: any, chunk: any) => chunk,
-  }),
+  })),
 }));
+vi.mock("@/composables/dashboard/promqlChunkProcessor", () => ({ createPromQLChunkProcessor }));
 
 // No IndexedDB in the test env; every card starts with nothing cached unless a
 // test sets `getPanelCacheMock` itself.
@@ -1860,6 +1861,25 @@ describe("useMetricsExplorerGrid", () => {
       expect(run.mock.calls.at(-1)![3]).not.toBe(owner);
 
       pending.catch(() => {});
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("streams a detail query under the series cap unless the caller lifts it", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const maxSeriesOf = () => createPromQLChunkProcessor.mock.calls.at(-1)![0].maxSeries;
+
+      grid.runDetailQuery("sum(capped)", card, new AbortController().signal).catch(() => {});
+      await flush();
+      expect(maxSeriesOf()).toBe(100);
+
+      grid
+        .runDetailQuery("sum(lifted)", card, new AbortController().signal, {
+          maxSeries: Infinity,
+        })
+        .catch(() => {});
+      await flush();
+      expect(maxSeriesOf()).toBe(Infinity);
       inFlight.splice(0).forEach((q) => q.complete(SERIES));
     });
 

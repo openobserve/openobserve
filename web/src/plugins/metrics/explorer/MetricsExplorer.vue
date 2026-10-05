@@ -1437,14 +1437,19 @@ export default defineComponent({
 
     const detailColor = computed(() => colorOf(detailMetric.value ?? ""));
 
-    const runDetailPreview = async (expr: string, signal: AbortSignal, card = detailCard.value) => {
+    const runDetailPreview = async (
+      expr: string,
+      signal: AbortSignal,
+      card = detailCard.value,
+      opts?: { maxSeries?: number },
+    ) => {
       if (!card) return null;
       // An unpreviewed card has no widening or NaN-guard decision yet, so a sparse counter charts "No data".
       if (!grid.previews.value[card.name]) await grid.requestPreview(card);
       // Abandoned, or made stale by the preview (the chart reloads on its new query, aborting `signal`).
       if (signal.aborted) throw new PreviewCancelledError(expr);
       try {
-        return await grid.runDetailQuery(expr, card, signal);
+        return await grid.runDetailQuery(expr, card, signal, opts);
       } finally {
         // The card's unmount, or a refresh, cancels an exemplar fetch in flight and drops its
         // state. Asked once the overview has settled, after that cancellation has landed.

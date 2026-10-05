@@ -83,6 +83,19 @@ describe("MetricCardChart builds the panel schema from its props", () => {
     expect(panelProp(wrapper, "panelSchema").config.unit_custom).toBe("s/s");
   });
 
+  it("hands a heatmap a shared colour range and precision only when given them", () => {
+    const own = panelProp(mountChart({ chartType: "heatmap" }), "panelSchema").config;
+    expect(own.visual_map_range).toBeUndefined();
+    expect(own.decimals).toBe(2);
+
+    const shared = panelProp(
+      mountChart({ chartType: "heatmap", visualMapRange: { min: 0, max: 40 }, decimals: 5 }),
+      "panelSchema",
+    ).config;
+    expect(shared.visual_map_range).toEqual({ min: 0, max: 40 });
+    expect(shared.decimals).toBe(5);
+  });
+
   it("carries the histogram bucket unit for a heatmap and updates it", async () => {
     const wrapper = mountChart({
       chartType: "heatmap",

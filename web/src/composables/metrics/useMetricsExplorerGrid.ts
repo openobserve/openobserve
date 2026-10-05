@@ -1166,10 +1166,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * the queue's AbortSignal is what the grid already fires on scroll-away,
    * filter change and refresh, so it is bridged to `cancelStreamQueryBasedOnRequestId`.
    */
-  const streamQuery = (query: string, step: number, signal: AbortSignal) =>
+  const streamQuery = (query: string, step: number, signal: AbortSignal, seriesLimit?: number) =>
     new Promise<any>((resolve, reject) => {
       const { traceId } = generateTraceContext();
-      const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+      const maxSeries = seriesLimit ?? store.state?.zoConfig?.max_dashboard_series ?? 100;
       const chunkProcessor = createPromQLChunkProcessor({
         maxSeries,
         enableLogging: false,
@@ -1913,7 +1913,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   let detailRequests = 0;
 
   /** One owner per request, so the queue drops only the aborting chart's waiter from a shared job. */
-  const runDetailQuery = (expr: string, card: MetricCard, signal: AbortSignal) => {
+  const runDetailQuery = (
+    expr: string,
+    card: MetricCard,
+    signal: AbortSignal,
+    opts?: { maxSeries?: number },
+  ) => {
     const step = dialogStepFor(card);
     const key = previewCacheKey(expr, step);
     if (signal.aborted) return Promise.reject(new PreviewCancelledError(key));
@@ -1921,7 +1926,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     const onAbort = () => queue.cancel(key, owner);
     signal.addEventListener("abort", onAbort, { once: true });
     return queue
-      .run(key, PRIORITY.DIALOG, (abort) => streamQuery(expr, step, abort), owner)
+      .run(key, PRIORITY.DIALOG, (abort) => streamQuery(expr, step, abort, opts?.maxSeries), owner)
       .finally(() => signal.removeEventListener("abort", onAbort));
   };
 

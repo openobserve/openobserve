@@ -23,6 +23,7 @@ import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectio
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { CARD_KIND, toO2Unit } from "@/utils/metrics/metricDefaults";
 import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 const { fieldValues } = vi.hoisted(() => ({ fieldValues: vi.fn() }));
 vi.mock("@/services/stream", async (importOriginal) => {
@@ -85,6 +86,9 @@ const MetricCardChartStub = {
     chartType: String,
     unit: String,
     unitCustom: String,
+    bucketUnit: String,
+    visualMapRange: Object,
+    decimals: Number,
     color: String,
     timeRange: Object,
     legend: Boolean,
@@ -699,6 +703,16 @@ describe("MetricBreakdown", () => {
         expect(cell("latest", "m0").text()).toBe("4.00c/s");
       });
 
+      it("leaves its rows display-only: only a heatmap's rows select", async () => {
+        wrapper = mountBreakdown({ selectedLabel: "method" });
+        await flushPromises();
+        const row = wrapper
+          .find('[data-test="metrics-breakdown-value-method-m0"]')
+          .element.closest("tr")!;
+        expect(row.getAttribute("tabindex")).toBeNull();
+        expect(row.className).not.toContain("cursor-pointer");
+      });
+
       it("shows each value's share of the window's total for a counter, from sums not averages", async () => {
         // m1 runs hotter but only for one step: by average it would claim 75%, by volume 3 of 7.
         runQuery.mockResolvedValue(
@@ -1296,23 +1310,366 @@ describe("MetricBreakdown", () => {
       );
     });
 
-    it("keeps a heatmap's breakdown as p90 lines: a heatmap holds one series", async () => {
-      wrapper = mountBreakdown({
-        card: { ...CARD, name: "lat_bucket", cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS },
-        variant: {
-          queries: [{ expr: "sum by (le) (rate(lat_bucket[4m]))", legendTemplate: "{le}" }],
-          chartType: "heatmap",
-          unit: "count-per-sec",
-          footerLabel: "heatmap",
-        },
-        panelQueries: [{ expr: "sum by (le) (rate(lat_bucket[$__rate_interval]))" }],
-        selectedLabel: "method",
+    describe("a heatmap", () => {
+      const LAT: any = {
+        ...CARD,
+        name: "lat_bucket",
+        cardKind: CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
+        unit: "seconds",
+      };
+      const HEATMAP = {
+        queries: [
+          { expr: 'sum by (le) (rate({__name__="lat_bucket"}[4m]))', legendTemplate: "{le}" },
+        ],
+        chartType: "heatmap",
+        unit: "count-per-sec",
+        bucketUnit: "seconds",
+        footerLabel: "heatmap",
+      };
+      const SPLIT = 'sum by (le, method) (rate({__name__="lat_bucket"}[4m]))';
+      // v0..v11 at 1..12 obs/s; 40% ≤ 0.1s, 80% ≤ 0.5s, 95% ≤ 1s, so p50 0.2s, p90 0.83s, p99 1s.
+      // The counts list only m0..m2.
+      const bucketsOf = (values: string[]) => ({
+        resultType: "matrix",
+        result: values.flatMap((value, i) =>
+          (
+            [
+              ["0.1", 0.4],
+              ["0.5", 0.8],
+              ["1", 0.95],
+              ["+Inf", 1],
+            ] as const
+          ).map(([le, share]) => ({
+            metric: { method: value, le },
+            values: [[1, String(share * (i + 1))]],
+          })),
+        ),
       });
-      await flushPromises();
-      expect(exprs()).toEqual([
-        'histogram_quantile(0.9, sum by (le, method) (rate({__name__="lat_bucket"}[4m])))',
-      ]);
-      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("chartType")).toBe("line");
+      const V = Array.from({ length: 12 }, (_, i) => `v${i}`);
+      const buckets = bucketsOf(V);
+      const mountHeatmap = (props: Record<string, any> = {}) =>
+        mountBreakdown({
+          card: LAT,
+          variant: HEATMAP,
+          panelQueries: [{ expr: 'sum by (le) (rate({__name__="lat_bucket"}[$__rate_interval]))' }],
+          ...props,
+        });
+      const heatmaps = (w: VueWrapper<any>) =>
+        w.findAll('[data-test^="metrics-breakdown-heatmap-"]');
+      const cell = (kind: string, value: string) =>
+        wrapper.find(`[data-test="metrics-breakdown-${kind}-method-${value}"]`);
+
+      beforeEach(() => {
+        runQuery.mockImplementation((expr: string) =>
+          Promise.resolve(expr === SPLIT ? buckets : SERIES),
+        );
+      });
+
+      it("keeps its tiles as p90 lines, and says so in their titles", async () => {
+        wrapper = mountHeatmap();
+        await flushPromises();
+        expect(exprs()).toContain(
+          'histogram_quantile(0.9, sum by (le, method) (rate({__name__="lat_bucket"}[4m])))',
+        );
+        expect(exprs()).not.toContain(SPLIT);
+        expect(wrapper.find('[data-test="metrics-breakdown-card-method"]').text()).toContain(
+          "p90 by method",
+        );
+        expect(wrapper.findComponent({ name: "MetricCardChart" }).props("chartType")).toBe("line");
+      });
+
+      it("draws the top 10 values by volume as heatmaps from one query, on one colour scale", async () => {
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+
+        expect(exprs()).toEqual([SPLIT]);
+        expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
+          "Heatmap by method",
+        );
+        expect(wrapper.find('[data-test="metrics-breakdown-topk"]').exists()).toBe(true);
+        expect(heatmaps(wrapper).map((h) => h.attributes("data-test"))).toEqual(
+          [11, 10, 9, 8, 7, 6, 5, 4, 3, 2].map((i) => `metrics-breakdown-heatmap-v${i}`),
+        );
+        const charts = wrapper.findAllComponents({ name: "MetricCardChart" });
+        expect(charts).toHaveLength(10);
+        for (const chart of charts) {
+          expect(chart.props("chartType")).toBe("heatmap");
+          expect(chart.props("bucketUnit")).toBe(toO2Unit("seconds").unit);
+          // v11's cells reach 4.8/s; the quietest value shown is scaled by it too.
+          expect(chart.props("visualMapRange").min).toBe(0);
+          expect(chart.props("visualMapRange").max).toBeCloseTo(4.8);
+          // One precision, from the busiest: it also formats the shared bucket labels.
+          expect(chart.props("decimals")).toBe(2);
+        }
+        // Each heatmap holds only its own value's buckets.
+        const v2 = charts.at(-1)!.props("results")![0].result;
+        expect(v2.map((s: any) => [s.metric.method, s.metric.le])).toEqual([
+          ["v2", "0.1"],
+          ["v2", "0.5"],
+          ["v2", "1"],
+          ["v2", "+Inf"],
+        ]);
+      });
+
+      it("ranks the table by rate and gives each value's p50, p90 and p99, without a share", async () => {
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+
+        const table = wrapper.find('[data-test="metrics-breakdown-table"]');
+        for (const header of ["Rate", "p50", "p90", "p99"]) expect(table.text()).toContain(header);
+        for (const header of ["Share", "Avg", "Latest", "Trend"])
+          expect(table.text()).not.toContain(header);
+        expect(wrapper.find('[data-test^="metrics-breakdown-share-"]').exists()).toBe(false);
+
+        const values = wrapper
+          .findAll('[data-test^="metrics-breakdown-value-method-"]')
+          .map((v) => v.text());
+        // Values the counts listed but the buckets lack go last, in count order.
+        expect(values.slice(0, 3)).toEqual(["v11", "v10", "v9"]);
+        expect(values.slice(-3)).toEqual(["m0", "m1", "m2"]);
+
+        const rate = toO2Unit("count-per-sec");
+        const seconds = toO2Unit("seconds");
+        expect(cell("rate", "v11").text()).toBe(
+          formatUnitValue(getUnitValue(12, rate.unit, rate.unitCustom ?? "", 2)),
+        );
+        // Each percentile at its own precision: under 1s takes 3 decimals, 1s takes 2.
+        const inSeconds = (v: number, decimals: number) =>
+          formatUnitValue(getUnitValue(v, seconds.unit, seconds.unitCustom ?? "", decimals));
+        expect(cell("p50", "v11").text()).toBe(inSeconds(0.2, 3));
+        expect(cell("p90", "v11").text()).toBe(inSeconds(0.5 + 0.5 * (0.1 / 0.15), 3));
+        expect(cell("p99", "v11").text()).toBe(inSeconds(1, 2));
+        const headers = table.findAll("th").map((th) => th.text());
+        expect(headers.slice(1, 5)).toEqual(["Rate", "p50", "p90", "p99"]);
+        expect(cell("p50", "m0").text()).toBe("—");
+      });
+
+      it("adds the busiest value's heatmap to a dashboard, or the row picked", async () => {
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+        const selected = () =>
+          heatmaps(wrapper)
+            .filter((h) => h.attributes("data-selected") === "true")
+            .map((h) => h.attributes("data-test"));
+        const row = (value: string) =>
+          wrapper
+            .find(`[data-test="metrics-breakdown-value-method-${value}"]`)
+            .element.closest("tr")!;
+        const add = async () => {
+          await wrapper.find('[data-test="metrics-breakdown-add-to-dashboard"]').trigger("click");
+          return wrapper.findComponent({ name: "AddToDashboard" });
+        };
+
+        expect(selected()).toEqual(["metrics-breakdown-heatmap-v11"]);
+        expect(row("v11").className).toContain("bg-table-row-selected-bg");
+        let dialog = await add();
+        expect(dialog.props("dashboardPanelData")!.data.queries[0].query).toBe(
+          'sum by (le) (rate({__name__="lat_bucket",method="v11"}[$__rate_interval]))',
+        );
+
+        row("v5").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await flushPromises();
+        expect(selected()).toEqual(["metrics-breakdown-heatmap-v5"]);
+        expect(row("v5").className).toContain("bg-table-row-selected-bg");
+        expect(row("v11").className).not.toContain("bg-table-row-selected-bg");
+
+        dialog = await add();
+        const data = dialog.props("dashboardPanelData")!.data;
+        expect(data.type).toBe("heatmap");
+        expect(data.queries).toHaveLength(1);
+        expect(data.queries[0].query).toBe(
+          'sum by (le) (rate({__name__="lat_bucket",method="v5"}[$__rate_interval]))',
+        );
+        expect(data.config.heatmap_mode).toBe("prometheus_histogram");
+        expect(data.config.unit).toBe(toO2Unit("count-per-sec").unit);
+        expect(data.config.bucket_unit).toBe(toO2Unit("seconds").unit);
+        expect(dialog.props("defaultPanelTitle")).toBe("Heatmap of method = v5 · lat_bucket");
+      });
+
+      it("lifts the series cap for its heatmaps' query alone", async () => {
+        wrapper = mountHeatmap();
+        await flushPromises();
+        await wrapper.setProps({ selectedLabel: "method" });
+        await flushPromises();
+        const callFor = (expr: string) => runQuery.mock.calls.find(([e]) => e === expr)!;
+        // Ten values' buckets can pass the explorer's 100-series cap, which would cut the +Inf rows.
+        expect(callFor(SPLIT)[2]).toEqual({ maxSeries: Infinity });
+        const p90 =
+          'histogram_quantile(0.9, sum by (le, method) (rate({__name__="lat_bucket"}[4m])))';
+        expect(callFor(p90)).toHaveLength(2);
+      });
+
+      it("ignores a click on a row it draws no heatmap for", async () => {
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+        const selected = () =>
+          wrapper.find('[data-test^="metrics-breakdown-heatmap-"][data-selected="true"]');
+        // v0 is outside the top 10; m0 only has a count.
+        for (const value of ["v0", "m0"])
+          wrapper
+            .find(`[data-test="metrics-breakdown-value-method-${value}"]`)
+            .element.closest("tr")!
+            .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await flushPromises();
+        expect(selected().attributes("data-test")).toBe("metrics-breakdown-heatmap-v11");
+      });
+
+      it("falls back to the busiest value when the picked one leaves the data", async () => {
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+        wrapper
+          .find('[data-test="metrics-breakdown-value-method-v5"]')
+          .element.closest("tr")!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await flushPromises();
+        expect(
+          wrapper.find('[data-test="metrics-breakdown-heatmap-v5"]').attributes("data-selected"),
+        ).toBe("true");
+
+        const without = bucketsOf(V.filter((v) => v !== "v5"));
+        runQuery.mockImplementation((expr: string) =>
+          Promise.resolve(expr === SPLIT ? without : SERIES),
+        );
+        await wrapper.setProps({ timeRange: { start_time: 1_000, end_time: 3_000 } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="metrics-breakdown-heatmap-v5"]').exists()).toBe(false);
+        expect(
+          wrapper.find('[data-test="metrics-breakdown-heatmap-v11"]').attributes("data-selected"),
+        ).toBe("true");
+        await wrapper.find('[data-test="metrics-breakdown-add-to-dashboard"]').trigger("click");
+        expect(
+          wrapper.findComponent({ name: "AddToDashboard" }).props("dashboardPanelData")!.data
+            .queries[0].query,
+        ).toBe('sum by (le) (rate({__name__="lat_bucket",method="v11"}[$__rate_interval]))');
+      });
+
+      it("caps a 20+ label to its 10 busiest values over the window, and draws no more than 10", async () => {
+        // A per-step cap can still answer more than 10 values; the client keeps its own top 10.
+        runQuery.mockImplementation(() =>
+          Promise.resolve({
+            resultType: "matrix",
+            result: bucketsOf(V).result.map((s: any) => ({
+              ...s,
+              metric: { instance: s.metric.method, le: s.metric.le },
+            })),
+          }),
+        );
+        wrapper = mountHeatmap({
+          selectedLabel: "instance",
+          timeRange: { start_time: 0, end_time: 3_600_000_000 },
+        });
+        await flushPromises();
+        expect(exprs()).toEqual([
+          'sum by (le, instance) (rate({__name__="lat_bucket"}[4m])) and on (instance) ' +
+            "topk(10, sum by (instance) " +
+            '(increase({__name__="lat_bucket",instance!="",le=~"[+]?[Ii]nf"}[1h] @ end())))',
+        ]);
+        expect(wrapper.find('[data-test="metrics-breakdown-topk"]').exists()).toBe(true);
+        expect(heatmaps(wrapper)).toHaveLength(10);
+        expect(heatmaps(wrapper).at(-1)!.attributes("data-test")).toBe(
+          "metrics-breakdown-heatmap-v2",
+        );
+      });
+
+      it("takes the heatmaps' precision from the drawn cells, not the cumulative rates", async () => {
+        // Cumulative rates reach 2/s (2 decimals); each drawn cell is 0.5/s (3 decimals).
+        const fine = {
+          resultType: "matrix",
+          result: (
+            [
+              ["0.1", "0.5"],
+              ["0.5", "1"],
+              ["1", "1.5"],
+              ["+Inf", "2"],
+            ] as const
+          ).map(([le, v]) => ({ metric: { method: "a", le }, values: [[1, v]] })),
+        };
+        runQuery.mockImplementation(() => Promise.resolve(fine));
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+        expect(adaptiveDecimals([fine])).toBe(2);
+        expect(wrapper.findComponent({ name: "MetricCardChart" }).props("decimals")).toBe(3);
+        await wrapper.find('[data-test="metrics-breakdown-add-to-dashboard"]').trigger("click");
+        expect(
+          wrapper.findComponent({ name: "AddToDashboard" }).props("dashboardPanelData")!.data.config
+            .decimals,
+        ).toBe(3);
+      });
+
+      it("gives each percentile its own precision", async () => {
+        // p50 ≈ 0.00083, p99 = 100: one precision for both would print p50 as 0.00.
+        runQuery.mockImplementation(() =>
+          Promise.resolve({
+            resultType: "matrix",
+            result: (
+              [
+                ["0.001", "0.6"],
+                ["100", "0.95"],
+                ["+Inf", "1"],
+              ] as const
+            ).map(([le, v]) => ({ metric: { method: "a", le }, values: [[1, v]] })),
+          }),
+        );
+        wrapper = mountHeatmap({
+          selectedLabel: "method",
+          variant: { ...HEATMAP, bucketUnit: "short" },
+        });
+        await flushPromises();
+        const short = toO2Unit("short");
+        const fmt = (v: number, d: number) =>
+          formatUnitValue(getUnitValue(v, short.unit, short.unitCustom ?? "", d));
+        expect(cell("p50", "a").text()).toBe(fmt(0.001 * (0.5 / 0.6), 6));
+        expect(cell("p50", "a").text()).not.toBe(fmt(0.001 * (0.5 / 0.6), 2));
+        expect(cell("p99", "a").text()).toBe(fmt(100, 2));
+      });
+
+      it("drops the row affordances when the same table switches to a line function", async () => {
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+        const row = () =>
+          wrapper.find('[data-test="metrics-breakdown-value-method-m0"]').element.closest("tr")!;
+        expect(row().getAttribute("tabindex")).toBe("0");
+
+        await wrapper.setProps({
+          variant: {
+            queries: [
+              {
+                expr: 'histogram_quantile(0.95, sum by (le) (rate({__name__="lat_bucket"}[4m])))',
+                legendTemplate: "p95",
+              },
+            ],
+            chartType: "line",
+            unit: "seconds",
+            footerLabel: "percentiles",
+          },
+        });
+        await flushPromises();
+        expect(row().getAttribute("tabindex")).toBeNull();
+        expect(row().className).not.toContain("cursor-pointer");
+      });
+
+      it("charts a label under 20 values in full, tagged top 10 only past 10 values", async () => {
+        runQuery.mockImplementation(() => Promise.resolve(bucketsOf(["a", "b"])));
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+        expect(exprs()).toEqual([SPLIT]);
+        expect(wrapper.find('[data-test="metrics-breakdown-topk"]').exists()).toBe(false);
+      });
+
+      it("starts again from the busiest value on another label", async () => {
+        wrapper = mountHeatmap({ selectedLabel: "method" });
+        await flushPromises();
+        wrapper
+          .find('[data-test="metrics-breakdown-value-method-v5"]')
+          .element.closest("tr")!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await wrapper.setProps({ selectedLabel: "route" });
+        await wrapper.setProps({ selectedLabel: "method" });
+        await flushPromises();
+        expect(
+          wrapper.find('[data-test="metrics-breakdown-heatmap-v11"]').attributes("data-selected"),
+        ).toBe("true");
+      });
     });
   });
 

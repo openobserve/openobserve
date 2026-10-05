@@ -39,21 +39,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <MetricChartTile
         ref="focusedTile"
-        class="h-60"
-        :queries="queriesByLabel[activeLabel]"
+        :class="heatmap ? 'min-h-60' : 'h-60'"
+        :queries="heatmap ? heatmapQueries : queriesByLabel[activeLabel]"
         :chart-type="chartType"
         :unit="unit"
         :color="color"
         :time-range="timeRange"
-        :run-query="runQuery"
+        :run-query="heatmap ? runHeatmapQuery : runQuery"
         legend
         data-test="metrics-breakdown-chart"
         @results="focused = $event"
       >
         <template #header>
-          <span class="truncate">{{ titleOf(activeLabel) }}</span>
+          <span class="truncate">{{ focusedTitle }}</span>
           <OTag
-            v-if="topkByLabel[activeLabel]"
+            v-if="topkByLabel[activeLabel] || (heatmap && heatmapStats.size > TOPK)"
             variant="default-outline"
             size="sm"
             class="shrink-0"
@@ -67,12 +67,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="xs"
             icon-left="dashboard-customize"
             class="shrink-0"
-            :disabled="focused.status !== 'done'"
+            :disabled="focused.status !== 'done' || (heatmap && selectedValue === null)"
             data-test="metrics-breakdown-add-to-dashboard"
             @click="openAddToDashboard"
           >
             {{ t("metrics.explorer.detail.breakdown.addToDashboard") }}
           </OButton>
+        </template>
+        <template v-if="heatmap" #chart="{ timeRange: drawnRange, onRenderError }">
+          <div class="flex flex-col gap-2 p-2">
+            <div
+              v-for="value in heatmapValues"
+              :key="value"
+              class="rounded-default flex h-44 flex-col border"
+              :class="value === selectedValue ? 'border-primary' : 'border-transparent'"
+              :data-selected="value === selectedValue"
+              :data-test="`metrics-breakdown-heatmap-${value}`"
+            >
+              <span class="text-2xs text-text-secondary truncate px-1 font-mono" :title="value">{{
+                value
+              }}</span>
+              <div class="min-h-0 flex-1">
+                <MetricCardChart
+                  :results="[heatmapResponses.get(value)]"
+                  :queries="heatmapQueries ?? []"
+                  chart-type="heatmap"
+                  :unit="o2HeatmapUnit.unit"
+                  :unit-custom="o2HeatmapUnit.unitCustom ?? undefined"
+                  :bucket-unit="o2BucketUnit.unit ?? undefined"
+                  :bucket-unit-custom="o2BucketUnit.unitCustom ?? undefined"
+                  :visual-map-range="heatmapRange"
+                  :decimals="heatmapDecimals"
+                  :color="color"
+                  :time-range="drawnRange"
+                  @error="onRenderError"
+                />
+              </div>
+            </div>
+          </div>
         </template>
       </MetricChartTile>
 
@@ -143,7 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="none"
             :show-global-filter="false"
             dense
+            :key="heatmap ? 'heatmap' : 'line'"
+            :row-class="heatmap ? heatmapRowClass : undefined"
             data-test="metrics-breakdown-table"
+            v-on="heatmap ? { rowClick: pickRow } : {}"
             @row-mouseenter="(row) => highlight(row, 'highlight')"
             @row-mouseleave="(row) => highlight(row, 'downplay')"
           >
@@ -281,7 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="select(label)"
         >
           <template #header>
-            <span class="min-w-0 truncate font-mono" :title="label">{{ label }}</span>
+            <span class="min-w-0 truncate font-mono" :title="label">{{
+              heatmap ? titleOf(label) : label
+            }}</span>
             <span
               v-if="distinctText(label)"
               class="text-2xs text-text-secondary shrink-0 font-normal tabular-nums"
@@ -336,6 +373,7 @@ import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
+import MetricCardChart from "./MetricCardChart.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -356,11 +394,23 @@ import {
   BREAKDOWN_LABEL_LIMIT,
   breakdownTitleKey,
   buildBreakdownQuery,
+  buildHeatmapBreakdownQuery,
+  buildHeatmapValueQuery,
   breakdownQueryOf,
   CARD_KIND,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
-import { adaptiveDecimals, seriesStatsByValue } from "@/utils/metrics/breakdownStats";
+import {
+  adaptiveDecimals,
+  decimalsForMax,
+  heatmapResponsesByValue,
+  heatmapStatsByValue,
+  seriesStatsByValue,
+  sharedHeatmapRange,
+  topValuesByRate,
+  type HeatmapStats,
+  type SeriesStats,
+} from "@/utils/metrics/breakdownStats";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
@@ -370,12 +420,13 @@ interface BreakdownVariant {
   queries: TileQuery[];
   chartType: string;
   unit: string;
+  bucketUnit?: string | null;
   footerLabel?: string;
 }
 
 /** 21, not 20: a 21st value is how "more than 20" is known. */
 const VALUES_SIZE = 21;
-/** Series kept for a label with "20+" values — beyond it the chart is a smear. */
+/** Series kept for a label with "20+" values — beyond it the chart is a smear. Also the heatmaps shown. */
 const TOPK = 10;
 
 interface LabelCounts {
@@ -397,7 +448,7 @@ const ADDITIVE_QUERY = /^(sum|count) by \(/;
 const isAdditive = (expr: string | undefined) =>
   !!expr && ADDITIVE_QUERY.test(expr) && !expr.includes(" / ");
 
-const STAT_COLUMNS = ["avg", "latest", "share"] as const;
+const STAT_COLUMNS = ["avg", "latest", "share", "rate", "p50", "p90", "p99"] as const;
 
 const ABSENT = raw("—");
 
@@ -407,6 +458,11 @@ interface BreakdownRow {
   avg: string | null;
   latest: string | null;
   share: string | null;
+  /** A heatmap's observation rate and percentiles over the window. */
+  rate: string | null;
+  p50: string | null;
+  p90: string | null;
+  p99: string | null;
   /** Sparkline path in a 100×24 box, one subpath per unbroken run. */
   trend: string | null;
   color: string | null;
@@ -445,6 +501,7 @@ export default defineComponent({
   name: "MetricBreakdown",
   components: {
     MetricChartTile,
+    MetricCardChart,
     AddToDashboard,
     PanelBar,
     OButton,
@@ -478,7 +535,9 @@ export default defineComponent({
     panelQueries: { type: Array as PropType<TileQuery[]>, default: () => [] },
     /** Runs one PromQL query on the detail view's scheduler slot. */
     runQuery: {
-      type: Function as PropType<(expr: string, signal: AbortSignal) => Promise<any>>,
+      type: Function as PropType<
+        (expr: string, signal: AbortSignal, opts?: { maxSeries?: number }) => Promise<any>
+      >,
       required: true,
     },
   },
@@ -744,9 +803,72 @@ export default defineComponent({
     const statsLoading = computed(
       () => focused.value.status === "idle" || focused.value.status === "loading",
     );
-    // A topk-capped chart holds only the top 10, whose shares would always sum to 100%.
+    const heatmap = computed(() => props.variant?.chartType === "heatmap");
+    const heatmapCtx = (panel: boolean) => ({
+      metricName: props.card.name,
+      filters: props.filters,
+      rateWindow: panel ? props.panelRateWindow : props.rateWindow,
+    });
+    /** `null` until the label's counts answer: only they know whether to cap at top 10. */
+    const heatmapQueries = computed<TileQuery[] | null>(() => {
+      const label = activeLabel.value;
+      if (!label || !countsByLabel.value[label].ready) return null;
+      const { start_time, end_time } = props.timeRange;
+      const cap = topkByLabel.value[label]
+        ? { topk: TOPK, windowSeconds: (end_time - start_time) / 1e6 }
+        : undefined;
+      const expr = buildHeatmapBreakdownQuery(heatmapCtx(false), label, cap);
+      return expr ? [{ expr, legendTemplate: "{le}" }] : [];
+    });
+    // Bounded by value already (top 10, or under 20 values), so the explorer's series cap would only cut buckets.
+    const runHeatmapQuery = (expr: string, signal: AbortSignal) =>
+      props.runQuery(expr, signal, { maxSeries: Infinity });
+    const heatmapStats = computed(() =>
+      heatmap.value && activeLabel.value && focused.value.status === "done"
+        ? heatmapStatsByValue(focused.value.results[0], activeLabel.value)
+        : new Map<string, HeatmapStats>(),
+    );
+    const heatmapValues = computed(() => topValuesByRate(heatmapStats.value, TOPK));
+    const heatmapResponses = computed(() =>
+      activeLabel.value
+        ? heatmapResponsesByValue(focused.value.results[0], activeLabel.value, heatmapValues.value)
+        : new Map<string, any>(),
+    );
+    const heatmapRange = computed(() => sharedHeatmapRange([...heatmapResponses.value.values()]));
+    // From the drawn cells, not cumulative rates; one for all, as it also formats the shared `le` labels.
+    const heatmapDecimals = computed(() =>
+      decimalsForMax(Math.max(-heatmapRange.value.min, heatmapRange.value.max)),
+    );
+    const o2HeatmapUnit = computed(() => toO2Unit(props.variant?.unit ?? ""));
+    const bucketUnit = computed(() => props.variant?.bucketUnit ?? props.card.unit);
+    const o2BucketUnit = computed(() => toO2Unit(bucketUnit.value ?? ""));
+
+    /** The value Add to dashboard adds: a clicked row, else the busiest value. */
+    const picked = ref<string | null>(null);
+    watch(activeLabel, () => (picked.value = null));
+    const selectedValue = computed(() =>
+      picked.value !== null && heatmapValues.value.includes(picked.value)
+        ? picked.value
+        : (heatmapValues.value[0] ?? null),
+    );
+    const pickRow = (row: BreakdownRow) => {
+      if (heatmapValues.value.includes(row.value)) picked.value = row.value;
+    };
+    const heatmapRowClass = (row: BreakdownRow) =>
+      row.value === selectedValue.value ? "bg-table-row-selected-bg" : "";
+
+    const focusedTitle = computed(() => {
+      const label = activeLabel.value;
+      if (!label) return "";
+      return heatmap.value
+        ? t("metrics.explorer.detail.breakdown.titleHeatmap", { label })
+        : titleOf(label);
+    });
+
+    // Top 10 shares always sum to 100%, and a heatmap sums buckets, not one total.
     const showShare = computed(
       () =>
+        !heatmap.value &&
         !!activeLabel.value &&
         !topkByLabel.value[activeLabel.value] &&
         isAdditive(queriesByLabel.value[activeLabel.value]?.[0]?.expr),
@@ -811,8 +933,9 @@ export default defineComponent({
     watch([focused, () => store.state.theme], () => {
       // Never show a colour read from the previous result or theme while the new one draws.
       seriesColors.value = {};
-      colorsRead = false;
-      bindChart();
+      // A heatmap's rows have no series colour, and reading one copies every cell on each render.
+      colorsRead = heatmap.value;
+      if (!heatmap.value) bindChart();
     });
 
     const highlight = (row: BreakdownRow, type: "highlight" | "downplay") => {
@@ -823,25 +946,36 @@ export default defineComponent({
     const rows = computed<BreakdownRow[]>(() => {
       const label = activeLabel.value;
       const stats =
-        label && focused.value.status === "done"
+        label && focused.value.status === "done" && !heatmap.value
           ? seriesStatsByValue(focused.value.results, label)
-          : new Map();
+          : new Map<string, SeriesStats>();
       const values = [...activeValues.value];
-      for (const value of stats.keys()) if (!values.includes(value)) values.push(value);
+      for (const value of [...stats.keys(), ...heatmapStats.value.keys()])
+        if (!values.includes(value)) values.push(value);
 
-      const o2Unit = toO2Unit(unit.value ?? "");
-      const format = (v: number, decimals: number) =>
+      const formatIn = (o2Unit: ReturnType<typeof toO2Unit>, v: number, decimals: number) =>
         formatUnitValue(getUnitValue(v, o2Unit.unit, o2Unit.unitCustom ?? "", decimals));
+      const o2Unit = toO2Unit(unit.value ?? "");
+      const format = (v: number, decimals: number) => formatIn(o2Unit, v, decimals);
       const total = [...stats.values()].reduce((sum, s) => sum + s.sum, 0);
 
       const ranked = values.map((value) => {
         const s = stats.get(value);
+        const h = heatmapStats.value.get(value);
+        const quantile = (p: number | null | undefined) =>
+          h && typeof p === "number"
+            ? formatIn(o2BucketUnit.value, p, decimalsForMax(Math.abs(p)))
+            : null;
         return {
           value,
-          rank: s?.avg ?? -Infinity,
+          rank: h?.rate ?? s?.avg ?? -Infinity,
           avg: s ? format(s.avg, s.decimals) : null,
           latest: s ? format(s.latest, s.decimals) : null,
           share: s && total > 0 ? `${((s.sum / total) * 100).toFixed(1)}%` : null,
+          rate: h ? formatIn(o2HeatmapUnit.value, h.rate, h.rateDecimals) : null,
+          p50: quantile(h?.p50),
+          p90: quantile(h?.p90),
+          p99: quantile(h?.p99),
           trend: s ? trendOf(s.points) : null,
           color: seriesColors.value[chartNameOf(value)] ?? null,
         };
@@ -858,19 +992,37 @@ export default defineComponent({
         accessorKey: "value",
         meta: { autoWidth: true, fillRemaining: true },
       },
-      { id: "trend", header: t("metrics.explorer.detail.breakdown.colTrend"), size: 128 },
-      {
-        id: "avg",
-        header: t("metrics.explorer.detail.breakdown.colAvg"),
-        size: 112,
-        meta: { align: "right" },
-      },
-      {
-        id: "latest",
-        header: t("metrics.explorer.detail.breakdown.colLatest"),
-        size: 112,
-        meta: { align: "right" },
-      },
+      ...(heatmap.value
+        ? [
+            {
+              id: "rate",
+              header: t("metrics.explorer.detail.breakdown.colRate"),
+              size: 112,
+              meta: { align: "right" },
+            },
+            ...(
+              [
+                ["p50", t("metrics.explorer.detail.breakdown.colP50")],
+                ["p90", t("metrics.explorer.detail.breakdown.colP90")],
+                ["p99", t("metrics.explorer.detail.breakdown.colP99")],
+              ] as const
+            ).map(([id, header]) => ({ id, header, size: 96, meta: { align: "right" } })),
+          ]
+        : [
+            { id: "trend", header: t("metrics.explorer.detail.breakdown.colTrend"), size: 128 },
+            {
+              id: "avg",
+              header: t("metrics.explorer.detail.breakdown.colAvg"),
+              size: 112,
+              meta: { align: "right" },
+            },
+            {
+              id: "latest",
+              header: t("metrics.explorer.detail.breakdown.colLatest"),
+              size: 112,
+              meta: { align: "right" },
+            },
+          ]),
       ...(showShare.value
         ? [
             {
@@ -890,9 +1042,32 @@ export default defineComponent({
     const dashboardPanel = ref<{ data: Record<string, any> }>({ data: {} });
     const dashboardPanelTitle = ref("");
 
+    const openHeatmapToDashboard = (label: string) => {
+      const value = selectedValue.value;
+      const expr = value === null ? null : buildHeatmapValueQuery(heatmapCtx(true), label, value);
+      if (value === null || !expr) return;
+      const data = buildPanelDataForCard(
+        props.card,
+        {
+          queries: [{ expr, legendTemplate: "{le}" }],
+          chartType: "heatmap",
+          unit: props.variant!.unit,
+        },
+        bucketUnit.value,
+      );
+      data.config.decimals = heatmapDecimals.value;
+      dashboardPanel.value = { data };
+      dashboardPanelTitle.value = t("metrics.explorer.detail.breakdown.panelTitle", {
+        title: t("metrics.explorer.detail.breakdown.titleHeatmapValue", { label, value }),
+        metric: props.card.name,
+      });
+      dashboardDialogOpen.value = true;
+    };
+
     /** The focused chart as a panel: its queries, filters and topk cap included. */
     const openAddToDashboard = () => {
       const label = activeLabel.value;
+      if (label && heatmap.value) return openHeatmapToDashboard(label);
       // Not the tile's window, which would freeze the panel at this range.
       const queries = label ? queriesFor(label, true) : null;
       if (!label || !queries?.length) return;
@@ -925,6 +1100,20 @@ export default defineComponent({
       t,
       raw,
       titleOf,
+      focusedTitle,
+      heatmap,
+      heatmapQueries,
+      runHeatmapQuery,
+      heatmapStats,
+      heatmapValues,
+      heatmapResponses,
+      heatmapRange,
+      heatmapDecimals,
+      o2HeatmapUnit,
+      o2BucketUnit,
+      selectedValue,
+      pickRow,
+      heatmapRowClass,
       chartType,
       unit,
       TOPK,

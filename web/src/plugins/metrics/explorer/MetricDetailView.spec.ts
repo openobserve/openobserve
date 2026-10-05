@@ -117,7 +117,7 @@ const mountView = (
         ...stubs,
         MetricBreakdown: {
           name: "MetricBreakdown",
-          props: ["variant", "panelQueries"],
+          props: ["variant", "panelQueries", "runQuery"],
           template: "<div data-test='breakdown-stub' />",
         },
         MetricCardChart: {
@@ -479,6 +479,18 @@ describe("MetricDetailView", () => {
       const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
       expect(breakdown.props("variant")).toEqual(OVERVIEW);
       expect(breakdown.props("panelQueries")).toEqual(panelQueries);
+    });
+
+    it("runs Breakdown's queries for this metric, passing a lifted series cap through", async () => {
+      wrapper = mountView({ overview: OVERVIEW });
+      const { signal } = new AbortController();
+      runQuery.mockClear();
+      await wrapper.findComponent({ name: "MetricBreakdown" }).props("runQuery")(
+        "sum(le)",
+        signal,
+        { maxSeries: Infinity },
+      );
+      expect(runQuery).toHaveBeenCalledWith("sum(le)", signal, undefined, { maxSeries: Infinity });
     });
   });
 

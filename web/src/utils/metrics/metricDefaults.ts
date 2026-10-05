@@ -1509,6 +1509,58 @@ export function buildBreakdownQuery(
   return opts?.topk ? `topk(${opts.topk}, ${expr})` : expr;
 }
 
+interface HeatmapQueryContext {
+  metricName: string;
+  filters?: FilterInput[];
+  rateWindow?: string;
+}
+
+/** Seconds in a duration as `formatPromDuration` writes it ("1h4m"); 0 for anything else. */
+function promDurationSeconds(duration: string): number {
+  if (!/^(\d+[dhms])+$/.test(duration)) return 0;
+  const size: Record<string, number> = { d: 86400, h: 3600, m: 60, s: 1 };
+  return [...duration.matchAll(/(\d+)([dhms])/g)].reduce(
+    (sum, [, n, unit]) => sum + Number(n) * size[unit],
+    0,
+  );
+}
+
+/** A classic histogram's buckets split by `label`, one heatmap per value; `cap` keeps the values busiest over the window. */
+export function buildHeatmapBreakdownQuery(
+  ctx: HeatmapQueryContext,
+  label: string,
+  cap?: { topk: number; windowSeconds: number },
+): string | null {
+  if (!LABEL_NAME_RE.test(label)) return null;
+  const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
+  const expr = `sum by (le, ${label}) (rate(${buildSelector(ctx.metricName, ctx.filters)}[${w}]))`;
+  if (!cap) return expr;
+  // A character class, not `\+`: PromQL strings reject the escape. OTLP writes the bound as "inf".
+  const total = buildSelector(ctx.metricName, [
+    ...(ctx.filters ?? []),
+    { label: raw("le"), operator: "=~", value: "[+]?[Ii]nf" },
+    // Series without the label would otherwise take one of the slots as a group of their own.
+    { label: raw(label), operator: "!=", value: "" },
+  ]);
+  // `@ end()` ranks once over the whole window: a per-step topk lets rotating bursts in and steady values out.
+  // Never shorter than the rate window: a range holding one sample has no increase, and `and` would drop every value.
+  const window = formatPromDuration(Math.max(cap.windowSeconds, promDurationSeconds(w)));
+  const ranked = `topk(${cap.topk}, sum by (${label}) (increase(${total}[${window}] @ end())))`;
+  return `${expr} and on (${label}) ${ranked}`;
+}
+
+/** The heatmap of one value of `label`: the card's own heatmap, narrowed to that value. */
+export function buildHeatmapValueQuery(
+  ctx: HeatmapQueryContext,
+  label: string,
+  value: string,
+): string | null {
+  if (!LABEL_NAME_RE.test(label)) return null;
+  const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
+  const sel = buildSelector(ctx.metricName, ctx.filters, { [label]: value });
+  return `sum by (le) (rate(${sel}[${w}]))`;
+}
+
 const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s*)?\(/g;
 
 /**

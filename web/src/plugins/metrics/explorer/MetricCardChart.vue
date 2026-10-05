@@ -60,6 +60,13 @@ export default defineComponent({
     unitCustom: { type: String, default: null },
     bucketUnit: { type: String, default: null },
     bucketUnitCustom: { type: String, default: null },
+    /** A heatmap's colour range, when it must match other heatmaps drawn beside it. */
+    visualMapRange: {
+      type: Object as PropType<{ min: number; max: number } | null>,
+      default: null,
+    },
+    /** Overrides the precision read off `results`, so heatmaps drawn together label buckets alike. */
+    decimals: { type: Number, default: null },
     color: { type: String, required: true },
     height: { type: String, default: "100%" },
     /**
@@ -135,7 +142,7 @@ export default defineComponent({
       config: {
         unit: props.unit,
         unit_custom: props.unitCustom,
-        decimals: adaptiveDecimals(props.results),
+        decimals: props.decimals ?? adaptiveDecimals(props.results),
         show_legends: props.legend,
         // Gridlines make a small chart readable — without them a sparkline is
         // just a shape. The heatmap is solid colour, so they'd only add noise.
@@ -158,6 +165,7 @@ export default defineComponent({
               compact_preview: true,
               bucket_unit: props.bucketUnit,
               bucket_unit_custom: props.bucketUnitCustom,
+              ...(props.visualMapRange ? { visual_map_range: props.visualMapRange } : {}),
             }
           : {}),
       },

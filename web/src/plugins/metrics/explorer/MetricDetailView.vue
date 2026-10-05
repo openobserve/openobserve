@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :panel-rate-window="panelRateWindow"
             :nan-guard="nanGuard"
             :color="color"
-            :run-query="runQuery"
+            :run-query="runBreakdownQuery"
             :variant="overview"
             :panel-queries="panelQueries"
             @update:selected-label="$emit('update:breakdownLabel', $event)"
@@ -491,7 +491,12 @@ export default defineComponent({
     /** Runs one PromQL query on the scheduler, stepped for `card` (default: this view's metric). */
     runQuery: {
       type: Function as PropType<
-        (expr: string, signal: AbortSignal, card?: MetricCardModel) => Promise<any>
+        (
+          expr: string,
+          signal: AbortSignal,
+          card?: MetricCardModel,
+          opts?: { maxSeries?: number },
+        ) => Promise<any>
       >,
       required: true,
     },
@@ -646,7 +651,12 @@ export default defineComponent({
         });
     });
 
+    /** The breakdown's queries run for this view's own metric. */
+    const runBreakdownQuery = (expr: string, signal: AbortSignal, opts?: { maxSeries?: number }) =>
+      props.runQuery(expr, signal, undefined, opts);
+
     return {
+      runBreakdownQuery,
       raw,
       t,
       unitLabel,
