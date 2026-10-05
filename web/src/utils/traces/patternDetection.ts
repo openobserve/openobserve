@@ -237,7 +237,7 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
 /**
  * Check if a span represents an error
  */
-function isSpanError(span: any): boolean {
+export function isSpanError(span: any): boolean {
   // Check span status (supports both snake_case from API and camelCase from formatted spans)
   if (span.status_code === 2 || span.span_status === "ERROR" || span.spanStatus === "ERROR") {
     return true;
