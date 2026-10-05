@@ -2060,9 +2060,7 @@ export default defineComponent({
       return normalizeSeverity(span.severity_text ?? span.severity);
     };
 
-    // The in-flight lookup and the span it is for, so a caller arriving mid-load
-    // (View Logs fired right after the span changed) waits for that span's
-    // result instead of seeing none — and never reuses another span's lookup.
+    // Keyed by span so a mid-load View Logs awaits this span's lookup and never reuses another's.
     let correlationRequest: { key: string; promise: Promise<void> } | null = null;
     const spanKey = (span: any) => `${span?.trace_id ?? ""}/${span?.span_id ?? ""}`;
 
@@ -2218,8 +2216,7 @@ export default defineComponent({
               startTime: spanStartUs - bufferUs,
               endTime: spanEndUs + bufferUs,
             },
-            // The whole trace's window, used when View Logs falls back from
-            // the span to the trace. Unknown bounds leave it unset.
+            // Fallback window for when View Logs widens from the span to the trace.
             traceTimeRange:
               selectedTrace?.trace_start_time && selectedTrace?.trace_end_time
                 ? {

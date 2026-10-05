@@ -31,9 +31,7 @@ import useNotifications from "@/composables/useNotifications";
 import { gt } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-// Streams written only by OpenObserve itself; they never hold an app's logs.
-// Mirrors the backend's is_internal_stream() in config/src/meta/self_reporting/usage.rs.
-// Other `_`-prefixed streams are user data.
+// Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
 const INTERNAL_LOG_STREAMS = new Set([
   "_agent_signals",
   "_redaction_evidence",
@@ -42,6 +40,7 @@ const INTERNAL_LOG_STREAMS = new Set([
   "_llm_experiment",
   "_anomalies",
 ]);
+const VIEW_LOGS_COUNT_TIMEOUT_MS = 5000;
 const isInternalLogStream = (name: string) =>
   name.startsWith("_o2_") || INTERNAL_LOG_STREAMS.has(name);
 const defaultObject = {
@@ -526,9 +525,7 @@ const useTraces = () => {
         `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
       );
 
-    // Once the trace id is known it already pins the logs; the stream's
-    // dimension filters (service, namespace, cluster) are redundant and drop
-    // every log row that lacks one of them, so they apply only without it.
+    // A trace id already pins the logs; dimension filters would drop rows lacking them.
     if (!traceId) {
       for (const streamInfo of correlationProps.logStreams) {
         const filters = streamInfo.filters ?? {};
@@ -550,13 +547,13 @@ const useTraces = () => {
     let queryString = Array.from(conditions.values()).join(" and ");
     let timeRange = correlationProps.timeRange;
 
-    // A span (often a DB or client span) may have no logs of its own. Count
-    // each stream separately so one failing stream (e.g. no span_id column)
-    // stays "unknown" instead of sinking the check. Only a complete response
-    // with a numeric count is evidence; anything else is unknown.
+    // Count per stream so one failing stream stays unknown; only a complete numeric count is evidence.
     let navStreams = streamList;
     let showTraceFallback = false;
     if (spanId && traceId) {
+      // A stream that has not answered in time counts as unknown, so a hung one cannot stall the click.
+      const countTimeout = new AbortController();
+      const timer = setTimeout(() => countTimeout.abort(), VIEW_LOGS_COUNT_TIMEOUT_MS);
       const counts = await Promise.allSettled(
         streamList.map((name) =>
           searchService.search({
@@ -571,9 +568,11 @@ const useTraces = () => {
               },
             },
             page_type: "logs",
+            signal: countTimeout.signal,
           }),
         ),
       );
+      clearTimeout(timer);
       const countOf = (c: PromiseSettledResult<any>): number | null => {
         if (c.status !== "fulfilled") return null;
         const data = c.value?.data;
@@ -587,17 +586,14 @@ const useTraces = () => {
 
       // Unknown (null) streams don't count against the fallback.
       if (counted.length && known.every((n) => !n)) {
-        // No span logs anywhere we could check: show the whole trace's logs.
-        // trace_id alone is one field, which the logs page tolerates on
-        // streams lacking it, so every eligible stream stays in.
+        // trace_id alone is tolerated on streams lacking it, so every eligible stream stays in.
         conditions.delete(groupIdFor(getSpanIdField()));
         queryString = Array.from(conditions.values()).join(" and ");
         // Trace-level logs span the whole trace, not the clicked span's window.
         timeRange = correlationProps.traceTimeRange ?? timeRange;
         showTraceFallback = true;
       } else if (counted.length) {
-        // Span-scoped: keep only streams whose count ran, i.e. that have both
-        // id columns — a stream without span_id would fail the logs query.
+        // A stream without span_id would fail the logs query, so keep only streams whose count ran.
         navStreams = counted;
       }
     }

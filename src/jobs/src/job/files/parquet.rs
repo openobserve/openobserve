@@ -964,8 +964,7 @@ pub(crate) async fn queue_service_streams_if_needed(
     }
 }
 
-/// Whether a stream's data feeds service discovery. Internal streams such as
-/// `_o2_db_stats` are skipped: see `is_internal_stream`.
+/// Internal streams such as `_o2_db_stats` never feed service discovery.
 #[cfg(feature = "enterprise")]
 fn is_service_discovery_candidate(
     org_id: &str,

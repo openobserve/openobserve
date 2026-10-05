@@ -543,8 +543,7 @@ pub fn schema_records_to_entries(
         .collect()
 }
 
-/// The streams a write cannot scan: every one while the pattern manager is down, else the
-/// streams with a pattern association that failed to build.
+/// All streams while the pattern manager is down, else those whose pattern failed to build.
 #[cfg(any(feature = "vectorscan", test))]
 fn unscannable_streams<'a>(
     streams: &[(&'a str, u64)],
@@ -558,10 +557,10 @@ fn unscannable_streams<'a>(
         .collect()
 }
 
-/// `ZO_SDR_FAIL_CLOSED`: why a write of `streams` (name, records) must be refused before any
-/// pipeline runs or anything is written, because redaction cannot run for one of them.
+/// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
 #[cfg(feature = "vectorscan")]
 pub async fn sdr_fail_closed_refusal(
+    platform_write: bool,
     org_id: &str,
     stream_type: StreamType,
     streams: &[(&str, u64)],
@@ -588,14 +587,14 @@ pub async fn sdr_fail_closed_refusal(
     };
     let reason = fail_closed_rejection(
         true,
+        platform_write,
         org_id,
         stream_type,
         unscannable.iter().map(|(stream, _)| *stream),
     )?;
-    for (stream, records) in unscannable
-        .iter()
-        .filter(|(stream, _)| !is_self_reporting_stream(org_id, stream, stream_type))
-    {
+    for (stream, records) in unscannable.iter().filter(|(stream, _)| {
+        !(platform_write && is_self_reporting_stream(org_id, stream, stream_type))
+    }) {
         crate::self_reporting::redaction_evidence::publish_scan_unavailable(
             &EvidenceScope::new(org_id, stream, stream_type),
             FailPosture::Closed,
@@ -906,6 +905,7 @@ mod tests {
     fn test_only_the_fail_closed_refusal_is_recognised() {
         let reason = config::meta::self_reporting::redaction::fail_closed_rejection(
             true,
+            false,
             "acme",
             StreamType::Logs,
             ["app"].into_iter(),

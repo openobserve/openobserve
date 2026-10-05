@@ -276,8 +276,7 @@ pub async fn ingest(
         tokio::task::coop::consume_budget().await;
     }
 
-    // Whole request, before the first group is written: ES shippers retry a 503 but drop a 4xx
-    // item.
+    // Checked up front: ES shippers retry a 503 for the whole request but drop a 4xx item.
     #[cfg(feature = "vectorscan")]
     {
         let streams: Vec<(&str, u64)> = streams_data
@@ -285,7 +284,7 @@ pub async fn ingest(
             .map(|(stream, records)| (stream.as_str(), records.len() as u64))
             .collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(org_id, stream_type, &streams).await
+            crate::ingestion::sdr_fail_closed_refusal(false, org_id, stream_type, &streams).await
         {
             return Err(infra::errors::Error::ResourceError(reason));
         }
@@ -311,9 +310,7 @@ pub async fn ingest(
             }
             Err(e) => {
                 log::error!("[LOGS:BULK] stream {org_id}/logs/{stream_name}: Ingestion error: {e}");
-                // A pipeline destination the preflight could not see was refused fail-closed: a
-                // 503 for the whole request, which shippers retry where they drop a 4xx item.
-                // Groups already written are written again on that retry.
+                // Fail-closed refusal is a 503 so shippers retry; written groups are re-sent.
                 #[cfg(feature = "vectorscan")]
                 if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
                     return Err(e);

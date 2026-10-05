@@ -107,9 +107,7 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-// ---------------------------------------------------------------------------
 // search service — dimension value counts on the Drill down page
-// ---------------------------------------------------------------------------
 const mockSearch = vi.hoisted(() => vi.fn());
 vi.mock("@/services/search", () => ({ default: { search: mockSearch } }));
 
@@ -1246,8 +1244,7 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
 
       expect(panelTitles()).toEqual(["span_status"]);
-      // Same dashboard object, same render key, same mounted charts: the
-      // remaining panel keeps its data and no new queries are generated.
+      // Same dashboard object: the remaining panel keeps its data and no new queries run.
       expect(wrapper.vm.dashboardData).toBe(dashboardBefore);
       expect(wrapper.vm.dashboardRenderKey).toBe(renderKeyBefore);
       expect(chartsEl()).toBe(chartsBefore);
@@ -1495,7 +1492,7 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
       const { query, page_type } = mockSearch.mock.calls[0][0];
       expect(page_type).toBe("logs");
       expect(query.query.sql).toBe(
-        'SELECT count("alert_id") AS c0, count("service_name") AS c1, count("span_status") AS c2, count("zone") AS c3 FROM "app_logs" WHERE severity = \'ERROR\'',
+        'SELECT count("alert_id") AS c0, count("service_name") AS c1, count("span_status") AS c2, count("zone") AS c3 FROM app_logs WHERE severity = \'ERROR\'',
       );
       expect(query.query.start_time).toBe(defaultProps.timeRange.startTime);
       expect(query.query.end_time).toBe(defaultProps.timeRange.endTime);
@@ -1511,6 +1508,13 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
       const { query } = mockSearch.mock.calls[0][0].query;
       expect(query.start_time).toBe(1_200_000_000);
       expect(query.end_time).toBe(1_300_000_000);
+    });
+
+    it("quotes a stream name that is not a plain identifier", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{}] } });
+      await remount({ streamName: 'my"logs' });
+
+      expect(mockSearch.mock.calls[0][0].query.query.sql).toContain('FROM "my""logs"');
     });
 
     it("sorts by count descending regardless of selection", async () => {

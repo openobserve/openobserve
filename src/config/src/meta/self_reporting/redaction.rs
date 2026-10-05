@@ -531,9 +531,10 @@ pub fn is_fail_closed_rejection(reason: &str) -> bool {
     reason.ends_with(FAIL_CLOSED_MARKER)
 }
 
-/// `ZO_SDR_FAIL_CLOSED`: why a batch the scanner could not see is refused; `None` stores it open.
+/// `ZO_SDR_FAIL_CLOSED`: why an unscanned batch is refused; platform writes skip their own.
 pub fn fail_closed_rejection<'a>(
     fail_closed: bool,
+    platform_write: bool,
     org_id: &str,
     stream_type: StreamType,
     mut streams: impl Iterator<Item = &'a str>,
@@ -542,7 +543,9 @@ pub fn fail_closed_rejection<'a>(
         return None;
     }
     // Unscanned, we cannot know a stream's patterns, so every scannable stream is refused.
-    let stream = streams.find(|stream| !is_self_reporting_stream(org_id, stream, stream_type))?;
+    let stream = streams.find(|stream| {
+        !(platform_write && is_self_reporting_stream(org_id, stream, stream_type))
+    })?;
     Some(format!(
         "sensitive-data redaction is unavailable; refusing to store unredacted data for {org_id}/{stream_type}/{stream} {FAIL_CLOSED_MARKER}"
     ))
@@ -602,7 +605,7 @@ mod tests {
     fn fail_open_never_refuses_an_unscanned_batch() {
         let streams = ["app_logs", REDACTION_EVIDENCE_STREAM];
         assert_eq!(
-            fail_closed_rejection(false, "acme", StreamType::Logs, streams.into_iter()),
+            fail_closed_rejection(false, false, "acme", StreamType::Logs, streams.into_iter()),
             None
         );
     }
@@ -610,19 +613,26 @@ mod tests {
     #[test]
     fn fail_closed_refuses_an_unscanned_customer_stream() {
         let streams = [REDACTION_EVIDENCE_STREAM, "app_logs"];
-        let err = fail_closed_rejection(true, "acme", StreamType::Logs, streams.into_iter())
+        let err = fail_closed_rejection(true, true, "acme", StreamType::Logs, streams.into_iter())
             .expect("a customer stream must be refused");
         assert!(err.contains("acme/logs/app_logs"), "{err}");
         assert!(
-            fail_closed_rejection(true, "acme", StreamType::Traces, ["default"].into_iter())
-                .is_some()
+            fail_closed_rejection(
+                true,
+                false,
+                "acme",
+                StreamType::Traces,
+                ["default"].into_iter()
+            )
+            .is_some()
         );
     }
 
     #[test]
     fn a_fail_closed_rejection_is_recognised_and_nothing_else_is() {
-        let reason = fail_closed_rejection(true, "acme", StreamType::Logs, ["app"].into_iter())
-            .expect("refused");
+        let reason =
+            fail_closed_rejection(true, false, "acme", StreamType::Logs, ["app"].into_iter())
+                .expect("refused");
         assert!(is_fail_closed_rejection(&reason));
         assert!(!is_fail_closed_rejection("memtable is full"));
     }
@@ -631,9 +641,19 @@ mod tests {
     fn fail_closed_still_writes_self_reporting_streams() {
         let streams = [REDACTION_EVIDENCE_STREAM, USAGE_STREAM];
         assert_eq!(
-            fail_closed_rejection(true, "acme", StreamType::Logs, streams.into_iter()),
+            fail_closed_rejection(true, true, "acme", StreamType::Logs, streams.into_iter()),
             None
         );
+    }
+
+    #[test]
+    fn fail_closed_refuses_a_customer_write_to_a_self_reporting_name() {
+        for stream in [REDACTION_EVIDENCE_STREAM, USAGE_STREAM, TRIGGERS_STREAM] {
+            let err =
+                fail_closed_rejection(true, false, "acme", StreamType::Logs, [stream].into_iter())
+                    .expect("a customer stream named like a platform one must be refused");
+            assert!(err.contains(&format!("acme/logs/{stream}")), "{err}");
+        }
     }
 
     #[test]

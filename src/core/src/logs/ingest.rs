@@ -136,6 +136,9 @@ pub async fn ingest(
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
+    // Only platform writers send Usage requests; a customer stream named `usage` is not one.
+    #[cfg(feature = "vectorscan")]
+    let platform_write = matches!(in_req, IngestionRequest::Usage(_));
     let log_ingestion_errors = ingestion_log_enabled().await;
     // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
@@ -163,9 +166,13 @@ pub async fn ingest(
     }
     // Refused here, before any pipeline runs: a remote-stream destination writes inside it.
     #[cfg(feature = "vectorscan")]
-    if let Some(reason) =
-        crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &[(&stream_name, 0)])
-            .await
+    if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        platform_write,
+        org_id,
+        StreamType::Logs,
+        &[(&stream_name, 0)],
+    )
+    .await
     {
         return Err(Error::ResourceError(reason));
     }
@@ -664,8 +671,13 @@ pub async fn ingest(
             .iter()
             .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
             .collect();
-        if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &streams).await
+        if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+            platform_write,
+            org_id,
+            StreamType::Logs,
+            &streams,
+        )
+        .await
         {
             return Err(Error::ResourceError(reason));
         }

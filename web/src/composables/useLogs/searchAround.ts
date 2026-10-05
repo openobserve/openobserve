@@ -73,8 +73,7 @@ export const useSearchAround = () => {
       let queryContext = "";
       const query: string = searchObj.data.query;
 
-      // With several streams selected, search around the hit's own stream
-      // (tagged as _stream_name) through the single-stream _around endpoint.
+      // The _around endpoint is single-stream, so multi-stream hits use their own _stream_name.
       const isMultiStream = searchObj.data.stream.selectedStream.length > 1;
       const hitStreamName: string = isMultiStream ? (params.body?.[STREAM_NAME_FIELD] ?? "") : "";
 

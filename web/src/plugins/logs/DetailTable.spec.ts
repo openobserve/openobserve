@@ -23,8 +23,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-// Streams the mocked searchState reports as selected; a plain (non-reactive)
-// object, so tests that change it remount the component.
+// A plain (non-reactive) object, so tests that change it remount the component.
 const mockStreams = vi.hoisted(() => ({ selected: ["stream1"] }));
 
 // Mock dependencies

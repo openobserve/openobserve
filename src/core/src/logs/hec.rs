@@ -120,7 +120,8 @@ pub async fn ingest(
             .map(|(stream, records)| (stream.as_str(), records.len() as u64))
             .collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &counts).await
+            crate::ingestion::sdr_fail_closed_refusal(false, org_id, StreamType::Logs, &counts)
+                .await
         {
             return Err(Error::ResourceError(reason));
         }
@@ -131,8 +132,7 @@ pub async fn ingest(
         return Ok(HecStatus::Custom(e.to_string(), 400).into());
     }
     if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
-        // A pipeline destination refused fail-closed is a 503, which HEC clients retry where they
-        // drop a 400; groups already written are written again on that retry.
+        // Fail-closed refusal is a 503 so HEC clients retry; written groups are re-sent.
         #[cfg(feature = "vectorscan")]
         if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
             return Err(e);
@@ -219,7 +219,8 @@ pub async fn preflight_streams(
             .map(|(stream, records)| (stream.as_str(), records.len() as u64))
             .collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &counts).await
+            crate::ingestion::sdr_fail_closed_refusal(false, org_id, StreamType::Logs, &counts)
+                .await
         {
             return Err(Error::ResourceError(reason));
         }

@@ -45,8 +45,7 @@ describe("SearchBar — Drill down mode toggle", () => {
   let wrapper: VueWrapper<any> | undefined;
   const originalIsEnterprise = config.isEnterprise;
 
-  // jsdom reports zero widths, which collapses the mode toggle group into the
-  // narrow-width dropdown; give the toolbar bar room so the group renders.
+  // jsdom reports zero widths, which collapses the toggle group into the narrow-width dropdown.
   const mountSearchBar = (toolbarWidth = 0) => {
     if (toolbarWidth) {
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (

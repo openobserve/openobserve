@@ -154,9 +154,13 @@ pub async fn handle_request(
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
     // Refused before the pipelines run: a remote-stream destination writes inside them.
     #[cfg(feature = "vectorscan")]
-    if let Some(reason) =
-        crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &[(&stream_name, 0)])
-            .await
+    if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        false,
+        org_id,
+        StreamType::Logs,
+        &[(&stream_name, 0)],
+    )
+    .await
     {
         return Ok(otlp_rejection_response(
             req_type,
@@ -749,7 +753,8 @@ pub async fn handle_request(
             .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
             .collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &streams).await
+            crate::ingestion::sdr_fail_closed_refusal(false, org_id, StreamType::Logs, &streams)
+                .await
         {
             return Ok(otlp_rejection_response(
                 req_type,

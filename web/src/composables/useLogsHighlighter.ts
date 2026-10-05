@@ -99,6 +99,11 @@ export function useLogsHighlighter(t: TranslateFn) {
       return processedResults.value;
     }
 
+    // Scoping depends only on (query, column), so it runs once per column, not per cell
+    const columnQueries = columns.map((column) =>
+      column.id === "source" ? queryString : scopeHighlightQuery(queryString, column.id),
+    );
+
     // Split hits into chunks
     const chunks = [];
     for (let i = 0; i < hits.length; i += chunkSize) {
@@ -146,10 +151,7 @@ export function useLogsHighlighter(t: TranslateFn) {
             showBraces: columns[columnIndex].id === "source",
             showQuotes: columns[columnIndex].id === "source",
             // Field filters highlight only their own column; source scopes per key
-            queryString:
-              columns[columnIndex].id === "source"
-                ? queryString
-                : scopeHighlightQuery(queryString, columns[columnIndex].id),
+            queryString: columnQueries[columnIndex],
           });
 
           batchUpdates[cacheKey] = processedHtml;

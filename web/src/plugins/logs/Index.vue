@@ -687,8 +687,7 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
 
-    // Drill down compares against the histogram brush that SearchResult tracks;
-    // SearchResult stays mounted (hidden) while this mode is active.
+    // Uses SearchResult's histogram brush; SearchResult stays mounted (hidden) in Drill down.
     const drillDownTimeRange = computed(
       () =>
         searchResultRef.value?.originalTimeRangeBeforeSelection ||
@@ -702,8 +701,7 @@ export default defineComponent({
         ? searchResultRef.value.histogramSelectionRange
         : undefined,
     );
-    // The filter of the last completed search: the editor stays editable in Drill
-    // down, so its live value can hold typing that was never run.
+    // The last run filter: the editor stays editable in Drill down and may hold unrun typing.
     const drillDownBaseFilter = ref(searchObj.data.editorValue);
     let runningSearchFilter = searchObj.data.editorValue;
     watch(

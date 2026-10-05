@@ -700,6 +700,7 @@ pub async fn handle_otlp_request(
     // Refused before the pipelines run: a remote-stream destination writes inside them.
     #[cfg(feature = "vectorscan")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        false,
         org_id,
         StreamType::Traces,
         &[(&traces_stream_name, 0)],
@@ -1213,7 +1214,8 @@ pub async fn handle_otlp_request(
             .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
             .collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Traces, &streams).await
+            crate::ingestion::sdr_fail_closed_refusal(false, org_id, StreamType::Traces, &streams)
+                .await
         {
             return Ok(otlp_rejection_response(
                 req_type,
@@ -1558,7 +1560,8 @@ pub async fn ingest_json(
             .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
             .collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Traces, &streams).await
+            crate::ingestion::sdr_fail_closed_refusal(false, org_id, StreamType::Traces, &streams)
+                .await
         {
             return Ok(MetaHttpResponse::error_with_header(
                 http::StatusCode::SERVICE_UNAVAILABLE,

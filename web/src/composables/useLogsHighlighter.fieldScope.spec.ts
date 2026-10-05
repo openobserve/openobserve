@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Runs useLogsHighlighter against the real useTextHighlighter, so the query a
-// logs-page cell receives is highlighted end to end.
+// Uses the real useTextHighlighter so a cell's query is highlighted end to end.
 import { describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";

@@ -3103,8 +3103,7 @@ export default defineComponent({
     // DateTime.vue's selectedDate watcher → saveDate → on:date-change, so
     // without this flag updateDateTime would re-enter twice.
     let suppressUpdateDateTime = false;
-    // Drill down is built from the logs results, so a date change re-runs that
-    // search there exactly as it does on the Search tab.
+    // Drill down is built from the logs results, so a date change re-runs that search too.
     const isLogsResultsMode = () =>
       searchObj.meta.logsVisualizeToggle === "logs" ||
       searchObj.meta.logsVisualizeToggle === "drilldown";

@@ -337,6 +337,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { formatEventCount } from "@/utils/formatters";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -414,8 +415,7 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
-// Page shell for `embedded`: lays out the drawer's header-left and body slots in
-// place. It takes none of the drawer-only attrs (title, width, open, ...).
+// Page shell for `embedded`: lays out the drawer's slots in place, without drawer-only attrs.
 const AnalysisPage: FunctionalComponent = (_, { slots }) =>
   h(
     "div",
@@ -584,8 +584,7 @@ const filteredDimensions = computed(() => {
     dimensions = dimensions.filter((dim) => dim.label.toLowerCase().includes(searchLower));
   }
 
-  // With value counts (Drill down page): by count, descending. Without them:
-  // selected dimensions first. Ties are alphabetical.
+  // By count descending when counts exist, else selected first; ties are alphabetical.
   const counts = dimensionCounts.value;
   const hasCounts = Object.keys(counts).length > 0;
   return [...dimensions].sort((a, b) => {
@@ -601,9 +600,7 @@ const filteredDimensions = computed(() => {
   });
 });
 
-// Non-null value count per dimension, for the Drill down page's sidebar. One
-// count(field) query covers every field in a single scan; the _values API would
-// run a GROUP BY per field and returns top values, not a field's total.
+// One count(field) query scans once; _values would GROUP BY per field and return only top values.
 const dimensionCounts = ref<Record<string, number>>({});
 let dimensionCountsAbort: AbortController | null = null;
 
@@ -629,7 +626,7 @@ const loadDimensionCounts = async () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: {
         query: {
-          sql: `SELECT ${columns} FROM "${props.streamName}"${where}`,
+          sql: `SELECT ${columns} FROM ${quoteSqlIdentifierIfNeeded(props.streamName)}${where}`,
           start_time: range.startTime,
           end_time: range.endTime,
           size: 1,
@@ -1040,8 +1037,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       panel.id = `${panel.id}_${timestamp}`;
     });
 
-    // Append in place: a new dashboard object would re-initialise
-    // RenderDashboardCharts' variables and re-run every existing panel's query.
+    // Append in place: a new dashboard object would re-run every existing panel's query.
     dashboardData.value.tabs[0].panels = [...currentPanels, ...newPanels];
 
     // Wait for DOM to update, then refresh GridStack to position new panels
@@ -1055,8 +1051,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
   }
 };
 
-// Drop the removed dimensions' panels in place. Keeping the same dashboard object
-// (and render key) means the remaining panels are neither remounted nor re-queried.
+// In place, so the remaining panels are neither remounted nor re-queried.
 const removeDimensionPanels = async (removedDimensions: string[]) => {
   const tab = dashboardData.value?.tabs?.[0];
   if (!tab?.panels) return;

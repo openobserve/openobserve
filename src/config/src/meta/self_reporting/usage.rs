@@ -38,11 +38,7 @@ pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
     stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
 }
 
-/// Streams OpenObserve itself writes into an org (rollups, redaction evidence,
-/// evaluator/LLM scores, anomaly points). A `service_name` column in them
-/// describes the monitored system, not a service of the org, so service
-/// discovery and correlation skip them. A closed list, not a `_` prefix: user
-/// stream names may start with `_` too.
+/// Streams O2 writes itself; a closed list, since user stream names may start with `_` too.
 pub fn is_internal_stream(stream_name: &str) -> bool {
     is_internal_rollup_stream(stream_name)
         || matches!(

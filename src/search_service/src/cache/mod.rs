@@ -1311,8 +1311,7 @@ fn redaction_skipped(
     Ok(())
 }
 
-/// Hits the redaction step failed on are refused with a 503, not a 400: the fault is the
-/// servers, not the querys.
+/// A redaction failure is the server's fault, so it is a 503, not a 400.
 #[cfg(any(feature = "vectorscan", test))]
 fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
     infra::errors::Error::ResourceError(format!(

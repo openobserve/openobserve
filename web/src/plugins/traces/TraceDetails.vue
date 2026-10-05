@@ -2805,9 +2805,7 @@ export default defineComponent({
       const spanId = span.spanId || span.span_id;
       updateSelectedSpan(spanId);
 
-      // Let the sidebar mount / switch to this span, then run its own View Logs:
-      // it loads the span's correlation (or waits for the in-flight lookup)
-      // before navigating, instead of reading data that is not loaded yet.
+      // Let the sidebar switch spans and run its own View Logs, which waits for the span's correlation.
       await nextTick();
       const sidebar = treeSidebarRef.value;
       if (sidebar?.viewSpanLogs) {

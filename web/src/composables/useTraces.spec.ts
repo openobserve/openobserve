@@ -111,8 +111,7 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   })),
 }));
 
-// navigateToCorrelatedLogs runs a count query before a span-level jump and
-// falls back to the trace's logs when it is empty.
+// navigateToCorrelatedLogs counts span logs first and falls back to the trace's logs when none.
 const { mockSearch, mockShowInfoNotification, mockToast } = vi.hoisted(() => ({
   mockSearch: vi.fn(),
   mockShowInfoNotification: vi.fn(),
@@ -776,6 +775,30 @@ describe("useTraces", () => {
       expect(pushedQuery()).toBe("trace_id = 'trace-u'");
       // trace_id alone: the stream whose span count failed keeps its trace logs.
       expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs,web_logs");
+    });
+
+    it("stops waiting for a stream that never answers and navigates on the counted ones", async () => {
+      vi.useFakeTimers();
+      try {
+        mockSearch.mockImplementation(
+          (req: any) =>
+            countFor("app_logs", 4)(req) ??
+            new Promise((_, reject) =>
+              req.signal.addEventListener("abort", () => reject(new Error("aborted"))),
+            ),
+        );
+        const { navigateToCorrelatedLogs } = useTraces();
+        selectSpan("span-h", "trace-h");
+
+        const done = navigateToCorrelatedLogs(streams("app_logs", "hung_logs"));
+        await vi.advanceTimersByTimeAsync(5000);
+        await done;
+
+        expect(mockSearch.mock.calls[1][0].signal.aborted).toBe(true);
+        expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("keeps the span query when any successful count is non-zero, despite a failure", async () => {

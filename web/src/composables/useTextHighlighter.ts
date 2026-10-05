@@ -48,50 +48,24 @@ export interface TextSegment {
   isWhitespace: boolean;
 }
 
-/**
- * Matches two-argument filter functions with a string-literal second argument:
- * - str_match(field, 'value') / match_field(field, 'value')
- * - str_match_ignore_case(field, 'value') / match_field_ignore_case(field, 'value')
- * - re_match(field, 'pattern')
- * - fuzzy_match(field, 'value', distance)
- * Group 1 is the function name; group 2 the field: a double-quoted identifier
- * ("" escapes a quote), a backtick-quoted one (`` escapes a backtick) or a bare
- * identifier; group 3 a single-quoted literal ('' escapes a quote), group 4 a
- * double-quoted literal.
- */
+/** Groups: 1 function, 2 field (quoted or bare), 3 single-quoted literal, 4 double-quoted literal. */
 const FIELD_FILTER_REGEX =
   /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match|fuzzy_match)\s*\(\s*("(?:[^"]|"")*"|`(?:[^`]|``)*`|[^,()"`\s]+)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")(?:\s*,\s*\d+)?\s*\)/gi;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/**
- * Bounds that keep re_match highlighting from stalling the UI. JS regexes
- * backtrack (Rust's do not), so a pattern that is cheap on the server can be
- * catastrophic here; patterns or texts beyond these limits are not highlighted.
- */
+// JS regexes backtrack (Rust's do not), so these bound re_match highlighting to keep the UI responsive.
 const MAX_REGEX_PATTERN_LENGTH = 256;
 const MAX_REGEX_TEXT_LENGTH = 512;
 const MAX_REGEX_MATCHES = 100;
-/**
- * Caps on the product of alternation branches across a pattern's groups, e.g.
- * (a|b)(c|d) has 4 combinations. Next to an unbounded quantifier each
- * combination is retried at every split point, so only one binary choice is
- * allowed there (ERROR (connection|timeout).*).
- */
+// Caps alternation combinations; beside an unbounded quantifier each is retried at every split point.
 const MAX_VARIANTS = 81;
 const MAX_VARIANTS_WITH_UNBOUNDED = 2;
 
-/**
- * Escaped str_match literals: no backtracking (at worst text length × literal
- * length), so exempt from MAX_REGEX_TEXT_LENGTH.
- */
+// Escaped literals cannot backtrack, so they are exempt from MAX_REGEX_TEXT_LENGTH.
 const literalPatterns = new WeakSet<RegExp>();
 
-/**
- * The characters a regex atom can match, as UTF-16 code unit ranges (optionally
- * negated). `any` means "assume it can match anything": `.`, and sets this
- * analysis does not bound.
- */
+/** UTF-16 code unit ranges an atom can match; `any` means not bounded by this analysis. */
 interface CharSet {
   ranges: Array<[number, number]>;
   negated: boolean;
@@ -207,10 +181,7 @@ function parseClass(source: string, i: number): { chars: CharSet; end: number } 
   return { chars: unbounded ? ANY_CHAR : { ranges, negated, any: false }, end: j };
 }
 
-/**
- * Adds the other-case form of every character, for the i flag. Negated or very
- * wide non-ASCII sets are not folded precisely and become ANY_CHAR.
- */
+/** Adds other-case forms for the i flag; negated or wide non-ASCII sets become ANY_CHAR. */
 function foldCase(chars: CharSet): CharSet {
   if (chars.any) return chars;
   if (chars.negated) return ANY_CHAR;
@@ -238,10 +209,7 @@ function isCovered(lo: number, hi: number, ranges: Array<[number, number]>): boo
   return next > hi;
 }
 
-/**
- * Whether two sets may share a character. Disjointness is only concluded when
- * it follows from the sets' definitions; otherwise they are assumed to overlap.
- */
+/** Whether two sets may share a character; overlap is assumed unless provably disjoint. */
 function charSetsOverlap(a: CharSet, b: CharSet): boolean {
   if (a.any || b.any || (a.negated && b.negated)) return true;
   if (a.negated || b.negated) {
@@ -278,13 +246,7 @@ function splitAlternation(source: string): string[] | null {
   return branches;
 }
 
-/**
- * Parses one alternation-free sequence into items. An unquantified group
- * without alternation is flattened into the sequence; one whose branches are
- * unquantified becomes a single item over the union of their characters.
- * Returns null for anything not modelled (lookarounds, backreferences, \p{..},
- * quantified groups, stray quantifiers).
- */
+/** Parses an alternation-free sequence into items, or null for constructs not modelled. */
 function parseSequence(
   source: string,
   flags: string,
@@ -350,8 +312,7 @@ function parseSequence(
         const union: CharSet = sets.some((set) => set.any || set.negated)
           ? ANY_CHAR
           : { ranges: sets.flatMap((set) => set.ranges), negated: false, any: false };
-        // A fixed set of literal choices backtracks at most once per branch, which
-        // MAX_VARIANTS bounds; it is not a repeat, so it counts as fixed width here.
+        // Literal choices backtrack once per branch (bounded by MAX_VARIANTS), so count as fixed width.
         const width = Math.min(...widths);
         items.push({ chars: union, min: width, max: width });
         choices *= branches.length * parsed.reduce((total, branch) => total * branch!.choices, 1);
@@ -390,22 +351,7 @@ function parseSequence(
   return { items, choices };
 }
 
-/**
- * Whether a regex source risks catastrophic backtracking in a JS engine.
- * Accepted patterns are bounded but not linear: quadratic at worst in the text
- * length (a+! retries from every start), which MAX_REGEX_TEXT_LENGTH keeps cheap.
- *
- * Each top-level alternative is parsed into a sequence of items (see
- * parseSequence). Two variable-width (quantified) items are only ambiguous when their
- * character sets may overlap and nothing mandatory between them stops the
- * first from running into the second: a required item whose characters one of
- * the two cannot match. So [a-z]+-\d+ (disjoint) and https?://\S+ (s? cannot
- * match ':') pass, while \w*\w*, a+a?, .*.*, \d+\s*\d+ and [Ā]+[Ā]+ are
- * rejected. Overlap is decided from the sets' definitions and assumed when
- * unknown. Alternation groups multiply choices, capped at MAX_VARIANTS (or
- * MAX_VARIANTS_WITH_UNBOUNDED beside an unbounded quantifier).
- * Anything not modelled is treated as a risk.
- */
+/** Whether a regex risks catastrophic backtracking in JS; anything not modelled counts as a risk. */
 function isBacktrackingRisk(source: string, flags: string): boolean {
   const alternatives = splitAlternation(source);
   if (!alternatives) return true;
@@ -437,11 +383,7 @@ function isBacktrackingRisk(source: string, flags: string): boolean {
   return false;
 }
 
-/**
- * Compiles a Rust-regex pattern (as passed to re_match) into a global JS RegExp.
- * Leading inline flags such as (?i) become JS flags. Returns null for anything
- * JS cannot compile or that risks catastrophic backtracking (isBacktrackingRisk).
- */
+/** Compiles a Rust re_match pattern into a global JS RegExp; null when uncompilable or unsafe. */
 function compileHighlightRegex(pattern: string): RegExp | null {
   if (!pattern || pattern.length > MAX_REGEX_PATTERN_LENGTH) return null;
 
@@ -468,12 +410,7 @@ function compileHighlightRegex(pattern: string): RegExp | null {
 /** Compiled patterns per (field-scoped) query string; cleared when it grows past 64 entries. */
 const patternCache = new Map<string, RegExp[]>();
 
-/**
- * The field a filter's first argument names, as the backend resolves it: a
- * quoted identifier ("ERROR" or `ERROR`) keeps its case and has its doubled
- * quotes unescaped ("a""b" is a"b), an unquoted one is lowercased (DataFusion
- * identifier normalization).
- */
+// Quoted identifiers keep their case and unquoted ones are lowercased, as DataFusion resolves them.
 const resolveFilterField = (field: string) => {
   const quote = field[0];
   if ((quote === '"' || quote === "`") && field.length > 1 && field.endsWith(quote)) {
@@ -482,16 +419,7 @@ const resolveFilterField = (field: string) => {
   return field.toLowerCase();
 };
 
-/**
- * Narrows a highlight query to one field: drops the field filters (str_match,
- * match_field, their _ignore_case forms, re_match and fuzzy_match) that name
- * another field, so they only highlight their own column / detail row.
- * match_all and fuzzy_match_all keywords are not field-scoped and stay.
- *
- * @param queryString - The highlight query
- * @param field - The field (column id or JSON key) being rendered
- * @returns The query without other fields' filters
- */
+/** Drops field filters naming another field, so each filter highlights only its own field. */
 export function scopeHighlightQuery(queryString: string, field: string): string {
   if (!queryString) return queryString;
   return queryString.replace(
@@ -512,8 +440,6 @@ export function useTextHighlighter() {
    * Matches patterns like:
    * - match_all('keyword')
    * - fuzzy_match_all('keyword', 2)
-   * Keywords are highlighted case-insensitively within each token; field
-   * filters (str_match, re_match, ...) are returned by extractHighlightPatterns.
    *
    * @param queryString - The SQL query string to parse
    * @returns Array of extracted keywords
@@ -539,31 +465,14 @@ export function useTextHighlighter() {
     return Array.from(new Set(result));
   }
 
-  /**
-   * Builds a global RegExp matching a str_match literal verbatim. Ignore-case
-   * literals get the u flag too, so case folding follows Unicode as the
-   * server's lowercase match does (e.g. the Kelvin sign matches k).
-   */
+  /** The u flag makes ignore-case folding Unicode-aware, like the server's lowercase match. */
   function literalPattern(value: string, ignoreCase: boolean): RegExp {
     const regex = new RegExp(escapeRegExp(value), ignoreCase ? "giu" : "g");
     literalPatterns.add(regex);
     return regex;
   }
 
-  /**
-   * Extracts highlight patterns from field filters; they are matched against a
-   * whole field value, so anchors and literals containing spaces behave as on
-   * the server:
-   * - str_match(field, 'value') / match_field(field, 'value') — case-sensitive literal
-   * - str_match_ignore_case / match_field_ignore_case — case-insensitive literal
-   * - re_match(field, 'pattern') — regex; re_not_match is skipped since its
-   *   rows by definition do not contain a match
-   * Literals are kept verbatim (the server does not trim them). Patterns JS
-   * cannot compile, or that risk catastrophic backtracking, are skipped silently.
-   *
-   * @param queryString - The SQL query string to parse
-   * @returns Array of global RegExps to highlight
-   */
+  /** Extracts field-filter patterns, skipping re_not_match and regexes JS cannot run safely. */
   function extractHighlightPatterns(queryString: string): RegExp[] {
     if (!queryString?.trim()) return [];
     const cached = patternCache.get(queryString);
@@ -593,10 +502,7 @@ export function useTextHighlighter() {
     return patterns;
   }
 
-  /**
-   * Collects the [start, end) ranges a global regex matches in text. Zero-length
-   * matches are skipped and at most MAX_REGEX_MATCHES ranges are collected.
-   */
+  /** Collects [start, end) match ranges, skipping zero-length ones, up to MAX_REGEX_MATCHES. */
   function collectMatchRanges(text: string, regex: RegExp, ranges: Array<[number, number]>) {
     regex.lastIndex = 0;
     let count = 0;
@@ -613,12 +519,7 @@ export function useTextHighlighter() {
     regex.lastIndex = 0;
   }
 
-  /**
-   * Collects the [start, end) ranges the highlight patterns match in text.
-   * Patterns run on a whole field value, so anchors and spaces behave as they
-   * do on the server; compiled re_match regexes skip texts over
-   * MAX_REGEX_TEXT_LENGTH.
-   */
+  /** Collects pattern ranges; compiled re_match regexes skip texts over MAX_REGEX_TEXT_LENGTH. */
   function collectPatternRanges(text: string, patterns: RegExp[]): Array<[number, number]> {
     const ranges: Array<[number, number]> = [];
     if (!text) return ranges;
@@ -631,10 +532,10 @@ export function useTextHighlighter() {
   }
 
   /**
-   * Splits text by highlight keywords and patterns and marks matched parts
+   * Splits text by highlight keywords and marks matched parts
    *
    * @param text - Text to process
-   * @param keywords - Array of keywords to highlight (case-insensitive)
+   * @param keywords - Array of keywords to highlight
    * @param patterns - Global RegExps to highlight, from extractHighlightPatterns
    * @returns Array of text parts with highlight flags
    */
@@ -646,9 +547,6 @@ export function useTextHighlighter() {
     return splitTextByRanges(text, keywords, collectPatternRanges(text, patterns));
   }
 
-  /**
-   * Splits text by highlight keywords plus precomputed highlight ranges.
-   */
   function splitTextByRanges(
     text: string,
     keywords: string[],

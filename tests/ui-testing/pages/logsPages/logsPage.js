@@ -402,8 +402,7 @@ export class LogsPage {
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-        // On logs, TracesAnalysisDashboard.vue renders embedded as the "Drill down" mode page
-        // (data-test="traces-analysis-dashboard-page"); leaving the mode (Search toggle) replaces close.
+        // Drill down renders the dashboard embedded; the Search toggle replaces close.
         this.logsAnalyzeDimensionsButton = '[data-test="logs-drilldown-toggle"]';
         this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-page"]';
         this.analysisDashboardClose = '[data-test="logs-logs-toggle"]';

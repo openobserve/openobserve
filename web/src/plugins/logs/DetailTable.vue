@@ -770,8 +770,7 @@ export default defineComponent({
       return hasAggregation(parsedSQL?.columns);
     });
 
-    // Search around runs on one stream: with several selected, the hit's
-    // _stream_name says which one.
+    // Search around runs on one stream; with several selected, the hit's _stream_name picks it.
     const canSearchAroundStream = computed(
       () =>
         searchObj.data.stream.selectedStream.length <= 1 || !!rowData.value?.[STREAM_NAME_FIELD],

@@ -603,8 +603,7 @@ describe("TraceDetailsSidebar", async () => {
         const navigatedStreams = mockNavigateToCorrelatedLogs.mock.calls.map(
           (call: any[]) => call[0].logStreams[0].stream_name,
         );
-        // Only the click on B navigates; the click on A is dropped because the
-        // displayed span changed while its lookup ran.
+        // A's click is dropped because the displayed span changed while its lookup ran.
         expect(navigatedStreams).toEqual(["b_logs"]);
         expect(mockToast).not.toHaveBeenCalled();
         expect(viewLogsWrapper.vm.correlationLoading).toBe(false);

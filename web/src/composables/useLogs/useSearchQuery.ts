@@ -121,8 +121,7 @@ export const useSearchQuery = (t: TranslateFn) => {
 
     const queryReq: SearchRequestPayload | null = buildSearch();
 
-    // Update highlight query on run-query. Keep the query's case: str_match and
-    // re_match highlight case-sensitively.
+    // Keep the query's case: str_match and re_match highlight case-sensitively.
     if (searchObj.meta.sqlMode) {
       searchObj.data.highlightQuery = searchObj.data.query.split(/where/i)?.[1] || "";
     } else {

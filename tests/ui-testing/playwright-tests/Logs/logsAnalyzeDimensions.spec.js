@@ -193,8 +193,7 @@ test.describe("Logs Analyze Dimensions testcases", () => {
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // With no results the Drill down page shows the same empty state as the results pane:
-    // pick-a-stream when none is selected, run-a-query otherwise
+    // No results: Drill down shows the results pane's empty state (pick a stream, else run a query).
     await page.locator('[data-test="logs-drilldown-toggle"]').click();
     await expect(
       page
