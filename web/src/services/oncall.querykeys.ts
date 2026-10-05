@@ -100,6 +100,8 @@ export const oncallKeys = {
     orgKey(org, "oncall", "responses", responseId, "progress"),
   responsePriorCauses: (org: string, responseId: string) =>
     orgKey(org, "oncall", "responses", responseId, "priorCauses"),
+  responseReport: (org: string, responseId: string) =>
+    orgKey(org, "oncall", "responses", responseId, "report"),
   responseHistory: (org: string, responseId: string, limit?: number) =>
     orgKey(org, "oncall", "responses", responseId, "history", limit ?? "all"),
   responseDeliveries: (org: string, responseId: string, limit?: number, offset?: number) =>

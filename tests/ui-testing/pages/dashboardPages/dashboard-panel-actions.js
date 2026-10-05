@@ -1,6 +1,8 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+
 export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
@@ -181,6 +183,22 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
+  // Raw discard-button locator for callers that must own the confirm dialog
+  // themselves (discardPanel() installs its own auto-accepting handler).
+  getPanelDiscardBtn() {
+    return this.discardPanelBtn;
+  }
+
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  // Scoped to the rendered layout branch: PanelEditor.vue mounts the field list
+  // twice, so the bare data-test matches 2 nodes.
+  getFieldListSearchInput() {
+    return this.page.locator(visibleOnly(SELECTORS.FIELD_LIST_SEARCH)).first();
+  }
+
   // Save panel button
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
@@ -199,6 +217,11 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  async getErrorToastText() {
+    await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
+    return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
   }
 
   /**
@@ -445,8 +468,8 @@ export default class DashboardactionPage {
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
 
-    // 2. Canvas has non-background pixels
-    const hasData = await this.page.evaluate(() => {
+    // 2. Canvas has non-background pixels; polled because a mounted canvas can still be awaiting its query.
+    const scanCanvases = () => this.page.evaluate(() => {
       const canvases = document.querySelectorAll("canvas");
       for (const canvas of canvases) {
         if (canvas.width < 10 || canvas.height < 10) continue;
@@ -470,7 +493,7 @@ export default class DashboardactionPage {
       }
       return false;
     });
-    expect(hasData).toBe(true);
+    await expect.poll(scanCanvases, { timeout: 15000 }).toBe(true);
   }
 
   /**

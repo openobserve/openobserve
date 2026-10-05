@@ -21,26 +21,83 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
+import ReplayLoadBand from "@/components/rum/ReplayLoadBand.vue";
+import ReplayPlaybackOverlay from "@/components/rum/ReplayPlaybackOverlay.vue";
+import ReplayStatusChip from "@/components/rum/ReplayStatusChip.vue";
 import {
-  buildMobileTimeline,
   wireframesAt,
   viewportAt,
   wireframeStyle,
-  type MobileSegment,
+  type MobileTimeline,
   type Wireframe,
 } from "@/composables/rum/useMobileSessionReplay";
+import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
+import {
+  canResume,
+  expectsMoreData,
+  formatReplayTime,
+  shouldBuffer,
+  skippedCount,
+  timelineLength,
+  toPercent,
+  type LoadState,
+  type LoadedRange,
+  type PlaybackState,
+  type ReplayIntent,
+} from "@/utils/rum/sessionReplayTimeline";
 
-const props = defineProps<{
-  /** Parsed `_sessionreplay` segments (each the decoded wireframe segment JSON). */
-  segments: MobileSegment[];
-  /** RUM events (action/view/error) with `relativeTime` — rendered as timeline markers. */
-  events?: any[];
-  /**
-   * True while the parent is still fetching this session's replay segments. Without it the
-   * player treats "segments not loaded yet" the same as "session has no replay" and flashes
-   * the empty state before the segment query resolves.
-   */
-  isLoading?: boolean;
+type Mode = "paused" | "playing" | "buffering" | "waiting" | "failed" | "ended";
+
+const props = withDefaults(
+  defineProps<{
+    /** Timestamp-ordered wireframe records, built once by the parent from the loaded segments. */
+    timeline: MobileTimeline;
+    /** RUM events (action/view/error) with `relativeTime` — rendered as timeline markers. */
+    events?: any[];
+    /** True until the first window has loaded, so "not loaded yet" is not shown as "no replay". */
+    isLoading?: boolean;
+    sessionStartMs?: number;
+    sessionEndMs?: number;
+    loadedRanges?: LoadedRange[];
+    loadState?: LoadState;
+    runComplete?: boolean;
+    loadPercent?: number;
+    failedFromMs?: number | null;
+    pendingSeekMs?: number | null;
+    retryAttempt?: number;
+    speed?: number;
+    skipInactivity?: boolean;
+    intent?: ReplayIntent;
+  }>(),
+  {
+    events: () => [],
+    isLoading: false,
+    sessionStartMs: 0,
+    sessionEndMs: 0,
+    loadedRanges: () => [],
+    loadState: "complete",
+    runComplete: false,
+    loadPercent: 0,
+    failedFromMs: null,
+    pendingSeekMs: null,
+    retryAttempt: 0,
+    speed: undefined,
+    skipInactivity: undefined,
+    intent: "pause",
+  },
+);
+
+const emit = defineEmits<{
+  ready: [];
+  "time-update": [sessionMs: number];
+  "seek-request": [sessionMs: number];
+  retry: [];
+  "update:speed": [speed: number];
+  "update:skipInactivity": [skip: boolean];
+  "update:intent": [intent: ReplayIntent];
+  "playback-state": [state: PlaybackState];
+  "loaded-end-change": [sessionMs: number];
 }>();
 
 const { t } = useI18nTyped();
@@ -56,25 +113,50 @@ const speedOptions = [
   { label: raw("8x"), value: 8 },
 ];
 
-const timeline = computed(() => buildMobileTimeline(props.segments ?? []));
+const timeline = computed(() => props.timeline);
 
 const playhead = ref(0); // ms offset from timeline.startTime
-const playing = ref(false);
-const speed = ref<number>(1);
-const skipInactivity = ref(false);
+const mode = ref<Mode>("paused");
+const localSpeed = ref<number>(1);
+const localSkipInactivity = ref(false);
+// Never shrinks: a batch whose records end before the metadata end must not pull the bar back.
+const timelineMs = ref(0);
 const stageRef = ref<HTMLElement | null>(null);
 const stageWidth = ref(0);
 const stageHeight = ref(0);
+let failedWasPlaying = false;
+let announcedReady = false;
+// Ended at the loaded end of a live session; new activity resumes it unless the user moved the playhead since.
+let liveEnded = false;
 
+const speed = computed(() => props.speed ?? localSpeed.value);
+const skipInactivity = computed(() => props.skipInactivity ?? localSkipInactivity.value);
+// Once the run holds the last segment, nothing still loading can extend this player.
+const awaitingData = computed(() => expectsMoreData(props.loadState) && !props.runComplete);
+const playing = computed(() => mode.value === "playing" || mode.value === "buffering");
 const currentTime = computed(() => timeline.value.startTime + playhead.value);
 const viewport = computed(() => viewportAt(timeline.value.records, currentTime.value));
 const currentWireframes = computed<Wireframe[]>(() =>
   wireframesAt(timeline.value.records, currentTime.value),
 );
 const hasReplay = computed(() => timeline.value.records.length > 0);
-const progressPct = computed(() =>
-  timeline.value.duration > 0 ? (playhead.value / timeline.value.duration) * 100 : 0,
+const sessionStart = computed(() => props.sessionStartMs || timeline.value.startTime);
+const originOffsetMs = computed(() =>
+  hasReplay.value ? timeline.value.startTime - sessionStart.value : 0,
 );
+const sessionTimeMs = computed(() => originOffsetMs.value + playhead.value);
+const displayMs = computed(() => props.pendingSeekMs ?? sessionTimeMs.value);
+const progressPct = computed(() => toPercent(displayMs.value, timelineMs.value));
+const loadedEndSessionMs = computed(() =>
+  hasReplay.value ? timeline.value.endTime - sessionStart.value : 0,
+);
+
+const playbackState = computed<PlaybackState>(() => {
+  if (props.loadState === "error") return "error";
+  if (props.loadState === "empty") return "empty";
+  if (!hasReplay.value) return "loading";
+  return mode.value;
+});
 
 // Fit the dp-based wireframe canvas inside the stage on BOTH axes.
 //
@@ -103,20 +185,13 @@ const canvasStyle = computed(() => ({
   "transform-origin": "top left",
 }));
 
-function fmt(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
 function imageSrc(w: Wireframe): string | undefined {
   return w.base64 ? `data:image/png;base64,${w.base64}` : undefined;
 }
 
 // ---- event timeline markers (error highlight) ----------------------------
 function markerLeftPct(event: any): number {
-  const rel = Number(event?.relativeTime ?? 0);
-  const pct = timeline.value.duration > 0 ? (rel / timeline.value.duration) * 100 : 0;
-  return Math.max(0, Math.min(100, pct));
+  return toPercent(Number(event?.relativeTime ?? 0), timelineMs.value);
 }
 // Applied via a :style binding, so the token is reached by var() here (a
 // sanctioned raw-var site: JS-generated style values have no utility class).
@@ -137,6 +212,15 @@ function markerTooltip(event: any): string {
   return event?.type === "error" ? t("rum.errorEventTooltip", { name: label }) : label;
 }
 
+function refreshTimeline() {
+  if (!hasReplay.value) return;
+  const end = props.sessionEndMs || timeline.value.endTime;
+  timelineMs.value = Math.max(
+    timelineMs.value,
+    timelineLength(sessionStart.value, end, timeline.value.endTime),
+  );
+}
+
 // ---- playback loop -------------------------------------------------------
 let rafId: number | null = null;
 let lastTs = 0;
@@ -148,54 +232,169 @@ function nextRecordAfter(absTime: number): number | null {
   return null;
 }
 
+// Reaching the end of what is loaded means different things depending on whether more is coming.
+function handleLoadedEdge() {
+  stopTick();
+  if (awaitingData.value) {
+    mode.value = "buffering";
+  } else if (props.loadState === "failed") {
+    mode.value = "failed";
+    failedWasPlaying = true;
+  } else if (props.loadState === "live") {
+    mode.value = "ended";
+    liveEnded = true;
+  } else {
+    mode.value = "ended";
+    emit("update:intent", "pause");
+  }
+}
+
 function tick(ts: number) {
-  if (!playing.value) return;
+  if (mode.value !== "playing") return;
+  const duration = timeline.value.duration;
   const delta = lastTs ? ts - lastTs : 0;
   lastTs = ts;
-  playhead.value = Math.min(timeline.value.duration, playhead.value + delta * speed.value);
+  playhead.value = Math.min(duration, playhead.value + delta * speed.value);
 
   if (skipInactivity.value) {
     const abs = timeline.value.startTime + playhead.value;
     const next = nextRecordAfter(abs);
     if (next != null && next - abs > SKIP_THRESHOLD_MS) {
-      playhead.value = Math.min(timeline.value.duration, next - timeline.value.startTime);
+      playhead.value = Math.min(duration, next - timeline.value.startTime);
     }
   }
+  emit("time-update", sessionTimeMs.value);
 
-  if (playhead.value >= timeline.value.duration) {
-    playing.value = false;
+  if (awaitingData.value && shouldBuffer(playhead.value, duration, speed.value)) {
+    stopTick();
+    mode.value = "buffering";
+    return;
+  }
+  if (playhead.value >= duration) {
+    handleLoadedEdge();
     return;
   }
   rafId = requestAnimationFrame(tick);
 }
 
-function play() {
-  if (!hasReplay.value) return;
-  if (playhead.value >= timeline.value.duration) playhead.value = 0;
-  playing.value = true;
+function startTick() {
+  mode.value = "playing";
+  liveEnded = false;
   lastTs = 0;
+  if (rafId != null) cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(tick);
 }
-function pause() {
-  playing.value = false;
+
+function stopTick() {
   if (rafId != null) cancelAnimationFrame(rafId);
   rafId = null;
 }
+
+// Resumes where the clock held once enough has loaded past it, or unconditionally once nothing more is coming.
+function tryResume() {
+  if (mode.value !== "buffering" || props.pendingSeekMs !== null) return;
+  const final =
+    props.loadState === "complete" || (expectsMoreData(props.loadState) && !awaitingData.value);
+  if (final || canResume(playhead.value, timeline.value.duration, speed.value)) {
+    startTick();
+  }
+}
+
+// The playhead is where the live edge stopped it, so ticking on from there is the resume.
+function resumeLiveEnded() {
+  if (mode.value !== "ended" || !liveEnded || props.pendingSeekMs !== null) return;
+  if (playhead.value < timeline.value.duration) startTick();
+}
+
+function beginPlayback() {
+  if (!hasReplay.value) return;
+  if (awaitingData.value && shouldBuffer(playhead.value, timeline.value.duration, speed.value)) {
+    mode.value = "buffering";
+    return;
+  }
+  startTick();
+}
+
+// A pending seek is display-only, so the playhead must not start moving until the parent seeks.
+function startPlayback() {
+  if (props.pendingSeekMs !== null) {
+    mode.value = "buffering";
+    return;
+  }
+  beginPlayback();
+}
+
+function play() {
+  emit("update:intent", "play");
+  if (mode.value === "ended") {
+    emit("seek-request", 0);
+    return;
+  }
+  if (mode.value === "failed") {
+    mode.value = "buffering";
+    emit("retry");
+    return;
+  }
+  if (mode.value === "waiting") {
+    mode.value = "buffering";
+    return;
+  }
+  startPlayback();
+}
+
+// Pausing while buffering cancels the auto-resume; a seek still waiting on data keeps waiting, paused.
+function pause() {
+  emit("update:intent", "pause");
+  failedWasPlaying = false;
+  stopTick();
+  if (mode.value !== "playing" && mode.value !== "buffering") return;
+  mode.value = props.pendingSeekMs !== null ? "waiting" : "paused";
+}
+
 function togglePlay() {
-  playing.value ? pause() : play();
+  if (playing.value) pause();
+  else play();
 }
-function seekTo(ms: number) {
-  playhead.value = Math.max(0, Math.min(timeline.value.duration, ms));
+
+/** The only seek entry point: session ms in, converted to this player's own playhead. */
+function seekTo(sessionMs: number, shouldPlay = false) {
+  const offset = sessionStart.value + sessionMs - timeline.value.startTime;
+  playhead.value = Math.max(0, Math.min(timeline.value.duration, offset));
   lastTs = 0;
+  liveEnded = false;
+  // The parent clears pendingSeekMs in this same tick, so the prop still holds the stale target here.
+  if (shouldPlay) {
+    beginPlayback();
+  } else {
+    stopTick();
+    mode.value = "paused";
+  }
 }
+
+// Seeks go to the parent, which knows what is loaded; the player never jumps into unloaded time itself.
 function skip(direction: "forward" | "backward") {
-  seekTo(playhead.value + (direction === "forward" ? 1 : -1) * SKIP_SECONDS * 1000);
+  if (!(timelineMs.value > 0)) return;
+  const delta = (direction === "forward" ? 1 : -1) * SKIP_SECONDS * 1000;
+  emit("seek-request", Math.max(0, Math.min(timelineMs.value, displayMs.value + delta)));
 }
+
 function onBarClick(e: MouseEvent) {
+  if (!(timelineMs.value > 0)) return;
   const bar = e.currentTarget as HTMLElement;
   const rect = bar.getBoundingClientRect();
   const ratio = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0;
-  seekTo(ratio * timeline.value.duration);
+  emit("seek-request", Math.max(0, Math.min(1, ratio)) * timelineMs.value);
+}
+
+function setSpeed(value: unknown) {
+  if (typeof value !== "number") return;
+  localSpeed.value = value;
+  emit("update:speed", value);
+}
+
+function setSkipInactivity(value: SwitchValue) {
+  localSkipInactivity.value = !!value;
+  emit("update:skipInactivity", !!value);
 }
 
 // Measure the stage so we can scale to fit. BOTH axes are needed: the stage is
@@ -215,19 +414,83 @@ watch(stageRef, (el) => {
   }
 });
 
-// Reset when a different session's segments load.
+// A later batch only adds later records, so the playhead is left where it is and a held clock may resume.
 watch(
-  () => props.segments,
+  () => [timeline.value.endTime, props.sessionStartMs, props.sessionEndMs],
   () => {
-    pause();
-    playhead.value = 0;
+    refreshTimeline();
+    if (hasReplay.value) emit("loaded-end-change", loadedEndSessionMs.value);
+    tryResume();
+    resumeLiveEnded();
+  },
+  { immediate: true },
+);
+
+watch(
+  hasReplay,
+  (has) => {
+    if (!has || announcedReady) return;
+    announcedReady = true;
+    emit("ready");
+  },
+  { immediate: true },
+);
+
+// The parent holds the target; the playhead stays put until the parent calls seekTo.
+watch(
+  () => props.pendingSeekMs,
+  (target, previous) => {
+    if (target !== null && (previous ?? null) === null) {
+      const wasPlaying = playing.value;
+      stopTick();
+      mode.value = wasPlaying ? "buffering" : "waiting";
+      return;
+    }
+    if (target !== null || (mode.value !== "buffering" && mode.value !== "waiting")) return;
+    if (props.loadState === "failed") {
+      failedWasPlaying = mode.value === "buffering";
+      mode.value = "failed";
+    } else if (mode.value === "waiting") {
+      mode.value = "paused";
+    } else {
+      tryResume();
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.loadState,
+  (state, previous) => {
+    if (state === "complete") {
+      tryResume();
+      return;
+    }
+    if (state === "failed" && props.pendingSeekMs === null) {
+      if (mode.value === "buffering" || mode.value === "waiting") {
+        failedWasPlaying = mode.value === "buffering";
+        mode.value = "failed";
+      }
+      return;
+    }
+    if (expectsMoreData(state) && previous === "failed" && mode.value === "failed") {
+      mode.value = failedWasPlaying ? "buffering" : "paused";
+    }
   },
 );
 
+watch(awaitingData, (awaiting) => {
+  if (!awaiting && expectsMoreData(props.loadState)) tryResume();
+});
+
+watch(playbackState, (state) => emit("playback-state", state));
+
 onBeforeUnmount(() => {
-  pause();
+  stopTick();
   resizeObserver?.disconnect();
 });
+
+defineExpose({ seekTo, play, pause, togglePlay, playbackState });
 </script>
 
 <template>
@@ -242,6 +505,17 @@ onBeforeUnmount(() => {
     >
       <OSpinner size="md" />
       <span>{{ t("rum.loadingSessionReplay") }}</span>
+      <span v-if="retryAttempt > 1" class="text-xs" data-test="rum-mobile-replay-retrying">
+        {{ t("rum.sessionReplayRetrying", { attempt: retryAttempt, total: MAX_ATTEMPTS }) }}
+      </span>
+    </div>
+
+    <div
+      v-else-if="loadState === 'error'"
+      class="text-text-secondary relative flex h-full items-center justify-center"
+      data-test="rum-mobile-replay-error"
+    >
+      <ReplayPlaybackOverlay state="error" @retry="emit('retry')" />
     </div>
 
     <div
@@ -276,6 +550,15 @@ onBeforeUnmount(() => {
             </div>
           </template>
         </div>
+        <ReplayPlaybackOverlay
+          :state="playbackState"
+          :pending-seek-ms="pendingSeekMs"
+          :loaded-end-ms="loadedEndSessionMs"
+          :failed-from-ms="failedFromMs"
+          :timeline-ms="timelineMs"
+          :retry-attempt="retryAttempt"
+          @retry="emit('retry')"
+        />
       </div>
 
       <!-- Controls, matching the browser session player. -->
@@ -285,8 +568,11 @@ onBeforeUnmount(() => {
           data-test="rum-mobile-replay-playback-bar"
           @click="onBarClick"
         >
+          <ReplayLoadBand :ranges="loadedRanges" :timeline-ms="timelineMs" />
           <div
             class="bg-accent absolute top-0 left-0 h-full transition-[width] duration-100 ease-linear"
+            :class="{ 'opacity-50': pendingSeekMs !== null }"
+            data-test="rum-mobile-replay-progress"
             :style="{ width: `${progressPct}%` }"
           />
           <div
@@ -338,22 +624,30 @@ onBeforeUnmount(() => {
               class="text-text-body ms-2 whitespace-nowrap tabular-nums"
               data-test="rum-mobile-replay-time"
             >
-              {{ fmt(playhead) }} / {{ fmt(timeline.duration) }}
+              {{ formatReplayTime(displayMs) }} / {{ formatReplayTime(timelineMs) }}
             </span>
+            <ReplayStatusChip
+              :load-state="loadState"
+              :load-percent="loadPercent"
+              :skipped-parts="skippedCount(loadedRanges)"
+              @retry="emit('retry')"
+            />
           </div>
 
           <div class="flex items-center gap-2">
             <OSwitch
-              v-model="skipInactivity"
+              :model-value="skipInactivity"
               :label="t('rum.skipInactivity')"
               data-test="rum-mobile-replay-skip-inactive"
               class="whitespace-nowrap"
+              @update:model-value="setSkipInactivity"
             />
             <OSelect
-              v-model="speed"
+              :model-value="speed"
               :options="speedOptions"
               :searchable="false"
               data-test="rum-mobile-replay-speed-select"
+              @update:model-value="setSpeed"
             />
           </div>
         </div>

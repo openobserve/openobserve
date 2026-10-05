@@ -39,11 +39,13 @@
         </div>
       </div>
       <div class="[&_#date-time-button]:h-9!">
+        <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <DateTime
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
           auto-apply
           menu-align="end"
+          :hide-range-shift="isMobile"
           :default-type="searchObj.data.datetime.type"
           @on:date-change="updateDateTime"
         />
@@ -260,13 +262,8 @@
           </div>
         </template>
 
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-              {{ resultTotal }} {{ t("search_history.results") }}
-            </div>
-            <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
-          </div>
+        <template v-if="dataToBeLoaded.length > 0" #footer-note>
+          <span>{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></span>
         </template>
       </OTable>
     </div>
@@ -308,6 +305,7 @@ import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
 
@@ -363,6 +361,7 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
     const { searchObj } = searchState();
@@ -415,8 +414,6 @@ export default defineComponent({
     ]);
 
     onUnmounted(() => {});
-
-    const resultTotal = ref<number>(0);
 
     const pageSize = ref(100);
     const pageSizeOptions = [5, 10, 20, 50, 100];
@@ -496,9 +493,6 @@ export default defineComponent({
         );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
-        if (filteredHits.length > 0) {
-          resultTotal.value = filteredHits.length;
-        }
         columnsToBeRendered.value = generateColumns();
         filteredHits.forEach((hit: any) => {
           //adding uuid to each which will be used to track the expanded "row"
@@ -752,6 +746,7 @@ export default defineComponent({
       getManager()?.setScope("logs");
     });
     return {
+      isMobile,
       searchObj,
       activeStreamType,
       activeStreamName,
@@ -776,7 +771,6 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       pageSize,
       pageSizeOptions,
       activeTab,

@@ -237,7 +237,8 @@ import {
   clearExemplarOverride,
   exemplarOverrideKey,
 } from "@/composables/dashboard/useExemplarOverride";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import {
   addPanel,
   checkIfVariablesAreLoaded,
@@ -1074,10 +1075,8 @@ export default defineComponent({
 
     const runQuery = (withoutCache = false) => {
       try {
-        if (!isValid(true, true)) {
-          // do not return if query is not valid
-          // allow to fire query
-        }
+        // PanelEditor.runQuery shows the toast on Apply.
+        isValid(true, true, false);
 
         // should use cache flag
         shouldRefreshWithoutCache.value = withoutCache;
@@ -1239,7 +1238,7 @@ export default defineComponent({
     });
 
     //validate the data
-    const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
+    const isValid = (onlyChart = false, isFieldsValidationRequired = true, notify = true) => {
       const errors = errorData.errors;
       errors.splice(0);
       const dashboardData = dashboardPanelData;
@@ -1254,8 +1253,9 @@ export default defineComponent({
       // will push errors in errors array
       validatePanel(errors, isFieldsValidationRequired);
 
-      if (errors.length) {
-        showErrorNotification(t("dashboard.addPanel.fixErrors"));
+      if (errors.length && notify) {
+        // This view's `errorData` is rendered nowhere, so the toast is all the user gets.
+        showErrorNotification(raw(errors.join(", ")));
       }
 
       if (errors.length) {
@@ -1266,6 +1266,7 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
+      // Left generic: these errors are never cleared before this guard, so they can be stale.
       if (dashboardPanelData.data.type === "custom_chart" && errorData.errors.length > 0) {
         showErrorNotification(t("dashboard.addPanel.fixErrors"));
         return;
@@ -1399,6 +1400,10 @@ export default defineComponent({
             return;
           }
         }
+        analytics.track("dashboard_panel_saved", {
+          chart_type: dashboardPanelData.data.type,
+          is_new: !editMode.value,
+        });
 
         isUnsavedTrackingActive = false;
 

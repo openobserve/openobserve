@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
+import analytics from "./product_analytics";
 
 export interface ExperimentScorerRef {
   id: string;
@@ -37,6 +38,19 @@ export type ExperimentTask =
       providerId: string;
       model?: string | null;
       params?: Record<string, unknown> | null;
+    }
+  | {
+      type: "prompt_ref";
+      /** Stable logical Prompt entity ID, never the physical version row ID. */
+      id: string;
+      version: number;
+      providerId: string;
+      paramsOverrides?: {
+        model?: string | null;
+        params?: Record<string, unknown> | null;
+        tools?: unknown;
+        responseFormat?: unknown;
+      } | null;
     }
   | {
       type: "remote";
@@ -151,6 +165,12 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   isBaseline: boolean;
   createdBy: string;
   createdAt: number;
+  /** Stable managed Prompt evidence. Present only for PromptRef runs. */
+  promptId?: string | null;
+  promptName?: string | null;
+  promptVersion?: number | null;
+  /** Present for both PromptRef and content-matched InlinePrompt runs. */
+  promptContentHash?: string | null;
   /**
    * Present only when fetched with `includeSummary` (list) or via `get()`
    * (always summarized). Lets the browse table read cost/progress/scores
@@ -612,6 +632,10 @@ function normalizeExperiment(input: any): LlmExperiment {
     isBaseline: value<boolean>(input, "isBaseline", "is_baseline", false) === true,
     createdBy: value(input, "createdBy", "created_by", ""),
     createdAt: Number(value(input, "createdAt", "created_at", 0)),
+    promptId: value(input, "promptId", "prompt_id", null),
+    promptName: value(input, "promptName", "prompt_name", null),
+    promptVersion: numberOrNull(value(input, "promptVersion", "prompt_version", null)),
+    promptContentHash: value(input, "promptContentHash", "prompt_content_hash", null),
     scoringStatus: value(input, "scoringStatus", "scoring_status", undefined),
     executionProgress: hasSummaryField(input, "executionProgress", "execution_progress")
       ? normalizeProgress(value<any>(input, "executionProgress", "execution_progress", {}))
@@ -995,11 +1019,20 @@ const llmExperimentsService = {
    */
   async list(
     orgId: string,
-    options: { includeSummary?: boolean; datasetId?: string } = {},
+    options: {
+      includeSummary?: boolean;
+      datasetId?: string;
+      promptId?: string;
+      promptVersion?: number;
+      contentHash?: string;
+    } = {},
   ): Promise<LlmExperiment[]> {
     const params = {
       ...(options.includeSummary ? { includeSummary: true } : {}),
       ...(options.datasetId ? { datasetId: options.datasetId } : {}),
+      ...(options.promptId ? { promptId: options.promptId } : {}),
+      ...(options.promptVersion == null ? {} : { promptVersion: options.promptVersion }),
+      ...(options.contentHash ? { contentHash: options.contentHash } : {}),
     };
     const response = await http().get(base(orgId), {
       params: Object.keys(params).length ? params : undefined,
@@ -1021,6 +1054,8 @@ const llmExperimentsService = {
 
   async create(orgId: string, payload: ExperimentCreatePayload): Promise<CreateExperimentResult> {
     const response = await http().post(base(orgId), payload);
+    // An idempotent replay returns the existing experiment with created=false.
+    if (response.data?.created === true) analytics.track("llm_experiment_created");
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),

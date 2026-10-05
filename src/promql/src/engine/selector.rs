@@ -16,17 +16,10 @@
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
 //! `label_selector`, and `skip_labels`; writes `result_type`.
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use config::meta::{
-    promql::{NAME_LABEL, value::*},
-    search::ScanStats,
-};
-use datafusion::{
-    arrow::datatypes::Schema,
-    error::{DataFusionError, Result},
-    prelude::SessionContext,
-};
+use config::meta::promql::{NAME_LABEL, value::*};
+use datafusion::error::{DataFusionError, Result};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::ErrorCodes;
@@ -38,14 +31,43 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 
 use super::Engine;
 use crate::{
+    ScanContext,
     ast::rewrite::remove_filter_all,
-    micros,
+    functions, micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     utils::{metric_name, offset_micros},
 };
 
-/// One context per selected schema with its scan stats and whether the matchers still apply.
-pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
+pub(super) type SelectorContexts = Vec<ScanContext>;
+
+/// What an instant selection emits at each step for the sample it picks there.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SelectorOutput {
+    Value,
+    /// The sample's own time in seconds, as `timestamp()` of a selector reads it.
+    SampleTimestamp,
+}
+
+impl SelectorOutput {
+    pub(super) fn project(self, sample: &Sample) -> f64 {
+        match self {
+            Self::Value => sample.value,
+            Self::SampleTimestamp => functions::timestamp_seconds(sample.timestamp),
+        }
+    }
+
+    pub(super) fn keep_metric_name(self) -> bool {
+        self == Self::Value
+    }
+
+    fn labels(self, labels: Labels) -> Labels {
+        if self.keep_metric_name() {
+            labels
+        } else {
+            labels.without_metric_name()
+        }
+    }
+}
 
 impl Engine {
     pub(super) fn selector_time_range(
@@ -72,7 +94,9 @@ impl Engine {
         selector: &VectorSelector,
         time_range: (i64, i64),
         labels: &hashbrown::HashSet<String>,
+        streaming: bool,
     ) -> Result<SelectorContexts> {
+        let mut filters = equal_matcher_filters(&selector.matchers);
         self.ctx
             .table_provider
             .create_context(
@@ -81,9 +105,30 @@ impl Engine {
                 time_range,
                 selector.matchers.clone(),
                 labels.clone(),
-                &mut equal_matcher_filters(&selector.matchers),
+                &mut filters,
+                streaming,
             )
             .await
+    }
+
+    /// An instant selector, streamed when the layout allows it; `None` when nothing is selected.
+    pub(super) async fn exec_vector_selector(
+        &mut self,
+        vs: &VectorSelector,
+        output: SelectorOutput,
+    ) -> Result<Value> {
+        let data = match self.try_streaming_instant_selector(vs, output).await? {
+            Some(data) => data,
+            None => {
+                let vs = plain_selector(vs, "VectorSelector")?;
+                self.eval_vector_selector(&vs, None, output).await?
+            }
+        };
+        Ok(if data.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(data)
+        })
     }
 
     /// Instant vector selector --- select a single sample at each evaluation
@@ -94,6 +139,7 @@ impl Engine {
         &mut self,
         selector: &VectorSelector,
         ctxs: Option<SelectorContexts>,
+        output: SelectorOutput,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
@@ -152,16 +198,14 @@ impl Engine {
                     None
                 };
 
-                // Add the matched sample (already validated to be within range)
                 if let Some(sample) = match_sample {
-                    // Use eval_ts as the timestamp for the selected sample
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    selected_samples.push(Sample::new(eval_ts, sample.value));
+                    selected_samples.push(Sample::new(eval_ts, output.project(sample)));
                 }
             }
 
+            let labels = output.labels(metric.labels);
             (!selected_samples.is_empty()).then_some(RangeValue {
-                labels: metric.labels,
+                labels,
                 samples: selected_samples,
                 exemplars: metric.exemplars,
                 time_window: metric.time_window,
@@ -322,7 +366,7 @@ impl Engine {
         let ctxs = match ctxs {
             Some(ctxs) => ctxs,
             None => {
-                self.create_selector_contexts(selector, (start, end), &label_selector)
+                self.create_selector_contexts(selector, (start, end), &label_selector, false)
                     .await?
             }
         };
@@ -350,7 +394,14 @@ impl Engine {
         let skip_labels = self.skip_labels;
         let mut tasks = Vec::with_capacity(ctxs.len());
         let mut abort_handles = Vec::with_capacity(ctxs.len());
-        for (ctx, schema, scan_stats, keep_filters) in ctxs {
+        for ScanContext {
+            ctx,
+            schema,
+            scan_stats,
+            keep_filters,
+            ..
+        } in ctxs
+        {
             let query_ctx = self.ctx.query_ctx.clone();
             let mut selector = selector.clone();
             if !keep_filters {
@@ -610,7 +661,11 @@ fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue>
 mod tests {
     use std::{sync::Arc, time::Duration};
 
-    use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
+    use config::meta::{
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL},
+        search::ScanStats,
+    };
+    use datafusion::{arrow::datatypes::Schema, prelude::SessionContext};
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{Offset, VectorSelector},
@@ -695,7 +750,10 @@ mod tests {
             at: None,
         };
 
-        engine.eval_vector_selector(&selector, None).await.unwrap();
+        engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await
+            .unwrap();
 
         let matchers = captured.lock().unwrap().take().unwrap();
         assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
@@ -733,7 +791,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -769,7 +829,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -805,7 +867,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -878,7 +942,9 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector, None).await;
+        let result = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await;
 
         assert!(result.is_err(), "expected an error, not a panic");
         assert!(
@@ -984,7 +1050,8 @@ mod tests {
             _matchers: Matchers,
             _label_selector: hashbrown::HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            _streaming: bool,
+        ) -> Result<Vec<ScanContext>> {
             use datafusion::arrow::{
                 array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
                 datatypes::{DataType, Field},
@@ -1012,7 +1079,12 @@ mod tests {
             .unwrap();
             let ctx = SessionContext::new();
             ctx.register_batch(stream_name, batch).unwrap();
-            Ok(vec![(ctx, schema, ScanStats::default(), true)])
+            Ok(vec![ScanContext::table(
+                ctx,
+                schema,
+                ScanStats::default(),
+                true,
+            )])
         }
     }
 
@@ -1038,7 +1110,10 @@ mod tests {
             at: None,
         };
 
-        let values = engine.eval_vector_selector(&selector, None).await.unwrap();
+        let values = engine
+            .eval_vector_selector(&selector, None, SelectorOutput::Value)
+            .await
+            .unwrap();
         assert_eq!(values.len(), 1);
         assert!(values[0].samples.is_empty());
         assert_eq!(values[0].exemplars.as_ref().unwrap().len(), 1);

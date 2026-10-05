@@ -236,6 +236,13 @@ impl PipelineExt for Workflow {
                 } else {
                     // there is a fn name, so ue that fn
                     let transform = get_transforms(&self.org_id, &func_params.name).await?;
+                    // Otherwise the body hits compile_js_function as an opaque syntax error.
+                    if !transform.is_js() {
+                        return Err(anyhow!(
+                            "Only JavaScript functions can be used in workflows. Function '{}' is not a JavaScript function. Please use JS functions instead.",
+                            func_params.name
+                        ));
+                    }
                     let res_arr = transform.is_result_array_js();
                     (transform.function, res_arr)
                 };
@@ -1654,6 +1661,7 @@ async fn process_llm_evaluation_node(
                         error_kind: None,
                         error_message: None,
                         skip_reason: Some("sampling".to_string()),
+                        prompt_attribution: None,
                         prompt: None,
                         response: None,
                     },
@@ -2869,17 +2877,39 @@ async fn process_destination_node(
             return Ok(0);
         }
         Module::Pipeline { endpoint } => {
+            if let Err(e) =
+                common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
+                    .await
+            {
+                return drain_destination_node_with_error(
+                    &metadata,
+                    &mut channels,
+                    node,
+                    format!("Destination URL blocked by SSRF guard: {e}"),
+                )
+                .await;
+            }
             let op_fmt = endpoint.output_format.unwrap_or_default();
             let send_data = op_fmt.get_body_from_data(&data, &endpoint.metadata);
             let content_type = op_fmt.get_content_type();
             let headers = endpoint.headers.unwrap_or_default();
-            let client = reqwest::Client::builder()
+            let builder = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(
                     cfg.pipeline.remote_request_timeout,
                 ))
-                .danger_accept_invalid_certs(endpoint.skip_tls_verify)
-                .build()
-                .unwrap();
+                .danger_accept_invalid_certs(endpoint.skip_tls_verify);
+            let client = match common::utils::ssrf_guard::build_safe_client(builder) {
+                Ok(client) => client,
+                Err(e) => {
+                    return drain_destination_node_with_error(
+                        &metadata,
+                        &mut channels,
+                        node,
+                        format!("Failed to build HTTP client: {e}"),
+                    )
+                    .await;
+                }
+            };
 
             let mut client = client
                 .post(endpoint.url)
@@ -4850,6 +4880,11 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     fn seed_pipeline_destination(org_id: &str, name: &str) {
+        seed_pipeline_destination_with_url(org_id, name, "http://127.0.0.1:1/never-dispatched");
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn seed_pipeline_destination_with_url(org_id: &str, name: &str, url: &str) {
         use config::meta::destinations::{Destination, Endpoint, Module};
         common::infra::config::DESTINATIONS.insert(
             format!("{org_id}/{name}"),
@@ -4859,7 +4894,7 @@ mod tests {
                 name: name.to_string(),
                 module: Module::Pipeline {
                     endpoint: Endpoint {
-                        url: "http://127.0.0.1:1/never-dispatched".to_string(),
+                        url: url.to_string(),
                         ..Default::default()
                     },
                 },
@@ -4991,6 +5026,42 @@ mod tests {
         assert!(
             messages.iter().any(|m| m.contains("ALSO_MISSING")),
             "the error must name the destination, got {messages:?}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_unsuppressed_destination_to_private_address_is_blocked() {
+        seed_pipeline_destination_with_url("org-1", "ssrf-metalink", "http://169.254.169.254/");
+        let workflow = destination_workflow("ssrf-metalink");
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("workflow must build");
+
+        let result = executable
+            .process_workflow(
+                "org-1",
+                vec![json::json!({"severity": "high"})],
+                None,
+                WorkflowRunOptions {
+                    suppress_destinations: false,
+                },
+            )
+            .await
+            .expect("run must complete");
+
+        let node_error = result
+            .errors
+            .get("d1")
+            .expect("a private destination must surface as a node error");
+        let messages: Vec<String> = node_error.errors.iter().map(|(m, _)| m.clone()).collect();
+        assert!(
+            messages.iter().any(|m| m.contains("SSRF")),
+            "the error must come from the SSRF guard, got {messages:?}"
+        );
+        assert!(
+            !result.outputs.contains_key("d1"),
+            "a blocked destination must not report an output"
         );
     }
 
@@ -5157,5 +5228,49 @@ mod tests {
             result.outputs.contains_key("arm"),
             "the downstream condition must match against the nested shape"
         );
+    }
+
+    #[tokio::test]
+    async fn workflow_rejects_a_function_that_is_not_javascript() {
+        // execute_workflow and retry_run skip validate_workflow, so this path must refuse both.
+        let org = "org-1";
+        for (name, trans_type) in [("null_typed_fn", None), ("vrl_typed_fn", Some(0))] {
+            QUERY_FUNCTIONS.insert(
+                format!("{org}/{name}"),
+                config::meta::function::Transform {
+                    function: ".a = 1 \n .".to_string(),
+                    name: name.to_string(),
+                    params: "row".to_string(),
+                    num_args: 1,
+                    trans_type,
+                    streams: None,
+                },
+            );
+
+            let node = Node::new(
+                "fn-1".to_string(),
+                NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                    name: name.to_string(),
+                    after_flatten: false,
+                    num_args: 1,
+                    raw_fn: None,
+                }),
+                0.0,
+                0.0,
+                "default".to_string(),
+            );
+            let workflow = test_workflow(vec![node], vec![]);
+
+            let result = workflow.register_functions().await;
+            QUERY_FUNCTIONS.remove(&format!("{org}/{name}"));
+
+            let err = result
+                .expect_err("a non-JS function must be rejected by name")
+                .to_string();
+            assert!(
+                err.contains(name) && err.contains("JavaScript"),
+                "error should name the function and the reason, got: {err}"
+            );
+        }
     }
 }

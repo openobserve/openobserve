@@ -2287,6 +2287,41 @@ describe("Convert PromQL Data Utils", () => {
       expect(formattedValue).toBe("75.5"); // Based on our mock getUnitValue
     });
 
+    it("should show the latest value of a series on a gauge", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "gauge",
+        config: {},
+        queries: [{ config: { promql_legend: "", min: 0, max: 100 } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "gauge_metric" },
+              values: [
+                [1640438800, "45"],
+                [1640442400, "80"],
+                [1640435200, "10"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.series[0].data[0].value).toBe("80");
+    });
+
     it("should test gauge tooltip valueFormatter function (lines 650-658)", async () => {
       const panelSchema = {
         id: "panel1",

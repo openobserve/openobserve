@@ -22,6 +22,7 @@ import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import { routeGuard } from "@/utils/zincutils";
+import { promptRoutes } from "@/views/AIObservability/promptRoutes";
 
 const AIObservabilityShell = () => import("@/enterprise/views/AIObservability/Index.vue");
 const AILLMInsightsPage = () => import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
@@ -163,6 +164,7 @@ const useEnvRoutes = () => {
           component: AIDatasetDetailPage,
           meta: { titleKey: "routeTitles.aiDatasetDetail", keepAlive: false },
         },
+        ...promptRoutes,
         {
           path: "playground",
           name: "aiPlayground",
@@ -271,6 +273,11 @@ const useEnvRoutes = () => {
           path: "billing_group",
           name: "billing_group",
           component: BillingGroup,
+        },
+        {
+          path: "paid_usage",
+          name: "paidUsage",
+          component: () => import("@/enterprise/components/billings/PaidUsage.vue"),
         },
       ],
     },

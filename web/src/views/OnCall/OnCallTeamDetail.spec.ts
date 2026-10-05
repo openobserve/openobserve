@@ -67,6 +67,8 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 const service = vi.mocked(oncallService);
 const toasted = vi.mocked(toast);
@@ -476,6 +478,24 @@ describe("OnCallTeamDetail", () => {
       // handed no params for its placeholders.
       expect(message).not.toMatch(/^\s*covers\s/);
     });
+
+    it("tracks oncall_override_created as a cover once it is saved", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      await save(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledWith("oncall_override_created", { kind: "cover" });
+    });
+
+    it("does not track a refused cover", async () => {
+      service.createOverride.mockRejectedValue({ response: { status: 409 } });
+      const wrapper = render();
+      await flushPromises();
+      await save(wrapper);
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
   });
 
   /// F6: a swap is two writes behind one button, which is exactly where a UI
@@ -568,6 +588,28 @@ describe("OnCallTeamDetail", () => {
       await swap(wrapper);
 
       expect(wrapper.findComponent({ name: "OnCallCoverForm" }).props("open")).toBe(false);
+    });
+
+    it("tracks one oncall_override_created swap once both covers are written", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("oncall_override_created", { kind: "swap" });
+    });
+
+    it("tracks nothing for a swap that was rolled back", async () => {
+      service.createOverride
+        .mockResolvedValueOnce({ data: { id: "ov_1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "already covered" } } });
+      service.deleteOverride.mockResolvedValue({} as any);
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 
@@ -943,6 +985,38 @@ describe("OnCallTeamDetail", () => {
     expect(editor.props("intent")).toBeFalsy();
   });
 
+  /// The banner's "Add a member" fix is the Members tab itself, so on an
+  /// empty team the reader is already there — `activeTab.value = "members"`
+  /// is a no-op write, and nothing else used to react to the click.
+  it("focuses the member picker from the attention banner, even when already on Members", async () => {
+    const focusMemberPicker = vi.fn();
+    service.listMembers.mockResolvedValue({ data: [] } as any);
+    const wrapper = mount(OnCallTeamDetail, {
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OnCallMembers: {
+            name: "OnCallMembers",
+            template: "<div />",
+            setup(_: unknown, { expose }: { expose: (exposed: object) => void }) {
+              expose({ focusMemberPicker });
+            },
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const panels = wrapper.findComponent({ name: "OTabPanels" });
+    expect(panels.props("modelValue")).toBe("members");
+
+    wrapper.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("act", "members");
+    await flushPromises();
+
+    expect(focusMemberPicker).toHaveBeenCalled();
+  });
+
   /// The panel and the overview list both read this team's own pages; asking
   /// for the whole org's would count other teams' work as this team's.
   it("asks only for this team's pages", async () => {
@@ -972,6 +1046,31 @@ describe("OnCallTeamDetail", () => {
 
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(false);
+  });
+
+  /// Deleting a team, then hitting the browser's Back button onto its now-gone
+  /// detail page, made this exact 404 land on the entry-probe check and render
+  /// "On-call isn't available on this deployment" — a build-wide gate — for
+  /// what is really just a missing record.
+  it("treats a 404 on the team's own id as a deleted team, not a missing feature", async () => {
+    service.getTeam.mockRejectedValueOnce({ response: { status: 404 } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-team-detail-not-available"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(false);
+  });
+
+  /// The org-level team list is the one fetch every on-call build serves
+  /// regardless of team id, so only its 404 is a real "feature unavailable" signal.
+  it("still shows the unavailable gate when the build has no on-call routes at all", async () => {
+    service.listTeams.mockRejectedValueOnce({ response: { status: 404 } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-team-detail-not-available"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-team-detail-not-found"]').exists()).toBe(false);
   });
 
   /// The tabs read only when they mount, so Refresh expires their reads and remounts the open one.

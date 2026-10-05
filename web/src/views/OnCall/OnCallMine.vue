@@ -53,14 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-mine-refresh"
         @click="refreshPage"
       />
+      <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
       <OButton
         variant="outline"
         size="sm-action"
         icon-left="notifications-active"
+        class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
         data-test="oncall-mine-open-pages"
         @click="openMyPages"
       >
-        {{ t("oncall.mineOpenPages") }}
+        <span class="max-md:sr-only">{{ t("oncall.mineOpenPages") }}</span>
       </OButton>
     </template>
 

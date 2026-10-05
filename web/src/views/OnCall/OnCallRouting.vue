@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <OnCallDefaultTeamCard v-if="ready" :key="cardKey" :teams="teams" :dialog="true" />
       <OButton
-        v-if="ready"
+        v-if="ready && !isMobile"
         variant="outline"
         size="sm-action"
         :active="testerOpen"
@@ -60,6 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="openAdd"
       >
         {{ t("oncall.newRule") }}
+      </OButton>
+    </template>
+    <!-- Rendered twice rather than moved, so the laptop order (card, test, new rule) is unchanged. -->
+    <template #actions-overflow>
+      <OButton
+        v-if="ready && isMobile"
+        variant="outline"
+        size="sm-action"
+        :active="testerOpen"
+        data-test="oncall-routing-test-signal"
+        @click="testerOpen = !testerOpen"
+      >
+        {{ testerOpen ? t("oncall.routingHideTest") : t("oncall.routingTestSignal") }}
       </OButton>
     </template>
 
@@ -105,10 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar beside the search and refresh every other table has. -->
       <component :is="tableComponent" v-bind="tableProps" v-on="tableEvents">
         <template #toolbar>
-          <div class="flex w-full min-w-0 flex-wrap items-center gap-2">
+          <div class="flex w-full min-w-0 flex-wrap items-center gap-2 max-md:contents">
             <OToggleGroup
               :model-value="tab"
               type="single"
+              mobile-dropdown
               data-test="oncall-routing-tabs"
               @update:model-value="setTab"
             >
@@ -129,10 +143,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              emergencies the row tags name; `include_dismissed` swaps the
              outstanding worklist for the raw historical record. -->
             <template v-if="tab === 'signals'">
-              <div class="bg-border-default h-4 w-px shrink-0" />
+              <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
 
               <OToggleGroup
                 :model-value="signalFilters.landing || 'both'"
+                mobile-dropdown
+                data-test="oncall-unrouted-filter"
                 @update:model-value="setSignalLanding"
               >
                 <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
@@ -154,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
 
-              <div class="bg-border-default h-4 w-px shrink-0" />
+              <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
 
               <OSwitch
                 :model-value="signalFilters.include_dismissed"
@@ -166,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OSearchInput
               v-model="search"
-              class="min-w-48 flex-1"
+              class="min-w-48 flex-1 max-md:min-w-24"
               clearable
               :placeholder="t('common.searchEllipsis')"
               data-test="oncall-routing-search"
@@ -260,6 +276,7 @@ import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
 import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -311,6 +328,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { identityDimensions, isOnCallUnavailable } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const store = useStore();
 const router = useRouter();
 

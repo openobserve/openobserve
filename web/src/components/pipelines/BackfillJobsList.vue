@@ -22,46 +22,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          tick — needed because #o2-page-actions is created by the parent shell
          (Functions.vue) which may not have fully rendered when this component
          mounts on initial page load. -->
-    <Teleport to="#o2-page-actions" defer>
-      <OSelect
-        v-model="filters.status"
-        :options="allStatusOptions"
-        :placeholder="t('common.status')"
-        clearable
-        searchable
-        class="w-37.5"
-        data-test="status-filter"
-      />
-      <OSelect
-        v-model="filters.pipelineId"
-        :options="allPipelineOptions"
-        labelKey="label"
-        valueKey="value"
-        :placeholder="t('pipeline.pipelineLabel')"
-        clearable
-        searchable
-        class="w-62.5"
-        data-test="pipeline-filter"
-      />
-      <OButton variant="outline" size="sm" @click="clearFilters" data-test="clear-filters-btn">
-        {{ t("pipeline.clearFilters") }}
-      </OButton>
-      <OTableColumnToggle
-        :columns="columns"
-        :column-visibility="columnVisibility"
-        @update:column-visibility="setColumnVisibility"
-      />
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        class="shrink-0"
-        @click="refreshJobs"
-        :disabled="loading"
-        data-test="refresh-btn"
-        icon-left="refresh"
+    <!-- A phone header only has room for the title, so the filters become a toolbar row in the body. -->
+    <Teleport to="#o2-page-actions" defer :disabled="isMobile">
+      <div
+        :class="
+          isMobile
+            ? 'px-page-edge border-border-default flex flex-wrap items-center gap-2 border-b py-2'
+            : 'contents'
+        "
       >
-        <OTooltip :content="t('common.refresh')" side="top" />
-      </OButton>
+        <OSelect
+          v-model="filters.status"
+          :options="allStatusOptions"
+          :placeholder="t('common.status')"
+          clearable
+          searchable
+          class="w-37.5 max-md:w-32"
+          data-test="status-filter"
+        />
+        <OSelect
+          v-model="filters.pipelineId"
+          :options="allPipelineOptions"
+          labelKey="label"
+          valueKey="value"
+          :placeholder="t('pipeline.pipelineLabel')"
+          clearable
+          searchable
+          class="w-62.5 max-md:w-auto max-md:min-w-32 max-md:flex-1"
+          data-test="pipeline-filter"
+        />
+        <OButton variant="outline" size="sm" @click="clearFilters" data-test="clear-filters-btn">
+          {{ t("pipeline.clearFilters") }}
+        </OButton>
+        <OTableColumnToggle
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          @update:column-visibility="setColumnVisibility"
+        />
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          class="shrink-0"
+          @click="refreshJobs"
+          :disabled="loading"
+          data-test="refresh-btn"
+          icon-left="refresh"
+        >
+          <OTooltip :content="t('common.refresh')" side="top" />
+        </OButton>
+      </div>
     </Teleport>
 
     <!-- Jobs Table -->
@@ -101,13 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (id) => id === 'clear-filters' && ((filters.status = ''), (filters.pipelineId = ''))
               "
             />
-          </template>
-
-          <!-- Bottom footer -->
-          <template #bottom="{ totalRows }">
-            <div class="me-4 flex items-center py-2 text-xs font-normal max-md:hidden">
-              {{ t("pipeline.backfillJobLabel", { count: totalRows }, totalRows) }}
-            </div>
           </template>
 
           <!-- Pipeline Name Column -->
@@ -388,6 +390,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -404,6 +407,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 const store = useStore();
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 
 // Refs
 const qTableRef = ref();

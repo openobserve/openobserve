@@ -86,22 +86,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('dbm.databases.searchPlaceholder')"
             search-data-test="dbm-databases-search"
           >
-            <DbmScopeFilters
-              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
-              :filters="dimensionFilters"
-              @clear="clearScope"
+            <template #filters>
+              <DbmScopeFilters
+                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
+                :filters="dimensionFilters"
+                @clear="clearScope"
+              />
+            </template>
+            <DbmCoverageLine
+              inline
+              class="ms-auto"
+              :freshness="freshness"
+              :hits="rows"
+              :top-n-subset="topNSubset"
+              :error-count="errorCount"
+              exact-percentiles
+              data-test="dbm-databases-coverage"
             />
           </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DbmRefreshButton
-              mode="status"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-databases-refresh"
-            />
             <DateTime
               auto-apply
               menu-align="end"
@@ -109,14 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-databases-date-time"
-              class="h-8"
+              class="h-8 max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
-            <DbmRefreshButton
-              mode="button"
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
               :loading="loading"
+              :last-run-at="lastRunAt"
               data-test="dbm-databases-refresh"
-              @refresh="onRefresh"
+              @click="onRefresh()"
             />
           </div>
         </template>
@@ -125,16 +133,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <DbmSubheaderBand data-test="dbm-databases-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
+            <OStatStrip
+              :items="summaryStats"
+              :loading="loading"
+              selectable
+              :selected-key="statFilter"
+              default-key="databases"
+              @select="onStatSelect"
+            />
           </DbmSubheaderBand>
-          <DbmCoverageLine
-            :freshness="freshness"
-            :hits="rows"
-            :top-n-subset="topNSubset"
-            :error-count="errorCount"
-            exact-percentiles
-            data-test="dbm-databases-coverage"
-          />
         </template>
 
         <!-- One name column at three grains: a database, a schema or service
@@ -432,7 +439,6 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DateTime from "@/components/DateTime.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
@@ -440,6 +446,7 @@ import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -620,6 +627,12 @@ const errorCount = computed(() => rows.value.reduce((acc, row) => acc + (row.err
  * facet the table can filter to, so making them clickable would promise a
  * behaviour the page does not have.
  */
+// The Failed tile narrows the table to databases with a failed call; Calls and Database time are totals, not rows.
+const statFilter = ref<"failed" | null>(null);
+const onStatSelect = (key: string) => {
+  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
+};
+
 const summaryStats = computed<StatItem[]>(() => {
   // Both figures are summed over the CLIENT hits, so the trace vantage is the
   // population signal: no trace rows means nobody measured, and the sums are
@@ -649,6 +662,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: calls.value ?? raw("—"),
       icon: "bar-chart",
       tone: "info",
+      selectable: false,
       dataTest: "dbm-databases-summary-calls",
     },
     {
@@ -657,6 +671,7 @@ const summaryStats = computed<StatItem[]>(() => {
       value: time.value ?? raw("—"),
       icon: "timer",
       tone: "teal",
+      selectable: false,
       dataTest: "dbm-databases-summary-time",
     },
     {
@@ -665,12 +680,15 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-databases-summary-failed",
     },
   ];
 });
 
-const isFiltered = computed(() => !!search.value || !!systemFilter.value);
+const isFiltered = computed(
+  () => !!search.value || !!systemFilter.value || statFilter.value !== null,
+);
 
 // Every filter change publishes the scope to the URL BEFORE reloading — the
 // factory owns the handler, so no entry can forget the URL half.
@@ -701,8 +719,10 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
  */
 const visibleRows = computed(() => {
   const needle = search.value.trim().toLowerCase();
-  if (!needle) return rows.value;
-  return rows.value.filter((row) =>
+  const scoped =
+    statFilter.value === "failed" ? rows.value.filter((row) => (row.errors ?? 0) > 0) : rows.value;
+  if (!needle) return scoped;
+  return scoped.filter((row) =>
     [row.db_instance, row.db_namespace, row.db_system, ...(row.calling_services ?? [])]
       .filter(Boolean)
       .some((field) => String(field).toLowerCase().includes(needle)),
@@ -1404,6 +1424,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // half that cannot be hoisted into a header on a table that mixes engines.
   {
     id: "calls",
+    hideable: true,
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
     // At 96 the "from your apps" sub-label ellipsised beside the sort chevron.
@@ -1416,6 +1437,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "qps",
+    hideable: true,
     header: t("dbm.databases.columns.qps"),
     // "Per second" plus the sort icon needs ~100; at 84 it ellipsised to
     // "Per se…".
@@ -1428,6 +1450,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "errorRate",
+    hideable: true,
     header: t("dbm.databases.columns.errorRate"),
     accessorKey: "errorRate",
     size: 84,
@@ -1436,6 +1459,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p50",
+    hideable: true,
     header: t("dbm.databases.columns.p50"),
     accessorKey: "p50_ns",
     // The label is prose ("Half are under"), not a token, so the width has to
@@ -1451,6 +1475,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p95",
+    hideable: true,
     header: t("dbm.databases.columns.p95"),
     accessorKey: "p95_ns",
     size: 96,
@@ -1463,6 +1488,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "p99",
+    hideable: true,
     header: t("dbm.databases.columns.p99"),
     accessorKey: "p99_ns",
     // Same as p50: "Slowest 1%" plus the sort icon did not fit in 92.
@@ -1476,6 +1502,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "services",
+    hideable: true,
     header: t("dbm.databases.columns.services"),
     accessorKey: "calling_services",
     size: 200,
@@ -1491,6 +1518,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // setting, which is the same discipline the four unmatched causes follow.
   {
     id: "instanceHealth",
+    hideable: true,
     header: t("dbm.instanceMetrics.columnHeader"),
     // Width 200: the cell carries a sparkline, the ratio, the "N of M
     // connections" line AND the secondary chips (cache hit, lag, deadlocks);
@@ -1510,6 +1538,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // the vantage it came from.
   {
     id: "attention",
+    hideable: true,
     header: t("dbm.databases.columns.attention"),
     size: 130,
     sortable: true,
@@ -1521,6 +1550,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "load",
+    hideable: true,
     header: t("dbm.databases.columns.load"),
     accessorKey: "total_time_ns",
     size: 190,
@@ -1572,6 +1602,7 @@ const defaultColumnVisibility = {};
 
 const clearScope = () => {
   systemFilter.value = null;
+  statFilter.value = null;
   // Clear the SEARCH too, the way every sibling tab's clear does
   // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set makes "clear"
   // mean two different things inside one section: the list stays narrowed by a

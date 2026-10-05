@@ -69,6 +69,7 @@ import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
 import { RumIngestionPage } from "./rumPages/rumIngestionPage.js";
 import { RumSourcemapsPage } from "./rumPages/rumSourcemapsPage.js";
+import { RumProductAnalyticsPage } from "./rumPages/rumProductAnalyticsPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
@@ -76,6 +77,8 @@ import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
 import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
 import { IamFormValidationPage } from "./iamPages/iamFormValidationPage.js";
+import { GroupsPage } from "./iamPages/groupsPage.js";
+import { RolesPage } from "./iamPages/rolesPage.js";
 import { DashboardsFormValidationPage } from "./dashboardPages/dashboardsFormValidationPage.js";
 import { AlertsFormValidationPage } from "./alertsPages/alertsFormValidationPage.js";
 import { OnboardingFormValidationPage } from "./generalPages/onboardingFormValidationPage.js";
@@ -94,8 +97,12 @@ import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.
 import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
+import { QueueWorkbenchPage } from "./generalPages/queueWorkbenchPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
+import { OrganizationManagementPage } from "./generalPages/organizationManagementPage.js";
+import { LogoManagementPage } from "./generalPages/logoManagementPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
+import { QueryManagementPage } from "./generalPages/queryManagementPage.js";
 import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
@@ -126,6 +133,7 @@ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationP
 // ===== FUNCTIONS PAGE OBJECTS =====
 const FunctionsPage = require("./functionsPages/functionsPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
+const FunctionsImportExportPage = require("./functionsPages/functionsImportExportPage.js");
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
@@ -224,6 +232,8 @@ class PageManager {
     this.iamPage = new IamPage(page);
     this.ingestionTokensPage = new IngestionTokensPage(page);
     this.iamFormValidation = new IamFormValidationPage(page);
+    this.groupsPage = new GroupsPage(page);
+    this.rolesPage = new RolesPage(page);
     this.dashboardsFormValidation = new DashboardsFormValidationPage(page);
     this.alertsFormValidation = new AlertsFormValidationPage(page);
     this.onboardingFormValidation = new OnboardingFormValidationPage(page);
@@ -242,8 +252,12 @@ class PageManager {
     this.correlationDrawerPage = new CorrelationDrawerPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
+    this.queueWorkbenchPage = new QueueWorkbenchPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
+    this.organizationManagementPage = new OrganizationManagementPage(page);
+    this.logoManagementPage = new LogoManagementPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
+    this.queryManagementPage = new QueryManagementPage(page);
     this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
@@ -265,6 +279,7 @@ class PageManager {
     // ===== FUNCTIONS PAGE OBJECTS =====
     this.functionsPage = new FunctionsPage(page);
     this.functionsFormValidation = new FunctionsFormValidationPage(page);
+    this.functionsImportExport = new FunctionsImportExportPage(page);
 
     // ===== CIPHER KEYS PAGE OBJECTS =====
     this.cipherKeysFormValidation = new CipherKeysFormValidationPage(page);
@@ -284,6 +299,7 @@ class PageManager {
     this.rumPerformancePage = new RumPerformancePage(page);
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);
+    this.rumProductAnalyticsPage = new RumProductAnalyticsPage(page);
   }
 }
 

@@ -1,6 +1,9 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+
+// The dropdown trigger intermittently drops the opening click, so it is re-tried.
+const HELP_MENU_OPEN_ATTEMPTS = 3;
 import { openNavFlyoutChild } from '../commonActions.js';
 
 class EnrichmentPage {
@@ -246,7 +249,23 @@ class EnrichmentPage {
      */
     async clickHelpMenuItem() {
         await this.helpMenuItem.waitFor({ state: 'visible', timeout: 10000 });
-        await this.helpMenuItem.click();
+
+        // The trigger intermittently swallows the first click and stays closed, which
+        // then reads as the menu's items being missing rather than never rendered.
+        // `data-state` is the dropdown's own signal, so it separates the two.
+        for (let attempt = 1; attempt <= HELP_MENU_OPEN_ATTEMPTS; attempt++) {
+            await this.helpMenuItem.click();
+            try {
+                await expect(this.helpMenuItem)
+                    .toHaveAttribute('data-state', 'open', { timeout: 3000 });
+                return;
+            } catch (e) {
+                testLogger.warn(`clickHelpMenuItem: menu still closed after attempt ${attempt}`);
+            }
+        }
+        throw new Error(
+            `help menu did not open after ${HELP_MENU_OPEN_ATTEMPTS} attempts`
+        );
     }
 
     /**
@@ -2531,6 +2550,66 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const inputFile = this.page.locator(this.fileInput);
         await inputFile.setInputFiles(filePath);
         testLogger.debug('File input set');
+    }
+
+    /** Delete on a budget; the prefix sweep in cleanup.spec.js is the real safety net. */
+    async bestEffortDeleteTable(tableName, budgetMs = 30000) {
+        let timer;
+        const budget = new Promise((resolve) => {
+            timer = setTimeout(() => resolve({ deleted: false, reason: 'budget_exceeded' }), budgetMs);
+        });
+        try {
+            return await Promise.race([this.deleteTableIfExists(tableName), budget]);
+        } catch (error) {
+            return { deleted: false, reason: 'deletion_failed', error: error.message };
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    /** Upload a CSV table under the given name, ready to be explored. */
+    async uploadTableAndConfirmListed(tableName, csvPath) {
+        await this.uploadEnrichmentFile(csvPath, tableName);
+        await this.waitForAddFormToClose();
+        await this.searchEnrichmentTableInList(tableName);
+        await this.verifyTableVisibleInList(tableName);
+    }
+
+    /** Wait for Explore to land on the logs page and hand back its query params. */
+    async waitForExploreNavigation() {
+        await this.page.waitForURL(/\/web\/logs/, { timeout: 30000 });
+        return new URL(this.page.url()).searchParams;
+    }
+
+    /** Explore must carry the table's own stream type, not fall back to logs. */
+    async expectExploreScopedToTable(tableName) {
+        const params = await this.waitForExploreNavigation();
+        expect(params.get('stream_type')).toBe('enrichment_tables');
+        expect(params.get('stream')).toBe(tableName);
+        expect(params.get('type')).toBe('stream_explorer');
+    }
+
+    /** Explore derives from/to from the table's stats; a 15m period means the lookup failed. */
+    async expectExploreTimeRangeFromTableStats() {
+        const params = await this.waitForExploreNavigation();
+        expect(params.get('period'), 'explore fell back to a relative period').toBeNull();
+
+        const from = Number(params.get('from'));
+        const to = Number(params.get('to'));
+        expect(Number.isFinite(from) && from > 0, `unusable from=${params.get('from')}`).toBe(true);
+        expect(Number.isFinite(to) && to > from, `unusable to=${params.get('to')}`).toBe(true);
+        return { from, to };
+    }
+
+    /** The explored table's own columns must load, which is what "stream not found" used to block. */
+    async expectFieldListContains(fieldName) {
+        await this.page
+            .locator(`[data-test="logs-field-list-item-${fieldName}"]`)
+            .waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    async expectNoStreamNotFoundError() {
+        await expect(this.page.getByText(/stream not found/i)).toHaveCount(0);
     }
 }
 

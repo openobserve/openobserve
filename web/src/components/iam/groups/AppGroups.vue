@@ -64,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('iam.groups')"
           sorting="client"
           selection="multiple"
           filter-mode="client"
@@ -173,12 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => (id === 'create' ? addGroup() : (filterQuery = ''))"
             />
           </template>
-          <template #bottom>
-            <span class="text-xs font-normal max-md:hidden"
-              >{{ rows.length }} {{ t("iam.groups") }}</span
-            >
+          <template #selection-actions>
             <OButton
-              v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
               variant="outline-destructive"
               size="sm"

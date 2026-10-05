@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Metrics index layout, label pruning, and row-selection caching.
+//! Metrics index layout and label pruning.
 
 pub mod block;
-mod cache;
+pub mod block_cache;
 pub mod layout;
+mod matcher;
 mod pruner;
 mod reader;
 
 pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
 };
-pub use pruner::search;
+pub use matcher::{matcher_predicates, matcher_residual_field};
+pub use pruner::{matching_blocks, search};
+pub use reader::fetch_parsed_index;
 
 #[cfg(test)]
 mod tests {
@@ -44,7 +47,7 @@ mod tests {
         METRICS_INDEX_ROW_COUNT,
         pruner::{
             create_physical_filter, metrics_index_labels, residual_matchers_covered, search,
-            selection_cache_key, sidecar_covers_labels,
+            sidecar_covers_labels,
         },
         reader::{MetricsIndexData, evaluate_metrics_index, load_metrics_index_file},
     };
@@ -65,25 +68,6 @@ mod tests {
         );
         assert_eq!(files.len(), 1);
         assert!(files[0].selection.is_none());
-    }
-
-    #[test]
-    fn cache_key_changes_with_the_schema_derived_label_set() {
-        // same matcher text, wider label set after schema evolution -> new key
-        let labels_v1 = vec!["a".to_string()];
-        let labels_v2 = vec!["a".to_string(), "b".to_string()];
-        let filter_key = r#"{a="x", b="y"}"#;
-        let key_v1 = selection_cache_key("acct", "path.midx", 100, &labels_v1, filter_key);
-        let key_v2 = selection_cache_key("acct", "path.midx", 100, &labels_v2, filter_key);
-        assert_ne!(key_v1, key_v2);
-        assert_eq!(
-            key_v1,
-            selection_cache_key("acct", "path.midx", 100, &labels_v1, filter_key)
-        );
-        assert_ne!(
-            key_v1,
-            selection_cache_key("acct", "path.midx", 101, &labels_v1, filter_key)
-        );
     }
 
     #[test]
@@ -233,7 +217,8 @@ mod tests {
             .unwrap();
         let id = config::ider::uuid();
         let account = format!("{id}:default");
-        let path = format!("files/test/midx/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
+        let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
         let store = object_store::memory::InMemory::new();
         store
             .put_opts(
@@ -246,10 +231,13 @@ mod tests {
         infra::storage::add_account(&id, Box::new(store)).await;
         load_metrics_index_file(
             &account,
+            &data_path,
             &path,
             config::FileFormat::Vortex,
-            rows,
-            123,
+            crate::block::ParentMetadata {
+                rows: rows as u64,
+                compressed_size: 123,
+            },
             0,
             crate::reader::IndexLabels {
                 requested: Arc::new(requested.to_vec()),

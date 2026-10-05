@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
 import store from "@/stores";
+import analytics from "./product_analytics";
 
 const STREAM_NAME = "synthetics_results";
 
@@ -46,6 +47,11 @@ export interface SyntheticsVariablePayload {
   tags?: string[];
 }
 
+/** A variable's kind is fixed once created, so an update may leave it out. */
+export type SyntheticsVariableUpdatePayload = Omit<SyntheticsVariablePayload, "kind"> & {
+  kind?: SyntheticsVariablePayload["kind"];
+};
+
 export interface SyntheticsEnvironmentPayload {
   name: string;
   description?: string;
@@ -74,12 +80,26 @@ export interface GetRunPayload {
 const syntheticsService = {
   create: (orgIdentifier: string, payload: unknown, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
-    return http().post(`/api/${orgIdentifier}/synthetics${params}`, payload);
+    return http()
+      .post(`/api/${orgIdentifier}/synthetics${params}`, payload)
+      .then((res) => {
+        analytics.track("synthetic_test_created", {
+          type: (payload as { type?: string } | null)?.type,
+        });
+        return res;
+      });
   },
 
   update: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
-    return http().put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload);
+    return http()
+      .put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload)
+      .then((res) => {
+        analytics.track("synthetic_test_updated", {
+          type: (payload as { type?: string } | null)?.type,
+        });
+        return res;
+      });
   },
 
   // folderId is the check's folder ID (KSUID, or "default"), passed as ?folder=
@@ -131,6 +151,15 @@ const syntheticsService = {
   getRun: (orgIdentifier: string, id: string, runId: string, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
     return http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}${params}`);
+  },
+
+  /** Checks that reference `id` as a subtest — used to warn before deleting or unpublishing it. */
+  referencedBy: (orgIdentifier: string, id: string, placeholders?: string[]) => {
+    // Absent means "do not evaluate breakage" — an empty value would read as an empty name list.
+    const query = placeholders?.length
+      ? `?placeholders=${encodeURIComponent(placeholders.join(","))}`
+      : "";
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}/referenced-by${query}`);
   },
 
   artifactUrl: (orgIdentifier: string, key: string, folderId?: string) => {
@@ -228,7 +257,7 @@ const syntheticsService = {
   updateGlobalVariable: (
     orgIdentifier: string,
     id: string,
-    body: SyntheticsVariablePayload,
+    body: SyntheticsVariableUpdatePayload,
     force = false,
   ) => http().put(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`, body),
 
@@ -270,7 +299,7 @@ const syntheticsService = {
     orgIdentifier: string,
     env: string,
     id: string,
-    body: SyntheticsVariablePayload,
+    body: SyntheticsVariableUpdatePayload,
     force = false,
   ) =>
     http().put(

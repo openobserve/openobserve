@@ -29,8 +29,10 @@ import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { b64EncodeStandard } from "@/utils/zincutils";
+import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import useIngestion from "@/composables/useIngestion";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
@@ -67,6 +69,7 @@ const subs = computed<CardSubstitutions>(() => {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
     token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    isPrimaryCloud: isPrimaryCloudWebUrl(store.state.zoConfig?.web_url),
   };
 });
 
@@ -127,6 +130,8 @@ const onStepAction = async (actionId: string) => {
       });
       return;
     }
+    // Only this user-invoked path counts; the import in onDetected runs on its own.
+    if (result.status === "created") analytics.track("dashboard_created");
     target = { id: result.dashboardId, folderId: result.folderId };
     importedDashboard.value = target;
   }

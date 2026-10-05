@@ -18,8 +18,8 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, DictionaryArray, Int64Array, LargeStringArray, StringArray,
-        StringViewArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array,
+        Array, ArrayRef, DictionaryArray, LargeStringArray, StringArray, StringViewArray,
+        UInt8Array, UInt16Array, UInt32Array,
     },
     datatypes::{DataType, UInt8Type, UInt16Type, UInt32Type},
 };
@@ -50,15 +50,19 @@ impl<'a> Input<'a> {
     fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.take(4)?.try_into()?))
     }
+    fn id(&mut self, width: usize) -> Result<u32> {
+        let mut id = [0u8; 4];
+        id[..width].copy_from_slice(self.take(width)?);
+        Ok(u32::from_le_bytes(id))
+    }
     fn remaining(&self) -> usize {
         self.bytes.len() - self.pos
     }
 }
 
-/// Encodes one column into a single zstd frame.
-pub(super) fn encode_frame(col: &dyn Array) -> Result<(Section, Vec<u8>)> {
-    let raw = encode_column(col)?;
-    let frame = zstd::bulk::compress(&raw, 1)?;
+/// Compresses one column's raw bytes into a single zstd frame.
+pub(super) fn encode_frame(raw: &[u8]) -> Result<(Section, Vec<u8>)> {
+    let frame = zstd::bulk::compress(raw, 1)?;
     Ok((
         Section {
             raw: u64::try_from(raw.len())?,
@@ -75,14 +79,12 @@ pub(super) fn frame_decoder() -> Result<zstd::bulk::Decompressor<'static>> {
     Ok(decoder)
 }
 
-/// Decodes one column frame whose declared decompressed size is `raw_len`.
+/// Decompresses one column frame whose declared decompressed size is `raw_len`.
 pub(super) fn decode_frame(
     decoder: &mut zstd::bulk::Decompressor<'static>,
     frame: &[u8],
     raw_len: usize,
-    kind: &DataType,
-    rows: usize,
-) -> Result<ArrayRef> {
+) -> Result<Vec<u8>> {
     ensure!(
         zstd::zstd_safe::find_frame_compressed_size(frame)
             .map_err(|e| anyhow::anyhow!("invalid zstd frame: {e:?}"))?
@@ -102,64 +104,45 @@ pub(super) fn decode_frame(
         decoder.decompress_to_buffer(frame, &mut raw)? == raw_len,
         "MIDX frame decompressed size mismatch"
     );
-    decode_column(&raw, kind, rows)
+    Ok(raw)
 }
 
-fn encode_column(col: &dyn Array) -> Result<Vec<u8>> {
-    let mut out = Vec::new();
-    match col.data_type() {
-        DataType::UInt64 => {
-            ensure!(col.null_count() == 0, "null compact integer");
-            for v in col
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .context("uint64")?
-                .values()
-            {
-                out.extend_from_slice(&v.to_le_bytes());
-            }
-        }
-        DataType::Int64 => {
-            ensure!(col.null_count() == 0, "null compact integer");
-            for v in col
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .context("int64")?
-                .values()
-            {
-                out.extend_from_slice(&v.to_le_bytes());
-            }
-        }
-        DataType::UInt32 => {
-            ensure!(col.null_count() == 0, "null compact integer");
-            for v in col
-                .as_any()
-                .downcast_ref::<UInt32Array>()
-                .context("uint32")?
-                .values()
-            {
-                out.extend_from_slice(&v.to_le_bytes());
-            }
-        }
-        DataType::Boolean => {
-            ensure!(col.null_count() == 0, "null compact bool");
-            let col = col
-                .as_any()
-                .downcast_ref::<BooleanArray>()
-                .context("bool")?;
-            for i in 0..col.len() {
-                out.push(u8::from(col.value(i)));
-            }
-        }
-        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
-            return encode_string_column(col);
-        }
-        _ => anyhow::bail!("unsupported compact field"),
+pub(super) fn put_varint(out: &mut Vec<u8>, mut value: u64) {
+    while value >= 0x80 {
+        out.push(value as u8 | 0x80);
+        value >>= 7;
     }
-    Ok(out)
+    out.push(value as u8);
 }
 
-fn encode_string_column(col: &dyn Array) -> Result<Vec<u8>> {
+/// Reads one LEB128 value of at most 10 bytes.
+#[inline]
+pub(super) fn get_varint(bytes: &[u8], pos: &mut usize) -> Result<u64> {
+    let mut value = 0u64;
+    for shift in (0..64).step_by(7) {
+        let byte = *bytes.get(*pos).context("truncated varint")?;
+        *pos += 1;
+        ensure!(shift < 63 || byte <= 1, "varint overflow");
+        value |= u64::from(byte & 0x7f) << shift;
+        if byte < 0x80 {
+            return Ok(value);
+        }
+    }
+    anyhow::bail!("varint overflow")
+}
+
+#[inline]
+pub(super) fn zigzag(value: i64) -> u64 {
+    ((value << 1) ^ (value >> 63)) as u64
+}
+
+#[inline]
+pub(super) fn unzigzag(value: u64) -> i64 {
+    ((value >> 1) as i64) ^ -((value & 1) as i64)
+}
+
+/// Dictionary, then one id per row whose width depends on the dictionary size.
+pub(super) fn encode_label_column(col: &dyn Array) -> Result<Vec<u8>> {
     let mut dictionary = Vec::new();
     let mut ids = HashMap::new();
     let mut indices = Vec::with_capacity(col.len());
@@ -180,62 +163,18 @@ fn encode_string_column(col: &dyn Array) -> Result<Vec<u8>> {
     }
     let mut out = Vec::new();
     out.extend_from_slice(&u32::try_from(dictionary.len())?.to_le_bytes());
-    for value in dictionary {
+    for value in &dictionary {
         out.extend_from_slice(&u32::try_from(value.len())?.to_le_bytes());
         out.extend_from_slice(value.as_bytes());
     }
+    let width = id_width(dictionary.len());
     for id in indices {
-        out.extend_from_slice(&id.to_le_bytes());
+        out.extend_from_slice(&id.to_le_bytes()[..width]);
     }
     Ok(out)
 }
 
-fn decode_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<ArrayRef> {
-    match kind {
-        DataType::UInt64 | DataType::Int64 => {
-            ensure!(
-                raw.len() == rows.checked_mul(8).context("column size overflow")?,
-                "compact integer length"
-            );
-            if kind == &DataType::UInt64 {
-                Ok(Arc::new(UInt64Array::from_iter_values(
-                    raw.chunks_exact(8)
-                        .map(|v| u64::from_le_bytes(v.try_into().unwrap())),
-                )))
-            } else {
-                Ok(Arc::new(Int64Array::from_iter_values(
-                    raw.chunks_exact(8)
-                        .map(|v| i64::from_le_bytes(v.try_into().unwrap())),
-                )))
-            }
-        }
-        DataType::UInt32 => {
-            ensure!(
-                raw.len() == rows.checked_mul(4).context("column size overflow")?,
-                "compact integer length"
-            );
-            Ok(Arc::new(UInt32Array::from_iter_values(
-                raw.chunks_exact(4)
-                    .map(|v| u32::from_le_bytes(v.try_into().unwrap())),
-            )))
-        }
-        DataType::Boolean => {
-            ensure!(
-                raw.len() == rows && raw.iter().all(|v| *v <= 1),
-                "invalid compact boolean"
-            );
-            Ok(Arc::new(BooleanArray::from(
-                raw.iter().map(|v| *v != 0).collect::<Vec<_>>(),
-            )))
-        }
-        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
-            decode_string_column(raw, kind, rows)
-        }
-        _ => anyhow::bail!("unsupported compact field"),
-    }
-}
-
-fn decode_string_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<ArrayRef> {
+pub(super) fn decode_label_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<ArrayRef> {
     let mut input = Input::new(raw);
     let count = input.u32()? as usize;
     ensure!(
@@ -254,8 +193,10 @@ fn decode_string_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<Arra
             .context("compact dictionary bytes overflow")?;
         dictionary.push(std::str::from_utf8(input.take(len)?)?);
     }
+    let id_width = id_width(count);
+    let null = u32::MAX >> (32 - 8 * id_width);
     ensure!(
-        input.remaining() == rows.checked_mul(4).context("index size overflow")?,
+        input.remaining() == rows.checked_mul(id_width).context("index size overflow")?,
         "compact label indices length"
     );
     let mut ids = Vec::new();
@@ -265,8 +206,8 @@ fn decode_string_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<Arra
     let mut view_payload = 0usize;
     let mut has_null = false;
     for _ in 0..rows {
-        let id = input.u32()?;
-        if id == u32::MAX {
+        let id = input.id(id_width)?;
+        if id == null {
             has_null = true;
             ids.push(None);
         } else {
@@ -348,6 +289,17 @@ fn decode_string_column(raw: &[u8], kind: &DataType, rows: usize) -> Result<Arra
     Ok(compact)
 }
 
+/// Stored label id width: the all-ones id of each width is NULL, so it never names an entry.
+fn id_width(count: usize) -> usize {
+    if count < 0xff {
+        1
+    } else if count < 0xffff {
+        2
+    } else {
+        4
+    }
+}
+
 #[cfg(test)]
 mod adaptive_tests {
     use super::*;
@@ -372,8 +324,8 @@ mod adaptive_tests {
                 .chain(std::iter::once(None))
                 .collect::<Vec<_>>();
             let source: ArrayRef = Arc::new(StringArray::from(rows));
-            let raw = encode_column(source.as_ref()).unwrap();
-            let decoded = decode_column(&raw, &DataType::Utf8, source.len()).unwrap();
+            let raw = encode_label_column(source.as_ref()).unwrap();
+            let decoded = decode_label_column(&raw, &DataType::Utf8, source.len()).unwrap();
             assert_eq!(
                 decoded.data_type(),
                 &DataType::Dictionary(Box::new(width), Box::new(DataType::Utf8))
@@ -409,8 +361,8 @@ mod adaptive_tests {
                 DataType::LargeUtf8 => Arc::new(LargeStringArray::from(values)),
                 _ => Arc::new(StringViewArray::from(values)),
             };
-            let raw = encode_column(source.as_ref()).unwrap();
-            let decoded = decode_column(&raw, &kind, source.len()).unwrap();
+            let raw = encode_label_column(source.as_ref()).unwrap();
+            let decoded = decode_label_column(&raw, &kind, source.len()).unwrap();
             assert!(
                 matches!(decoded.data_type(),DataType::Dictionary(key,_) if **key==DataType::UInt8)
             );
@@ -424,8 +376,43 @@ mod adaptive_tests {
         let source: ArrayRef = Arc::new(StringArray::from_iter_values(
             (0..1024).map(|i| format!("unique-{i:06}")),
         ));
-        let raw = encode_column(source.as_ref()).unwrap();
-        let decoded = decode_column(&raw, &DataType::Utf8, source.len()).unwrap();
+        let raw = encode_label_column(source.as_ref()).unwrap();
+        let decoded = decode_label_column(&raw, &DataType::Utf8, source.len()).unwrap();
         assert_eq!(decoded.data_type(), &DataType::Utf8);
+    }
+
+    #[test]
+    fn label_id_width_and_null_follow_dictionary_size() {
+        for (count, width) in [(254, 1), (255, 2), (65534, 2), (65535, 4)] {
+            let values = std::iter::once(String::new())
+                .chain((1..count).map(|i| format!("v{i}")))
+                .collect::<Vec<_>>();
+            let rows = values
+                .iter()
+                .map(|value| Some(value.as_str()))
+                .chain([None, Some("")])
+                .collect::<Vec<_>>();
+            let source: ArrayRef = Arc::new(StringArray::from(rows));
+            let raw = encode_label_column(source.as_ref()).unwrap();
+            let dictionary = 4 + values.iter().map(|v| 4 + v.len()).sum::<usize>();
+            assert_eq!(raw.len(), dictionary + source.len() * width);
+            let null = &raw[dictionary + count * width..][..width];
+            assert!(null.iter().all(|byte| *byte == 0xff));
+            let decoded = decode_label_column(&raw, &DataType::Utf8, source.len()).unwrap();
+            for row in 0..source.len() {
+                assert_eq!(
+                    super::label_value(source.as_ref(), row).unwrap(),
+                    super::label_value(decoded.as_ref(), row).unwrap()
+                );
+            }
+            assert_eq!(super::label_value(decoded.as_ref(), count).unwrap(), None);
+            assert_eq!(
+                super::label_value(decoded.as_ref(), count + 1).unwrap(),
+                Some("")
+            );
+            let mut truncated = raw.clone();
+            truncated.pop();
+            assert!(decode_label_column(&truncated, &DataType::Utf8, source.len()).is_err());
+        }
     }
 }

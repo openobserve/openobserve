@@ -285,9 +285,6 @@ export interface OTableProps<TData = any> {
   totalCountExact?: boolean;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
-  /** When true, the caller's `#bottom` slot IS the pagination bar and replaces
-   *  the built-in controls. Leave false when `#bottom` holds only bulk actions. */
-  customPaginationBar?: boolean;
 
   // ── Sorting ──
   sorting?: OTableSortingMode;
@@ -306,8 +303,6 @@ export interface OTableProps<TData = any> {
   /** Show built-in global filter search bar (default: true) */
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
-  /** Label shown bold in the footer as "N footerTitle" (e.g. "2 Dashboards") */
-  footerTitle?: I18nText;
 
   // ── Selection ──
   selection?: OTableSelectionMode;
@@ -637,8 +632,8 @@ export interface OTableSlots<TData = any> {
   "toolbar-trailing"?: () => any;
   /** Full-width content between the toolbar and the table body (e.g. a summary-stat strip). */
   subheader?: () => any;
-  /** Content below the table (above pagination). Scoped with pagination state. */
-  bottom?: (props: {
+  /** A caller-drawn pager: replaces the built-in pagination bar and still renders with `pagination="none"`. */
+  "pagination-bar"?: (props: {
     currentPage: number;
     pageSize: number;
     totalPages: number;
@@ -651,6 +646,10 @@ export interface OTableSlots<TData = any> {
     nextPage: () => void;
     lastPage: () => void;
   }) => any;
+  /** Bulk-action buttons after the footer's "N of M selected" count while rows are selected; the built-in bar hosts them, so `pagination="none"` or `#pagination-bar` renders none. */
+  "selection-actions"?: () => any;
+  /** Footer start-side line for what the pager cannot say (a cap, partial data), yielding to the selection count; like `#selection-actions`, it needs the built-in bar. */
+  "footer-note"?: () => any;
   /** Shown when loading=true AND data exists (thin banner, not overlay) */
   "loading-banner"?: () => any;
   /** Custom loading indicator (overlay when no data) */
@@ -659,6 +658,8 @@ export interface OTableSlots<TData = any> {
   empty?: () => any;
   /** Custom error state */
   error?: (props: { message: string }) => any;
+  /** One `<tr>` (cells spanning the columns) rendered as the first row of the body, under the column header, before the first data row; not measured by virtual scrolling. */
+  "body-start"?: () => any;
   /** Expanded row content — scoped to the plain row data (`row.original`) */
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */

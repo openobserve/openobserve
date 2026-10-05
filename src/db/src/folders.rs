@@ -76,6 +76,9 @@ pub enum FolderError {
     /// An error that occurs when trying to delete a folder that contains workflows.
     #[error("Folder contains workflows. Please move/delete workflows from folder.")]
     DeleteWithWorkflows,
+    /// An error that occurs when trying to delete a folder that contains prompts.
+    #[error("Folder contains prompts. Please move/delete prompts from folder.")]
+    DeleteWithPrompts,
 
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
@@ -244,6 +247,7 @@ pub async fn list_folders(
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
         FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
         FolderType::Workflows => OFGA_MODELS.get("workflow_folder").unwrap().key,
+        FolderType::Prompts => OFGA_MODELS.get("prompt_folders").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -354,6 +358,38 @@ pub async fn delete_folder(
                 return Err(FolderError::DeleteWithWorkflows);
             }
         }
+        FolderType::Prompts => {
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+            {
+                use sea_orm::{
+                    ConnectionTrait, TryGetable,
+                    sea_query::{Alias, Expr, Func, Query},
+                };
+                let query = Query::select()
+                    .expr_as(
+                        Func::count(Expr::col(Alias::new("entity_id"))),
+                        Alias::new("count"),
+                    )
+                    .from(Alias::new("llm_prompts"))
+                    .and_where(Expr::col(Alias::new("org_id")).eq(org_id))
+                    .and_where(Expr::col(Alias::new("folder_id")).eq(folder_pk))
+                    .to_owned();
+                let statement = client.get_database_backend().build(&query);
+                let count = match client
+                    .query_one(statement)
+                    .await
+                    .map_err(infra::errors::Error::from)?
+                {
+                    Some(row) => i64::try_get(&row, "", "count")
+                        .map_err(|error| infra::errors::Error::Message(format!("{error:?}")))?,
+                    None => 0,
+                };
+                if count > 0 {
+                    return Err(FolderError::DeleteWithPrompts);
+                }
+            }
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {
@@ -388,6 +424,7 @@ fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
         FolderType::Reports => "report_folders",
         FolderType::Synthetics => "synthetic_folder",
         FolderType::Workflows => "workflow_folder",
+        FolderType::Prompts => "prompt_folders",
     }
 }
 
@@ -427,6 +464,9 @@ async fn permitted_folders(
             OFGA_MODELS.get("workflow_folder").unwrap().key,
             OFGA_MODELS.get("workflows").unwrap().key,
         ),
+        // Prompt grants are plain `prompt:{id}` with no folder prefix, so there is no
+        // individual grant to lift a folder into view: only folder `GET` counts.
+        FolderType::Prompts => (OFGA_MODELS.get("prompt_folders").unwrap().key, ""),
     };
 
     let Some(user_id) = user_id else {
@@ -437,6 +477,10 @@ async fn permitted_folders(
     let mut folder_list = list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
         .await
         .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+
+    if child_ofga_model.is_empty() {
+        return Ok(folder_list);
+    }
 
     // In some cases, there might not be direct `GET` permission on the folder.
     // So, we need to check if the user has `GET` permission on any of the dashboards

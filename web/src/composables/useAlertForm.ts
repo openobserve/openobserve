@@ -37,7 +37,7 @@ import {
 } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 
 import useStreams from "@/composables/useStreams";
@@ -107,8 +107,10 @@ import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
+  anomalyBandWidthPrefill,
   anomalyBudgetPerDay,
   anomalyIntervalSeconds,
+  anomalyWindowShareErrors,
   type AnomalyIntervalUnit,
   type AnomalyStoredIntervals,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
@@ -189,6 +191,11 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    // Off by default: a recovery is a new outbound message class, so it is opted into.
+    notify_on_recovery: false,
+    recovery_destinations: [],
+    // Seconds the condition must stay clear before recovering. 0 = immediately.
+    keep_firing_for: 0,
     // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
     // priority id, and the payload layer drops null so pre-Feature-2 alerts
     // serialize unchanged.
@@ -263,6 +270,28 @@ export const anomalyIntervalPayload = (
   return { histogram_interval, schedule_interval, detection_window_seconds };
 };
 
+const numberOrNull = (v: unknown): number | null =>
+  v === "" || v === null || v === undefined ? null : Number(v);
+
+/** Band width and delivery-policy fields; a blank input goes out as null, which the server reads as its default. */
+export const anomalyBandPayload = (
+  c: {
+    band_width?: unknown;
+    alert_direction?: string | null;
+    alert_window_buckets?: unknown;
+    alert_window_fire_pct?: unknown;
+    alert_window_recover_pct?: unknown;
+  },
+  budgetMode: boolean,
+) => ({
+  // The server rejects a band width beside a budget: the override would leave the budget controller inert.
+  band_width: budgetMode ? null : numberOrNull(c.band_width),
+  alert_direction: c.alert_direction ?? "both",
+  alert_window_buckets: numberOrNull(c.alert_window_buckets),
+  alert_window_fire_pct: numberOrNull(c.alert_window_fire_pct),
+  alert_window_recover_pct: numberOrNull(c.alert_window_recover_pct),
+});
+
 export const defaultAnomalyConfig = () => ({
   name: "",
   description: "",
@@ -280,11 +309,18 @@ export const defaultAnomalyConfig = () => ({
   // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
   detection_window_value: 3,
   detection_window_unit: "h" as AnomalyIntervalUnit,
-  training_window_days: 14,
+  training_window_days: 28,
   retrain_interval_days: 7,
   threshold: 97,
   // Set only when the backend stored a budget; undefined/null = percentile mode.
   alert_budget_per_day: undefined as number | undefined,
+  // Null is Auto: the trained k decides. A number overrides it live.
+  band_width: null as number | string | null,
+  alert_direction: "both" as "both" | "above" | "below",
+  alert_window_buckets: 1 as number | string | null,
+  alert_window_fire_pct: 100 as number | string | null,
+  // Null means recover at the fire share.
+  alert_window_recover_pct: null as number | string | null,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -293,7 +329,7 @@ export const defaultAnomalyConfig = () => ({
   enabled: true,
   last_error: undefined as string | undefined,
   // Set only by the config API (§4.8); the UI keys the health badge on it, never on error-string prefixes.
-  notice_class: null as "window_floor" | "window_skip" | "hybrid_fallback" | "retrain" | null,
+  notice_class: null as "window_floor" | "window_skip" | "retrain" | null,
   last_detection_run: undefined as number | undefined,
   next_run_at: undefined as number | undefined,
   // Feature 2: anomaly configs carry the same triage metadata as alerts.
@@ -578,18 +614,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...filterLines.map((l: string, i: number) => (i === 0 ? l.replace(/^\s+AND /, "  ") : l)),
         ].join("\n")
       : "";
-    const autoSeasonality = c.training_window_days >= 7 ? "week" : "day";
-    const seasonalSelect =
-      autoSeasonality === "week"
-        ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
-        : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
-    const seasonalGroup = autoSeasonality === "week" ? ", hour, dow" : ", hour";
     return [
       `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
-      `       ${fn} AS value${seasonalSelect}`,
+      `       ${fn} AS value`,
       `FROM ${stream}`,
       where,
-      `GROUP BY time_bucket${seasonalGroup}`,
+      `GROUP BY time_bucket`,
       `ORDER BY time_bucket`,
     ]
       .filter(Boolean)
@@ -1564,6 +1594,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     setF("destinations", destinations);
   };
 
+  const updateRecoveryDestinations = (destinations: any[]) => {
+    setF("recovery_destinations", destinations);
+  };
+
   const updateWorkflows = (workflows: any[]) => {
     setF("workflows", workflows);
   };
@@ -1917,6 +1951,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
     }
 
+    if (Object.values(anomalyWindowShareErrors(anomalyConfig.value)).some((e) => e !== null)) {
+      activeTab.value = "anomaly-alerting";
+      toast({
+        variant: "error",
+        message: t("alerts.messages.fixHighlightedFields"),
+      });
+      return;
+    }
+
     if (
       anomalyConfig.value.alert_enabled &&
       anomalyConfig.value.alert_destination_ids.length === 0
@@ -2005,6 +2048,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...(budgetPerDay !== null
             ? { alert_budget_per_day: budgetPerDay }
             : { threshold: c.threshold }),
+          ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
         },
       };
@@ -2312,7 +2356,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         button: "Update Alert",
         page: "Alerts",
       });
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Alert",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -2350,7 +2394,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         button: "Create Alert",
         page: "Alerts",
       });
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Save Alert",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -2419,6 +2463,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
+      // Same guard: the full swap above drops any key the GET omitted, and an undefined list
+      // would make the edit-save wipe the override.
+      if (!Array.isArray(data.recovery_destinations)) data.recovery_destinations = [];
       // BE stores seconds; the form field displays minutes (mirrors the
       // frequency field's display unit). Falls back to 0 for any alert type
       // where the field is absent from the GET response (older cached
@@ -2937,6 +2984,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_function: parsedFn,
           detection_function_field: parsedField,
           threshold: data.threshold ?? data.percentile ?? 97,
+          band_width: anomalyBandWidthPrefill(data),
           filters: Array.isArray(data.filters) ? data.filters : [],
           histogram_interval_value: histInterval.value,
           histogram_interval_unit: histInterval.unit,
@@ -3173,6 +3221,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     refreshDestinations,
     refreshTemplates,
     updateDestinations,
+    updateRecoveryDestinations,
     updateWorkflows,
     updateTab,
     handleGoToSqlEditor,

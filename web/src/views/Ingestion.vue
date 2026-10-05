@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <div class="w-50 flex-none max-md:w-auto max-md:min-w-36 max-md:flex-1">
+      <!-- A fixed phone width lets the title, search and token button share one row. -->
+      <div class="w-50 flex-none max-md:w-40">
         <OSearchInput
           v-model="globalSearchQuery"
           :placeholder="t('common.search')"
@@ -36,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <OSelect
-        v-if="!isMobile && !isRUMPage && tokenOptions.length > 0"
+        v-if="lgUp && !isRUMPage && tokenOptions.length > 0"
         v-model="selectedTokenName"
         :options="tokenOptions"
         label-key="label"
@@ -84,7 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
       <div class="-ms-3 w-full">
-        <div v-if="isMobile && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
+        <!-- Below lg the token picker sits above the tabs so the title, search and token button share one row. -->
+        <div v-if="!lgUp && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
           <OSelect
             v-model="selectedTokenName"
             :options="tokenOptions"
@@ -238,7 +240,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -262,7 +264,7 @@ export default defineComponent({
     OBanner,
   },
   setup() {
-    const { isMobile } = useBreakpoint();
+    const { isMobile, lgUp } = useBreakpoint();
     const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
@@ -502,7 +504,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Passcode",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -548,7 +550,7 @@ export default defineComponent({
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
@@ -566,7 +568,7 @@ export default defineComponent({
     const resetPasscode = useMutation(() => resetPasscodeMutation(orgIdForWrites.value));
 
     const generateRUMToken = () => {
-      // Held rather than returned inline: the `segment.track` call below must
+      // Held rather than returned inline: the `analytics.track` call below must
       // still run synchronously, exactly as it did before.
       const request = createRumToken
         .mutateAsync()
@@ -591,7 +593,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Generate RUM Token",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -625,7 +627,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update RUM Token",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -708,6 +710,7 @@ export default defineComponent({
 
     return {
       isMobile,
+      lgUp,
       t,
       store,
       router,

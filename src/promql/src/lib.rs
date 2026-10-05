@@ -25,7 +25,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use config::meta::search::ScanStats;
+use config::meta::{promql::MetricsBlockScan, search::ScanStats};
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use hashbrown::HashSet;
 use promql_parser::label::Matchers;
@@ -44,6 +44,8 @@ mod series_stream;
 mod streaming_eval;
 pub mod utils;
 
+pub use series_stream::blocks::load_metrics_block_index;
+
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
 pub const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
@@ -54,6 +56,20 @@ const MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING: i64 = 10; // Adjust this value as
 
 #[async_trait]
 pub trait TableProvider: Sync + Send + 'static {
+    /// Creates the contexts that scan `stream_name` over `time_range` for one selector.
+    ///
+    /// Each returned [`ScanContext`] names the [`ScanSource`] it must be read from, decided
+    /// here from the stream's schema and files; the evaluator reads exactly that source and
+    /// never retries a context another way.
+    ///
+    /// - `matchers` are the selector's label matchers; `filters` are its equality matchers, which
+    ///   the provider may rewrite into partition values.
+    /// - `label_selector` limits the label columns the evaluation reads; empty means all.
+    /// - `streaming` says the caller consumes [`ScanSource::HashSorted`] and [`ScanSource::Blocks`]
+    ///   series by series. Only then may a provider return [`ScanSource::Blocks`], whose files are
+    ///   read by range instead of cached and index-selected up front; a materializing caller passes
+    ///   `false` and reads the table.
+    #[allow(clippy::too_many_arguments)]
     async fn create_context(
         &self,
         org_id: &str,
@@ -62,7 +78,8 @@ pub trait TableProvider: Sync + Send + 'static {
         matchers: Matchers,
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
-    ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>;
+        streaming: bool,
+    ) -> Result<Vec<ScanContext>>;
 
     /// Registers this evaluation with the host's query cancellation service.
     ///
@@ -74,6 +91,51 @@ pub trait TableProvider: Sync + Send + 'static {
         _trace_id: &str,
     ) -> Result<Option<oneshot::Receiver<()>>> {
         Ok(None)
+    }
+}
+
+/// One context a selector scans, with the source the evaluator reads it from.
+pub struct ScanContext {
+    pub ctx: SessionContext,
+    pub schema: Arc<Schema>,
+    pub scan_stats: ScanStats,
+    /// `false` once an exact index selection has applied the matchers.
+    pub keep_filters: bool,
+    pub source: ScanSource,
+}
+
+impl ScanContext {
+    /// A context read through its plain table.
+    pub fn table(
+        ctx: SessionContext,
+        schema: Arc<Schema>,
+        scan_stats: ScanStats,
+        keep_filters: bool,
+    ) -> Self {
+        Self {
+            ctx,
+            schema,
+            scan_stats,
+            keep_filters,
+            source: ScanSource::Table,
+        }
+    }
+}
+
+/// How a context's rows are read, fixed when the context is created.
+#[derive(Debug, Clone)]
+pub enum ScanSource {
+    /// The plain table, loaded whole by the materializing path.
+    Table,
+    /// The table with its `(__hash__, _timestamp)` order declared, streamed series by series.
+    HashSorted,
+    /// The MIDX blocks of these files, streamed series by series.
+    Blocks(Arc<MetricsBlockScan>),
+}
+
+impl ScanSource {
+    pub fn streams(&self) -> bool {
+        !matches!(self, Self::Table)
     }
 }
 

@@ -24,13 +24,14 @@
 //! refuses to create a private location rather than creating one that no agent
 //! can ever serve.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::{
     folder::{DEFAULT_FOLDER, Folder, FolderType},
     synthetics::{
-        ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem, SyntheticListResponse,
-        SyntheticVariable, for_each_string_at_path, take_strings_at_path,
+        BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem,
+        SyntheticListResponse, SyntheticType, SyntheticVariable, for_each_string_at_path,
+        take_strings_at_path,
     },
     synthetics_variables::{
         CheckVariableFootprint, GLOBAL_ENVIRONMENT_NAME, OrgVariableState, ResolvedVariableView,
@@ -44,7 +45,7 @@ use config::meta::{
 pub use infra::table::synthetics_environments::SyntheticsEnvironmentRecord;
 use infra::table::{
     cipher, folders, synthetics_agents, synthetics_checks, synthetics_environments,
-    synthetics_jobs, synthetics_locations, synthetics_runs, synthetics_variables,
+    synthetics_jobs, synthetics_locations, synthetics_refs, synthetics_runs, synthetics_variables,
     synthetics_variables::SyntheticsVariableRecord,
 };
 // ── OpenFGA ───────────────────────────────────────────────────────────────────
@@ -94,6 +95,8 @@ pub(crate) async fn set_parent_relation(_id: &str, _ty: &str, _parent: &str, _pa
 pub(crate) async fn remove_parent_relation(_id: &str, _ty: &str, _parent: &str, _parent_ty: &str) {}
 
 pub mod checks;
+pub mod composition;
+pub mod composition_lock;
 pub mod crypto;
 pub mod locations;
 pub mod runs;
@@ -179,6 +182,7 @@ mod tests {
 
         let source: String = [
             include_str!("checks.rs"),
+            include_str!("composition.rs"),
             include_str!("crypto.rs"),
             include_str!("locations.rs"),
             include_str!("runs.rs"),
@@ -199,7 +203,8 @@ mod tests {
              environment put/delete, batch) and the check update a promote writes through the \
              table layer"
         );
-        const NON_PUBLISH_READS: usize = 2; // `location_entry` and `super_cluster_enabled`
+        // `location_entry` and `super_cluster_enabled` read the flag without publishing
+        const NON_PUBLISH_READS: usize = 2;
         assert_eq!(
             guards,
             publishes + NON_PUBLISH_READS,
@@ -218,8 +223,11 @@ mod tests {
             .find("pub async fn run_synthetic_now")
             .expect("run_synthetic_now moved");
         let body = &checks[start..];
-        let end = body[1..]
-            .find("\npub ")
+        // Stop at the next fn of any visibility, or the private helpers below get swept in.
+        let end = ["\npub ", "\nasync fn ", "\nfn "]
+            .iter()
+            .filter_map(|marker| body[1..].find(marker))
+            .min()
             .map(|i| i + 1)
             .unwrap_or(body.len());
         assert!(

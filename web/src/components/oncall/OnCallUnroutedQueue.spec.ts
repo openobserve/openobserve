@@ -230,4 +230,47 @@ describe("OnCallUnroutedQueue", () => {
       expect(wrapper.emitted("retry")).toHaveLength(1);
     });
   });
+
+  /// A phone's action column holds one control, so claim and dismiss are mirrored in a menu that must emit the same events.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    function renderWithMenu() {
+      return mount(OnCallUnroutedQueue, {
+        props: { signals: [signal()], teamName: "Payments" },
+        global: { plugins: [i18n, store], stubs: menuStubs },
+      });
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", () => {
+      const wrapper = renderWithMenu();
+
+      for (const action of ["claim", "dismiss"]) {
+        expect(wrapper.find(`[data-test="oncall-unrouted-${action}-s1"]`).classes()).toContain(
+          "max-md:hidden",
+        );
+      }
+      expect(wrapper.find('[data-test="oncall-unrouted-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("claims and dismisses the signal the row is for", async () => {
+      const wrapper = renderWithMenu();
+
+      await wrapper.find('[data-test="oncall-unrouted-claim-s1-menu"]').trigger("click");
+      await wrapper.find('[data-test="oncall-unrouted-dismiss-s1-menu"]').trigger("click");
+
+      expect(wrapper.emitted("claim")?.[0][0]).toMatchObject({ id: "s1" });
+      expect(wrapper.emitted("dismiss")?.[0][0]).toMatchObject({ id: "s1" });
+    });
+  });
 });

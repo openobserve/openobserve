@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 use config::{
@@ -430,7 +430,7 @@ fn generate_local_stream_dirs(
     ];
     if stream_type == StreamType::Metrics {
         dirs.push(PathBuf::from(format!(
-            "{data_stream_dir}files/{org_id}/midx/{stream_name}"
+            "{data_stream_dir}files/{org_id}/mindex/{stream_name}"
         )));
     }
     dirs
@@ -573,7 +573,7 @@ pub async fn delete_from_file_list(
         "delete_from_file_list-{}-{}-{}",
         task_id, time_range.0, time_range.1
     );
-    let files = file_list::query(
+    let mut files = file_list::query(
         &fake_trace_id,
         org_id,
         stream_type,
@@ -587,34 +587,22 @@ pub async fn delete_from_file_list(
         return Ok(());
     }
 
-    let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
-    for mut file in files {
-        let columns: Vec<_> = file.key.split('/').collect();
-        let hour_key = format!(
-            "{}/{}/{}/{}",
-            columns[4], columns[5], columns[6], columns[7]
-        );
-        let entry = hours_files.entry(hour_key).or_default();
+    for file in files.iter_mut() {
         file.deleted = true;
-        entry.push(file);
     }
-    // generate a new array and sort by key
-    let mut hours_files = hours_files.into_iter().collect::<Vec<_>>();
-    hours_files.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+    files.sort_unstable_by(|a, b| a.key.cmp(&b.key));
 
     // write file list to storage
-    write_file_list(org_id, hours_files).await?;
+    write_file_list(org_id, &files).await?;
 
     Ok(())
 }
 
 // write file list to db, all the files should be deleted
-async fn write_file_list(
-    org_id: &str,
-    hours_files: Vec<(String, Vec<FileKey>)>,
-) -> Result<(), anyhow::Error> {
+async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    for (_, events) in hours_files {
+    // the db layer splits each batch by date itself, so a batch may span many hours
+    for events in files.chunks(cfg.compact.file_list_deleted_batch_size.max(1)) {
         // set to db, retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
@@ -638,7 +626,7 @@ async fn write_file_list(
                 }
             }
             // delete from file_list table
-            if let Err(e) = infra_file_list::batch_process(&events).await {
+            if let Err(e) = infra_file_list::batch_process(events).await {
                 log::error!("[COMPACTOR] batch_delete to db failed, retrying: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
@@ -656,6 +644,7 @@ async fn write_file_list(
                         account: v.account.clone(),
                         file: v.key.clone(),
                         index_file: v.meta.index_size > 0,
+                        mindex_file: v.meta.mindex_size > 0,
                         flattened: v.meta.flattened,
                     })
                     .collect::<Vec<_>>();
@@ -836,7 +825,7 @@ mod tests {
             vec![
                 PathBuf::from("/data/files/org/metrics/cpu"),
                 PathBuf::from("/data/files/org/index/cpu_metrics"),
-                PathBuf::from("/data/files/org/midx/cpu"),
+                PathBuf::from("/data/files/org/mindex/cpu"),
             ]
         );
         assert_eq!(

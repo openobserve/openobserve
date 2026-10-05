@@ -27,7 +27,7 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (k: string) => k }),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
@@ -81,6 +81,21 @@ vi.mock("@/composables/useParser", () => ({
       astify: vi.fn().mockReturnValue({ from: [{ table: "default" }] }),
     }),
   }),
+}));
+
+const { downloadFileMock, toastMock } = vi.hoisted(() => ({
+  downloadFileMock: vi.fn(),
+  toastMock: vi.fn(),
+}));
+
+vi.mock("@/utils/dom", async (importOriginal) => ({
+  ...((await importOriginal()) as any),
+  downloadFile: downloadFileMock,
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...((await importOriginal()) as any),
+  toast: toastMock,
 }));
 
 // ---------------------------------------------------------------------------
@@ -348,6 +363,43 @@ function mountSearchBar(props: Record<string, unknown> = {}): VueWrapper {
       stubs: sharedStubs,
     },
   });
+}
+
+// Minimal RFC 4180 reader so the test checks column alignment independently of the writer.
+function csvToRows(csv: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < csv.length; i++) {
+    const ch = csv[i];
+    if (quoted) {
+      if (ch === '"' && csv[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        cell += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\r" && csv[i + 1] === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      i++;
+    } else {
+      cell += ch;
+    }
+  }
+  row.push(cell);
+  rows.push(row);
+  return rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -813,6 +865,61 @@ describe("SearchBar", () => {
       const btn = wrapper.find('[title="traces.exportTraces"]');
       expect(btn.exists()).toBe(true);
       expect(btn.attributes("disabled")).toBeUndefined();
+    });
+
+    it("should export a traces-mode hit with a services object as aligned CSV", async () => {
+      downloadFileMock.mockReturnValue(true);
+      searchObjInstance.data.queryResults.hits = [
+        {
+          trace_id: "t-1",
+          services: { "svc-a": { count: 1, duration: 0 }, "svc-b": { count: 2, duration: 5 } },
+          spans: [3, 1],
+          zo_sql_timestamp: 1700000000000,
+        },
+        { trace_id: "t-2", services: { "svc-c": { count: 1, duration: 2 } }, extra: "a,b" },
+      ];
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      (wrapper.vm as any).downloadLogs();
+
+      expect(downloadFileMock).toHaveBeenCalledTimes(1);
+      const [fileName, csv, mimeType] = downloadFileMock.mock.calls[0];
+      expect(fileName).toBe("traces-data.csv");
+      expect(mimeType).toBe("text/csv");
+      const rows = csvToRows(csv);
+      expect(rows[0]).toEqual(["trace_id", "services", "spans", "zo_sql_timestamp", "extra"]);
+      expect(rows).toHaveLength(3);
+      rows.forEach((row) => expect(row).toHaveLength(rows[0].length));
+      expect(rows[1][1]).toBe(
+        JSON.stringify({ "svc-a": { count: 1, duration: 0 }, "svc-b": { count: 2, duration: 5 } }),
+      );
+      expect(rows[2][4]).toBe("a,b");
+      expect(toastMock).not.toHaveBeenCalled();
+    });
+
+    it("should not download or throw when there are no hits", async () => {
+      searchObjInstance.data.queryResults.hits = [];
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(() => (wrapper.vm as any).downloadLogs()).not.toThrow();
+      expect(downloadFileMock).not.toHaveBeenCalled();
+      expect(toastMock).not.toHaveBeenCalled();
+    });
+
+    it("should show an error toast when the download fails", async () => {
+      downloadFileMock.mockReturnValue(false);
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      (wrapper.vm as any).downloadLogs();
+
+      expect(downloadFileMock).toHaveBeenCalledTimes(1);
+      expect(toastMock).toHaveBeenCalledWith({
+        message: "traces.exportTracesFailed",
+        variant: "error",
+      });
     });
   });
 

@@ -342,7 +342,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -426,19 +426,17 @@ export default defineComponent({
         this.searchObj.runQuery = true;
       }
 
-      if (config.isCloud == "true") {
-        segment.track("Button Click", {
-          button: "Search Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          show_query: this.searchObj.meta.showQuery,
-          show_histogram: this.searchObj.meta.showHistogram,
-          sqlMode: this.searchObj.meta.sqlMode,
-          showFields: this.searchObj.meta.showFields,
-          page: "Search Logs",
-        });
-      }
+      analytics.track("Button Click", {
+        button: "Search Data",
+        user_org: this.store.state.selectedOrganization.identifier,
+        user_id: this.store.state.userInfo.email,
+        stream_name: this.searchObj.data.stream.selectedStream.join(","),
+        show_query: this.searchObj.meta.showQuery,
+        show_histogram: this.searchObj.meta.showHistogram,
+        sqlMode: this.searchObj.meta.sqlMode,
+        showFields: this.searchObj.meta.showFields,
+        page: "Search Logs",
+      });
     },
     async getMoreDataRecordsPerPage() {
       if (this.searchObj.meta.refreshInterval == 0) {
@@ -462,15 +460,13 @@ export default defineComponent({
           await this.getJobData(false);
         }
 
-        if (config.isCloud == "true") {
-          segment.track("Button Click", {
-            button: "Get More Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get More Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
     async getMoreData() {
@@ -490,15 +486,13 @@ export default defineComponent({
           await this.getJobData(false);
         }
 
-        if (config.isCloud == "true") {
-          segment.track("Button Click", {
-            button: "Get More Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get More Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
     async getLessData() {
@@ -520,15 +514,13 @@ export default defineComponent({
         await this.getQueryData(true);
         this.refreshHistogramChart();
 
-        if (config.isCloud == "true") {
-          segment.track("Button Click", {
-            button: "Get Less Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get Less Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
   },
@@ -609,11 +601,19 @@ export default defineComponent({
       { immediate: true },
     );
     // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+    let preTabletSplitter: number | null = null;
     watch(
       isTablet,
-      (tablet) => {
+      (tablet, wasTablet) => {
         if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+          preTabletSplitter = searchObj.config.splitterModel;
           searchObj.config.splitterModel = 30;
+        } else if (wasTablet && !tablet && !isMobile.value && preTabletSplitter !== null) {
+          // Back on a laptop: undo the floor unless the reader dragged the pane since.
+          if (searchObj.config.splitterModel === 30) {
+            searchObj.config.splitterModel = preTabletSplitter;
+          }
+          preTabletSplitter = null;
         }
       },
       { immediate: true },

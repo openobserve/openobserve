@@ -5,9 +5,12 @@ import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory, onBeforeRouteLeave, useRoute } from "vue-router";
 import { isEqual } from "lodash-es";
-import { getDashboard, updatePanel } from "@/utils/commons";
+import { addPanel, getDashboard, updatePanel } from "@/utils/commons";
+import analytics from "@/services/product_analytics";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { createI18n } from "vue-i18n";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock external dependencies
 vi.mock("@/utils/commons", () => ({
@@ -70,7 +73,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     resetDashboardPanelData: vi.fn(),
     resetDashboardPanelDataAndAddTimeField: vi.fn(),
     resetAggregationFunction: vi.fn(),
-    validatePanel: vi.fn(),
+    validatePanel: validatePanelMock,
     makeAutoSQLQuery: vi.fn(),
   })),
 }));
@@ -82,12 +85,19 @@ vi.mock("@/composables/useLoading", () => ({
   })),
 }));
 
+// One stable object, so a test can assert on what the view actually notified.
+// Stable across the mock factory, so a test can make `validatePanel` fail the
+// way a real query/field error does.
+const validatePanelMock = vi.hoisted(() => vi.fn());
+
+const notificationMocks = vi.hoisted(() => ({
+  showErrorNotification: vi.fn(),
+  showPositiveNotification: vi.fn(),
+  showConfictErrorNotificationWithRefreshBtn: vi.fn(),
+}));
+
 vi.mock("@/composables/useNotifications", () => ({
-  default: vi.fn(() => ({
-    showErrorNotification: vi.fn(),
-    showPositiveNotification: vi.fn(),
-    showConfictErrorNotificationWithRefreshBtn: vi.fn(),
-  })),
+  default: vi.fn(() => notificationMocks),
 }));
 
 vi.mock("@/composables/useAiChat", () => ({
@@ -4727,6 +4737,150 @@ describe("AddPanel.vue", () => {
       expect(updatePanel).toHaveBeenCalled();
       expect(window.sessionStorage.getItem(key)).toBeNull();
       vi.mocked(useRoute).mockReset();
+    });
+  });
+
+  describe("product analytics on save", () => {
+    const mountWithRoute = async (query: Record<string, string>) => {
+      vi.mocked(useRoute).mockReturnValue({ query, params: {} } as any);
+      vi.mocked(getDashboard).mockResolvedValue({
+        title: "d",
+        tabs: [{ tabId: "t1", panels: [] }],
+      });
+      wrapper = shallowMount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: { PanelEditor: true, DateTimePickerDashboard: true, QueryInspector: true },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      wrapper.vm.dashboardPanelData.data.id = "p1";
+      wrapper.vm.dashboardPanelData.data.title = "Latency";
+      wrapper.vm.dashboardPanelData.data.type = "bar";
+      vi.mocked(analytics.track).mockClear();
+    };
+
+    afterEach(() => {
+      vi.mocked(useRoute).mockReset();
+    });
+
+    it("tracks dashboard_panel_saved as an existing panel once updatePanel resolves", async () => {
+      vi.mocked(updatePanel).mockResolvedValue(undefined as any);
+      await mountWithRoute({ dashboard: "d1", panelId: "p1", tab: "t1", folder: "f1" });
+
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_panel_saved", {
+        chart_type: "bar",
+        is_new: false,
+      });
+    });
+
+    it("tracks dashboard_panel_saved as a new panel once addPanel resolves", async () => {
+      vi.mocked(addPanel).mockResolvedValue(undefined as any);
+      await mountWithRoute({ dashboard: "d1", tab: "t1", folder: "f1" });
+
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_panel_saved", {
+        chart_type: "bar",
+        is_new: true,
+      });
+    });
+
+    it("does not track dashboard_panel_saved when the save rejects", async () => {
+      vi.mocked(updatePanel).mockRejectedValue(new Error("boom"));
+      await mountWithRoute({ dashboard: "d1", panelId: "p1", tab: "t1", folder: "f1" });
+
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(updatePanel).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Save validation reporting", () => {
+    const mountForValidation = async () => {
+      const w = mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            OPageHeader: true,
+            PanelEditor: true,
+            DateTimePickerDashboard: true,
+            QueryInspector: true,
+            AddSettingVariable: true,
+            ConfigDrawer: true,
+          },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      return w;
+    };
+
+    const lastErrorMessage = () => {
+      const calls = notificationMocks.showErrorNotification.mock.calls;
+      return calls.length ? calls[calls.length - 1][0] : undefined;
+    };
+
+    it("names the failing checks instead of the generic message", async () => {
+      // A query/field failure is what actually reaches this path: the OForm
+      // schema already blocks an empty title before submit.
+      validatePanelMock.mockImplementation((errors: string[]) => {
+        errors.push("There should be at least one field on Y-Axis");
+        errors.push("Add one field on X-Axis");
+      });
+      wrapper = await mountForValidation();
+      wrapper.vm.dashboardPanelData.data.title = "A panel";
+
+      try {
+        await wrapper.vm.savePanelChangesToDashboard("dash-1");
+      } catch (e) {
+        /* ignore: the save deps are mocked and may reject */
+      }
+
+      expect(lastErrorMessage()).toBe(
+        "There should be at least one field on Y-Axis, Add one field on X-Axis",
+      );
+    });
+
+    it("keeps the generic message for a custom chart, whose errors may be stale", async () => {
+      // `errorData.errors` is not cleared before that guard, so a leftover
+      // chart/save error must not be presented as the reason Save failed.
+      wrapper = await mountForValidation();
+      wrapper.vm.dashboardPanelData.data.type = "custom_chart";
+      wrapper.vm.errorData.errors.splice(0);
+      wrapper.vm.errorData.errors.push("a stale chart error");
+
+      try {
+        await wrapper.vm.savePanelChangesToDashboard("dash-1");
+      } catch (e) {
+        /* ignore: the save deps are mocked and may reject */
+      }
+
+      expect(lastErrorMessage()).toBe("dashboard.addPanel.fixErrors");
+    });
+
+    it("does not toast on Apply, where PanelEditor already reports the errors", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementationOnce((errors: string[]) => {
+        errors.push("Add one field for the X-Axis");
+      });
+      notificationMocks.showErrorNotification.mockClear();
+
+      wrapper.vm.runQuery();
+
+      expect(validatePanelMock).toHaveBeenCalled();
+      expect(notificationMocks.showErrorNotification).not.toHaveBeenCalled();
+      expect(wrapper.vm.errorData.errors).toEqual(["Add one field for the X-Axis"]);
     });
   });
 });

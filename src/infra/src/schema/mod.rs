@@ -556,6 +556,10 @@ pub async fn merge(
         return Ok(None);
     }
     let start_dt = min_ts;
+    // build_key drops a zero start_dt, so a new schema row must get a real one
+    let create_start_dt = min_ts
+        .filter(|min_ts| *min_ts > 0)
+        .unwrap_or_else(|| Utc::now().timestamp_micros());
     let key = mk_key(org_id, stream_type, stream_name);
     let inferred_schema = schema.clone();
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -578,16 +582,18 @@ pub async fn merge(
                             {
                                 inferred_schema
                             } else {
-                                let start_dt =
-                                    start_dt.unwrap_or_else(|| Utc::now().timestamp_micros());
                                 let mut schema_metadata = inferred_schema.metadata().clone();
                                 if !schema_metadata.contains_key("created_at") {
-                                    schema_metadata
-                                        .insert("created_at".to_string(), start_dt.to_string());
+                                    schema_metadata.insert(
+                                        "created_at".to_string(),
+                                        create_start_dt.to_string(),
+                                    );
                                 }
                                 if !schema_metadata.contains_key("start_dt") {
-                                    schema_metadata
-                                        .insert("start_dt".to_string(), start_dt.to_string());
+                                    schema_metadata.insert(
+                                        "start_dt".to_string(),
+                                        create_start_dt.to_string(),
+                                    );
                                 }
                                 inferred_schema.with_metadata(schema_metadata)
                             };
@@ -596,7 +602,7 @@ pub async fn merge(
                         }])
                         .unwrap()
                         .into(),
-                        start_dt,
+                        Some(create_start_dt),
                     )),
                 ))),
                 Some(value) => {
@@ -631,7 +637,9 @@ pub async fn merge(
                         .collect::<Vec<_>>();
                     let need_new_version = !schema_version_changes.is_empty();
 
-                    if need_new_version && let Some(start_dt) = start_dt {
+                    if need_new_version
+                        && let Some(start_dt) = start_dt.filter(|start_dt| *start_dt > 0)
+                    {
                         // update old version end_dt
                         let mut metadata = latest_schema.metadata().clone();
                         metadata.insert("end_dt".to_string(), start_dt.to_string());
@@ -697,10 +705,11 @@ pub async fn update_setting(
             for (k, v) in metadata.iter() {
                 schema_metadata.insert(k.clone(), v.clone());
             }
-            let start_dt = match schema_metadata.get("created_at") {
-                Some(v) => v.parse().unwrap(),
-                None => Utc::now().timestamp_micros(),
-            };
+            let start_dt = schema_metadata
+                .get("created_at")
+                .and_then(|created_at| created_at.parse::<i64>().ok())
+                .filter(|created_at| *created_at > 0)
+                .unwrap_or_else(|| Utc::now().timestamp_micros());
             if !schema_metadata.contains_key("created_at") {
                 schema_metadata.insert("created_at".to_string(), start_dt.to_string());
             }

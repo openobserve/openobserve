@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-date-time-dropdown"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8 max-lg:me-auto"
+            class="h-8 max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -394,7 +394,7 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { debounce } from "lodash-es";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -406,6 +406,8 @@ import {
 } from "@/utils/traces/filterUtils";
 import { isDatetimeChanged } from "./tracesSearchBar.utils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { downloadFile } from "@/utils/dom";
+import { toCsv } from "@/utils/csv";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -602,8 +604,8 @@ export default defineComponent({
     // Debounced query trigger for absolute time when auto-run is enabled.
     // Gives the user 2.5s to finish typing start/end time before firing.
     const triggerAbsoluteQueryDebounced = debounce((value: object) => {
-      if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+      if (value.userChangedValue) {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,
@@ -700,8 +702,8 @@ export default defineComponent({
         emit("searchdata");
       }
 
-      if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+      if (value.userChangedValue) {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,
@@ -756,35 +758,18 @@ export default defineComponent({
       }
     };
 
-    const jsonToCsv = (jsonData) => {
-      const replacer = (key, value) => (value === null ? "" : value);
-      const header = Object.keys(jsonData[0]);
-      let csv = header.join(",") + "\r\n";
-
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = header
-          .map((fieldName) => JSON.stringify(jsonData[i][fieldName], replacer))
-          .join(",");
-        csv += row + "\r\n";
-      }
-
-      return csv;
-    };
-
     const downloadLogs = () => {
-      const filename = "traces-data.csv";
-      const data = jsonToCsv(searchObj.data.queryResults.hits);
-      const file = new File([data], filename, {
-        type: "text/csv",
-      });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const hits = searchObj.data.queryResults.hits;
+      if (!hits?.length) return;
+      let downloaded = false;
+      try {
+        downloaded = downloadFile("traces-data.csv", toCsv(hits), "text/csv");
+      } catch (e) {
+        console.error("Error exporting traces:", e);
+      }
+      if (!downloaded) {
+        toast({ message: t("traces.exportTracesFailed"), variant: "error" });
+      }
     };
 
     const updateTimezone = () => {

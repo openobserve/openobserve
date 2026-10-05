@@ -50,10 +50,12 @@ pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
 pub mod profiles;
+pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
+pub mod rum_pa;
 use search_service as search;
 #[cfg(feature = "profiling")]
 pub mod self_profiles;
@@ -76,3 +78,9 @@ pub mod workflows;
 
 #[cfg(feature = "cloud")]
 pub mod org_domain_ownership;
+/// One authorized AI operation, or `()` in builds without the quota module, so
+/// the RCA signature keeps one shape instead of being cfg-gated at every caller.
+#[cfg(feature = "cloud")]
+pub type AiUsagePermit = trial_quota::AiUsagePermit;
+#[cfg(not(feature = "cloud"))]
+pub type AiUsagePermit = ();

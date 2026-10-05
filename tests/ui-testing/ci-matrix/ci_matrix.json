@@ -26,7 +26,8 @@
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
-      "alertDestinationsPagination.spec.js"
+      "alertDestinationsPagination.spec.js",
+      "alerts-destinations-usage.spec.js"
     ],
     "disabled": [
       {
@@ -102,6 +103,7 @@
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
+      "dashboard-panel-unsaved-changes.spec.js",
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboardPagination.spec.js"
@@ -194,7 +196,8 @@
       "dashboard-variables-default-values-chain.spec.js",
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-variables-stream-field.spec.js",
-      "dashboard-mustache-variables.spec.js"
+      "dashboard-mustache-variables.spec.js",
+      "dashboard-variable-select-all.spec.js"
     ],
     "disabled": []
   },
@@ -219,7 +222,8 @@
       "js-transform-type.spec.js",
       "row-expansion.spec.js",
       "enrichment-table-url.spec.js",
-      "functions-form-validation.spec.js"
+      "functions-form-validation.spec.js",
+      "functions-import-export.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -232,34 +236,44 @@
     "browser": "chrome",
     "run_files": [
       "sanity.spec.js",
-      "changeOrg.spec.js",
-      "enrichment.spec.js",
-      "schema.spec.js",
-      "schemaload.spec.js",
-      "serviceAccount.spec.js",
-      "usersOrg.spec.js",
-      "org.spec.js",
-      "theme-management.spec.js",
-      "ingestion-config.spec.js",
-      "ingestionTokens.spec.js",
       "landingPage.spec.js",
-      "languageTranslation.spec.js",
-      "edition-features.spec.js",
+      "datetime-picker-copy-paste.spec.js",
+      "dateTime.spec.js",
+      "dateTimeCustomRange.spec.js",
+      "otableSelectCell.spec.js",
+      "shared-components-form-validation.spec.js",
+      "ai-toolsets-form-validation.spec.js",
+      "annotationQueueInputPreview.spec.js",
+      "login-form-validation.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Management",
+    "actual_folder": "Management",
+    "browser": "chrome",
+    "run_files": [
       "iam-form-validation.spec.js",
-      "regex-patterns-form-validation.spec.js",
+      "serviceAccount.spec.js",
+      "users.spec.js",
+      "passwordPolicy.spec.js",
       "cipher-keys-form-validation.spec.js",
       "settings-form-validation.spec.js",
-      "ai-toolsets-form-validation.spec.js",
-      "shared-components-form-validation.spec.js",
-      "onboarding-form-validation.spec.js",
-      "rum-form-validation.spec.js",
-      "login-form-validation.spec.js",
-      "datetime-picker-copy-paste.spec.js",
-      "splunk-hec-ingestion-window.spec.js",
-      "connectDataSourcePopup.spec.js",
-      "otableSelectCell.spec.js",
       "theme.spec.js",
-      "passwordPolicy.spec.js"
+      "languageTranslation.spec.js",
+      "edition-features.spec.js",
+      "onboarding-form-validation.spec.js",
+      "settings-query-management-redirect.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Org",
+    "actual_folder": "Org",
+    "browser": "chrome",
+    "run_files": [
+      "org.spec.js",
+      "changeOrg.spec.js"
     ],
     "disabled": []
   },
@@ -326,7 +340,8 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "searchPatternsMultiStream.spec.js"
     ],
     "disabled": [
       {
@@ -363,7 +378,8 @@
       "metrics-table-column-order.spec.js",
       "metrics-promql-builder.spec.js",
       "metrics-share-deep-link.spec.js",
-      "metrics-explorer-share-visualize.spec.js"
+      "metrics-explorer-share-visualize.spec.js",
+      "metrics-explorer-stream-cache.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -424,7 +440,21 @@
       "rum-page-dataflow.spec.js",
       "rum-onboarding-snippets.spec.js",
       "sourcemap-ui.spec.js",
-      "sourcemap-upload-pretty.spec.js"
+      "sourcemap-upload-pretty.spec.js",
+      "rum-form-validation.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "RUM-Analytics",
+    "_comment": "RUM Product Analytics on the real query engine. The specs seed three weeks of back-dated _rumdata (retention, funnels, paths) under a per-run application_id, so this shard accepts 60 days of backdated ingestion; the workflow default of 5 hours would drop the history while still answering 200. Own instance, not merged into RUM. workers 1: both specs drive long analytics searches, which contend on a debug build.",
+    "actual_folder": "RUM-Analytics",
+    "browser": "chrome",
+    "ingest_allowed_upto": "1440",
+    "workers": 1,
+    "run_files": [
+      "rum-product-analytics.spec.js",
+      "rum-product-analytics-engine.spec.js"
     ],
     "disabled": []
   },
@@ -450,7 +480,14 @@
       "streamname.spec.js",
       "streaming.spec.js",
       "stream-settings.spec.js",
-      "streams-form-validation.spec.js"
+      "streams-form-validation.spec.js",
+      "ingestion-config.spec.js",
+      "ingestionTokens.spec.js",
+      "ingestion-passcode-forbidden.spec.js",
+      "connectDataSourcePopup.spec.js",
+      "splunk-hec-ingestion-window.spec.js",
+      "enrichment.spec.js",
+      "schema.spec.js"
     ],
     "disabled": []
   },
@@ -468,7 +505,8 @@
       "tracesAnalyzeDimensions.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
-      "tracesCharts.spec.js"
+      "tracesCharts.spec.js",
+      "traceSessionReplay.spec.js"
     ],
     "disabled": []
   },

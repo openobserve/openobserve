@@ -72,9 +72,19 @@ spans it).
   secondary control sits between primaries on desktop, render it twice:
   `v-if="!isMobile"` at its desktop position in `#actions`, `v-if="isMobile"` in
   `#actions-overflow` (see `ViewDashboard.vue`'s `AutoRefreshInterval`).
-- Wide header controls (date pickers) drop their text label below md:
-  `class="max-md:[&_.date-time-label]:hidden"`; labelled buttons go icon-only with
-  `<span class="max-md:hidden">{{ label }}</span>` and keep a `:title` / `OTooltip`.
+- A date picker in the header's `#actions` drops its text label below md on its own
+  (`OPageHeader` hides `.date-time-label`). If an icon-only picker still does not fit
+  beside the title, pass `:hide-range-shift="isMobile"` (Metrics editor, Search
+  history). Labelled buttons go icon-only with
+  `<span class="max-md:sr-only">{{ label }}</span>` — `sr-only`, not `hidden`, so the
+  button keeps its accessible name — and an `sm-action` button also needs
+  `max-md:min-w-0 max-md:ps-2 max-md:pe-2` (it carries `min-w-20`).
+- A control that owns a dialog or popover (a trigger with its own `ODialog`) cannot
+  move into `#actions-overflow`: the menu unmounts it when it closes. Move a plain
+  button instead, or let the header take a second row.
+- Filters teleported into a shared header (`#o2-page-actions`) stay there on desktop
+  and render as a body toolbar row on phones: `<Teleport :disabled="isMobile">` around
+  a wrapper that is `display: contents` on desktop (see `PipelineHistory.vue`).
 - A header should never take more than two rows on a phone. If it does, something
   belongs in `#actions-overflow` or in the page body.
 
@@ -142,9 +152,15 @@ The recipe every list toolbar follows:
   a check on the active one. Data-tests: trigger `<group data-test>-dropdown-btn`,
   items `<item data-test>-item`. `AppTabs` forwards the same prop. This is the answer
   whenever a filter strip would claim its own row — do not hand-roll a second control.
-- **Search needs a floor.** `flex-1` is `basis-0`; without `max-md:min-w-40` (or
-  `min-w-24` in a crowded row) it shrinks to nothing instead of wrapping. A fixed
-  `w-64` search becomes `w-64 max-md:w-auto max-md:min-w-40 max-md:flex-1`.
+- **Search needs a floor.** `flex-1` is `basis-0`; without a floor it shrinks to
+  nothing instead of wrapping. `OSearchInput` floors itself at `max-md:min-w-32`
+  unless you pass your own `min-w-*` (its input's intrinsic ~13rem floor is what used
+  to push the column toggle and refresh onto a second row). A fixed `w-64` search
+  becomes `w-64 max-md:w-auto max-md:flex-1`, never `max-md:w-full`.
+- **A `w-full` toolbar wrapper without `max-md:contents` always wraps.** Its width is
+  the whole row, so OTable's column toggle and refresh drop to a second line.
+- `ORefreshButton layout="inline"` drops its "Nm ago" label below md (icon-only);
+  do not re-add a text refresh button to a phone toolbar.
 - **Page toolbars** (Logs / Metrics / Traces style): the mode toggle becomes an
   `ODropdown` showing the current mode (see `MetricsExplorer.vue`),
   `AutoRefreshInterval :is-compact="isMobile"`, text buttons go icon-only, spacers
@@ -183,8 +199,12 @@ The recipe every list toolbar follows:
   item is conditional, `v-if` the whole `ODropdown` on "any item applies" so a row never
   opens an empty menu. Hover-only buttons with no click action (a preview tooltip) have
   no menu counterpart.
-- **Footer on one row**: the plain "N items" count is `max-md:hidden` — the pager's
-  "x – y of z" already says it. Bulk-action buttons stay.
+- **The footer is `OTable`'s own, never hand-built**: there is no "N items" total
+  label at any width — the pager's "x – y of z" already says it. Bulk actions go
+  in `#selection-actions` and a note in `#footer-note`; below md the selected
+  count and the actions take a full row above the pager, and a note takes its own
+  row. Give a note that should not show on a phone a `max-md:hidden` root and it
+  leaves no empty row.
 
 ## Stat strips and KPI cards: one row
 
@@ -218,8 +238,12 @@ the same recipe so it never takes two rows of chrome:
   pane `max-md:h-auto max-md:min-h-0`.
 - A fixed-height region whose content grows on phones scrolls: `max-lg:overflow-y-auto`,
   and grids that must size to content use `max-lg:auto-rows-min`.
-- `OEmptyState` already scrolls with safe centering below lg; custom hero content goes
-  in a `max-lg:overflow-y-auto` container.
+- `OEmptyState` compacts itself below md (smaller illustration, title, padding and
+  action cards) so the whole state — action included — fits one phone screen; it
+  also scrolls with safe centering below lg. Never size an empty state per page;
+  custom hero content goes in a `max-lg:overflow-y-auto` container.
+- `OBanner inline-actions` keeps its message at least 12rem wide below md and wraps
+  the actions under it; do not stack them by hand.
 - Full-viewport shells use `h-dvh`, never `100vh` (mobile browser chrome overlaps it).
 - Long chips and IDs: `max-md:max-w-full max-md:truncate` on the text, not on the row.
 

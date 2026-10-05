@@ -5,13 +5,18 @@ import { TABS_CONTEXT_KEY } from "./OTabs.types";
 import type { TabsContext } from "./OTabs.types";
 import { TabsRoot, TabsList } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { lgUp } = useBreakpoint();
 
 const scrollRef = ref<HTMLElement | null>(null);
 const tablistRef = ref<HTMLElement | null>(null);
 
 function handleFocusin(event: FocusEvent): void {
-  const target = event.target as HTMLElement;
-  if (target.getAttribute("role") !== "tab") return;
+  const target = event.target as HTMLElement | null;
+  // event.target can be null if focus moves away from an element that was
+  // removed from the DOM in the same tick (e.g. a tab unmounted on click).
+  if (!target || target.getAttribute("role") !== "tab") return;
   // Scroll into view: arrow keys move focus without activating, so modelValue watch doesn't fire
   const el = scrollRef.value;
   if (!el) return;
@@ -281,6 +286,8 @@ onMounted(() => {
   }
   nextTick(() => {
     updateScrollState();
+    // A deep link can open on a tab the narrow strip has scrolled out of view, leaving nothing marked active.
+    if (!lgUp.value) revealActiveTab("auto");
     // Enable the slide animation only after the bar is placed once.
     requestAnimationFrame(() => {
       indicatorReady.value = true;
@@ -295,6 +302,20 @@ onUnmounted(() => {
   cancelAnimationFrame(scrollStateRaf);
 });
 
+function revealActiveTab(behavior: ScrollBehavior): void {
+  const el = scrollRef.value;
+  if (!el) return;
+  const activeTab = el.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+  if (!activeTab) return;
+  const tabRect = activeTab.getBoundingClientRect();
+  const containerRect = el.getBoundingClientRect();
+  if (tabRect.left < containerRect.left) {
+    el.scrollBy({ left: tabRect.left - containerRect.left - 8, behavior });
+  } else if (tabRect.right > containerRect.right) {
+    el.scrollBy({ left: tabRect.right - containerRect.right + 8, behavior });
+  }
+}
+
 // Auto-scroll to reveal the active tab when modelValue changes
 watch(
   () => props.modelValue,
@@ -303,17 +324,7 @@ watch(
     await nextTick();
     // Slide the shared underline to the newly active tab.
     updateIndicator();
-    const el = scrollRef.value;
-    if (!el) return;
-    const activeTab = el.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
-    if (!activeTab) return;
-    const tabRect = activeTab.getBoundingClientRect();
-    const containerRect = el.getBoundingClientRect();
-    if (tabRect.left < containerRect.left) {
-      el.scrollBy({ left: tabRect.left - containerRect.left - 8, behavior: "smooth" });
-    } else if (tabRect.right > containerRect.right) {
-      el.scrollBy({ left: tabRect.right - containerRect.right + 8, behavior: "smooth" });
-    }
+    revealActiveTab("smooth");
   },
 );
 

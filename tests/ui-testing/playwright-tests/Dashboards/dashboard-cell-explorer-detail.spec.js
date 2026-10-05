@@ -220,8 +220,10 @@ test.describe("Dashboard Cell Explorer Log Detail", { tag: ["@all", "@dashboard"
     await pm.dashboardCellExplorer.clickTableTab();
 
     await pm.dashboardCellExplorer.expectKvKeyVisible("_timestamp");
-    await pm.dashboardCellExplorer.fillKvSearch("kubernetes_namespace_name");
-    await pm.dashboardCellExplorer.expectKvKeyVisible("kubernetes_namespace_name");
+    // The drilled row varies run to run and fixture fields are sparse, so search a key this row actually has.
+    const searchKey = await pm.dashboardCellExplorer.firstKvKeyOtherThan("_timestamp");
+    await pm.dashboardCellExplorer.fillKvSearch(searchKey);
+    await pm.dashboardCellExplorer.expectKvKeyVisible(searchKey);
     await pm.dashboardCellExplorer.expectKvKeyHidden("_timestamp");
     testLogger.info("KV table search narrows the field list to matching keys");
 

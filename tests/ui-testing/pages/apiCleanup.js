@@ -33,9 +33,13 @@ class APICleanup {
     async _fetch(url, options = {}) {
         if (this._page && isCloudEnvironment()) {
             // Ensure page is on the same origin so session cookies are sent with fetch
-            if (!this._pageNavigated) {
+            // Re-navigating an already-open app page would reset the test's UI state and org context.
+            const onAppOrigin = (() => {
+                try { return new URL(this._page.url()).origin === new URL(this.baseUrl).origin; } catch { return false; }
+            })();
+            if (!this._pageNavigated && !onAppOrigin) {
                 try {
-                    await this._page.goto(`${this.baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+                    await this._page.goto(`${this.baseUrl}/web/?org_identifier=${this.org}`, { waitUntil: 'domcontentloaded' });
                     this._pageNavigated = true;
                 } catch (e) {
                     testLogger.warn('Failed to navigate page to baseUrl for cookie auth', { error: e.message });
@@ -992,6 +996,75 @@ class APICleanup {
             throw new Error(`createFunction: HTTP ${response.status} — ${body}`);
         }
         testLogger.info('Created function via API', { functionName, org: targetOrg });
+        return await response.json().catch(() => ({}));
+    }
+
+    /**
+     * Create a realtime pipeline whose middle node calls an existing function,
+     * so the function has a dependent the UI can warn about.
+     * @param {string} pipelineName
+     * @param {string} functionName - must already exist
+     * @param {string} [sourceStream]
+     * @param {string} [org]
+     * @returns {Promise<string>} the new pipeline's id
+     */
+    async createPipelineUsingFunction(pipelineName, functionName, sourceStream = 'e2e_automate', org = null) {
+        const targetOrg = org || this.org;
+        const stamp = Date.now();
+        const inputId = `in-${stamp}`;
+        const fnId = `fn-${stamp}`;
+        const outputId = `out-${stamp}`;
+        const edge = (id, source, target) => ({
+            id, source, target, type: 'custom', animated: true, updatable: true,
+            markerEnd: { type: 'arrowclosed', width: 20, height: 20 },
+            style: { strokeWidth: 2 },
+        });
+        const payload = {
+            pipeline_id: '', version: 0, enabled: true, org: targetOrg,
+            name: pipelineName, description: `E2E pipeline using ${functionName}`,
+            source: { source_type: 'realtime' }, paused_at: null,
+            nodes: [
+                { id: inputId, position: { x: 100, y: 100 }, io_type: 'input',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: sourceStream, org_id: targetOrg } },
+                { id: fnId, position: { x: 300, y: 200 }, io_type: 'default',
+                  data: { node_type: 'function', name: functionName, after_flatten: true } },
+                { id: outputId, position: { x: 500, y: 300 }, io_type: 'output',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: `${pipelineName}_dest`, org_id: targetOrg } },
+            ],
+            edges: [edge(`e1-${stamp}`, inputId, fnId), edge(`e2-${stamp}`, fnId, outputId)],
+        };
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/pipelines`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createPipelineUsingFunction: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json().catch(() => ({}));
+        testLogger.info('Created pipeline using function', { pipelineName, functionName, org: targetOrg });
+        return result.id;
+    }
+
+    /**
+     * Create a JavaScript function (transType 1) via API.
+     * @param {string} functionName
+     * @param {string} jsCode - Function body; JS is not VRL, so it is stored verbatim
+     * @param {string} [org] - Organization identifier
+     */
+    async createJsFunction(functionName, jsCode, org = null) {
+        const targetOrg = org || this.org;
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/functions`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: functionName, function: jsCode, params: 'row', transType: 1 })
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createJsFunction: HTTP ${response.status} — ${body}`);
+        }
+        testLogger.info('Created JS function via API', { functionName, org: targetOrg });
         return await response.json().catch(() => ({}));
     }
 
@@ -3590,6 +3663,68 @@ class APICleanup {
         } catch (error) {
             testLogger.error('Correlation settings cleanup failed', { error: error.message });
         }
+    }
+
+    /**
+     * IAM leftovers a CRASHED run orphaned: roles, groups, users and service accounts
+     * under `prefix`.
+     *
+     * The ONLY prefix sweep for IAM. Each IAM spec deletes exactly what it created
+     * (makeTracker in playwright-tests/IAM/iam-fixtures.js); doing a prefix sweep in
+     * every spec's beforeAll is what had them deleting each other's fixtures mid-test.
+     * Recovery belongs here, once, before any suite starts.
+     *
+     * Order matters: a group pins the roles it holds, so groups go first.
+     * Enterprise-only — on an OSS build /roles answers 4xx and this returns quietly,
+     * because every other suite depends on cleanup succeeding.
+     */
+    async cleanupIamArtifacts(prefix = 'ui_auto') {
+        testLogger.info('Starting IAM artifact cleanup', { prefix });
+        const headers = { 'Authorization': this.authHeader, 'Content-Type': 'application/json' };
+        const api = (path) => `${this.baseUrl}/api/${this.org}${path}`;
+        const removed = { groups: [], roles: [], users: [] };
+
+        try {
+            const probe = await this._fetch(api('/roles'), { method: 'GET', headers });
+            if (!probe.ok) {
+                testLogger.info('IAM cleanup skipped — roles API unavailable (RBAC off / OSS build)', {
+                    status: probe.status,
+                });
+                return removed;
+            }
+
+            const json = async (res) => { try { return await res.json(); } catch { return null; } };
+            const del = async (path) => {
+                try { await this._fetch(api(path), { method: 'DELETE', headers }); } catch { /* best effort */ }
+            };
+
+            for (const g of (await json(await this._fetch(api('/groups'), { method: 'GET', headers }))) || []) {
+                if (typeof g === 'string' && g.startsWith(prefix)) { await del(`/groups/${g}`); removed.groups.push(g); }
+            }
+            for (const r of (await json(probe)) || []) {
+                if (typeof r === 'string' && r.startsWith(prefix)) { await del(`/roles/${r}`); removed.roles.push(r); }
+            }
+            const users = (await json(await this._fetch(api('/users'), { method: 'GET', headers })))?.data ?? [];
+            for (const u of users) {
+                if (typeof u?.email === 'string' && u.email.startsWith(prefix)) {
+                    await del(`/users/${u.email}`); removed.users.push(u.email);
+                }
+            }
+            const sas = (await json(await this._fetch(api('/service_accounts'), { method: 'GET', headers })))?.data ?? [];
+            for (const sa of sas) {
+                if (typeof sa?.email === 'string' && sa.email.startsWith(prefix) && !sa.is_system) {
+                    await del(`/service_accounts/${sa.email}`); removed.users.push(sa.email);
+                }
+            }
+
+            testLogger.info('IAM artifact cleanup complete', {
+                groups: removed.groups.length, roles: removed.roles.length, users: removed.users.length,
+            });
+        } catch (e) {
+            // Never fail the cleanup run: every other suite is waiting on it.
+            testLogger.warn('IAM artifact cleanup hit an error — continuing', { error: e?.message });
+        }
+        return removed;
     }
 
     /**

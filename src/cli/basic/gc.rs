@@ -164,7 +164,7 @@ async fn gc_stream(
     ];
     if stream_type == config::meta::stream::StreamType::Metrics {
         // Metrics index (`.midx`)
-        prefixes.push(format!("files/{org_id}/midx/{stream_name}/"));
+        prefixes.push(format!("files/{org_id}/mindex/{stream_name}/"));
     }
     let mut total_dirs = 0usize;
     let mut total_files = 0usize;

@@ -113,6 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="inline" :title="filteredEvent.name" data-test="event-name">
                 {{ filteredEvent.name }}
               </div>
+              <OTag
+                v-if="markedSet.has(filteredEvent.timestamp)"
+                :label="t('rum.analytics.viewer.stepMark')"
+                variant="primary-soft"
+                size="xs"
+                class="ms-2"
+                data-test="session-viewer-funnel-step-mark"
+              />
             </div>
           </div>
         </template>
@@ -122,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch, type PropType } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
@@ -161,7 +169,13 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  markedTimestamps: {
+    type: Array as PropType<number[]>,
+    default: () => [],
+  },
 });
+
+const markedSet = computed(() => new Set(props.markedTimestamps));
 
 const activeTab = ref<string>("breadcrumbs");
 const tabs: Array<{

@@ -2,6 +2,7 @@
 //methods: All configs related to dashboard panels
 
 import { expect } from "@playwright/test";
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
 
 export default class DashboardPanelConfigs {
   constructor(page) {
@@ -580,6 +581,7 @@ export default class DashboardPanelConfigs {
       .first();
     await firstField.waitFor({ state: "visible", timeout: 5000 });
     await firstField.click();
+    await this.waitForAddFieldMenuClosed();
   }
 
   /**
@@ -595,6 +597,16 @@ export default class DashboardPanelConfigs {
     );
     await fieldOptions.first().waitFor({ state: "visible", timeout: 5000 });
     await fieldOptions.last().click();
+    await this.waitForAddFieldMenuClosed();
+  }
+
+  /** Wait for the "Add field" dropdown to unmount after a field is picked. */
+  async waitForAddFieldMenuClosed() {
+    // The menu hands focus back to its trigger on unmount, which dismisses any popover opened before then.
+    await this.page
+      .locator('[data-test^="dashboard-addpanel-config-add-field-"]')
+      .first()
+      .waitFor({ state: "detached", timeout: 5000 });
   }
 
   /** Select a unit from the Value Formatting OSelect for the currently configured column. */
@@ -606,10 +618,16 @@ export default class DashboardPanelConfigs {
     // nodes until scrolled to. Type into the built-in search box instead, which
     // narrows filteredOptions so the match renders immediately.
     const parentDataTest = await unitSelect.getAttribute("data-test");
-    await unitSelect.click();
-
+    const trigger = this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
     const searchInput = this.page.locator(`[data-test="${parentDataTest}-search"]`);
-    await searchInput.waitFor({ state: "visible", timeout: 5000 });
+
+    // A focus shift can dismiss the popover right after it opens, so re-open until the search box holds.
+    await expect(async () => {
+      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+        await trigger.click();
+      }
+      await searchInput.waitFor({ state: "visible", timeout: 2000 });
+    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
     await searchInput.fill(unitName);
 
     const unitOption = this.page.locator(
@@ -706,6 +724,9 @@ export default class DashboardPanelConfigs {
       .first();
     await btn.waitFor({ state: "visible", timeout: 5000 });
     await btn.click();
+    await expect(btn.locator('[role="checkbox"]')).toHaveAttribute("aria-checked", "true", {
+      timeout: 5000,
+    });
   }
 
   /**
@@ -1817,4 +1838,34 @@ export default class DashboardPanelConfigs {
     return this.page.locator(`[data-test="dashboard-addpanel-config-markline-remove-${index}"]`);
   }
 
+  /**
+   * Hover the Drilldown section's info icon and return its tooltip.
+   *
+   * PanelEditor.vue mounts ConfigPanel in two layout branches, so the icon matches
+   * 2 nodes and the dormant one is parked OFF-VIEWPORT rather than hidden — it
+   * satisfies `visible=true` yet hover never reaches it ("element is outside of the
+   * viewport", retried to timeout). Probing each copy and keeping the one that
+   * actually opens the bubble is the only reliable discriminator.
+   */
+  async hoverDrilldownInfoForTooltip() {
+    const candidates = this.page.locator(SELECTORS.CONFIG_DRILLDOWN_INFO);
+    const total = await candidates.count();
+
+    for (let i = 0; i < total; i++) {
+      try {
+        await candidates.nth(i).hover({ timeout: 5000 });
+        const tooltip = this.page
+          .locator(visibleOnly(SELECTORS.TOOLTIP_CONTENT))
+          .first();
+        await tooltip.waitFor({ state: "visible", timeout: 5000 });
+        return tooltip;
+      } catch {
+        // Dormant layout branch — try the next copy.
+      }
+    }
+
+    throw new Error(
+      `hoverDrilldownInfoForTooltip: none of the ${total} drilldown info icons opened a tooltip`
+    );
+  }
 }

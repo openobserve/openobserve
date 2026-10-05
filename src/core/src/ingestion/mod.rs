@@ -234,7 +234,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.name
         );
         match alert
-            .send_notification(&trace_id, val, now, None, now, None, None, None, &[])
+            .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
             .await
         {
             Err(e) => {

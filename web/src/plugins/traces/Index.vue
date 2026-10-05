@@ -343,7 +343,7 @@ import {
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
@@ -455,11 +455,19 @@ watch(
   { immediate: true },
 );
 // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+let preTabletSplitter: number | null = null;
 watch(
   isTablet,
-  (tablet) => {
+  (tablet, wasTablet) => {
     if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+      preTabletSplitter = searchObj.config.splitterModel;
       searchObj.config.splitterModel = 30;
+    } else if (wasTablet && !tablet && !isMobile.value && preTabletSplitter !== null) {
+      // Back on a laptop: undo the floor unless the reader dragged the pane since.
+      if (searchObj.config.splitterModel === 30) {
+        searchObj.config.splitterModel = preTabletSplitter;
+      }
+      preTabletSplitter = null;
     }
   },
   { immediate: true },
@@ -1056,6 +1064,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           }
           delete tracesRequestState[searchTraceId];
           if (!isPagination) {
+            analytics.track("traces_search_completed");
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
@@ -1860,34 +1869,30 @@ const searchData = () => {
 
   runQueryFn();
 
-  if (config.isCloud == "true") {
-    segment.track("Button Click", {
-      button: "Search Data",
-      user_org: store.state.selectedOrganization.identifier,
-      user_id: store.state.userInfo.email,
-      stream_name: searchObj.data.stream.selectedStream.value,
-      show_query: searchObj.meta.showQuery,
-      show_histogram: searchObj.meta.showHistogram,
-      sqlMode: searchObj.meta.sqlMode,
-      showFields: searchObj.meta.showFields,
-      page: "Search Logs",
-    });
-  }
+  analytics.track("Button Click", {
+    button: "Search Data",
+    user_org: store.state.selectedOrganization.identifier,
+    user_id: store.state.userInfo.email,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    show_query: searchObj.meta.showQuery,
+    show_histogram: searchObj.meta.showHistogram,
+    sqlMode: searchObj.meta.sqlMode,
+    showFields: searchObj.meta.showFields,
+    page: "Search Logs",
+  });
 };
 
 const getMoreData = () => {
   if (searchObj.meta.refreshInterval == 0) {
     getQueryData(true);
 
-    if (config.isCloud == "true") {
-      segment.track("Button Click", {
-        button: "Get More Data",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        stream_name: searchObj.data.stream.selectedStream.value,
-        page: "Search Logs",
-      });
-    }
+    analytics.track("Button Click", {
+      button: "Get More Data",
+      user_org: store.state.selectedOrganization.identifier,
+      user_id: store.state.userInfo.email,
+      stream_name: searchObj.data.stream.selectedStream.value,
+      page: "Search Logs",
+    });
   }
 };
 

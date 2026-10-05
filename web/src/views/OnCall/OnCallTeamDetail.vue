@@ -84,6 +84,15 @@
       />
     </OContent>
 
+    <OContent v-else-if="teamNotFound" y>
+      <OEmptyState
+        size="hero"
+        :title="t('oncall.teamNotFoundTitle')"
+        :description="t('oncall.teamNotFoundDescription')"
+        data-test="oncall-team-detail-not-found"
+      />
+    </OContent>
+
     <OContent v-else-if="loadError" y>
       <OEmptyState
         size="hero"
@@ -170,9 +179,8 @@
         </OTab>
       </OTabs>
 
-      <!-- `scroll` defaults to overflow-hidden, which silently clipped the
-           escalation policy so its lower priorities were unreachable. -->
-      <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y">
+      <!-- `scroll` alone left the escalation policy clipped, and `grow` alone never shrinks below content without `min-h-0`, which is what lets Covers' `sticky bottom-0` below pin itself. -->
+      <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y" class="min-h-0">
         <OTabPanel name="overview">
           <!-- Two blocks in one column. The demo read as a wall: five sortable
                columns of history beside a rail restating reach and readiness that
@@ -226,6 +234,7 @@
              they on next. -->
         <OTabPanel name="members" stretch>
           <OnCallMembers
+            ref="membersRef"
             :team-id="teamId"
             :members="members"
             :rotations="schedule?.rotations ?? []"
@@ -245,7 +254,7 @@
         <!-- What the schedule WILL do, then the rotations that decide it, then
              the editor. Reading before editing: the timeline is resolved by the
              engine, so it answers "is this right" in a way the draft cannot. -->
-        <OTabPanel name="schedule">
+        <OTabPanel name="schedule" layout="flex-col" stretch>
           <!-- Only what the chart cannot be acted on for. Who is on, until
                when and who is next are on the lane the reader is already
                looking at; restating them here gave the reader two renderings
@@ -257,12 +266,15 @@
             @add-people="activeTab = 'members'"
           />
 
-          <OContent y class="flex flex-col gap-5">
+          <OContent y class="flex h-full min-h-0 flex-1 flex-col gap-5">
             <!-- Every act on a rotation arrives here, and every one of them opens
                  the SAME drawer: a rotation is one form, and which button was
                  pressed only decides what it opens on. The chart draws every
                  rotation the team has: the picker that used to scope it to one
-                 hid lanes on exactly the teams whose lanes are worth comparing. -->
+                 hid lanes on exactly the teams whose lanes are worth comparing.
+                 flex-1 so it takes the tab's own floor, which is what lets the
+                 Covers panel below sit pinned at the bottom rather than right
+                 under the calendar. -->
             <OnCallScheduleTimeline
               v-model:window="scheduleWindow"
               :rotations="teamRotations"
@@ -271,6 +283,7 @@
               :viewer-timezone="store.state.timezone"
               :loading="segmentsLoading"
               :can-cover="hasMembers !== false && canConfigure"
+              class="min-h-0 flex-1"
               @fill-gap="onFillGap"
               @add="openScheduleEditor({ mode: 'new' })"
               @edit="openScheduleEditor({ mode: 'edit', id: $event })"
@@ -282,12 +295,10 @@
               @presets="presetsOpen = true"
             />
 
-            <!-- Under the calendar, because a cover is an exception to what
-                 the calendar draws — and until now the only trace of one was
-                 an "· override" annotation on a cell, with no reason, no whose
-                 shift, and no way to take it back. -->
+            <!-- Pinned to the tab's own floor rather than left in flow, since whether anyone is overriding the schedule shouldn't depend on how far the reader scrolled. -->
             <OnCallCoverList
               ref="coverListRef"
+              class="sticky bottom-0 z-1"
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
               :viewer-timezone="store.state.timezone"
@@ -396,7 +407,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -438,6 +449,7 @@ import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
+import analytics from "@/services/product_analytics";
 import {
   createOverrideMutation,
   deleteOverrideMutation,
@@ -544,6 +556,9 @@ const coverOpen = ref(false);
 /// landed on the server and left the list under the calendar unchanged.
 const coverListRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 
+/// So the attention banner's "Add a member" can focus the picker even when switching to this tab is a no-op.
+const membersRef = ref<{ focusMemberPicker: () => void } | null>(null);
+
 /// Both things a written cover invalidates: the calendar, which the server
 /// resolves, and the list of covers beneath it. Never one without the other —
 /// a band that moves over a list that does not is the same confusion by half.
@@ -586,6 +601,7 @@ const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const oncallUnavailable = ref(false);
+const teamNotFound = ref(false);
 const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -669,8 +685,15 @@ function openOnCallList() {
 }
 
 // A coverage_gap finding has no single rotation to point at, so land in create mode instead of leaving the drawer closed.
-function onAttentionAct(tab: string, rotation?: string | null) {
+async function onAttentionAct(tab: string, rotation?: string | null) {
+  const wasAlreadyThere = activeTab.value === tab;
   activeTab.value = tab;
+  if (tab === "members") {
+    // The panel only mounts on the tick after switching tabs, so wait unless we were already there.
+    if (!wasAlreadyThere) await nextTick();
+    membersRef.value?.focusMemberPicker();
+    return;
+  }
   if (tab !== "schedule") return;
   if (!rotation) {
     openScheduleEditor({ mode: "new" });
@@ -727,58 +750,86 @@ const refreshScheduleForEdit = () =>
 
 async function fetchAll(force = false) {
   loadError.value = null;
+  teamNotFound.value = false;
   const org = orgId.value;
   const id = teamId.value;
-  try {
-    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes, teamsRes] = await Promise.all([
+
+  // Issued together rather than awaiting the teams probe first, which turned every load into teams + max(the other five).
+  const [teamsSettled, teamSettled, memberSettled, scheduleSettled, policySettled, onCallSettled] =
+    await Promise.allSettled([
+      read<OnCallTeam[]>(oncallTeamsQuery(org), force),
       read<OnCallTeam | null>(oncallTeamQuery(org, id), force),
       read<OnCallTeamMember[]>(teamMembersQuery(org, id), force),
       read<OnCallSchedule | null>(teamScheduleQuery(org, id), force),
       read<OnCallPolicy | null>(teamPolicyQuery(org, id), force),
       read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
-      read<OnCallTeam[]>(oncallTeamsQuery(org), force),
     ]);
-    team.value = teamRes;
-    teams.value = teamsRes;
-    members.value = memberRes;
-    schedule.value = scheduleRes;
-    policy.value = policyRes;
-    onCallNow.value = onCallRes;
-    // The oldest, so the age never claims the page is fresher than the stalest thing on it.
-    lastFetchedAt.value = Math.min(
-      ...[
-        oncallTeamQuery(org, id),
-        teamMembersQuery(org, id),
-        teamScheduleQuery(org, id),
-        teamPolicyQuery(org, id),
-        whoIsOnCallQuery(org, id),
-        oncallTeamsQuery(org),
-      ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
-    );
-    // Only on success, so a failed load never renders a team as uncovered.
-    if (!loaded.value) {
-      activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
-    }
-    loaded.value = true;
-    await Promise.allSettled([
-      fetchRuleCount(force),
-      fetchPages(force),
-      fetchInsights(force),
-      fetchPreview(force),
-    ]);
-  } catch (err: any) {
-    // Entry fetch ONLY: a 404 on a specific team id past this point is a
-    // missing record, not a missing feature.
+
+  // The org-level list exists in every on-call build regardless of this team id, so only its failure means the feature is unavailable.
+  if (teamsSettled.status === "rejected") {
+    const err: any = teamsSettled.reason;
     if (isOnCallUnavailable(err)) {
       oncallUnavailable.value = true;
       return;
     }
-    // The state, not a toast. With the load failed the page below renders a
-    // team with no members, no schedule and no policy — the exact look of a
-    // team somebody forgot to configure, on a screen whose job is to say
-    // whether a page would land.
     loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    return;
   }
+
+  if (teamSettled.status === "rejected") {
+    const err: any = teamSettled.reason;
+    // The probe above already confirmed on-call is available, so a 404 on this query alone means the team id was deleted.
+    if (err?.response?.status === 404) {
+      teamNotFound.value = true;
+      return;
+    }
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    return;
+  }
+
+  if (
+    memberSettled.status === "rejected" ||
+    scheduleSettled.status === "rejected" ||
+    policySettled.status === "rejected" ||
+    onCallSettled.status === "rejected"
+  ) {
+    const err: any = (
+      [memberSettled, scheduleSettled, policySettled, onCallSettled].find(
+        (settled) => settled.status === "rejected",
+      ) as PromiseRejectedResult
+    ).reason;
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    return;
+  }
+
+  team.value = teamSettled.value;
+  teams.value = teamsSettled.value;
+  members.value = memberSettled.value;
+  schedule.value = scheduleSettled.value;
+  policy.value = policySettled.value;
+  onCallNow.value = onCallSettled.value;
+  // The oldest, so the age never claims the page is fresher than the stalest thing on it.
+  lastFetchedAt.value = Math.min(
+    ...[
+      oncallTeamQuery(org, id),
+      teamMembersQuery(org, id),
+      teamScheduleQuery(org, id),
+      teamPolicyQuery(org, id),
+      whoIsOnCallQuery(org, id),
+      oncallTeamsQuery(org),
+    ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
+  );
+  // Only on success, so a failed load never renders a team as uncovered.
+  if (!loaded.value) {
+    activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
+  }
+  loaded.value = true;
+  await Promise.allSettled([
+    fetchRuleCount(force),
+    fetchPages(force),
+    fetchInsights(force),
+    fetchPreview(force),
+  ]);
 }
 
 // The count feeds a warning tile, so a failed lookup leaves it at zero-known
@@ -1110,6 +1161,7 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
     firstId = created.data?.id ?? null;
 
     await coverWrite.mutateAsync(value.second);
+    analytics.track("oncall_override_created", { kind: "swap" });
 
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.swapSaved") });
@@ -1171,6 +1223,7 @@ async function saveCover(value: {
   coverSaving.value = true;
   try {
     await coverWrite.mutateAsync(value);
+    analytics.track("oncall_override_created", { kind: "cover" });
     coverOpen.value = false;
     coverGap.value = null;
     // The message is "{name} covers {team} · {range}" and it was called with no
