@@ -17,14 +17,17 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+use infra::table::score_configs::ScoreConfig;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
+    auth::{UserEmail, is_ofga_object_visible},
     http::map_error_to_http_response,
-    llm_evaluations::quality::{self, QualityError, QualityScorePage, QualitySummary},
+    llm_evaluations::quality::{self, QualityConfigList, QualityError, QualityScorePage},
 };
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    models::quality::{ListQualityScoresQuery, QualitySummaryQuery},
+    models::quality::{ListQualityQuery, ListQualityScoresQuery},
 };
 
 fn quality_error_response(error: QualityError) -> Response {
@@ -52,35 +55,56 @@ fn quality_error_response(error: QualityError) -> Response {
     }
 }
 
-/// GetScoreConfigQuality
+/// ListScoreConfigQuality
 #[utoipa::path(
     get,
-    path = "/{org_id}/score_configs/{entity_id}/quality",
+    path = "/{org_id}/score_configs/quality",
     context_path = "/api",
     tag = "ScoreConfigs",
-    operation_id = "GetScoreConfigQuality",
-    summary = "Quality summary for one Score Config",
-    description = "Reads the latest Score per evaluation for the config in the time window and returns its health status, totals, average, per-scope counts and value distribution. The scope filter applies to everything except the per-scope counts.",
+    operation_id = "ListScoreConfigQuality",
+    summary = "Quality summary for every Score Config",
+    description = "Reads the latest Score per evaluation for each active Score Config the caller can see, in the time window, and returns its health status, totals, average, per-scope counts and most frequent value. The scope filter applies to everything except the per-scope counts.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("entity_id" = String, Path, description = "Score Config entity ID"),
-        QualitySummaryQuery,
+        ListQualityQuery,
     ),
     responses(
-        (status = 200, body = inline(QualitySummary)),
+        (status = 200, body = inline(QualityConfigList)),
         (status = 400, description = "Invalid request or search query", content_type = "application/json", body = MetaHttpResponse),
-        (status = 404, description = "Score Config not found", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Quality query failed", content_type = "application/json", body = MetaHttpResponse),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "get"}))),
+    extensions(("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
 )]
-pub async fn get_quality_summary(
-    Path((org_id, entity_id)): Path<(String, String)>,
-    Query(query): Query<QualitySummaryQuery>,
+pub async fn list_quality_summaries(
+    Path(org_id): Path<String>,
+    Query(query): Query<ListQualityQuery>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match quality::summary(&org_id, &entity_id, query.into()).await {
-        Ok(summary) => MetaHttpResponse::json(summary),
+    // Same visibility as ListScoreConfigs, so the page never names a config
+    // the caller cannot open.
+    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
+        &org_id,
+        &user_email.user_id,
+        "GET",
+        "score_config",
+    )
+    .await
+    {
+        Ok(list) => list,
+        Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
+    };
+    let is_visible = |config: &ScoreConfig| {
+        is_ofga_object_visible(
+            &org_id,
+            "score_config",
+            &config.entity_id,
+            permitted_objects.as_deref(),
+        )
+    };
+    match quality::list_summaries(&org_id, query.into(), is_visible).await {
+        Ok(list) => MetaHttpResponse::json(list),
         Err(error) => quality_error_response(error),
     }
 }
@@ -88,12 +112,12 @@ pub async fn get_quality_summary(
 /// ListScoreConfigQualityScores
 #[utoipa::path(
     get,
-    path = "/{org_id}/score_configs/{entity_id}/quality/scores",
+    path = "/{org_id}/score_configs/{entity_id}/quality",
     context_path = "/api",
     tag = "ScoreConfigs",
     operation_id = "ListScoreConfigQualityScores",
-    summary = "Latest Scores for one Score Config",
-    description = "Pages the latest Score per evaluation for the config, newest first. Filters by scope, agent, health, numeric distribution bucket or exact value. The total counts every Score that matches the filters.",
+    summary = "Value distribution and latest Scores for one Score Config",
+    description = "Pages the latest Score per evaluation for the config, newest first. Filters by scope, agent, health, numeric distribution bucket or exact value. The total counts every Score that matches the filters. The value distribution follows only the scope and agent filters, so it stays the same while the page drills into one bucket or value.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
