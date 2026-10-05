@@ -17,6 +17,13 @@
       @submit="onSubmit"
     >
       <div class="add-dashboard-form-card-section flex flex-col gap-4">
+        <OBanner
+          v-if="notice"
+          variant="info"
+          dense
+          :content="notice"
+          data-test="add-to-dashboard-notice"
+        />
         <!-- select folder or create new folder and select -->
         <SelectFolderDropdown @folder-selected="updateActiveFolderId" />
 
@@ -49,7 +56,7 @@
 import { computed, defineComponent, ref, watch, type Ref, type PropType } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { getFoldersList, getPanelId, addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
@@ -57,6 +64,7 @@ import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -76,6 +84,7 @@ export default defineComponent({
     ODialog,
     OForm,
     OFormInput,
+    OBanner,
   },
   props: {
     open: {
@@ -95,6 +104,11 @@ export default defineComponent({
     panels: {
       type: Array as PropType<any[]>,
       default: () => [],
+    },
+    /** A note shown above the form, such as what a copied panel keeps. */
+    notice: {
+      type: String as unknown as PropType<I18nText>,
+      default: undefined,
     },
   },
   emits: ["save", "update:open"],

@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createMemoryHistory, createRouter } from "vue-router";
 import useRoutes from "./router";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
 
@@ -96,6 +98,29 @@ vi.mock("@/views/RUM/ErrorViewer.vue", () => ({ default: { name: "ErrorViewer" }
 vi.mock("@/views/RUM/AppPerformance.vue", () => ({ default: { name: "AppPerformance" } }));
 vi.mock("@/views/RUM/AppErrors.vue", () => ({ default: { name: "AppErrors" } }));
 vi.mock("@/views/RUM/AppSessions.vue", () => ({ default: { name: "AppSessions" } }));
+vi.mock("@/views/RUM/AppAnalytics.vue", () => ({ default: { name: "AppAnalytics" } }));
+vi.mock("@/views/RUM/NamedEventEditor.vue", () => ({ default: { name: "NamedEventEditor" } }));
+vi.mock("@/components/rum/productAnalytics/AnalyticsOverview.vue", () => ({
+  default: { name: "AnalyticsOverview" },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsFunnels.vue", () => ({
+  default: { name: "AnalyticsFunnels" },
+}));
+vi.mock("@/components/rum/productAnalytics/SavedFunnelsPage.vue", async () => ({
+  default: {
+    name: "SavedFunnelsPage",
+    beforeRouteEnter: (await import("@/utils/rum/funnelLinks")).forwardFunnelLink,
+  },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsPaths.vue", () => ({
+  default: { name: "AnalyticsPaths" },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsRetention.vue", () => ({
+  default: { name: "AnalyticsRetention" },
+}));
+vi.mock("@/components/rum/productAnalytics/NamedEventsListPage.vue", () => ({
+  default: { name: "NamedEventsListPage" },
+}));
 vi.mock("@/components/reports/ReportList.vue", () => ({ default: { name: "ReportList" } }));
 vi.mock("@/components/reports/CreateReport.vue", () => ({ default: { name: "CreateReport" } }));
 vi.mock("@/components/rum/performance/PerformanceSummary.vue", () => ({
@@ -1532,6 +1557,98 @@ describe("useRoutes (router.ts)", () => {
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+  });
+
+  describe("homeChildRoutes — Product Analytics", () => {
+    const shell = () => findRoute(useRoutes().homeChildRoutes, PA_ROUTES.shell);
+
+    const realRouter = () => {
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+    };
+
+    it("is its own top-level route, not a RUM child", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.find((r: any) => r.name === PA_ROUTES.shell)?.path).toBe(
+        "product-analytics",
+      );
+      const rum = findRoute(homeChildRoutes, "RUM");
+      expect(rum.children.map((c: any) => c.path)).not.toContain("analytics");
+      expect(findRoute(homeChildRoutes, "RumAnalytics")).toBeUndefined();
+    });
+
+    it("renders the six sub-tab routes inside the shell, each lazy and guarded", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const route = shell();
+      expect(typeof route.component).toBe("function");
+      expect(route.meta.titleKey).toBe("menu.productAnalytics");
+      expect(route.children.map((c: any) => [c.path, c.name])).toEqual([
+        ["overview", PA_ROUTES.overview],
+        ["funnels", PA_ROUTES.funnels],
+        ["funnels/build", PA_ROUTES.funnelBuilder],
+        ["paths", PA_ROUTES.paths],
+        ["retention", PA_ROUTES.retention],
+        ["events", PA_ROUTES.events],
+      ]);
+      for (const child of [route, ...route.children]) {
+        expect(typeof child.component).toBe("function");
+        const next = vi.fn();
+        child.beforeEnter({}, {}, next);
+        expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+      }
+    });
+
+    it("registers the named event editors as siblings of the shell, outside its tab strip", () => {
+      const { homeChildRoutes } = useRoutes();
+      const top = (name: string) => homeChildRoutes.find((r: any) => r.name === name);
+      expect(top(PA_ROUTES.eventNew)?.path).toBe("product-analytics/events/new");
+      expect(top(PA_ROUTES.eventEdit)?.path).toBe("product-analytics/events/:id/edit");
+      expect(top(PA_ROUTES.eventEdit)?.props).toBe(true);
+      const router = realRouter();
+      for (const [path, name] of [
+        ["/product-analytics/events/new", PA_ROUTES.eventNew],
+        ["/product-analytics/events/abc/edit", PA_ROUTES.eventEdit],
+      ]) {
+        const resolved = router.resolve(path);
+        expect(resolved.name).toBe(name);
+        expect(resolved.matched.map((m) => m.name)).not.toContain(PA_ROUTES.shell);
+      }
+      expect(router.resolve("/product-analytics/events").matched.map((m) => m.name)).toEqual([
+        undefined,
+        PA_ROUTES.shell,
+        PA_ROUTES.events,
+      ]);
+      expect(router.resolve("/product-analytics/funnels/build").name).toBe(PA_ROUTES.funnelBuilder);
+    });
+
+    it.each([
+      ["/product-analytics/funnels?app=web&sf=Alpha000000000000000000001", "sf"],
+      ["/product-analytics/funnels?app=web&funnel=abc", "funnel"],
+    ])("forwards %s, a link naming a funnel, to the builder with its query", async (path, key) => {
+      const router = realRouter();
+      await router.push(path);
+      expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnelBuilder);
+      expect(router.currentRoute.value.path).toBe("/product-analytics/funnels/build");
+      expect(router.currentRoute.value.query).toMatchObject({ app: "web" });
+      expect(router.currentRoute.value.query[key]).toBeDefined();
+    });
+
+    it("leaves the remaining RUM tabs where they were", async () => {
+      const router = realRouter();
+      await router.push("/rum/sessions?period=15m");
+      expect(router.currentRoute.value.name).toBe("Sessions");
     });
   });
 

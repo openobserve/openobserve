@@ -406,6 +406,8 @@ import {
 } from "@/utils/traces/filterUtils";
 import { isDatetimeChanged } from "./tracesSearchBar.utils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { downloadFile } from "@/utils/dom";
+import { toCsv } from "@/utils/csv";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -756,35 +758,18 @@ export default defineComponent({
       }
     };
 
-    const jsonToCsv = (jsonData) => {
-      const replacer = (key, value) => (value === null ? "" : value);
-      const header = Object.keys(jsonData[0]);
-      let csv = header.join(",") + "\r\n";
-
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = header
-          .map((fieldName) => JSON.stringify(jsonData[i][fieldName], replacer))
-          .join(",");
-        csv += row + "\r\n";
-      }
-
-      return csv;
-    };
-
     const downloadLogs = () => {
-      const filename = "traces-data.csv";
-      const data = jsonToCsv(searchObj.data.queryResults.hits);
-      const file = new File([data], filename, {
-        type: "text/csv",
-      });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const hits = searchObj.data.queryResults.hits;
+      if (!hits?.length) return;
+      let downloaded = false;
+      try {
+        downloaded = downloadFile("traces-data.csv", toCsv(hits), "text/csv");
+      } catch (e) {
+        console.error("Error exporting traces:", e);
+      }
+      if (!downloaded) {
+        toast({ message: t("traces.exportTracesFailed"), variant: "error" });
+      }
     };
 
     const updateTimezone = () => {
