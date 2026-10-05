@@ -1385,8 +1385,8 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
                 .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
-                .route("/{org_id}/score_configs/{entity_id}/quality", get(quality::get_quality_summary))
-                .route("/{org_id}/score_configs/{entity_id}/quality/scores", get(quality::list_quality_scores))
+                .route("/{org_id}/score_configs/quality", get(quality::list_quality_summaries))
+                .route("/{org_id}/score_configs/{entity_id}/quality", get(quality::list_quality_scores))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
                 // Scorers (Online Eval Phase 2)
