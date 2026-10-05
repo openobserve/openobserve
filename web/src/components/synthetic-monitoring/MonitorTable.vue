@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :persist-columns="true"
     table-id="synthetic-monitoring-table"
     :enable-column-resize="true"
-    :footer-title="resolvedFooterTitle"
     :empty-message="resolvedEmptyMessage"
     :data-test="dataTest"
     :horizontal-scroll="true"
@@ -457,81 +456,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Footer with count + bulk action buttons -->
-    <template #bottom>
-      <div class="flex h-12 w-full items-center justify-between gap-1">
-        <span class="text-secondary min-w-25 text-xs">
-          <template v-if="localSelectedIds.length > 0">{{
-            t("synthetics.table.selectedCount", {
-              selected: localSelectedIds.length,
-              total: data.length,
-            })
-          }}</template>
-          <span v-else class="max-md:hidden">{{ data.length }} {{ resolvedFooterTitle }}</span>
-        </span>
-        <template v-if="localSelectedIds.length > 0">
+    <template #selection-actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="pause"
+        :data-test="`${dataTest}-pause-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('pause-selected')"
+        >{{ t("synthetics.table.pause") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="play-arrow"
+        :data-test="`${dataTest}-enable-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('enable-selected')"
+        >{{ t("synthetics.table.enable") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="sound-sampler"
+        :data-test="`${dataTest}-trigger-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('trigger-selected')"
+        >{{ t("synthetics.table.trigger") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="drive-file-move"
+        :data-test="`${dataTest}-move-selected-btn`"
+        @click="emit('move-selected')"
+        >{{ t("synthetics.table.move") }}</OButton
+      >
+      <ODropdown v-if="downtimesEnabled" side="top">
+        <template #trigger>
           <OButton
             variant="outline"
             size="sm"
-            icon-left="pause"
-            :data-test="`${dataTest}-pause-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('pause-selected')"
-            >{{ t("synthetics.table.pause") }}</OButton
+            icon-left="notifications-paused"
+            :data-test="`${dataTest}-mute-selected-btn`"
           >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="play-arrow"
-            :data-test="`${dataTest}-enable-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('enable-selected')"
-            >{{ t("synthetics.table.enable") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="sound-sampler"
-            :data-test="`${dataTest}-trigger-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('trigger-selected')"
-            >{{ t("synthetics.table.trigger") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="drive-file-move"
-            :data-test="`${dataTest}-move-selected-btn`"
-            @click="emit('move-selected')"
-            >{{ t("synthetics.table.move") }}</OButton
-          >
-          <ODropdown v-if="downtimesEnabled" side="top">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm"
-                icon-left="notifications-paused"
-                :data-test="`${dataTest}-mute-selected-btn`"
-              >
-                {{ t("alerts.downtimes.mute.bulk") }}
-              </OButton>
-            </template>
-            <MuteMenuItems
-              :data-test-prefix="`${dataTest}-bulk-mute`"
-              @preset="(secs) => muteRows(selectedRows, secs)"
-              @until="openMuteDialog(selectedRows)"
-            />
-          </ODropdown>
-          <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            :data-test="`${dataTest}-delete-selected-btn`"
-            :loading="!!props.bulkActionLoading"
-            @click="emit('delete-selected')"
-            >{{ t("synthetics.table.delete") }}</OButton
-          >
+            {{ t("alerts.downtimes.mute.bulk") }}
+          </OButton>
         </template>
-      </div>
+        <MuteMenuItems
+          :data-test-prefix="`${dataTest}-bulk-mute`"
+          @preset="(secs) => muteRows(selectedRows, secs)"
+          @until="openMuteDialog(selectedRows)"
+        />
+      </ODropdown>
+      <OButton
+        variant="outline-destructive"
+        size="sm"
+        icon-left="delete"
+        :data-test="`${dataTest}-delete-selected-btn`"
+        :loading="!!props.bulkActionLoading"
+        @click="emit('delete-selected')"
+        >{{ t("synthetics.table.delete") }}</OButton
+      >
     </template>
   </OTable>
 
@@ -656,7 +642,6 @@ const props = withDefaults(
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;
-    footerTitle?: I18nText;
     emptyMessage?: I18nText;
     dataTest?: string;
     toggleLoadingMap?: Record<string, boolean>;
@@ -707,11 +692,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-// Not `withDefaults` defaults: those are evaluated once at module scope, which
-// would freeze the copy in whatever locale was active at first load.
-const resolvedFooterTitle = computed(
-  () => props.footerTitle ?? t("synthetics.table.checksFooterTitle"),
-);
+// Not a `withDefaults` default: that is evaluated once at module scope and would freeze the copy in the first-loaded locale.
 const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t("search.noResult"));
 
 const localSelectedIds = computed({

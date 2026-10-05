@@ -46,6 +46,7 @@ mod pipelines;
 mod ratelimit;
 mod re_pattern;
 mod reports;
+mod rum_analytics;
 mod scheduler;
 mod schemas;
 mod search_job;
@@ -113,6 +114,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
         on_kv_msg: kv::process,
         on_service_streams_msg: service_streams::process,
+        on_rum_analytics_msg: rum_analytics::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

@@ -70,6 +70,7 @@ pub mod ratelimit;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;
 pub mod reports;
+pub mod rum_pa;
 pub mod score_configs;
 pub mod scorers;
 pub mod search_job;

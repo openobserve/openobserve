@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
           :current-page="currentPage"
-          :footer-title="t('alert_templates.header')"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -283,10 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @deleted="onDependencyDeleted"
             />
           </template>
-          <template v-if="selectedTemplates.length > 0" #bottom>
-            <span class="text-text-secondary text-xs">
-              {{ selectedTemplates.length }} {{ t("alert_templates.selected") }}
-            </span>
+          <template #selection-actions>
             <OButton
               data-test="template-list-delete-templates-btn"
               variant="outline-destructive"
@@ -420,7 +416,6 @@ const editingTemplate: Ref<TemplateData | null> = ref(null);
 // True when the editor was opened via the clone action — the AddTemplate
 // form should treat the prefilled data as a fresh template (not an update).
 const cloningTemplate = ref(false);
-const resultTotal = ref<number>(0);
 
 const confirmDelete: Ref<{
   visible: boolean;
@@ -750,15 +745,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return byTab;
   return filterData(byTab, filterQuery.value);
 });
-// Watch visibleRows to sync resultTotal with search filter
-watch(
-  visibleRows,
-  (newVisibleRows) => {
-    resultTotal.value = newVisibleRows.length;
-  },
-  { immediate: true },
-);
-
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;
 };

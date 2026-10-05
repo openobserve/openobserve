@@ -57,11 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :expand-on-row-click="true"
         :show-global-filter="false"
         table-id="dbm-deadlocks"
-        :footer-title="
-          grouping === 'pairs'
-            ? t('dbm.deadlocks.summary.pairs')
-            : t('dbm.deadlocks.summary.deadlocks')
-        "
         persist-columns
         :get-row-style="rowStyle"
         :total-count-exact="!truncated"

@@ -83,7 +83,7 @@ describe("SummaryList.vue", () => {
             ],
             emits: ["update:selected-ids", "row-click"],
             template:
-              '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="bottom" /></div>',
+              '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="selection-actions" /></div>',
           },
         },
       },

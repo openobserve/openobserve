@@ -243,7 +243,7 @@ import { defineComponent, ref, computed } from "vue";
 import jsTransformService from "../../services/jstransform";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -455,7 +455,7 @@ export default defineComponent({
           dismiss();
         }
 
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: props.isUpdating
             ? `Update Enrichment Table (${value.updateMode})`
             : "Save Enrichment Table from URL",
@@ -504,7 +504,7 @@ export default defineComponent({
           dismiss();
         }
 
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Save Enrichment Table",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,

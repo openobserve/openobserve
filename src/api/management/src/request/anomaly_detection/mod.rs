@@ -521,7 +521,7 @@ pub struct HistoryQuery {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AnomalyConfigResponse {
-    // Response mirrors the database structure
+    // The config row is returned flat, with every column as a top-level key
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

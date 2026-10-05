@@ -33,6 +33,7 @@ import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHan
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
 import { raw, type TranslateFn } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 
 export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -98,6 +99,10 @@ export const useSearchStream = (t: TranslateFn) => {
    * Orchestrates histogram processing if needed
    */
   const handleSearchComplete = (payload: any) => {
+    if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
+      analytics.track("logs_search_completed");
+    }
+
     // Process histogram if needed
     if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
       getHistogramData(payload.queryReq, {

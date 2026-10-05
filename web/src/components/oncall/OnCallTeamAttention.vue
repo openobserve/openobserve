@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-team-attention"
       >
         <span class="flex min-w-0 items-center gap-x-3">
-          <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
+          <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase max-md:hidden">
             {{ t("oncall.attentionHeading") }}
           </span>
           <span class="flex min-w-0 items-center gap-1.5" data-test="oncall-attention-worst">
@@ -52,7 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <!-- The worst finding whole, on one line. The count moved into the
                  disclosure button, so nothing here can wrap the strip. -->
-            <span class="text-text-body min-w-0 truncate text-sm">
+            <!-- Touch has no hover to read a clipped sentence by, so below lg it gets a second line instead. -->
+            <span
+              class="text-text-body min-w-0 truncate text-sm max-lg:line-clamp-2 max-lg:whitespace-normal"
+            >
               {{ worst.message }}
               <OTooltip side="bottom" :content="worst.message" />
             </span>

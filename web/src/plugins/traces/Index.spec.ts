@@ -22,6 +22,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
+import analytics from "@/services/product_analytics";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -311,7 +312,7 @@ vi.mock("@/services/jstransform", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -1288,6 +1289,30 @@ describe("Index.vue (Main Traces Page)", () => {
 
       const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
       expect(ids).toEqual(fresh.map((h) => h.span_id));
+    });
+
+    it("tracks traces_search_completed when a new search completes", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      lastCallbacks().complete(null);
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed");
+    });
+
+    it("does not track traces_search_completed when a page completes", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      lastCallbacks().complete(null);
+
+      expect(analytics.track).not.toHaveBeenCalledWith("traces_search_completed");
     });
   });
 

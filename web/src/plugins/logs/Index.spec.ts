@@ -214,7 +214,7 @@ vi.mock("@/composables/useLogs/usePatterns", () => ({
 }));
 
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 
 describe("Logs Index", async () => {
   let wrapper: any;
@@ -785,7 +785,7 @@ describe("Logs Index", async () => {
   it("Should set loading & runQuery, and track analytics on cloud in searchData", async () => {
     const originalIsCloud = config.isCloud;
     try {
-      (segment as any).track = vi.fn();
+      (analytics as any).track = vi.fn();
       (config as any).isCloud = "true";
 
       wrapper.vm.searchObj.loading = false;
@@ -800,7 +800,7 @@ describe("Logs Index", async () => {
 
       expect(wrapper.vm.searchObj.loading).toBe(true);
       expect(wrapper.vm.searchObj.runQuery).toBe(true);
-      expect((segment as any).track).toHaveBeenCalledWith(
+      expect((analytics as any).track).toHaveBeenCalledWith(
         "Button Click",
         expect.objectContaining({ button: "Search Data" }),
       );

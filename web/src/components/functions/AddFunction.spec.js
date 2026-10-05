@@ -16,8 +16,8 @@ vi.mock("@/services/jstransform", async (importOriginal) => {
   });
 });
 
-// Mock segment analytics
-vi.mock("@/services/segment_analytics", () => ({
+// Mock product analytics
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },

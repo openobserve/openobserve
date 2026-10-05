@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import useBreakpoint from "@/composables/useBreakpoint";
 import OScheduleBand from "@/lib/data/ScheduleTimeline/OScheduleBand.vue";
 import OScheduleTimeline from "@/lib/data/ScheduleTimeline/OScheduleTimeline.vue";
 import type {
@@ -142,6 +143,7 @@ const props = withDefaults(
 );
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 
 /** One sample per hour: fine enough to catch an hour-long hole. */
 const STEP_MICROS = 60 * 60 * 1_000_000;
@@ -417,6 +419,8 @@ const summary = computed<I18nText>(() => {
 /// Roughly this many labelled marks across the window — enough to place a band
 /// within a day, few enough that the labels do not collide.
 const TICK_TARGET = 7;
+/** A phone-width strip only has room for this many date labels before they collide. */
+const TICK_TARGET_PHONE = 4;
 
 /// The next local midnight at or after `at`.
 ///
@@ -455,7 +459,8 @@ const dayColumns = computed(() => dayBoundaries.value.map((at) => (at - start.va
 /// they thin out — but always onto real midnights, never onto even fractions of
 /// the window, which would put "Mon 18" at half past two on the Monday.
 const axisTicks = computed<ScheduleAxisTick[]>(() => {
-  const step = Math.max(1, Math.ceil(props.days / TICK_TARGET));
+  const target = isMobile.value ? TICK_TARGET_PHONE : TICK_TARGET;
+  const step = Math.max(1, Math.ceil(props.days / target));
   return dayBoundaries.value
     .filter((_, index) => index % step === 0)
     .map((at) => ({

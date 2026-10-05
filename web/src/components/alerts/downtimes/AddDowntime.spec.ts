@@ -75,6 +75,9 @@ const mountPage = async () => {
 const save = async (wrapper: ReturnType<typeof mount>) => {
   await wrapper.get('[data-test="add-downtime-save"]').trigger("click");
   await flushPromises();
+  // The submit can land a macrotask after the click, so a microtask flush alone may miss it.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushPromises();
 };
 
 const tick = async (wrapper: ReturnType<typeof mount>, dataTest: string) => {

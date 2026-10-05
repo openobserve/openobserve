@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
+import analytics from "./product_analytics";
 
 export interface ExperimentScorerRef {
   id: string;
@@ -1053,6 +1054,8 @@ const llmExperimentsService = {
 
   async create(orgId: string, payload: ExperimentCreatePayload): Promise<CreateExperimentResult> {
     const response = await http().post(base(orgId), payload);
+    // An idempotent replay returns the existing experiment with created=false.
+    if (response.data?.created === true) analytics.track("llm_experiment_created");
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),

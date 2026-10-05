@@ -313,12 +313,6 @@ describe("EvidenceEvents", () => {
     expect(statusText()).toEqual(["500", "404", "200"]);
   });
 
-  it("labels the footer count instead of leaving a bare number", () => {
-    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBe(
-      "Events",
-    );
-  });
-
   it("lets the inline step list expand a row to the full record", async () => {
     const w = mountEvents({ mode: "inline" });
     expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(true);

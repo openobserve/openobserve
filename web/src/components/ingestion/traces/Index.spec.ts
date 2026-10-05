@@ -18,8 +18,8 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
-// Mock segment analytics to prevent real tracking calls
-vi.mock("@/services/segment_analytics", () => ({
+// Mock product analytics to prevent real tracking calls
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 

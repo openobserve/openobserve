@@ -572,7 +572,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
-    let v0_0_52 = version_compare::Version::from("0.0.52").unwrap();
+    let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -687,7 +687,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] prompt folders permissions migration needed");
         pending.prompt_folders = true;
     }
-    if existing_model_version < v0_0_52 {
+    if existing_model_version < v0_0_53 {
         log::info!("[OFGA:Local] downtimes permissions migration needed");
         pending.downtimes = true;
     }

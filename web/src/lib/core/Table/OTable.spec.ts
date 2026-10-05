@@ -12,6 +12,12 @@ const i18n = createI18n({
     en: {
       search: { noData: "No data available" },
       common: { loading: "Loading..." },
+      components: {
+        table: {
+          selectedOfTotal: "{selected} of {total} selected",
+          selectedCount: "{selected} selected",
+        },
+      },
     },
   },
 });
@@ -21,7 +27,7 @@ beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
 
-import { nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1660,21 +1666,161 @@ describe("OTable", () => {
     });
   });
 
-  // ── Scoped Bottom Slot ─────────────────────────────────────
+  // ── Footer start side ──────────────────────────────────────
 
-  describe("bottom slot", () => {
-    it("renders bottom slot", () => {
-      wrapper = mount(OTable, {
-        props: {
-          data: makeRows(5),
-          columns: makeColumns(),
-          pagination: "client",
-        },
+  describe("footer start side", () => {
+    const BAR = '[data-test="o2-table-pagination-bottom"]';
+    const SELECTION = '[data-test="o2-table-pagination-selection"]';
+    const COUNT = '[data-test="o2-table-selected-count"]';
+    const NOTE = '[data-test="o2-table-pagination-note"]';
+    const ACTIONS = { "selection-actions": '<button data-test="bulk-delete">Delete</button>' };
+    const NOTE_SLOT = { "footer-note": '<span data-test="cap-note">Showing the first 25</span>' };
+
+    const mountFooter = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
+      mount(OTable, {
+        props: { data: makeRows(25), columns: makeColumns(), selection: "multiple", ...props },
+        slots,
+      });
+
+    it("renders the pager alone when neither slot is provided", () => {
+      wrapper = mountFooter({ selectedIds: ["1"] });
+      expect(wrapper.find(BAR).element.children).toHaveLength(1);
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+    });
+
+    it("prints no total label ahead of the pager", () => {
+      wrapper = mountFooter();
+      const info = wrapper.find('[data-test="o2-table-pagination-info"]').text();
+      expect(wrapper.find(BAR).text().indexOf(info)).toBe(0);
+    });
+
+    it("renders the pager alone until a row is selected", () => {
+      wrapper = mountFooter({}, ACTIONS);
+      expect(wrapper.find(BAR).element.children).toHaveLength(1);
+      expect(wrapper.find('[data-test="bulk-delete"]').exists()).toBe(false);
+    });
+
+    it("shows the selected count of the total beside the actions", () => {
+      wrapper = mountFooter({ selectedIds: ["1", "2"] }, ACTIONS);
+      const count = wrapper.find(COUNT);
+      expect(count.text()).toBe("2 of 25 selected");
+      expect(count.attributes("role")).toBe("status");
+      expect(wrapper.find(SELECTION).find('[data-test="bulk-delete"]').exists()).toBe(true);
+    });
+
+    it("follows the selection as rows are toggled", async () => {
+      wrapper = mountFooter({}, ACTIONS);
+      const checkbox = wrapper.find('[data-test="o2-table-select-0"] button');
+
+      await checkbox.trigger("click");
+      expect(wrapper.find(COUNT).text()).toBe("1 of 25 selected");
+
+      await checkbox.trigger("click");
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+    });
+
+    it("drops the total when the selection outnumbers it", () => {
+      wrapper = mountFooter({ data: makeRows(2), selectedIds: ["1", "2", "9"] }, ACTIONS);
+      expect(wrapper.find(COUNT).text()).toBe("3 selected");
+    });
+
+    it("counts against totalCount in server mode", () => {
+      wrapper = mountFooter(
+        { data: makeRows(20), pagination: "server", totalCount: 137, selectedIds: ["1", "2"] },
+        ACTIONS,
+      );
+      expect(wrapper.find(COUNT).text()).toBe("2 of 137 selected");
+    });
+
+    it("marks a lower-bound total", () => {
+      wrapper = mountFooter(
+        { pagination: "server", totalCount: 40, totalCountExact: false, selectedIds: ["1", "2"] },
+        ACTIONS,
+      );
+      expect(wrapper.find(COUNT).text()).toBe("2 of 40+ selected");
+    });
+
+    it("shows the note when one is provided", () => {
+      wrapper = mountFooter({}, NOTE_SLOT);
+      expect(wrapper.find(NOTE).find('[data-test="cap-note"]').text()).toBe("Showing the first 25");
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+    });
+
+    it("gives the start side to the selection over the note", async () => {
+      wrapper = mountFooter({ selectedIds: ["1"] }, { ...ACTIONS, ...NOTE_SLOT });
+      expect(wrapper.find(COUNT).text()).toBe("1 of 25 selected");
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+
+      await wrapper.setProps({ selectedIds: [] });
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+      expect(wrapper.find('[data-test="cap-note"]').exists()).toBe(true);
+    });
+
+    it("keeps the note when rows are selected but the table has no bulk actions", () => {
+      wrapper = mountFooter({ selectedIds: ["1"] }, NOTE_SLOT);
+      expect(wrapper.find(COUNT).exists()).toBe(false);
+      expect(wrapper.find('[data-test="cap-note"]').exists()).toBe(true);
+    });
+
+    it("withholds the selection and the note while the table is loading", () => {
+      wrapper = mountFooter({ loading: true, selectedIds: ["1"] }, { ...ACTIONS, ...NOTE_SLOT });
+      expect(wrapper.find(BAR).element.children).toHaveLength(1);
+      expect(wrapper.find('[data-test="bulk-delete"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="cap-note"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-pagination-info-skel"]').exists()).toBe(true);
+    });
+
+    it("picks up a note the page provides after mount", async () => {
+      const Host = defineComponent({
+        components: { OTable },
+        props: { capped: Boolean },
+        setup: () => ({ rows: makeRows(25), columns: makeColumns() }),
+        template: `<OTable :data="rows" :columns="columns">
+          <template v-if="capped" #footer-note><span data-test="cap-note">Capped</span></template>
+        </OTable>`,
+      });
+      wrapper = mount(Host);
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+
+      await wrapper.setProps({ capped: true });
+      expect(wrapper.find(NOTE).find('[data-test="cap-note"]').exists()).toBe(true);
+
+      await wrapper.setProps({ capped: false });
+      expect(wrapper.find(NOTE).exists()).toBe(false);
+    });
+  });
+
+  // ── Caller-drawn pagination bar ────────────────────────────
+
+  describe("pagination-bar slot", () => {
+    const CUSTOM_BAR = '[data-test="custom-bar"]';
+    const mountWithBar = (props: Record<string, unknown> = {}) =>
+      mount(OTable, {
+        props: { data: makeRows(25), columns: makeColumns(), pageSize: 10, ...props },
         slots: {
-          bottom: '<div data-test="custom-bottom">Bottom Content</div>',
+          "pagination-bar": (scope: any) =>
+            h(
+              "button",
+              { "data-test": "custom-bar", onClick: scope.nextPage },
+              `${scope.currentPage}/${scope.totalPages} of ${scope.totalRows}`,
+            ),
         },
       });
-      expect(wrapper.find('[data-test="custom-bottom"]').exists()).toBe(true);
+
+    it("replaces the built-in bar when pagination is on", async () => {
+      wrapper = mountWithBar({ pagination: "client" });
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
+      expect(wrapper.find(CUSTOM_BAR).text()).toBe("1/3 of 25");
+
+      await wrapper.find(CUSTOM_BAR).trigger("click");
+      expect(wrapper.find(CUSTOM_BAR).text()).toBe("2/3 of 25");
+    });
+
+    it("still renders when pagination is off", () => {
+      wrapper = mountWithBar({ pagination: "none" });
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
+      expect(wrapper.find(CUSTOM_BAR).text()).toContain("of 25");
     });
   });
 

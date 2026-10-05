@@ -61,22 +61,23 @@ describe("groupNavLinks", () => {
       link("metrics"),
       link("traces"),
       link("rum"),
+      link("productAnalytics"),
       link("dashboards"),
       link("alertList"),
       link("iam"),
       link("settings"),
     ];
-    // Output mirrors the input order exactly (no reordering). Only alertList
-    // changes shape — it collapses into the Reliability tile in its own slot —
-    // and traces, which keeps its slot but gains its NAV_SUBNAV flyout. Infra
-    // is the one INSERTION: it absorbs nothing, so it adds a tile rather than
-    // replacing one, anchored directly after Reliability.
+    // Output mirrors the input order exactly (no reordering). rum and
+    // productAnalytics fold into the Experience tile in rum's slot, alertList
+    // into Reliability in its own, and traces keeps its slot with its NAV_SUBNAV
+    // flyout. Infra is the one INSERTION: it absorbs nothing, so it adds a tile
+    // rather than replacing one, anchored directly after Reliability.
     expect(keysOf(groupNavLinks(input))).toEqual([
       "link:home",
       "link:logs",
       "link:metrics",
       "linkGroup:traces",
-      "link:rum",
+      "linkGroup:experience",
       "link:dashboards",
       "linkGroup:reliability",
       "linkGroup:infra",
@@ -405,27 +406,97 @@ describe("groupNavLinks", () => {
     expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:dashboards"]);
   });
 
-  it("groups RUM and Synthetics under the Experience tile", () => {
+  const experienceGroup = (entries: RailEntry[]) =>
+    entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "experience",
+    );
+
+  it("groups RUM, Synthetics and Product Analytics under the Experience tile, in that order", () => {
     const entries = groupNavLinks([
       link("home"),
       link("rum"),
+      link("productAnalytics"),
       link("synthetics"),
       link("alertList"),
     ]);
-    // rum/synthetics are absorbed; the Experience tile takes rum's slot.
+    // All three are absorbed; the Experience tile takes rum's slot.
     expect(keysWithoutInfra(entries)).toEqual([
       "link:home",
       "linkGroup:experience",
       "linkGroup:reliability",
     ]);
-    const experience = entries.find(
-      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
-        e.type === "linkGroup" && e.item.name === "experience",
-    );
+    const experience = experienceGroup(entries);
     // Clicking the tile lands on RUM (always-present route).
     expect(experience?.item.link).toBe("/rum");
-    // Children navigate by route name: RUM + synthetics.
-    expect(experience?.children.map((c) => c.name)).toEqual(["RUM", "synthetics"]);
+    expect(experience?.children.map((c) => c.name)).toEqual([
+      "RUM",
+      "synthetics",
+      "productAnalytics",
+    ]);
+  });
+
+  it("still forms Experience from RUM and Product Analytics when Synthetics is off", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("traces"),
+      link("rum"),
+      link("productAnalytics"),
+      link("dashboards"),
+    ]);
+    expect(keysWithoutInfra(entries)).toEqual([
+      "link:home",
+      "linkGroup:traces",
+      "linkGroup:experience",
+      "link:dashboards",
+    ]);
+    expect(experienceGroup(entries)?.children.map((c) => c.name)).toEqual([
+      "RUM",
+      "productAnalytics",
+    ]);
+  });
+
+  it("never renders a standalone Product Analytics tile or flyout", () => {
+    const entries = groupNavLinks([link("rum"), link("productAnalytics"), link("synthetics")]);
+    expect(entries.some((e) => e.type !== "group" && e.item.name === "productAnalytics")).toBe(
+      false,
+    );
+    expect(NAV_SUBNAV.productAnalytics).toBeUndefined();
+  });
+
+  it("declares Product Analytics like its sibling children, lit on every Product Analytics route", () => {
+    const pa = NAV_GROUPS.find((g) => g.key === "experience")?.children.find(
+      (c) => c.name === "productAnalytics",
+    );
+    expect(pa).toMatchObject({
+      titleKey: "menu.productAnalytics",
+      icon: "insights",
+      name: "productAnalytics",
+      requires: "productAnalytics",
+    });
+    expect(pa?.activeOnRoutes).toEqual(
+      expect.arrayContaining([
+        "productAnalyticsOverview",
+        "productAnalyticsFunnels",
+        "productAnalyticsFunnelBuilder",
+        "productAnalyticsPaths",
+        "productAnalyticsRetention",
+        "productAnalyticsEvents",
+        "productAnalyticsEventNew",
+        "productAnalyticsEventEdit",
+      ]),
+    );
+  });
+
+  it("drops only the Product Analytics child when it is hidden by name", () => {
+    // custom_hide_menus=productAnalytics removes it from linksList, so `requires` drops the child.
+    const entries = groupNavLinks([link("home"), link("rum"), link("synthetics")]);
+    expect(experienceGroup(entries)?.children.map((c) => c.name)).toEqual(["RUM", "synthetics"]);
+  });
+
+  it("leaves Synthetics a plain tile when RUM (and with it Product Analytics) is hidden", () => {
+    const entries = groupNavLinks([link("home"), link("synthetics"), link("dashboards")]);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:synthetics", "link:dashboards"]);
   });
 
   it("keeps RUM a plain link when Synthetics is absent", () => {

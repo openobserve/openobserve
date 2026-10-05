@@ -4517,6 +4517,20 @@ export class LogsPage {
         }
     }
 
+    /**
+     * Open the saved-function dropdown and apply one by name.
+     *
+     * The dropdown only renders while the transform editor is on, so call
+     * toggleVrlEditor() first.
+     */
+    async selectSavedFunction(name) {
+        await this.page.locator(this.logsSearchBarFunctionDropdown).first().click();
+        const item = this.page.locator(`[data-test="logs-search-saved-function-${name}"]`);
+        await item.waitFor({ state: 'visible', timeout: 15000 });
+        await item.click();
+        testLogger.info('Applied saved function from the logs dropdown', { name });
+    }
+
     async clickVrlEditor() {
         // Wait for the VRL editor host to be visible before driving Monaco.
         // The data-test matches both outer container and inner Monaco div, so use .first().

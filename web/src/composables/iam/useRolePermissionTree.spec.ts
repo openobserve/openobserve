@@ -325,6 +325,15 @@ describe("useRolePermissionTree - modifyResourcePermissions new resource types",
     expect(r.permission.AllowDelete.show).toBe(true);
   });
 
+  it("rum_analytics shows only the write actions OpenFGA defines", () => {
+    const r = makeResource("rum_analytics");
+    modifyResourcePermissions(r);
+    ["AllowAll", "AllowPost", "AllowPut", "AllowDelete"].forEach((action) =>
+      expect(r.permission[action].show).toBe(true),
+    );
+    ["AllowList", "AllowGet"].forEach((action) => expect(r.permission[action].show).toBe(false));
+  });
+
   it("prompt_label shows only Update", () => {
     const r = makeResource("prompt_label");
     modifyResourcePermissions(r);

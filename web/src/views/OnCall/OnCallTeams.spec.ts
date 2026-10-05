@@ -509,4 +509,54 @@ describe("OnCallTeams", () => {
     expect(spy).toHaveBeenCalledWith(usersExpiry);
     spy.mockRestore();
   });
+
+  /// A phone's action column holds one control, so the row's buttons are mirrored in a menu that must act the same.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    async function rendered() {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs: menuStubs } });
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", async () => {
+      const wrapper = await rendered();
+
+      for (const action of ["edit", "delete"]) {
+        expect(wrapper.find(`[data-test="oncall-team-${action}-team_1"]`).classes()).toContain(
+          "max-md:hidden",
+        );
+      }
+      expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("edits the team the row is for", async () => {
+      const wrapper = await rendered();
+      await wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
+        expect.objectContaining({ id: "team_1" }),
+      );
+    });
+
+    it("asks before deleting, as the button does", async () => {
+      const wrapper = await rendered();
+      await wrapper.find('[data-test="oncall-team-delete-team_1-menu"]').trigger("click");
+
+      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
+    });
+  });
 });

@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :persist-columns="true"
             :default-columns="false"
-            :footer-title="t('workflow.header')"
             table-id="workflows-workflow-list"
             width="100%"
             class="h-full w-full"
@@ -292,18 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @action="(id) => (id === 'clear-filters' ? clearFilters() : openCreateEditor())"
               />
             </template>
-
-            <template #bottom>
-              <!-- h-12 / w-50 are exact rem equivalents of the pixel sizes this
-                   footer used to hardcode, so it renders unchanged. The old margin class was
-                   dropped — a legacy CSS-framework class this repo does not
-                   generate, so it never applied. -->
-              <div class="flex h-12 w-full items-center justify-between">
-                <div class="o2-table-footer-title flex w-50 items-center max-md:hidden">
-                  {{ resultTotal }} {{ t("workflow.header") }}
-                </div>
-              </div>
-            </template>
           </OTable>
         </div>
       </div>
@@ -501,8 +488,6 @@ const filteredWorkflows = computed(() => {
     return w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q);
   });
 });
-
-const resultTotal = computed(() => filteredWorkflows.value.length);
 
 // The list API has no `trigger` field — it returns each workflow's full `nodes`
 // array, so we derive the Trigger label from the trigger node in the graph.

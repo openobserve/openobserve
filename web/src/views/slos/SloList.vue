@@ -71,27 +71,6 @@
     >
       <template #toolbar>
         <div class="flex w-full min-w-0 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents">
-          <OButton
-            v-if="selectedIds.length"
-            variant="outline"
-            size="sm-action"
-            icon-left="drive-file-move"
-            data-test="slos-slolist-move-selected"
-            @click="openMove(selectedRows)"
-          >
-            {{ t("slos.moveSelected", { count: selectedIds.length }) }}
-          </OButton>
-          <OButton
-            v-if="selectedIds.length"
-            variant="outline"
-            size="sm-action"
-            icon-left="download"
-            :loading="exporting"
-            data-test="slos-slolist-export-selected"
-            @click="openExport(selectedRows)"
-          >
-            {{ t("common.export") }}
-          </OButton>
           <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
@@ -392,6 +371,28 @@
             {{ t("slos.new") }}
           </OButton>
         </OEmptyState>
+      </template>
+
+      <template #selection-actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="drive-file-move"
+          data-test="slos-slolist-move-selected"
+          @click="openMove(selectedRows)"
+        >
+          {{ t("common.move") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="download"
+          :loading="exporting"
+          data-test="slos-slolist-export-selected"
+          @click="openExport(selectedRows)"
+        >
+          {{ t("common.export") }}
+        </OButton>
       </template>
     </OTable>
 

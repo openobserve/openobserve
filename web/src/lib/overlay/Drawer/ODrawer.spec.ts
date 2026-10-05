@@ -165,6 +165,20 @@ describe("ODrawer", () => {
     });
   });
 
+  // A subtitle wider than a phone-sized panel pushed the close button off screen while the block could not shrink.
+  it("lets the title block shrink below lg, and only there", () => {
+    const wrapper = mount(ODrawer, {
+      props: { open: true, title: "Quick start", subTitle: "A sentence longer than the panel" },
+    });
+    const title = wrapper
+      .findAll("span")
+      .find((span) => span.classes().includes("truncate") && span.text().includes("Quick start"));
+    const block = title!.element.parentElement!;
+
+    expect(block.classList.contains("shrink-0")).toBe(true);
+    expect(block.classList.contains("max-lg:shrink")).toBe(true);
+  });
+
   describe("sticky layout structure", () => {
     it("header has shrink-0 class (pinned, never scrolls)", () => {
       const wrapper = mount(ODrawer, {

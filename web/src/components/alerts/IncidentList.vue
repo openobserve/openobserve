@@ -289,20 +289,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
-
-        <!-- Bottom -->
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-              {{ visibleIncidents.length }}
-              {{
-                visibleIncidents.length === 1
-                  ? t("alerts.incidentSingular")
-                  : t("alerts.incidentPlural")
-              }}
-            </div>
-          </div>
-        </template>
       </OTable>
     </OPageLayout>
   </div>
