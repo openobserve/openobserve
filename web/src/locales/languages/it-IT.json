@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "Crea Modello Email",
     "headers": "Intestazioni",
     "previewError": "Impossibile generare l'anteprima",
+    "webhookPreviewNote": "Il tuo URL riceve questo corpo così com'è, non come una card formattata. I valori sono dati di avviso di esempio.",
     "slackOAuth": {
       "setupMethodLabel": "Come vuoi connettere Slack?",
       "oauthMethodTitle": "Connetti Slack",

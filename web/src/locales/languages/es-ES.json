@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "Crear plantilla de correo electrónico",
     "headers": "Encabezados",
     "previewError": "Error al generar la vista previa",
+    "webhookPreviewNote": "Tu URL recibe este cuerpo tal cual, no como una tarjeta con formato. Los valores son datos de alerta de ejemplo.",
     "slackOAuth": {
       "setupMethodLabel": "¿Cómo quieres conectar Slack?",
       "oauthMethodTitle": "Conectar Slack",

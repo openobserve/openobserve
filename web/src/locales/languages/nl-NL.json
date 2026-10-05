@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "E-mailsjabloon aanmaken",
     "headers": "Kopteksten",
     "previewError": "Voorbeeld genereren mislukt",
+    "webhookPreviewNote": "Uw URL ontvangt deze inhoud ongewijzigd, niet als een opgemaakte kaart. De waarden zijn voorbeeldgegevens van een alarm.",
     "slackOAuth": {
       "setupMethodLabel": "Hoe wil je Slack verbinden?",
       "oauthMethodTitle": "Slack verbinden",

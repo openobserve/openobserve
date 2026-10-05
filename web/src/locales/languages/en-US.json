@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "Create Email Template",
     "headers": "Headers",
     "previewError": "Failed to generate preview",
+    "webhookPreviewNote": "Your URL receives this body as is, not a formatted card. The values are sample alert data.",
     "slackOAuth": {
       "setupMethodLabel": "How do you want to connect Slack?",
       "oauthMethodTitle": "Connect Slack",

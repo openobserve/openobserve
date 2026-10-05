@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "E-Mail-Vorlage erstellen",
     "headers": "Kopfzeilen",
     "previewError": "Vorschau konnte nicht generiert werden",
+    "webhookPreviewNote": "Ihre URL empfängt diesen Inhalt unverändert, nicht als formatierte Karte. Die Werte sind Beispieldaten einer Warnmeldung.",
     "slackOAuth": {
       "setupMethodLabel": "Wie möchten Sie Slack verbinden?",
       "oauthMethodTitle": "Slack verbinden",

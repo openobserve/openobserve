@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "إنشاء قالب بريد إلكتروني",
     "headers": "الرؤوس",
     "previewError": "فشل في توليد المعاينة",
+    "webhookPreviewNote": "يستلم عنوان URL الخاص بك هذا المحتوى كما هو، وليس كبطاقة منسّقة. القيم هي بيانات تنبيه نموذجية.",
     "slackOAuth": {
       "setupMethodLabel": "كيف تريد ربط Slack؟",
       "oauthMethodTitle": "ربط Slack",

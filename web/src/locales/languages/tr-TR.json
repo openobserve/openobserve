@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "E-posta Şablonu Oluştur",
     "headers": "Başlıklar",
     "previewError": "Önizleme oluşturulamadı",
+    "webhookPreviewNote": "URL'niz bu içeriği biçimlendirilmiş bir kart olarak değil, olduğu gibi alır. Değerler örnek uyarı verileridir.",
     "slackOAuth": {
       "setupMethodLabel": "Slack'e nasıl bağlanmak istiyorsunuz?",
       "oauthMethodTitle": "Slack'e bağlan",

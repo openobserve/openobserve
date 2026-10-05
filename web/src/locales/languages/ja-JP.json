@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "メールテンプレートを作成",
     "headers": "ヘッダー",
     "previewError": "プレビューの生成に失敗しました",
+    "webhookPreviewNote": "URLはこのボディをそのまま受け取ります。書式設定されたカードではありません。値はサンプルのアラートデータです。",
     "slackOAuth": {
       "setupMethodLabel": "Slackへの接続方法を選択してください。",
       "oauthMethodTitle": "Slackに接続",

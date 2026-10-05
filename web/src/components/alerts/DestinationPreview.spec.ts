@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import DestinationPreview from "./DestinationPreview.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import i18n from "@/locales";
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
@@ -386,5 +387,39 @@ describe("DestinationPreview", () => {
   it("should render the destination-preview-card container", () => {
     wrapper = mountComponent({ type: "slack" });
     expect(wrapper.find('[data-test="destination-preview-card"]').exists()).toBe(true);
+  });
+
+  it("shows the rendered body for a type without a mockup", () => {
+    wrapper = mountComponent({ type: "custom", templateContent: '{"alert": "High CPU"}' });
+    expect(wrapper.findComponent(OCodeBlock).attributes("data-test")).toBe("raw-preview");
+    // The dialog body already pads the content; the block's own margin is dropped.
+    expect(wrapper.findComponent(OCodeBlock).classes()).toContain("my-0!");
+    expect(wrapper.find('[data-test="raw-preview"] code').text()).toBe('{"alert": "High CPU"}');
+    expect(wrapper.findComponent(OCodeBlock).props("lang")).toBe("json");
+    // The footer's Copy Template button is the only copy action.
+    expect(wrapper.find('[data-test="raw-preview-copy-btn"]').exists()).toBe(false);
+  });
+
+  it("leaves the language to auto-detection when the body is not JSON", () => {
+    wrapper = mountComponent({ type: "custom", templateContent: "alert=High CPU" });
+    expect(wrapper.findComponent(OCodeBlock).props("lang")).toBeUndefined();
+  });
+
+  it("says the rendered body is filled with sample data", () => {
+    wrapper = mountComponent({ type: "custom", templateContent: "{}" });
+    expect(wrapper.find('[data-test="raw-preview-note"]').text()).toBe(
+      "Your URL receives this body as is, not a formatted card. The values are sample alert data.",
+    );
+  });
+
+  it("does not show the rendered body for a type with a mockup", () => {
+    wrapper = mountComponent({ type: "slack", templateContent: "body" });
+    expect(wrapper.find('[data-test="raw-preview"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="raw-preview-note"]').exists()).toBe(false);
+  });
+
+  it("names a custom destination Web Hook in the dialog title", () => {
+    wrapper = mountComponent({ type: "custom" });
+    expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web Hook");
   });
 });

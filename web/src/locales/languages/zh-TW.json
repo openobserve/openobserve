@@ -9213,6 +9213,7 @@
     "createEmailTemplate": "建立電子郵件範本",
     "headers": "標頭",
     "previewError": "產生預覽失敗",
+    "webhookPreviewNote": "您的 URL 會原樣收到此請求主體，而非格式化的卡片。這些值是範例警示資料。",
     "slackOAuth": {
       "setupMethodLabel": "您想如何連線 Slack？",
       "oauthMethodTitle": "連線 Slack",
