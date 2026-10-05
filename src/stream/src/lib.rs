@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{future::Future, io::Error, sync::Arc};
+use std::{future::Future, io::Error};
 
 use arrow_schema::{DataType, Field, Schema};
 use axum::{http, response::Response as HttpResponse};
@@ -48,7 +48,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, SchemaCache,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
         get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
         unwrap_stream_settings,
     },
@@ -348,45 +348,9 @@ pub async fn save_stream_settings(
     };
     let settings = saved.settings;
 
-    // Otherwise reads on this node serve the old settings until the schema watcher catches up.
-    publish_saved_settings(
-        format!("{org_id}/{stream_type}/{stream_name}"),
-        saved.previous_settings,
-        &settings,
-    )
-    .await;
-
     sync_associated_metadata_stream_retention(org_id, stream_name, stream_type, &settings).await;
 
     Ok(MetaHttpResponse::ok(""))
-}
-
-/// Publish saved settings to this node's caches unless a later save got there first.
-async fn publish_saved_settings(
-    key: String,
-    previous: Option<StreamSettings>,
-    settings: &StreamSettings,
-) {
-    // the watcher caches a stream that has no saved settings as the defaults
-    let previous = previous.unwrap_or_default();
-    let settings_json = json::to_string(settings).unwrap();
-    // cache what the watcher would: the JSON round trip reorders partition_keys past ten keys
-    infra::schema::put_stream_settings_if_unchanged(
-        key.clone(),
-        &previous,
-        Arc::new(StreamSettings::from(settings_json.as_str())),
-    )
-    .await;
-    let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    if let Some(cached) = w.get(&key)
-        && unwrap_stream_settings(cached.schema()).unwrap_or_default() == previous
-    {
-        let mut schema = cached.schema().as_ref().clone();
-        schema
-            .metadata
-            .insert("settings".to_string(), settings_json);
-        w.insert(key, SchemaCache::new(schema));
-    }
 }
 
 async fn sync_associated_metadata_stream_retention(
@@ -1848,99 +1812,5 @@ mod tests {
         let index_fields = settings_test_stream(name).await.index_fields;
         assert!(index_fields.contains(&"fa".to_string()), "{index_fields:?}");
         assert!(index_fields.contains(&"fb".to_string()), "{index_fields:?}");
-    }
-
-    async fn cache_settings_test_key(key: &str, settings: Option<&StreamSettings>) {
-        let mut metadata = HashMap::new();
-        if let Some(settings) = settings {
-            metadata.insert("settings".to_string(), json::to_string(settings).unwrap());
-        }
-        STREAM_SCHEMAS_LATEST.write().await.insert(
-            key.to_string(),
-            SchemaCache::new(Schema::empty().with_metadata(metadata)),
-        );
-        infra::schema::put_stream_settings(
-            key.to_string(),
-            Arc::new(settings.cloned().unwrap_or_default()),
-        )
-        .await;
-    }
-
-    async fn cached_settings_test_key(
-        key: &str,
-    ) -> (Option<StreamSettings>, Option<StreamSettings>) {
-        let schema = STREAM_SCHEMAS_LATEST
-            .read()
-            .await
-            .get(key)
-            .map(|cached| unwrap_stream_settings(cached.schema()).unwrap_or_default());
-        let settings = infra::schema::get_stream_settings_atomic(key).map(|s| (*s).clone());
-        (settings, schema)
-    }
-
-    #[tokio::test]
-    async fn test_publish_saved_settings_leaves_a_later_save_in_place() {
-        let key = format!("{SETTINGS_TEST_ORG}/logs/publish_{}", now_micros());
-        let started_from = StreamSettings {
-            data_retention: 1,
-            ..Default::default()
-        };
-        let mine = StreamSettings {
-            data_retention: 3,
-            ..Default::default()
-        };
-        let later = StreamSettings {
-            data_retention: 9,
-            ..Default::default()
-        };
-
-        // another save reached both caches first
-        cache_settings_test_key(&key, Some(&later)).await;
-        publish_saved_settings(key.clone(), Some(started_from.clone()), &mine).await;
-        assert_eq!(
-            cached_settings_test_key(&key).await,
-            (Some(later.clone()), Some(later))
-        );
-
-        cache_settings_test_key(&key, Some(&started_from)).await;
-        publish_saved_settings(key.clone(), Some(started_from), &mine).await;
-        assert_eq!(
-            cached_settings_test_key(&key).await,
-            (Some(mine.clone()), Some(mine.clone()))
-        );
-
-        // a stream without saved settings is cached as the defaults
-        cache_settings_test_key(&key, None).await;
-        publish_saved_settings(key.clone(), None, &mine).await;
-        assert_eq!(
-            cached_settings_test_key(&key).await,
-            (Some(mine.clone()), Some(mine.clone()))
-        );
-
-        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
-        infra::schema::remove_stream_settings(&key).await;
-        publish_saved_settings(key.clone(), None, &mine).await;
-        assert_eq!(cached_settings_test_key(&key).await, (Some(mine), None));
-        infra::schema::remove_stream_settings(&key).await;
-    }
-
-    #[tokio::test]
-    async fn test_publish_saved_settings_caches_what_the_next_save_compares() {
-        let key = format!("{SETTINGS_TEST_ORG}/logs/publish_keys_{}", now_micros());
-        // past ten keys the JSON round trip reorders partition_keys
-        let mine = StreamSettings {
-            partition_keys: (0..12)
-                .map(|i| config::meta::stream::StreamPartition::new(&format!("k{i}")))
-                .collect(),
-            ..Default::default()
-        };
-
-        cache_settings_test_key(&key, None).await;
-        publish_saved_settings(key.clone(), None, &mine).await;
-        let (settings, schema) = cached_settings_test_key(&key).await;
-        assert_eq!(settings, schema);
-
-        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
-        infra::schema::remove_stream_settings(&key).await;
     }
 }

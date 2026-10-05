@@ -86,26 +86,10 @@ fn publish_stream_settings(settings: &StreamSettingsCache) {
 /// Insert or replace one stream's settings and republish the read snapshot.
 ///
 /// All mutations of the settings cache must go through this function,
-/// [`put_stream_settings_if_unchanged`], [`put_stream_settings_batch`] or
-/// [`remove_stream_settings`]; callers must never rebuild the snapshot themselves.
+/// [`put_stream_settings_batch`] or [`remove_stream_settings`]; callers must
+/// never rebuild the snapshot themselves.
 pub async fn put_stream_settings(key: String, settings: Arc<StreamSettings>) {
     let mut w = STREAM_SETTINGS.write().await;
-    w.insert(key, settings);
-    publish_stream_settings(&w);
-}
-
-/// Like [`put_stream_settings`], but a no-op if another value replaced `previous` in the cache.
-pub async fn put_stream_settings_if_unchanged(
-    key: String,
-    previous: &StreamSettings,
-    settings: Arc<StreamSettings>,
-) {
-    let mut w = STREAM_SETTINGS.write().await;
-    if w.get(&key)
-        .is_some_and(|cached| cached.as_ref() != previous)
-    {
-        return;
-    }
     w.insert(key, settings);
     publish_stream_settings(&w);
 }
@@ -1095,31 +1079,6 @@ mod tests {
         assert!(get_stream_settings_atomic(&key2).is_some());
         remove_stream_settings(&key2).await;
         assert!(get_stream_settings_atomic(&key2).is_none());
-    }
-
-    #[tokio::test]
-    async fn test_put_stream_settings_if_unchanged() {
-        let key = "settings_if_unchanged_test_org/logs/s1".to_string();
-        let started_from = StreamSettings::default();
-        let mine = Arc::new(StreamSettings {
-            data_retention: 3,
-            ..Default::default()
-        });
-        let later = Arc::new(StreamSettings {
-            data_retention: 9,
-            ..Default::default()
-        });
-
-        put_stream_settings_if_unchanged(key.clone(), &started_from, mine.clone()).await;
-        assert_eq!(get_stream_settings_atomic(&key), Some(mine.clone()));
-
-        put_stream_settings(key.clone(), later.clone()).await;
-        put_stream_settings_if_unchanged(key.clone(), &started_from, mine.clone()).await;
-        assert_eq!(get_stream_settings_atomic(&key), Some(later.clone()));
-
-        put_stream_settings_if_unchanged(key.clone(), &later, mine.clone()).await;
-        assert_eq!(get_stream_settings_atomic(&key), Some(mine));
-        remove_stream_settings(&key).await;
     }
 
     #[test]
