@@ -342,6 +342,11 @@ const onlineEvalsService = {
     delete: async (orgId: string, entityId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/scorers/${entityId}`);
     },
+    versions: async (orgId: string, entityId: string): Promise<Scorer[]> =>
+      unwrapList<Scorer>(
+        await http().get(`/api/${orgId}/scorers/${entityId}/versions`),
+        "versions",
+      ),
     test: async (orgId: string, payload: ScorerTestPayload): Promise<ScorerTestResult> =>
       (await http().post(`/api/${orgId}/scorers/test`, payload)).data,
     previewLlmJudgeOutputSchema: async (

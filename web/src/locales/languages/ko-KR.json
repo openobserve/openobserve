@@ -13255,6 +13255,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "이유",
+      "noReasoning": "이 점수에 대한 추론이 기록되지 않았습니다.",
       "scoredAt": "{time}에 채점됨",
       "moreCount": "+{count}개 더",
       "allScores": "모든 점수 ({count})"
@@ -13680,7 +13681,18 @@
         "usedByIntro": "이 스코어러를 참조하는 작업 및 실험입니다.",
         "usedByEmpty": "아직 이 스코어러를 참조하는 작업이나 실험이 없습니다.",
         "usedByExperiment": "실험",
-        "versionsIntro": "버전은 스코어러 구성의 변경 불가능한 스냅샷입니다. 활성 버전은 오늘 작업이 실행하는 버전입니다.",
+        "versions": {
+          "empty": "이 스코어러에 대한 버전을 찾을 수 없습니다.",
+          "template": "템플릿",
+          "fields": {
+            "description": "설명",
+            "variables": "변수",
+            "params": "매개변수",
+            "producesScoreConfig": "점수 구성",
+            "referenceBased": "참조 기반",
+            "outputSchema": "출력 스키마"
+          }
+        },
         "lastUpdated": "마지막 업데이트",
         "metadataSection": "메타데이터",
         "createdLabel": "생성됨",

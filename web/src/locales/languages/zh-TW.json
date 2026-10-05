@@ -13250,6 +13250,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "為什麼",
+      "noReasoning": "此分數未記錄推理內容。",
       "scoredAt": "評分於 {time}",
       "moreCount": "+{count} 更多",
       "allScores": "全部分數 ({count})"
@@ -13675,7 +13676,18 @@
         "usedByIntro": "參照此評分器的工作與實驗。",
         "usedByEmpty": "尚無工作或實驗參照此評分器。",
         "usedByExperiment": "實驗",
-        "versionsIntro": "版本是評分器設定的不可變更快照。使用中版本即為作業今日執行的版本。",
+        "versions": {
+          "empty": "找不到此評分器的版本。",
+          "template": "範本",
+          "fields": {
+            "description": "說明",
+            "variables": "變數",
+            "params": "參數",
+            "producesScoreConfig": "分數設定",
+            "referenceBased": "基於參考",
+            "outputSchema": "輸出結構描述"
+          }
+        },
         "lastUpdated": "上次更新",
         "metadataSection": "中繼資料",
         "createdLabel": "建立時間",

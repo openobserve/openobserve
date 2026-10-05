@@ -13255,6 +13255,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "理由",
+      "noReasoning": "このスコアの推論は記録されていません。",
       "scoredAt": "スコア済み: {time}",
       "moreCount": "+{count} 件",
       "allScores": "すべてのスコア ({count})"
@@ -13680,7 +13681,18 @@
         "usedByIntro": "このスコアラーを参照しているジョブと実験。",
         "usedByEmpty": "このスコアラーを参照しているジョブまたは実験はまだありません。",
         "usedByExperiment": "実験",
-        "versionsIntro": "バージョンは、スコアラー設定の変更不可能なスナップショットです。有効なバージョンは、現在ジョブが実行しているものです。",
+        "versions": {
+          "empty": "このスコアラーにはバージョンが見つかりません。",
+          "template": "テンプレート",
+          "fields": {
+            "description": "説明",
+            "variables": "変数",
+            "params": "パラメータ",
+            "producesScoreConfig": "スコア設定",
+            "referenceBased": "参照ベース",
+            "outputSchema": "出力スキーマ"
+          }
+        },
         "lastUpdated": "最終更新",
         "metadataSection": "メタデータ",
         "createdLabel": "作成日",

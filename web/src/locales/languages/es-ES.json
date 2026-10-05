@@ -13255,6 +13255,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Por qué",
+      "noReasoning": "No se registró razonamiento para esta puntuación.",
       "scoredAt": "Puntuado {time}",
       "moreCount": "+{count} más",
       "allScores": "Todas las puntuaciones ({count})"
@@ -13680,7 +13681,18 @@
         "usedByIntro": "Trabajos y experimentos que hacen referencia a este evaluador.",
         "usedByEmpty": "Ningún trabajo ni experimento hace referencia a este evaluador todavía.",
         "usedByExperiment": "Experimento",
-        "versionsIntro": "Las versiones son instantáneas inmutables de la configuración del evaluador. La versión activa es la que ejecutan los trabajos hoy.",
+        "versions": {
+          "empty": "No se encontraron versiones para este evaluador.",
+          "template": "Plantilla",
+          "fields": {
+            "description": "Descripción",
+            "variables": "Variables",
+            "params": "Parámetros",
+            "producesScoreConfig": "Configuración de puntuación",
+            "referenceBased": "Basado en referencia",
+            "outputSchema": "Esquema de salida"
+          }
+        },
         "lastUpdated": "Última actualización",
         "metadataSection": "Metadatos",
         "createdLabel": "Creado",

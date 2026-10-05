@@ -13255,6 +13255,7 @@
     "versionPrefix": "v",
     "traceScoreChip": {
       "reasoning": "Warum",
+      "noReasoning": "Keine Begründung für diesen Score aufgezeichnet.",
       "scoredAt": "Bewertet {time}",
       "moreCount": "+{count} weitere",
       "allScores": "Alle Bewertungen ({count})"
@@ -13680,7 +13681,18 @@
         "usedByIntro": "Jobs und Experimente, die auf diesen Scorer verweisen.",
         "usedByEmpty": "Bisher verweisen keine Jobs oder Experimente auf diesen Scorer.",
         "usedByExperiment": "Experiment",
-        "versionsIntro": "Versionen sind unveränderliche Snapshots der Scorer-Konfiguration. Die aktive Version ist die, die Aufträge heute ausführen.",
+        "versions": {
+          "empty": "Keine Versionen für diesen Scorer gefunden.",
+          "template": "Vorlage",
+          "fields": {
+            "description": "Beschreibung",
+            "variables": "Variablen",
+            "params": "Parameter",
+            "producesScoreConfig": "Score-Konfiguration",
+            "referenceBased": "Referenzbasiert",
+            "outputSchema": "Ausgabeschema"
+          }
+        },
         "lastUpdated": "Zuletzt aktualisiert",
         "metadataSection": "Metadaten",
         "createdLabel": "Erstellt",
