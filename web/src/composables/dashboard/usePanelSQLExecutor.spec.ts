@@ -602,6 +602,82 @@ describe("usePanelSQLExecutor", () => {
     });
   });
 
+  describe("superseded runs on the time-shift and multi-query paths", () => {
+    const query = (sql: string, time_shift: any[] = []) => ({
+      query: sql,
+      vrlFunctionQuery: "",
+      fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+      config: { time_shift },
+    });
+    const hits = [{ value: "OK" }, { value: "ERROR" }];
+    const streamHits = (payload: any, handlers: any) => {
+      handlers.data(payload, {
+        type: "search_response_metadata",
+        content: { results: { query_index: 0, streaming_aggs: false } },
+      });
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { query_index: 0, hits } },
+      });
+    };
+    const cases = [
+      {
+        name: "time-shift",
+        queries: [query("SELECT * FROM logs", [{ offSet: "1d" }])],
+        run: (ex: any) => ex.executeSQL(0, 300_000_000, null),
+      },
+      {
+        name: "multi-query",
+        queries: [query("SELECT * FROM logs"), query("SELECT * FROM metrics")],
+        run: (ex: any) => ex.executeMultiSQL(0, 300_000_000, null, "logs"),
+      },
+    ];
+
+    it.each(cases)("$name: a superseded run's stream cannot write", async ({ queries, run }) => {
+      const {
+        ctx,
+        state,
+        fetchQueryDataWithHttpStream,
+        handleSearchError,
+        handleSearchReset,
+        removeTraceId,
+      } = makeCtx({ panelSchema: makePanelSchema(queries) });
+      const executor = usePanelSQLExecutor(ctx);
+      await run(executor);
+      await run(executor);
+
+      const [[stalePayload, stale], [currentPayload, current]] =
+        fetchQueryDataWithHttpStream.mock.calls;
+      streamHits(currentPayload, current);
+      streamHits(stalePayload, stale);
+      stale.data(stalePayload, { type: "end" });
+      await stale.complete(stalePayload, { type: "end" });
+      stale.error(stalePayload, { content: { message: "x" } });
+      stale.reset(stalePayload, {});
+
+      expect(state.data[0].map((h: any) => h.value)).toEqual(["OK", "ERROR"]);
+      expect(state.loading).toBe(true);
+      expect(handleSearchError).not.toHaveBeenCalled();
+      expect(handleSearchReset).not.toHaveBeenCalled();
+      expect(removeTraceId).toHaveBeenCalledWith(stalePayload.traceId);
+    });
+
+    it("multi-query: the searchResponse early return still supersedes an in-flight stream", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({
+        panelSchema: makePanelSchema(cases[1].queries),
+      });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+      ctx.searchResponse.value = { hits: [{ value: "cached" }] };
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+
+      const [[stalePayload, stale]] = fetchQueryDataWithHttpStream.mock.calls;
+      streamHits(stalePayload, stale);
+
+      expect(state.data.flat().map((h: any) => h.value)).toEqual(["cached"]);
+    });
+  });
+
   describe("getRegionClusterParams integration", () => {
     it("spreads region cluster params into queryReq for simple queries", async () => {
       const { ctx, fetchQueryDataWithHttpStream } = makeCtx({

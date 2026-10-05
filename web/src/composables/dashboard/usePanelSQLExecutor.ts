@@ -188,19 +188,15 @@ export const usePanelSQLExecutor = (ctx: {
         return;
       }
 
-      const runToken = sqlRunToken;
-      // A superseded run's stream keeps flowing; letting it write appends its hits to the new run's data.
-      const isCurrentRun = (p: any) => {
-        if (runToken === sqlRunToken) return true;
-        removeTraceId(p?.traceId);
-        return false;
-      };
-      fetchQueryDataWithHttpStream(payload, {
-        data: (p: any, r: any) => runToken === sqlRunToken && handleSearchResponse(p, r),
-        error: (p: any, r: any) => isCurrentRun(p) && handleSearchError(p, r),
-        complete: (p: any, r: any) => isCurrentRun(p) && handleSearchClose(p, r),
-        reset: (p: any, r: any) => runToken === sqlRunToken && handleSearchReset(p, r),
-      });
+      fetchQueryDataWithHttpStream(
+        payload,
+        dropSupersededRunEvents({
+          data: handleSearchResponse,
+          error: handleSearchError,
+          complete: handleSearchClose,
+          reset: handleSearchReset,
+        }),
+      );
 
       addTraceId(traceId);
     } catch (e: any) {
@@ -214,10 +210,26 @@ export const usePanelSQLExecutor = (ctx: {
     }
   };
 
-  // Bumped by executeSQL on every run. A fire-and-forget stream captures
-  // the token at fire time and only writes if it still matches — so a slow stream
-  // from a previous range/variable can't overwrite the freshly-reset state.
+  // Bumped per run; streams fired by a superseded run drop their writes.
   let sqlRunToken = 0;
+
+  // A superseded run's stream keeps flowing; letting it write appends its hits to the new run's data.
+  const dropSupersededRunEvents = (
+    handlers: Record<"data" | "error" | "complete" | "reset", (p: any, r: any) => any>,
+  ) => {
+    const runToken = sqlRunToken;
+    const isCurrentRun = (p: any, freeTraceId: boolean) => {
+      if (runToken === sqlRunToken) return true;
+      if (freeTraceId) removeTraceId(p?.traceId);
+      return false;
+    };
+    return {
+      data: (p: any, r: any) => isCurrentRun(p, false) && handlers.data(p, r),
+      error: (p: any, r: any) => isCurrentRun(p, true) && handlers.error(p, r),
+      complete: (p: any, r: any) => isCurrentRun(p, true) && handlers.complete(p, r),
+      reset: (p: any, r: any) => isCurrentRun(p, false) && handlers.reset(p, r),
+    };
+  };
 
   // Isolated 2nd fetch: a UI histogram (is_ui_histogram=true) of the SAME query,
   // used ONLY to draw the metric sparkline. Fully guarded and fire-and-forget —
@@ -327,7 +339,7 @@ export const usePanelSQLExecutor = (ctx: {
         queries: [],
       };
       state.resultMetaData = [];
-      // Invalidate any in-flight stream from a previous run before reset.
+      // Supersede the previous run so its still-flowing streams drop their writes.
       sqlRunToken++;
       state.sparklineData = [];
       state.sparklineWarning = "";
@@ -489,141 +501,145 @@ export const usePanelSQLExecutor = (ctx: {
               },
             };
 
-            fetchQueryDataWithHttpStream(payload, {
-              data: (payload: any, response: any) => {
-                // Handle streaming response for multi-query
-                if (response.type === "search_response_metadata") {
-                  const results = response?.content?.results;
+            fetchQueryDataWithHttpStream(
+              payload,
+              dropSupersededRunEvents({
+                data: (payload: any, response: any) => {
+                  // Handle streaming response for multi-query
+                  if (response.type === "search_response_metadata") {
+                    const results = response?.content?.results;
 
-                  const queryIndex = results?.query_index ?? 0;
+                    const queryIndex = results?.query_index ?? 0;
 
-                  // Store the current query index for the next hits event
-                  currentQueryIndexInStream = queryIndex;
+                    // Store the current query index for the next hits event
+                    currentQueryIndexInStream = queryIndex;
 
-                  // Initialize metadata array if not exists
-                  if (!state.resultMetaData[queryIndex]) {
-                    state.resultMetaData[queryIndex] = [];
-                  }
-
-                  // Detect chunking direction from first metadata entry
-                  if (state.resultMetaData[queryIndex].length === 0) {
-                    const metaContent = {
-                      ...(response?.content ?? {}),
-                      ...(response?.content?.results ?? {}),
-                    };
-                    const direction = detectChunkingDirection(
-                      metaContent?.time_offset?.start_time ?? 0,
-                      metaContent?.time_offset?.end_time ?? 0,
-                      state.metadata?.queries?.[queryIndex]?.startTime ??
-                        state.metadata?.queries?.[0]?.startTime ??
-                        0,
-                      state.metadata?.queries?.[queryIndex]?.endTime ??
-                        state.metadata?.queries?.[0]?.endTime ??
-                        0,
-                    );
-                    if (direction !== null) {
-                      chunkingLeftToRight.set(queryIndex, direction);
+                    // Initialize metadata array if not exists
+                    if (!state.resultMetaData[queryIndex]) {
+                      state.resultMetaData[queryIndex] = [];
                     }
-                  }
 
-                  // Push metadata for each partition
-                  state.resultMetaData[queryIndex].push({
-                    ...(response?.content ?? {}),
-                    ...(response?.content?.results ?? {}),
-                  });
-                }
-
-                if (response.type === "search_response_hits") {
-                  // The hits come directly in response.content.hits or response.content.results.hits
-                  const hits = response?.content?.results?.hits ?? response?.content?.hits;
-                  // Get query_index from results metadata
-                  const results = response?.content?.results;
-
-                  // Use query_index from the event, or from the last metadata event, or find next empty
-                  let queryIndex = results?.query_index ?? currentQueryIndexInStream;
-
-                  // If query_index is still not available, find the first query that doesn't have hits yet
-                  if (queryIndex === undefined || queryIndex === null) {
-                    queryIndex = state.resultMetaData.findIndex(
-                      (meta: any, idx: number) => !state.data[idx] || state.data[idx].length === 0,
-                    );
-                  }
-
-                  if (
-                    queryIndex >= 0 &&
-                    queryIndex < state.data.length &&
-                    Array.isArray(hits) &&
-                    hits.length > 0
-                  ) {
-                    // Check if streaming_aggs is enabled
-                    const streaming_aggs =
-                      state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
-
-                    // If streaming_aggs, replace the data (aggregation query)
-                    if (streaming_aggs) {
-                      state.data[queryIndex] = markRaw([...hits]);
-                    }
-                    // Otherwise, append/prepend based on chunking direction and order_by
-                    else {
-                      const orderAsc =
-                        state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
-                      const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
-                      const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
-
-                      if (shouldPrepend) {
-                        state.data[queryIndex] = markRaw([
-                          ...hits,
-                          ...toRaw(state.data[queryIndex] ?? []),
-                        ]);
-                      } else {
-                        state.data[queryIndex] = markRaw([
-                          ...toRaw(state.data[queryIndex] ?? []),
-                          ...hits,
-                        ]);
+                    // Detect chunking direction from first metadata entry
+                    if (state.resultMetaData[queryIndex].length === 0) {
+                      const metaContent = {
+                        ...(response?.content ?? {}),
+                        ...(response?.content?.results ?? {}),
+                      };
+                      const direction = detectChunkingDirection(
+                        metaContent?.time_offset?.start_time ?? 0,
+                        metaContent?.time_offset?.end_time ?? 0,
+                        state.metadata?.queries?.[queryIndex]?.startTime ??
+                          state.metadata?.queries?.[0]?.startTime ??
+                          0,
+                        state.metadata?.queries?.[queryIndex]?.endTime ??
+                          state.metadata?.queries?.[0]?.endTime ??
+                          0,
+                      );
+                      if (direction !== null) {
+                        chunkingLeftToRight.set(queryIndex, direction);
                       }
                     }
 
-                    if (state.resultMetaData[queryIndex]) {
-                      state.resultMetaData[queryIndex].hits = state.data[queryIndex];
+                    // Push metadata for each partition
+                    state.resultMetaData[queryIndex].push({
+                      ...(response?.content ?? {}),
+                      ...(response?.content?.results ?? {}),
+                    });
+                  }
+
+                  if (response.type === "search_response_hits") {
+                    // The hits come directly in response.content.hits or response.content.results.hits
+                    const hits = response?.content?.results?.hits ?? response?.content?.hits;
+                    // Get query_index from results metadata
+                    const results = response?.content?.results;
+
+                    // Use query_index from the event, or from the last metadata event, or find next empty
+                    let queryIndex = results?.query_index ?? currentQueryIndexInStream;
+
+                    // If query_index is still not available, find the first query that doesn't have hits yet
+                    if (queryIndex === undefined || queryIndex === null) {
+                      queryIndex = state.resultMetaData.findIndex(
+                        (meta: any, idx: number) =>
+                          !state.data[idx] || state.data[idx].length === 0,
+                      );
                     }
+
+                    if (
+                      queryIndex >= 0 &&
+                      queryIndex < state.data.length &&
+                      Array.isArray(hits) &&
+                      hits.length > 0
+                    ) {
+                      // Check if streaming_aggs is enabled
+                      const streaming_aggs =
+                        state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
+
+                      // If streaming_aggs, replace the data (aggregation query)
+                      if (streaming_aggs) {
+                        state.data[queryIndex] = markRaw([...hits]);
+                      }
+                      // Otherwise, append/prepend based on chunking direction and order_by
+                      else {
+                        const orderAsc =
+                          state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
+                        const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
+                        const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
+
+                        if (shouldPrepend) {
+                          state.data[queryIndex] = markRaw([
+                            ...hits,
+                            ...toRaw(state.data[queryIndex] ?? []),
+                          ]);
+                        } else {
+                          state.data[queryIndex] = markRaw([
+                            ...toRaw(state.data[queryIndex] ?? []),
+                            ...hits,
+                          ]);
+                        }
+                      }
+
+                      if (state.resultMetaData[queryIndex]) {
+                        state.resultMetaData[queryIndex].hits = state.data[queryIndex];
+                      }
+                    }
+                    state.errorDetail = { message: "", code: "" };
+                    // saveCurrentStateToCache();
                   }
-                  state.errorDetail = { message: "", code: "" };
-                  // saveCurrentStateToCache();
-                }
 
-                if (response.type === "search_response") {
-                  // Legacy format: single response with all data
-                  const results = response?.content?.results;
-                  const queryIndex = results?.query_index ?? 0;
+                  if (response.type === "search_response") {
+                    // Legacy format: single response with all data
+                    const results = response?.content?.results;
+                    const queryIndex = results?.query_index ?? 0;
 
-                  if (results?.hits && Array.isArray(results.hits)) {
-                    state.data[queryIndex] = markRaw([...results.hits]);
-                    state.resultMetaData[queryIndex] = {
-                      ...(state.resultMetaData[queryIndex] ?? {}),
-                      ...results,
-                    };
+                    if (results?.hits && Array.isArray(results.hits)) {
+                      state.data[queryIndex] = markRaw([...results.hits]);
+                      state.resultMetaData[queryIndex] = {
+                        ...(state.resultMetaData[queryIndex] ?? {}),
+                        ...results,
+                      };
+                    }
+                    state.errorDetail = { message: "", code: "" };
                   }
-                  state.errorDetail = { message: "", code: "" };
-                }
 
-                if (response.type === "error") {
-                  processApiError(response?.content, "sql");
-                }
+                  if (response.type === "error") {
+                    processApiError(response?.content, "sql");
+                  }
 
-                if (response.type === "end") {
+                  if (response.type === "end") {
+                    state.loading = false;
+                    state.isPartialData = false;
+                    saveCurrentStateToCache();
+                  }
+                },
+                error: handleSearchError,
+                complete: async () => {
                   state.loading = false;
-                  state.isPartialData = false;
                   saveCurrentStateToCache();
-                }
-              },
-              error: handleSearchError,
-              complete: async () => {
-                state.loading = false;
-                saveCurrentStateToCache();
-                removeTraceId(traceId);
-              },
-              reset: handleSearchReset,
-            });
+                  removeTraceId(traceId);
+                },
+                reset: handleSearchReset,
+              }),
+            );
 
             // Wait for annotations to complete (started in parallel earlier)
             state.annotations = await annotationsPromise;
@@ -814,6 +830,8 @@ export const usePanelSQLExecutor = (ctx: {
     abortControllerRef: any,
     pageType: string,
   ) => {
+    // Bumped before the pre-fetch early return so it also supersedes in-flight streams.
+    sqlRunToken++;
     // Handle searchResponse pre-fetch early return
     if (searchResponse?.value?.hits?.length > 0) {
       state.loading = true;
@@ -861,8 +879,6 @@ export const usePanelSQLExecutor = (ctx: {
       queries: [],
     };
     state.resultMetaData = [];
-    // Invalidate any in-flight stream from a previous run before reset.
-    sqlRunToken++;
     state.sparklineData = [];
     state.sparklineWarning = "";
     state.annotations = [];
@@ -1081,118 +1097,128 @@ export const usePanelSQLExecutor = (ctx: {
       },
     };
 
-    fetchQueryDataWithHttpStream(payload, {
-      data: (_payload: any, response: any) => {
-        if (response.type === "search_response_metadata") {
-          const results = response?.content?.results;
-          const queryIndex = results?.query_index ?? 0;
+    fetchQueryDataWithHttpStream(
+      payload,
+      dropSupersededRunEvents({
+        data: (_payload: any, response: any) => {
+          if (response.type === "search_response_metadata") {
+            const results = response?.content?.results;
+            const queryIndex = results?.query_index ?? 0;
 
-          currentQueryIndexInStream = queryIndex;
+            currentQueryIndexInStream = queryIndex;
 
-          if (!state.resultMetaData[queryIndex]) {
-            state.resultMetaData[queryIndex] = [];
-          }
-
-          // Detect chunking direction from first metadata entry
-          if (state.resultMetaData[queryIndex].length === 0) {
-            const metaContent = {
-              ...(response?.content ?? {}),
-              ...(response?.content?.results ?? {}),
-            };
-            const direction = detectChunkingDirection(
-              metaContent?.time_offset?.start_time ?? 0,
-              metaContent?.time_offset?.end_time ?? 0,
-              state.metadata?.queries?.[queryIndex]?.startTime ??
-                state.metadata?.queries?.[0]?.startTime ??
-                0,
-              state.metadata?.queries?.[queryIndex]?.endTime ??
-                state.metadata?.queries?.[0]?.endTime ??
-                0,
-            );
-            if (direction !== null) {
-              chunkingLeftToRight.set(queryIndex, direction);
+            if (!state.resultMetaData[queryIndex]) {
+              state.resultMetaData[queryIndex] = [];
             }
-          }
 
-          state.resultMetaData[queryIndex].push({
-            ...(response?.content ?? {}),
-            ...(response?.content?.results ?? {}),
-          });
-        }
-
-        if (response.type === "search_response_hits") {
-          const hits = response?.content?.results?.hits ?? response?.content?.hits;
-          const results = response?.content?.results;
-
-          let queryIndex = results?.query_index ?? currentQueryIndexInStream;
-
-          if (queryIndex === undefined || queryIndex === null) {
-            queryIndex = state.resultMetaData.findIndex(
-              (_meta: any, idx: number) => !state.data[idx] || state.data[idx].length === 0,
-            );
-          }
-
-          if (
-            queryIndex >= 0 &&
-            queryIndex < state.data.length &&
-            Array.isArray(hits) &&
-            hits.length > 0
-          ) {
-            const streaming_aggs = state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
-
-            if (streaming_aggs) {
-              state.data[queryIndex] = markRaw([...hits]);
-            } else {
-              const orderAsc = state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
-              const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
-              const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
-
-              if (shouldPrepend) {
-                state.data[queryIndex] = markRaw([...hits, ...toRaw(state.data[queryIndex] ?? [])]);
-              } else {
-                state.data[queryIndex] = markRaw([...toRaw(state.data[queryIndex] ?? []), ...hits]);
+            // Detect chunking direction from first metadata entry
+            if (state.resultMetaData[queryIndex].length === 0) {
+              const metaContent = {
+                ...(response?.content ?? {}),
+                ...(response?.content?.results ?? {}),
+              };
+              const direction = detectChunkingDirection(
+                metaContent?.time_offset?.start_time ?? 0,
+                metaContent?.time_offset?.end_time ?? 0,
+                state.metadata?.queries?.[queryIndex]?.startTime ??
+                  state.metadata?.queries?.[0]?.startTime ??
+                  0,
+                state.metadata?.queries?.[queryIndex]?.endTime ??
+                  state.metadata?.queries?.[0]?.endTime ??
+                  0,
+              );
+              if (direction !== null) {
+                chunkingLeftToRight.set(queryIndex, direction);
               }
             }
 
-            if (state.resultMetaData[queryIndex]) {
-              state.resultMetaData[queryIndex].hits = state.data[queryIndex];
+            state.resultMetaData[queryIndex].push({
+              ...(response?.content ?? {}),
+              ...(response?.content?.results ?? {}),
+            });
+          }
+
+          if (response.type === "search_response_hits") {
+            const hits = response?.content?.results?.hits ?? response?.content?.hits;
+            const results = response?.content?.results;
+
+            let queryIndex = results?.query_index ?? currentQueryIndexInStream;
+
+            if (queryIndex === undefined || queryIndex === null) {
+              queryIndex = state.resultMetaData.findIndex(
+                (_meta: any, idx: number) => !state.data[idx] || state.data[idx].length === 0,
+              );
             }
+
+            if (
+              queryIndex >= 0 &&
+              queryIndex < state.data.length &&
+              Array.isArray(hits) &&
+              hits.length > 0
+            ) {
+              const streaming_aggs = state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
+
+              if (streaming_aggs) {
+                state.data[queryIndex] = markRaw([...hits]);
+              } else {
+                const orderAsc =
+                  state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
+                const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
+                const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
+
+                if (shouldPrepend) {
+                  state.data[queryIndex] = markRaw([
+                    ...hits,
+                    ...toRaw(state.data[queryIndex] ?? []),
+                  ]);
+                } else {
+                  state.data[queryIndex] = markRaw([
+                    ...toRaw(state.data[queryIndex] ?? []),
+                    ...hits,
+                  ]);
+                }
+              }
+
+              if (state.resultMetaData[queryIndex]) {
+                state.resultMetaData[queryIndex].hits = state.data[queryIndex];
+              }
+            }
+            state.errorDetail = { message: "", code: "" };
           }
-          state.errorDetail = { message: "", code: "" };
-        }
 
-        if (response.type === "search_response") {
-          const results = response?.content?.results;
-          const queryIndex = results?.query_index ?? 0;
+          if (response.type === "search_response") {
+            const results = response?.content?.results;
+            const queryIndex = results?.query_index ?? 0;
 
-          if (results?.hits && Array.isArray(results.hits)) {
-            state.data[queryIndex] = markRaw([...results.hits]);
-            state.resultMetaData[queryIndex] = {
-              ...(state.resultMetaData[queryIndex] ?? {}),
-              ...results,
-            };
+            if (results?.hits && Array.isArray(results.hits)) {
+              state.data[queryIndex] = markRaw([...results.hits]);
+              state.resultMetaData[queryIndex] = {
+                ...(state.resultMetaData[queryIndex] ?? {}),
+                ...results,
+              };
+            }
+            state.errorDetail = { message: "", code: "" };
           }
-          state.errorDetail = { message: "", code: "" };
-        }
 
-        if (response.type === "error") {
-          processApiError(response?.content, "sql");
-        }
+          if (response.type === "error") {
+            processApiError(response?.content, "sql");
+          }
 
-        if (response.type === "end") {
+          if (response.type === "end") {
+            state.loading = false;
+            state.isPartialData = false;
+            saveCurrentStateToCache();
+          }
+        },
+        error: handleSearchError,
+        complete: async () => {
           state.loading = false;
-          state.isPartialData = false;
           saveCurrentStateToCache();
-        }
-      },
-      error: handleSearchError,
-      complete: async () => {
-        state.loading = false;
-        saveCurrentStateToCache();
-        removeTraceId(traceId);
-      },
-      reset: handleSearchReset,
-    });
+          removeTraceId(traceId);
+        },
+        reset: handleSearchReset,
+      }),
+    );
 
     // Wait for annotations to complete (started in parallel)
     state.annotations = await annotationsPromise;
