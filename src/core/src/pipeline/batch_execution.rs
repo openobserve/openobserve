@@ -2870,17 +2870,39 @@ async fn process_destination_node(
             return Ok(0);
         }
         Module::Pipeline { endpoint } => {
+            if let Err(e) =
+                common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
+                    .await
+            {
+                return drain_destination_node_with_error(
+                    &metadata,
+                    &mut channels,
+                    node,
+                    format!("Destination URL blocked by SSRF guard: {e}"),
+                )
+                .await;
+            }
             let op_fmt = endpoint.output_format.unwrap_or_default();
             let send_data = op_fmt.get_body_from_data(&data, &endpoint.metadata);
             let content_type = op_fmt.get_content_type();
             let headers = endpoint.headers.unwrap_or_default();
-            let client = reqwest::Client::builder()
+            let builder = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(
                     cfg.pipeline.remote_request_timeout,
                 ))
-                .danger_accept_invalid_certs(endpoint.skip_tls_verify)
-                .build()
-                .unwrap();
+                .danger_accept_invalid_certs(endpoint.skip_tls_verify);
+            let client = match common::utils::ssrf_guard::build_safe_client(builder) {
+                Ok(client) => client,
+                Err(e) => {
+                    return drain_destination_node_with_error(
+                        &metadata,
+                        &mut channels,
+                        node,
+                        format!("Failed to build HTTP client: {e}"),
+                    )
+                    .await;
+                }
+            };
 
             let mut client = client
                 .post(endpoint.url)
@@ -4851,6 +4873,11 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     fn seed_pipeline_destination(org_id: &str, name: &str) {
+        seed_pipeline_destination_with_url(org_id, name, "http://127.0.0.1:1/never-dispatched");
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn seed_pipeline_destination_with_url(org_id: &str, name: &str, url: &str) {
         use config::meta::destinations::{Destination, Endpoint, Module};
         common::infra::config::DESTINATIONS.insert(
             format!("{org_id}/{name}"),
@@ -4860,7 +4887,7 @@ mod tests {
                 name: name.to_string(),
                 module: Module::Pipeline {
                     endpoint: Endpoint {
-                        url: "http://127.0.0.1:1/never-dispatched".to_string(),
+                        url: url.to_string(),
                         ..Default::default()
                     },
                 },
@@ -4992,6 +5019,42 @@ mod tests {
         assert!(
             messages.iter().any(|m| m.contains("ALSO_MISSING")),
             "the error must name the destination, got {messages:?}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_unsuppressed_destination_to_private_address_is_blocked() {
+        seed_pipeline_destination_with_url("org-1", "ssrf-metalink", "http://169.254.169.254/");
+        let workflow = destination_workflow("ssrf-metalink");
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("workflow must build");
+
+        let result = executable
+            .process_workflow(
+                "org-1",
+                vec![json::json!({"severity": "high"})],
+                None,
+                WorkflowRunOptions {
+                    suppress_destinations: false,
+                },
+            )
+            .await
+            .expect("run must complete");
+
+        let node_error = result
+            .errors
+            .get("d1")
+            .expect("a private destination must surface as a node error");
+        let messages: Vec<String> = node_error.errors.iter().map(|(m, _)| m.clone()).collect();
+        assert!(
+            messages.iter().any(|m| m.contains("SSRF")),
+            "the error must come from the SSRF guard, got {messages:?}"
+        );
+        assert!(
+            !result.outputs.contains_key("d1"),
+            "a blocked destination must not report an output"
         );
     }
 
