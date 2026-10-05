@@ -531,21 +531,31 @@ pub fn is_fail_closed_rejection(reason: &str) -> bool {
     reason.ends_with(FAIL_CLOSED_MARKER)
 }
 
-/// `ZO_SDR_FAIL_CLOSED`: why an unscanned batch is refused; platform writes skip their own.
+/// A write `ZO_SDR_FAIL_CLOSED` still stores unscanned: one only the platform can send.
+pub fn is_platform_write(
+    usage_request: bool,
+    internal_writer: bool,
+    source_stream: &str,
+    stream_name: &str,
+) -> bool {
+    // Only the Usage target itself: a pipeline on it may route into a customer stream.
+    (usage_request && stream_name == source_stream)
+        || (internal_writer && super::usage::is_internal_rollup_stream(stream_name))
+}
+
+/// `ZO_SDR_FAIL_CLOSED`: why an unscanned batch is refused; `exempt` marks platform writes.
 pub fn fail_closed_rejection<'a>(
     fail_closed: bool,
-    platform_write: bool,
     org_id: &str,
     stream_type: StreamType,
     mut streams: impl Iterator<Item = &'a str>,
+    exempt: impl Fn(&str) -> bool,
 ) -> Option<String> {
     if !fail_closed {
         return None;
     }
     // Unscanned, we cannot know a stream's patterns, so every scannable stream is refused.
-    let stream = streams.find(|stream| {
-        !(platform_write && is_self_reporting_stream(org_id, stream, stream_type))
-    })?;
+    let stream = streams.find(|stream| !exempt(stream))?;
     Some(format!(
         "sensitive-data redaction is unavailable; refusing to store unredacted data for {org_id}/{stream_type}/{stream} {FAIL_CLOSED_MARKER}"
     ))
@@ -605,55 +615,72 @@ mod tests {
     fn fail_open_never_refuses_an_unscanned_batch() {
         let streams = ["app_logs", REDACTION_EVIDENCE_STREAM];
         assert_eq!(
-            fail_closed_rejection(false, false, "acme", StreamType::Logs, streams.into_iter()),
+            fail_closed_rejection(false, "acme", StreamType::Logs, streams.into_iter(), |_| {
+                false
+            }),
             None
         );
     }
 
     #[test]
     fn fail_closed_refuses_an_unscanned_customer_stream() {
-        let streams = [REDACTION_EVIDENCE_STREAM, "app_logs"];
-        let err = fail_closed_rejection(true, true, "acme", StreamType::Logs, streams.into_iter())
-            .expect("a customer stream must be refused");
+        let streams = ["_o2_service_graph", "app_logs"];
+        let exempt = |stream: &str| is_platform_write(false, true, "app_logs", stream);
+        let err =
+            fail_closed_rejection(true, "acme", StreamType::Logs, streams.into_iter(), exempt)
+                .expect("a customer stream must be refused");
         assert!(err.contains("acme/logs/app_logs"), "{err}");
+        let traces = ["default"].into_iter();
         assert!(
-            fail_closed_rejection(
-                true,
-                false,
-                "acme",
-                StreamType::Traces,
-                ["default"].into_iter()
-            )
-            .is_some()
+            fail_closed_rejection(true, "acme", StreamType::Traces, traces, |_| false).is_some()
         );
     }
 
     #[test]
     fn a_fail_closed_rejection_is_recognised_and_nothing_else_is() {
         let reason =
-            fail_closed_rejection(true, false, "acme", StreamType::Logs, ["app"].into_iter())
-                .expect("refused");
+            fail_closed_rejection(true, "acme", StreamType::Logs, ["app"].into_iter(), |_| {
+                false
+            })
+            .expect("refused");
         assert!(is_fail_closed_rejection(&reason));
         assert!(!is_fail_closed_rejection("memtable is full"));
     }
 
     #[test]
-    fn fail_closed_still_writes_self_reporting_streams() {
-        let streams = [REDACTION_EVIDENCE_STREAM, USAGE_STREAM];
+    fn fail_closed_still_stores_platform_writes() {
+        for stream in [REDACTION_EVIDENCE_STREAM, USAGE_STREAM, "_llm_scores"] {
+            assert!(is_platform_write(true, false, stream, stream), "{stream}");
+        }
+        let rollups = ["_o2_service_graph", "_o2_db_stats", "_agent_signals"];
+        let internal = |stream: &str| is_platform_write(false, true, "_o2_service_graph", stream);
         assert_eq!(
-            fail_closed_rejection(true, true, "acme", StreamType::Logs, streams.into_iter()),
+            fail_closed_rejection(
+                true,
+                "acme",
+                StreamType::Logs,
+                rollups.into_iter(),
+                internal
+            ),
             None
         );
     }
 
     #[test]
-    fn fail_closed_refuses_a_customer_write_to_a_self_reporting_name() {
-        for stream in [REDACTION_EVIDENCE_STREAM, USAGE_STREAM, TRIGGERS_STREAM] {
-            let err =
-                fail_closed_rejection(true, false, "acme", StreamType::Logs, [stream].into_iter())
-                    .expect("a customer stream named like a platform one must be refused");
-            assert!(err.contains(&format!("acme/logs/{stream}")), "{err}");
+    fn fail_closed_refuses_a_customer_write_to_a_platform_stream_name() {
+        for stream in [
+            REDACTION_EVIDENCE_STREAM,
+            USAGE_STREAM,
+            TRIGGERS_STREAM,
+            "_o2_x",
+        ] {
+            assert!(!is_platform_write(false, false, stream, stream), "{stream}");
         }
+        // An internal writer is exempt only for rollup streams, never a customer stream.
+        assert!(!is_platform_write(false, true, USAGE_STREAM, USAGE_STREAM));
+        assert!(!is_platform_write(false, true, "app_logs", "app_logs"));
+        // A pipeline from a Usage target into a customer stream is still scanned or refused.
+        assert!(!is_platform_write(true, false, USAGE_STREAM, "app_logs"));
     }
 
     #[test]

@@ -41,6 +41,29 @@ const INTERNAL_LOG_STREAMS = new Set([
   "_anomalies",
 ]);
 const VIEW_LOGS_COUNT_TIMEOUT_MS = 5000;
+// Count queries share the search work-group queue; too many at once come back as 429s.
+const VIEW_LOGS_COUNT_CONCURRENCY = 4;
+
+const settleLimited = async <T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> => {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      try {
+        results[i] = { status: "fulfilled", value: await fn(items[i]) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+};
 const isInternalLogStream = (name: string) =>
   name.startsWith("_o2_") || INTERNAL_LOG_STREAMS.has(name);
 const defaultObject = {
@@ -554,23 +577,21 @@ const useTraces = () => {
       // A stream that has not answered in time counts as unknown, so a hung one cannot stall the click.
       const countTimeout = new AbortController();
       const timer = setTimeout(() => countTimeout.abort(), VIEW_LOGS_COUNT_TIMEOUT_MS);
-      const counts = await Promise.allSettled(
-        streamList.map((name) =>
-          searchService.search({
-            org_identifier: store.state.selectedOrganization.identifier,
+      const counts = await settleLimited(streamList, VIEW_LOGS_COUNT_CONCURRENCY, (name) =>
+        searchService.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: {
             query: {
-              query: {
-                sql: `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
-                start_time: timeRange.startTime,
-                end_time: timeRange.endTime,
-                from: 0,
-                size: 1,
-              },
+              sql: `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
+              start_time: timeRange.startTime,
+              end_time: timeRange.endTime,
+              from: 0,
+              size: 1,
             },
-            page_type: "logs",
-            signal: countTimeout.signal,
-          }),
-        ),
+          },
+          page_type: "logs",
+          signal: countTimeout.signal,
+        }),
       );
       clearTimeout(timer);
       const countOf = (c: PromiseSettledResult<any>): number | null => {
@@ -585,14 +606,15 @@ const useTraces = () => {
       const counted = streamList.filter((_, i) => known[i] !== null);
 
       // Unknown (null) streams don't count against the fallback.
-      if (counted.length && known.every((n) => !n)) {
+      // With no stream known to hold span logs (even all throttled), only trace_id is a safe query.
+      if (known.every((n) => !n)) {
         // trace_id alone is tolerated on streams lacking it, so every eligible stream stays in.
         conditions.delete(groupIdFor(getSpanIdField()));
         queryString = Array.from(conditions.values()).join(" and ");
         // Trace-level logs span the whole trace, not the clicked span's window.
         timeRange = correlationProps.traceTimeRange ?? timeRange;
-        showTraceFallback = true;
-      } else if (counted.length) {
+        showTraceFallback = counted.length > 0;
+      } else {
         // A stream without span_id would fail the logs query, so keep only streams whose count ran.
         navStreams = counted;
       }

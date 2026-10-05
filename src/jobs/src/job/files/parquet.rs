@@ -965,7 +965,7 @@ pub(crate) async fn queue_service_streams_if_needed(
 }
 
 /// Internal streams such as `_o2_db_stats` never feed service discovery.
-#[cfg(feature = "enterprise")]
+#[cfg(any(feature = "enterprise", test))]
 fn is_service_discovery_candidate(
     org_id: &str,
     stream_type: StreamType,
@@ -1146,7 +1146,6 @@ mod tests {
 
     use super::*;
 
-    #[cfg(feature = "enterprise")]
     #[test]
     fn test_service_discovery_skips_internal_streams() {
         assert!(is_service_discovery_candidate(

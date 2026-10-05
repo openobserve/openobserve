@@ -112,23 +112,14 @@ pub async fn ingest(
 
     let user = IngestUser::from_user_email(user_email.to_string());
     let streams: Vec<(String, Vec<json::Value>)> = parsed.streams.into_iter().collect();
-    // A 503 error, not a `Custom(_, 400)` status: HEC clients drop a 400 and retry a 503.
-    #[cfg(feature = "vectorscan")]
-    {
-        let counts: Vec<(&str, u64)> = streams
-            .iter()
-            .map(|(stream, records)| (stream.as_str(), records.len() as u64))
-            .collect();
-        if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(false, org_id, StreamType::Logs, &counts)
-                .await
-        {
-            return Err(Error::ResourceError(reason));
-        }
-    }
     // Admission checks for every group before the first write; the response shape
     // for a rejection is unchanged (still `Custom(_, 400)`).
     if let Err(e) = preflight_streams(org_id, &streams, &user).await {
+        // A 503 error, not a `Custom(_, 400)` status: HEC clients drop a 400 and retry a 503.
+        #[cfg(feature = "vectorscan")]
+        if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
+            return Err(e);
+        }
         return Ok(HecStatus::Custom(e.to_string(), 400).into());
     }
     if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
@@ -218,8 +209,11 @@ pub async fn preflight_streams(
             .iter()
             .map(|(stream, records)| (stream.as_str(), records.len() as u64))
             .collect();
+        let counts =
+            crate::ingestion::with_pipeline_destinations(org_id, StreamType::Logs, &counts).await;
+        let counts: Vec<(&str, u64)> = counts.iter().map(|(s, n)| (s.as_str(), *n)).collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(false, org_id, StreamType::Logs, &counts)
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &counts, |_| false)
                 .await
         {
             return Err(Error::ResourceError(reason));

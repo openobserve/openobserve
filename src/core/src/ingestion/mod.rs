@@ -557,16 +557,38 @@ fn unscannable_streams<'a>(
         .collect()
 }
 
-/// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
+/// Each stream plus its pipelines' fixed same-type destinations, with the source's record count.
 #[cfg(feature = "vectorscan")]
-pub async fn sdr_fail_closed_refusal(
-    platform_write: bool,
+pub async fn with_pipeline_destinations(
     org_id: &str,
     stream_type: StreamType,
     streams: &[(&str, u64)],
+) -> Vec<(String, u64)> {
+    let mut all: Vec<(String, u64)> = streams.iter().map(|(s, n)| (s.to_string(), *n)).collect();
+    for (stream, records) in streams {
+        let params = StreamParams::new(org_id, stream, stream_type);
+        for pipeline in get_stream_executable_pipelines(&params).await {
+            for dest in pipeline.get_all_destination_streams() {
+                let same_scope = dest.org_id == org_id && dest.stream_type == stream_type;
+                if same_scope && !all.iter().any(|(s, _)| *s == dest.stream_name) {
+                    all.push((dest.stream_name.to_string(), *records));
+                }
+            }
+        }
+    }
+    all
+}
+
+/// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
+#[cfg(feature = "vectorscan")]
+pub async fn sdr_fail_closed_refusal(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+    exempt: impl Fn(&str) -> bool,
 ) -> Option<String> {
     use config::meta::self_reporting::redaction::{
-        DataWindow, EvidenceScope, FailPosture, fail_closed_rejection, is_self_reporting_stream,
+        DataWindow, EvidenceScope, FailPosture, fail_closed_rejection,
     };
     if !config::get_config().common.sdr_fail_closed {
         return None;
@@ -587,14 +609,12 @@ pub async fn sdr_fail_closed_refusal(
     };
     let reason = fail_closed_rejection(
         true,
-        platform_write,
         org_id,
         stream_type,
         unscannable.iter().map(|(stream, _)| *stream),
+        &exempt,
     )?;
-    for (stream, records) in unscannable.iter().filter(|(stream, _)| {
-        !(platform_write && is_self_reporting_stream(org_id, stream, stream_type))
-    }) {
+    for (stream, records) in unscannable.iter().filter(|(stream, _)| !exempt(stream)) {
         crate::self_reporting::redaction_evidence::publish_scan_unavailable(
             &EvidenceScope::new(org_id, stream, stream_type),
             FailPosture::Closed,
@@ -905,10 +925,10 @@ mod tests {
     fn test_only_the_fail_closed_refusal_is_recognised() {
         let reason = config::meta::self_reporting::redaction::fail_closed_rejection(
             true,
-            false,
             "acme",
             StreamType::Logs,
             ["app"].into_iter(),
+            |_| false,
         )
         .expect("refused");
         assert!(is_sdr_fail_closed_refusal(&Error::ResourceError(

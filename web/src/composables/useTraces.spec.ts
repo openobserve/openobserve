@@ -834,8 +834,8 @@ describe("useTraces", () => {
 
       await navigateToCorrelatedLogs(streams("a_logs", "b_logs", "c_logs", "d_logs"));
 
-      // Nothing is known, so no fallback: span-scoped over every stream.
-      expect(pushedQuery()).toBe("span_id = 'span-p' and trace_id = 'trace-p'");
+      // Nothing is known: trace_id alone works on every stream; no "span has no logs" claim.
+      expect(pushedQuery()).toBe("trace_id = 'trace-p'");
       expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("a_logs,b_logs,c_logs,d_logs");
       expect(mockShowInfoNotification).not.toHaveBeenCalled();
     });
@@ -856,16 +856,35 @@ describe("useTraces", () => {
       expect(mockShowInfoNotification).toHaveBeenCalledTimes(1);
     });
 
-    it("navigates with the span-scoped query when every count fails", async () => {
-      mockSearch.mockRejectedValue(new Error("boom"));
+    it("navigates with the trace-only query when every count fails, e.g. throttled", async () => {
+      mockSearch.mockRejectedValue({ response: { status: 429 } });
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-e", "trace-e");
 
       await navigateToCorrelatedLogs(streams("app_logs", "web_logs"));
 
-      expect(pushedQuery()).toBe("span_id = 'span-e' and trace_id = 'trace-e'");
-      expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({ from: "1000", to: "2000" });
+      expect(pushedQuery()).toBe("trace_id = 'trace-e'");
+      expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({ from: "500", to: "9000" });
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs,web_logs");
       expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    });
+
+    it("runs at most four count queries at once", async () => {
+      let inFlight = 0;
+      let peak = 0;
+      mockSearch.mockImplementation(async () => {
+        peak = Math.max(peak, ++inFlight);
+        await Promise.resolve();
+        inFlight--;
+        return { data: { hits: [{ zo_count: 1 }] } };
+      });
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-l", "trace-l");
+
+      await navigateToCorrelatedLogs(streams("s1", "s2", "s3", "s4", "s5", "s6", "s7"));
+
+      expect(mockSearch).toHaveBeenCalledTimes(7);
+      expect(peak).toBe(4);
     });
 
     it("excludes only internal system streams from the stream list", async () => {

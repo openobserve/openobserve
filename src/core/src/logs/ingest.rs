@@ -136,9 +136,8 @@ pub async fn ingest(
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
-    // Only platform writers send Usage requests; a customer stream named `usage` is not one.
     #[cfg(feature = "vectorscan")]
-    let platform_write = matches!(in_req, IngestionRequest::Usage(_));
+    let usage_request = matches!(in_req, IngestionRequest::Usage(_));
     let log_ingestion_errors = ingestion_log_enabled().await;
     // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
@@ -164,13 +163,27 @@ pub async fn ingest(
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
+    // Internal writers pass the same test as the rollup write guard below.
+    #[cfg(feature = "vectorscan")]
+    let platform_write = {
+        let internal_writer = is_derived || matches!(user, IngestUser::SystemJob(_));
+        let source = stream_name.clone();
+        move |stream: &str| {
+            config::meta::self_reporting::redaction::is_platform_write(
+                usage_request,
+                internal_writer,
+                &source,
+                stream,
+            )
+        }
+    };
     // Refused here, before any pipeline runs: a remote-stream destination writes inside it.
     #[cfg(feature = "vectorscan")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
-        platform_write,
         org_id,
         StreamType::Logs,
         &[(&stream_name, 0)],
+        &platform_write,
     )
     .await
     {
@@ -672,10 +685,10 @@ pub async fn ingest(
             .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
             .collect();
         if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
-            platform_write,
             org_id,
             StreamType::Logs,
             &streams,
+            &platform_write,
         )
         .await
         {

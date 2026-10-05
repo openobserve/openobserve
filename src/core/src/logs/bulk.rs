@@ -276,22 +276,30 @@ pub async fn ingest(
         tokio::task::coop::consume_budget().await;
     }
 
-    // Checked up front: ES shippers retry a 503 for the whole request but drop a 4xx item.
+    // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
     #[cfg(feature = "vectorscan")]
     {
         let streams: Vec<(&str, u64)> = streams_data
             .iter()
             .map(|(stream, records)| (stream.as_str(), records.len() as u64))
             .collect();
+        let streams =
+            crate::ingestion::with_pipeline_destinations(org_id, stream_type, &streams).await;
+        let streams: Vec<(&str, u64)> = streams.iter().map(|(s, n)| (s.as_str(), *n)).collect();
         if let Some(reason) =
-            crate::ingestion::sdr_fail_closed_refusal(false, org_id, stream_type, &streams).await
+            crate::ingestion::sdr_fail_closed_refusal(org_id, stream_type, &streams, |_| false)
+                .await
         {
             return Err(infra::errors::Error::ResourceError(reason));
         }
     }
 
     // process data by stream
+    #[cfg(feature = "vectorscan")]
+    let mut written_any = false;
     for (stream_name, records) in streams_data {
+        #[cfg(feature = "vectorscan")]
+        let record_count = records.len();
         match super::ingest::ingest(
             thread_id,
             org_id,
@@ -304,16 +312,42 @@ pub async fn ingest(
         .await
         {
             Ok(v) => {
+                #[cfg(feature = "vectorscan")]
+                {
+                    written_any = true;
+                }
                 for status in v.status {
                     bulk_res.items.extend(status.items);
                 }
             }
             Err(e) => {
                 log::error!("[LOGS:BULK] stream {org_id}/logs/{stream_name}: Ingestion error: {e}");
-                // Fail-closed refusal is a 503 so shippers retry; written groups are re-sent.
+                // Once a group is written, a whole-request retry would duplicate it: 503 per item.
                 #[cfg(feature = "vectorscan")]
                 if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
-                    return Err(e);
+                    if !written_any {
+                        return Err(e);
+                    }
+                    bulk_res.errors = true;
+                    for _ in 0..record_count {
+                        add_record_status(
+                            stream_name.to_string(),
+                            None,
+                            action.to_string(),
+                            None,
+                            &mut bulk_res,
+                            Some("service_unavailable".to_string()),
+                            Some(e.to_string()),
+                        );
+                        if let Some(item) = bulk_res
+                            .items
+                            .last_mut()
+                            .and_then(|i| i.values_mut().next())
+                        {
+                            item.status = 503;
+                        }
+                    }
+                    continue;
                 }
                 bulk_res.errors = true;
                 metrics::INGEST_ERRORS
