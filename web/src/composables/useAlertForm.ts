@@ -924,14 +924,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     try {
       const parsed = parser.parse(sql);
       const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
-      if (fromStream && fromStream !== formData.value.stream_name) {
+      // A half-typed name is not a stream yet; getStream rejects it.
+      const isKnownStream = (indexOptions.value as string[]).includes(fromStream ?? "");
+      if (fromStream && isKnownStream && fromStream !== formData.value.stream_name) {
         isSyncingStreamFromSql.value = true;
         setF("stream_name", fromStream);
         await updateStreamFields(fromStream);
-        isSyncingStreamFromSql.value = false;
       }
     } catch {
       // ignore parse errors while user is mid-typing
+    } finally {
+      isSyncingStreamFromSql.value = false;
     }
   }, 600);
 

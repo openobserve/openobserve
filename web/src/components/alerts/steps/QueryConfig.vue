@@ -1190,7 +1190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="inlineStatusState === 'sql-status-bar--error'">
                   <OIcon class="shrink-0" name="error-outline" size="xs" />
                   <span class="min-w-0 flex-1 truncate">{{ sqlQueryErrorMsg }}</span>
-                  <OTooltip side="top">{{ sqlQueryErrorMsg }}</OTooltip>
+                  <OTooltip side="top" :content="sqlQueryErrorMsg" />
                 </template>
                 <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
                   <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
