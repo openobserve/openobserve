@@ -10428,6 +10428,7 @@
     "loadingStream": "스트림 로드 중...",
     "noLogsAvailableForService": "이 서비스에 사용할 수 있는 로그가 없습니다.",
     "noCorrelatedLogsFound": "이 Span에 대한 연관 로그를 찾을 수 없습니다.",
+    "spanHasNoLogsShowingTrace": "이 Span에는 로그가 없습니다. 전체 트레이스의 로그를 표시합니다.",
     "noData": {
       "title": "{product}로 트레이스 전송 시작",
       "description": "아직 이 조직에서 트레이스 스트림을 찾을 수 없습니다. 서비스를 계측하면 트레이스가 여기에 자동으로 표시됩니다.",

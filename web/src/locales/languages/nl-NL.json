@@ -10428,6 +10428,7 @@
     "loadingStream": "Stream wordt geladen...",
     "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service",
     "noCorrelatedLogsFound": "Geen gecorreleerde logboeken gevonden voor dit span",
+    "spanHasNoLogsShowingTrace": "Deze span heeft geen logboeken. Logboeken voor de hele trace worden weergegeven.",
     "noData": {
       "title": "Start met het verzenden van traces naar {product}",
       "description": "Nog geen trace-streams gevonden in deze organisatie. Instrumenteer uw services en traces verschijnen hier automatisch.",

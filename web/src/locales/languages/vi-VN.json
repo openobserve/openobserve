@@ -10428,6 +10428,7 @@
     "loadingStream": "Đang tải Luồng...",
     "noLogsAvailableForService": "Không có Nhật ký nào cho dịch vụ này",
     "noCorrelatedLogsFound": "Không tìm thấy nhật ký tương quan nào cho span này",
+    "spanHasNoLogsShowingTrace": "Span này không có nhật ký. Đang hiển thị nhật ký cho toàn bộ trace.",
     "noData": {
       "title": "Bắt đầu gửi trace tới {product}",
       "description": "Chưa tìm thấy stream trace nào trong tổ chức này. Hãy tích hợp trace vào các dịch vụ của bạn và trace sẽ tự động xuất hiện ở đây.",

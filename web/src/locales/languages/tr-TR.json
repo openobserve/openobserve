@@ -10428,6 +10428,7 @@
     "loadingStream": "Akış Yükleniyor...",
     "noLogsAvailableForService": "Bu hizmet için günlük yok",
     "noCorrelatedLogsFound": "Bu Span için ilişkili günlük bulunamadı",
+    "spanHasNoLogsShowingTrace": "Bu Span'ın günlüğü yok. Günlükler tüm iz için gösteriliyor.",
     "noData": {
       "title": "{product} ürününe iz göndermeye başlayın",
       "description": "Bu organizasyonda henüz iz akışı bulunamadı. Hizmetlerinizi enstrümante edin, izler otomatik olarak burada görünecek.",

@@ -10428,6 +10428,7 @@
     "loadingStream": "正在加载数据流...",
     "noLogsAvailableForService": "此服务没有可用的日志",
     "noCorrelatedLogsFound": "未找到此 span 的相关日志",
+    "spanHasNoLogsShowingTrace": "此 Span 没有日志。正在显示整个追踪的日志。",
     "noData": {
       "title": "开始向 {product} 发送追踪数据",
       "description": "此组织中尚未找到追踪数据流。对服务进行插桩后，追踪将自动显示在此处。",

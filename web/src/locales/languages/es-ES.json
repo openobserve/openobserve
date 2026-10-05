@@ -10428,6 +10428,7 @@
     "loadingStream": "Cargando Stream...",
     "noLogsAvailableForService": "No hay registros disponibles para este servicio",
     "noCorrelatedLogsFound": "No se encontraron registros correlacionados para este span",
+    "spanHasNoLogsShowingTrace": "Este span no tiene logs. Mostrando los logs de toda la traza.",
     "noData": {
       "title": "Comienza a enviar trazas a {product}",
       "description": "Aún no se han encontrado streams de trazas en esta organización. Instrumenta tus servicios y las trazas aparecerán aquí automáticamente.",

@@ -10428,6 +10428,7 @@
     "loadingStream": "Chargement du flux...",
     "noLogsAvailableForService": "Aucun journal disponible pour ce service",
     "noCorrelatedLogsFound": "Aucun log corrélé trouvé pour ce span",
+    "spanHasNoLogsShowingTrace": "Ce span n'a aucun log. Affichage des logs pour toute la trace.",
     "noData": {
       "title": "Commencez à envoyer des traces à {product}",
       "description": "Aucun flux de traces trouvé dans cette organisation pour le moment. Instrumentez vos services et les traces apparaîtront ici automatiquement.",

@@ -10428,6 +10428,7 @@
     "loadingStream": "Stream wird geladen...",
     "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar",
     "noCorrelatedLogsFound": "Keine korrelierten Logs für diesen Span gefunden",
+    "spanHasNoLogsShowingTrace": "Dieser Span hat keine Logs. Es werden Logs für den gesamten Trace angezeigt.",
     "noData": {
       "title": "Sende Traces an {product}",
       "description": "Noch keine Trace-Streams in dieser Organisation gefunden. Instrumentiere deine Dienste, und Traces erscheinen hier automatisch.",

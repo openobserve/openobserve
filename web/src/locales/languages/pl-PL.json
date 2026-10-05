@@ -10428,6 +10428,7 @@
     "loadingStream": "Ładowanie strumienia...",
     "noLogsAvailableForService": "Brak logów dla tej usługi",
     "noCorrelatedLogsFound": "Nie znaleziono powiązanych logów dla tego spanu.",
+    "spanHasNoLogsShowingTrace": "Ten span nie ma logów. Wyświetlane są logi dla całego trace'a.",
     "noData": {
       "title": "Zacznij wysyłać ślady do {product}",
       "description": "Nie znaleziono jeszcze strumieni śladów w tej organizacji. Zainstrumentuj swoje usługi, a ślady pojawią się tutaj automatycznie.",

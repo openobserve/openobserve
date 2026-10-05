@@ -10423,6 +10423,7 @@
     "loadingStream": "載入串流中...",
     "noLogsAvailableForService": "此服務無可用的日誌",
     "noCorrelatedLogsFound": "找不到此 span 的相關日誌",
+    "spanHasNoLogsShowingTrace": "此 Span 沒有日誌。顯示整個追蹤的日誌。",
     "noData": {
       "title": "開始傳送追蹤資料到 {product}",
       "description": "此組織中尚未找到任何追蹤串流。對您的服務進行檢測後，追蹤將自動顯示於此處。",

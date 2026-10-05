@@ -10428,6 +10428,7 @@
     "loadingStream": "ストリームをロード中...",
     "noLogsAvailableForService": "このサービスで利用できるログはありません",
     "noCorrelatedLogsFound": "このスパンに関連するログは見つかりませんでした",
+    "spanHasNoLogsShowingTrace": "このスパンにはログがありません。トレース全体のログを表示しています。",
     "noData": {
       "title": "{product} へのトレース送信を始めましょう",
       "description": "この組織にはまだトレースストリームが見つかりません。サービスを計装すると、トレースがここに自動的に表示されます。",
