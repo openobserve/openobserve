@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :current-time="currentTime"
         :start-time="startTime"
         :end-time="endTime"
+        :rum-window-us="rumWindowUs"
         @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
       />
     </KeepAlive>
@@ -168,6 +169,10 @@ const props = defineProps({
   endTime: {
     type: Number,
     default: 0,
+  },
+  rumWindowUs: {
+    type: Object as PropType<{ start: number; end: number } | null>,
+    default: null,
   },
   markedTimestamps: {
     type: Array as PropType<number[]>,
