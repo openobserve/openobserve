@@ -155,6 +155,15 @@ impl IndexCondition {
             .all(|condition| condition.can_remove_filter())
     }
 
+    /// Fields on which the index can match NULL rows that SQL leaves out.
+    pub fn null_sensitive_fields(&self) -> HashSet<String> {
+        let mut fields = HashSet::new();
+        for condition in self.conditions.iter() {
+            condition.null_sensitive_fields(false, &mut fields);
+        }
+        fields
+    }
+
     // use for simple distinct optimization
     pub fn get_str_match_condition(&self) -> Option<(String, bool)> {
         match &self.conditions[0] {

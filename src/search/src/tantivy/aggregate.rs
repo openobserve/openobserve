@@ -113,15 +113,23 @@ mod tests {
     use crate::index::Condition;
 
     async fn fixture() -> (Arc<QueryParams>, Vec<FileKey>) {
+        fixture_with(&[
+            ("old", None),
+            ("new", Some(vec!["svc-a", "svc-b", "svc-a"])),
+            ("zero", Some(vec!["svc-z", "svc-z"])),
+        ])
+        .await
+    }
+
+    /// One index file per entry; `None` leaves `service_name` out of that index.
+    async fn fixture_with(
+        file_services: &[(&str, Option<Vec<&str>>)],
+    ) -> (Arc<QueryParams>, Vec<FileKey>) {
         let org = format!("aggregate_fallback_{}", rand::random::<u64>());
         let account = format!("{org}:default");
         let store = InMemory::new();
         let mut files = Vec::new();
-        for (name, services) in [
-            ("old", None),
-            ("new", Some(vec!["svc-a", "svc-b", "svc-a"])),
-            ("zero", Some(vec!["svc-z", "svc-z"])),
-        ] {
+        for (name, services) in file_services {
             let mut schema = tantivy::schema::Schema::builder();
             let ts = schema.add_i64_field(TIMESTAMP_COL_NAME, FAST | INDEXED);
             let pod = schema.add_text_field("k8s_pod", STRING | FAST);
@@ -356,5 +364,99 @@ mod tests {
         assert!(
             matches!(result(&prepared), Some(TantivyMultiResult::MultiHistogram(buckets)) if buckets.iter().map(|(_, _, n)| n).sum::<u64>() == 5)
         );
+    }
+
+    /// The index builder stores a NULL `service_name` as "", as in the first file.
+    async fn null_fixture() -> (Arc<QueryParams>, Vec<FileKey>) {
+        let mut with_null = vec!["svc-a"; 7];
+        with_null.extend(["svc-b", ""]);
+        let mut complete = vec!["svc-a"; 8];
+        complete.push("svc-b");
+        fixture_with(&[("with_null", Some(with_null)), ("complete", Some(complete))]).await
+    }
+
+    fn service_condition(condition: Condition) -> IndexCondition {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(condition);
+        index_condition
+    }
+
+    #[tokio::test]
+    async fn aggregate_fallback_where_the_condition_can_match_null_rows() {
+        let (query, files) = null_fixture().await;
+        let not_svc_a = Condition::NotEqual("service_name".into(), "svc-a".into());
+        let empty = Condition::Equal("service_name".into(), "".into());
+        for (condition, count) in [(not_svc_a, 1), (empty, 0)] {
+            let prepared = prepare_aggregate(
+                query.clone(),
+                files.clone(),
+                Some(service_condition(condition.clone())),
+                IndexOptimizeMode::SimpleCount,
+            )
+            .await;
+            assert_eq!(prepared.fallback_files.len(), 1, "{condition:?}");
+            assert_eq!(
+                prepared.fallback_files[0].key, files[0].key,
+                "{condition:?}"
+            );
+            assert!(
+                matches!(result(&prepared), Some(TantivyMultiResult::Count(n)) if *n == count),
+                "{condition:?}"
+            );
+        }
+
+        // `!= ''` leaves NULL rows out as SQL does, so both files are answered
+        let not_empty = Condition::NotEqual("service_name".into(), "".into());
+        let prepared = prepare_aggregate(
+            query,
+            files,
+            Some(service_condition(not_empty)),
+            IndexOptimizeMode::SimpleCount,
+        )
+        .await;
+        assert!(prepared.fallback_files.is_empty());
+        assert!(matches!(
+            result(&prepared),
+            Some(TantivyMultiResult::Count(17))
+        ));
+    }
+
+    #[tokio::test]
+    async fn row_selection_adds_the_filter_back_where_null_rows_can_match() {
+        let (query, files) = null_fixture().await;
+        // both files match 35% of their rows or less, so neither is skipped for too many matches
+        for (file, add_back) in [(&files[0], true), (&files[1], false)] {
+            let mut file_list = vec![file.clone()];
+            let (_, is_add_filter_back, _) = tantivy_search(
+                query.clone(),
+                &mut file_list,
+                Some(service_condition(Condition::NotEqual(
+                    "service_name".into(),
+                    "svc-a".into(),
+                ))),
+                None,
+            )
+            .await
+            .unwrap();
+            assert_eq!(is_add_filter_back, add_back, "{}", file.key);
+        }
+    }
+
+    #[tokio::test]
+    async fn null_rows_fallback_is_not_an_index_error() {
+        let (query, files) = null_fixture().await;
+        let error = crate::tantivy::search_tantivy_index(
+            &query.trace_id,
+            query.time_range,
+            Some(service_condition(Condition::NotEqual(
+                "service_name".into(),
+                "svc-a".into(),
+            ))),
+            Some(IndexOptimizeMode::SimpleCount),
+            &files[0],
+        )
+        .await
+        .unwrap_err();
+        assert!(error.is::<crate::tantivy::NotExact>(), "{error}");
     }
 }

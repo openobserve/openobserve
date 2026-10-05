@@ -569,6 +569,48 @@ impl Condition {
             Condition::Not(condition) => condition.can_remove_filter(),
         }
     }
+
+    /// Adds the fields on which "", the indexed form of NULL, makes the condition true.
+    pub fn null_sensitive_fields(&self, negated: bool, fields: &mut HashSet<String>) {
+        match self {
+            Condition::Equal(field, value) => {
+                if negated != value.is_empty() {
+                    fields.insert(field.clone());
+                }
+            }
+            Condition::NotEqual(field, value) => {
+                if negated == value.is_empty() {
+                    fields.insert(field.clone());
+                }
+            }
+            Condition::In(field, values, in_negated) => {
+                if (negated != *in_negated) != values.iter().any(String::is_empty) {
+                    fields.insert(field.clone());
+                }
+            }
+            // ContainsQuery rejects an empty keyword, and "" contains no other
+            Condition::StrMatch(field, ..) => {
+                if negated {
+                    fields.insert(field.clone());
+                }
+            }
+            // a pattern can match ""
+            Condition::Regex(field, _) => {
+                fields.insert(field.clone());
+            }
+            // SQL match_all() checks IS NOT NULL first, so a NULL is false on both sides
+            Condition::MatchAll(_) => {}
+            // NOT fuzzy_match_all can keep a NULL row, but `_all` never holds "" to look up
+            Condition::FuzzyMatchAll(..) => {}
+            Condition::All() => {}
+            Condition::Or(items) | Condition::And(items) => {
+                for item in items {
+                    item.null_sensitive_fields(negated, fields);
+                }
+            }
+            Condition::Not(condition) => condition.null_sensitive_fields(!negated, fields),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -971,6 +1013,76 @@ mod tests {
         let right = Condition::Regex("field2".to_string(), "pattern.*".to_string());
         let condition = Condition::Or(vec![left, right]);
         assert!(!condition.can_remove_filter());
+    }
+
+    fn null_sensitive_fields(condition: &Condition) -> HashSet<String> {
+        let mut fields = HashSet::new();
+        condition.null_sensitive_fields(false, &mut fields);
+        fields
+    }
+
+    #[test]
+    fn test_condition_null_sensitive_fields_when_empty_value_makes_it_true() {
+        let eq = |value: &str| Condition::Equal("f".to_string(), value.to_string());
+        let ne = |value: &str| Condition::NotEqual("f".to_string(), value.to_string());
+        let in_list = |values: &[&str], negated: bool| {
+            Condition::In(
+                "f".to_string(),
+                values.iter().map(|v| v.to_string()).collect(),
+                negated,
+            )
+        };
+        let not = |condition: Condition| Condition::Not(Box::new(condition));
+        let sensitive = [
+            ne("a"),
+            not(eq("a")),
+            in_list(&["a", "b"], true),
+            eq(""),
+            in_list(&["a", ""], false),
+            not(Condition::StrMatch("f".to_string(), "a".to_string(), true)),
+        ];
+        for condition in sensitive {
+            assert_eq!(
+                null_sensitive_fields(&condition),
+                HashSet::from(["f".to_string()]),
+                "{condition:?}"
+            );
+        }
+        let exact = [
+            eq("a"),
+            ne(""),
+            in_list(&["a", "b"], false),
+            in_list(&["a", ""], true),
+            not(ne("a")),
+            not(eq("")),
+            Condition::StrMatch("f".to_string(), "a".to_string(), true),
+            not(Condition::MatchAll("error".to_string())),
+            Condition::All(),
+        ];
+        for condition in exact {
+            assert!(
+                null_sensitive_fields(&condition).is_empty(),
+                "{condition:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_condition_null_sensitive_fields_collects_nested_fields() {
+        let condition = Condition::Or(vec![
+            Condition::And(vec![
+                Condition::Equal("a".to_string(), "x".to_string()),
+                Condition::NotEqual("b".to_string(), "y".to_string()),
+            ]),
+            Condition::Not(Box::new(Condition::Or(vec![
+                Condition::Equal("c".to_string(), "z".to_string()),
+                Condition::NotEqual("d".to_string(), "w".to_string()),
+            ]))),
+        ]);
+        assert_eq!(
+            null_sensitive_fields(&condition),
+            HashSet::from(["b".to_string(), "c".to_string()])
+        );
     }
 
     /// Build a minimal tantivy schema containing only the given text field names.

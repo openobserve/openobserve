@@ -41,14 +41,15 @@ use config::{
     utils::{inverted_index::to_tantivy_name, size::bytes_to_human_readable},
 };
 use futures::{StreamExt, stream};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{cache::file_data, errors::Error};
 use itertools::Itertools;
 pub use result::{TantivyMultiResult, TantivyMultiResultBuilder};
 pub use search::TantivyResult;
 use tantivy::{
-    Directory, ReloadPolicy, Term,
+    Directory, ReloadPolicy, SegmentReader, Term,
     query::{BooleanQuery, Occur, RangeQuery},
+    schema::Schema,
 };
 use tantivy_utils::puffin_directory::{
     PROP_ROW_GROUP_SIZE, caching_directory::CachingDirectory, footer_cache::FooterCache,
@@ -67,6 +68,18 @@ use crate::{
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     types::QueryParams,
 };
+
+/// A file the index cannot answer exactly, so it is scanned instead; not an index error.
+#[derive(Debug)]
+struct NotExact(&'static str);
+
+impl std::fmt::Display for NotExact {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+impl std::error::Error for NotExact {}
 
 /// Filter file list using tantivy index
 #[tracing::instrument(name = "service:search:grpc:storage:tantivy_search", skip_all)]
@@ -225,6 +238,13 @@ pub async fn tantivy_search(
                 drop(permit);
                 match ret {
                     Ok(ret) => Ok(ret),
+                    Err(e) if e.is::<NotExact>() => {
+                        log::debug!(
+                            "[trace_id {trace_id}] search->tantivy: scan {} instead: {e}",
+                            file.key
+                        );
+                        Err(e)
+                    }
                     Err(e) => {
                         log::error!(
                             "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, index_size: {}, error: {e:?}",
@@ -325,9 +345,11 @@ pub async fn tantivy_search(
                     }
                 }
                 Err(e) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search->tantivy: error filtering via index. Keep file to search, error: {e}"
-                    );
+                    if !e.is::<NotExact>() {
+                        log::error!(
+                            "[trace_id {trace_id}] search->tantivy: error filtering via index. Keep file to search, error: {e}"
+                        );
+                    }
                     is_add_filter_back = true;
                     continue;
                 }
@@ -493,16 +515,32 @@ async fn search_tantivy_index(
         ]));
     }
 
-    WarmPlan::build(
+    let warm_plan = WarmPlan::build(
         &condition,
         query.as_ref(),
         &idx_optimize_rule,
         &tantivy_schema,
         file_in_range,
         has_skipped_conditions,
-    )
-    .execute(searcher.segment_reader(0))
-    .await?;
+    );
+    let segment_reader = searcher.segment_reader(0);
+    let (matches_null_rows, ()) = tokio::try_join!(
+        has_empty_term(
+            segment_reader,
+            &tantivy_schema,
+            condition.null_sensitive_fields()
+        ),
+        warm_plan.execute(segment_reader),
+    )?;
+    if matches_null_rows
+        && idx_optimize_rule
+            .as_ref()
+            .is_some_and(|mode| mode.is_aggregate())
+    {
+        return Err(NotExact("aggregate condition can match NULL rows in the index").into());
+    }
+    // DataFusion checks the condition again on the rows the index selects
+    let has_skipped_conditions = has_skipped_conditions || matches_null_rows;
 
     // search the index
     let file_min_ts = parquet_file.meta.min_ts;
@@ -605,6 +643,29 @@ async fn search_tantivy_index(
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
+}
+
+/// Whether the file indexes "", a NULL or an empty string, in any of the fields.
+async fn has_empty_term(
+    segment_reader: &SegmentReader,
+    schema: &Schema,
+    fields: HashSet<String>,
+) -> anyhow::Result<bool> {
+    for name in fields {
+        // a field missing from this index is a skipped condition already
+        let Ok(field) = schema.get_field(&name) else {
+            continue;
+        };
+        let inverted_index = segment_reader.inverted_index(field)?;
+        if inverted_index
+            .doc_freq_async(&Term::from_field_text(field, ""))
+            .await?
+            > 0
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Common guards for matched row ids: returns `Some(NoMatch)` when there is
