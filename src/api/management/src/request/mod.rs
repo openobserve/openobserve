@@ -59,6 +59,8 @@ pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
+pub mod quality;
+#[cfg(feature = "enterprise")]
 pub mod remote_tasks;
 pub mod rum_analytics;
 #[cfg(feature = "enterprise")]

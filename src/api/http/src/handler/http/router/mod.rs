@@ -57,7 +57,8 @@ use {
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
         domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
-        prompts, providers, remote_tasks, score_configs, scorers, service_streams, workflows,
+        prompts, providers, quality, remote_tasks, score_configs, scorers, service_streams,
+        workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1384,6 +1385,8 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
                 .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
+                .route("/{org_id}/score_configs/{entity_id}/quality", get(quality::get_quality_summary))
+                .route("/{org_id}/score_configs/{entity_id}/quality/scores", get(quality::list_quality_scores))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
                 // Scorers (Online Eval Phase 2)

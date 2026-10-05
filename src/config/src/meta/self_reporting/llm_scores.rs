@@ -352,6 +352,12 @@ pub struct LlmScoreRecord {
     /// Justification for this individual Score dimension.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Bounded excerpt of the target input the scorer evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_preview: Option<String>,
+    /// Bounded excerpt of the target output the scorer evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_preview: Option<String>,
     /// Attempts this scorer dimension has consumed, 1-based. Resuming the
     /// bounded sequence after a restart reads this and nothing else.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -436,6 +442,8 @@ impl Default for LlmScoreRecord {
             job_id: None,
             job_version: None,
             reasoning: None,
+            input_preview: None,
+            output_preview: None,
             attempt_count: None,
             error_reason: None,
             annotation_id: None,
@@ -484,6 +492,8 @@ impl LlmScoreRecord {
             job_id: Some(String::new()),
             job_version: Some(0),
             reasoning: Some(String::new()),
+            input_preview: Some(String::new()),
+            output_preview: Some(String::new()),
             skip_reason: Some(ExperimentSkipReason::NoReference),
             attempt_count: Some(0),
             error_reason: Some(LlmScoreErrorReason::AttemptFailed),
@@ -629,6 +639,8 @@ mod tests {
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
             reasoning: None,
+            input_preview: None,
+            output_preview: None,
             attempt_count: None,
             error_reason: None,
             annotation_id: None,
