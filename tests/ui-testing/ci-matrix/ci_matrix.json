@@ -61,7 +61,8 @@
       "dashboard-config-trellis.spec.js",
       "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
-      "dashboard-config-markline.spec.js"
+      "dashboard-config-markline.spec.js",
+      "dashboard-config-unit-locale.spec.js"
     ],
     "disabled": []
   },
