@@ -226,7 +226,11 @@ import {
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
-import { arrivalTraceWindowUs, traceQueryWindow } from "@/utils/rum/traceWindow";
+import {
+  arrivalTraceWindowUs,
+  TRACE_RANGE_PADDING_US,
+  traceQueryWindow,
+} from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
@@ -608,11 +612,15 @@ async function fetchTraces() {
       return;
     }
 
-    // `_timestamp` is server arrival, which trails the device-clock session window.
-    const searchWindow = (props.rumWindowUs && arrivalTraceWindowUs(rumHits)) || {
-      start: searchStartTime,
-      end: searchEndTime,
-    };
+    const deviceWindow = { start: searchStartTime, end: searchEndTime };
+    const arrival = props.rumWindowUs ? arrivalTraceWindowUs(rumHits) : null;
+    // Arrival can trail a span by more than the pad (offline buffering), so keep the device window too.
+    const searchWindow = arrival
+      ? {
+          start: Math.min(arrival.start, deviceWindow.start - TRACE_RANGE_PADDING_US),
+          end: Math.max(arrival.end, deviceWindow.end),
+        }
+      : deviceWindow;
     if (props.rumWindowUs) traceSearchWindow.value = searchWindow;
 
     // Deduplicate by trace_id, keep first occurrence for view context.

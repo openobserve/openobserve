@@ -1455,18 +1455,56 @@ describe("PlayerTracesTab", () => {
       );
 
       const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
-      expect(bulk[1]).toBe(first - PAD);
+      expect(bulk[1]).toBe(START_MS * 1000 - PAD);
       expect(bulk[2]).toBe(last + PAD);
 
       const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
-      expect(queryReq.start_time).toBe(first - PAD);
+      expect(queryReq.start_time).toBe(START_MS * 1000 - PAD);
       expect(queryReq.end_time).toBe(last + PAD);
 
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await flushPromises();
       const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
-      expect(traceDetails.props("startTimeProp")).toBe(first - PAD);
+      expect(traceDetails.props("startTimeProp")).toBe(START_MS * 1000 - PAD);
       expect(traceDetails.props("endTimeProp")).toBe(last + PAD);
+    });
+
+    it("keeps the device start when every row arrived 5 min after its device time", async () => {
+      const lag = 300_000_000;
+      await remount(
+        { rumWindowUs: RUM_WINDOW },
+        [createRumHit({ _first_ts: START_MS * 1000 + lag, _last_ts: END_MS * 1000 + lag })],
+        [createTraceMetadata({ start_time: undefined, end_time: undefined })],
+      );
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - PAD);
+      expect(bulk[2]).toBe(END_MS * 1000 + lag + PAD);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - PAD);
+      expect(queryReq.end_time).toBe(END_MS * 1000 + lag + PAD);
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await flushPromises();
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(START_MS * 1000 - PAD);
+      expect(traceDetails.props("endTimeProp")).toBe(END_MS * 1000 + lag + PAD);
+    });
+
+    it("spans both windows when the device clock runs hours ahead", async () => {
+      const H = 3_600_000_000;
+      await remount({ rumWindowUs: RUM_WINDOW }, [
+        createRumHit({ _first_ts: START_MS * 1000 - 3 * H, _last_ts: END_MS * 1000 - 3 * H }),
+      ]);
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - 3 * H - PAD);
+      expect(bulk[2]).toBe(END_MS * 1000);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - 3 * H - PAD);
+      expect(queryReq.end_time).toBe(END_MS * 1000);
     });
 
     it("falls back to the device window when no hit carries a usable _first_ts", async () => {
