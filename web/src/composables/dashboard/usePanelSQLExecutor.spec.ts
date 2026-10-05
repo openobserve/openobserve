@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
+import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 
 // ─── module mocks ─────────────────────────────────────────────────────────────
 
@@ -187,13 +188,80 @@ describe("usePanelSQLExecutor", () => {
       expect(addTraceId).toHaveBeenCalled();
     });
 
-    it("single query uses standard handleSearchResponse handler", async () => {
+    it("single query forwards stream events to the standard handlers", async () => {
       const { ctx, fetchQueryDataWithHttpStream, handleSearchResponse } = makeCtx();
       const { executeSQL } = usePanelSQLExecutor(ctx);
       await executeSQL(0, 300_000_000, null);
 
       const [, handlers] = fetchQueryDataWithHttpStream.mock.calls[0];
-      expect(handlers.data).toBe(handleSearchResponse);
+      const payload = { traceId: "mock-trace-sql" };
+      const response = { type: "end" };
+      handlers.data(payload, response);
+      expect(handleSearchResponse).toHaveBeenCalledWith(payload, response);
+    });
+
+    it("ignores events from a previous run's stream once a new run has started", async () => {
+      const {
+        ctx,
+        fetchQueryDataWithHttpStream,
+        handleSearchResponse,
+        handleSearchClose,
+        handleSearchError,
+        handleSearchReset,
+        removeTraceId,
+      } = makeCtx();
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+      await executeSQL(0, 300_000_000, null);
+
+      const [[stalePayload, stale], [, current]] = fetchQueryDataWithHttpStream.mock.calls;
+      stale.data(stalePayload, { type: "search_response_hits" });
+      stale.error(stalePayload, { content: { message: "x" } });
+      stale.reset(stalePayload, {});
+      stale.complete(stalePayload, { type: "end" });
+      expect(handleSearchResponse).not.toHaveBeenCalled();
+      expect(handleSearchError).not.toHaveBeenCalled();
+      expect(handleSearchReset).not.toHaveBeenCalled();
+      expect(handleSearchClose).not.toHaveBeenCalled();
+      expect(removeTraceId).toHaveBeenCalledWith(stalePayload.traceId);
+
+      current.data(stalePayload, { type: "search_response_hits" });
+      expect(handleSearchResponse).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not duplicate categories when a re-run overlaps the previous run's stream", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx();
+      const handlers = usePanelSearchHandlers({
+        state,
+        processApiError: vi.fn(),
+        saveCurrentStateToCache: vi.fn(),
+        loadData: vi.fn(),
+        removeTraceId: vi.fn(),
+      });
+      Object.assign(ctx, {
+        handleSearchResponse: handlers.handleSearchResponse,
+        handleSearchClose: handlers.handleSearchClose,
+        handleSearchError: handlers.handleSearchError,
+        handleSearchReset: handlers.handleSearchReset,
+      });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+      await executeSQL(0, 300_000_000, null);
+
+      const hits = [{ value: "OK" }, { value: "ERROR" }];
+      for (const [payload, streamHandlers] of fetchQueryDataWithHttpStream.mock.calls) {
+        streamHandlers.data(payload, {
+          type: "search_response_metadata",
+          content: { results: { streaming_aggs: false } },
+        });
+        streamHandlers.data(payload, {
+          type: "search_response_hits",
+          content: { results: { hits } },
+        });
+        streamHandlers.data(payload, { type: "end" });
+      }
+
+      expect(state.data[0].map((h: any) => h.value)).toEqual(["OK", "ERROR"]);
     });
 
     it("includes panel metadata in payload.meta", async () => {
