@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="trending-up" size="sm" class="me-2" />
         <span class="select-none">{{
-          t("dashboard.alertContextMenu.forecastReaches", { value: formattedValue })
+          t("dashboard.alertContextMenu.forecastReaches", {
+            value: forecastValue.toLocaleString(undefined, { maximumSignificantDigits: 4 }),
+          })
         }}</span>
       </div>
       <div
@@ -117,10 +119,13 @@ export default defineComponent({
       top: `${props.y}px`,
     }));
 
+    // The threshold is written into the alert's PromQL and notification, so it is the value the item shows.
+    const forecastValue = computed(() => Number(Number(props.value).toPrecision(4)));
+
     const handleMenuItemClick = (condition: "above" | "below" | "forecast") => {
       emit("select", {
         condition,
-        threshold: props.value,
+        threshold: condition === "forecast" ? forecastValue.value : props.value,
         panelQueryIndex: props.panelQueryIndex,
         seriesRole: props.seriesRole,
       });
@@ -162,6 +167,7 @@ export default defineComponent({
       t,
       menuRef,
       formattedValue,
+      forecastValue,
       menuStyle,
       handleMenuItemClick,
     };

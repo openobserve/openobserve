@@ -183,6 +183,14 @@ describe("AlertContextMenu Component", () => {
       });
     });
 
+    it("alerts on the forecast value it shows", async () => {
+      wrapper = createWrapper({ value: 0.904237, panelQueryIndex: 0, seriesRole: "forecast" });
+      const item = wrapper.find('[data-test="alert-context-menu-forecast"]');
+      expect(item.text()).toBe("Alert when the forecast reaches 0.9042");
+      await item.trigger("click");
+      expect(wrapper.emitted("select")[0][0].threshold).toBe(0.9042);
+    });
+
     it("should emit select with the current value as threshold", () => {
       wrapper = createWrapper({ value: 999 });
       wrapper.vm.handleMenuItemClick("above");
