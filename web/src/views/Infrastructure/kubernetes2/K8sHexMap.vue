@@ -21,7 +21,16 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { chartColor } from "@/utils/chartTheme";
 import { hexLayout, type HexLayout } from "./hexLayout";
-import { WHEEL_FACTOR, axisRanges, fit, isClick, pan, zoomAt, type ViewState } from "./hexViewport";
+import {
+  WHEEL_FACTOR,
+  axisRanges,
+  fit,
+  isClick,
+  pan,
+  pinch,
+  zoomAt,
+  type ViewState,
+} from "./hexViewport";
 import { chipLabel, formatPct } from "./kubernetesModel";
 import type { MapEntity, MapGroup } from "./kubernetesQueries";
 import type { MapFill } from "./kubernetesUrlState";
@@ -324,13 +333,12 @@ function onPointerMove(e: PointerEvent) {
   if (!prev || !view.value) return;
   const next = local(e);
   if (pointers.size >= 2) {
-    const [a, b] = [...pointers.values()];
-    const before = Math.hypot(a.x - b.x, a.y - b.y);
+    const from = [...pointers.values()].slice(0, 2);
     pointers.set(e.pointerId, next);
-    const [c, d] = [...pointers.values()];
-    const after = Math.hypot(c.x - d.x, c.y - d.y);
+    const to = [...pointers.values()].slice(0, 2);
     dragging = true;
-    if (before > 0) zoomBy((c.x + d.x) / 2, (c.y + d.y) / 2, after / before);
+    const fitScale = fitState.value?.scale;
+    if (fitScale) view.value = pinch(view.value, from, to, { ...size.value, fit: fitScale });
     return;
   }
   pointers.set(e.pointerId, next);

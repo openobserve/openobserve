@@ -20,6 +20,7 @@ import {
   fit,
   isClick,
   pan,
+  pinch,
   toLayout,
   zoomAt,
   type ViewSize,
@@ -86,5 +87,42 @@ describe("hexViewport (AC 52)", () => {
     expect(isClick(3, 2)).toBe(true);
     expect(isClick(4, 0)).toBe(false);
     expect(isClick(0, -10)).toBe(false);
+  });
+
+  describe("two-finger pinch", () => {
+    const size: ViewSize = { width: 800, height: 600, fit: 2 };
+    const start = { scale: 4, cx: 50, cy: -40 };
+    const mid = (p: { x: number; y: number }[]) => [(p[0].x + p[1].x) / 2, (p[0].y + p[1].y) / 2];
+
+    it("pans with the midpoint when the fingers move together", () => {
+      const from = [
+        { x: 300, y: 300 },
+        { x: 400, y: 300 },
+      ];
+      const to = [
+        { x: 350, y: 260 },
+        { x: 450, y: 260 },
+      ];
+      expect(pinch(start, from, to, size)).toEqual(pan(start, 50, -40));
+    });
+
+    it("keeps the layout point under the fingers' midpoint while zooming and moving", () => {
+      const from = [
+        { x: 200, y: 400 },
+        { x: 300, y: 450 },
+      ];
+      const to = [
+        { x: 220, y: 380 },
+        { x: 380, y: 460 },
+      ];
+      const next = pinch(start, from, to, size);
+      const [m0x, m0y] = mid(from);
+      const [m1x, m1y] = mid(to);
+      const before = toLayout(start, m0x, m0y, size);
+      const after = toLayout(next, m1x, m1y, size);
+      expect(after[0]).toBeCloseTo(before[0], 6);
+      expect(after[1]).toBeCloseTo(before[1], 6);
+      expect(next.scale).toBeCloseTo(start.scale * (Math.hypot(160, 80) / Math.hypot(100, 50)), 6);
+    });
   });
 });

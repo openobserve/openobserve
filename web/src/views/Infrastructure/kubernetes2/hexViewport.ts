@@ -88,6 +88,22 @@ export function pan(state: ViewState, dx: number, dy: number): ViewState {
   return { scale: state.scale, cx: state.cx - dx / state.scale, cy: state.cy + dy / state.scale };
 }
 
+// The map follows the fingers' midpoint and scales by their separation, as one gesture.
+export function pinch(
+  state: ViewState,
+  from: { x: number; y: number }[],
+  to: { x: number; y: number }[],
+  size: ViewSize,
+): ViewState {
+  const mid = (p: { x: number; y: number }[]) => [(p[0].x + p[1].x) / 2, (p[0].y + p[1].y) / 2];
+  const span = (p: { x: number; y: number }[]) => Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+  const [x0, y0] = mid(from);
+  const [x1, y1] = mid(to);
+  const moved = pan(state, x1 - x0, y1 - y0);
+  const before = span(from);
+  return before > 0 && span(to) !== before ? zoomAt(moved, x1, y1, span(to) / before, size) : moved;
+}
+
 export function isClick(dx: number, dy: number) {
   return Math.hypot(dx, dy) < CLICK_SLOP;
 }

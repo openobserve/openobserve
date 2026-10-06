@@ -95,9 +95,9 @@ const ranges = () => ({
 const canvas = () => wrapper.find('[data-test="k8s2-map-canvas"]');
 
 // jsdom has no PointerEvent, so a MouseEvent carries the pointer fields.
-const pointer = async (type: string, clientX: number, clientY: number) => {
+const pointer = async (type: string, clientX: number, clientY: number, pointerId = 1) => {
   const event = new MouseEvent(type, { clientX, clientY, bubbles: true });
-  Object.defineProperty(event, "pointerId", { value: 1 });
+  Object.defineProperty(event, "pointerId", { value: pointerId });
   canvas().element.dispatchEvent(event);
   await wrapper.vm.$nextTick();
 };
@@ -196,6 +196,22 @@ describe("K8sHexMap (AC 52)", () => {
 
     await wrapper.find('[data-test="k8s2-map-reset"]').trigger("click");
     expect(ranges()).toEqual(fitRanges);
+  });
+
+  it("keeps the map under the fingers on a two-finger drag that also pinches", async () => {
+    await mountMap();
+    await wheel(-100, 500, 300);
+    const layoutAt = (r: ReturnType<typeof ranges>, px: number, py: number) => [
+      r.x[0] + (px / WIDTH) * (r.x[1] - r.x[0]),
+      r.y[1] - (py / HEIGHT) * (r.y[1] - r.y[0]),
+    ];
+    await pointer("pointerdown", 300, 300, 1);
+    await pointer("pointerdown", 400, 300, 2);
+    const before = layoutAt(ranges(), 350, 300);
+    await pointer("pointermove", 420, 330, 2);
+    const after = layoutAt(ranges(), 360, 315);
+    expect(after[0]).toBeCloseTo(before[0], 6);
+    expect(after[1]).toBeCloseTo(before[1], 6);
   });
 
   it("a press that moves under 4px emits the hex click; a drag does not", async () => {
