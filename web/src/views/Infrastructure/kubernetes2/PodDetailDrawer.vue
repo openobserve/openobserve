@@ -78,6 +78,8 @@ const emit = defineEmits<{
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
+// useStreams injects the store, which only works during setup, never inside a click handler.
+const streamsApi = useStreams(gt);
 
 const dash = raw("—");
 const text = (value: string | null | undefined) => (value ? raw(value) : dash);
@@ -242,7 +244,7 @@ const viewLogs = async () => {
       end: props.range.end,
       multiCluster: props.multiCluster,
     },
-    useStreams(gt),
+    streamsApi,
   );
   if (!link) {
     toast({ variant: "warning", message: t("infra.k8s2.logsNoStream") });
