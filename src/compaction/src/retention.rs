@@ -678,6 +678,33 @@ async fn write_file_list(
     Ok(())
 }
 
+/// Stream-dir paths for `[start, end)`: `YYYY/MM/DD` per whole day, else `YYYY/MM/DD/HH` per hour.
+fn generate_local_paths(start: i64, end: i64) -> Vec<String> {
+    let format = |micros: i64, pattern: &str| {
+        Utc.timestamp_nanos(micros * 1000)
+            .format(pattern)
+            .to_string()
+    };
+    let mut paths = Vec::new();
+    // a partly covered first hour stays, but the 1970-01-01 job starts 1 ms into a whole one
+    let into_hour = start.rem_euclid(hour_micros(1));
+    let mut start = if into_hour <= 1000 {
+        start - into_hour
+    } else {
+        start - into_hour + hour_micros(1)
+    };
+    while start + hour_micros(1) <= end {
+        if start.rem_euclid(day_micros(1)) == 0 && start + day_micros(1) <= end {
+            paths.push(format(start, "%Y/%m/%d"));
+            start += day_micros(1);
+        } else {
+            paths.push(format(start, "%Y/%m/%d/%H"));
+            start += hour_micros(1);
+        }
+    }
+    paths
+}
+
 fn generate_local_dirs(
     org_id: &str,
     stream_type: StreamType,
@@ -692,21 +719,12 @@ fn generate_local_dirs(
         stream_type,
         stream_name,
     );
-    // a partly covered day also holds hours outside the range, so only whole days go by directory
-    let start = date_start.timestamp_micros();
-    let into_day = start.rem_euclid(day_micros(1));
-    let first_whole_day = if into_day == 0 {
-        start
-    } else {
-        start - into_day + day_micros(1)
-    };
     let mut dirs_to_delete = Vec::new();
-    for (date, _) in generate_deletion_dates(first_whole_day, date_end.timestamp_micros()) {
-        let date = date.replace('-', "/");
+    for path in generate_local_paths(date_start.timestamp_micros(), date_end.timestamp_micros()) {
         for stream_dir in &stream_dirs {
-            let day_path = stream_dir.join(&date);
-            if day_path.exists() {
-                dirs_to_delete.push(day_path);
+            let dir = stream_dir.join(&path);
+            if dir.exists() {
+                dirs_to_delete.push(dir);
             }
         }
     }
@@ -1269,13 +1287,80 @@ mod tests {
         let whole_days = dirs("2026-09-30T00:00:00Z", "2026-10-02T00:00:00Z");
         std::fs::remove_dir_all(&stream_dir).unwrap();
 
-        assert!(partly.is_empty(), "{partly:?}");
-        assert!(across_midnight.is_empty(), "{across_midnight:?}");
-        assert_eq!(with_a_whole_day, vec![stream_dir.join("2026/10/01")]);
-        assert_eq!(ending_mid_day, vec![stream_dir.join("2026/10/01")]);
+        assert_eq!(partly, vec![stream_dir.join("2026/10/01/03")]);
+        assert_eq!(
+            across_midnight,
+            vec![
+                stream_dir.join("2026/09/30/23"),
+                stream_dir.join("2026/10/01/01")
+            ]
+        );
+        assert_eq!(
+            with_a_whole_day,
+            vec![
+                stream_dir.join("2026/09/30/23"),
+                stream_dir.join("2026/10/01"),
+                stream_dir.join("2026/10/02/01")
+            ]
+        );
+        assert_eq!(
+            ending_mid_day,
+            vec![
+                stream_dir.join("2026/10/01"),
+                stream_dir.join("2026/10/02/01")
+            ]
+        );
         assert_eq!(
             whole_days,
             vec![stream_dir.join("2026/09/30"), stream_dir.join("2026/10/01")]
+        );
+    }
+
+    #[test]
+    fn test_generate_local_paths_takes_whole_days_and_the_hours_of_other_days() {
+        let at = |s: &str| parse_str_to_timestamp_micros(s).unwrap();
+        let hours = |day: &str, hours: std::ops::Range<u32>| {
+            hours.map(|h| format!("{day}/{h:02}")).collect::<Vec<_>>()
+        };
+
+        assert_eq!(
+            generate_local_paths(at("2026-10-06T01:00:00Z"), at("2026-10-06T02:00:00Z")),
+            vec!["2026/10/06/01"]
+        );
+        let mut no_whole_day = hours("2026/10/05", 1..24);
+        no_whole_day.extend(hours("2026/10/06", 0..2));
+        assert_eq!(
+            generate_local_paths(at("2026-10-05T01:00:00Z"), at("2026-10-06T02:00:00Z")),
+            no_whole_day
+        );
+        let mut a_whole_day = vec!["2026/10/05".to_string()];
+        a_whole_day.extend(hours("2026/10/06", 0..2));
+        assert_eq!(
+            generate_local_paths(at("2026-10-05T00:00:00Z"), at("2026-10-06T02:00:00Z")),
+            a_whole_day
+        );
+        assert_eq!(
+            generate_local_paths(at("2026-10-04T00:00:00Z"), at("2026-10-06T00:00:00Z")),
+            vec!["2026/10/04", "2026/10/05"]
+        );
+        // an hour the range only partly covers stays
+        assert_eq!(
+            generate_local_paths(at("2026-10-06T01:00:00Z"), at("2026-10-06T02:30:00Z")),
+            vec!["2026/10/06/01"]
+        );
+        assert_eq!(
+            generate_local_paths(at("2026-10-06T01:30:00Z"), at("2026-10-06T03:00:00Z")),
+            vec!["2026/10/06/02"]
+        );
+        assert_eq!(
+            generate_local_paths(
+                at("1970-01-01T00:00:00Z") + 1000,
+                at("1970-01-03T00:00:00Z")
+            ),
+            vec!["1970/01/01", "1970/01/02"]
+        );
+        assert!(
+            generate_local_paths(at("2026-10-06T02:00:00Z"), at("2026-10-06T02:00:00Z")).is_empty()
         );
     }
 
