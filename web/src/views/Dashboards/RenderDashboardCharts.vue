@@ -1189,12 +1189,16 @@ export default defineComponent({
     );
 
     watch(
-      () => panels.value.map((panel: any) => panel.id).join(","),
+      () =>
+        panels.value
+          .map((panel: any) => panel.id)
+          .sort()
+          .join(","),
       async (ids, previousIds) => {
-        // A panel that joins an already-built grid is otherwise never observed, so it stays a placeholder.
+        // A panel that joins an already-built grid is never made a widget, so it collapses and never mounts.
         if (!previousIds || ids === previousIds) return;
         await nextTick();
-        await setupPanelObservers();
+        await refreshGridStack();
       },
     );
 

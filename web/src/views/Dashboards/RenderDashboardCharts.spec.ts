@@ -72,6 +72,7 @@ const mockGridStackInstance = {
   destroy: vi.fn(),
   removeAll: vi.fn(),
   makeWidget: vi.fn(),
+  batchUpdate: vi.fn(),
   getGridItems: vi.fn().mockReturnValue([]),
   float: vi.fn(),
   setAnimation: vi.fn(),
@@ -334,7 +335,7 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("mounts a panel that joins an already-built tab once it scrolls into view", async () => {
+    it("registers and mounts a panel that joins an already-built tab", async () => {
       const io = installFakeIntersectionObserver({ autoVisible: true });
       try {
         const panel = (id: string) => ({
@@ -352,7 +353,13 @@ describe("RenderDashboardCharts", () => {
         await flushPromises();
         await wrapper.setProps({ dashboardData: dashboard(["panel-a", "panel-b"]) });
         await flushPromises();
-        expect(wrapper.vm.shouldMountPanel("panel-b")).toBe(true);
+        await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("panel-b")).toBe(true));
+        // Unregistered, the item has no grid size and collapses at tablet and desktop widths.
+        const added = wrapper.find('[gs-id="panel-b"]').element;
+        expect(mockGridStackInstance.makeWidget).toHaveBeenCalledWith(
+          added,
+          expect.objectContaining({ id: "panel-b" }),
+        );
       } finally {
         io.restore();
       }
