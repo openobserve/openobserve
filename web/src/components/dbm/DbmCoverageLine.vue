@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The line itself. `min-h-6.5` holds the 26px budget the space plan
          allocates it, so a healthy page spends no more than that. -->
     <div
-      class="px-page-edge flex min-h-6.5 min-w-0 items-center justify-between gap-4 py-1"
+      class="px-page-edge flex min-h-6.5 min-w-0 items-center justify-between gap-4 py-1 max-md:flex-wrap max-md:gap-y-0.5"
       :class="toneSurface"
       data-test="dbm-coverage-line"
     >
