@@ -131,42 +131,21 @@ def _poll_search(session, base_url, sql, predicate, timeout=45, what="condition"
 
 
 @pytest.fixture(scope="module")
-def redacted_stream(create_session, base_url):
-    """A stream with one card-number pattern associated to `body` at Both."""
+def redacted_stream(request, create_session, base_url):
+    """A stream with one card-number pattern associated to `body` at Both.
+
+    Every resource registers its own teardown the moment it exists. Asserting before a
+    single `yield` would skip teardown entirely on a half-built fixture, orphaning an
+    org-level pattern that nothing else sweeps: `cleanupRegexPatterns` matches only the
+    names in the shared test-data files, and no suite calls it for `sdr_auto_*`.
+    """
     suffix = _suffix()
     stream = f"sdr_auto_{suffix}"
     name = f"sdr_auto_card_{suffix}"
 
-    resp = create_session.post(
-        f"{base_url}api/{ORG_ID}/{stream}/_json",
-        json=[{"body": f"charged card {CARD} ok", "service": "billing"}],
-    )
-    assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
+    def _drop_stream():
+        create_session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type=logs")
 
-    assert _create_pattern(create_session, base_url, name, "[0-9]{16}").status_code == 200
-    pattern_id = _pattern_id(create_session, base_url, name)
-    assert pattern_id, "pattern was created but does not appear in the list"
-
-    assert (
-        _associate(create_session, base_url, stream, "body", pattern_id, "[0-9]{16}", name).status_code
-        == 200
-    )
-    # The association has to reach the pattern manager before a search reflects it.
-    # Not required: SDR-01 is the test that judges whether redaction happened.
-    _poll_search(
-        create_session,
-        base_url,
-        f'SELECT body FROM "{stream}"',
-        lambda hits: any("[REDACTED]" in h.get("body", "") for h in hits),
-        required=False,
-    )
-
-    yield {"stream": stream, "name": name, "id": pattern_id}
-
-    # Remove EVERY association a test in this module may have added, not just the one the
-    # fixture created: test_sdr_06 attempts a Detect association on `service` and skips
-    # where the node allows it, which would otherwise leave that association in place,
-    # block the pattern delete, and orphan an org-level pattern silently.
     def _assoc(field, policy):
         return {
             "field": field,
@@ -178,23 +157,67 @@ def redacted_stream(create_session, base_url):
             "apply_at": "Both",
         }
 
-    create_session.put(
-        f"{base_url}api/{ORG_ID}/streams/{stream}/settings?type=logs",
-        json={
-            "pattern_associations": {
-                "add": [],
-                "remove": [_assoc("body", "Redact"), _assoc("service", "Detect")],
-            }
-        },
+    def _drop_associations():
+        # Remove EVERY association a test in this module may have added, not just the one
+        # the fixture created: test_sdr_06 attempts a Detect association on `service` and
+        # skips where the node allows it, which would otherwise leave that association in
+        # place, block the pattern delete, and orphan an org-level pattern silently.
+        create_session.put(
+            f"{base_url}api/{ORG_ID}/streams/{stream}/settings?type=logs",
+            json={
+                "pattern_associations": {
+                    "add": [],
+                    "remove": [_assoc("body", "Redact"), _assoc("service", "Detect")],
+                }
+            },
+        )
+
+    def _drop_pattern():
+        # Resolve the id again rather than closing over it: the pattern exists from the
+        # moment create answers 200, which is before the list lookup that names it.
+        found = _pattern_id(create_session, base_url, name)
+        assert found, f"pattern {name} was created but cannot be found to delete"
+        deleted = create_session.delete(f"{base_url}api/{ORG_ID}/re_patterns/{found}")
+        # Assert rather than hope: a blocked delete means an association survived teardown,
+        # and the next run inherits a pattern it did not create.
+        assert deleted.status_code == 200, (
+            f"pattern {name} was not deleted ({deleted.status_code} {deleted.text}); "
+            "an association probably survived teardown"
+        )
+
+    # Finalizers run LIFO, so registering in creation order tears down in the only order
+    # the server accepts: associations, then the pattern they block, then the stream.
+    resp = create_session.post(
+        f"{base_url}api/{ORG_ID}/{stream}/_json",
+        json=[{"body": f"charged card {CARD} ok", "service": "billing"}],
     )
-    deleted = create_session.delete(f"{base_url}api/{ORG_ID}/re_patterns/{pattern_id}")
-    # Assert rather than hope: a blocked delete means an association survived teardown,
-    # and the next run inherits a pattern it did not create.
-    assert deleted.status_code == 200, (
-        f"pattern {name} was not deleted ({deleted.status_code} {deleted.text}); "
-        "an association probably survived teardown"
+    request.addfinalizer(_drop_stream)
+    assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
+
+    created = _create_pattern(create_session, base_url, name, "[0-9]{16}")
+    if created.status_code == 200:
+        request.addfinalizer(_drop_pattern)
+    assert created.status_code == 200, f"pattern create failed: {created.status_code} {created.text}"
+    pattern_id = _pattern_id(create_session, base_url, name)
+    assert pattern_id, "pattern was created but does not appear in the list"
+
+    associated = _associate(create_session, base_url, stream, "body", pattern_id, "[0-9]{16}", name)
+    request.addfinalizer(_drop_associations)
+    assert associated.status_code == 200, (
+        f"association failed: {associated.status_code} {associated.text}"
     )
-    create_session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type=logs")
+
+    # The association has to reach the pattern manager before a search reflects it.
+    # Not required: SDR-01 is the test that judges whether redaction happened.
+    _poll_search(
+        create_session,
+        base_url,
+        f'SELECT body FROM "{stream}"',
+        lambda hits: any("[REDACTED]" in h.get("body", "") for h in hits),
+        required=False,
+    )
+
+    yield {"stream": stream, "name": name, "id": pattern_id}
 
 
 # ---------------------------------------------------------------------------
