@@ -74,7 +74,7 @@ pub(crate) use label_replace::label_replace;
 pub(crate) use math_operations::*;
 pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
-pub(crate) use scalar::scalar;
+pub(crate) use scalar::{min_max_of, scalar};
 pub(crate) use sort::sort;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
@@ -134,7 +134,9 @@ pub(crate) enum Func {
     Log10,
     Log2,
     MadOverTime,
+    MaxOf,
     MaxOverTime,
+    MinOf,
     MinOverTime,
     Minute,
     Month,

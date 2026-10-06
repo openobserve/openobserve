@@ -220,6 +220,19 @@ impl Engine {
 
                 functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)
             }
+            Func::MaxOf | Func::MinOf => {
+                let err = "Invalid args, expected min_of(a scalar, b scalar)";
+                self.ensure_args_len(args, 2, err)?;
+                let a = self.call_scalar_arg(args, 0, err).await?;
+                let b = self.call_scalar_arg(args, 1, err).await?;
+
+                Ok(functions::min_max_of(
+                    &a,
+                    &b,
+                    func_name == Func::MaxOf,
+                    &self.eval_ctx,
+                ))
+            }
             Func::PredictLinear => {
                 let err = "Invalid args, expected predict_linear(v range-vector, t scalar)";
                 self.ensure_args_len(args, 2, err)?;
@@ -1088,6 +1101,8 @@ mod tests {
             (format!("quantile({{p}}, {series})"), 0.0, 0.5),
             (format!("histogram_quantile({{p}}, {buckets})"), 0.1, 0.4),
             (format!("histogram_fraction(0, {{p}}, {buckets})"), 0.5, 0.5),
+            ("vector(min_of({p}, 5))".to_string(), 3.0, 2.0),
+            ("vector(max_of(5, {p}))".to_string(), 3.0, 2.0),
             (format!("histogram_fraction({{p}}, 2, {buckets})"), 0.5, 0.5),
             (
                 format!(r#"histogram_quantiles({buckets}, "q", {{p}})"#),
@@ -1435,5 +1450,34 @@ mod tests {
             assert!(err.contains(hint), "{err}");
         }
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    /// Cases from upstream `functions.test`.
+    #[tokio::test]
+    async fn test_min_of_and_max_of() {
+        for (query, expected) in [
+            ("min_of(3, 5)", 3.0),
+            ("min_of(5, 3)", 3.0),
+            ("max_of(3, 5)", 5.0),
+            ("max_of(5, 3)", 5.0),
+            ("min_of(4, 4)", 4.0),
+            ("max_of(4, 4)", 4.0),
+            ("min_of(-2, -5)", -5.0),
+            ("max_of(-2, -5)", -2.0),
+            ("min_of(0, 1)", 0.0),
+            ("max_of(0, 1)", 1.0),
+            ("min_of(NaN, 3)", f64::NAN),
+            ("min_of(3, NaN)", f64::NAN),
+            ("max_of(NaN, 3)", f64::NAN),
+            ("max_of(3, NaN)", f64::NAN),
+        ] {
+            let Value::Float(actual) = eval_at(query, instant()).await else {
+                panic!("{query} is not a scalar");
+            };
+            assert_eq!(actual.is_nan(), expected.is_nan(), "{query}");
+            if !expected.is_nan() {
+                assert_eq!(actual, expected, "{query}");
+            }
+        }
     }
 }
