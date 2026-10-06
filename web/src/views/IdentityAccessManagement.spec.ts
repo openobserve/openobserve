@@ -261,6 +261,26 @@ describe("IdentityAccessManagement.vue Component", () => {
       expect(roles?.locked).toBe(true);
       w.unmount();
     });
+
+    it("suppresses the upgrade CTA when the edition already supports RBAC but the toggle is off", async () => {
+      vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
+      vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
+      store.state.zoConfig.rbac_enabled = false;
+
+      const w = mount(IdentityAccessManagement, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: defaultStubs,
+        },
+      });
+      await flushPromises();
+
+      const items = visibleItems(w.vm.sectionGroups);
+      const groups = items.find((i: any) => i.key === "groups");
+      expect(groups?.lockedShowUpgradeCta).toBe(false);
+      w.unmount();
+    });
   });
 
   describe("Tab Configuration Tests - Enterprise vs Open Source", () => {

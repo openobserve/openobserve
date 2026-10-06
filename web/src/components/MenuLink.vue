@@ -327,14 +327,11 @@ export default defineComponent({
       return !!c && (typeof c === "function" || Object.keys(c).length > 0);
     });
 
-    // Resolve the root element/component for the current mode. Locked wins
-    // over everything else: rendering a REAL `RouterLink` and relying on
-    // `onRootClick`'s preventDefault to stop it does NOT work — RouterLink's
-    // own click handler is merged onto the root BEFORE the parent's `@click`
-    // fallthrough listener (confirmed in vue-router's source: the two land in
-    // a listener array, RouterLink's own `navigate` first), so by the time
-    // our handler calls preventDefault, `router.push()` has already run. A
-    // plain, non-navigating `div` is the only way to guarantee no navigation.
+    // Locked wins over everything else. A real `RouterLink` can't be made
+    // inert via `onRootClick`'s preventDefault — RouterLink's own click
+    // handler runs before the parent's `@click` fallthrough listener (vue-
+    // router merges its `navigate` first) — so a plain `div` is the only way
+    // to guarantee no navigation.
     const rootComponent = computed(() =>
       props.locked ? "div" : props.external ? "a" : props.asTrigger ? "button" : RouterLink,
     );
@@ -351,7 +348,9 @@ export default defineComponent({
         "aria-disabled": props.locked || undefined,
       };
       if (props.locked) {
-        return { ...common, role: "link" };
+        // A plain `div` carries no native tabindex — add one so keyboard
+        // users can still reach it (and its tooltip) by Tab.
+        return { ...common, role: "link", tabindex: 0 };
       }
       // Set only when present: an explicit undefined would erase the tooltip's own describedby.
       if (props.paywalled) {

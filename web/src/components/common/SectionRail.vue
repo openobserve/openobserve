@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <LockedFeatureTooltip
               v-if="item.locked && item.lockedMessage"
               :message="item.lockedMessage"
+              :show-upgrade-cta="item.lockedShowUpgradeCta !== false"
             />
           </template>
         </template>

@@ -24,6 +24,7 @@ import {
   checkFeatureAccess,
   buildFeatureGateContext,
   isFeatureKey,
+  withFeatureGate,
 } from "@/utils/enterpriseFeatures";
 
 describe("enterpriseFeatures", () => {
@@ -39,11 +40,12 @@ describe("enterpriseFeatures", () => {
       expect(buildFeatureGateContext().isCloud).toBe(false);
     });
 
-    it("reads rbac from the given zoConfig-shaped object", () => {
+    it("reads rbac from the given zoConfig-shaped object, defaulting open when not yet loaded", () => {
       expect(buildFeatureGateContext({ rbac_enabled: true }).rbac).toBe(true);
       expect(buildFeatureGateContext({ rbac_enabled: false }).rbac).toBe(false);
-      expect(buildFeatureGateContext(undefined).rbac).toBe(false);
-      expect(buildFeatureGateContext(null).rbac).toBe(false);
+      expect(buildFeatureGateContext(undefined).rbac).toBe(true);
+      expect(buildFeatureGateContext(null).rbac).toBe(true);
+      expect(buildFeatureGateContext({}).rbac).toBe(true);
     });
   });
 
@@ -72,8 +74,7 @@ describe("enterpriseFeatures", () => {
     // Cloud never offers this batch at all — a self-hosted admin's own node/
     // cipher-key/license management has no Cloud equivalent to "upgrade"
     // into, so pure Cloud must hide it entirely rather than show a false
-    // upsell (a real bug caught in review: Service Graph — same shape as
-    // this batch — was showing locked on Cloud before `cloudOffers` existed).
+    // upsell. Service Graph is the same shape, covered below via `cloudOffers`.
     it.each(["cipherKeys", "enterprise", "nodes", "license"] as const)(
       "hides %s entirely (not locked) on a pure cloud build",
       (key) => {
@@ -145,6 +146,54 @@ describe("enterpriseFeatures", () => {
       config.isEnterprise = "true";
       const ctx = buildFeatureGateContext({ rbac_enabled: true });
       expect(checkFeatureAccess("rbac", ctx).allowed).toBe(true);
+    });
+
+    // N1 regression: zoConfig is still {} on a cold load/refresh — this must
+    // NOT bounce a real Enterprise/Cloud user with RBAC on to the locked page.
+    it("unlocks rbac in an enterprise build when the backend flag hasn't loaded yet", () => {
+      config.isEnterprise = "true";
+      expect(checkFeatureAccess("rbac", buildFeatureGateContext({})).allowed).toBe(true);
+      expect(checkFeatureAccess("rbac", buildFeatureGateContext(undefined)).allowed).toBe(true);
+    });
+
+    it("marks the upgrade CTA irrelevant when the edition already supports RBAC but the toggle is off", () => {
+      config.isEnterprise = "true";
+      const result = checkFeatureAccess("rbac", buildFeatureGateContext({ rbac_enabled: false }));
+      expect(result.allowed).toBe(false);
+      expect(result.ctaRelevant).toBe(false);
+    });
+
+    it("keeps the upgrade CTA relevant when OSS is the reason rbac is locked", () => {
+      const result = checkFeatureAccess("rbac", buildFeatureGateContext({ rbac_enabled: true }));
+      expect(result.allowed).toBe(false);
+      expect(result.ctaRelevant).toBe(true);
+    });
+  });
+
+  describe("withFeatureGate", () => {
+    it("calls the wrapped guard when the feature is allowed", () => {
+      config.isEnterprise = "true";
+      const guard = vi.fn();
+      const next = vi.fn();
+      withFeatureGate("cipherKeys", guard)({ query: {} }, {}, next);
+      expect(guard).toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it("redirects to the locked page, preserving org_identifier and the original path", () => {
+      const guard = vi.fn();
+      const next = vi.fn();
+      const to = { query: { org_identifier: "o1" }, fullPath: "/settings/cipher_keys?org_identifier=o1" };
+      withFeatureGate("cipherKeys", guard)(to, {}, next);
+      expect(guard).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: {
+          feature: "cipherKeys",
+          org_identifier: "o1",
+          redirect: "/settings/cipher_keys?org_identifier=o1",
+        },
+      });
     });
   });
 

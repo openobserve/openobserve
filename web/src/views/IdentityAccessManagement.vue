@@ -143,6 +143,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           to: { name: "groups", query: orgQuery.value },
           locked: !rbacAccess.allowed,
           lockedMessage: rbacAccess.message,
+          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
           dataTest: "iam-groups-tab",
         },
         {
@@ -153,6 +154,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           to: { name: "roles", query: orgQuery.value },
           locked: !rbacAccess.allowed,
           lockedMessage: rbacAccess.message,
+          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
           dataTest: "iam-roles-tab",
         },
         {
@@ -166,6 +168,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           visible: meta,
           locked: !rbacAccess.allowed,
           lockedMessage: rbacAccess.message,
+          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
           dataTest: "iam-quota-tab",
         },
       ],
