@@ -19,6 +19,7 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -33,6 +34,7 @@ const props = withDefaults(
     total: number;
     countLabel?: I18nText;
     capped?: boolean;
+    chip?: I18nText;
     namespaced?: boolean;
     namespaceOptions?: string[];
     namespaces?: string[];
@@ -43,6 +45,7 @@ const props = withDefaults(
   {
     countLabel: undefined,
     capped: false,
+    chip: undefined,
     namespaced: false,
     namespaceOptions: () => [],
     namespaces: () => [],
@@ -96,6 +99,14 @@ const onNamespaces = (value: unknown) =>
       </span>
       <template v-else>{{ countLabel ?? t("infra.k8s2.items", { count }, count) }}</template>
     </span>
+    <OTag
+      v-if="chip"
+      size="xs"
+      variant="default-soft"
+      class="shrink-0"
+      data-test="k8s2-list-chip"
+      >{{ chip }}</OTag
+    >
     <div class="ms-auto flex min-w-0 items-center gap-2">
       <OSelect
         v-if="namespaced"
