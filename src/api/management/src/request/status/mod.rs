@@ -475,7 +475,8 @@ pub async fn zo_config(
     let logo_dark = enterprise_value!(None, get_logo_dark().await);
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
+    // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
+    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);

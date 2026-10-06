@@ -35,6 +35,7 @@ vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
 });
 
 import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -328,6 +329,52 @@ describe("ConfigPanel", () => {
     it("is absent outside PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: promqlPanel("line") }, { promqlMode: false });
       expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+  });
+
+  describe("Time shift (Comparison against)", () => {
+    const shiftedPanel = (queryType: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "line",
+        queries: [
+          {
+            query: "rate(x[5m])",
+            fields: { breakdown: [] },
+            config: { query_type: queryType, time_shift: [{ offSet: "1d" }] },
+          },
+        ],
+      },
+    });
+
+    const offsetPickers = () =>
+      wrapper
+        .findAllComponents(CustomDateTimePicker)
+        .filter((picker: any) => picker.props("isFirstEntry") === false);
+
+    it("offers the section for a PromQL range query, without the month unit", () => {
+      wrapper = createWrapper({ dashboardPanelData: shiftedPanel("range") }, { promqlMode: true });
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-time-shift-add-btn"]').exists(),
+      ).toBe(true);
+      expect(offsetPickers()).toHaveLength(1);
+      expect(offsetPickers()[0].props("excludeMonths")).toBe(true);
+    });
+
+    it("hides the section for a PromQL instant query", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: shiftedPanel("instant") },
+        { promqlMode: true },
+      );
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-time-shift-add-btn"]').exists(),
+      ).toBe(false);
+    });
+
+    it("keeps the month unit for SQL", () => {
+      wrapper = createWrapper({ dashboardPanelData: shiftedPanel("range") }, { promqlMode: false });
+      expect(offsetPickers()[0].props("excludeMonths")).toBe(false);
     });
   });
 

@@ -207,6 +207,7 @@ mod m20260924_000001_add_recovery_episode_columns;
 mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
+mod m20261004_000001_create_query_history;
 mod m20261005_000001_create_downtimes;
 mod m20261005_000002_add_muted_by_downtime_id_to_alert_incidents;
 mod m20261005_000003_add_last_downtime_id_to_alert_states;
@@ -524,6 +525,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260908_000001_create_synthetics_refs::Migration),
             Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
             Box::new(m20261003_000001_create_rum_pa_tables::Migration),
+            Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261005_000001_create_downtimes::Migration),
             Box::new(m20261005_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
             Box::new(m20261005_000003_add_last_downtime_id_to_alert_states::Migration),
@@ -583,7 +585,8 @@ mod tests {
         (94, "m20260908_000001_create_synthetics_refs"),
         (95, "m20261001_000001_add_anomaly_band_settings"),
         (96, "m20261003_000001_create_rum_pa_tables"),
-        (97, "m20261005_000004_add_kind_to_slo_backfill_jobs"),
+        (97, "m20261004_000001_create_query_history"),
+        (98, "m20261005_000004_add_kind_to_slo_backfill_jobs"),
     ];
 
     #[test]

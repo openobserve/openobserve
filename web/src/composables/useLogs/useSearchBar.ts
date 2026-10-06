@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { savedViewsQuery } from "@/services/saved_views.queries";
+import { viewTypeOf } from "@/services/saved_views";
 import { queryClient } from "@/composables/query/queryClient";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
@@ -101,7 +102,7 @@ export const useSearchBar = (t: TranslateFn) => {
       )
         .then((views: any[]) => {
           searchObj.loadingSavedView = false;
-          searchObj.data.savedViews = views;
+          searchObj.data.savedViews = views.filter((v) => viewTypeOf(v) === "logs");
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;

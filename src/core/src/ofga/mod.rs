@@ -74,6 +74,7 @@ struct PendingMigrations {
     synthetic_environments: bool,
     prompts: bool,
     prompt_folders: bool,
+    query_history: bool,
     downtimes: bool,
 }
 
@@ -530,6 +531,10 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.prompt_folders {
         keys.push("prompt_folders");
     }
+    // Members reach their own query history via owningOrg, which needs this tuple.
+    if pending.query_history {
+        keys.push("query_history");
+    }
     if pending.downtimes {
         keys.extend(["downtime_folders", "downtimes"]);
     }
@@ -573,6 +578,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
+    let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -687,10 +693,51 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] prompt folders permissions migration needed");
         pending.prompt_folders = true;
     }
+    // 0.0.52 (`rum_analytics`) relies on explicit grants only, so it needs no back-fill.
     if existing_model_version < v0_0_53 {
+        log::info!("[OFGA:Local] query history permissions migration needed");
+        pending.query_history = true;
+    }
+    // Gated on the latest model so a 0.0.53 model never back-fills types it lacks.
+    if meta_version >= v0_0_54 && existing_model_version < v0_0_54 {
         log::info!("[OFGA:Local] downtimes permissions migration needed");
         pending.downtimes = true;
     }
 
     pending
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_history_back_fill_below_0_0_53() {
+        let pending = pending_migrations("0.0.53", "0.0.52");
+        assert!(pending.query_history);
+        assert!(!pending.prompt_folders);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["query_history"]);
+
+        let pending = pending_migrations("0.0.53", "0.0.53");
+        assert!(!pending.query_history);
+        assert!(all_org_ownership_keys(&pending).is_empty());
+    }
+
+    #[test]
+    fn test_downtimes_back_fill_below_0_0_54() {
+        let pending = pending_migrations("0.0.54", "0.0.53");
+        assert!(pending.downtimes);
+        assert!(!pending.query_history);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["downtime_folders", "downtimes"]
+        );
+
+        let pending = pending_migrations("0.0.54", "0.0.52");
+        assert!(pending.downtimes && pending.query_history);
+
+        let pending = pending_migrations("0.0.54", "0.0.54");
+        assert!(!pending.downtimes);
+        assert!(all_org_ownership_keys(&pending).is_empty());
+    }
 }

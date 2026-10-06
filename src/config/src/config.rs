@@ -93,8 +93,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 94: create synthetics_refs.
 // 95: add band settings to anomaly_detection_config.
 // 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
-// 97: create downtimes; add muted_by_downtime_id, last_downtime_id, and kind to slo_backfill_jobs.
-pub const DB_SCHEMA_VERSION: u64 = 97;
+// 97: create query_history.
+// 98: create downtimes; add muted_by_downtime_id, last_downtime_id, and kind to slo_backfill_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 98;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2295,6 +2296,12 @@ pub struct Common {
     )]
     pub sdr_detect_policy_enabled: bool,
     #[env_config(
+        name = "ZO_SDR_FAIL_CLOSED",
+        default = false,
+        help = "Refuse rather than keep unredacted data when sensitive-data redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build, and a search on a stream with search-time patterns errors when its redaction step cannot run. Off by default: data is stored and returned unredacted and the evidence row records a fail-open."
+    )]
+    pub sdr_fail_closed: bool,
+    #[env_config(
         name = "ZO_SDR_EVIDENCE_HEARTBEAT_INTERVAL",
         default = 300,
         help = "Seconds between redaction-evidence heartbeat rows per (org, stream). A heartbeat records that scanning was active even when nothing matched."
@@ -2651,6 +2658,18 @@ pub struct Limit {
         help = "How long the alert availability ledger (alert_eval_intervals) is kept, in days. This is the history every alert-based SLO measures against, so it must cover the longest SLO window (90 days) plus backfill headroom; lowering it below that silently freezes those SLOs for want of coverage. 0 or less disables the reaper."
     )]
     pub alert_eval_ledger_retention_days: i64,
+    #[env_config(
+        name = "ZO_QUERY_HISTORY_ENABLED",
+        default = true,
+        help = "Records the queries users run in their query history. When false nothing is stored and the history lists empty; existing entries are kept until deleted or reaped."
+    )]
+    pub query_history_enabled: bool,
+    #[env_config(
+        name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
+        default = 14,
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
+    )]
+    pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

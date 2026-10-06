@@ -251,7 +251,7 @@ describe("PlayerEventsSidebar", () => {
       const CountingTracesTab = {
         name: "PlayerTracesTab",
         template: '<div data-test="counting-traces-tab" />',
-        props: ["sessionId", "currentTime", "startTime", "endTime"],
+        props: ["sessionId", "currentTime", "startTime", "endTime", "rumWindowUs"],
         mounted() {
           mountCount++;
         },
@@ -278,6 +278,27 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(true);
 
       expect(mountCount).toBe(1);
+    });
+
+    it("passes rumWindowUs through to the Traces tab", async () => {
+      const TracesTab = {
+        name: "PlayerTracesTab",
+        template: '<div data-test="traces-tab-with-window" />',
+        props: ["sessionId", "currentTime", "startTime", "endTime", "rumWindowUs"],
+      };
+      const rumWindowUs = { start: 1_000, end: 2_000 };
+      wrapper.unmount();
+      wrapper = mount(PlayerEventsSidebar, {
+        attachTo: "#app",
+        props: { events: mockEvents, sessionDetails: mockSessionDetails, rumWindowUs },
+        global: { plugins: [i18n], stubs: { ...stubs, PlayerTracesTab: TracesTab } },
+      });
+      await wrapper.vm.$nextTick();
+
+      await wrapper.findComponent({ name: "AppTabs" }).vm.$emit("update:active-tab", "traces");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.findComponent(TracesTab).props("rumWindowUs")).toEqual(rumWindowUs);
     });
   });
 
