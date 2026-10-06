@@ -270,6 +270,10 @@ export const normalizePrefill = (input: AlertPrefill): AlertPrefill => {
   if (sql && UNRESOLVED_QUERY_MARKERS.some((marker) => sql.includes(marker))) {
     warnings.push(warn("unresolvedQuery", "blocking"));
   }
+  // The alert evaluator substitutes no dashboard variables, so `$__rate_interval` would never parse.
+  if (promql && /\$__\w/.test(promql)) {
+    warnings.push(warn("unresolvedQuery", "blocking"));
+  }
 
   // Invariant 2 — exactly one stream, or a set of candidates for the dialog.
   const candidates = input.streamCandidates?.length ? input.streamCandidates : undefined;

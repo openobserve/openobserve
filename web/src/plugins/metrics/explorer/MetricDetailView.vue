@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               source="panel"
               :build="buildOverviewAlertPrefill"
               :disabled-reason="
-                overview.queries.length ? null : t('metrics.explorer.detail.noPreview')
+                overview.queries.length ? null : t('metrics.explorer.detail.noAlertQuery')
               "
               data-test="metrics-detail-create-alert"
             />
@@ -643,9 +643,8 @@ export default defineComponent({
             ? queries.map((query, index) => ({ index, query: query.query }))
             : undefined,
         timeRange: {
-          value_type: "absolute",
-          startTime: props.timeRange.start_time,
-          endTime: props.timeRange.end_time,
+          start_time: new Date(props.timeRange.start_time / 1000),
+          end_time: new Date(props.timeRange.end_time / 1000),
         },
       });
     };

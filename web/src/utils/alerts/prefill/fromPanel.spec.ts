@@ -390,6 +390,35 @@ describe("buildPrefillFromPanel — the Date pair a rendered panel holds", () =>
   });
 });
 
+describe("buildPrefillFromPanel — relative or absolute", () => {
+  const HOUR_MS = 3_600_000;
+  const NOW_MS = 1_800_000_000_000;
+  const dates = (endMs: number, unit: number) => ({
+    start_time: new Date((endMs - HOUR_MS) * unit),
+    end_time: new Date(endMs * unit),
+  });
+
+  it("treats a window ending now as a rolling one, without the absolute-range warning", () => {
+    for (const unit of [1, 1000]) {
+      const p = buildPrefillFromPanel(
+        promqlPanel({ timeRange: dates(NOW_MS - 30_000, unit), now: NOW_MS }),
+        makeId,
+      );
+      expect(p.periodMinutes).toBe(60);
+      expect(p.warnings.map((w) => w.key)).not.toContain("absoluteToRolling");
+    }
+  });
+
+  it("warns for a window that ended in the past", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({ timeRange: dates(NOW_MS - 24 * HOUR_MS, 1000), now: NOW_MS }),
+      makeId,
+    );
+    expect(p.periodMinutes).toBe(60);
+    expect(p.warnings.map((w) => w.key)).toContain("absoluteToRolling");
+  });
+});
+
 describe("executedPanelQuery", () => {
   const metadata = [
     { query: "avg(disk_used)", panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },

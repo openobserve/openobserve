@@ -269,6 +269,19 @@ describe("usePanelActions", () => {
       expect(alertCreationDialog.value?.prefill.promqlCondition?.value).toBe(7);
     });
 
+    it("refuses the raw template text when the panel has not run, rather than storing $__", () => {
+      const args = makePromql();
+      args.metadata.value = { queries: [] };
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 1 });
+
+      expect(args.router.push).not.toHaveBeenCalled();
+      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).toContain(
+        "unresolvedQuery",
+      );
+    });
+
     it("offers only the visible queries, and skips the dialog when one is left", () => {
       const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
       const api = usePanelAlertCreation(args as any);

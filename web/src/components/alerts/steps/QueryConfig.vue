@@ -1074,13 +1074,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test-prefix="alert-inline-sql"
                         :languages="localTab === 'promql' ? ['promql'] : ['sql']"
                         :default-language="localTab === 'promql' ? 'promql' : 'sql'"
-                        :query="
-                          localTab === 'sql'
-                            ? localSqlQuery
-                            : isForecastMode
-                              ? forecastExpression
-                              : localPromqlQuery
-                        "
+                        :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
                         :keywords="effectiveKeywords"
@@ -1093,7 +1087,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="
-                        (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
+                        (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
                         queryEditorPlaceholderFlag
                       "
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
@@ -1752,7 +1746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="viewSqlEditor"
       :tab="localTab === 'promql' ? 'promql' : 'sql'"
       :sqlQuery="localSqlQuery"
-      :promqlQuery="localPromqlQuery"
+      :promqlQuery="editorPromqlQuery"
       :vrlFunction="vrlFunctionContent"
       :streamName="streamName"
       :streamType="streamType"
@@ -1762,7 +1756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :savedFunctions="functionsList"
       :sqlQueryErrorMsg="sqlQueryErrorMsg"
       @update:sqlQuery="updateSqlQuery"
-      @update:promqlQuery="updatePromqlQuery"
+      @update:promqlQuery="onEditorPromqlUpdate"
       @update:vrlFunction="handleVrlFunctionUpdate"
       @validate-sql="handleValidateSql"
     />
@@ -1828,6 +1822,7 @@ import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.v
 import {
   FORECAST_FREQUENCY_MINUTES,
   FORECAST_PERIOD_MINUTES,
+  isForecastRowTemplate,
   parseForecastAlertPromql,
 } from "@/utils/alerts/forecastAlert";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -2122,10 +2117,8 @@ export default defineComponent({
       _sqlOnQueryChange();
       if (localTab.value === "sql") {
         updateSqlQuery(newQuery);
-      } else if (isForecastMode.value) {
-        setFV("_ui.forecast.U", newQuery);
       } else {
-        updatePromqlQuery(newQuery);
+        onEditorPromqlUpdate(newQuery);
       }
       autoCompleteData.value.query = newQuery;
       autoCompleteData.value.cursorIndex = inlineQueryEditorRef.value?.getCursorIndex?.() ?? 0;
@@ -2139,7 +2132,7 @@ export default defineComponent({
     // Inline editor status bar state
     const inlineStatusState = computed(() => {
       if (props.sqlQueryErrorMsg?.trim()) return "sql-status-bar--error";
-      const query = localTab.value === "sql" ? localSqlQuery.value : localPromqlQuery.value;
+      const query = localTab.value === "sql" ? localSqlQuery.value : editorPromqlQuery.value;
       if (!query?.trim()) return "sql-status-bar--hint";
       return "sql-status-bar--idle";
     });
@@ -2223,16 +2216,16 @@ export default defineComponent({
 
     // Chips insert only into an EMPTY editor — silently replacing a
     // half-written query is the one way this feature makes someone angry.
-    const canInsertPromqlSample = computed(() => !localPromqlQuery.value);
+    const canInsertPromqlSample = computed(() => !editorPromqlQuery.value);
     const insertPromqlSample = (sample: { query: string }) => {
       if (!canInsertPromqlSample.value) return;
-      updatePromqlQuery(sample.query);
+      onEditorPromqlUpdate(sample.query);
       queryEditorPlaceholderFlag.value = false;
     };
 
     const onBlurInlineSqlEditor = async () => {
       queryEditorPlaceholderFlag.value =
-        localTab.value === "sql" ? localSqlQuery.value === "" : localPromqlQuery.value === "";
+        localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
         await _sqlOnBlur();
         emit("validate-sql");
@@ -2604,16 +2597,48 @@ export default defineComponent({
     const isForecastMode = computed(() => !!forecastStore.value);
     const forecastExpression = computed(() => String(forecastStore.value?.U ?? ""));
 
+    // Editor affordances work on U in Forecast mode, never on the generated query.
+    const editorPromqlQuery = computed(() =>
+      isForecastMode.value ? forecastExpression.value : localPromqlQuery.value,
+    );
+    const onEditorPromqlUpdate = (query: string) => {
+      if (isForecastMode.value) setFV("_ui.forecast.U", query);
+      else updatePromqlQuery(query);
+    };
+
+    // Threshold settings Forecast mode overwrites, restored when the user switches back.
+    const THRESHOLD_FIELDS = [
+      "query_condition.promql_condition",
+      "query_condition.promql_multi_alert",
+      "query_condition.promql_warning_value",
+      "trigger_condition.threshold",
+      "trigger_condition.operator",
+      "row_template",
+    ];
+    let thresholdSnapshot: Record<string, unknown> | null = null;
+
+    const leaveForecastMode = () => {
+      updatePromqlQuery(forecastExpression.value);
+      setFV("_ui.forecast", null);
+      if (thresholdSnapshot) {
+        Object.entries(thresholdSnapshot).forEach(([path, value]) => setFV(path, value));
+      } else {
+        setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
+        if (isForecastRowTemplate(String(fv("row_template") ?? ""))) setFV("row_template", "");
+      }
+      thresholdSnapshot = null;
+    };
+
     const onPromqlModeChange = (mode: unknown) => {
       if (!mode || mode === (isForecastMode.value ? "forecast" : "threshold")) return;
       if (mode === "threshold") {
-        // An incomplete forecast generated no query; the expression is the user's work.
-        if (!String(fv("query_condition.promql") ?? "").trim()) {
-          updatePromqlQuery(forecastExpression.value);
-        }
-        setFV("_ui.forecast", null);
+        leaveForecastMode();
         return;
       }
+      thresholdSnapshot = Object.fromEntries(
+        THRESHOLD_FIELDS.map((path) => [path, JSON.parse(JSON.stringify(fv(path) ?? null))]),
+      );
+      setFV("query_condition.promql_warning_value", "");
       // A query this mode generated earlier reopens with its own fields, not as a nested U.
       const promql = String(fv("query_condition.promql") ?? "");
       setFV(
@@ -3798,6 +3823,8 @@ export default defineComponent({
       localPromqlQuery,
       isForecastMode,
       forecastExpression,
+      editorPromqlQuery,
+      onEditorPromqlUpdate,
       onPromqlModeChange,
       vrlFunctionContent,
       selectedSavedFunctionName,

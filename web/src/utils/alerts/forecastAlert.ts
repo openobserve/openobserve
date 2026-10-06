@@ -109,3 +109,7 @@ export const forecastModeFields = (forecast: ForecastAlert): Record<string, unkn
 
 /** The notification row; T is written in because no template variable carries it. */
 export const forecastRowTemplate = (T: number): string => `reaches ${T} in {value} days`;
+
+/** True for a row template `forecastRowTemplate` wrote, which the form may rewrite or clear. */
+export const isForecastRowTemplate = (row: string): boolean =>
+  /^reaches \S+ in \{value\} days$/.test(row);

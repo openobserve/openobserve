@@ -945,7 +945,7 @@ mod tests {
         }
     }
 
-    /// The alert form's forecast query (web/src/utils/alerts/forecastAlert.ts) with `W` = 2d.
+    /// Must match `buildForecastAlertPromql` in web/src/utils/alerts/forecastAlert.ts, at `W` = 2d.
     fn forecast_days(u: &str, threshold: f64, rises: bool) -> String {
         let (crossed, towards) = if rises { (">=", ">") } else { ("<=", "<") };
         format!(

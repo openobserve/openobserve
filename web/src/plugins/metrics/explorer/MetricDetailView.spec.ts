@@ -266,6 +266,17 @@ describe("MetricDetailView", () => {
       expect(chart.props("queries")[0].stream).toBe(SELECTED.name);
     });
 
+    it("says why Create alert is disabled when the metric has no query", async () => {
+      wrapper = mountView(
+        { overview: { queries: [], chartType: "line", unit: "", bucketUnit: null } },
+        { stubs: dropdownStubs },
+      );
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "CreateAlertAction" }).props("disabledReason")).toBe(
+        "This metric has no query to alert on",
+      );
+    });
+
     it("opens the alert form on the overview query from the header's overflow menu", async () => {
       wrapper = mountView(
         { timeRange: { start_time: 10 * HOUR_US, end_time: 11 * HOUR_US } },

@@ -948,6 +948,14 @@ describe("QueryConfig.vue", () => {
         promqlCondition: { operator: ">=", value: 1 },
       });
       await flushPromises();
+      hostForm().setFieldValue("query_condition.promql_condition", {
+        column: "value",
+        operator: ">=",
+        value: 10,
+      });
+      hostForm().setFieldValue("query_condition.promql_warning_value", 5);
+      hostForm().setFieldValue("row_template", "{device} is at {value}");
+      await flushPromises();
       wrapper.vm.onPromqlModeChange("forecast");
       hostForm().setFieldValue("_ui.forecast.T", "0.9");
       await flushPromises();
@@ -968,7 +976,17 @@ describe("QueryConfig.vue", () => {
       expect(v.trigger_condition.operator).toBe(">=");
       expect(v.trigger_condition.period).toBe(5);
       expect(v.trigger_condition.frequency).toBe(30);
-      expect(v.row_template).toBe("reaches 0.9 in {value} days");
+      expect(v.row_template).toBe("{device} is at {value}");
+    });
+
+    it("writes the row template when it is empty or one it wrote, never over the user's", async () => {
+      hostForm().setFieldValue("row_template", "");
+      hostForm().setFieldValue("_ui.forecast.T", "0.8");
+      await flushPromises();
+      expect(values().row_template).toBe("reaches 0.8 in {value} days");
+      hostForm().setFieldValue("_ui.forecast.T", "0.95");
+      await flushPromises();
+      expect(values().row_template).toBe("reaches 0.95 in {value} days");
     });
 
     it("shows the forecast fields in place of the value condition", () => {
@@ -998,8 +1016,15 @@ describe("QueryConfig.vue", () => {
     });
 
     it("reopens its own generated query with the same fields, not as a nested expression", async () => {
+      const generated = values().query_condition.promql;
       wrapper.vm.onPromqlModeChange("threshold");
       await flushPromises();
+      hostForm().setFieldValue("query_condition.promql", generated);
+      hostForm().setFieldValue("query_condition.promql_condition", {
+        column: "value",
+        operator: "<=",
+        value: 7,
+      });
       wrapper.vm.onPromqlModeChange("forecast");
       await flushPromises();
       expect(values()._ui.forecast).toEqual({
@@ -1011,21 +1036,49 @@ describe("QueryConfig.vue", () => {
       });
     });
 
-    it("keeps the expression when leaving a forecast that generated no query", async () => {
+    it("clears a warning value it hides, so save is not blocked by an invisible field", async () => {
+      expect(values().query_condition.promql_warning_value).toBe("");
+      hostForm().setFieldValue("query_condition.promql_warning_value", 5);
+      await flushPromises();
+      expect(await submit()).toBe(true);
+    });
+
+    it("points every editor affordance at the expression, not the generated query", async () => {
       hostForm().setFieldValue("_ui.forecast.T", "");
       await flushPromises();
       expect(values().query_condition.promql).toBe("");
-      wrapper.vm.onPromqlModeChange("threshold");
+      const dialog = wrapper.findComponent({ name: "QueryEditorDialog" });
+      expect(dialog.props("promqlQuery")).toBe("avg(disk_used)");
+      expect(wrapper.vm.canInsertPromqlSample).toBe(false);
+
+      await dialog.vm.$emit("update:promqlQuery", "max(disk_used)");
       await flushPromises();
-      expect(wrapper.emitted("update:promqlQuery")!.at(-1)).toEqual(["avg(disk_used)"]);
+      expect(values()._ui.forecast.U).toBe("max(disk_used)");
+
+      wrapper.vm.onEditorPromqlUpdate("");
+      await flushPromises();
+      expect(wrapper.vm.canInsertPromqlSample).toBe(true);
+      wrapper.vm.insertPromqlSample({ query: "sum(disk_used)" });
+      await flushPromises();
+      expect(values()._ui.forecast.U).toBe("sum(disk_used)");
+      expect(values().query_condition.promql).toBe("");
     });
 
-    it("returns to Threshold mode with the generated text unchanged", async () => {
-      const generated = values().query_condition.promql;
+    it("returns to Threshold mode with the expression and the previous threshold settings", async () => {
+      hostForm().setFieldValue("_ui.forecast.U", "max(disk_used)");
+      await flushPromises();
       wrapper.vm.onPromqlModeChange("threshold");
       await flushPromises();
-      expect(values()._ui.forecast).toBeNull();
-      expect(values().query_condition.promql).toBe(generated);
+      const v = values();
+      expect(v._ui.forecast).toBeNull();
+      expect(wrapper.emitted("update:promqlQuery")!.at(-1)).toEqual(["max(disk_used)"]);
+      expect(v.query_condition.promql_condition).toEqual({
+        column: "value",
+        operator: ">=",
+        value: 10,
+      });
+      expect(v.query_condition.promql_warning_value).toBe(5);
+      expect(v.row_template).toBe("{device} is at {value}");
       expect(host.find('[data-test="alert-forecast-fields"]').exists()).toBe(false);
     });
   });

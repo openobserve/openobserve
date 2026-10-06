@@ -83,11 +83,9 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   forecastModeFields,
   forecastRowTemplate,
+  isForecastRowTemplate,
   type ForecastAlert,
 } from "@/utils/alerts/forecastAlert";
-
-/** A row template this form wrote, which it may rewrite when the threshold changes. */
-const GENERATED_ROW_TEMPLATE = /^reaches \S+ in \{value\} days$/;
 
 const { t } = useI18nTyped();
 const form: any = inject(FORM_CONTEXT_KEY, null);
@@ -118,7 +116,7 @@ watch(
     const fields = forecastModeFields({ ...value, T, H: toNumber(value.H) });
     Object.entries(fields).forEach(([path, next]) => form.setFieldValue(path, next));
     const row = String(form.getFieldValue("row_template") ?? "");
-    if (Number.isFinite(T) && (!row.trim() || GENERATED_ROW_TEMPLATE.test(row))) {
+    if (Number.isFinite(T) && (!row.trim() || isForecastRowTemplate(row))) {
       form.setFieldValue("row_template", forecastRowTemplate(T));
     }
   },

@@ -439,8 +439,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
           });
         }
       }
-      // PromQL family: promql_warning_value vs promql_condition.
-      if (isPromql) {
+      // PromQL family: promql_warning_value vs promql_condition. Forecast mode has no warning.
+      if (isPromql && !(val._ui as Record<string, any> | undefined)?.forecast) {
         const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
         const msg = matrixIssue(qc.promql_warning_value, pc.value, pc.operator);
         if (msg) {

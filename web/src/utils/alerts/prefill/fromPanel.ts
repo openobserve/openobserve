@@ -56,6 +56,8 @@ export interface PanelPrefillInput {
     start_time?: Date | null;
     end_time?: Date | null;
   };
+  /** Wall-clock time in ms; a Date-pair window ending this close to it was a relative range. */
+  now?: number;
   /** Threshold picked off the chart (context-menu flow). */
   threshold?: number;
   condition?: "above" | "below";
@@ -67,6 +69,9 @@ export interface PanelPrefillInput {
 /** Microseconds since the epoch exceed this; milliseconds do not until the year 5138. */
 const MIN_EPOCH_MICROS = 1e14;
 
+/** A rendered window ending within this of now was a relative ("last N") range. */
+const ROLLING_END_TOLERANCE_MICROS = 5 * 60_000_000;
+
 // Dashboards build these Dates from µs epochs, the Explorer from ms.
 const dateToMicros = (date: Date): number => {
   const value = date.getTime();
@@ -74,15 +79,17 @@ const dateToMicros = (date: Date): number => {
 };
 
 /** The dashboard time range uses its own vocabulary; map it onto the shared one. */
-const toPrefillRange = (timeRange: PanelPrefillInput["timeRange"]) => {
+const toPrefillRange = (timeRange: PanelPrefillInput["timeRange"], nowMs: number) => {
   if (!timeRange) return null;
 
   if (timeRange.start_time instanceof Date && timeRange.end_time instanceof Date) {
-    return {
-      type: "absolute" as const,
-      startTime: dateToMicros(timeRange.start_time),
-      endTime: dateToMicros(timeRange.end_time),
-    };
+    const startTime = dateToMicros(timeRange.start_time);
+    const endTime = dateToMicros(timeRange.end_time);
+    if (Math.abs(nowMs * 1000 - endTime) <= ROLLING_END_TOLERANCE_MICROS && endTime > startTime) {
+      const minutes = Math.max(1, Math.round((endTime - startTime) / 60_000_000));
+      return { type: "relative" as const, relativeTimePeriod: `${minutes}m` };
+    }
+    return { type: "absolute" as const, startTime, endTime };
   }
 
   if (timeRange.value_type === "relative") {
@@ -214,7 +221,7 @@ export const buildPrefillFromPanel = (
   const sourceQuery = input.executedQuery || query?.query || "";
 
   const { minutes, warnings: rangeWarnings } = periodMinutesFromRange(
-    toPrefillRange(input.timeRange),
+    toPrefillRange(input.timeRange, input.now ?? Date.now()),
   );
   warnings.push(...rangeWarnings);
 

@@ -9355,6 +9355,7 @@
         "backTo": "metrics",
         "openInVisualize": "Open in Visualize",
         "moreActions": "More actions",
+        "noAlertQuery": "This metric has no query to alert on",
         "noPreview": "No preview — open it in Visualize",
         "exemplars": "Exemplars",
         "filtersNotApplied": "Filter {filters} does not apply to this metric; showing all its series | Filters {filters} do not apply to this metric; showing all its series",

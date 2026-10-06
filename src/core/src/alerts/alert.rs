@@ -7207,12 +7207,20 @@ mod tests {
         else {
             panic!("expected a webhook body");
         };
-        for (device, days) in [("a", "5"), ("b", "7"), ("c", "0")] {
-            assert!(
-                body.contains(&format!("\"{device}\"")) && body.contains(days),
-                "{body}"
-            );
-        }
+        // The default template ignores the row template: each fired series is its labels and days.
+        let body: Value = serde_json::from_str(&body).unwrap();
+        let rows: Vec<(&str, f64)> = body["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                (
+                    row["device"].as_str().unwrap(),
+                    row["value"].as_f64().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(rows, [("a", 5.0), ("b", 7.0), ("c", 0.0)]);
     }
 
     // ── The SLO alert-level collapse (§6b.3, D34) ───────────────────────────
