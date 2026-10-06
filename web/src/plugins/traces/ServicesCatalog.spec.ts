@@ -65,8 +65,6 @@ const mockSearchObj = reactive({
   loading: false,
   loadingStream: false,
   meta: {
-    refreshInterval: 0,
-    refreshIntervalLabel: "Off",
     showFields: true,
     showQuery: true,
     showHistogram: true,

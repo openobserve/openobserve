@@ -388,7 +388,6 @@ const correlationFilters = useCorrelationFilters({
 });
 correlationFilters.watchQuery();
 
-let refreshIntervalID = 0;
 const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
@@ -1353,7 +1352,6 @@ onBeforeMount(async () => {
 
 onDeactivated(() => {
   cleanupContextProvider();
-  clearInterval(refreshIntervalID);
 });
 
 onUnmounted(() => {
@@ -1895,17 +1893,15 @@ const searchData = () => {
 };
 
 const getMoreData = () => {
-  if (searchObj.meta.refreshInterval == 0) {
-    getQueryData(true);
+  getQueryData(true);
 
-    analytics.track("Button Click", {
-      button: "Get More Data",
-      user_org: store.state.selectedOrganization.identifier,
-      user_id: store.state.userInfo.email,
-      stream_name: searchObj.data.stream.selectedStream.value,
-      page: "Search Logs",
-    });
-  }
+  analytics.track("Button Click", {
+    button: "Get More Data",
+    user_org: store.state.selectedOrganization.identifier,
+    user_id: store.state.userInfo.email,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    page: "Search Logs",
+  });
 };
 
 const onChangeStream = async () => {

@@ -163,7 +163,6 @@ const mockSearchObj = {
       sortBy: "start_time" as string,
       sortOrder: "desc" as "asc" | "desc",
     },
-    refreshInterval: 0,
     liveMode: false,
     serviceColors: {},
     metricsRangeFilters: new Map(),
@@ -1362,7 +1361,6 @@ describe("Index.vue (Main Traces Page)", () => {
         label: "default",
         value: "default",
       };
-      mockSearchObj.meta.refreshInterval = 0;
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -2024,9 +2022,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(result).toBeUndefined();
     });
 
-    it("should handle refresh interval of 0 correctly", async () => {
-      mockSearchObj.meta.refreshInterval = 5;
-
+    it("getMoreData fetches the next page", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -2042,14 +2038,15 @@ describe("Index.vue (Main Traces Page)", () => {
           },
         },
       });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockFetchQueryDataWithHttpStream.mockClear();
 
+      await wrapper.vm.getMoreData();
       await flushPromises();
 
-      // Should not call getQueryData when refresh interval is not 0
-      await wrapper.vm.getMoreData();
-
-      // No error should be thrown
-      expect(wrapper.vm).toBeTruthy();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
     });
   });
 

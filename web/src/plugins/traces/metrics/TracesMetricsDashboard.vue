@@ -64,15 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import {
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  computed,
-  defineAsyncComponent,
-  nextTick,
-  watch,
-} from "vue";
+import { ref, onMounted, computed, defineAsyncComponent, nextTick, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -155,7 +147,6 @@ const effectiveTimeRange = computed<TimeRange>(() => ({
   endTime: searchObj.data.datetime.endTime,
 }));
 
-const autoRefreshIntervalId = ref<number | null>(null);
 const error = ref<string | null>(null);
 const dashboardChartsRef = ref<any>(null);
 const currentTimeObj = ref({
@@ -567,19 +558,8 @@ const clearOriginalTimeRange = () => {
   originalTimeRangeBeforeSelection.value = null;
 };
 
-const stopAutoRefresh = () => {
-  if (autoRefreshIntervalId.value !== null) {
-    clearInterval(autoRefreshIntervalId.value);
-    autoRefreshIntervalId.value = null;
-  }
-};
-
 onMounted(() => {
   loadDashboard();
-});
-
-onBeforeUnmount(() => {
-  stopAutoRefresh();
 });
 
 defineExpose({
