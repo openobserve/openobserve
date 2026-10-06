@@ -175,11 +175,11 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
 
   test('an invalid query shows the shared error state with the raw planner text collapsed', {
     tag: ['@bug-ent2806', '@P1', '@regression', '@tracesRegression'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.tracesPage.enterTraceQuery('operation_name');
     await pm.tracesPage.runTraceSearch();
     await pm.tracesPage.expectGenericQueryError();
-    await expect(page.getByText('Error during planning'), 'ENT#2806: planner text must stay behind Show details').toHaveCount(0);
+    await expect(pm.tracesPage.queryErrorPlannerText(), 'ENT#2806: planner text must stay behind Show details').toHaveCount(0);
 
     await pm.tracesPage.toggleQueryErrorDetail();
     await expect(pm.tracesPage.queryErrorDetailBody()).toContainText('Error during planning');
@@ -202,16 +202,16 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
 
   test('switching to Traces with invalid editor text shows the shared error state, and a valid run recovers', {
     tag: ['@bug-ent2806', '@P2', '@regression', '@tracesRegression'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.tracesPage.searchUntilResultCount('Spans Found');
     await pm.tracesPage.enterTraceQuery('operation_name');
     await pm.tracesPage.switchToTracesMode();
     await pm.tracesPage.expectGenericQueryError();
-    await expect(page.getByText('Error during planning')).toHaveCount(0);
+    await expect(pm.tracesPage.queryErrorPlannerText()).toHaveCount(0);
 
     await pm.tracesPage.replaceTraceQuery(ERROR_FILTER);
     await pm.tracesPage.searchUntilResultCount('Traces Found');
-    await expect(page.locator(pm.tracesPage.errorMessage), 'a valid run must clear the error state').toBeHidden();
+    await pm.tracesPage.expectQueryErrorCleared();
   });
 
   test('the Services Catalog side panel resolves a relative range when it opens', {
@@ -219,18 +219,22 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
   }, async ({ page }) => {
     await pm.tracesPage.searchUntilResultCount('Spans Found');
     await pm.tracesPage.navigateToServicesViaTab();
-    await expect(page.locator(`[data-test="services-catalog-service-link-${SERVICE}"]`)).toBeVisible({ timeout: 30000 });
+    await pm.tracesPage.expectServicesCatalogServiceVisible(SERVICE);
     await page.waitForTimeout(20000);
 
     const capture = pm.tracesPage.captureSearchRequests();
     const openedAt = nowUs();
     await pm.tracesPage.clickServicesCatalogService(SERVICE);
-    await expect.poll(() => capture.requests.filter((r) => r.endTime).length, { timeout: 20000 }).toBeGreaterThan(0);
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.tracesPage.expectServiceSidePanelVisible();
+    // Only the side panel's own queries filter on the clicked service.
+    const panelRequests = () => capture.requests.filter((r) => r.endTime && r.sql.includes(`'${SERVICE}'`));
+    await expect.poll(() => panelRequests().length, { timeout: 20000, message: 'the side panel must query the clicked service' }).toBeGreaterThan(0);
+    const settledAt = nowUs();
     capture.stop();
 
-    for (const request of capture.requests.filter((r) => r.endTime)) {
-      expect(openedAt - request.endTime, `side panel ${request.panel} query must end at the time it opened`).toBeLessThan(5_000_000);
+    for (const request of panelRequests()) {
+      expect(request.endTime, `side panel ${request.panel} query must not end before the panel opened`).toBeGreaterThanOrEqual(openedAt - 5_000_000);
+      expect(request.endTime, `side panel ${request.panel} query must not end in the future`).toBeLessThanOrEqual(settledAt);
     }
   });
 });

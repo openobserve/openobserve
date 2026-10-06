@@ -3586,7 +3586,10 @@ export class TracesPage {
       try { query = JSON.parse(request.postData() || '{}').query || {}; } catch { /* non-JSON body */ }
       const panel = (request.url().match(/panel_name=([^&]+)/) || [])[1]
         || (request.url().includes('search_type=ui') ? 'results' : 'other');
-      requests.push({ panel, startTime: query.start_time, endTime: query.end_time, from: query.from });
+      // The results search sends its SQL base64-encoded; panels send it as plain text.
+      let sql = String(query.sql || '');
+      if (/^[A-Za-z0-9+/=_.-]+$/.test(sql)) sql = Buffer.from(sql, 'base64').toString();
+      requests.push({ panel, startTime: query.start_time, endTime: query.end_time, from: query.from, sql });
     };
     this.page.on('request', onRequest);
     return { requests, stop: () => this.page.off('request', onRequest) };
@@ -3626,11 +3629,32 @@ export class TracesPage {
     await this.page.locator(`${this.errorMessage} [data-test="error-detail-toggle-btn"]`).click();
   }
 
+  // The raw DataFusion planner message, which must stay behind "Show details".
+  queryErrorPlannerText() {
+    return this.page.getByText('Error during planning');
+  }
+
+  async expectQueryErrorCleared() {
+    await expect(this.page.locator(this.errorMessage)).toBeHidden({ timeout: 15000 });
+  }
+
   queryErrorDetailBody() {
     return this.page.locator(`${this.errorMessage} [data-test="error-detail-body"]`);
   }
 
+  servicesCatalogServiceLink(serviceName) {
+    return this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`);
+  }
+
+  async expectServicesCatalogServiceVisible(serviceName) {
+    await expect(this.servicesCatalogServiceLink(serviceName)).toBeVisible({ timeout: 30000 });
+  }
+
   async clickServicesCatalogService(serviceName) {
-    await this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`).click();
+    await this.servicesCatalogServiceLink(serviceName).click();
+  }
+
+  async expectServiceSidePanelVisible() {
+    await expect(this.page.locator('[data-test="service-graph-side-panel"]')).toBeVisible({ timeout: 15000 });
   }
 }
