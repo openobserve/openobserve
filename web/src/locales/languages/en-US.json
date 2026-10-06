@@ -18343,7 +18343,9 @@
       "tabPods": "Pods",
       "tabNodes": "Nodes",
       "tabDeployments": "Deployments",
-      "tileAll": "All",
+      "tileAllPods": "All pods",
+      "tileAllNodes": "All nodes",
+      "tileAllDeployments": "All deployments",
       "podsNotRunning": "Pods not running or not ready",
       "podsContainerErrors": "Pods with container errors",
       "podsOomKilled": "Pods OOMKilled",
@@ -18363,6 +18365,7 @@
       "usageMissing": "{stream} isn't ingested, so its usage column shows —.",
       "oomNeedsStream": "OOMKilled needs {stream}, which the openobserve-collector chart's keep list drops",
       "noClusterLabel": "{family} data has no cluster label; its rows could not be matched and may appear twice",
+      "noClusterLabelScoped": "{family} data has no cluster label, so its rows are hidden while one cluster is selected; choose All to see them",
       "partialFailure": "Some Kubernetes queries failed, so their columns show —.",
       "columnName": "Name",
       "columnNamespace": "Namespace",
@@ -18408,6 +18411,7 @@
       "trendMemory": "Memory (working set)",
       "trendSummary": "Current {current} · peak {peak}",
       "viewLogs": "View logs",
+      "podNotFound": "Pod not found",
       "logsNoStream": "No log stream carries this pod's name and namespace fields.",
       "logsNoClusterField": "This log stream has no cluster field; logs from same-named pods in other clusters may be included"
     }

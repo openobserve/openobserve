@@ -102,6 +102,33 @@ describe("useKubernetesInventory", () => {
       expect(inventory.detection.value).toBe("undetected");
     });
 
+    it("ignores a stream list that resolves after a newer request started", async () => {
+      let releaseOld: (v: any) => void = () => {};
+      getStreams.mockReturnValueOnce(new Promise((resolve) => (releaseOld = resolve)));
+      getStreams.mockResolvedValueOnce({ list: [] });
+      const inventory = useKubernetesInventory(() => parseListState({}));
+      const old = inventory.loadStreams();
+      await inventory.loadStreams({ force: true });
+      releaseOld({ list: [{ name: "kube_pod_status_phase" }] });
+      await old;
+      expect(inventory.detection.value).toBe("undetected");
+    });
+
+    it("reset forgets the org's streams, results and errors and drops an in-flight refresh", async () => {
+      respond({ P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })] });
+      const { inventory } = await setup(ALL_STREAMS);
+      await refresh(inventory);
+      expect(inventory.loaded.value).toBe(true);
+      const inFlight = refresh(inventory);
+      inventory.reset();
+      await inFlight;
+      expect(inventory.detection.value).toBe("unknown");
+      expect(inventory.inventory.value.pods).toEqual([]);
+      expect(inventory.pageError.value).toBeNull();
+      expect(inventory.banners.value).toEqual([]);
+      expect(inventory.loaded.value).toBe(false);
+    });
+
     it("detects a KSM-only org from the pod anchor alone", async () => {
       const { inventory } = await setup(["kube_pod_status_phase"]);
       expect(inventory.detection.value).toBe("detected");
@@ -276,6 +303,25 @@ describe("useKubernetesInventory", () => {
       expect(inventory.pageError.value).toBe("all down");
     });
 
+    it("says unlabelled rows are hidden while a single cluster is in scope", async () => {
+      respond({
+        P1: [
+          ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" }),
+          ksm({ k8s_cluster: "alpha", namespace: "shop", pod: "a", uid: "a", phase: "Running" }),
+        ],
+        K2: [{ metric: { k8s_namespace_name: "shop", k8s_pod_name: "web" }, value: 1 }],
+      });
+      const { inventory, state } = await setup(ALL_STREAMS);
+      await refresh(inventory);
+      expect(inventory.banners.value.find((b) => b.id === "no-cluster-kubeletstats")?.key).toBe(
+        "infra.k8s2.noClusterLabelScoped",
+      );
+      state.value = parseListState({ cluster: "*" });
+      expect(inventory.banners.value.find((b) => b.id === "no-cluster-kubeletstats")?.key).toBe(
+        "infra.k8s2.noClusterLabel",
+      );
+    });
+
     it("warns when one family has no cluster label next to a labelled one", async () => {
       respond({
         P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
@@ -350,6 +396,14 @@ describe("useKubernetesInventory", () => {
       state.value = parseListState({ cluster: "*", name: "zzz", issue: "podsNotRunning" });
       expect(inventory.counts.value.podsNotRunning).toBe(2);
       expect(inventory.rows.value).toHaveLength(0);
+    });
+
+    it("counts the All facet rows", async () => {
+      respond(twoClusters);
+      const { inventory } = await setup(ALL_STREAMS);
+      await refresh(inventory);
+      expect(inventory.clusterTotal.value).toBe(3);
+      expect(inventory.namespaceTotal.value).toBe(2);
     });
 
     it("lists namespace facets for the scoped cluster with counts", async () => {

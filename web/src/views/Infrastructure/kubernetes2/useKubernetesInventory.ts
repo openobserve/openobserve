@@ -50,7 +50,6 @@ export type Detection = "unknown" | "error" | "undetected" | "detected";
 
 export interface K8sBanner {
   id: string;
-  // null = shown on every tab.
   kind: K8sKind | null;
   key: I18nKey;
   params?: Record<string, string>;
@@ -131,19 +130,37 @@ export function useKubernetesInventory(listState: () => K8sListState) {
   const failed = shallowRef<Set<QueryId>>(new Set());
   const pageError = ref<string | null>(null);
   const loading = ref(false);
+  const loaded = ref(false);
 
   // metrics_query takes no AbortSignal, so superseded responses are dropped by generation.
   let generation = 0;
+  let streamsGeneration = 0;
 
   const loadStreams = async ({ force = false }: { force?: boolean } = {}) => {
+    const gen = ++streamsGeneration;
     try {
       const res: any = await getStreams("metrics", false, false, force);
+      if (gen !== streamsGeneration) return;
       streams.value = new Set(((res?.list ?? []) as Array<{ name: string }>).map((s) => s.name));
       streamsError.value = false;
     } catch {
+      if (gen !== streamsGeneration) return;
       streams.value = null;
       streamsError.value = true;
     }
+  };
+
+  // An org switch must never query or render with the previous org's streams or rows.
+  const reset = () => {
+    generation++;
+    streamsGeneration++;
+    streams.value = null;
+    streamsError.value = false;
+    results.value = new Map();
+    failed.value = new Set();
+    pageError.value = null;
+    loading.value = false;
+    loaded.value = false;
   };
 
   const detection = computed<Detection>(() => {
@@ -198,6 +215,7 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     pageError.value = null;
     results.value = next;
     failed.value = rejected;
+    loaded.value = true;
   };
 
   const inventory = computed(() => buildInventory(results.value));
@@ -209,7 +227,6 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     return [...all].sort((a, b) => a.localeCompare(b));
   });
 
-  // The cluster the facets filter on; null = every cluster.
   const effectiveCluster = computed(() => {
     const param = listState().cluster;
     if (param === "*") return null;
@@ -242,6 +259,8 @@ export function useKubernetesInventory(listState: () => K8sListState) {
 
   const clusterFacet = computed(() => countBy(kindRows.value, (row) => row.cluster));
 
+  const clusterTotal = computed(() => kindRows.value.length);
+
   const namespaceFacet = computed(() => {
     const kind = listState().kind;
     if (kind === "nodes") return [];
@@ -250,6 +269,10 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     );
     return countBy(scoped, (row) => (row as PodRow | DeploymentRow).namespace);
   });
+
+  const namespaceTotal = computed(() =>
+    namespaceFacet.value.reduce((sum, facet) => sum + facet.count, 0),
+  );
 
   const rows = computed<AnyRow[]>(() => {
     const state = listState();
@@ -307,7 +330,10 @@ export function useKubernetesInventory(listState: () => K8sListState) {
       out.push({
         id: `no-cluster-${family}`,
         kind: null,
-        key: "infra.k8s2.noClusterLabel",
+        // Under one cluster the unlabelled rows are filtered out rather than shown twice.
+        key: effectiveCluster.value
+          ? "infra.k8s2.noClusterLabelScoped"
+          : "infra.k8s2.noClusterLabel",
         params: { family },
       });
     }
@@ -327,6 +353,7 @@ export function useKubernetesInventory(listState: () => K8sListState) {
   return {
     detection,
     loading,
+    loaded,
     pageError,
     inventory,
     clusters,
@@ -335,7 +362,9 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     scopedCount,
     counts,
     clusterFacet,
+    clusterTotal,
     namespaceFacet,
+    namespaceTotal,
     rows,
     page,
     pagedRows,
@@ -344,5 +373,6 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     podUsageStreams,
     loadStreams,
     refresh,
+    reset,
   };
 }
