@@ -223,6 +223,28 @@ describe("useAnnouncementBanners", () => {
     second.dispose();
   });
 
+  it("keeps the combined downtime banner dismissed until the set of active downtimes changes", async () => {
+    const twoActive = "downtime:d1:100,d2:200";
+    respondWith([banner({ id: twoActive, message: "2 downtimes are active." })]);
+    const first = await mountComposable();
+    first.dismiss(twoActive);
+    first.dispose();
+
+    const same = await mountComposable();
+    expect(same.banners.value).toHaveLength(0);
+    same.dispose();
+
+    respondWith([banner({ id: "downtime:d1:100,d2:200,d3:300", message: "3 downtimes" })]);
+    const grown = await mountComposable();
+    expect(grown.banners.value.map((b) => b.message)).toEqual(["3 downtimes"]);
+    grown.dispose();
+
+    respondWith([banner({ id: "downtime:d1:100", message: "d1 is active." })]);
+    const shrunk = await mountComposable();
+    expect(shrunk.banners.value.map((b) => b.message)).toEqual(["d1 is active."]);
+    shrunk.dispose();
+  });
+
   it("suppresses a promo while a critical banner is up", async () => {
     respondWith([
       banner({ id: "outage", variant: "critical", message: "Search is down" }),

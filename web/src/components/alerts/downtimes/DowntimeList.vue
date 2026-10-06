@@ -513,7 +513,7 @@ const downtimeFolderName = (id: string) => folderNameIn(downtimeFoldersList.data
 // ── Filters ─────────────────────────────────────────────────────────────────
 const activeFolderId = ref<string>((route.query.folder as string) || "default");
 const search = ref("");
-const searchAcrossFolders = ref(false);
+const searchAcrossFolders = ref(route.query.scope === "all");
 const typeFilter = ref<TypeFilter>(
   (["once", "recurring"] as const).find((v) => v === route.query.repeat) ?? "all",
 );
@@ -554,8 +554,9 @@ const searchText = (row: DowntimeListItem) =>
 
 const folderRows = computed(() => {
   const term = search.value.trim().toLowerCase();
+  // The org banner links here with every folder and a status filter, and no search term.
   const scoped =
-    searchAcrossFolders.value && term
+    searchAcrossFolders.value && (term || statFilter.value)
       ? allRows.value
       : allRows.value.filter((r) => (r.folder_id || "default") === activeFolderId.value);
   const byType = scoped.filter((r) =>

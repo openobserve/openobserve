@@ -22,7 +22,7 @@ pub mod matching;
 pub mod resources;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, LazyLock, RwLock},
     time::{Duration, Instant},
 };
@@ -31,8 +31,8 @@ use config::{
     meta::{
         downtimes::{
             AffectedItems, DimensionCondition, Downtime, DowntimeDetail, DowntimeListItem,
-            DowntimeRequest, MoveDowntimesRequest, PreviewMatch, PreviewRequest, PreviewResponse,
-            ResourcesRequest, ResourcesResponse, TargetModule,
+            DowntimeRequest, DowntimeWindow, MoveDowntimesRequest, PreviewMatch, PreviewRequest,
+            PreviewResponse, ResourcesRequest, ResourcesResponse, TargetModule,
         },
         folder::{DEFAULT_FOLDER, FolderType},
     },
@@ -54,6 +54,14 @@ use self::matching::{Inventory, Matches, Visibility};
 const MATCH_COUNTS_TTL: Duration = Duration::from_secs(60);
 /// The `affected` lists of `GET /{id}` stop at this many names per module.
 const AFFECTED_CAP: usize = 500;
+
+/// The order modules are listed in on a combined banner.
+const MODULE_ORDER: [TargetModule; 4] = [
+    TargetModule::Alerts,
+    TargetModule::AnomalyDetections,
+    TargetModule::Synthetics,
+    TargetModule::Slos,
+];
 
 /// `downtime_id -> (updated_at of the row, computed at, matches)`; an edit changes `updated_at`.
 type MatchCountsCache = RwLock<HashMap<String, (i64, Instant, Arc<Matches>)>>;
@@ -114,6 +122,13 @@ impl MatchCounts {
             TargetModule::Slos => self.slos,
         }
     }
+}
+
+/// One active downtime row with its current window and what it matches.
+struct ActiveWindow<'a> {
+    row: &'a Downtime,
+    window: DowntimeWindow,
+    matches: Arc<Matches>,
 }
 
 pub fn ensure_enabled() -> Result<(), DowntimeError> {
@@ -320,7 +335,8 @@ pub async fn match_counts(downtime: &Downtime) -> Result<MatchCounts, DowntimeEr
     Ok(counts_of(&match_counts_with(downtime, &inventory)))
 }
 
-/// One banner per active downtime with `show_banner` (D19), and the next instant the set changes.
+/// One banner for all active downtimes with `show_banner` (D19), and the next instant the set
+/// changes.
 pub async fn banners_for_org(
     org: &str,
     now: i64,
@@ -330,14 +346,26 @@ pub async fn banners_for_org(
         .iter()
         .filter(|row| row.show_banner && row.cancelled_at.is_none())
         .collect();
-    let mut banners = Vec::new();
-    for row in &live {
-        if let Some(window) = schedule::window_at(&row.schedule, now) {
-            let counts = match_counts(row).await?;
-            banners.push(banner_of(row, &window, &counts));
+    let windows: Vec<(&Downtime, DowntimeWindow)> = live
+        .iter()
+        .filter_map(|row| schedule::window_at(&row.schedule, now).map(|w| (*row, w)))
+        .collect();
+    let mut active = Vec::with_capacity(windows.len());
+    if !windows.is_empty() {
+        let inventory = inventory::cached(org).await?;
+        for (row, window) in windows {
+            let matches = match_counts_with(row, &inventory);
+            active.push(ActiveWindow {
+                row,
+                window,
+                matches,
+            });
         }
     }
-    Ok((banners, next_banner_boundary(&live, now)))
+    Ok((
+        combined_banner(&active).into_iter().collect(),
+        next_banner_boundary(&live, now),
+    ))
 }
 
 async fn load(org: &str, id: &str) -> Result<Downtime, DowntimeError> {
@@ -522,28 +550,47 @@ fn list_item(row: &Downtime, counts: &MatchCounts, now: i64) -> DowntimeListItem
     }
 }
 
-/// The id changes per window, so a dismissal lasts for this window only.
-fn banner_of(
-    row: &Downtime,
-    window: &config::meta::downtimes::DowntimeWindow,
-    counts: &MatchCounts,
-) -> Banner {
-    let per_module: Vec<(TargetModule, usize)> = row
-        .targets
+/// The id names every active row and window, so a dismissal lasts until that set changes.
+fn combined_banner(active: &[ActiveWindow]) -> Option<Banner> {
+    let mut keys: Vec<String> = active
         .iter()
-        .map(|t| (t.module, counts.of(t.module)))
+        .map(|a| format!("{}:{}", a.row.id, a.window.start))
         .collect();
-    Banner {
-        message: banner_message(&row.name, &per_module),
-        id: Some(format!("downtime:{}:{}", row.id, window.start)),
+    keys.sort();
+    let id = format!("downtime:{}", keys.join(","));
+    let (message, cta, per_module) = match active {
+        [] => return None,
+        [one] => {
+            let counts = counts_of(&one.matches);
+            let per_module: Vec<(TargetModule, usize)> = one
+                .row
+                .targets
+                .iter()
+                .map(|t| (t.module, counts.of(t.module)))
+                .collect();
+            let cta = BannerCta {
+                text: "View downtime".to_string(),
+                url: format!("/web/downtimes/{}", one.row.id),
+            };
+            (banner_message(&one.row.name, &per_module), cta, per_module)
+        }
+        many => {
+            let per_module = merged_counts(many);
+            let cta = BannerCta {
+                text: "View downtimes".to_string(),
+                url: "/web/downtimes?status=active&scope=all".to_string(),
+            };
+            (merged_message(many.len(), &per_module), cta, per_module)
+        }
+    };
+    Some(Banner {
+        message,
+        id: Some(id),
         variant: BannerVariant::Warning,
-        starts_at: Some(window.start),
-        ends_at: Some(window.end),
+        starts_at: active.iter().map(|a| a.window.start).min(),
+        ends_at: active.iter().map(|a| a.window.end).min(),
         dismissible: true,
-        cta: Some(BannerCta {
-            text: "View downtime".to_string(),
-            url: format!("/web/downtimes/{}", row.id),
-        }),
+        cta: Some(cta),
         orgs: None,
         counts: Some(
             per_module
@@ -554,7 +601,36 @@ fn banner_of(
                 })
                 .collect(),
         ),
-    }
+    })
+}
+
+/// Per targeted module, the distinct items muted by any of the rows, so an overlap counts once.
+fn merged_counts(active: &[ActiveWindow]) -> Vec<(TargetModule, usize)> {
+    MODULE_ORDER
+        .into_iter()
+        .filter(|m| {
+            active
+                .iter()
+                .any(|a| a.row.targets.iter().any(|t| t.module == *m))
+        })
+        .map(|m| {
+            let ids: HashSet<&str> = active
+                .iter()
+                .flat_map(|a| a.matches.module(m).matched.iter().map(|x| x.id.as_str()))
+                .collect();
+            (m, ids.len())
+        })
+        .collect()
+}
+
+fn merged_message(active: usize, per_module: &[(TargetModule, usize)]) -> String {
+    let subject = format!("{active} downtimes");
+    // `banner_message` words its subject as a single downtime.
+    banner_message(&subject, per_module).replacen(
+        &format!("{subject} is active."),
+        &format!("{subject} are active."),
+        1,
+    )
 }
 
 /// The nearest window start or end after `now` among the rows that show a banner.
@@ -602,7 +678,7 @@ mod tests {
         DowntimeSchedule, DowntimeTarget, LogicalOp, PairOperator, Repeat, TargetFolders,
     };
 
-    use super::*;
+    use super::{matching::ModuleMatch, *};
 
     const HOUR: i64 = 3_600_000_000;
 
@@ -712,22 +788,43 @@ mod tests {
     }
 
     #[test]
-    fn a_banner_names_the_downtime_and_counts_and_its_id_changes_per_window() {
+    fn matched(ids: &[&str]) -> ModuleMatch {
+        ModuleMatch {
+            matched: ids
+                .iter()
+                .map(|id| PreviewMatch {
+                    id: (*id).to_string(),
+                    name: (*id).to_string(),
+                    folder_id: "default".to_string(),
+                    matched_by: None,
+                    missing: None,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn window(start: i64, end: i64) -> DowntimeWindow {
+        DowntimeWindow { start, end }
+    }
+
+    fn one_active_downtime_gets_its_own_banner_whose_id_changes_per_window() {
         let d = row(
             vec![TargetModule::Alerts, TargetModule::Slos],
             10 * HOUR,
             12 * HOUR,
         );
-        let counts = MatchCounts {
-            alerts: 7,
-            slos: 3,
+        let matches = Arc::new(Matches {
+            alerts: matched(&["a1", "a2", "a3", "a4", "a5", "a6", "a7"]),
+            slos: matched(&["s1", "s2", "s3"]),
             ..Default::default()
-        };
-        let first = config::meta::downtimes::DowntimeWindow {
-            start: 10 * HOUR,
-            end: 12 * HOUR,
-        };
-        let banner = banner_of(&d, &first, &counts);
+        });
+        let active = [ActiveWindow {
+            row: &d,
+            window: window(10 * HOUR, 12 * HOUR),
+            matches: matches.clone(),
+        }];
+        let banner = combined_banner(&active).unwrap();
         assert_eq!(
             banner.message,
             "d1 is active. 7 alerts and 3 SLOs are muted."
@@ -736,6 +833,7 @@ mod tests {
         assert_eq!(banner.ends_at, Some(12 * HOUR));
         assert_eq!(banner.id.as_deref(), Some("downtime:d1:36000000000"));
         assert_eq!(
+        assert_eq!(banner.cta.unwrap().url, "/web/downtimes/d1");
             banner.counts.unwrap(),
             vec![
                 BannerCount {
@@ -748,17 +846,99 @@ mod tests {
                 },
             ]
         );
-        let next = config::meta::downtimes::DowntimeWindow {
-            start: 34 * HOUR,
-            end: 36 * HOUR,
-        };
+        let next = [ActiveWindow {
+            row: &d,
+            window: window(34 * HOUR, 36 * HOUR),
+            matches,
+        }];
         assert_ne!(
-            banner_of(&d, &next, &counts).id,
+            combined_banner(&next).unwrap().id,
             Some("downtime:d1:36000000000".to_string())
         );
     }
 
     #[test]
+    #[test]
+    fn no_active_downtime_gets_no_banner() {
+        assert!(combined_banner(&[]).is_none());
+    }
+
+    #[test]
+    fn several_active_downtimes_share_one_banner_with_distinct_counts_and_the_soonest_end() {
+        let d1 = row(vec![TargetModule::Alerts], 10 * HOUR, 14 * HOUR);
+        let mut d2 = row(
+            vec![TargetModule::Alerts, TargetModule::Synthetics],
+            9 * HOUR,
+            12 * HOUR,
+        );
+        d2.id = "d2".to_string();
+        let mut d3 = row(vec![TargetModule::Alerts], 11 * HOUR, 20 * HOUR);
+        d3.id = "d3".to_string();
+        let active = [
+            ActiveWindow {
+                row: &d3,
+                window: window(11 * HOUR, 20 * HOUR),
+                matches: Arc::new(Matches {
+                    alerts: matched(&["a1"]),
+                    ..Default::default()
+                }),
+            },
+            ActiveWindow {
+                row: &d1,
+                window: window(10 * HOUR, 14 * HOUR),
+                matches: Arc::new(Matches {
+                    alerts: matched(&["a1", "a2", "a3"]),
+                    ..Default::default()
+                }),
+            },
+            ActiveWindow {
+                row: &d2,
+                window: window(9 * HOUR, 12 * HOUR),
+                matches: Arc::new(Matches {
+                    alerts: matched(&["a2", "a4"]),
+                    synthetics: matched(&["c1", "c2"]),
+                    ..Default::default()
+                }),
+            },
+        ];
+        let banner = combined_banner(&active).unwrap();
+        assert_eq!(
+            banner.message,
+            "3 downtimes are active. 4 alerts and 2 synthetics checks are muted."
+        );
+        assert_eq!(banner.ends_at, Some(12 * HOUR));
+        assert_eq!(banner.starts_at, Some(9 * HOUR));
+        assert_eq!(
+            banner.id.as_deref(),
+            Some("downtime:d1:36000000000,d2:32400000000,d3:39600000000")
+        );
+        let cta = banner.cta.unwrap();
+        assert_eq!(cta.text, "View downtimes");
+        assert_eq!(cta.url, "/web/downtimes?status=active&scope=all");
+        assert_eq!(
+            banner.counts.unwrap(),
+            vec![
+                BannerCount {
+                    module: "alerts".to_string(),
+                    count: 4
+                },
+                BannerCount {
+                    module: "synthetics".to_string(),
+                    count: 2
+                },
+            ]
+        );
+        let ended_early = combined_banner(&active[..2]).unwrap();
+        assert_ne!(
+            ended_early.id,
+            Some("downtime:d1:36000000000,d2:32400000000,d3:39600000000".to_string())
+        );
+        assert_eq!(
+            ended_early.message,
+            "2 downtimes are active. 3 alerts are muted."
+        );
+    }
+
     fn the_next_boundary_is_the_nearest_start_or_end() {
         let active = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
         let mut later = row(vec![TargetModule::Alerts], 11 * HOUR, 20 * HOUR);
