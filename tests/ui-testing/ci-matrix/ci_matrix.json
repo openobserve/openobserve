@@ -321,8 +321,8 @@
       "streamNotFound.spec.js",
       "logsRefreshCacheDropdown.spec.js",
       "logs-highlighting.spec.js",
-      "logs-drilldown.spec.js",
-      "logs-search-around-multistream.spec.js"
+      "logs-search-around-multistream.spec.js",
+      "logs-default-columns.spec.js"
     ],
     "disabled": [
       {
