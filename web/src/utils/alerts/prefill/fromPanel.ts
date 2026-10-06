@@ -32,6 +32,7 @@ import {
 } from "@/ts/interfaces/alertPrefill";
 import { sanitizeAlertNamePart, periodMinutesFromRange, warn } from "../alertPrefill";
 import { formulaRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql/formula";
+import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlacement";
 
 /** Panel types whose shape has no meaningful row count to alert on. */
 const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey"];
@@ -48,6 +49,8 @@ export interface PanelPrefillInput {
   queryChoices?: AlertPrefillQueryChoice[];
   /** The chosen query with dashboard variables already substituted — preferred over its raw text. */
   executedQuery?: string;
+  /** The panel's executed metadata, which gives a formula's inputs their resolved text. */
+  metadataQueries?: any[];
   timeRange?: {
     value_type?: string;
     relative_value?: number;
@@ -180,18 +183,24 @@ const conditionsFromFilters = (fields: any, makeId: () => string) => {
 };
 
 /** The metrics a formula's inputs read, once each; an alert needs one of them as its stream. */
-const formulaInputStreams = (queries: any[], formula: string): AlertPrefillStreamCandidate[] => {
+const formulaInputStreams = (
+  queries: any[],
+  formula: string,
+  metadataQueries: any[] | undefined,
+): AlertPrefillStreamCandidate[] => {
   const referenced = new Set(formulaRefs(formula));
   const letters = queryRefs(queries);
-  const seen = new Set<string>();
-  return queries.flatMap((query, i) => {
-    const name = query?.fields?.stream;
+  // A code-mode query's `fields.stream` is the editor's inherited pick, not what its text reads.
+  const metricsOf = (query: any, i: number): string[] =>
+    query?.customQuery === false
+      ? [query?.fields?.stream].filter(Boolean)
+      : selectorMetricNames(executedPanelQuery(metadataQueries, i) || query?.query || "");
+  const names = queries.flatMap((query, i) => {
     const letter = letters[i];
-    if (!name || !letter || !referenced.has(letter) || isFormulaQuery(query) || seen.has(name))
-      return [];
-    seen.add(name);
-    return [{ name, type: query.fields.stream_type || "metrics" }];
+    if (!letter || !referenced.has(letter) || isFormulaQuery(query)) return [];
+    return metricsOf(query, i);
   });
+  return [...new Set(names)].map((name) => ({ name, type: "metrics" }));
 };
 
 /** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
@@ -237,7 +246,7 @@ export const buildPrefillFromPanel = (
   const isPromql = input.queryType === "promql";
   const inputStreams =
     isPromql && isFormulaQuery(query)
-      ? formulaInputStreams(input.queries ?? [], query.config.formula)
+      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
       : [];
   const sourceQuery = input.executedQuery || query?.query || "";
   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.

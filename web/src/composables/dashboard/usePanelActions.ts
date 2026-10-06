@@ -131,6 +131,7 @@ export function usePanelAlertCreation({
   router,
   emit,
   visibleQueryIndexes,
+  hideChartTooltip,
 }: {
   panelSchema: any;
   allowAlertCreation: any;
@@ -142,6 +143,7 @@ export function usePanelAlertCreation({
   emit: any;
   /** Panel queries not hidden in the editor; all of them when absent. */
   visibleQueryIndexes?: { value: number[] };
+  hideChartTooltip?: () => void;
 }) {
   // Context menu state for alert creation
   const contextMenuVisible = ref(false);
@@ -163,6 +165,8 @@ export function usePanelAlertCreation({
       return;
     }
 
+    // The chart tooltip sits above every menu, so it would cover the alert items.
+    hideChartTooltip?.();
     contextMenuVisible.value = true;
     contextMenuPosition.value = { x: event.x, y: event.y };
     contextMenuValue.value = event.value;
@@ -251,6 +255,7 @@ export function usePanelAlertCreation({
         condition: selection.condition as "above" | "below",
         yAxisColumn: yAxisColumnOf(index),
         executedQuery: executedQueryOf(index),
+        metadataQueries: metadata.value?.queries,
       });
     };
 

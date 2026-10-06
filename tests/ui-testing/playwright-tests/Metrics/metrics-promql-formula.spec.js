@@ -114,5 +114,13 @@ test.describe('Metrics PromQL formulas', () => {
     expect(savedPanel.queries.map((q) => q.config.hide ?? false)).toEqual([true, true, false]);
     expect(savedPanel.queries.map((q) => q.config.ref ?? null)).toEqual(['A', 'B', null]);
     expect(savedPanel.queries[2].config.formula).toBe(FORMULA);
+
+    // The inputs were typed in code mode, so each one's metric comes from its text, not the inherited stream pick.
+    await savedChart.hover();
+    await page.locator(`[data-test="dashboard-edit-panel-${panelTitle}-dropdown"]`).click();
+    await page.locator('[data-test="dashboard-create-alert-from-panel"]').click();
+    for (const metric of [RELATED_METRIC, DETAIL_METRIC]) {
+      await expect(page.locator(`[data-test="create-alert-stream-option-${metric}"]`)).toBeVisible({ timeout: 15000 });
+    }
   });
 });

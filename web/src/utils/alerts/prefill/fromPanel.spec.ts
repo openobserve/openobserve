@@ -523,7 +523,7 @@ describe("buildPrefillFromPanel — a formula query", () => {
 
   it("lists a metric two inputs share once, and needs no stream choice then", () => {
     const panel = formulaPanel("A / B");
-    panel.queries![0].fields.stream = "http_requests_total";
+    panel.queries![0].query = 'sum(rate(http_requests_total{code=~"5.."}[5m]))';
     const p = normalizePrefill(buildPrefillFromPanel(panel, makeId));
     expect(p.streamCandidates).toBeUndefined();
     expect(p.streamName).toBe("http_requests_total");
@@ -543,6 +543,53 @@ describe("buildPrefillFromPanel — a formula query", () => {
     const p = buildPrefillFromPanel(panel, makeId);
     expect(p.streamCandidates?.map((c) => c.name)).toEqual([
       "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
+  it("reads code-mode inputs' metrics from their text, not the inherited stream pick", () => {
+    const panel = formulaPanel("A / B * 100");
+    panel.queries![0].fields.stream = "cpu_usage";
+    panel.queries![1].fields.stream = "cpu_usage";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
+  it("finds the inputs' metrics when the inherited stream pick is empty", () => {
+    const panel = formulaPanel("A / B * 100");
+    panel.queries![0].fields.stream = "";
+    panel.queries![1].fields.stream = "";
+    const p = normalizePrefill(buildPrefillFromPanel(panel, makeId));
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+    expect(isPrefillBlocked(p)).toBe(false);
+  });
+
+  it("prefers an input's executed text, so a metric behind a variable is still found", () => {
+    const panel = formulaPanel("A / B", {
+      metadataQueries: [
+        { query: "sum(rate(errors_v2[1m]))", panelQueryIndex: 0, notSent: true },
+        { query: "sum(rate(requests_v2[1m]))", panelQueryIndex: 1, notSent: true },
+      ],
+    });
+    panel.queries![0].query = "sum(rate($errors[$__rate_interval]))";
+    panel.queries![1].query = "sum(rate($requests[$__rate_interval]))";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual(["errors_v2", "requests_v2"]);
+  });
+
+  it("takes a builder-mode input's metric from its builder stream", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].customQuery = false;
+    panel.queries![0].fields.stream = "builder_metric";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "builder_metric",
       "http_requests_total",
     ]);
   });

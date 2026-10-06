@@ -1222,6 +1222,7 @@ export default defineComponent({
             ? panelQueryChoices(queries, this.metaData?.queries, visible)
             : undefined,
         executedQuery: executedPanelQuery(this.metaData?.queries, queryIndex),
+        metadataQueries: this.metaData?.queries,
         timeRange: this.props.selectedTimeDate,
       });
     },
