@@ -15,7 +15,10 @@
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import llmExperimentsService, { type LlmExperiment } from "./llm-experiments.service";
-import remoteTasksService, { type RemoteTask } from "./remote-tasks.service";
+import remoteTasksService, {
+  type RemoteTask,
+  type RemoteTaskSecretMaterial,
+} from "./remote-tasks.service";
 import { experimentKeys, remoteTaskKeys } from "./llm-experiments.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -111,6 +114,14 @@ export const testRemoteTaskConnectionMutation = (org: string) =>
 export const discardRemoteTaskDraftMutation = (org: string) =>
   mutationOptions({
     mutationFn: (entityId: string) => remoteTasksService.discardDraft(org, entityId),
+    meta: { invalidates: [remoteTaskKeys.all(org)], silentError: true },
+  });
+
+/** Re-encrypts the auth secret in place; the task keeps its version. */
+export const replaceRemoteTaskAuthMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { entityId: string; material: RemoteTaskSecretMaterial }) =>
+      remoteTasksService.replaceAuth(org, vars.entityId, vars.material),
     meta: { invalidates: [remoteTaskKeys.all(org)], silentError: true },
   });
 

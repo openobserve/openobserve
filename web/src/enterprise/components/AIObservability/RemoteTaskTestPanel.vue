@@ -6,7 +6,9 @@
   It tests the form as it stands, through `POST /tasks/test`, which takes the
   whole candidate — so nothing is registered, no secret is written and no version
   is published. Publishing still requires a passing test; that check belongs to
-  the Publish button, which runs its own.
+  the Publish button, which runs its own. The page may instead run the stored
+  published version (when editing a task with write-only secrets) and says so
+  through `hint`.
 
   It always shows the raw exchange, on success and on failure alike, because
   "what did we actually send, and what came back" is the only thing that helps
@@ -22,6 +24,13 @@
         <h3 class="text-text-heading m-0 text-sm font-bold">
           {{ t("aiObservability.remoteTasks.testPanel.title") }}
         </h3>
+        <p
+          v-if="hint"
+          class="text-text-secondary m-0 text-xs leading-relaxed"
+          data-test="ai-remote-task-test-hint"
+        >
+          {{ hint }}
+        </p>
       </div>
 
       <div class="flex flex-col gap-1.5">
@@ -211,6 +220,8 @@ const props = defineProps<{
   state: "idle" | "running" | "passed" | "failed";
   report: RemoteTaskVerificationReport | null;
   errorMessage: I18nText | null;
+  /** Says what the run actually exercises when that is not the form as it stands. */
+  hint?: I18nText | null;
 }>();
 
 const emit = defineEmits<{

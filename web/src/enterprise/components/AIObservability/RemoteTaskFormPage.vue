@@ -419,6 +419,11 @@
           :state="testState"
           :report="testReport"
           :error-message="testError"
+          :hint="
+            testsStoredVersion
+              ? t('aiObservability.remoteTasks.testPanel.storedCredentialsHint')
+              : null
+          "
           @run="runCandidateTest"
         />
       </div>
@@ -606,6 +611,13 @@ const testError = ref<I18nText | null>(null);
 
 const canRunTest = computed(() => Boolean(nameValue.value.trim() && endpointValue.value.trim()));
 
+/**
+ * Whether the task being edited holds a write-only secret. The form can never
+ * repopulate one, so a candidate test would send it blank; such a task is
+ * tested through `test_run`, which uses the published version's stored secrets.
+ */
+const testsStoredVersion = ref(false);
+
 const signingKey = form.useStore((state: any) => String(state.values.signingKey ?? ""));
 const signingKeyCopied = ref(false);
 const headerShape = raw(SIGNATURE_HEADER_SHAPE);
@@ -724,6 +736,10 @@ async function runCandidateTest() {
   testReport.value = null;
 
   try {
+    if (testsStoredVersion.value) {
+      await runStoredVersionTest();
+      return;
+    }
     const values = form.state.values as RemoteTaskFormValues;
     const result = await remoteTasksService.testCandidate(orgId.value, {
       ...toCreatePayload(values),
@@ -738,6 +754,25 @@ async function runCandidateTest() {
     testState.value = "failed";
     testError.value =
       raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.form.testFailed");
+  }
+}
+
+async function runStoredVersionTest() {
+  const [row] = await remoteTasksService.testRun(orgId.value, routeEntityId.value, [
+    currentSample(),
+  ]);
+  testReport.value = row
+    ? {
+        rawRequest: row.rawRequest,
+        rawResponse: row.rawResponse,
+        statusCode: row.httpStatus,
+        parsedOutput: row.parsedOutput,
+        latencyMs: row.latencyMs,
+      }
+    : null;
+  testState.value = row?.status === "ok" ? "passed" : "failed";
+  if (testState.value === "failed") {
+    testError.value = raw(row?.error) || t("aiObservability.remoteTasks.form.testFailed");
   }
 }
 
@@ -879,6 +914,10 @@ async function loadForEdit() {
       return;
     }
     draftFromVersion.value = task.isDraft ? undefined : task.version;
+    testsStoredVersion.value =
+      task.auth.usesSecret ||
+      task.signing.usesSecret ||
+      task.customHeaders.some((header) => header.usesSecret);
     form.reset(remoteTaskToFormValues(task));
   } catch (error: any) {
     toast({
