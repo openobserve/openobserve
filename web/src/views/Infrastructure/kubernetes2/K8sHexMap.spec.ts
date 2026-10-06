@@ -32,6 +32,18 @@ import { groupRows, statusCounts, type GroupHeader, type RowGroup } from "./mapF
 
 const palette = vi.hoisted(() => ({ dark: false }));
 
+// jsdom has no canvas to measure text, so every character is 7px wide here.
+vi.mock("echarts/core", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    format: {
+      ...actual.format,
+      getTextRect: (text: string) => ({ width: String(text).length * 7 }),
+    },
+  };
+});
+
 vi.mock("@/utils/chartTheme", () => ({
   chartColor: (token: string) => `${palette.dark ? "dark" : "light"}:${token}`,
 }));
@@ -85,7 +97,6 @@ const headersOf = (groups: RowGroup[], clickable = (g: RowGroup) => !g.special):
     count: String(g.rows.length),
     summary: statusCounts(g.rows),
     word: null,
-    pin: 0,
     tip: `<b>${g.special ? "Unscheduled" : g.name}</b>`,
     clickable: clickable(g),
   }));
@@ -345,6 +356,23 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
     expect(options().tooltip.formatter({ seriesIndex: 1, dataIndex: 0 })).toBe("<b>n1</b>");
   });
 
+  it("mutes zero counts and colours the others by status", async () => {
+    await mountMap();
+    const line2 = texts(cardAt(0, 20)).find((t) => t.includes("✓"))!;
+    const [error, warning, ok] = statusCounts(groupRows(ROWS, "node").groups[0].rows);
+    const seg = (cls: string, glyph: string, n: number) =>
+      `{${n === 0 ? "neutral" : cls}|${glyph} ${n}}`;
+    expect(line2).toBe(
+      [
+        seg("error", "✕", error.count),
+        seg("warning", "!", warning.count),
+        seg("ok", "✓", ok.count),
+      ].join("  "),
+    );
+    expect(ok.count).toBeGreaterThan(0);
+    expect(error.count).toBe(0);
+  });
+
   it("writes the status summary as ✕ ! ✓ with every count, zeros included", async () => {
     await mountMap();
     const line2 = texts(cardAt(0, 20)).find((t) => t.includes("✓"))!;
@@ -353,24 +381,28 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
     expect(plain).toBe(`✕ ${error.count}  ! ${warning.count}  ✓ ${ok.count}`);
   });
 
-  it("keeps the kind on a workload title at a 20 px band, truncating only its middle", async () => {
-    const rows = Array.from({ length: 120 }, (_, i) => ({
-      ...pod(`w${i}`, "n1", 10),
-      workload: { kind: "Deployment", name: "api-gateway" },
+  it("always titles a workload card by its name at the fit, widening narrow cards to fit it", async () => {
+    const names = Array.from({ length: 40 }, (_, i) => `service-number-${i}-with-a-long-name`);
+    const rows = names.map((name, i) => ({
+      ...pod(`${name}-x${i}`, "n1", 10),
+      workload: { kind: "Deployment", name },
     }));
     await mountMap(rows as PodRow[], { group: "workload" });
     await wrapper.setProps({
-      headers: wrapper.props("headers").map((h: GroupHeader) => ({ ...h, pin: 13 })),
+      headers: wrapper.props("headers").map((h: GroupHeader) => ({
+        ...h,
+        word: { text: "deploy", tone: null },
+      })),
     });
-    const [title] = texts(cardAt(0, 10));
-    expect(title.startsWith("Deployment · ")).toBe(true);
-    expect(texts(cardAt(0, 20))[0]).toBe("Deployment · api-gateway");
-    await wrapper.setProps({
-      headers: [{ ...wrapper.props("headers")[0], title: "Deployment · recommendation-service" }],
-    });
-    for (const scale of [10, 14, 20]) {
-      const line = texts(cardAt(0, scale))[0];
-      if (line !== "") expect(line.startsWith("Deployment · ")).toBe(true);
+    const { x } = ranges();
+    const scale = WIDTH / (x[1] - x[0]);
+    const frames = options().series[1].data;
+    for (let i = 0; i < frames.length; i++) {
+      const [title, , line2] = texts(cardAt(i, scale));
+      const name = wrapper.props("headers")[i].title as string;
+      expect(title.length).toBeGreaterThanOrEqual(18);
+      expect(name.startsWith(title.split("…")[0])).toBe(true);
+      if (line2 !== undefined) expect(line2.startsWith("{neutral|deploy}")).toBe(true);
     }
   });
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { fitScale } from "./hexViewport";
+import { MAX_FIT_SCALE, fitScale } from "./hexViewport";
 import type { MapEntity, MapGroup } from "./kubernetesQueries";
 
 export interface LayoutParams {
@@ -23,6 +23,8 @@ export interface LayoutParams {
   width: number;
   height: number;
   bottomInset: number;
+  minFramePx?: number;
+  minBandPx?: number;
 }
 
 export interface HexBounds {
@@ -77,6 +79,9 @@ const MIN_FRAME_WIDTH = 8;
 // Bounds the shelf search to 200 packings however many groups there are.
 const MAX_SHELF_CANDIDATES = 200;
 
+// Widening lowers the fit scale, which needs more width again; this converges in a few rounds.
+const MAX_WIDEN_ROUNDS = 8;
+
 // Run sums equal a cursor position exactly, but float addition order differs.
 const EPSILON = 1e-9;
 
@@ -123,18 +128,12 @@ export function shortGroupNames(names: readonly string[]): string[] {
   return [...names];
 }
 
-// Keeps head and tail, where names differ, around "…"; the first `pin` chars always stay.
-export function middleTruncate(
-  text: string,
-  maxPx: number,
-  measure: (s: string) => number,
-  pin = 0,
-) {
+// Keeps the head and the tail, where names differ, around an ellipsis.
+export function middleTruncate(text: string, maxPx: number, measure: (s: string) => number) {
   if (measure(text) <= maxPx) return text;
-  const [head, rest] = [text.slice(0, pin), text.slice(pin)];
   const cut = (kept: number) =>
-    `${head}${rest.slice(0, Math.ceil(kept / 2))}…${rest.slice(rest.length - Math.floor(kept / 2))}`;
-  let [lo, hi] = [0, rest.length - 1];
+    `${text.slice(0, Math.ceil(kept / 2))}…${text.slice(text.length - Math.floor(kept / 2))}`;
+  let [lo, hi] = [0, text.length - 1];
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
     if (measure(cut(mid)) <= maxPx) lo = mid;
@@ -146,6 +145,8 @@ export function middleTruncate(
 function sameParams(a: LayoutParams, b: LayoutParams) {
   if (a.entity !== b.entity || a.group !== b.group) return false;
   if (a.width !== b.width || a.height !== b.height || a.bottomInset !== b.bottomInset) return false;
+  if ((a.minFramePx ?? 0) !== (b.minFramePx ?? 0)) return false;
+  if ((a.minBandPx ?? 0) !== (b.minBandPx ?? 0)) return false;
   if (a.groups.length !== b.groups.length) return false;
   for (let g = 0; g < a.groups.length; g++) {
     const [ka, kb] = [a.groups[g], b.groups[g]];
@@ -159,7 +160,7 @@ function isFramed(params: LayoutParams) {
   return params.group !== "none";
 }
 
-function blocksOf(params: LayoutParams): Block[] {
+function blocksOf(params: LayoutParams, minWidth = MIN_FRAME_WIDTH): Block[] {
   const framed = isFramed(params);
   const pad = framed ? PAD : 0;
   const band = framed ? LABEL_BAND : 0;
@@ -169,7 +170,7 @@ function blocksOf(params: LayoutParams): Block[] {
     const rows = Math.ceil(n / cols);
     const contentWidth = cols * HEX_WIDTH + (rows > 1 ? HEX_HALF_WIDTH : 0);
     const contentHeight = (rows - 1) * ROW_STEP + 2 * HEX_HALF_HEIGHT;
-    const width = Math.max(contentWidth + 2 * pad, framed ? MIN_FRAME_WIDTH : 0);
+    const width = Math.max(contentWidth + 2 * pad, framed ? minWidth : 0);
     return { n, cols, width, height: contentHeight + 2 * pad + band, left: 0, top: 0 };
   });
 }
@@ -204,12 +205,34 @@ function bestShelf(blocks: Block[], params: LayoutParams) {
   return best.width;
 }
 
+// A pixel minimum depends on the fit scale, which depends on the widths, so widen until it holds.
+function blocksWithMinPx(params: LayoutParams) {
+  const plain = blocksOf(params);
+  let blocks = plain;
+  let minWidth = MIN_FRAME_WIDTH;
+  for (let round = 0; ; round++) {
+    const { spanX, spanY } = pack(blocks, bestShelf(blocks, params));
+    const scale = Math.min(
+      fitScale(spanX, spanY, params.width, params.height, params.bottomInset),
+      MAX_FIT_SCALE,
+    );
+    // Wider cards are only worth it while the header band can still show a title.
+    if (round > 0 && scale * LABEL_BAND < (params.minBandPx ?? 0)) {
+      pack(plain, bestShelf(plain, params));
+      return plain;
+    }
+    const needed = (params.minFramePx ?? 0) / scale;
+    if (needed <= minWidth + EPSILON || round === MAX_WIDEN_ROUNDS) return blocks;
+    minWidth = needed;
+    blocks = blocksOf(params, minWidth);
+  }
+}
+
 function computeLayout(params: LayoutParams): HexLayout {
   const framed = isFramed(params);
   const pad = framed ? PAD : 0;
   const band = framed ? LABEL_BAND : 0;
-  const blocks = blocksOf(params);
-  pack(blocks, bestShelf(blocks, params));
+  const blocks = blocksWithMinPx(params);
   const total = blocks.reduce((sum, b) => sum + b.n, 0);
   const x = new Float64Array(total);
   const y = new Float64Array(total);

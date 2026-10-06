@@ -246,6 +246,29 @@ describe("hexLayout fills the canvas (AC 82)", () => {
   });
 });
 
+describe("hexLayout minimum card width in pixels", () => {
+  it("widens every card to the requested pixels at the resulting fit", () => {
+    const sizes = Array.from({ length: 27 }, (_, i) => (i < 5 ? 3 : 1));
+    const base = params(sizes, { group: "workload", width: 1230, height: 600, bottomInset: INSET });
+    const narrow = hexLayout(base);
+    const narrowScale = fit(narrow.bounds, 1230, 600, INSET).scale;
+    expect(narrow.frames.some((f) => (f.right - f.left) * narrowScale < 175)).toBe(true);
+    const wide = hexLayout({ ...base, minFramePx: 175, minBandPx: 16 });
+    const scale = fit(wide.bounds, 1230, 600, INSET).scale;
+    for (const f of wide.frames)
+      expect((f.right - f.left) * scale).toBeGreaterThanOrEqual(175 - 1e-6);
+    expect(2 * scale).toBeGreaterThanOrEqual(16);
+  });
+
+  it("does not widen when wider cards would shrink the header band below the title minimum", () => {
+    const sizes = Array.from({ length: 27 }, (_, i) => (i < 5 ? 3 : 1));
+    const base = params(sizes, { group: "workload", width: 343, height: 414, bottomInset: INSET });
+    const widths = (l: ReturnType<typeof hexLayout>) => l.frames.map((f) => f.right - f.left);
+    const plain = widths(hexLayout(base));
+    expect(widths(hexLayout({ ...base, minFramePx: 175, minBandPx: 16 }))).toEqual(plain);
+  });
+});
+
 describe("hexLayout at high cardinality (AC 99)", () => {
   const pod = (i: number, labels: Record<string, string>, workload: number): PodRow =>
     ({
@@ -325,14 +348,5 @@ describe("group titles (AC 83)", () => {
     expect(sixPx(ta)).toBeLessThanOrEqual(72);
     expect(ta).not.toBe(tb);
     expect(middleTruncate("short", 72, sixPx)).toBe("short");
-  });
-
-  it("never cuts into a pinned head, and drops the title when the head cannot fit", () => {
-    const title = "Deployment · recommendation-service";
-    const cut = middleTruncate(title, 120, sixPx, "Deployment · ".length);
-    expect(cut.startsWith("Deployment · ")).toBe(true);
-    expect(cut).toContain("…");
-    expect(sixPx(cut)).toBeLessThanOrEqual(120);
-    expect(middleTruncate(title, 60, sixPx, "Deployment · ".length)).toBe("");
   });
 });

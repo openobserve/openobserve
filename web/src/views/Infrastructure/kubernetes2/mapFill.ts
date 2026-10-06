@@ -47,8 +47,6 @@ export interface RowGroup {
 
 export interface GroupHeader {
   title: string;
-  // A workload's kind must survive truncation, so the title is pinned up to here.
-  pin: number;
   count: string;
   summary: { cls: StatusClass; count: number }[];
   word: { text: string; tone: StatusClass | null } | null;
@@ -60,6 +58,16 @@ export interface GroupedRows {
   groups: RowGroup[];
   totalGroups: number;
 }
+
+export const SHORT_KIND: Record<string, string> = {
+  Deployment: "deploy",
+  DaemonSet: "ds",
+  StatefulSet: "sts",
+  ReplicaSet: "rs",
+  Job: "job",
+  CronJob: "cj",
+  Pod: "pod",
+};
 
 // A label key can have thousands of values; this bounds the cards drawn and laid out.
 export const MAX_LABEL_GROUPS = 100;
@@ -211,7 +219,7 @@ function groupOf(row: MapRow, group: MapGroup): Omit<RowGroup, "rows"> {
   if (!owner) return { ...blank, id: "noOwner", special: "noOwner" };
   return {
     id: `wl|${row.namespace}|${owner.kind}|${owner.name}`,
-    name: `${owner.kind} · ${owner.name}`,
+    name: owner.name,
     special: null,
     owner,
     namespace: row.namespace,
@@ -230,7 +238,8 @@ function labelGroupOf(row: MapRow, key: string): Omit<RowGroup, "rows"> {
 function disambiguateWorkloads(groups: RowGroup[]) {
   const seen = new Map<string, number>();
   for (const g of groups) if (!g.special) seen.set(g.name, (seen.get(g.name) ?? 0) + 1);
-  for (const g of groups) if (!g.special && seen.get(g.name)! > 1) g.name += ` (${g.namespace})`;
+  for (const g of groups)
+    if (!g.special && seen.get(g.name)! > 1) g.name = `${g.namespace}/${g.name}`;
 }
 
 function capLabelGroups(sorted: RowGroup[]): RowGroup[] {

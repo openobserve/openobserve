@@ -27,6 +27,7 @@ import {
   legendClasses,
   listTarget,
   MAX_LABEL_GROUPS,
+  SHORT_KIND,
   noLabelCounts,
   statusClass,
   statusCounts,
@@ -203,7 +204,7 @@ describe("mapFill groups (AC 44, 45)", () => {
     ]);
   });
 
-  it("titles a workload group Kind · name, adding the namespace only when two would read alike (AC 83)", () => {
+  it("titles a workload group by its name, as ns/name only when two would read alike", () => {
     const rows = [
       pod({ name: "a", workload: { kind: "Deployment", name: "api" } }),
       pod({ name: "b", workload: { kind: "Deployment", name: "api" } }),
@@ -215,9 +216,9 @@ describe("mapFill groups (AC 44, 45)", () => {
       "workload",
     );
     expect(groups.map((g) => [g.name, g.namespace, g.rows.length])).toEqual([
-      ["Deployment · api (ns)", "ns", 2],
-      ["DaemonSet · agent", "ns", 1],
-      ["Deployment · api (other)", "other", 1],
+      ["ns/api", "ns", 2],
+      ["agent", "ns", 1],
+      ["other/api", "other", 1],
       ["", "", 1],
     ]);
     expect(groups[3].special).toBe("noOwner");
@@ -325,6 +326,20 @@ describe("mapFill label groups (AC 96)", () => {
       pod({ name: `w${i}`, workload: { kind: "Deployment", name: `svc-${i}` } }),
     );
     expect(groupRows(rows, "workload").groups).toHaveLength(300);
+  });
+});
+
+describe("mapFill short kinds", () => {
+  it("names each workload kind as kubectl does", () => {
+    expect(SHORT_KIND).toEqual({
+      Deployment: "deploy",
+      DaemonSet: "ds",
+      StatefulSet: "sts",
+      ReplicaSet: "rs",
+      Job: "job",
+      CronJob: "cj",
+      Pod: "pod",
+    });
   });
 });
 

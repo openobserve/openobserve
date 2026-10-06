@@ -114,6 +114,10 @@ const LINE_OFFSET_PX = 8;
 
 const CARD_RADIUS_PX = 12;
 
+const TITLE_CHARS = 18;
+
+const SAMPLE_TEXT = "abcdefghijklmnopqrstuvwxyz-0123456789";
+
 // 16px is the CSS default root size when no stylesheet sets one.
 const DEFAULT_REM_PX = 16;
 
@@ -147,6 +151,8 @@ const layout = computed<HexLayout | null>(() =>
         width: size.value.width,
         height: size.value.height,
         bottomInset: bottomInset.value,
+        minFramePx: props.group === "workload" ? workloadCardPx() : 0,
+        minBandPx: LINE_ONE_MIN_PX,
       })
     : null,
 );
@@ -249,13 +255,22 @@ function requestRender() {
   });
 }
 
+// Workload names are long and line 1 must always show one, so these cards get ~18 average chars.
+function workloadCardPx() {
+  const perChar = textWidth(SAMPLE_TEXT, TITLE_FONT) / SAMPLE_TEXT.length;
+  return TITLE_CHARS * perChar + textWidth("99", COUNT_FONT) + 3 * HEADER_PAD_PX;
+}
+
 function textWidth(text: string, font: string) {
   return format.getTextRect(text, font).width;
 }
 
 function summaryText(header: GroupHeader) {
   const word = header.word ? `{${header.word.tone ?? "neutral"}|${header.word.text}}  ` : "";
-  return word + header.summary.map((s) => `{${s.cls}|${GLYPH[s.cls]}} ${s.count}`).join("  ");
+  const counts = header.summary.map(
+    (s) => `{${s.count === 0 ? "neutral" : s.cls}|${GLYPH[s.cls]} ${s.count}}`,
+  );
+  return word + counts.join("  ");
 }
 
 function headerTexts(
@@ -276,7 +291,7 @@ function headerTexts(
       x: x0 + HEADER_PAD_PX,
       y: lineOne,
       style: {
-        text: middleTruncate(header.title, titleWidth, (s) => textWidth(s, TITLE_FONT), header.pin),
+        text: middleTruncate(header.title, titleWidth, (s) => textWidth(s, TITLE_FONT)),
         fill: colors.heading,
         font: TITLE_FONT,
         verticalAlign: "middle",

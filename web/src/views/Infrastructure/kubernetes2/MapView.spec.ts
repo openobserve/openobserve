@@ -257,20 +257,24 @@ describe("MapView groups (AC 44, 45)", () => {
   it("groups by workload: Deployment via ReplicaSet, DaemonSet, and No owner", async () => {
     await mountView(mapState({ group: "workload" }));
     const headers = hexMap().props("headers");
-    const gatewayHeader = headers.find((h: any) => h.title === "Deployment · api-gateway");
-    expect(gatewayHeader.pin).toBe("Deployment · ".length);
-    expect(headers.find((h: any) => h.title === "No owner").pin).toBe(0);
+    expect(headers.find((h: any) => h.title === "api-gateway").word).toEqual({
+      text: "deploy",
+      tone: null,
+    });
+    expect(headers.find((h: any) => h.title === "fluent-bit").word).toEqual({
+      text: "ds",
+      tone: null,
+    });
+    expect(headers.find((h: any) => h.title === "No owner").word).toBeNull();
     const { groups } = groupRows(inventory().pods, "workload");
     const named = (name: string) => groups.find((g) => g.name === name)!;
     expect(
-      named("Deployment · api-gateway")
+      named("api-gateway")
         .rows.map((r) => r.name)
         .sort(),
     ).toEqual(["api-gateway-5d8f7c9b4f-m3n7q", "api-gateway-5d8f7c9b4f-x2k9p"]);
-    expect(
-      named("DaemonSet · fluent-bit").rows.every((r) => r.name.startsWith("fluent-bit-")),
-    ).toBe(true);
-    expect(named("DaemonSet · fluent-bit").rows).toHaveLength(4);
+    expect(named("fluent-bit").rows.every((r) => r.name.startsWith("fluent-bit-"))).toBe(true);
+    expect(named("fluent-bit").rows).toHaveLength(4);
     expect(groups.find((g) => g.special === "noOwner")!.rows.map((r) => r.name)).toEqual([
       "debug-shell",
     ]);
@@ -513,7 +517,7 @@ describe("MapView accessibility and fallback (AC 51)", () => {
     await mountView(mapState({ group: "workload" }));
     const gateway = wrapper
       .findAll('[data-test="k8s2-map-group-link"]')
-      .find((l) => l.text().startsWith("Deployment · api-gateway"))!;
+      .find((l) => l.text().startsWith("api-gateway"))!;
     await gateway.trigger("click");
     expect(wrapper.emitted("open")).toEqual([
       [{ kind: "deployment", cluster: GEN, namespace: "gateway", name: "api-gateway" }],
@@ -597,6 +601,15 @@ describe("MapView label filter: hidden, not dimmed (AC 79)", () => {
 
   it("notes that the list ignores the filter, and Show as list stays enabled", async () => {
     await mountView(mapState({ filter: GATEWAY }), labelledInventory());
+    expect(
+      wrapper.find('[data-test="k8s2-map-filter-chips"] [data-test="k8s2-map-list-note"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.find('[data-test="k8s2-list-header"] [data-test="k8s2-map-show-list"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.find('[data-test="k8s2-map-controls"] [data-test="k8s2-map-show-list"]').exists(),
+    ).toBe(false);
     expect(wrapper.find('[data-test="k8s2-map-list-note"]').text()).toBe(
       "List ignores the map filter",
     );

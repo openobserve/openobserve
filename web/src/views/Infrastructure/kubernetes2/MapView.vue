@@ -54,6 +54,7 @@ import {
   legendClasses,
   listTarget,
   noLabelCounts,
+  SHORT_KIND,
   statusCounts,
   type FillClass,
   type GroupHeader,
@@ -262,10 +263,9 @@ const headers = computed<GroupHeader[]>(() =>
       g.special === "noLabel" ? t("infra.k8s2.mapNoLabelSplit", noLabelCounts(g)) : undefined;
     return {
       title: shortNames.value.get(g.id) ?? title,
-      pin: props.state.group === "workload" && g.owner ? `${g.owner.kind} · `.length : 0,
       count: String(g.rows.length),
       summary,
-      word: props.state.group === "node" && !g.special ? nodeWord(g.name) : null,
+      word: wordOf(g),
       tip: groupCard(title, count, summary, t, note),
       clickable: linkOf(g) != null,
     };
@@ -316,6 +316,13 @@ function fullTitle(g: RowGroup): string {
   if (g.special === "noLabel") return t("infra.k8s2.mapNoLabel", { key: labelKey.value ?? "" });
   if (g.special === "other") return t("infra.k8s2.mapOtherGroups", { count: g.merged ?? 0 });
   return g.name;
+}
+
+function wordOf(g: RowGroup): GroupHeader["word"] {
+  if (g.special) return null;
+  if (props.state.group === "node") return nodeWord(g.name);
+  const kind = props.state.group === "workload" ? g.owner?.kind : undefined;
+  return kind ? { text: SHORT_KIND[kind] ?? kind.toLowerCase(), tone: null } : null;
 }
 
 function nodeWord(name: string): GroupHeader["word"] {
@@ -420,6 +427,15 @@ function linkText(g: RowGroup): I18nText {
       @clear="clearFilters"
     >
       <template #trailing>
+        <OButton
+          class="shrink-0"
+          variant="ghost-primary"
+          size="xs"
+          data-test="k8s2-map-show-list"
+          @click="showList"
+        >
+          {{ t("infra.k8s2.mapShowAsList") }}
+        </OButton>
         <ORefreshButton
           :last-run-at="lastUpdatedAt"
           :loading="loading"
@@ -479,19 +495,6 @@ function linkText(g: RowGroup): I18nText {
         </template>
         <template #trigger>{{ filterTrigger }}</template>
       </OSelect>
-      <div class="ms-auto flex items-center gap-2">
-        <OText
-          v-if="state.filter.length"
-          tag="span"
-          class="text-text-secondary text-xs"
-          data-test="k8s2-map-list-note"
-        >
-          {{ t("infra.k8s2.mapListNote") }}
-        </OText>
-        <OButton variant="ghost-primary" size="xs" data-test="k8s2-map-show-list" @click="showList">
-          {{ t("infra.k8s2.mapShowAsList") }}
-        </OButton>
-      </div>
     </div>
     <div
       v-if="state.filter.length"
@@ -516,6 +519,9 @@ function linkText(g: RowGroup): I18nText {
       >
         {{ t("infra.k8s2.mapFilterClear") }}
       </OButton>
+      <OText tag="span" class="text-text-secondary ms-auto text-xs" data-test="k8s2-map-list-note">
+        {{ t("infra.k8s2.mapListNote") }}
+      </OText>
     </div>
     <OEmptyState
       v-if="anchorMissing"
