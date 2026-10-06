@@ -54,12 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </div>
-        <!-- Icon-only on a narrow bar: the full label otherwise squeezes the panel title to nothing. -->
+        <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
           size="sm"
-          class="shrink-0"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
           data-test="dashboard-panel-curated-badge"
           :aria-label="curatedBadgeText"
         >
