@@ -922,39 +922,32 @@ pub fn convert_json_to_record_batch(
         .map(|(idx, f)| (f.name().as_str(), idx))
         .collect();
 
-    // Utf8 builders otherwise start at 1 KiB of values and double as they grow;
-    // the memtable keeps whatever capacity they ended with until the file rotates.
-    let mut value_bytes = vec![0usize; num_fields];
-    for record in data.iter() {
-        if let Some(obj) = record.as_object() {
-            for (key, value) in obj.iter() {
-                if let Some(&idx) = field_indices.get(key.as_str()) {
-                    value_bytes[idx] += match value {
-                        serde_json::Value::String(s) => s.len(),
-                        serde_json::Value::Null => 0,
-                        serde_json::Value::Bool(_) => 5,
-                        serde_json::Value::Number(_) => 20,
-                        _ => 64,
-                    };
-                }
-            }
-        }
-    }
-
     let mut builders: Vec<Box<dyn ArrayBuilder>> = schema
         .fields()
         .iter()
-        .zip(value_bytes.iter())
-        .map(|(f, &bytes)| -> Box<dyn ArrayBuilder> {
-            match f.data_type() {
-                DataType::Utf8 => Box::new(StringBuilder::with_capacity(records_len, bytes)),
-                DataType::LargeUtf8 => {
-                    Box::new(LargeStringBuilder::with_capacity(records_len, bytes))
+        .map(|f| -> Result<Box<dyn ArrayBuilder>, ArrowError> {
+            Ok(match f.data_type() {
+                DataType::Utf8 | DataType::LargeUtf8 => {
+                    let bytes = data.iter().try_fold(0usize, |bytes, record| {
+                        bytes
+                            .checked_add(json_string_value_bytes(&record[f.name()]))
+                            .ok_or_else(|| {
+                                ArrowError::MemoryError(
+                                    "String value capacity overflow".to_string(),
+                                )
+                            })
+                    })?;
+                    match f.data_type() {
+                        DataType::Utf8 => {
+                            Box::new(StringBuilder::with_capacity(records_len, bytes))
+                        }
+                        _ => Box::new(LargeStringBuilder::with_capacity(records_len, bytes)),
+                    }
                 }
                 dt => make_builder(dt, records_len),
-            }
+            })
         })
-        .collect();
+        .collect::<Result<_, _>>()?;
 
     // Cache data types for faster access
     let data_types: Vec<&DataType> = schema.fields().iter().map(|f| f.data_type()).collect();
@@ -994,6 +987,27 @@ pub fn convert_json_to_record_batch(
         .collect();
 
     RecordBatch::try_new(schema.clone(), cols)
+}
+
+// Keep the byte count identical to the Utf8 and LargeUtf8 append formatting.
+fn json_string_value_bytes(value: &serde_json::Value) -> usize {
+    match value {
+        serde_json::Value::String(s) => s.len(),
+        serde_json::Value::Bool(true) => 4,
+        serde_json::Value::Bool(false) => 5,
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                itoa::Buffer::new().format(i).len()
+            } else if let Some(u) = n.as_u64() {
+                itoa::Buffer::new().format(u).len()
+            } else if let Some(f) = n.as_f64() {
+                ryu::Buffer::new().format(f).len()
+            } else {
+                0
+            }
+        }
+        _ => 0,
+    }
 }
 
 /// Fast append value with zero-copy optimization and inline type conversion
@@ -2296,11 +2310,134 @@ mod test {
     }
 
     #[test]
+    fn test_json_string_value_bytes_matches_append() {
+        let values = vec![
+            serde_json::json!(null),
+            serde_json::json!(""),
+            serde_json::json!("é雪🦀"),
+            serde_json::json!(true),
+            serde_json::json!(false),
+            serde_json::json!(i64::MIN),
+            serde_json::json!(i64::MAX),
+            serde_json::json!(u64::MAX),
+            serde_json::json!(-0.0),
+            serde_json::json!(1.2345678901234567),
+            serde_json::json!(f64::MIN_POSITIVE),
+            serde_json::json!(f64::MAX),
+            serde_json::from_str("18446744073709551616").unwrap(),
+            serde_json::from_str("1e400").unwrap(),
+            serde_json::json!([]),
+            serde_json::json!({"nested": "ignored"}),
+        ];
+        for data_type in [DataType::Utf8, DataType::LargeUtf8] {
+            for value in &values {
+                let mut builder = make_builder(&data_type, 1);
+                append_value_optimized(&mut builder, &data_type, value).unwrap();
+                let array = builder.finish();
+                let bytes = array.to_data().buffers()[1].len();
+                assert_eq!(json_string_value_bytes(value), bytes, "{value}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_string_capacity_and_values() {
+        for data_type in [DataType::Utf8, DataType::LargeUtf8] {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("s", data_type.clone(), true),
+                Field::new("n", DataType::Int64, true),
+                Field::new("absent", data_type.clone(), true),
+            ]));
+            let data = vec![
+                Arc::new(serde_json::json!({"s": "é雪🦀", "n": 7, "extra": "ignored"})),
+                Arc::new(serde_json::json!({"s": ""})),
+                Arc::new(serde_json::json!({"s": null})),
+                Arc::new(serde_json::json!({"n": 8})),
+                Arc::new(serde_json::json!({"s": true})),
+                Arc::new(serde_json::json!({"s": false})),
+                Arc::new(serde_json::json!({"s": -42})),
+                Arc::new(serde_json::json!({"s": u64::MAX})),
+                Arc::new(serde_json::json!({"s": 1.5})),
+                Arc::new(serde_json::json!({"s": [1, 2]})),
+                Arc::new(serde_json::json!({"s": {"key": "value"}})),
+            ];
+            let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+            assert_eq!(batch.schema(), schema);
+            assert_eq!(batch.num_rows(), data.len());
+            let expected = vec![
+                Some("é雪🦀"),
+                Some(""),
+                None,
+                None,
+                Some("true"),
+                Some("false"),
+                Some("-42"),
+                Some("18446744073709551615"),
+                Some("1.5"),
+                Some(""),
+                Some(""),
+            ];
+            let col = batch.column(0);
+            let actual: Vec<_> = match data_type {
+                DataType::Utf8 => col
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap()
+                    .iter()
+                    .collect(),
+                _ => col
+                    .as_any()
+                    .downcast_ref::<LargeStringArray>()
+                    .unwrap()
+                    .iter()
+                    .collect(),
+            };
+            assert_eq!(actual, expected);
+            let expected_bytes: usize = expected.iter().flatten().map(|s| s.len()).sum();
+            assert_eq!(col.to_data().buffers()[1].len(), expected_bytes);
+            assert!(col.to_data().buffers()[1].capacity() < 1024);
+            assert_eq!(batch.column(2).null_count(), data.len());
+            assert_eq!(batch.column(2).to_data().buffers()[1].capacity(), 0);
+            let numbers = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            assert_eq!(numbers.value(0), 7);
+            assert_eq!(numbers.value(3), 8);
+            assert_eq!(numbers.null_count(), data.len() - 2);
+        }
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_string_capacity_above_default() {
+        for data_type in [DataType::Utf8, DataType::LargeUtf8] {
+            let schema = Arc::new(Schema::new(vec![Field::new("s", data_type, true)]));
+            let data = vec![Arc::new(serde_json::json!({"s": "x".repeat(1500)}))];
+            let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+            let array = batch.column(0).to_data();
+            assert_eq!(array.buffers()[1].len(), 1500);
+            assert!(array.buffers()[1].capacity() < 2048);
+        }
+    }
+
+    #[test]
     fn test_convert_json_to_record_batch_non_object_error() {
-        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
-        let data = vec![Arc::new(serde_json::json!([1, 2, 3]))];
-        let result = convert_json_to_record_batch(&schema, &data);
-        assert!(result.is_err());
+        for data_type in [DataType::Utf8, DataType::LargeUtf8] {
+            let schema = Arc::new(Schema::new(vec![Field::new("a", data_type, true)]));
+            for value in [
+                serde_json::json!([1, 2, 3]),
+                serde_json::json!(null),
+                serde_json::json!("text"),
+                serde_json::json!(42),
+            ] {
+                let data = vec![Arc::new(serde_json::json!({"a": "valid"})), Arc::new(value)];
+                let error = convert_json_to_record_batch(&schema, &data).unwrap_err();
+                assert!(
+                    matches!(error, ArrowError::SchemaError(message) if message == "Expected JSON object")
+                );
+            }
+        }
     }
 
     #[test]
