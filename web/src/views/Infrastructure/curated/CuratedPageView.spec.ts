@@ -155,11 +155,17 @@ const setupCardStub = defineComponent({
 
 // Declares the REAL DateTime props under test, so an unpassed one is observable
 // rather than swallowed into $attrs by inheritAttrs:false.
+const absoluteTimeCalls: [number, number][] = [];
 const dateTimeStub = defineComponent({
   name: "DateTime",
   inheritAttrs: false,
   props: ["defaultType", "defaultRelativeTime", "autoApply", "menuAlign"],
   emits: ["on:date-change"],
+  methods: {
+    setAbsoluteTime(from: number, to: number) {
+      absoluteTimeCalls.push([from, to]);
+    },
+  },
   template: "<div data-test='curated-datetime-stub' />",
 });
 
@@ -267,6 +273,12 @@ describe("CuratedPageView", () => {
       await retry.trigger("click");
       await flushPromises();
       expect(refreshSpy).toHaveBeenCalledWith(expect.objectContaining({ force: true }));
+    });
+
+    it("the setup face drops the range picker: there is nothing to chart over a range", async () => {
+      wrapper = await mountView({}, { face: ref("undetected"), dashboard: ref(null) });
+      expect(wrapper.find('[data-test="curated-datetime-stub"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-refresh"]').exists()).toBe(true);
     });
 
     it("`undetected` on kubernetes renders the inline setup card for the k8s slug", async () => {
@@ -1076,6 +1088,30 @@ describe("CuratedPageView", () => {
       expect(banner.text()).not.toContain("1970");
       expect(banner.text()).not.toMatch(/\d{5,} days?/);
       expect(banner.text().toLowerCase()).toContain("no data yet");
+    });
+
+    it("several stale sources render ONE banner that lists each of them", async () => {
+      const state = staleState();
+      state.staleGroups.value.push({
+        ...state.staleGroups.value[0],
+        group: { ...state.staleGroups.value[0].group, id: "kubelet-node" },
+      });
+      wrapper = await mountView({}, state);
+      expect(wrapper.findAll('[data-test="curated-stale-banner"]')).toHaveLength(1);
+      expect(wrapper.findAll('[data-test="curated-stale-banner-row"]')).toHaveLength(2);
+    });
+
+    it("the banner offers the jump only once the window runs past the last data", async () => {
+      wrapper = await mountView({}, staleState());
+      // The fixture clock sits years past the real one, so the default window ends before the data.
+      expect(wrapper.find('[data-test="curated-stale-jump-to-data"]').exists()).toBe(false);
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: NOW_US - 3 * HOUR_US,
+        endTime: NOW_US,
+        userChangedValue: true,
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="curated-stale-jump-to-data"]').exists()).toBe(true);
     });
 
     it("the 'as of the last stream-list refresh' caveat is TOOLTIP-only", async () => {
@@ -2059,7 +2095,26 @@ describe("CuratedPageView", () => {
       // It names what stopped and when.
       const text = wrapper.find('[data-test="curated-dormant-stream"]').text();
       expect(text).toContain("k8s_node_cpu_usage");
-      expect(text).toContain("stopped reporting");
+      expect(text).toContain("no data for");
+    });
+
+    it("offers ONE click to the last window every source was still reporting", async () => {
+      absoluteTimeCalls.length = 0;
+      wrapper = await mountView(
+        {},
+        { face: ref("dormant"), dashboard: ref(null), hiddenGroups: ref([deadGroup()]) },
+      );
+      const last = NOW_US - 120 * HOUR_US;
+      const jump = wrapper.find('[data-test="curated-jump-to-data"]');
+      expect(jump.exists()).toBe(true);
+      refreshSpy.mockClear();
+      await jump.trigger("click");
+      await flushPromises();
+      // The picker must show the window the panels now read, or the header lies.
+      expect(absoluteTimeCalls).toEqual([[last - 3 * HOUR_US, last + 1_000_000]]);
+      expect(refreshSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ start: last - 3 * HOUR_US, end: last + 1_000_000, force: true }),
+      );
     });
 
     it("M1: a PRESENT group's strip row offers no Set-up — its collector already works", async () => {

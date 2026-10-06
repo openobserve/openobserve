@@ -29,6 +29,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
@@ -142,6 +143,12 @@ const partialTelemetryKey = computed(() => {
   return "infra.curated.partialTelemetryKubernetes" as const;
 });
 
+// A range picker over a page with nothing to chart is a control that does nothing.
+const showRangeControls = computed(
+  () =>
+    hasPack.value && face.value !== "undetected" && !(face.value === "unknown" && loadError.value),
+);
+
 const openSetupRoute = () => {
   const door = setupDoor.value;
   if (door?.kind === "route") router.push({ name: door.routeName });
@@ -218,10 +225,16 @@ const hasStrip = computed(
 
 const collapsedCapabilities = computed<I18nText>(() => {
   const sentences = hiddenGroups.value.map((hidden) => t(hidden.group.capabilityKey));
-  // With nothing hidden the strip only carries stale or partial groups, which have no capability sentence to show.
-  const labels = [...staleGroups.value, ...partialGroups.value].map((entry) =>
-    t(entry.group.labelKey),
+  // Partial groups hide individual panels, which is the fact worth leading with when no whole group is gone.
+  const partialPanels = partialGroups.value.reduce(
+    (sum, partial) => sum + partial.hiddenPanelIds.length,
+    0,
   );
+  if (sentences.length === 0 && partialPanels > 0) {
+    return t("infra.curated.hiddenPanelCount", { count: partialPanels }, partialPanels);
+  }
+  // With nothing hidden or partial the strip only carries stale groups, which have no capability sentence.
+  const labels = staleGroups.value.map((entry) => t(entry.group.labelKey));
   const items = sentences.length > 0 ? sentences : [...new Set(labels)];
   const separator = sentences.length > 0 ? " " : ", ";
   if (items.length === 0) return raw("");
@@ -239,18 +252,27 @@ const staleStreams = (hidden: HiddenGroupInfo) =>
   hidden.missingStreams.filter((entry) => entry.state === "stale");
 
 const formatUs = (value: number | null | undefined) =>
-  value == null ? "" : timestampToTimezoneDate(Math.floor(value / 1000), timezone.value);
+  value == null
+    ? ""
+    : timestampToTimezoneDate(Math.floor(value / 1000), timezone.value, "yyyy-MM-dd HH:mm");
 
 /** Dormant face: every group whose streams exist but stopped reporting. */
 const dormantGroups = computed(() =>
   hiddenGroups.value
     .map((hidden) => ({ hidden, stale: staleStreams(hidden) }))
     .filter((entry) => entry.stale.length > 0)
-    .map(({ hidden, stale }) => ({
-      group: hidden.group,
-      streams: stale.map((entry) => entry.name).join(", "),
-      date: formatUs(Math.max(...stale.map((entry) => entry.lastSeenUs ?? 0))),
-    })),
+    .map(({ hidden, stale }) => {
+      const lastSeenUs = Math.max(...stale.map((entry) => entry.lastSeenUs ?? 0));
+      return {
+        group: hidden.group,
+        streams: stale.map((entry) => entry.name).join(", "),
+        lastSeenUs,
+        lastSeen: t("infra.curated.staleBadge", {
+          duration: humanDuration(lastSeenUs),
+          date: formatUs(lastSeenUs),
+        }),
+      };
+    }),
 );
 
 const expandedSetupSlug = ref<string | null>(null);
@@ -277,6 +299,7 @@ const staleDurations = computed(() =>
     const noDataYet = stale.noDataYet === true || !stale.lastSeenUs;
     return {
       id: stale.group.id,
+      noDataYet,
       key: noDataYet ? "infra.curated.staleNoDataBanner" : "infra.curated.staleBanner",
       // The label, not the capability sentence: "... are unavailable stopped 3 hours ago" does not parse.
       capability: t(stale.group.labelKey),
@@ -295,6 +318,53 @@ function humanDuration(sinceUs: number): string {
   if (hours < 48) return t("infra.curated.durationHours", { count: hours });
   return t("infra.curated.durationDays", { count: Math.floor(hours / 24) });
 }
+
+// ── Jump to latest data ─────────────────────────────────────────────────────
+
+const JUMP_END_NUDGE_US = 1_000_000;
+const JUMP_TOLERANCE_US = 10 * 60 * 1_000_000;
+
+// The EARLIEST stop: up to then every source was reporting, so the jumped-to page is complete.
+const lastCompleteUs = computed<number | null>(() => {
+  const seen =
+    face.value === "dormant"
+      ? dormantGroups.value.map((entry) => entry.lastSeenUs)
+      : staleGroups.value.filter((stale) => !stale.noDataYet).map((stale) => stale.lastSeenUs);
+  const known = seen.filter((value) => value > 0);
+  return known.length > 0 ? Math.min(...known) : null;
+});
+
+const jumpTarget = computed(() => {
+  const last = lastCompleteUs.value;
+  if (last === null) return null;
+  return {
+    from: last - periodWidthUs(manifest.value.defaultRelativePeriod),
+    to: last + JUMP_END_NUDGE_US,
+  };
+});
+
+const showStaleJump = computed(
+  () => lastCompleteUs.value !== null && range.value.to > lastCompleteUs.value + JUMP_TOLERANCE_US,
+);
+
+const jumpLabel = computed(() =>
+  lastCompleteUs.value === null
+    ? raw("")
+    : t("traces.tracesNoEventsState.lastData", {
+        formatted: formatUs(lastCompleteUs.value),
+        zone: timezone.value,
+      }),
+);
+
+const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
+
+const jumpToLatestData = () => {
+  const target = jumpTarget.value;
+  if (!target) return;
+  selectedWindow.value = { kind: "absolute", from: target.from, to: target.to };
+  (dateTimeRef.value as any)?.setAbsoluteTime?.(target.from, target.to);
+  void runRefresh(true);
+};
 
 // ── Warnings ────────────────────────────────────────────────────────────────
 
@@ -490,9 +560,11 @@ watch(
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime
+          v-if="showRangeControls"
+          ref="dateTimeRef"
           auto-apply
           menu-align="end"
-          :default-type="'relative'"
+          :default-type="selectedWindow.kind"
           :default-relative-time="manifest.defaultRelativePeriod"
           data-test-name="curated-date-time"
           @on:date-change="onDateChange"
@@ -570,12 +642,12 @@ watch(
         class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
         data-test="curated-setup-state"
       >
-        <OText tag="h2" class="text-xl font-semibold">{{
-          t("infra.workload.setupHeadline")
-        }}</OText>
-        <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
-          t(partialTelemetryKey)
-        }}</OText>
+        <div class="flex flex-col gap-1 px-3">
+          <OText data-test="curated-setup-lead">{{ t("infra.workload.setupHeadline") }}</OText>
+          <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
+            t(partialTelemetryKey)
+          }}</OText>
+        </div>
         <DataSourceSetupCard
           v-if="setupDoor?.kind === 'card'"
           :slug="setupDoor.slug"
@@ -606,22 +678,35 @@ watch(
         :title="t('infra.curated.dormantHeadline', { workload: t(manifest.titleKey) })"
         :description="t('infra.curated.dormantBody')"
       >
+        <template #actions>
+          <EmptyStateActionCard
+            v-if="jumpTarget"
+            icon="schedule"
+            :label="t('traces.noEvents.jumpToData')"
+            :sublabel="jumpLabel"
+            data-test="curated-jump-to-data"
+            @click="jumpToLatestData"
+          />
+        </template>
         <template #extra>
-          <div class="flex w-full max-w-xl flex-col gap-2 text-start">
-            <OBanner
+          <ul
+            class="border-border-default divide-border-default rounded-surface flex w-full max-w-xl flex-col divide-y border text-start"
+          >
+            <li
               v-for="hidden in dormantGroups"
               :key="hidden.group.id"
-              variant="warning"
-              dense
+              class="flex flex-col gap-1.5 px-4 py-3"
               data-test="curated-dormant-stream"
-              :content="
-                t('infra.curated.streamsStale', {
-                  list: hidden.streams,
-                  date: hidden.date,
-                })
-              "
-            />
-          </div>
+            >
+              <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
+                <OText variant="meta">{{ hidden.lastSeen }}</OText>
+              </div>
+              <p class="leading-5">
+                <OText variant="mono">{{ raw(hidden.streams) }}</OText>
+              </p>
+            </li>
+          </ul>
         </template>
       </OEmptyState>
     </div>
@@ -645,20 +730,56 @@ watch(
       >
         <template #before_panels>
           <div class="flex flex-col gap-2 pb-2">
+            <!-- One banner per outage: a stack of near-identical warnings buries the panels it qualifies. -->
             <OBanner
-              v-for="stale in staleDurations"
-              :key="stale.id"
+              v-if="staleDurations.length > 0"
               variant="warning"
               dense
+              inline-actions
               data-test="curated-stale-banner"
-              :content="
-                t(stale.key as never, {
-                  capability: stale.capability,
-                  duration: stale.duration,
-                  date: stale.date,
+            >
+              <template v-if="staleDurations.length === 1">{{
+                t(staleDurations[0].key as never, {
+                  capability: staleDurations[0].capability,
+                  duration: staleDurations[0].duration,
+                  date: staleDurations[0].date,
                 })
-              "
-            />
+              }}</template>
+              <div v-else class="flex flex-col gap-1">
+                <span>{{ t("infra.curated.staleSummary") }}</span>
+                <ul class="flex flex-col gap-0.5">
+                  <li
+                    v-for="stale in staleDurations"
+                    :key="stale.id"
+                    class="flex flex-wrap gap-x-2"
+                    data-test="curated-stale-banner-row"
+                  >
+                    <span class="font-medium">{{ stale.capability }}</span>
+                    <span>{{
+                      stale.noDataYet
+                        ? t("infra.curated.staleNoDataBadge")
+                        : t("infra.curated.staleBadge", {
+                            duration: stale.duration,
+                            date: stale.date,
+                          })
+                    }}</span>
+                  </li>
+                </ul>
+              </div>
+              <!-- Always passed: OBanner reads its slots once, so a slot that appears later never renders. -->
+              <template #actions>
+                <OButton
+                  v-if="showStaleJump"
+                  variant="outline"
+                  size="sm"
+                  icon-left="schedule"
+                  data-test="curated-stale-jump-to-data"
+                  @click="jumpToLatestData"
+                >
+                  {{ t("traces.noEvents.jumpToData") }}
+                </OButton>
+              </template>
+            </OBanner>
 
             <OBanner
               v-for="warning in probeWarnings"
@@ -718,14 +839,18 @@ watch(
                     variant="meta"
                     data-test="curated-strip-streams-missing"
                     >{{
-                      t("infra.curated.streamsMissing", {
-                        count: absentStreams(hidden).length,
-                        list: raw(
-                          absentStreams(hidden)
-                            .map((s) => s.name)
-                            .join(", "),
-                        ),
-                      })
+                      t(
+                        "infra.curated.streamsMissing",
+                        {
+                          count: absentStreams(hidden).length,
+                          list: raw(
+                            absentStreams(hidden)
+                              .map((s) => s.name)
+                              .join(", "),
+                          ),
+                        },
+                        absentStreams(hidden).length,
+                      )
                     }}</OText
                   >
                   <OText
@@ -782,11 +907,16 @@ watch(
                   :key="`partial-${partial.group.id}`"
                   class="flex flex-col gap-1"
                 >
+                  <OText>{{ t(partial.group.labelKey) }}</OText>
                   <OText variant="meta">{{
-                    t("infra.curated.streamsMissing", {
-                      count: partial.missingStreams.length,
-                      list: raw(partial.missingStreams.map((s) => s.name).join(", ")),
-                    })
+                    t(
+                      "infra.curated.streamsMissing",
+                      {
+                        count: partial.missingStreams.length,
+                        list: raw(partial.missingStreams.map((s) => s.name).join(", ")),
+                      },
+                      partial.missingStreams.length,
+                    )
                   }}</OText>
                 </div>
 
