@@ -550,6 +550,10 @@ const openUnifiedAnalysisDashboard = () => {
   showAnalysisDashboard.value = true;
 };
 
+const clearOriginalTimeRange = () => {
+  originalTimeRangeBeforeSelection.value = null;
+};
+
 const stopAutoRefresh = () => {
   if (autoRefreshIntervalId.value !== null) {
     clearInterval(autoRefreshIntervalId.value);
@@ -574,6 +578,7 @@ defineExpose({
   getBaseFilters,
   rangeFiltersVersion,
   openUnifiedAnalysisDashboard,
+  clearOriginalTimeRange,
 });
 </script>
 

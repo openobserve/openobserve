@@ -26,6 +26,7 @@ import {
   instantToPickerMs,
   durationBand,
   composeFilter,
+  isRangeSelectionCurrent,
   type LatencyHeatmapHit,
 } from "./latencyHeatmap";
 
@@ -277,5 +278,72 @@ describe("instantToPickerMs", () => {
 
   it("is the identity when the app zone equals the browser zone", () => {
     expect(instantToPickerMs(instantMs, "UTC")).toBe(instantMs);
+  });
+});
+
+describe("isRangeSelectionCurrent", () => {
+  const entry = {
+    panelTitle: "Duration",
+    start: 100_000,
+    end: 500_000,
+    timeStart: 10,
+    timeEnd: 20,
+    appliedStart: 1_000_000,
+    appliedEnd: 2_000_000,
+    baselineFilter: "service_name = 'a'",
+    stream: "default",
+    searchMode: "traces" as const,
+  };
+  const composed = "(service_name = 'a') and duration >= '100ms' and duration < '500ms'";
+  const current = (overrides: Record<string, unknown> = {}) => ({
+    startTime: 1_000_000,
+    endTime: 2_000_000,
+    stream: "default",
+    searchMode: "traces" as const,
+    editorText: composed,
+    ...overrides,
+  });
+
+  it("keeps a selection whose applied range, composed text, stream and mode all match", () => {
+    expect(isRangeSelectionCurrent(entry, current())).toBe(true);
+  });
+
+  it("keeps it when the composed text differs only in whitespace", () => {
+    const spaced = "(service_name  =  'a')\n and duration >= '100ms'   and duration < '500ms' ";
+    expect(isRangeSelectionCurrent(entry, current({ editorText: spaced }))).toBe(true);
+  });
+
+  it("drops it for a different applied range", () => {
+    expect(isRangeSelectionCurrent(entry, current({ endTime: 2_000_001 }))).toBe(false);
+    expect(isRangeSelectionCurrent(entry, current({ startTime: 999_999 }))).toBe(false);
+  });
+
+  it("drops it when the band is removed from the editor", () => {
+    expect(isRangeSelectionCurrent(entry, current({ editorText: "service_name = 'a'" }))).toBe(
+      false,
+    );
+  });
+
+  it("drops it for an unrelated filter edit in the baseline part", () => {
+    const edited = composed.replace("'a'", "'b'");
+    expect(isRangeSelectionCurrent(entry, current({ editorText: edited }))).toBe(false);
+  });
+
+  it("drops it when Error Only appends a span_status term", () => {
+    const toggled = `${composed} and span_status = 'ERROR'`;
+    expect(isRangeSelectionCurrent(entry, current({ editorText: toggled }))).toBe(false);
+  });
+
+  it("keeps a both-null entry whose editor equals its baseline text", () => {
+    const full = { ...entry, start: null, end: null };
+    expect(isRangeSelectionCurrent(full, current({ editorText: "service_name = 'a'" }))).toBe(true);
+  });
+
+  it("drops it for a different stream", () => {
+    expect(isRangeSelectionCurrent(entry, current({ stream: "other" }))).toBe(false);
+  });
+
+  it("drops it for a different search mode", () => {
+    expect(isRangeSelectionCurrent(entry, current({ searchMode: "spans" }))).toBe(false);
   });
 });

@@ -817,6 +817,30 @@ describe("TracesMetricsDashboard", () => {
       expect(analysis().attributes("baselinefilter")).toBeUndefined();
     });
 
+    it("uses the current range for a baseline-only Drill down after clearOriginalTimeRange", async () => {
+      await wrapper.vm.onHeatmapSelect({
+        timeStartUs: 1_200_000,
+        timeEndUs: 1_400_000,
+        durationLoUs: 100,
+        durationHiUs: 500,
+      });
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: 1_000_000,
+        endTime: 2_000_000,
+      });
+      mockMetricsRangeFilters.clear();
+      mockSearchObj.data.datetime = { startTime: 5_000_000, endTime: 6_000_000 };
+
+      wrapper.vm.clearOriginalTimeRange();
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toBeNull();
+      expect(
+        wrapper.findComponent('[data-test="traces-analysis-dashboard"]').props("timeRange"),
+      ).toEqual({ startTime: 5_000_000, endTime: 6_000_000 });
+    });
+
     it("passes no baselineFilter on a baseline-only Drill down", async () => {
       wrapper.vm.openUnifiedAnalysisDashboard();
       await flushPromises();
@@ -964,6 +988,10 @@ describe("TracesMetricsDashboard", () => {
 
     it("should expose the openUnifiedAnalysisDashboard method", () => {
       expect(typeof wrapper.vm.openUnifiedAnalysisDashboard).toBe("function");
+    });
+
+    it("should expose clearOriginalTimeRange", () => {
+      expect(Object.keys(wrapper.vm.$.exposed)).toContain("clearOriginalTimeRange");
     });
   });
 

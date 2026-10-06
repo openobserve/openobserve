@@ -964,6 +964,149 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("Heatmap selection across searches", () => {
+    const mockClearOriginalTimeRange = vi.fn();
+    // Mirrors applyFilterTerm's append, so the Error Only toggle edits the editor text.
+    const mockApplyFiltersAppend = vi.fn((terms: string[]) => {
+      mockSearchObj.data.editorValue = `${mockSearchObj.data.editorValue} and ${terms.join(" and ")}`;
+    });
+    const composed = "(service_name = 'a') and duration >= '100ms' and duration < '500ms'";
+    const APPLIED = { startTime: 1_700_000_000_000_000, endTime: 1_700_000_060_000_000 };
+    const heatmapEntry = (overrides: Record<string, unknown> = {}) => ({
+      panelTitle: "Duration",
+      start: 100_000,
+      end: 500_000,
+      timeStart: APPLIED.startTime,
+      timeEnd: APPLIED.endTime,
+      appliedStart: APPLIED.startTime,
+      appliedEnd: APPLIED.endTime,
+      baselineFilter: "service_name = 'a'",
+      stream: "default",
+      searchMode: "traces",
+      ...overrides,
+    });
+    const savedDatetime = { ...mockSearchObj.data.datetime };
+    const filters = mockSearchObj.meta.metricsRangeFilters as Map<string, any>;
+
+    const mountPage = async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              template: "<div />",
+              setup() {
+                return {
+                  applyFilters: mockApplyFiltersAppend,
+                  removeFilterByField: vi.fn(),
+                  setEditorValue: vi.fn(),
+                };
+              },
+            },
+            "search-result": true,
+            "index-list": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      // SearchResult is not rendered before a search has run, so its ref is set the way the drill-down test does.
+      wrapper.vm.searchResultRef = {
+        metricsDashboardRef: { clearOriginalTimeRange: mockClearOriginalTimeRange },
+        getDashboardData: vi.fn(),
+      };
+      // The state a heatmap box leaves behind, set after mount so page loading cannot disturb it.
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.data.editorValue = composed;
+      Object.assign(mockSearchObj.data.datetime, APPLIED, { type: "absolute" });
+      filters.clear();
+      mockClearOriginalTimeRange.mockClear();
+    };
+
+    afterEach(() => {
+      Object.assign(mockSearchObj.data.datetime, savedDatetime);
+      filters.clear();
+    });
+
+    it("keeps a matching Duration entry across the search and deletes Rate and Errors", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+      filters.set("rate", { panelTitle: "Rate", start: -1, end: -1, timeStart: 1, timeEnd: 2 });
+      filters.set("errors", { panelTitle: "Errors", start: -1, end: -1, timeStart: 1, timeEnd: 2 });
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["applied range", { appliedEnd: APPLIED.endTime - 1_000_000 }],
+      ["editor text", { baselineFilter: "service_name = 'b'" }],
+      ["stream", { stream: "test-stream" }],
+      ["search mode", { searchMode: "spans" }],
+    ])("drops a Duration entry whose %s no longer matches", async (_label, overrides) => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry(overrides));
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("drops the entry when Error Only is toggled before the next search", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.onErrorOnlyToggled(true);
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe(`${composed} and span_status = 'ERROR'`);
+      expect(filters.size).toBe(0);
+    });
+
+    it("drops an entry captured in spans mode on a switch to traces mode", async () => {
+      await mountPage();
+      mockSearchObj.meta.searchMode = "spans";
+      filters.set("heatmap", heatmapEntry({ searchMode: "spans" }));
+
+      wrapper.vm.onSearchModeChange("traces");
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("drops an entry captured on another stream on a stream change", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry({ stream: "test-stream" }));
+
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("clears the original range on Reset", async () => {
+      await mountPage();
+
+      wrapper.vm.onFiltersReset();
+
+      expect(mockClearOriginalTimeRange).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("Error Handling", () => {
     const mountForErrors = async () => {
       mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];

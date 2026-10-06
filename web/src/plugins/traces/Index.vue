@@ -313,6 +313,7 @@ import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { isRangeSelectionCurrent } from "@/plugins/traces/metrics/latencyHeatmap";
 import { isLLMTrace } from "@/utils/llmUtils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -783,6 +784,26 @@ function buildEditorFilter() {
   return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
 }
 
+// Stream and mode changes reach getQueryData without searchData, so the heatmap entry is checked here.
+const dropStaleHeatmapSelection = () => {
+  const filters = searchObj.meta.metricsRangeFilters;
+  let dropped = false;
+  for (const [id, entry] of filters) {
+    if (entry.panelTitle !== "Duration") continue;
+    const current = isRangeSelectionCurrent(entry, {
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      stream: searchObj.data.stream.selectedStream.value,
+      searchMode: searchObj.meta.searchMode,
+      editorText: searchObj.data.editorValue,
+    });
+    if (current) continue;
+    filters.delete(id);
+    dropped = true;
+  }
+  if (dropped) searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
+};
+
 async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
@@ -834,7 +855,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     if (!isPagination) submittedFilter = buildEditorFilter();
     const combinedFilter = submittedFilter;
 
-    if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
+    if (!isPagination && !isSort) {
+      dropStaleHeatmapSelection();
+      searchResultRef?.value?.getDashboardData();
+    }
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
@@ -1534,9 +1558,8 @@ watch(
 // Handler for Reset Filters button
 // Clears all filters including brush selections
 const onFiltersReset = () => {
-  // Brush selections already cleared in SearchBar.vue
-  // metricsRangeFilters.clear() was called
-  // No additional action needed here
+  // SearchBar already cleared the map; a later baseline-only Drill down must use the current range.
+  searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
 const isStreamSelected = computed(() => {
@@ -1847,9 +1870,10 @@ const searchData = () => {
 
   if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
 
-  // Clear brush selections when running query
-  // The filters are now part of the query, so brush selections should be cleared
-  searchObj.meta.metricsRangeFilters.clear();
+  // Rate/Errors brushes are now part of the query; the heatmap entry is kept while the search still reflects it.
+  for (const [id, entry] of searchObj.meta.metricsRangeFilters) {
+    if (entry.panelTitle !== "Duration") searchObj.meta.metricsRangeFilters.delete(id);
+  }
 
   runQueryFn();
 

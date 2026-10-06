@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { DateTime } from "luxon";
+import type { MetricsRangeFilter, TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 
 // Integer bounds keep every bucket exactly expressible as `duration >= lo AND duration < hi`.
 export const DURATION_BOUNDS_US: readonly number[] = [
@@ -155,4 +156,29 @@ export function composeFilter(baselineFilter: string, band: string): string {
   if (band === "") return baselineFilter;
   if (baselineFilter.trim() === "") return band;
   return `(${baselineFilter}) and ${band}`;
+}
+
+export interface RangeSelectionContext {
+  startTime: number;
+  endTime: number;
+  stream: string;
+  searchMode: TraceSearchMode;
+  editorText: string;
+}
+
+const normaliseWhitespace = (text: string) => text.replace(/\s+/g, " ").trim();
+
+// The selection holds only while the search still shows exactly what the box applied.
+export function isRangeSelectionCurrent(
+  entry: MetricsRangeFilter,
+  current: RangeSelectionContext,
+): boolean {
+  const expected = composeFilter(entry.baselineFilter ?? "", durationBand(entry.start, entry.end));
+  return (
+    entry.appliedStart === current.startTime &&
+    entry.appliedEnd === current.endTime &&
+    entry.stream === current.stream &&
+    entry.searchMode === current.searchMode &&
+    normaliseWhitespace(current.editorText ?? "") === normaliseWhitespace(expected)
+  );
 }
