@@ -11,6 +11,12 @@ export function encodeDef(value) {
         .replace(/=/g, '.');
 }
 
+/** Inverse of encodeDef, for asserting what a URL parameter carries. */
+export function decodeDef(param) {
+    const b64 = String(param).replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+    return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+}
+
 export class RumProductAnalyticsPage {
     constructor(page) {
         this.page = page;
@@ -72,6 +78,65 @@ export class RumProductAnalyticsPage {
         this.sessionViewerEventsOnly = page.locator('[data-test="session-viewer-events-only"]');
         this.sessionViewerStepMark = page.locator('[data-test="session-viewer-funnel-step-mark"]');
         this.sessionViewerNoReplay = page.locator('[data-test="session-viewer-no-replay"]');
+
+        this.body = page.locator('body');
+        this.datePicker = page.locator('[data-test="rum-analytics-date-picker"]');
+        this.noData = page.locator('[data-test="rum-analytics-no-data"]');
+        this.emptyWebCard = page.locator('[data-test="rum-empty-web-card"]');
+        this.emptySessionCard = page.locator('[data-test="rum-empty-session-card"]');
+        this.invalidLink = page.locator('[data-test="rum-analytics-invalid-link"]');
+        this.invalidLinkDismiss = page.locator('[data-test="rum-analytics-invalid-link-dismiss"]');
+        this.deletedEventLink = page.locator('[data-test="rum-analytics-deleted-event-link"]');
+        this.syntheticExcluded = page.locator('[data-test="rum-analytics-synthetic-excluded"]');
+        this.kpiSessions = page.locator('[data-test="rum-analytics-kpi-sessions"]');
+
+        this.trendsClearBtn = page.locator('[data-test="rum-analytics-trends-clear-btn"]');
+
+        this.funnelAlertBtn = page.locator('[data-test="rum-analytics-funnel-alert-btn"]');
+        this.funnelLeftOut = page.locator('[data-test="rum-analytics-funnel-left-out"]');
+        this.funnelWindowFixed = page.locator('[data-test="rum-analytics-funnel-window-fixed"]');
+        this.funnelWindowTrigger = page.locator('[data-test="rum-analytics-funnel-window-select-trigger"]');
+        this.funnelSuggestionsError = page.locator('[data-test="rum-analytics-funnel-suggestions-error"]');
+        this.funnelSuggestionsRetryBtn = page.locator('[data-test="rum-analytics-funnel-suggestions-retry-btn"]');
+        this.funnelEntryStart0 = page.locator('[data-test="rum-analytics-funnel-entry-start-0"]');
+        this.funnelEntriesFailed = page.locator('[data-test="rum-analytics-funnel-entries-failed"]');
+        this.funnelSavedName = page.locator('[data-test="rum-analytics-funnel-saved-name"]');
+        this.funnelSaveBtn = page.locator('[data-test="rum-analytics-funnel-save-btn"]');
+        this.funnelSaveBtnHolder = page.locator('span:has(> [data-test="rum-analytics-funnel-save-btn"])');
+        this.saveFunnelDialog = page.locator('[data-test="rum-analytics-save-funnel-dialog"]');
+        this.saveFunnelNameField = this.saveFunnelDialog.locator('[data-test="rum-analytics-save-funnel-name-field"]');
+        this.saveFunnelPrimaryBtn = this.saveFunnelDialog.locator('[data-test="o-dialog-primary-btn"]');
+        this.saveFunnelCancelBtn = this.saveFunnelDialog.locator('[data-test="o-dialog-secondary-btn"]');
+        this.alertDialog = page.locator('[data-test="create-alert-from-source-dialog"]');
+        this.alertQueryPreview = page.locator('[data-test="create-alert-query-preview"]');
+
+        this.dropoffNextRow0 = page.locator('[data-test="rum-analytics-dropoff-next-row-0"]');
+        this.dropoffErrorDropped = page.locator('[data-test="rum-analytics-dropoff-error-dropped"]');
+        this.dropoffErrorConverted = page.locator('[data-test="rum-analytics-dropoff-error-converted"]');
+        this.dropoffSessionsCap = page.locator('[data-test="rum-analytics-dropoff-sessions-cap"]');
+
+        this.pathsEmpty = page.locator('[data-test="rum-analytics-paths-empty"]');
+        this.pathsAnchorTrigger = page.locator('[data-test="rum-analytics-paths-anchor-select-trigger"]');
+        this.pathsAnchorOptions = page.locator('[data-test="rum-analytics-paths-anchor-select-option"]');
+        this.branchSessionsCap = page.locator('[data-test="rum-analytics-paths-branch-sessions-cap"]');
+        this.branchSessionRow0Open = page.locator('[data-test="rum-analytics-paths-branch-sessions-row-0-open"]');
+
+        this.retentionGranularityTrigger = page.locator('[data-test="rum-analytics-retention-granularity-trigger"]');
+        this.retentionModeAfter = page.locator('[data-test="rum-analytics-retention-mode-after"]');
+        this.retentionUser0 = page.locator('[data-test="rum-analytics-retention-user-0"]');
+        this.retentionUser0SessionsBtn = page.locator('[data-test="rum-analytics-retention-user-0-sessions-btn"]');
+
+        this.eventNameField = page.locator('[data-test="rum-analytics-named-events-name-field"]');
+        this.addRuleBtn = page.locator('[data-test="rum-analytics-named-events-add-rule-btn"]');
+        this.eventPreview = page.locator('[data-test="rum-analytics-named-events-preview"]');
+        this.eventCancelBtn = page.locator('[data-test="rum-analytics-event-editor-cancel-btn"]');
+        this.eventDiscardDialog = page.locator('[data-test="rum-analytics-event-editor-discard-dialog"]');
+        this.eventDiscardConfirmBtn = this.eventDiscardDialog.locator('[data-test="o-dialog-primary-btn"]');
+        this.eventRules = page.locator('[data-test^="rum-analytics-named-events-rule-"][data-test$="-kind"]');
+
+        this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
+        this.sessionsNoData = this.sessionsTable.locator('[data-test="no-data-message"]');
+        this.toasts = page.locator('[data-test="o-toast-message"]');
     }
 
     /** Pins _rumdata's reported doc_time_min to the seed start: stream stats pick up back-dated rows only on their next run. */
@@ -97,10 +162,11 @@ export class RumProductAnalyticsPage {
         });
     }
 
-    async goto(subTab = null, params = {}) {
+    /** `org` opens another org than ORGNAME, e.g. a state org created by the test. */
+    async goto(subTab = null, params = {}, { org = null } = {}) {
         const path = subTab ? `/web/product-analytics/${subTab}` : '/web/product-analytics';
         const url = new URL(`${this.base}${path}`);
-        url.searchParams.set('org_identifier', this.org);
+        url.searchParams.set('org_identifier', org || this.org);
         for (const [k, v] of Object.entries(params)) {
             for (const item of Array.isArray(v) ? v : [v]) url.searchParams.append(k, String(item));
         }
@@ -110,6 +176,15 @@ export class RumProductAnalyticsPage {
 
     async gotoRum(path = '') {
         await this.page.goto(`${this.base}/web/rum${path}?org_identifier=${this.org}`);
+    }
+
+    /** Opens the RUM Sessions list of `org` over an absolute range (µs). */
+    async gotoRumSessions({ org = null, from, to }) {
+        const url = new URL(`${this.base}/web/rum/sessions`);
+        url.searchParams.set('org_identifier', org || this.org);
+        url.searchParams.set('from', String(from));
+        url.searchParams.set('to', String(to));
+        await this.page.goto(url.toString());
     }
 
     async openExperienceMenu() {
@@ -376,6 +451,234 @@ export class RumProductAnalyticsPage {
         return this.page
             .waitForResponse((r) => r.request().method() === method && new RegExp(`/api/[^/]+/rum/analytics/${path}(/[0-9A-Za-z]{27})?\\?`).test(r.url()))
             .then(async (r) => ({ status: r.status(), body: await r.json().catch(() => null) }));
+    }
+
+    /** The AnalyticsPanelState error box of a panel, e.g. `rum-analytics-paths` or `rum-analytics-overview-pages`. */
+    panelError(prefix) {
+        return this.page.locator(`[data-test="${prefix}-error"]`);
+    }
+
+    async expectNoPanelError(...prefixes) {
+        for (const prefix of prefixes) await expect(this.panelError(prefix)).toHaveCount(0);
+    }
+
+    async showPagesView(view) {
+        const option = this.page.locator(`[data-test="rum-analytics-overview-pages-view-${view}"]`);
+        await option.click();
+        await expect(option).toHaveAttribute('data-state', 'on');
+    }
+
+    async expectTopRankedRow(table, key, sessions) {
+        await expect(this.rankedRow(table, 0, 'key')).toHaveText(key, { timeout: 30000 });
+        await expect(this.rankedRow(table, 0, 'sessions')).toHaveText(String(sessions), { timeout: 30000 });
+    }
+
+    async expectRankedSessions(table, key, sessions) {
+        const i = await this.rowIndexOf(table, key);
+        await expect(this.rankedRow(table, i, 'sessions')).toHaveText(String(sessions), { timeout: 30000 });
+    }
+
+    trendSeries(i) {
+        return this.page.locator(`[data-test="rum-analytics-trends-series-${i}"]`);
+    }
+
+    countBy(unit) {
+        return this.page.locator(`[data-test="rum-analytics-funnel-count-by-${unit}"]`);
+    }
+
+    async selectCountBy(unit) {
+        await this.countBy(unit).click();
+        await expect(this.countBy(unit)).toHaveAttribute('data-state', 'on');
+    }
+
+    /** The funnel definition the URL carries now. */
+    funnelFromUrl() {
+        const param = this.query().get('funnel');
+        return param ? decodeDef(param) : null;
+    }
+
+    async pickConversionWindow(value) {
+        await this.pickOption('rum-analytics-funnel-window-select', { value });
+        await expect(this.funnelWindowTrigger).toHaveAttribute('data-test-selected-value', value);
+    }
+
+    dropoffSessionReplayTag(i) {
+        return this.page.locator(`[data-test="rum-analytics-dropoff-sessions-row-${i}-replay"]`);
+    }
+
+    branchSessionReplayTag(i) {
+        return this.page.locator(`[data-test="rum-analytics-paths-branch-sessions-row-${i}-replay"]`);
+    }
+
+    pathsInclude(name) {
+        return this.page.locator(`[data-test="rum-analytics-paths-include-${name}"]`);
+    }
+
+    pathsDirection(name) {
+        return this.page.locator(`[data-test="rum-analytics-paths-direction-${name}"]`);
+    }
+
+    /** Clicks a Paths include option and waits until it is the active one and in the URL. */
+    async setPathsInclude(name) {
+        await this.pathsInclude(name).click();
+        await expect(this.pathsInclude(name)).toHaveAttribute('data-state', 'on');
+        await expect.poll(() => this.query().get('inc')).toBe(name === 'all' ? null : name);
+    }
+
+    pathsTopRow(i) {
+        return this.page.locator(`[data-test="rum-analytics-paths-top-row-${i}"]`);
+    }
+
+    /** The labels the Paths "From" picker offers. */
+    async pathsAnchorOptionLabels() {
+        // The picker lists the selected anchor at once and only appends the scope's keys once its first search answers.
+        const loaded = this.page.waitForResponse(
+            (r) => /\/_search(\?|$)/.test(r.url()) && /SELECT kind, k, COUNT\(DISTINCT sid\) AS sessions FROM e\b/.test(r.request().postData() || ''),
+            { timeout: 30000 },
+        );
+        await this.pathsAnchorTrigger.click();
+        await expect(this.pathsAnchorOptions.first()).toBeVisible({ timeout: 30000 });
+        await loaded;
+        await expect(this.pathsAnchorTrigger.getByRole('status')).toHaveCount(0, { timeout: 30000 });
+        const labels = await this.pathsAnchorOptions.evaluateAll((els) => els.map((e) => e.getAttribute('data-test-label')));
+        await this.closePopovers();
+        return labels;
+    }
+
+    /** The Top paths table text, or '' while it is not rendered. */
+    async pathsTopText() {
+        return this.pathsTopTable.innerText({ timeout: 1000 }).catch(() => '');
+    }
+
+    async expectFlowRendered() {
+        await expect(this.pathsFlow.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+        await expect(this.pathsTopTable).toBeVisible({ timeout: 30000 });
+    }
+
+    retentionGranularityOption(value) {
+        return this.page.locator(`[data-test="rum-analytics-retention-granularity-option"][data-test-value="${value}"]`);
+    }
+
+    async openRetentionGranularity() {
+        await this.retentionGranularityTrigger.click();
+        await expect(this.retentionGranularityOption('week')).toBeVisible({ timeout: 20000 });
+    }
+
+    ruleRow(i) {
+        return this.page.locator(`[data-test="rum-analytics-named-events-rule-${i}"]`);
+    }
+
+    ruleValueInput(i) {
+        return this.page.locator(`[data-test="rum-analytics-named-events-rule-${i}-value-input"]`);
+    }
+
+    /** The operator labels a page rule offers. */
+    async ruleOpOptionLabels(i) {
+        await this.page.locator(`[data-test="rum-analytics-named-events-rule-${i}-op-trigger"]`).click();
+        const options = this.page.locator(`[data-test="rum-analytics-named-events-rule-${i}-op-option"]`);
+        await expect(options.first()).toBeVisible({ timeout: 20000 });
+        const labels = await options.evaluateAll((els) => els.map((e) => e.getAttribute('data-test-label')));
+        await this.closePopovers();
+        return labels;
+    }
+
+    async setRuleOp(i, value) {
+        await this.pickOption(`rum-analytics-named-events-rule-${i}-op`, { value });
+        await expect(this.page.locator(`[data-test="rum-analytics-named-events-rule-${i}-op-trigger"]`))
+            .toHaveAttribute('data-test-selected-value', value);
+    }
+
+    async fillRuleValue(i, value) {
+        await this.ruleValueInput(i).fill(value);
+        await this.page.keyboard.press('Tab');
+    }
+
+    /** Opens a new, empty named event from the list's New event button. */
+    async openNewEventEditor() {
+        await this.openNamedEvents();
+        await expect(this.newEventBtn).toBeEnabled({ timeout: 20000 });
+        await this.newEventBtn.click();
+        await expect(this.eventEditor).toBeVisible({ timeout: 20000 });
+        await expect(this.eventNameField).toBeVisible({ timeout: 20000 });
+    }
+
+    /** Clicks Save and expects the editor to stay open showing `message`. */
+    async expectEventSaveRejected(message) {
+        await this.eventSaveBtn.click();
+        await expect(this.eventEditor).toContainText(message, { timeout: 20000 });
+        await expect(this.eventEditor).toBeVisible();
+    }
+
+    async openSaveFunnelDialog() {
+        await this.funnelSaveBtn.click();
+        await expect(this.saveFunnelDialog).toBeVisible({ timeout: 20000 });
+    }
+
+    /** Submits the name dialog with `name` and expects it to stay open showing `message`. */
+    async expectSaveFunnelRejected(name, message) {
+        await this.saveFunnelNameField.fill(name);
+        await this.saveFunnelPrimaryBtn.click();
+        await expect(this.saveFunnelDialog).toContainText(message, { timeout: 20000 });
+        await expect(this.saveFunnelDialog).toBeVisible();
+    }
+
+    async closeSaveFunnelDialog() {
+        await this.saveFunnelCancelBtn.click();
+        await expect(this.saveFunnelDialog).toBeHidden({ timeout: 20000 });
+    }
+
+    /** The tooltip the Save button's holder shows on hover. */
+    async saveBtnTooltip() {
+        await this.funnelSaveBtnHolder.hover();
+        const tip = this.page.getByRole('tooltip');
+        await expect(tip).toBeVisible({ timeout: 10000 });
+        return tip;
+    }
+
+    /** Flags, from the first paint on, any moment the KPI strip shows `text`; read it back with kpiTextSeen(). */
+    async watchKpiText(text) {
+        await this.page.addInitScript((needle) => {
+            window.__kpiTextSeen = false;
+            new MutationObserver(() => {
+                const strip = document.querySelector('[data-test="rum-analytics-kpi-strip"]');
+                if (strip && strip.textContent.includes(needle)) window.__kpiTextSeen = true;
+            }).observe(document, { childList: true, subtree: true, characterData: true });
+        }, text);
+    }
+
+    async kpiTextSeen() {
+        return this.page.evaluate(() => window.__kpiTextSeen === true);
+    }
+
+    /** Text of the whole page; regression checks assert a raw server error never reaches it. */
+    async expectPageNotToContain(text) {
+        await expect(this.body).not.toContainText(text);
+    }
+
+    /** Resolves after `quietMs` with no request in flight; networkidle is not reset by in-app navigation. */
+    async waitForNetworkQuiet(quietMs = 1000, timeoutMs = 30000) {
+        let inflight = 0;
+        let last = Date.now();
+        const up = () => {
+            inflight++;
+            last = Date.now();
+        };
+        const down = () => {
+            inflight = Math.max(0, inflight - 1);
+            last = Date.now();
+        };
+        this.page.on('request', up);
+        this.page.on('requestfinished', down);
+        this.page.on('requestfailed', down);
+        try {
+            await expect
+                .poll(() => inflight === 0 && Date.now() - last >= quietMs, { timeout: timeoutMs, intervals: [100] })
+                .toBe(true);
+        } finally {
+            this.page.off('request', up);
+            this.page.off('requestfinished', down);
+            this.page.off('requestfailed', down);
+        }
     }
 
     /** WCAG contrast of an element's text against its nearest opaque background. */

@@ -466,6 +466,18 @@
     "disabled": []
   },
   {
+    "testfolder": "RUM-Analytics-Regressions",
+    "_comment": "RUM Product Analytics schema-state regressions (ENT#2798-2801). Each describe creates its own org via POST /api/organizations as root and seeds it, because a field once in an org's _rumdata schema can never be removed. Own instance with the RUM-Analytics settings: 60 days of backdated ingestion, workers 1 for long analytics searches on a debug build.",
+    "actual_folder": "RUM-Analytics",
+    "browser": "chrome",
+    "ingest_allowed_upto": "1440",
+    "workers": 1,
+    "run_files": [
+      "rum-product-analytics-schema-states.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "RUM-Token",
     "_comment": "rum-token.spec.js RESETS the org RUM token; running it beside the dataflow specs (workers run files in parallel) would 401 their in-flight SDK beacons. Own shard = own isolated instance \u2014 do NOT merge back into RUM.",
     "actual_folder": "RUM",

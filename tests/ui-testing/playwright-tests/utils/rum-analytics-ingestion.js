@@ -48,13 +48,23 @@ function runAppId(prefix = 'pa-e2e') {
 }
 
 class SessionBuilder {
-  constructor(appId, sessionId, startMs, { user = null, replay = false, browser = 'Chrome' } = {}) {
+  constructor(appId, sessionId, startMs, {
+    user = null,
+    replay = false,
+    browser = 'Chrome',
+    source = 'browser',
+    sessionType = 'user',
+    omit = [],
+  } = {}) {
     this.appId = appId;
     this.sessionId = sessionId;
     this.t = startMs;
     this.user = user;
     this.replay = replay;
     this.browser = browser;
+    this.source = source;
+    this.sessionType = sessionType;
+    this.omit = new Set(omit);
     this.rows = [];
     this.views = 0;
     this.actions = 0;
@@ -70,9 +80,9 @@ class SessionBuilder {
       env: 'e2e',
       version: '1.0.0',
       service: 'pa-e2e',
-      source: 'browser',
+      source: this.source,
       session_id: this.sessionId,
-      session_type: 'user',
+      session_type: this.sessionType,
       user_agent_user_agent_family: this.browser,
       user_agent_os_family: 'Mac OS X',
       user_agent_device_family: 'Mac',
@@ -80,12 +90,22 @@ class SessionBuilder {
     };
     if (this.user) row.usr_email = this.user;
     if (this.replay) row.session_has_replay = true;
+    for (const field of this.omit) delete row[field];
     return row;
   }
 
   view(url) {
     this.views += 1;
     const row = { ...this.base('view'), view_id: `${this.sessionId}-v${this.views}`, view_url: url, view_loading_type: 'route_change' };
+    this.rows.push(row);
+    this.rows.push({ ...row, _timestamp: row._timestamp + 1000, date: row.date + 1 });
+    return this;
+  }
+
+  /** A mobile SDK view: no URL, the screen name in view_name, which is what keys mobile pages. */
+  screen(name) {
+    this.views += 1;
+    const row = { ...this.base('view'), view_id: `${this.sessionId}-v${this.views}`, view_url: '', view_name: name, view_loading_type: 'route_change' };
     this.rows.push(row);
     this.rows.push({ ...row, _timestamp: row._timestamp + 1000, date: row.date + 1 });
     return this;
@@ -182,12 +202,131 @@ function buildPlaceholderIdentitySeed(appId, nowMs = Date.now()) {
   return rows;
 }
 
-/** Basic-auth API context for the run's org; every helper and spec here builds requests from it. */
-function apiContext() {
-  const { orgId, baseUrl, email, password } = rumTestContext();
+/** buildSeed's six funnel sessions in the last few hours, so [6, 3, 1] holds in any org; replay false drops session_has_replay. */
+function buildFunnelSessions(appId, nowMs = Date.now(), { replay = 'seed', omit = [] } = {}) {
+  const sessions = [];
+  const session = (i, opts) => {
+    const start = nowMs - 5 * HOUR_MS + i * 30 * 60 * 1000;
+    const s = new SessionBuilder(appId, `${appId}-s${String(i + 1).padStart(3, '0')}`, start, { omit, ...opts });
+    sessions.push(s);
+    return s;
+  };
+  const rep = (flag) => (replay === 'seed' ? flag : false);
+  session(0, { user: 'u1@e2e.test', replay: rep(true) }).view(FUNNEL.a).click(FUNNEL.b, FUNNEL.a).view(FUNNEL.c);
+  session(1, { user: 'u2@e2e.test' }).view(FUNNEL.a).click(FUNNEL.b, FUNNEL.a).error();
+  session(2, { user: 'u3@e2e.test', replay: rep(true) }).view(FUNNEL.a).view('https://shop.example.com/web/help');
+  session(3, { user: 'u4@e2e.test' }).click(FUNNEL.b, FUNNEL.c).view(FUNNEL.a).click(FUNNEL.b, FUNNEL.a);
+  session(4, { user: 'u5@e2e.test', browser: 'Firefox' }).click(FUNNEL.b, FUNNEL.c).view(FUNNEL.a);
+  session(5, { user: 'u6@e2e.test', browser: 'Firefox' }).view(FUNNEL.a).error().view('https://shop.example.com/web/help');
   return {
-    orgId,
-    baseUrl,
+    rows: sessions.flatMap((s) => s.rows),
+    facts: {
+      appId,
+      funnel: { a: FUNNEL.aKey, b: FUNNEL.b, c: FUNNEL.cKey, counts: [6, 3, 1] },
+      // Last page view per session: s2, s4, s5 end on /web/a; s3, s6 on /web/help; s1 on /web/c.
+      exit: { key: FUNNEL.aKey, sessions: 3 },
+    },
+  };
+}
+
+/** Five Android sessions keyed by screen name: three reach the cart, two stop at the product screen. */
+function buildMobileScreensSeed(appId, nowMs = Date.now()) {
+  const screens = { home: 'HomeScreen', product: 'ProductDetailScreen', cart: 'CartScreen' };
+  const rows = [];
+  for (let i = 0; i < 5; i++) {
+    const s = new SessionBuilder(appId, `${appId}-m${i}`, nowMs - (4 * HOUR_MS) + i * 20 * 60 * 1000, {
+      user: `m${i}@e2e.test`,
+      source: 'android',
+      browser: 'Android',
+    });
+    s.screen(screens.home).screen(screens.product);
+    if (i < 3) s.screen(screens.cart);
+    rows.push(...s.rows);
+  }
+  return {
+    rows,
+    facts: {
+      appId,
+      screens,
+      pages: { [screens.home]: 5, [screens.product]: 5, [screens.cart]: 3 },
+      entry: { key: screens.home, sessions: 5 },
+      exit: { key: screens.cart, sessions: 3 },
+      funnel: [5, 5, 3],
+    },
+  };
+}
+
+/** Views only, never a click: four sessions /web/landing → /web/pricing (two with replay), two /web/landing → /web/signup. */
+function buildViewsTwoPageSeed(appId, nowMs = Date.now()) {
+  const rows = [];
+  for (let i = 0; i < 6; i++) {
+    const s = new SessionBuilder(appId, `${appId}-s${i}`, nowMs - 4 * HOUR_MS + i * 20 * 60 * 1000, {
+      user: `v${i}@e2e.test`,
+      replay: i < 2,
+    });
+    s.view('https://shop.example.com/web/landing').view(`https://shop.example.com/web/${i < 4 ? 'pricing' : 'signup'}`);
+    rows.push(...s.rows);
+  }
+  return { rows, facts: { appId, landing: '/web/landing', landingSessions: 6, next: ['/web/pricing', '/web/signup'] } };
+}
+
+/** w1 reaches /web/c 30 min after /web/a, w2 three hours after, w3 never; two anonymous sessions see /web/a only. */
+function buildUsersModeSeed(appId, nowMs = Date.now()) {
+  const rows = [];
+  const A = 'https://shop.example.com/web/a';
+  const C = 'https://shop.example.com/web/c';
+  const at = (h) => nowMs - h * HOUR_MS;
+  const sessions = [
+    [`${appId}-w1a`, at(5), 'w1@e2e.test', A],
+    [`${appId}-w1b`, at(4.5), 'w1@e2e.test', C],
+    [`${appId}-w2a`, at(5.5), 'w2@e2e.test', A],
+    [`${appId}-w2b`, at(2.5), 'w2@e2e.test', C],
+    [`${appId}-w3a`, at(5), 'w3@e2e.test', A],
+    [`${appId}-n1`, at(4), null, A],
+    [`${appId}-n2`, at(3.5), null, A],
+  ];
+  for (const [id, start, user, url] of sessions) rows.push(...new SessionBuilder(appId, id, start, { user }).view(url).rows);
+  return {
+    rows,
+    facts: {
+      appId,
+      sessionsAtA: 5,
+      usersAtA: 3,
+      leftOut: 2,
+      windows: { session: [3, 0], '1h': [3, 1], '1d': [3, 2], '7d': [3, 2] },
+    },
+  };
+}
+
+/** Three real sessions and two synthetic ones, all viewing /web/a. */
+function buildSyntheticMixSeed(appId, nowMs = Date.now()) {
+  const rows = [];
+  for (let i = 0; i < 5; i++) {
+    const s = new SessionBuilder(appId, `${appId}-s${i}`, nowMs - (i + 2) * HOUR_MS, {
+      user: `y${i}@e2e.test`,
+      sessionType: i < 3 ? 'user' : 'synthetic',
+    });
+    s.view('https://shop.example.com/web/a');
+    rows.push(...s.rows);
+  }
+  return { rows, facts: { appId, real: 3, synthetic: 2 } };
+}
+
+const ORG_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/** Basic-auth API context for the run's org, or for a state org this run created, which only root (its creator) belongs to. */
+function apiContext(orgId = null) {
+  const ctx = rumTestContext();
+  let { email, password } = ctx;
+  if (orgId) {
+    if (!ORG_ID_PATTERN.test(orgId)) throw new Error(`org id "${orgId}" is not safe for an API path`);
+    email = process.env.ZO_ROOT_USER_EMAIL;
+    password = process.env.ZO_ROOT_USER_PASSWORD;
+    if (!email || !password) throw new Error('State orgs need ZO_ROOT_USER_EMAIL / ZO_ROOT_USER_PASSWORD');
+  }
+  return {
+    orgId: orgId || ctx.orgId,
+    baseUrl: ctx.baseUrl,
     headers: {
       Authorization: `Basic ${Buffer.from(`${email}:${password}`).toString('base64')}`,
       'Content-Type': 'application/json',
@@ -195,9 +334,33 @@ function apiContext() {
   };
 }
 
-async function ingestJson(page, stream, rows) {
-  const { orgId, baseUrl, headers } = apiContext();
-  const res = await page.request.post(`${baseUrl}/api/${orgId}/${stream}/_json`, { headers, data: rows });
+/** Creates a fresh org as root (OSS lets no one else) and returns its server-generated identifier. */
+async function createRumStateOrg(page, prefix) {
+  const name = `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  // Any valid org id selects root credentials; the create route itself is org-less.
+  const { baseUrl, headers } = apiContext(rumTestContext().orgId);
+  const res = await page.request.post(`${baseUrl}/api/organizations`, { headers, data: { name } });
+  const text = await res.text();
+  if (!res.ok()) throw new Error(`org create failed: ${res.status()} ${text}`);
+  const body = JSON.parse(text);
+  const identifier = body.identifier || body.data?.identifier;
+  if (!identifier) throw new Error(`org create returned no identifier: ${text}`);
+  testLogger.info('Created RUM state org', { name, identifier });
+  return { name, identifier };
+}
+
+/** The org's _rumdata field names, or null when the stream does not exist. */
+async function rumSchemaFields(page, orgId) {
+  const { baseUrl, headers } = apiContext(orgId);
+  const res = await page.request.get(`${baseUrl}/api/${orgId}/streams/_rumdata/schema?type=logs`, { headers });
+  if (res.status() === 404) return null;
+  if (!res.ok()) throw new Error(`schema read failed for ${orgId}: ${res.status()} ${await res.text()}`);
+  return new Set(((await res.json()).schema || []).map((f) => f.name));
+}
+
+async function ingestJson(page, stream, rows, { orgId = null } = {}) {
+  const { orgId: org, baseUrl, headers } = apiContext(orgId);
+  const res = await page.request.post(`${baseUrl}/api/${org}/${stream}/_json`, { headers, data: rows });
   const body = await res.text();
   if (!res.ok()) throw new Error(`${stream} ingest failed: ${res.status()} ${body}`);
   const parsed = JSON.parse(body);
@@ -208,13 +371,13 @@ async function ingestJson(page, stream, rows) {
   return parsed;
 }
 
-const postRows = (page, rows) => ingestJson(page, '_rumdata', rows);
+const postRows = (page, rows, opts = {}) => ingestJson(page, '_rumdata', rows, opts);
 
-async function waitForStream(page, stream) {
-  const { orgId, baseUrl, headers } = apiContext();
+async function waitForStream(page, stream, { orgId = null } = {}) {
+  const { orgId: org, baseUrl, headers } = apiContext(orgId);
   const deadline = Date.now() + 90000;
   while (Date.now() < deadline) {
-    const res = await page.request.get(`${baseUrl}/api/${orgId}/streams/${stream}/schema?type=logs`, { headers });
+    const res = await page.request.get(`${baseUrl}/api/${org}/streams/${stream}/schema?type=logs`, { headers });
     if (res.ok()) return;
     await page.waitForTimeout(2000);
   }
@@ -222,7 +385,7 @@ async function waitForStream(page, stream) {
 }
 
 /** The Sessions list renders only once a _sessionreplay stream exists; the stream then stays, so the org keeps its Sessions tab. */
-async function ensureSessionReplayStream(page, appId, nowMs = Date.now()) {
+async function ensureSessionReplayStream(page, appId, nowMs = Date.now(), { orgId = null } = {}) {
   await ingestJson(page, '_sessionreplay', [{
     _timestamp: nowMs * 1000,
     session_id: `${appId}-replay-marker`,
@@ -235,16 +398,24 @@ async function ensureSessionReplayStream(page, appId, nowMs = Date.now()) {
     ip: '127.0.0.1',
     source: 'browser',
     segment: '',
-  }]);
-  await waitForStream(page, '_sessionreplay');
+  }], { orgId });
+  await waitForStream(page, '_sessionreplay', { orgId });
 }
 
 /** Ingests the seed and waits until search sees every row, since search lags the WAL flush. */
-async function seedRumAnalytics(page, { appId = runAppId(), nowMs = Date.now() } = {}) {
+async function seedRumAnalytics(page, { appId = runAppId(), nowMs = Date.now(), orgId = null } = {}) {
   const seed = buildSeed(appId, nowMs);
-  await postRows(page, seed.rows);
+  await postRows(page, seed.rows, { orgId });
   testLogger.info('Seeded RUM analytics rows', { appId, rows: seed.rows.length });
-  await waitForRows(page, appId, seed.rows.length, nowMs);
+  await waitForRows(page, appId, seed.rows.length, nowMs, { orgId });
+  return seed.facts;
+}
+
+/** Ingests one built seed ({ rows, facts }) and waits until search sees every row. */
+async function seedBuilt(page, seed, { nowMs = Date.now(), orgId = null } = {}) {
+  await postRows(page, seed.rows, { orgId });
+  testLogger.info('Seeded RUM rows', { appId: seed.facts.appId, rows: seed.rows.length, orgId: orgId || 'run org' });
+  await waitForRows(page, seed.facts.appId, seed.rows.length, nowMs, { orgId });
   return seed.facts;
 }
 
@@ -276,12 +447,12 @@ async function seedLongPageApp(page, { appId, nowMs = Date.now() }) {
   return { appId, pageKey: `/web/${'q'.repeat(1100)}` };
 }
 
-async function waitForRows(page, appId, expected, nowMs) {
-  const { orgId, baseUrl, headers } = apiContext();
+async function waitForRows(page, appId, expected, nowMs, { orgId = null } = {}) {
+  const { orgId: org, baseUrl, headers } = apiContext(orgId);
   const deadline = Date.now() + 90000;
   const sql = `SELECT COUNT(*) AS n FROM "_rumdata" WHERE application_id = '${appId}'`;
   while (Date.now() < deadline) {
-    const res = await page.request.post(`${baseUrl}/api/${orgId}/_search?type=logs`, {
+    const res = await page.request.post(`${baseUrl}/api/${org}/_search?type=logs`, {
       headers,
       data: { query: { sql, start_time: (nowMs - 30 * DAY_MS) * 1000, end_time: (nowMs + HOUR_MS) * 1000, from: 0, size: 1 } },
     });
@@ -296,6 +467,15 @@ async function waitForRows(page, appId, expected, nowMs) {
 
 module.exports = {
   apiContext,
+  createRumStateOrg,
+  rumSchemaFields,
+  seedBuilt,
+  waitForStream,
+  buildFunnelSessions,
+  buildMobileScreensSeed,
+  buildViewsTwoPageSeed,
+  buildUsersModeSeed,
+  buildSyntheticMixSeed,
   ensureSessionReplayStream,
   seedRumAnalytics,
   seedViewsOnlyApp,
