@@ -222,6 +222,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:sort-by="onSortChange"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-queries-error"
+            @action="onRefresh()"
+          />
+        </template>
         <!-- ONE toolbar row: search, the filter popover, its chips, the
              statement toggle, then the time range pinned right. -->
         <!-- Coverage, then the cross-row framing. Both inside the table frame
@@ -595,6 +603,7 @@ import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

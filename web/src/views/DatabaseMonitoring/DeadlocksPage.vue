@@ -62,6 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :total-count-exact="!truncated"
         data-test="dbm-deadlocks-table"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-deadlocks-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #toolbar>
           <DbmTableToolbar
             v-model:search="search"
@@ -430,6 +438,7 @@ import DbmLockEmptyState, {
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

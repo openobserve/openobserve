@@ -133,6 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-samples-table"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-samples-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #subheader>
           <!-- The scatter — inside the table frame because it draws exactly
                the rows below it. Hidden while empty: an axis with no points

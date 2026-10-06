@@ -56,6 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :total-count-exact="!truncated"
         data-test="dbm-blocked-table"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-blocked-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #toolbar>
           <DbmTableToolbar
             v-model:search="search"
@@ -431,6 +439,7 @@ import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
