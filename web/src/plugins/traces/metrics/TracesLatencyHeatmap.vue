@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-latency-heatmap-no-data"
         class="h-full"
       />
-      <!-- ChartRenderer escape hatch: fixed time × duration grid with empty cells and index → bucket box mapping; the dashboard heatmap converter can do neither -->
+      <!-- ChartRenderer escape hatch (ui-architect "Charts / graphs", fixed-grid case): empty cells kept and index → bucket box mapping, which the heatmap converter cannot do -->
       <ChartRenderer
         v-else-if="status === 'ready'"
         :data="{ options }"
