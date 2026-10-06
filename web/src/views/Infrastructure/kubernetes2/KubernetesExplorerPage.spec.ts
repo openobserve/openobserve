@@ -710,6 +710,16 @@ describe("KubernetesExplorerPage", () => {
       ]);
     });
 
+    it("the Deployment pods count opens the same filtered list", async () => {
+      await mountPage({ kind: "deployments" });
+      await wrapper
+        .find(`[data-test="k8s2-deployment-pods-${GEN}/data/recommendation-service"]`)
+        .trigger("click");
+      await flushPromises();
+      expect(query()).toEqual({ workload: `${GEN}/data/Deployment/recommendation-service` });
+      expect(listed("pod")).toHaveLength(2);
+    });
+
     it("a Node row opens its pods in that cluster only", async () => {
       twoClusters();
       await mountPage({ kind: "nodes", cluster: "*" });

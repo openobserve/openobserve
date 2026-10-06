@@ -193,13 +193,7 @@ const onTile = (key: string) => writeState(withTile(state.value, key as IssueKey
 
 const onKind = (kind: string | number) => writeState(withKind(state.value, kind as K8sKind));
 
-const nameInput = ref(state.value.name);
-watch(
-  () => state.value.name,
-  (name) => (nameInput.value = name),
-);
 const onName = (name: string) => {
-  nameInput.value = name;
   if (name !== state.value.name) writeState(withFilter(state.value, { name }));
 };
 
@@ -262,7 +256,6 @@ const tableProps = computed(() => ({
           v-if="detection === 'detected'"
           variant="default-soft"
           size="sm"
-          class="max-md:hidden"
           data-test="k8s2-scope-cluster"
           >{{ scopeChip }}</OTag
         >
@@ -270,7 +263,6 @@ const tableProps = computed(() => ({
           v-if="detection === 'detected' && state.namespace"
           variant="default-soft"
           size="sm"
-          class="max-md:hidden"
           data-test="k8s2-scope-namespace"
           >{{ t("infra.k8s2.scopeNamespace", { name: raw(state.namespace) }) }}</OTag
         >
@@ -382,7 +374,7 @@ const tableProps = computed(() => ({
           class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-3 overflow-y-auto border-e px-1.5 py-2"
         >
           <OSearchInput
-            :model-value="nameInput"
+            :model-value="state.name"
             :debounce="300"
             :placeholder="t('infra.k8s2.filterPlaceholder')"
             data-test="k8s2-name-filter"

@@ -139,7 +139,6 @@ export interface ListFilter {
 
 type AnyRow = PodRow | NodeRow | DeploymentRow;
 
-// Per-container maps for the current uid of one pod.
 interface PodAcc {
   phases: Set<string>;
   ready: Set<string>;

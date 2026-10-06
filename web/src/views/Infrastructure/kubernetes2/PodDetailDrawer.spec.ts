@@ -86,11 +86,7 @@ const drawerStub = defineComponent({
   emits: ["update:open"],
   setup(props, { slots }) {
     return () =>
-      h(
-        "div",
-        { "data-test": "drawer-stub", "data-title": props.title, "data-sub": props.subTitle },
-        [slots.default?.()],
-      );
+      h("div", { "data-title": props.title, "data-sub": props.subTitle }, [slots.default?.()]);
   },
 });
 
