@@ -18,10 +18,13 @@ import http from "./http";
 export type PublicLinkStatus =
   "live" | "paused" | "preparing" | "needs_attention" | "expired" | "dashboard_deleted";
 
+/** A rolling window rebuilt every refresh, or a fixed one (UTC micros) built once. */
+export type PublicLinkRange =
+  { type: "relative"; secs: number } | { type: "absolute"; start: number; end: number };
+
 export interface PublicLinkTimeRange {
-  editable: boolean;
-  default_range_secs?: number | null;
-  allowed_presets_secs: number[];
+  ranges: PublicLinkRange[];
+  default: PublicLinkRange;
 }
 
 /** The settings a link is created or edited with. */
@@ -72,6 +75,8 @@ const public_dashboards_admin = {
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`),
   resume: (org: string, dashboardId: string, linkId: string) =>
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`),
+  rebuild: (org: string, dashboardId: string, linkId: string) =>
+    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/rebuild`),
   revoke: (org: string, dashboardId: string, linkId: string) =>
     http().delete(`${linksPath(org, dashboardId)}/${linkId}`),
 };

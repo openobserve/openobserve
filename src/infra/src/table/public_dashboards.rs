@@ -42,31 +42,31 @@ pub async fn get_by_slug<C: ConnectionTrait>(
         .await?)
 }
 
-/// Point-read the materialized snapshot for one `(dashboard, preset)`.
+/// Point-read the materialized snapshot for one `(dashboard, range key)`.
 pub async fn get_snapshot<C: ConnectionTrait>(
     conn: &C,
     public_dashboard_id: &str,
-    preset_secs: i64,
+    range_key: &str,
 ) -> Result<Option<public_dashboard_snapshots::Model>, errors::Error> {
     Ok(public_dashboard_snapshots::Entity::find_by_id((
         public_dashboard_id.to_string(),
-        preset_secs,
+        range_key.to_string(),
     ))
     .one(conn)
     .await?)
 }
 
-/// Which presets currently have a built snapshot — feeds the sanitized config's
-/// `available_presets`.
-pub async fn list_snapshot_presets<C: ConnectionTrait>(
+/// Each built snapshot's range key and build time, without the data.
+pub async fn list_snapshot_keys<C: ConnectionTrait>(
     conn: &C,
     public_dashboard_id: &str,
-) -> Result<Vec<i64>, errors::Error> {
+) -> Result<Vec<(String, i64)>, errors::Error> {
     Ok(public_dashboard_snapshots::Entity::find()
         .select_only()
-        .column(public_dashboard_snapshots::Column::PresetSecs)
+        .column(public_dashboard_snapshots::Column::RangeKey)
+        .column(public_dashboard_snapshots::Column::BuiltAt)
         .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(public_dashboard_id))
-        .into_tuple::<i64>()
+        .into_tuple::<(String, i64)>()
         .all(conn)
         .await?)
 }
@@ -92,11 +92,11 @@ pub async fn list_enabled<C: ConnectionTrait>(
         .await?)
 }
 
-/// Insert-or-replace the snapshot row for one `(dashboard, preset)`.
+/// Insert-or-replace the snapshot row for one `(dashboard, range key)`.
 pub async fn upsert_snapshot<C: ConnectionTrait>(
     conn: &C,
     public_dashboard_id: &str,
-    preset_secs: i64,
+    range_key: &str,
     data: &str,
     now: i64,
 ) -> Result<(), errors::Error> {
@@ -107,13 +107,13 @@ pub async fn upsert_snapshot<C: ConnectionTrait>(
             Expr::value(now),
         )
         .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(public_dashboard_id))
-        .filter(public_dashboard_snapshots::Column::PresetSecs.eq(preset_secs))
+        .filter(public_dashboard_snapshots::Column::RangeKey.eq(range_key))
         .exec(conn)
         .await?;
     if res.rows_affected == 0 {
         let model = public_dashboard_snapshots::Model {
             public_dashboard_id: public_dashboard_id.to_string(),
-            preset_secs,
+            range_key: range_key.to_string(),
             data: data.to_string(),
             built_at: now,
         };
@@ -134,18 +134,16 @@ pub async fn delete_snapshots<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Drop snapshot rows for presets no longer offered (on config update).
+/// Drop snapshot rows for ranges no longer offered (on config update).
 pub async fn prune_snapshots<C: ConnectionTrait>(
     conn: &C,
     public_dashboard_id: &str,
-    keep_presets: &[i64],
+    keep_keys: &[String],
 ) -> Result<(), errors::Error> {
     let mut q = public_dashboard_snapshots::Entity::delete_many()
         .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(public_dashboard_id));
-    if !keep_presets.is_empty() {
-        q = q.filter(
-            public_dashboard_snapshots::Column::PresetSecs.is_not_in(keep_presets.to_vec()),
-        );
+    if !keep_keys.is_empty() {
+        q = q.filter(public_dashboard_snapshots::Column::RangeKey.is_not_in(keep_keys.to_vec()));
     }
     q.exec(conn).await?;
     Ok(())

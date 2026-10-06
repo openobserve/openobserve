@@ -19,9 +19,9 @@ pub struct Model {
     pub name: String,
     // 0 draft, 1 public.
     pub visibility: i32,
-    pub time_range_editable: bool,
-    pub default_range_secs: Option<i64>,
-    pub allowed_presets_secs: Option<String>,
+    // JSON list of relative and absolute ranges.
+    pub time_ranges: Option<String>,
+    pub default_range_key: Option<String>,
     pub frozen_variables: Option<String>,
     pub rebuild_secs: i32,
     pub last_rebuilt_at: Option<i64>,

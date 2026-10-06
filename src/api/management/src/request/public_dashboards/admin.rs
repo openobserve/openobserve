@@ -262,6 +262,31 @@ pub async fn resume(
     }
 }
 
+/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/rebuild — build the absolute
+/// ranges again.
+pub async fn rebuild(
+    Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false).await {
+        return r;
+    }
+    let link = match load_link(&org_id, &dashboard_id, &link_id).await {
+        Ok(link) => link,
+        Err(r) => return r,
+    };
+    match openobserve_core::public_dashboards::rebuild_now(link, &user.user_id).await {
+        Ok(link) => view_response("rebuild", &org_id, link).await,
+        Err(e) if e.to_string().contains("absolute") || e.to_string().contains("resume") => {
+            MetaHttpResponse::bad_request(e)
+        }
+        Err(e) => map_err("rebuild", e),
+    }
+}
+
 /// DELETE /{org_id}/dashboards/{dashboard_id}/public_links/{link_id} — revoke.
 pub async fn delete(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,

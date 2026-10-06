@@ -27,6 +27,7 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     update: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
+    rebuild: vi.fn(),
     revoke: vi.fn(),
   },
 }));
@@ -71,6 +72,12 @@ const OTableStub = {
   template:
     '<div><slot name="toolbar-trailing" /><div v-for="row in data" :key="row.id"><div v-for="col in columns" :key="col.id"><slot :name="\'cell-\' + col.id" :row="row" /></div></div></div>',
 };
+const DateTimeStub = {
+  name: "DateTime",
+  props: ["defaultType", "defaultRelativeTime", "defaultAbsoluteTime"],
+  emits: ["on:date-change"],
+  template: "<div />",
+};
 const VVSStub = {
   name: "VariablesValueSelector",
   template: "<div />",
@@ -91,7 +98,13 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
   folder_name: "default",
   status: "live",
   enabled: true,
-  time_range: { editable: true, default_range_secs: 3600, allowed_presets_secs: [3600, 86400] },
+  time_range: {
+    ranges: [
+      { type: "relative", secs: 3600 },
+      { type: "relative", secs: 86400 },
+    ],
+    default: { type: "relative", secs: 3600 },
+  },
   frozen_variables: { env: "stage" },
   rebuild_secs: 600,
   last_rebuilt_at: 1,
@@ -122,6 +135,7 @@ const build = (props: Record<string, unknown> = {}) =>
         ODropdownItem: ODropdownItemStub,
         OTable: OTableStub,
         VariablesValueSelector: VVSStub,
+        DateTime: DateTimeStub,
       },
     },
   });
@@ -158,7 +172,13 @@ describe("PublicLinksPanel", () => {
     expect(admin.create).toHaveBeenCalledWith("default", "dash-1", {
       name: "NOC wall",
       visibility: "public",
-      time_range: { editable: true, default_range_secs: 3600, allowed_presets_secs: [3600, 86400] },
+      time_range: {
+        ranges: [
+          { type: "relative", secs: 3600 },
+          { type: "relative", secs: 86400 },
+        ],
+        default: { type: "relative", secs: 3600 },
+      },
       frozen_variables: { env: "prod" },
       rebuild_secs: 60,
       expires_at: null,
@@ -308,30 +328,70 @@ describe("PublicLinksPanel", () => {
     expect(cfg.rebuild_secs).toBe(600);
   });
 
-  it("moves the default time range to the first chosen range when it is no longer chosen", async () => {
+  it("edits each range in its own picker row, flags bad rows and adds new ones", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);
     const w = build({ editLinkId: "l1" });
     await flushPromises();
-    const form = (
-      w.vm as unknown as {
-        form: {
-          setFieldValue: (k: string, v: number[]) => void;
-          state: { values: { defaultPreset: number } };
-        };
-      }
-    ).form;
+    const pickers = () => w.findAllComponents({ name: "DateTime" });
+    const pick = async (index: number, value: Record<string, unknown>) => {
+      pickers()[index].vm.$emit("on:date-change", { userChangedValue: true, ...value });
+      await flushPromises();
+    };
+    const rowError = (index: number) =>
+      w.find(`[data-test="dashboards-public-links-panel-range-${index}-error"]`);
+    expect(pickers().map((p) => p.props("defaultRelativeTime"))).toEqual(["1h", "1d"]);
 
-    form.setFieldValue("presets", [86400, 604800]);
-    await flushPromises();
-    expect(form.state.values.defaultPreset).toBe(86400);
+    await w.find('[data-test="dashboards-public-links-panel-add-range-btn"]').trigger("click");
+    expect(pickers()).toHaveLength(3);
+    expect(pickers()[2].props("defaultRelativeTime")).toBe("1w");
 
-    form.setFieldValue("presets", [604800, 86400, 2592000]);
-    await flushPromises();
-    expect(form.state.values.defaultPreset).toBe(86400);
+    // The picker's own mount emit repeats its value and must not overwrite the row.
+    await pick(2, { userChangedValue: false, valueType: "relative", relativeTimePeriod: "1h" });
+    expect(rowError(2).exists()).toBe(false);
+    await pick(2, { valueType: "relative", relativeTimePeriod: "1h", startTime: 0, endTime: 0 });
+    expect(rowError(2).text()).toBe("This time range is already in the list");
 
-    form.setFieldValue("presets", [604800]);
+    const future = Date.now() * 1000 + 3_600_000_000;
+    await pick(2, { valueType: "absolute", startTime: 1_000_000, endTime: future });
+    expect(rowError(2).text()).toBe("An absolute time range must end in the past");
+    await pick(2, { valueType: "absolute", startTime: 1_000_000, endTime: 86_401_000_000 });
+    expect(rowError(2).exists()).toBe(false);
+
+    await w.find('[data-test="dashboards-public-links-panel-range-0-remove-btn"]').trigger("click");
+    await w.find('[data-test="dashboards-public-links-panel-range-0-remove-btn"]').trigger("click");
     await flushPromises();
-    expect(form.state.values.defaultPreset).toBe(604800);
+    expect(pickers()).toHaveLength(1);
+    expect(has(w, "dashboards-public-links-panel-rebuild-select")).toBe(false);
+
+    await submit(w);
+    const absolute = { type: "absolute", start: 1_000_000, end: 86_401_000_000 };
+    expect(vi.mocked(admin.update).mock.calls[0][3].time_range).toEqual({
+      ranges: [absolute],
+      default: absolute,
+    });
+  });
+
+  it("rebuilds a link with an absolute range from its menu", async () => {
+    const absolute = { type: "absolute" as const, start: 1_000_000, end: 86_401_000_000 };
+    vi.mocked(admin.list).mockResolvedValue({
+      data: { list: [link({ time_range: { ranges: [absolute], default: absolute } })] },
+    } as never);
+    vi.mocked(admin.rebuild).mockResolvedValue({ data: link() } as never);
+    const w = build();
+    await flushPromises();
+    expect(w.text()).toContain("Once");
+    await w.find('[data-test="dashboards-public-links-panel-l1-rebuild-menu"]').trigger("click");
+    await flushPromises();
+    expect(admin.rebuild).toHaveBeenCalledWith("default", "dash-1", "l1");
+    expect(notify.positive).toHaveBeenCalled();
+  });
+
+  it("offers no rebuild for a link of only relative ranges", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-l1-rebuild-menu")).toBe(false);
   });
 
   it("offers refresh intervals from 10 seconds and keeps the link's own", async () => {

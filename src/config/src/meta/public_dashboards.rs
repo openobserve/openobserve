@@ -47,16 +47,60 @@ impl Visibility {
     }
 }
 
-/// The viewer's time-range contract: locked to a default, or a bounded set of
-/// pre-materialized relative presets (seconds).
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+/// One window a link offers: rolling and rebuilt every refresh, or fixed and built once.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TimeRange {
+    Relative {
+        secs: i64,
+    },
+    /// UTC micros.
+    Absolute {
+        start: i64,
+        end: i64,
+    },
+}
+
+impl TimeRange {
+    /// The id its snapshot is stored under and the viewer asks for.
+    pub fn key(&self) -> String {
+        match self {
+            Self::Relative { secs } => format!("r{secs}"),
+            Self::Absolute { start, end } => format!("a{start}-{end}"),
+        }
+    }
+
+    pub fn is_relative(&self) -> bool {
+        matches!(self, Self::Relative { .. })
+    }
+
+    pub fn length_secs(&self) -> i64 {
+        match self {
+            Self::Relative { secs } => *secs,
+            Self::Absolute { start, end } => (end - start) / 1_000_000,
+        }
+    }
+
+    /// The `(start, end)` micros a build at `now` covers.
+    pub fn window(&self, now: i64) -> (i64, i64) {
+        match self {
+            Self::Relative { secs } => (now - secs * 1_000_000, now),
+            Self::Absolute { start, end } => (*start, *end),
+        }
+    }
+}
+
+/// The ranges a link offers; with more than one, viewers can switch between them.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TimeRangePolicy {
-    #[serde(default)]
-    pub editable: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub default_range_secs: Option<i64>,
-    #[serde(default)]
-    pub allowed_presets_secs: Vec<i64>,
+    pub ranges: Vec<TimeRange>,
+    pub default: TimeRange,
+}
+
+impl TimeRangePolicy {
+    pub fn has_relative(&self) -> bool {
+        self.ranges.iter().any(TimeRange::is_relative)
+    }
 }
 
 /// Admin request body to create/update a public link. Variables are frozen at
@@ -105,7 +149,8 @@ impl PublicLinkStatus {
         };
         // Three missed rebuilds means the viewer is looking at data the author didn't promise.
         let stale_after = 3 * i64::from(link.rebuild_secs.max(1)) * 1_000_000;
-        if link.rebuild_failed || now - built > stale_after {
+        let stale = link.has_relative && now - built > stale_after;
+        if link.rebuild_failed || stale {
             return Self::NeedsAttention;
         }
         Self::Live
@@ -121,6 +166,8 @@ pub struct PublicLinkState {
     pub last_rebuilt_at: Option<i64>,
     pub rebuild_failed: bool,
     pub rebuild_secs: i32,
+    /// Absolute ranges are built once, so only a relative range can go stale.
+    pub has_relative: bool,
 }
 
 /// Whether a panel rendered, or was withheld (unreadable stream / unsupported).
@@ -152,7 +199,7 @@ pub struct PanelSnapshot {
     pub metadata: serde_json::Value,
 }
 
-/// Stored per `(public_dashboard, preset)`; serialized into the snapshot row's
+/// Stored per `(public_dashboard, range key)`; serialized into the snapshot row's
 /// `data` column and point-read by the anonymous plane. Keyed by panel id so the
 /// viewer can look up each panel's slice directly.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -162,13 +209,15 @@ pub struct SnapshotData {
 }
 
 /// The sanitized config the anonymous plane returns — layout + viz specs and
-/// available presets only. No ids, no SQL, no stream internals, no variables.
+/// the offered ranges only. No ids, no SQL, no stream internals.
 #[derive(Clone, Debug, Serialize)]
 pub struct SanitizedDashboard {
     pub title: String,
     pub layout: serde_json::Value,
-    pub time_range: TimeRangePolicy,
-    pub available_presets: Vec<i64>,
+    pub ranges: Vec<KeyedRange>,
+    pub default_key: String,
+    /// Keys of the ranges that have a snapshot to show.
+    pub available_keys: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub built_at: Option<i64>,
     /// The renderer keys time-series axes off this; anonymous viewers get no `/config`.
@@ -177,6 +226,14 @@ pub struct SanitizedDashboard {
     pub refresh_secs: i64,
     /// Frozen variable values, shown read-only; no variable is ever viewer-editable.
     pub variables: Vec<PublicVariable>,
+}
+
+/// A range with the key the viewer requests its snapshot by.
+#[derive(Clone, Debug, Serialize)]
+pub struct KeyedRange {
+    pub key: String,
+    #[serde(flatten)]
+    pub range: TimeRange,
 }
 
 /// A dashboard variable as the public viewer sees it: display label and frozen value only.
@@ -244,6 +301,7 @@ mod tests {
             last_rebuilt_at: Some(1_000_000_000),
             rebuild_failed: false,
             rebuild_secs: 60,
+            has_relative: true,
         }
     }
 
@@ -303,5 +361,33 @@ mod tests {
             PublicLinkStatus::derive(&state(), built + 180_000_001),
             PublicLinkStatus::NeedsAttention
         );
+        let absolute_only = PublicLinkState {
+            has_relative: false,
+            ..state()
+        };
+        assert_eq!(
+            PublicLinkStatus::derive(&absolute_only, built + 86_400_000_000),
+            PublicLinkStatus::Live
+        );
+    }
+
+    #[test]
+    fn ranges_key_and_window_by_type() {
+        let rel = TimeRange::Relative { secs: 3600 };
+        let abs = TimeRange::Absolute {
+            start: 1_000_000,
+            end: 61_000_000,
+        };
+        assert_eq!(rel.key(), "r3600");
+        assert_eq!(abs.key(), "a1000000-61000000");
+        assert_eq!(rel.window(5_000_000_000), (1_400_000_000, 5_000_000_000));
+        assert_eq!(abs.window(5_000_000_000), (1_000_000, 61_000_000));
+        assert_eq!(abs.length_secs(), 60);
+        let json = serde_json::to_string(&abs).unwrap();
+        assert_eq!(
+            json,
+            r#"{"type":"absolute","start":1000000,"end":61000000}"#
+        );
+        assert_eq!(serde_json::from_str::<TimeRange>(&json).unwrap(), abs);
     }
 }

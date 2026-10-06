@@ -33,7 +33,7 @@ use config::{
     axum::middlewares::RealIp,
     meta::{
         dashboards::Dashboard,
-        public_dashboards::{PublicVariable, SanitizedDashboard, TimeRangePolicy},
+        public_dashboards::{KeyedRange, PublicVariable, SanitizedDashboard},
     },
     utils::time::now_micros,
 };
@@ -52,7 +52,7 @@ static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::defa
 
 #[derive(Deserialize)]
 pub struct DataParams {
-    preset: i64,
+    range: String,
 }
 
 enum Servable {
@@ -97,7 +97,7 @@ pub async fn config(ip: Option<Extension<RealIp>>, Path(slug): Path<String>) -> 
     with_headers(serve_config(&slug).await)
 }
 
-/// GET /api/public_dashboards/{slug}/data?preset= — point-read one snapshot.
+/// GET /api/public_dashboards/{slug}/data?range= — point-read one range's snapshot.
 pub async fn data(
     ip: Option<Extension<RealIp>>,
     Path(slug): Path<String>,
@@ -106,7 +106,7 @@ pub async fn data(
     if rate_limited(ip.map(|e| e.0)) {
         return with_headers(too_many_requests());
     }
-    with_headers(serve_data(&slug, params.preset).await)
+    with_headers(serve_data(&slug, &params.range).await)
 }
 
 async fn serve_config(slug: &str) -> Response {
@@ -122,14 +122,26 @@ async fn serve_config(slug: &str) -> Response {
         return StatusCode::NOT_FOUND.into_response();
     };
     let (title, layout) = project_layout(&dash);
-    let available_presets = table::list_snapshot_presets(conn, &pd.id)
+    let available_keys = table::list_snapshot_keys(conn, &pd.id)
         .await
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(key, _)| key)
+        .collect();
+    let policy = openobserve_core::public_dashboards::time_ranges(&pd);
     Json(SanitizedDashboard {
         title,
         layout,
-        time_range: time_policy(&pd),
-        available_presets,
+        ranges: policy
+            .ranges
+            .iter()
+            .map(|range| KeyedRange {
+                key: range.key(),
+                range: *range,
+            })
+            .collect(),
+        default_key: policy.default.key(),
+        available_keys,
         built_at: pd.last_rebuilt_at,
         timestamp_column: config::TIMESTAMP_COL_NAME.to_string(),
         refresh_secs: i64::from(pd.rebuild_secs),
@@ -138,7 +150,7 @@ async fn serve_config(slug: &str) -> Response {
     .into_response()
 }
 
-async fn serve_data(slug: &str, preset: i64) -> Response {
+async fn serve_data(slug: &str, range_key: &str) -> Response {
     let pd = match resolve(slug).await {
         Servable::Ok(pd) => pd,
         Servable::Unavailable => return unavailable(),
@@ -146,7 +158,7 @@ async fn serve_data(slug: &str, preset: i64) -> Response {
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
     };
     let conn = get_orm_client_ro().await;
-    match table::get_snapshot(conn, &pd.id, preset).await {
+    match table::get_snapshot(conn, &pd.id, range_key).await {
         Ok(Some(snap)) => match serde_json::from_str::<serde_json::Value>(&snap.data) {
             Ok(v) => Json(v).into_response(),
             Err(_) => (StatusCode::ACCEPTED, "preparing").into_response(),
@@ -219,18 +231,6 @@ fn unavailable() -> Response {
         "This dashboard is currently unavailable.",
     )
         .into_response()
-}
-
-fn time_policy(pd: &Model) -> TimeRangePolicy {
-    TimeRangePolicy {
-        editable: pd.time_range_editable,
-        default_range_secs: pd.default_range_secs,
-        allowed_presets_secs: pd
-            .allowed_presets_secs
-            .as_deref()
-            .and_then(|s| serde_json::from_str(s).ok())
-            .unwrap_or_default(),
-    }
 }
 
 /// Project a viewer-safe layout from the dashboard: v8 tabs/panels with query

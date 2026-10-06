@@ -608,6 +608,10 @@ fn public_dashboard_admin_routes(router: Router) -> Router {
             "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
             post(public_dashboards::admin::resume),
         )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/rebuild",
+            post(public_dashboards::admin::rebuild),
+        )
 }
 
 pub fn proxy_routes(enable_auth: bool) -> Router {

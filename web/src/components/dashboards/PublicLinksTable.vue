@@ -116,7 +116,11 @@
         <PublicLinkRangesCell :link="row" :data-test="`dashboards-public-links-${row.id}-ranges`" />
       </template>
       <template #cell-refresh="{ row }">
-        <span class="text-text-body text-sm">{{ refreshLabel(row.rebuild_secs, t) }}</span>
+        <span class="text-text-body text-sm">{{
+          hasRelativeRange(row)
+            ? refreshLabel(row.rebuild_secs, t)
+            : t("dashboard.publicLinks.refreshOnce")
+        }}</span>
       </template>
       <template #cell-expires="{ row }">
         <PublicLinkExpiresCell
@@ -236,6 +240,14 @@
               }}
             </ODropdownItem>
             <ODropdownItem
+              v-if="canRebuild(row)"
+              icon-left="refresh"
+              :data-test="`dashboards-public-links-${row.id}-rebuild-menu`"
+              @select="rebuildLink(row)"
+            >
+              {{ t("dashboard.publicLinks.rebuildNow") }}
+            </ODropdownItem>
+            <ODropdownItem
               icon-left="delete"
               variant="destructive"
               :data-test="`dashboards-public-links-${row.id}-revoke-menu`"
@@ -303,11 +315,18 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { PublicLink, PublicLinkStatus } from "@/services/public_dashboards_admin";
 import {
   publicLinksListQuery,
+  rebuildPublicLinkMutation,
   revokePublicLinkMutation,
   setPublicLinkPausedMutation,
 } from "@/services/public_dashboards.queries";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
-import { publicLinkColumns, publicLinkUrl, refreshLabel } from "./publicLinkDisplay";
+import {
+  canRebuild,
+  hasRelativeRange,
+  publicLinkColumns,
+  publicLinkUrl,
+  refreshLabel,
+} from "./publicLinkDisplay";
 import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 
@@ -347,6 +366,7 @@ const refreshLinks = () => linksQuery.refetch();
 
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
+const rebuildMutation = useMutation(() => rebuildPublicLinkMutation(orgId.value));
 
 const statusFilter = ref<StatusFilter>("all");
 const searchQuery = ref("");
@@ -474,6 +494,15 @@ async function setPaused(link: PublicLink, paused: boolean) {
     showPositiveNotification(
       paused ? t("dashboard.publicLinks.pausedToast") : t("dashboard.publicLinks.resumedToast"),
     );
+  } catch (e: unknown) {
+    showErrorNotification(serverMessage(e) || t("dashboard.publicLinks.actionFailed"));
+  }
+}
+
+async function rebuildLink(link: PublicLink) {
+  try {
+    await rebuildMutation.mutateAsync(link);
+    showPositiveNotification(t("dashboard.publicLinks.rebuiltToast"));
   } catch (e: unknown) {
     showErrorNotification(serverMessage(e) || t("dashboard.publicLinks.actionFailed"));
   }

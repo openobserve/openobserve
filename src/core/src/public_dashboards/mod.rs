@@ -26,7 +26,7 @@ use config::{
         dashboards::Dashboard,
         public_dashboards::{
             PanelSnapshot, PanelState, PublicDashboardConfig, PublicLinkState, PublicLinkStatus,
-            SnapshotData, TimeRangePolicy,
+            SnapshotData, TimeRange, TimeRangePolicy,
         },
         search,
         sql::{TableReferenceExt, resolve_stream_names_with_type},
@@ -44,9 +44,14 @@ use regex::Regex;
 
 const REBUILD_STATE_OK: i32 = 1;
 const REBUILD_STATE_ERROR: i32 = 2;
-const MAX_PRESETS: usize = 10;
-const MIN_PRESET_SECS: i64 = 60;
-const MAX_PRESET_SECS: i64 = 90 * 86_400;
+const MAX_RANGES: usize = 10;
+const MIN_RANGE_SECS: i64 = 60;
+const MAX_RANGE_SECS: i64 = 365 * 86_400;
+/// A relative range longer than this re-queries a lot of data, so it needs a slow refresh.
+const LONG_RANGE_SECS: i64 = 30 * 86_400;
+const LONG_RANGE_MIN_REFRESH_SECS: i32 = 3600;
+/// How often a link of only absolute ranges is checked for expiry and a departed publisher.
+const ABSOLUTE_CHECK_SECS: i64 = 86_400;
 const MAX_FROZEN_VARIABLES_BYTES: usize = 64 * 1024;
 
 /// Search-response fields the renderer reads; SQL, VRL errors and trace ids stay private.
@@ -71,26 +76,33 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
         return Ok(());
     };
 
-    let mut presets = parse_i64_list(pd.allowed_presets_secs.as_deref());
-    if let Some(default) = pd.default_range_secs {
-        presets.push(default);
+    // An absolute range is built once, then again only after the link changes.
+    let built: BTreeMap<String, i64> = pd_table::list_snapshot_keys(conn, &pd.id)
+        .await?
+        .into_iter()
+        .collect();
+    let due: Vec<TimeRange> = time_ranges(pd)
+        .ranges
+        .into_iter()
+        .filter(|r| r.is_relative() || built.get(&r.key()).is_none_or(|at| *at < pd.updated_at))
+        .collect();
+    if due.is_empty() {
+        return Ok(());
     }
-    presets.sort_unstable();
-    presets.dedup();
 
     let vars = parse_frozen_vars(pd.frozen_variables.as_deref());
     let mut authorized: BTreeSet<String> = BTreeSet::new();
     let mut unauthorized: BTreeSet<String> = BTreeSet::new();
 
-    for preset in &presets {
-        let start = now - preset * 1_000_000;
+    for range in &due {
+        let (start, end) = range.window(now);
         let panels = build_panels(
             &pd.org_id,
             &pd.published_by,
             &dash,
             &vars,
             start,
-            now,
+            end,
             &mut authorized,
             &mut unauthorized,
         )
@@ -99,7 +111,7 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
             panels,
             built_at: now,
         })?;
-        pd_table::upsert_snapshot(conn, &pd.id, *preset, &json, now).await?;
+        pd_table::upsert_snapshot(conn, &pd.id, &range.key(), &json, now).await?;
     }
 
     let auth_json =
@@ -116,6 +128,28 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
     )
     .await?;
     Ok(())
+}
+
+/// A link's ranges and default; a default no range matches falls back to the first range.
+pub fn time_ranges(link: &PublicDashboard) -> TimeRangePolicy {
+    let ranges: Vec<TimeRange> = link
+        .time_ranges
+        .as_deref()
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_default();
+    let default = ranges
+        .iter()
+        .find(|r| link.default_range_key.as_deref() == Some(r.key().as_str()))
+        .or(ranges.first())
+        .copied()
+        .unwrap_or(TimeRange::Relative { secs: 3600 });
+    TimeRangePolicy { ranges, default }
+}
+
+/// When a link of only absolute ranges is next checked: daily, or at expiry if that is sooner.
+pub fn next_absolute_check(expires_at: Option<i64>, now: i64) -> i64 {
+    let daily = now + ABSOLUTE_CHECK_SECS * 1_000_000;
+    expires_at.map_or(daily, |exp| daily.min(exp.max(now)))
 }
 
 /// Enumerate v8 panels → queries and materialize each. Non-v8 dashboards are
@@ -478,11 +512,6 @@ fn var_value_to_string(value: &serde_json::Value) -> String {
     }
 }
 
-fn parse_i64_list(json: Option<&str>) -> Vec<i64> {
-    json.and_then(|s| serde_json::from_str::<Vec<i64>>(s).ok())
-        .unwrap_or_default()
-}
-
 fn parse_frozen_vars(json: Option<&str>) -> BTreeMap<String, serde_json::Value> {
     json.and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_default()
@@ -594,9 +623,8 @@ pub async fn create(
         slug: slug.clone(),
         name: cfg.name.trim().to_string(),
         visibility: cfg.visibility.to_i32(),
-        time_range_editable: cfg.time_range.editable,
-        default_range_secs: cfg.time_range.default_range_secs,
-        allowed_presets_secs: Some(serde_json::to_string(&cfg.time_range.allowed_presets_secs)?),
+        time_ranges: Some(serde_json::to_string(&cfg.time_range.ranges)?),
+        default_range_key: Some(cfg.time_range.default.key()),
         frozen_variables: Some(serde_json::to_string(&cfg.frozen_variables)?),
         rebuild_secs: cfg.rebuild_secs,
         last_rebuilt_at: None,
@@ -675,6 +703,7 @@ pub async fn views(
         .into_iter()
         .map(|link| {
             let label = labels.get(&link.dashboard_id);
+            let time_range = time_ranges(&link);
             let status = PublicLinkStatus::derive(
                 &PublicLinkState {
                     dashboard_exists: label.is_some(),
@@ -683,6 +712,7 @@ pub async fn views(
                     last_rebuilt_at: link.last_rebuilt_at,
                     rebuild_failed: link.rebuild_state == REBUILD_STATE_ERROR,
                     rebuild_secs: link.rebuild_secs,
+                    has_relative: time_range.has_relative(),
                 },
                 now,
             );
@@ -692,11 +722,7 @@ pub async fn views(
                 folder_name: label.map(|l| l.folder_name.clone()),
                 status,
                 enabled: link.enabled,
-                time_range: TimeRangePolicy {
-                    editable: link.time_range_editable,
-                    default_range_secs: link.default_range_secs,
-                    allowed_presets_secs: parse_i64_list(link.allowed_presets_secs.as_deref()),
-                },
+                time_range,
                 frozen_variables: parse_frozen_vars(link.frozen_variables.as_deref()),
                 rebuild_secs: link.rebuild_secs,
                 last_rebuilt_at: link.last_rebuilt_at,
@@ -733,17 +759,15 @@ pub async fn update_link(
 ) -> Result<PublicDashboard, anyhow::Error> {
     link.updated_by = Some(user_id.to_string());
     link.name = cfg.name.trim().to_string();
-    link.time_range_editable = cfg.time_range.editable;
-    link.default_range_secs = cfg.time_range.default_range_secs;
-    link.allowed_presets_secs = Some(serde_json::to_string(&cfg.time_range.allowed_presets_secs)?);
+    link.time_ranges = Some(serde_json::to_string(&cfg.time_range.ranges)?);
+    link.default_range_key = Some(cfg.time_range.default.key());
     link.frozen_variables = Some(serde_json::to_string(&cfg.frozen_variables)?);
     link.rebuild_secs = cfg.rebuild_secs;
     link.expires_at = cfg.expires_at;
     link.updated_at = now_micros();
     pd_table::update(&link).await?;
 
-    let mut keep = cfg.time_range.allowed_presets_secs.clone();
-    keep.extend(cfg.time_range.default_range_secs);
+    let keep: Vec<String> = cfg.time_range.ranges.iter().map(TimeRange::key).collect();
     pd_table::prune_snapshots(infra::db::get_orm_client_rw().await, &link.id, &keep).await?;
     if link.enabled {
         restart_rebuilds(&link).await?;
@@ -811,6 +835,26 @@ pub async fn resume_link(
     Ok(link)
 }
 
+/// Build a link's absolute ranges again, picking up dashboard edits and late data.
+pub async fn rebuild_now(
+    mut link: PublicDashboard,
+    user_id: &str,
+) -> Result<PublicDashboard, anyhow::Error> {
+    if time_ranges(&link).ranges.iter().all(TimeRange::is_relative) {
+        return Err(anyhow::anyhow!(
+            "this link has no absolute time range; relative ranges rebuild on their own"
+        ));
+    }
+    if !link.enabled {
+        return Err(anyhow::anyhow!("resume this link before rebuilding it"));
+    }
+    link.updated_by = Some(user_id.to_string());
+    link.updated_at = now_micros();
+    pd_table::update(&link).await?;
+    restart_rebuilds(&link).await?;
+    Ok(link)
+}
+
 /// Revoke: delete the share, its snapshots, and its rebuild trigger.
 pub async fn delete(org: &str, id: &str) -> Result<bool, anyhow::Error> {
     let existed = pd_table::delete(org, id).await?;
@@ -871,20 +915,22 @@ async fn register_trigger(org: &str, id: &str, next_run_at: i64) -> Result<(), a
 
 /// Reject a create request the server would otherwise have to rewrite or store unbounded.
 pub fn validate_config(cfg: &PublicDashboardConfig) -> Result<(), String> {
-    check_expiry(cfg.expires_at, now_micros())?;
-    validate_limits(cfg)
+    let now = now_micros();
+    check_expiry(cfg.expires_at, now)?;
+    validate_limits(cfg, now)
 }
 
 /// An edit that keeps an expired link's date is allowed, so only a changed expiry must be in the
 /// future.
 pub fn validate_edit(cfg: &PublicDashboardConfig, link: &PublicDashboard) -> Result<(), String> {
+    let now = now_micros();
     if cfg.expires_at != link.expires_at {
-        check_expiry(cfg.expires_at, now_micros())?;
+        check_expiry(cfg.expires_at, now)?;
     }
-    validate_limits(cfg)
+    validate_limits(cfg, now)
 }
 
-fn validate_limits(cfg: &PublicDashboardConfig) -> Result<(), String> {
+fn validate_limits(cfg: &PublicDashboardConfig, now: i64) -> Result<(), String> {
     check_rebuild_secs(cfg.rebuild_secs)?;
     let name = cfg.name.trim();
     if name.is_empty() {
@@ -893,7 +939,7 @@ fn validate_limits(cfg: &PublicDashboardConfig) -> Result<(), String> {
     if name.chars().count() > 256 {
         return Err("name must be at most 256 characters".to_string());
     }
-    check_presets(&cfg.time_range)?;
+    check_ranges(&cfg.time_range, cfg.rebuild_secs, now)?;
     let vars_len = serde_json::to_string(&cfg.frozen_variables).map_or(0, |s| s.len());
     if vars_len > MAX_FROZEN_VARIABLES_BYTES {
         return Err("frozen variables must be at most 64 KB".to_string());
@@ -901,15 +947,48 @@ fn validate_limits(cfg: &PublicDashboardConfig) -> Result<(), String> {
     Ok(())
 }
 
-fn check_presets(tr: &TimeRangePolicy) -> Result<(), String> {
-    if tr.allowed_presets_secs.len() > MAX_PRESETS {
-        return Err(format!("at most {MAX_PRESETS} time ranges are allowed"));
+fn check_ranges(tr: &TimeRangePolicy, rebuild_secs: i32, now: i64) -> Result<(), String> {
+    if tr.ranges.is_empty() {
+        return Err("at least one time range is required".to_string());
     }
-    let in_range = |secs: &i64| (MIN_PRESET_SECS..=MAX_PRESET_SECS).contains(secs);
-    let all_in_range = tr.allowed_presets_secs.iter().all(in_range)
-        && tr.default_range_secs.as_ref().is_none_or(in_range);
-    if !all_in_range {
-        return Err("time ranges must be between 1 minute and 90 days".to_string());
+    if tr.ranges.len() > MAX_RANGES {
+        return Err(format!("at most {MAX_RANGES} time ranges are allowed"));
+    }
+    let keys: BTreeSet<String> = tr.ranges.iter().map(TimeRange::key).collect();
+    if keys.len() != tr.ranges.len() {
+        return Err("each time range can be listed only once".to_string());
+    }
+    if !keys.contains(&tr.default.key()) {
+        return Err("the default time range must be one of the time ranges".to_string());
+    }
+    for range in &tr.ranges {
+        check_range(range, rebuild_secs, now)?;
+    }
+    Ok(())
+}
+
+fn check_range(range: &TimeRange, rebuild_secs: i32, now: i64) -> Result<(), String> {
+    match range {
+        TimeRange::Relative { secs } if *secs < MIN_RANGE_SECS => {
+            return Err("a relative time range must be at least 1 minute".to_string());
+        }
+        TimeRange::Relative { secs }
+            if *secs > LONG_RANGE_SECS && rebuild_secs < LONG_RANGE_MIN_REFRESH_SECS =>
+        {
+            return Err(
+                "time ranges longer than 30 days need a refresh of at least 1 hour".to_string(),
+            );
+        }
+        TimeRange::Absolute { start, end } if start >= end => {
+            return Err("an absolute time range must start before it ends".to_string());
+        }
+        TimeRange::Absolute { end, .. } if *end > now => {
+            return Err("an absolute time range must end in the past".to_string());
+        }
+        _ => {}
+    }
+    if range.length_secs() > MAX_RANGE_SECS {
+        return Err("time ranges can be at most 365 days".to_string());
     }
     Ok(())
 }
@@ -1040,10 +1119,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_i64_list_handles_valid_invalid_and_none() {
-        assert_eq!(parse_i64_list(Some("[900,3600]")), vec![900, 3600]);
-        assert!(parse_i64_list(Some("not json")).is_empty());
-        assert!(parse_i64_list(None).is_empty());
+    fn next_absolute_check_is_daily_or_at_expiry() {
+        let day = ABSOLUTE_CHECK_SECS * 1_000_000;
+        assert_eq!(next_absolute_check(None, 10), 10 + day);
+        assert_eq!(next_absolute_check(Some(500), 10), 500);
+        assert_eq!(next_absolute_check(Some(5), 10), 10);
     }
 
     #[test]
@@ -1201,17 +1281,43 @@ mod tests {
         );
     }
 
+    fn rel(secs: i64) -> TimeRange {
+        TimeRange::Relative { secs }
+    }
+
     #[test]
-    fn presets_are_capped_in_count_and_length() {
-        let tr = |presets: Vec<i64>, default: Option<i64>| TimeRangePolicy {
-            editable: true,
-            default_range_secs: default,
-            allowed_presets_secs: presets,
-        };
-        assert!(check_presets(&tr(vec![60, 90 * 86_400], Some(3600))).is_ok());
-        assert!(check_presets(&tr((1..=11).map(|i| i * 60).collect(), None)).is_err());
-        assert!(check_presets(&tr(vec![30], None)).is_err());
-        assert!(check_presets(&tr(vec![3600], Some(91 * 86_400))).is_err());
+    fn ranges_are_capped_in_count_and_unique_with_a_listed_default() {
+        let tr = |ranges: Vec<TimeRange>, default: TimeRange| TimeRangePolicy { ranges, default };
+        assert!(check_ranges(&tr(vec![rel(60), rel(3600)], rel(3600)), 60, 0).is_ok());
+        assert!(check_ranges(&tr(vec![], rel(3600)), 60, 0).is_err());
+        let eleven = (1..=11).map(|i| rel(i * 60)).collect();
+        assert!(check_ranges(&tr(eleven, rel(60)), 60, 0).is_err());
+        assert!(check_ranges(&tr(vec![rel(60), rel(60)], rel(60)), 60, 0).is_err());
+        assert_eq!(
+            check_ranges(&tr(vec![rel(60)], rel(3600)), 60, 0).unwrap_err(),
+            "the default time range must be one of the time ranges"
+        );
+    }
+
+    #[test]
+    fn each_range_is_checked_by_type() {
+        let now = 1_000 * 86_400 * 1_000_000;
+        let abs = |start: i64, end: i64| TimeRange::Absolute { start, end };
+        let day = 86_400 * 1_000_000;
+        assert!(check_range(&rel(30), 60, now).is_err());
+        assert!(check_range(&rel(365 * 86_400), 3600, now).is_ok());
+        assert!(check_range(&rel(366 * 86_400), 3600, now).is_err());
+        assert_eq!(
+            check_range(&rel(31 * 86_400), 60, now).unwrap_err(),
+            "time ranges longer than 30 days need a refresh of at least 1 hour"
+        );
+        assert!(check_range(&abs(now - 365 * day, now), 60, now).is_ok());
+        assert!(check_range(&abs(now - 366 * day, now), 60, now).is_err());
+        assert!(check_range(&abs(now, now - day), 60, now).is_err());
+        assert_eq!(
+            check_range(&abs(now - day, now + 1), 60, now).unwrap_err(),
+            "an absolute time range must end in the past"
+        );
     }
 
     #[test]
@@ -1220,19 +1326,18 @@ mod tests {
             name: name.to_string(),
             visibility: Default::default(),
             time_range: TimeRangePolicy {
-                editable: false,
-                default_range_secs: Some(3600),
-                allowed_presets_secs: vec![3600],
+                ranges: vec![rel(3600)],
+                default: rel(3600),
             },
             frozen_variables: BTreeMap::new(),
             rebuild_secs: 3600,
             expires_at: None,
         };
         assert_eq!(
-            validate_limits(&cfg("   ")).unwrap_err(),
+            validate_limits(&cfg("   "), 0).unwrap_err(),
             "name is required"
         );
-        assert!(validate_limits(&cfg(&"x".repeat(257))).is_err());
-        assert!(validate_limits(&cfg("NOC wall")).is_ok());
+        assert!(validate_limits(&cfg(&"x".repeat(257)), 0).is_err());
+        assert!(validate_limits(&cfg("NOC wall"), 0).is_ok());
     }
 }

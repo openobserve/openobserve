@@ -37,8 +37,12 @@ const CONFIG = {
       panels: [{ id: "p1", title: "Panel 1" }],
     },
   ],
-  time_range: { editable: true, default_range_secs: 3600, allowed_presets_secs: [3600, 86400] },
-  available_presets: [3600, 86400],
+  ranges: [
+    { key: "r3600", type: "relative", secs: 3600 },
+    { key: "r86400", type: "relative", secs: 86400 },
+  ],
+  default_key: "r3600",
+  available_keys: ["r3600", "r86400"],
   built_at: 1_700_000_000_000_000,
   refresh_secs: 30,
 };
@@ -131,7 +135,7 @@ describe("PublicDashboard viewer", () => {
 
   it("shows preparing (not an infinite spinner) when no presets are built yet", async () => {
     (service.getConfig as any).mockResolvedValue({
-      data: { ...CONFIG, available_presets: [], time_range: { editable: true } },
+      data: { ...CONFIG, available_keys: [] },
       status: 200,
     });
     const w = buildWrapper();
@@ -144,7 +148,7 @@ describe("PublicDashboard viewer", () => {
     vi.useFakeTimers();
     vi.mocked(service.getConfig)
       .mockResolvedValueOnce({
-        data: { ...CONFIG, available_presets: [], time_range: { editable: true } },
+        data: { ...CONFIG, available_keys: [] },
         status: 200,
       } as never)
       .mockResolvedValue({ data: CONFIG, status: 200 } as never);
@@ -157,7 +161,7 @@ describe("PublicDashboard viewer", () => {
     expect(w.text()).toContain("Preparing");
 
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(service.getData).toHaveBeenCalledWith(expect.any(String), 3600);
+    expect(service.getData).toHaveBeenCalledWith(expect.any(String), "r3600");
     expect(grid(w).exists()).toBe(true);
   });
 
@@ -215,6 +219,41 @@ describe("PublicDashboard viewer", () => {
     expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 7s");
   });
 
+  it("shows an absolute range's fixed window without a countdown or polling", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_020_000);
+    const absolute = {
+      key: "a1000000-86401000000",
+      type: "absolute",
+      start: 1_000_000,
+      end: 86_401_000_000,
+    };
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...CONFIG,
+        ranges: [absolute],
+        default_key: absolute.key,
+        available_keys: [absolute.key],
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: {
+        built_at: 1_800_000_000_000_000,
+        panels: { p1: { state: { state: "ok" }, data: [] } },
+      },
+    } as never);
+    const w = mountWithActions();
+    await flushPromises();
+    expect(service.getData).toHaveBeenCalledWith("abc", absolute.key);
+    expect(grid(w).props("currentTimeObj").__global.start_time.getTime()).toBe(1000);
+    expect(grid(w).props("currentTimeObj").__global.end_time.getTime()).toBe(86_401_000);
+    expect(has(w, "dashboards-public-dashboard-next-refresh")).toBe(false);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(1);
+  });
+
   it("offers the time range picker only when viewers can switch", async () => {
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({
@@ -228,8 +267,8 @@ describe("PublicDashboard viewer", () => {
     (service.getConfig as any).mockResolvedValue({
       data: {
         ...CONFIG,
-        available_presets: [3600],
-        time_range: { editable: false, default_range_secs: 3600, allowed_presets_secs: [3600] },
+        ranges: [{ key: "r3600", type: "relative", secs: 3600 }],
+        available_keys: ["r3600"],
       },
       status: 200,
     });

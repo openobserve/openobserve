@@ -43,10 +43,10 @@ describe("public_dashboards viewer service", () => {
     expect(mockGet).toHaveBeenCalledWith("/api/public_dashboards/slug1");
   });
 
-  it("getData() passes the preset as a query param", async () => {
-    await service.getData("slug1", 3600);
+  it("getData() passes the range key as a query param", async () => {
+    await service.getData("slug1", "r3600");
     expect(mockGet).toHaveBeenCalledWith("/api/public_dashboards/slug1/data", {
-      params: { preset: 3600 },
+      params: { range: "r3600" },
     });
   });
 });

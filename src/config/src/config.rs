@@ -93,7 +93,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 94: create synthetics_refs.
 // 95: create public_dashboards tables and add their name column.
 // 96: add updated_by to public_dashboards.
-pub const DB_SCHEMA_VERSION: u64 = 96;
+pub const DB_SCHEMA_VERSION: u64 = 97;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

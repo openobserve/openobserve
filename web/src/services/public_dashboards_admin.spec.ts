@@ -24,7 +24,10 @@ import service, { type PublicLinkConfig } from "./public_dashboards_admin";
 const cfg: PublicLinkConfig = {
   name: "NOC",
   visibility: "public",
-  time_range: { editable: false, default_range_secs: 3600, allowed_presets_secs: [3600] },
+  time_range: {
+    ranges: [{ type: "relative", secs: 3600 }],
+    default: { type: "relative", secs: 3600 },
+  },
   frozen_variables: {},
   rebuild_secs: 60,
   expires_at: null,
@@ -57,12 +60,16 @@ describe("public_dashboards_admin service", () => {
     expect(mockHttp.put).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1", cfg);
   });
 
-  it("pauses, resumes and revokes one link", async () => {
+  it("pauses, resumes, rebuilds and revokes one link", async () => {
     await service.pause("org1", "dash1", "l1");
     await service.resume("org1", "dash1", "l1");
+    await service.rebuild("org1", "dash1", "l1");
     await service.revoke("org1", "dash1", "l1");
     expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/pause");
     expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/resume");
+    expect(mockHttp.post).toHaveBeenCalledWith(
+      "/api/org1/dashboards/dash1/public_links/l1/rebuild",
+    );
     expect(mockHttp.delete).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1");
   });
 });

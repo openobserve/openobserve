@@ -28,6 +28,7 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     update: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
+    rebuild: vi.fn(),
     revoke: vi.fn(),
   },
 }));
@@ -86,7 +87,13 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
   folder_name: "Ops",
   status: "live",
   enabled: true,
-  time_range: { editable: true, default_range_secs: 3600, allowed_presets_secs: [3600, 86400] },
+  time_range: {
+    ranges: [
+      { type: "relative", secs: 3600 },
+      { type: "relative", secs: 86400 },
+    ],
+    default: { type: "relative", secs: 3600 },
+  },
   frozen_variables: {},
   rebuild_secs: 600,
   last_rebuilt_at: 1,
@@ -114,7 +121,10 @@ const LINKS = [
     id: "l5",
     name: "Wall",
     status: "needs_attention",
-    time_range: { editable: false, default_range_secs: 86400, allowed_presets_secs: [86400] },
+    time_range: {
+      ranges: [{ type: "relative", secs: 86400 }],
+      default: { type: "relative", secs: 86400 },
+    },
   }),
 ];
 
@@ -270,6 +280,21 @@ describe("PublicLinksTable", () => {
     await find(w, "dashboards-public-links-l2-resume-menu").trigger("click");
     await flushPromises();
     expect(admin.resume).toHaveBeenCalledWith("default", "dash-1", "l2");
+  });
+
+  it("shows an absolute-only link as refreshed once and rebuilds it from the menu", async () => {
+    const absolute = { type: "absolute" as const, start: 1_000_000, end: 86_401_000_000 };
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: { list: [link({ time_range: { ranges: [absolute], default: absolute } })] },
+    } as never);
+    vi.mocked(admin.rebuild).mockResolvedValue({ data: link() } as never);
+    const w = build();
+    await flushPromises();
+    expect(w.text()).toContain("Once");
+    await find(w, "dashboards-public-links-l1-rebuild-menu").trigger("click");
+    await flushPromises();
+    expect(admin.rebuild).toHaveBeenCalledWith("default", "dash-1", "l1");
+    expect(notify.positive).toHaveBeenCalled();
   });
 
   it("revokes only after the confirmation, even for a deleted dashboard", async () => {

@@ -61,7 +61,7 @@
         </template>
         <template #actions>
           <span
-            v-if="windowLabel"
+            v-if="windowLabel && !pickerShowsWindow"
             class="text-text-secondary text-sm whitespace-nowrap tabular-nums max-lg:hidden"
             data-test="dashboards-public-dashboard-window"
           >
@@ -77,7 +77,7 @@
           >
             {{ nextRefreshLabel }}
           </span>
-          <ODropdown v-if="timeEditable && presetOptions.length" side="bottom" align="end">
+          <ODropdown v-if="rangeOptions.length > 1" side="bottom" align="end">
             <template #trigger>
               <OButton
                 variant="outline"
@@ -87,16 +87,16 @@
                 icon-right="keyboard-arrow-down"
                 data-test="dashboards-public-dashboard-preset-btn"
               >
-                {{ selectedPresetLabel }}
+                {{ selectedRange ? rangeLabel(selectedRange) : "" }}
               </OButton>
             </template>
             <ODropdownItem
-              v-for="option in presetOptions"
-              :key="option.value"
-              :data-test="`dashboards-public-dashboard-preset-${option.value}`"
-              @select="selectPreset(option.value)"
+              v-for="option in rangeOptions"
+              :key="option.key"
+              :data-test="`dashboards-public-dashboard-preset-${option.key}`"
+              @select="selectRange(option.key)"
             >
-              {{ option.label }}
+              {{ rangeLabel(option) }}
             </ODropdownItem>
           </ODropdown>
           <ThemeSwitcher bordered />
@@ -143,11 +143,18 @@
       </RenderDashboardCharts>
 
       <footer
-        class="border-border-default px-page-edge text-2xs text-text-secondary flex items-center justify-between gap-3 border-t py-3"
+        class="border-border-default px-page-edge text-2xs text-text-secondary flex items-center gap-2 border-t py-3"
         data-test="dashboards-public-dashboard-footer"
       >
         <PoweredByOpenObserve />
-        <span>{{ footerNote }}</span>
+        <OIcon
+          name="info-outline"
+          size="sm"
+          class="cursor-help"
+          data-test="dashboards-public-dashboard-footer-info"
+        >
+          <OTooltip side="top" max-width="20rem" :content="footerNote" />
+        </OIcon>
       </footer>
     </template>
   </div>
@@ -163,6 +170,8 @@ import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -170,11 +179,12 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
 import publicDashboardsService from "@/services/public_dashboards";
 import { durationFormatter, formatExactDuration } from "@/utils/formatters";
+import type { PublicLinkRange } from "@/services/public_dashboards_admin";
+import { sortRanges } from "@/components/dashboards/PublicLinkForm.schema";
+import { longRange } from "@/components/dashboards/publicLinkDisplay";
 
-interface PresetOption {
-  label: I18nText;
-  value: number;
-}
+/** A range as the public config lists it, with the key its snapshot is read by. */
+type KeyedRange = PublicLinkRange & { key: string };
 
 const route = useRoute();
 const store = useStore();
@@ -186,18 +196,24 @@ const state = ref<"loading" | "ready" | "preparing" | "notfound" | "unavailable"
 );
 const config = ref<Record<string, any>>({});
 const snapshot = ref<Record<string, any>>({});
-const selectedPreset = ref<number | null>(null);
+const selectedKey = ref<string | null>(null);
+// Anonymous viewers have no saved timezone, so dates read in the browser's.
+const viewerTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // RenderDashboardCharts and TabList read and switch the active tab through this.
 const selectedTabId = ref<string>("");
 provide("selectedTabId", selectedTabId);
 
 const tabs = computed<any[]>(() => (Array.isArray(config.value.layout) ? config.value.layout : []));
-const timeEditable = computed(() => !!config.value?.time_range?.editable);
-const presetOptions = computed<PresetOption[]>(() =>
-  (config.value?.available_presets ?? [])
-    .slice()
-    .sort((a: number, b: number) => a - b)
-    .map((secs: number) => ({ value: secs, label: presetLabel(secs) })),
+const ranges = computed<KeyedRange[]>(() =>
+  Array.isArray(config.value?.ranges) ? config.value.ranges : [],
+);
+// Only ranges with a built snapshot can be shown.
+const rangeOptions = computed<KeyedRange[]>(() => {
+  const available: string[] = config.value?.available_keys ?? [];
+  return sortRanges(ranges.value.filter((r) => available.includes(r.key)));
+});
+const selectedRange = computed<KeyedRange | null>(
+  () => ranges.value.find((r) => r.key === selectedKey.value) ?? null,
 );
 const builtAt = computed<number | null>(
   () => snapshot.value?.built_at ?? config.value?.built_at ?? null,
@@ -212,10 +228,20 @@ const dashboardData = computed(() => ({
   variables: { list: [] },
 }));
 
+// An absolute range's window is fixed; a relative one ends when its snapshot was built.
+const shownWindow = computed<{ startMs: number; endMs: number } | null>(() => {
+  const range = selectedRange.value;
+  if (!range) return null;
+  if (range.type === "absolute") return { startMs: range.start / 1000, endMs: range.end / 1000 };
+  if (!builtAt.value) return null;
+  const endMs = builtAt.value / 1000;
+  return { startMs: endMs - range.secs * 1000, endMs };
+});
+
 // The window the snapshot was built for, so any time-aware chrome matches the data.
 const currentTimeObj = computed(() => {
-  const endMs = builtAt.value ? builtAt.value / 1000 : Date.now();
-  const startMs = endMs - (selectedPreset.value ?? 0) * 1000;
+  const endMs = shownWindow.value?.endMs ?? Date.now();
+  const startMs = shownWindow.value?.startMs ?? endMs;
   return { __global: { start_time: new Date(startMs), end_time: new Date(endMs) } };
 });
 
@@ -243,30 +269,21 @@ const injectedPanelData = computed(() => {
   return out;
 });
 
-function presetLabel(secs: number): I18nText {
-  if (secs % 86400 === 0) {
-    const n = secs / 86400;
-    return t("dashboard.publicDashboard.pastDays", { n }, n);
-  }
-  if (secs % 3600 === 0) {
-    const n = secs / 3600;
-    return t("dashboard.publicDashboard.pastHours", { n }, n);
-  }
-  const n = Math.max(1, Math.round(secs / 60));
-  return t("dashboard.publicDashboard.pastMinutes", { n }, n);
-}
-
-const selectedPresetLabel = computed<I18nText>(() =>
-  selectedPreset.value ? presetLabel(selectedPreset.value) : raw(""),
+// The picker already names an absolute range by its dates, so the header doesn't repeat them.
+const pickerShowsWindow = computed(
+  () => rangeOptions.value.length > 1 && selectedRange.value?.type === "absolute",
 );
+
+function rangeLabel(range: PublicLinkRange): I18nText {
+  return longRange(range, t, viewerTimezone);
+}
 
 // Start → end of the window the shown snapshot covers; spans of a day or more show the date too.
 const windowLabel = computed<I18nText | "">(() => {
-  if (!builtAt.value || !selectedPreset.value) return "";
-  const endMs = builtAt.value / 1000;
-  const startMs = endMs - selectedPreset.value * 1000;
+  if (!shownWindow.value) return "";
+  const { startMs, endMs } = shownWindow.value;
   const opts: Intl.DateTimeFormatOptions =
-    selectedPreset.value >= 86400
+    endMs - startMs >= 86_400_000
       ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
       : { hour: "2-digit", minute: "2-digit" };
   const fmt = (ms: number) => raw(new Date(ms).toLocaleString(undefined, opts));
@@ -285,16 +302,16 @@ const variableValue = (value: unknown): string => {
   return Array.isArray(value) ? value.join(", ") : String(value);
 };
 
-const selectPreset = (secs: number) => {
-  selectedPreset.value = secs;
-  loadData();
+const selectRange = async (key: string) => {
+  selectedKey.value = key;
+  await loadData();
+  scheduleRefresh();
 };
 
-const pickDefaultPreset = (): number | null => {
-  const def = config.value?.time_range?.default_range_secs;
-  const presets: number[] = config.value?.available_presets ?? [];
-  if (def && presets.includes(def)) return def;
-  return presets.slice().sort((a, b) => a - b)[0] ?? null;
+const pickDefaultRange = (): string | null => {
+  const def: string | undefined = config.value?.default_key;
+  if (def && rangeOptions.value.some((r) => r.key === def)) return def;
+  return rangeOptions.value[0]?.key ?? null;
 };
 
 const mapError = (e: unknown) => {
@@ -305,12 +322,12 @@ const mapError = (e: unknown) => {
 const loadData = async () => {
   // No preset resolved yet means no snapshot has been built — show "preparing"
   // rather than hanging on the loading spinner forever.
-  if (selectedPreset.value == null) {
+  if (selectedKey.value == null) {
     state.value = "preparing";
     return;
   }
   try {
-    const res = await publicDashboardsService.getData(slug, selectedPreset.value);
+    const res = await publicDashboardsService.getData(slug, selectedKey.value);
     if (res.status === 202) {
       state.value = "preparing";
       return;
@@ -343,7 +360,7 @@ const load = async () => {
   try {
     const res = await publicDashboardsService.getConfig(slug);
     applyConfig(res.data ?? {});
-    selectedPreset.value = pickDefaultPreset();
+    selectedKey.value = pickDefaultRange();
     await loadData();
   } catch (e: unknown) {
     mapError(e);
@@ -352,8 +369,13 @@ const load = async () => {
 
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const refreshSecs = computed(() => Number(config.value?.refresh_secs) || 0);
+const hasRelative = computed(() => ranges.value.some((r) => r.type === "relative"));
+// An absolute range never changes, so it shows no countdown and the page stops polling for it.
+const pollsForSelection = computed(
+  () => refreshSecs.value > 0 && selectedRange.value?.type !== "absolute",
+);
 const footerNote = computed<I18nText>(() =>
-  refreshSecs.value > 0
+  refreshSecs.value > 0 && hasRelative.value
     ? t("dashboard.publicDashboard.footerNoteRefresh", {
         interval: formatExactDuration(refreshSecs.value),
       })
@@ -366,7 +388,7 @@ const refresh = async () => {
   try {
     const res = await publicDashboardsService.getConfig(slug);
     applyConfig(res.data ?? {});
-    if (selectedPreset.value === null) selectedPreset.value = pickDefaultPreset();
+    if (selectedKey.value === null) selectedKey.value = pickDefaultRange();
     await loadData();
   } catch (e: unknown) {
     mapError(e);
@@ -384,7 +406,7 @@ const OVERDUE_POLL_MS = 15000;
 const nowMs = ref(Date.now());
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 const nextRefreshLabel = computed<I18nText | "">(() => {
-  if (!builtAt.value || refreshSecs.value <= 0) return "";
+  if (!builtAt.value || !pollsForSelection.value) return "";
   const left = Math.ceil((builtAt.value / 1000 + refreshSecs.value * 1000 - nowMs.value) / 1000);
   return left > 0
     ? t("dashboard.publicDashboard.nextRefreshIn", { time: raw(durationFormatter(left)) })
@@ -403,7 +425,7 @@ const nextRefreshDelay = (): number => {
 
 const scheduleRefresh = () => {
   if (refreshTimer) clearTimeout(refreshTimer);
-  if (refreshSecs.value <= 0) return;
+  if (!pollsForSelection.value && state.value !== "preparing") return;
   refreshTimer = setTimeout(async () => {
     // Paused while the tab is hidden, so a background tab never polls.
     if (!document.hidden) await refresh();

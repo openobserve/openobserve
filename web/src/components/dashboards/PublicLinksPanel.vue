@@ -122,28 +122,109 @@
           :placeholder="t('dashboard.publicLinks.namePlaceholder')"
           data-test="dashboards-public-links-panel-name-input"
         />
+        <component :is="form.Field" name="ranges">
+          <template #default="{ field }">
+            <div class="flex flex-col gap-1.5" data-test="dashboards-public-links-panel-ranges">
+              <span
+                class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium"
+              >
+                {{ t("dashboard.publicDashboard.availableRanges")
+                }}<span aria-hidden="true" class="select-none">*</span>
+              </span>
+              <div class="flex flex-wrap items-start gap-3 pt-2">
+                <div
+                  v-for="(row, index) in rows"
+                  :key="row.id"
+                  class="flex max-w-full flex-col gap-1"
+                  :data-test="`dashboards-public-links-panel-range-${index}`"
+                >
+                  <div class="relative">
+                    <DateTime
+                      class="min-w-0"
+                      field-appearance
+                      menu-align="start"
+                      auto-apply
+                      hide-range-shift
+                      :default-type="row.range.type"
+                      :default-relative-time="
+                        row.range.type === 'relative' ? pickerPeriod(row.range.secs) : '1h'
+                      "
+                      :default-absolute-time="
+                        row.range.type === 'absolute'
+                          ? { startTime: row.range.start, endTime: row.range.end }
+                          : undefined
+                      "
+                      :data-test-name="`dashboards-public-links-panel-range-${index}-picker`"
+                      @on:date-change="(value: PickedTime) => onRangeChanged(row, value)"
+                    />
+                    <OButton
+                      variant="outline"
+                      size="icon-xs-circle"
+                      class="bg-surface-base! absolute! -end-1.5 -top-1.5 size-4!"
+                      :aria-label="
+                        t('dashboard.publicLinks.removeRange', {
+                          range: longRange(row.range, t, timezone),
+                        })
+                      "
+                      :data-test="`dashboards-public-links-panel-range-${index}-remove-btn`"
+                      @click="removeRange(row)"
+                    >
+                      <template #icon-left><OIcon name="close" size="xs" /></template>
+                    </OButton>
+                  </div>
+                  <span
+                    v-if="rowErrors[index]"
+                    class="text-select-error-text w-0 min-w-full text-xs leading-snug"
+                    role="alert"
+                    :data-test="`dashboards-public-links-panel-range-${index}-error`"
+                  >
+                    {{ rowErrors[index] }}
+                  </span>
+                </div>
+                <OButton
+                  v-if="rows.length < MAX_RANGES"
+                  variant="outline"
+                  size="sm"
+                  icon-left="add"
+                  data-test="dashboards-public-links-panel-add-range-btn"
+                  @click="addRange"
+                >
+                  {{ t("dashboard.publicLinks.addRange") }}
+                </OButton>
+              </div>
+              <span
+                v-if="field.state.meta.errors.length"
+                class="text-select-error-text text-xs leading-none"
+                role="alert"
+              >
+                {{ firstFieldError(field.state.meta.errors) }}
+              </span>
+            </div>
+          </template>
+        </component>
         <OFormSelect
-          name="presets"
-          :options="presetOptions"
-          multiple
-          required
-          :label="t('dashboard.publicDashboard.availableRanges')"
-          data-test="dashboards-public-links-panel-presets-select"
-        />
-        <OFormSelect
-          name="defaultPreset"
-          :options="selectedPresetOptions"
+          name="defaultKey"
+          :options="defaultOptions"
           required
           :label="t('dashboard.publicDashboard.defaultRange')"
           data-test="dashboards-public-links-panel-default-select"
         />
         <OFormSelect
+          v-if="ranges.some((r) => r.type === 'relative')"
           name="rebuildSecs"
           :options="refreshOptions"
           required
           :label="t('dashboard.publicDashboard.refreshEvery')"
           data-test="dashboards-public-links-panel-rebuild-select"
-        />
+        >
+          <template #tooltip>
+            <OTooltip
+              side="right"
+              max-width="20rem"
+              :content="t('dashboard.publicLinks.refreshEveryHint')"
+            />
+          </template>
+        </OFormSelect>
         <OFormDate
           name="expires"
           clearable
@@ -259,7 +340,11 @@
           <PublicLinkRangesCell :link="row" />
         </template>
         <template #cell-refresh="{ row }">
-          <span class="text-text-body text-sm">{{ refreshLabel(row.rebuild_secs, t) }}</span>
+          <span class="text-text-body text-sm">{{
+            hasRelativeRange(row)
+              ? refreshLabel(row.rebuild_secs, t)
+              : t("dashboard.publicLinks.refreshOnce")
+          }}</span>
         </template>
         <template #cell-expires="{ row }">
           <PublicLinkExpiresCell
@@ -368,6 +453,14 @@
                 }}
               </ODropdownItem>
               <ODropdownItem
+                v-if="canRebuild(row)"
+                icon-left="refresh"
+                :data-test="`dashboards-public-links-panel-${row.id}-rebuild-menu`"
+                @select="rebuildLink(row)"
+              >
+                {{ t("dashboard.publicLinks.rebuildNow") }}
+              </ODropdownItem>
+              <ODropdownItem
                 icon-left="delete"
                 variant="destructive"
                 :data-test="`dashboards-public-links-panel-${row.id}-revoke-menu`"
@@ -415,28 +508,39 @@ import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
-import type { PublicLink } from "@/services/public_dashboards_admin";
+import DateTime from "@/components/DateTime.vue";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import type { PublicLink, PublicLinkRange } from "@/services/public_dashboards_admin";
 import {
   publicLinksForDashboardQuery,
+  rebuildPublicLinkMutation,
   revokePublicLinkMutation,
   savePublicLinkMutation,
   setPublicLinkPausedMutation,
 } from "@/services/public_dashboards.queries";
 import {
-  PRESET_SECONDS,
   REFRESH_SECONDS,
   makePublicLinkSchema,
   publicLinkDefaults,
   publicLinkFormFrom,
+  MAX_RANGES,
+  nextNewRange,
+  pickerPeriod,
+  rangeError,
+  rangeFromPicker,
+  rangeKey,
   todayIn,
   toPublicLinkConfig,
+  type PickedTime,
   type PublicLinkForm,
 } from "./PublicLinkForm.schema";
 import {
+  canRebuild,
+  hasRelativeRange,
+  longRange,
   publicLinkColumns,
   publicLinkUrl as publicUrl,
   refreshLabel,
-  shortRange,
 } from "./publicLinkDisplay";
 
 type VariableValues = { values?: Array<{ name: string; value: unknown }> };
@@ -444,6 +548,15 @@ type PanelView = "list" | "form" | "created";
 
 interface PresetOption extends SelectOption {
   value: number;
+}
+
+interface RangeOption extends SelectOption {
+  value: string;
+}
+
+interface RangeRow {
+  id: number;
+  range: PublicLinkRange;
 }
 
 const FORM_ID = "dashboards-public-links-panel-form";
@@ -516,6 +629,7 @@ const filteredLinks = computed(() => {
 const saveMutation = useMutation(() => savePublicLinkMutation(orgId.value));
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
+const rebuildMutation = useMutation(() => rebuildPublicLinkMutation(orgId.value));
 
 const view = ref<PanelView>("list");
 const editing = ref<PublicLink | null>(null);
@@ -554,13 +668,36 @@ const form = useOForm<PublicLinkForm>({
   schema: makePublicLinkSchema(t, today.value),
   onSubmit: (value) => submit(value),
 });
-const selectedPresets = form.useStore((s) => s.values.presets);
-
-const presetOptions = computed<PresetOption[]>(() =>
-  PRESET_SECONDS.map((value) => ({ value, label: presetLabel(value) })),
+const ranges = form.useStore((s) => s.values.ranges);
+const defaultOptions = computed<RangeOption[]>(() =>
+  ranges.value.map((range) => ({
+    value: rangeKey(range),
+    label: longRange(range, t, timezone.value),
+  })),
 );
-const selectedPresetOptions = computed<PresetOption[]>(() =>
-  presetOptions.value.filter((o) => selectedPresets.value.includes(o.value)),
+// The form holds the ranges; rows give each a stable id, so a picker isn't remounted mid-pick.
+let nextRowId = 0;
+const rows = ref<RangeRow[]>([]);
+watch(
+  ranges,
+  (list) => {
+    const same =
+      list.length === rows.value.length &&
+      list.every((r, i) => rangeKey(r) === rangeKey(rows.value[i].range));
+    if (!same) rows.value = list.map((range) => ({ id: nextRowId++, range }));
+  },
+  { immediate: true },
+);
+// A duplicate is flagged on the later row only.
+const rowErrors = computed(() =>
+  rows.value.map((row, i) =>
+    rangeError(
+      row.range,
+      rows.value.slice(0, i).map((r) => r.range),
+      Date.now() * 1000,
+      t,
+    ),
+  ),
 );
 // An edited link keeps an interval the list doesn't offer, so saving doesn't silently change it.
 const refreshOptions = computed<PresetOption[]>(() => {
@@ -584,8 +721,27 @@ const variableSeed = computed(() => ({
 
 const columns = publicLinkColumns(t);
 
-function presetLabel(secs: number): I18nText {
-  return t("dashboard.publicDashboard.past", { range: raw(shortRange(secs)) });
+function syncRanges() {
+  form.setFieldValue(
+    "ranges",
+    rows.value.map((r) => r.range),
+  );
+}
+
+function onRangeChanged(row: RangeRow, value: PickedTime) {
+  if (value.userChangedValue === false) return;
+  row.range = rangeFromPicker(value);
+  syncRanges();
+}
+
+function addRange() {
+  rows.value.push({ id: nextRowId++, range: nextNewRange(rows.value.map((r) => r.range)) });
+  syncRanges();
+}
+
+function removeRange(row: RangeRow) {
+  rows.value = rows.value.filter((r) => r.id !== row.id);
+  syncRanges();
 }
 
 // Expired and orphaned links can't be resumed, so they offer no pause toggle.
@@ -662,6 +818,15 @@ async function setPaused(link: PublicLink, paused: boolean) {
   }
 }
 
+async function rebuildLink(link: PublicLink) {
+  try {
+    await rebuildMutation.mutateAsync(link);
+    showPositiveNotification(t("dashboard.publicLinks.rebuiltToast"));
+  } catch (e: unknown) {
+    showErrorNotification(serverMessage(e) || t("dashboard.publicLinks.actionFailed"));
+  }
+}
+
 async function revokeLink(link: PublicLink) {
   const ok = await confirm({
     title: t("dashboard.publicLinks.revokeTitle", {
@@ -711,10 +876,10 @@ watch(
   },
   { immediate: true },
 );
-watch(selectedPresetOptions, (options) => {
+watch(defaultOptions, (options) => {
   const first = options[0];
-  if (first && !options.some((o) => o.value === form.state.values.defaultPreset)) {
-    form.setFieldValue("defaultPreset", first.value);
+  if (first && !options.some((o) => o.value === form.state.values.defaultKey)) {
+    form.setFieldValue("defaultKey", first.value);
   }
 });
 watch(

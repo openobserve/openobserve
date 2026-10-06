@@ -14,21 +14,56 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatInTimeZone } from "date-fns-tz";
-import type { I18nText, TranslateFn } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { PublicLink } from "@/services/public_dashboards_admin";
+import type { PublicLink, PublicLinkRange } from "@/services/public_dashboards_admin";
 import { formatExactDuration } from "@/utils/formatters";
-import { todayIn } from "./PublicLinkForm.schema";
+import { rangeKey, todayIn } from "./PublicLinkForm.schema";
 
 export interface ExpiryNote {
   text: I18nText;
   soon: boolean;
 }
 
-export function shortRange(secs: number): string {
-  if (secs % 86400 === 0) return `${secs / 86400}d`;
-  if (secs % 3600 === 0) return `${secs / 3600}h`;
-  return `${secs / 60}m`;
+// A month is 30 days, as in the dashboard time picker.
+const RELATIVE_UNITS = [
+  { secs: 2_592_000, short: "mo", long: "dashboard.publicDashboard.pastMonths" },
+  { secs: 604_800, short: "w", long: "dashboard.publicDashboard.pastWeeks" },
+  { secs: 86_400, short: "d", long: "dashboard.publicDashboard.pastDays" },
+  { secs: 3_600, short: "h", long: "dashboard.publicDashboard.pastHours" },
+  { secs: 60, short: "m", long: "dashboard.publicDashboard.pastMinutes" },
+] as const;
+
+function relativeUnit(secs: number) {
+  return RELATIVE_UNITS.find((u) => secs % u.secs === 0) ?? RELATIVE_UNITS[4];
+}
+
+// The year shows only when it isn't the current one, so recent windows stay short.
+function shortDate(micros: number, timezone: string): string {
+  const ms = micros / 1000;
+  const sameYear =
+    formatInTimeZone(ms, timezone, "yyyy") === formatInTimeZone(Date.now(), timezone, "yyyy");
+  return formatInTimeZone(ms, timezone, sameYear ? "d MMM" : "d MMM yyyy");
+}
+
+/** `2w`, `3mo`, or `1 Sept → 30 Sept` for the chips and list columns. */
+export function shortRange(range: PublicLinkRange, timezone: string): string {
+  if (range.type === "absolute") {
+    return `${shortDate(range.start, timezone)} → ${shortDate(range.end, timezone)}`;
+  }
+  const unit = relativeUnit(range.secs);
+  return `${range.secs / unit.secs}${unit.short}`;
+}
+
+/** `Past 2 weeks`, or the full start and end with times. */
+export function longRange(range: PublicLinkRange, t: TranslateFn, timezone: string): I18nText {
+  if (range.type === "absolute") {
+    const fmt = (micros: number) => formatInTimeZone(micros / 1000, timezone, "d MMM yyyy, HH:mm");
+    return raw(`${fmt(range.start)} → ${fmt(range.end)}`);
+  }
+  const unit = relativeUnit(range.secs);
+  const n = range.secs / unit.secs;
+  return t(unit.long, { n }, n);
 }
 
 // 30 days is offered as "1 month", and reads the same wherever the interval is shown.
@@ -53,8 +88,17 @@ export function publicLinkExpiry(
   return { text: t("dashboard.publicLinks.expiresInDays", { n: days }, days), soon: false };
 }
 
-export function defaultRange(link: PublicLink): number {
-  return link.time_range.default_range_secs ?? link.time_range.allowed_presets_secs[0] ?? 0;
+export function hasRelativeRange(link: PublicLink): boolean {
+  return link.time_range.ranges.some((r) => r.type === "relative");
+}
+
+/** Only absolute ranges wait for a rebuild; a paused link builds nothing. */
+export function canRebuild(link: PublicLink): boolean {
+  return link.enabled && link.time_range.ranges.some((r) => r.type === "absolute");
+}
+
+export function isDefaultRange(link: PublicLink, range: PublicLinkRange): boolean {
+  return rangeKey(range) === rangeKey(link.time_range.default);
 }
 
 /** The columns every public link table shows; the org-wide list adds the link's folder and dashboard. */
@@ -99,7 +143,7 @@ export function publicLinkColumns(
         ]
       : []),
     col("status", t("dashboard.publicLinks.status"), 110, "status"),
-    col("ranges", t("dashboard.publicLinks.timeRanges"), 100),
+    col("ranges", t("dashboard.publicLinks.timeRanges"), 190),
     col("refresh", t("dashboard.publicLinks.refresh"), 90, "rebuild_secs"),
     col("expires", t("dashboard.publicLinks.expires"), 115, "expires_at"),
     col("updated", t("dashboard.publicLinks.updated"), 120, "last_rebuilt_at"),

@@ -3761,11 +3761,7 @@ async fn handle_public_dashboard_triggers(
 
     // Skipped, not dropped, so the link comes back if the org is restored.
     if db::org_status::is_blocked(&pd.org_id) {
-        new_trigger.next_run_at = next_public_dashboard_run(
-            trigger.next_run_at,
-            i64::from(pd.rebuild_secs),
-            now_micros(),
-        );
+        new_trigger.next_run_at = public_dashboard_next_run(&pd, trigger.next_run_at, now_micros());
         db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
         return Ok(());
     }
@@ -3783,13 +3779,22 @@ async fn handle_public_dashboard_triggers(
         );
     }
 
-    new_trigger.next_run_at = next_public_dashboard_run(
-        trigger.next_run_at,
-        i64::from(pd.rebuild_secs),
-        now_micros(),
-    );
+    new_trigger.next_run_at = public_dashboard_next_run(&pd, trigger.next_run_at, now_micros());
     db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
     Ok(())
+}
+
+/// A relative range rebuilds every refresh; a link of only absolute ranges is only checked.
+fn public_dashboard_next_run(
+    pd: &infra::table::entity::public_dashboards::Model,
+    scheduled_at: i64,
+    now: i64,
+) -> i64 {
+    if crate::public_dashboards::time_ranges(pd).has_relative() {
+        next_public_dashboard_run(scheduled_at, i64::from(pd.rebuild_secs), now)
+    } else {
+        crate::public_dashboards::next_absolute_check(pd.expires_at, now)
+    }
 }
 
 /// Fixed-rate: completion + interval lands just past a poll and waits a whole extra poll cycle.

@@ -15,26 +15,30 @@
 -->
 <template>
   <span class="text-text-body text-sm">
-    <template v-for="(secs, i) in ranges" :key="secs">
+    <template v-for="(range, i) in ranges" :key="rangeKey(range)">
       <span v-if="i > 0" class="text-text-secondary">{{ raw(" · ") }}</span>
-      <span :class="secs === defaultRange(link) ? 'font-semibold' : ''">{{
-        raw(shortRange(secs))
-      }}</span>
+      <span :class="isDefaultRange(link, range) ? 'font-semibold' : ''"
+        >{{ raw(shortRange(range, timezone)) }}<OTooltip :content="longRange(range, t, timezone)"
+      /></span>
     </template>
   </span>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw } from "@/types/i18n";
+import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { PublicLink } from "@/services/public_dashboards_admin";
-import { defaultRange, shortRange } from "./publicLinkDisplay";
+import { isDefaultRange, longRange, shortRange } from "./publicLinkDisplay";
+import { rangeKey, sortRanges } from "./PublicLinkForm.schema";
 
 const props = defineProps<{ link: PublicLink }>();
 
-const ranges = computed(() =>
-  props.link.time_range.editable
-    ? props.link.time_range.allowed_presets_secs
-    : [defaultRange(props.link)],
+const store = useStore();
+const { t } = useI18nTyped();
+const timezone = computed<string>(
+  () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );
+const ranges = computed(() => sortRanges(props.link.time_range.ranges));
 </script>

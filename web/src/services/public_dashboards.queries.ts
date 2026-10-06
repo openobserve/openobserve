@@ -60,6 +60,13 @@ export const setPublicLinkPausedMutation = (org: string) =>
     meta: { invalidates: [publicLinkKeys.all(org)], silentError: true },
   });
 
+export const rebuildPublicLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (link: PublicLink): Promise<PublicLink> =>
+      (await admin.rebuild(org, link.dashboard_id, link.id)).data,
+    meta: { invalidates: [publicLinkKeys.all(org)], silentError: true },
+  });
+
 export const revokePublicLinkMutation = (org: string) =>
   mutationOptions({
     mutationFn: (link: PublicLink) => admin.revoke(org, link.dashboard_id, link.id),

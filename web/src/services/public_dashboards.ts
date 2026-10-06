@@ -26,8 +26,8 @@ const client = () =>
 
 const public_dashboards = {
   getConfig: (slug: string) => client().get(`/api/public_dashboards/${slug}`),
-  getData: (slug: string, preset: number) =>
-    client().get(`/api/public_dashboards/${slug}/data`, { params: { preset } }),
+  getData: (slug: string, rangeKey: string) =>
+    client().get(`/api/public_dashboards/${slug}/data`, { params: { range: rangeKey } }),
 };
 
 export default public_dashboards;
