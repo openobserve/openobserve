@@ -684,9 +684,7 @@ export class TracesPage {
   }
 
   async expectQueryError() {
-    const hasError = await this.page.locator(this.queryErrorMessage).isVisible({ timeout: 5000 }).catch(() => false) ||
-                    await this.page.locator('[data-test="traces-search-error-message"]').isVisible({ timeout: 5000 }).catch(() => false) ||
-                    await this.page.locator('[data-test="traces-search-error-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+    const hasError = await this.page.locator(this.queryErrorMessage).isVisible({ timeout: 5000 }).catch(() => false);
     expect(hasError).toBeTruthy();
   }
 
@@ -1864,22 +1862,13 @@ export class TracesPage {
   }
 
   /**
-   * Get error message element text (if visible). Source: traces Index.vue
-   * exposes both `traces-search-error-message` and the legacy
-   * `logs-search-error-message` data-tests.
+   * Get the traces error state text (if visible).
    * @returns {Promise<string>}
    */
   async getVisibleErrorMessage() {
-    const candidates = [
-      this.errorMessage,
-      '[data-test="traces-search-error-message"]',
-      '[data-test="traces-search-error-text"]',
-    ];
-    for (const sel of candidates) {
-      const el = this.page.locator(sel).first();
-      if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
-        return (await el.textContent().catch(() => '')) || '';
-      }
+    const el = this.page.locator(this.errorMessage).first();
+    if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
+      return (await el.textContent().catch(() => '')) || '';
     }
     return '';
   }
@@ -3550,9 +3539,7 @@ export class TracesPage {
     await expect(async () => {
       await this.runTraceSearch();
       if (await this.page.locator(this.errorMessage).isVisible()) {
-        const detailsBtn = this.page.locator('[data-test="traces-search-error-details-btn"]');
-        await detailsBtn.click({ timeout: 2000 }).catch(() => {});
-        const detail = await this.page.locator('[data-test="traces-search-detail-error-message"]').textContent({ timeout: 2000 }).catch(() => '');
+        const detail = await this.page.locator(this.errorMessage).textContent({ timeout: 2000 }).catch(() => '');
         testLogger.warn('Trace search returned an error; re-running', { detail: (detail || '').trim() });
       }
       await expect(firstRow).toBeVisible({ timeout: 5000 });

@@ -10525,11 +10525,9 @@
       "or": "Hoặc:",
       "askAi": "Yêu cầu AI thiết lập dấu vết"
     },
-    "configureFullTextSearch": "để cấu hình trường tìm kiếm văn bản đầy đủ cho luồng.",
     "collapseFields": "Thu gọn Trường",
     "openFields": "Mở Trường",
     "timeRangeUpdated": "Khoảng thời gian đã chọn không bao gồm trace này. Khoảng thời gian đã được cập nhật để khớp với dấu thời gian của trace.",
-    "errorRetrievingTraces": "Đã xảy ra lỗi khi truy xuất trace.",
     "fetchingTraces": "Đang tải Trace...",
     "noStream": {
       "title": "Chọn một luồng để bắt đầu khám phá",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Xem xu hướng truy vấn trong Giám sát cơ sở dữ liệu"
     },
     "index": {
-      "clickHere": "Nhấp vào đây",
       "changeStreamTitle": "Thay đổi luồng?",
       "switchStream": "Chuyển luồng",
       "cancel": "Hủy",

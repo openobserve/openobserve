@@ -706,10 +706,20 @@ const selectedServiceNode = computed(() =>
 
 const emptyGraphData = { nodes: [], edges: [] };
 
-const timeRange = computed(() => ({
-  startTime: searchObj.data.datetime.startTime,
-  endTime: searchObj.data.datetime.endTime,
-}));
+// Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
+const timeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+watch(
+  () => [
+    selectedServiceRow.value,
+    searchObj.data.datetime.type,
+    searchObj.data.datetime.relativeTimePeriod,
+    searchObj.data.datetime.startTime,
+    searchObj.data.datetime.endTime,
+  ],
+  () => {
+    if (selectedServiceRow.value) timeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+  },
+);
 
 let currentTraceId: string | null = null;
 
