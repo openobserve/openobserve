@@ -293,6 +293,7 @@ vi.mock("@/composables/useTraces", () => ({
 // Import the component AFTER all vi.mock declarations.
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
+import TracesSavedViewsDialog from "@/plugins/traces/TracesSavedViewsDialog.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 
 // ---------------------------------------------------------------------------
@@ -1582,6 +1583,8 @@ describe("SearchBar", () => {
 
     afterEach(() => {
       widthSpy.mockRestore();
+      breakpointState.lgUp = true;
+      if (!isPinned("savedViews")) togglePin("savedViews");
     });
 
     it("lists only traces views", async () => {
@@ -1722,24 +1725,75 @@ describe("SearchBar", () => {
       const moreGroup = () =>
         wrapper.find('[data-test="traces-search-bar-menu-saved-views-group"]');
       const toolbarGroup = () => wrapper.find('[data-test="traces-search-bar-saved-views"]');
+      const dialog = () => wrapper.findComponent(TracesSavedViewsDialog);
 
-      it("shows the saved-views group with the list, create and pin button", async () => {
+      it("shows the saved-views group with List, Create and the pin button", async () => {
         wrapper = mountSearchBar();
         await flushPromises();
 
         expect(moreGroup().exists()).toBe(true);
         expect(
-          moreGroup().find('[data-test="traces-search-bar-menu-saved-view-apply-t1"]').exists(),
+          moreGroup().find('[data-test="traces-search-bar-menu-list-saved-views-btn"]').exists(),
         ).toBe(true);
-        expect(
-          moreGroup().find('[data-test="traces-search-bar-menu-saved-view-apply-l1"]').exists(),
-        ).toBe(false);
         expect(
           moreGroup().find('[data-test="traces-search-bar-menu-create-saved-view-btn"]').exists(),
         ).toBe(true);
         expect(
           moreGroup().find('[data-test="traces-search-bar-menu-pin-saved-views-btn"]').exists(),
         ).toBe(true);
+        expect(moreGroup().find('[data-test="traces-saved-view-apply-t1"]').exists()).toBe(false);
+      });
+
+      it("opens the saved-views dialog from List saved views", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(dialog().props("open")).toBe(false);
+
+        await moreGroup()
+          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
+          .trigger("click");
+
+        expect(dialog().props("open")).toBe(true);
+        expect(dialog().props("views")).toEqual([tracesView]);
+      });
+
+      it("opens the saved-views dialog from the pinned dropdown's Manage item", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        await toolbarGroup().find('[data-test="traces-saved-view-manage"]').trigger("click");
+
+        expect(dialog().props("open")).toBe(true);
+      });
+
+      it("deletes from the dialog through the confirmation flow while unpinned", async () => {
+        togglePin("savedViews");
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(toolbarGroup().exists()).toBe(false);
+
+        dialog().vm.$emit("delete", tracesView);
+        await flushPromises();
+
+        expect(mockConfirm).toHaveBeenCalledTimes(1);
+        expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
+      });
+
+      it("applies and updates views from the dialog", async () => {
+        mockGetViewDetail.mockResolvedValue({ data: { ...tracesView, data: expectedData() } });
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("apply", tracesView);
+        await flushPromises();
+        expect(wrapper.emitted("apply-saved-view")?.[0]).toEqual([expectedData()]);
+
+        dialog().vm.$emit("update", tracesView);
+        await flushPromises();
+        expect(mockSavedViewsPut).toHaveBeenCalledWith(expect.any(String), "t1", {
+          view_name: "checkout errors",
+          data: expectedData(),
+        });
       });
 
       it("pin click toggles the toolbar group without closing the menu", async () => {
@@ -1763,32 +1817,6 @@ describe("SearchBar", () => {
         expect(toolbarGroup().exists()).toBe(true);
       });
 
-      it("applies the view selected from the More copy", async () => {
-        mockGetViewDetail.mockResolvedValue({ data: { ...tracesView, data: expectedData() } });
-        wrapper = mountSearchBar();
-        await flushPromises();
-
-        await wrapper
-          .find('[data-test="traces-search-bar-menu-saved-view-apply-t1"]')
-          .trigger("click");
-        await flushPromises();
-
-        expect(mockGetViewDetail).toHaveBeenCalledWith(expect.any(String), "t1");
-        expect(wrapper.emitted("apply-saved-view")?.[0]).toEqual([expectedData()]);
-      });
-
-      it("offers update but no delete in the More copy", async () => {
-        wrapper = mountSearchBar();
-        await flushPromises();
-
-        expect(
-          wrapper.find('[data-test="traces-search-bar-menu-saved-view-update-t1"]').exists(),
-        ).toBe(true);
-        expect(
-          wrapper.find('[data-test="traces-search-bar-menu-saved-view-delete-t1"]').exists(),
-        ).toBe(false);
-      });
-
       it("opens the save dialog from Create saved view", async () => {
         wrapper = mountSearchBar();
         await flushPromises();
@@ -1797,14 +1825,6 @@ describe("SearchBar", () => {
           .find('[data-test="traces-search-bar-menu-create-saved-view-btn"]')
           .trigger("click");
         expect((wrapper.vm as any).saveViewDialogOpen).toBe(true);
-      });
-
-      it("shows the empty state when there are no traces views", async () => {
-        mockSavedViewsGet.mockResolvedValue({ data: { views: [] } });
-        wrapper = mountSearchBar();
-        await flushPromises();
-
-        expect(moreGroup().text()).toContain("search.savedViewsNotFound");
       });
 
       it.each(["service-graph", "services-catalog"])(

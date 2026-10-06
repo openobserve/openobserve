@@ -128,8 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownGroup :label="t('search.savedViewsLabel')">
                 <TracesSavedViewsMenuItems
                   :views="tracesSavedViews"
-                  data-test-prefix="traces-saved-view"
-                  show-delete
                   @apply="applySavedView"
                   @update="updateSavedViewFromCurrent"
                   @delete="deleteTracesSavedView"
@@ -142,6 +140,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="openSaveViewDialog"
               >
                 {{ t("search.createSavedView") }}
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="settings"
+                data-test="traces-saved-view-manage"
+                @select="openSavedViewsDialog"
+              >
+                {{ t("search.manageSavedViews") }}
               </ODropdownItem>
             </ODropdown>
             <OSeparator vertical />
@@ -213,13 +218,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
                 </OButton>
               </template>
-              <TracesSavedViewsMenuItems
-                :views="tracesSavedViews"
-                data-test-prefix="traces-search-bar-menu-saved-view"
-                compact
-                @apply="applySavedView"
-                @update="updateSavedViewFromCurrent"
-              />
+              <ODropdownItem
+                data-test="traces-search-bar-menu-list-saved-views-btn"
+                @select="openSavedViewsDialog"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="format-list-bulleted" size="sm" />
+                  </span>
+                </template>
+                {{ t("search.listSavedViews") }}
+              </ODropdownItem>
               <ODropdownItem
                 data-test="traces-search-bar-menu-create-saved-view-btn"
                 @select="openSaveViewDialog"
@@ -494,6 +505,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-saved-view-name-input"
       />
     </ODialog>
+    <TracesSavedViewsDialog
+      v-model:open="savedViewsDialogOpen"
+      :views="tracesSavedViews"
+      @apply="applySavedView"
+      @update="updateSavedViewFromCurrent"
+      @delete="deleteTracesSavedView"
+    />
   </div>
 </template>
 
@@ -535,6 +553,7 @@ import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import TracesSavedViewsMenuItems from "./TracesSavedViewsMenuItems.vue";
+import TracesSavedViewsDialog from "./TracesSavedViewsDialog.vue";
 
 import { debounce } from "lodash-es";
 import analytics from "@/services/product_analytics";
@@ -587,6 +606,7 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     SyntaxGuide,
     TracesSavedViewsMenuItems,
+    TracesSavedViewsDialog,
   },
   emits: [
     "searchdata",
@@ -1056,6 +1076,11 @@ export default defineComponent({
       saveViewDialogOpen.value = true;
     };
 
+    const savedViewsDialogOpen = ref(false);
+    const openSavedViewsDialog = () => {
+      savedViewsDialogOpen.value = true;
+    };
+
     const saveAsNewView = async () => {
       const viewName = newViewName.value.trim();
       if (!viewName) {
@@ -1227,6 +1252,8 @@ export default defineComponent({
       saveViewDialogOpen,
       newViewName,
       openSaveViewDialog,
+      savedViewsDialogOpen,
+      openSavedViewsDialog,
       saveAsNewView,
       updateSavedViewFromCurrent,
       deleteTracesSavedView,

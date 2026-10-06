@@ -121,3 +121,17 @@ describe("useToolbarPins scopes", () => {
     expect(useToolbarPins().isPinned("histogram")).toBe(true);
   });
 });
+
+describe("useToolbarPins scope keys", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("ignores a key outside the scope's key list", async () => {
+    const { useToolbarPins } = await importFresh();
+    const traces = useToolbarPins("traces");
+    traces.togglePin("histogram");
+    expect(traces.isPinned("histogram")).toBe(false);
+    expect(window.localStorage.getItem("traces_toolbar_pinned_items")).toBeNull();
+  });
+});

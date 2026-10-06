@@ -24,15 +24,9 @@ interface TracesSavedView {
   view_name: string;
 }
 
-const props = withDefaults(
-  defineProps<{
-    views: TracesSavedView[];
-    dataTestPrefix: string;
-    showDelete?: boolean;
-    compact?: boolean;
-  }>(),
-  { showDelete: false, compact: false },
-);
+const props = defineProps<{
+  views: TracesSavedView[];
+}>();
 
 const emit = defineEmits<{
   (e: "apply", view: TracesSavedView): void;
@@ -44,15 +38,12 @@ const { t } = useI18nTyped();
 </script>
 
 <template>
-  <div
-    v-if="props.views.length"
-    :class="[props.compact ? 'max-h-44' : 'max-h-72', 'overflow-y-auto overscroll-contain']"
-  >
+  <div v-if="props.views.length" class="max-h-72 overflow-y-auto overscroll-contain">
     <ODropdownItem
       v-for="view in props.views"
       :key="view.view_id"
       :text-value="view.view_name"
-      :data-test="`${props.dataTestPrefix}-apply-${view.view_id}`"
+      :data-test="`traces-saved-view-apply-${view.view_id}`"
       @select="emit('apply', view)"
     >
       <span class="max-w-56 truncate">{{ view.view_name }}</span>
@@ -63,16 +54,15 @@ const { t } = useI18nTyped();
           icon-left="edit"
           class="ms-auto"
           :title="t('search.updateSavedViewWithCurrent')"
-          :data-test="`${props.dataTestPrefix}-update-${view.view_id}`"
+          :data-test="`traces-saved-view-update-${view.view_id}`"
           @click.stop.prevent="emit('update', view)"
         />
         <OButton
-          v-if="props.showDelete"
           variant="ghost"
           size="icon-xs-sq"
           icon-left="delete"
           :title="t('search.deleteSavedView')"
-          :data-test="`${props.dataTestPrefix}-delete-${view.view_id}`"
+          :data-test="`traces-saved-view-delete-${view.view_id}`"
           @click.stop.prevent="emit('delete', view)"
         />
       </template>

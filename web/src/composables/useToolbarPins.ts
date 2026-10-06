@@ -1,17 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Toolbar "pin" preferences composable.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-// Lets the user pin items out of a toolbar "More" menu so they render as fixed-position
-// toolbar controls. Each scope (logs, traces) persists its own set of pinned item keys to
-// localStorage and shares it reactively across every consumer via module-level state.
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
 //
-// Usage:
-//   const { isPinned, togglePin, pinnedItems } = useToolbarPins();          // logs
-//   const { isPinned, togglePin } = useToolbarPins("traces");
-//   isPinned("sqlMode")        // -> boolean
-//   togglePin("sqlMode")       // pin / unpin and persist
-//   pinnedItems.value          // -> ordered list of currently pinned keys
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// Pin state is module-level per scope, so every useToolbarPins(scope) caller shares one reactive set.
 
 import { computed, ref, type Ref } from "vue";
 
@@ -109,6 +111,8 @@ export function useToolbarPins(scope: ToolbarPinScope = "logs") {
   const isPinned = (key: ToolbarPinKey): boolean => pinnedSet.value.has(key);
 
   const togglePin = (key: ToolbarPinKey): void => {
+    // A key outside the scope would be dropped by readStoredPins on reload, so never store it.
+    if (!config.keys.includes(key)) return;
     const next = new Set(pinnedSet.value);
     if (next.has(key)) next.delete(key);
     else next.add(key);
