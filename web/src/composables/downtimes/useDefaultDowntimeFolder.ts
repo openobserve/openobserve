@@ -52,9 +52,7 @@ export function useDefaultDowntimeFolder(options: { rememberLast?: boolean } = {
     let listed = folders.data.value;
     if (listed === undefined && !folders.isError.value) {
       try {
-        listed = await queryClient.ensureQueryData(
-          permittedFoldersQuery(orgId.value, "downtimes"),
-        );
+        listed = await queryClient.ensureQueryData(permittedFoldersQuery(orgId.value, "downtimes"));
       } catch {
         listed = undefined;
       }
