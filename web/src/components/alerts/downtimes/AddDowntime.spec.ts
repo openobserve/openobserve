@@ -6,6 +6,8 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import AddDowntime from "./AddDowntime.vue";
 import downtimes from "@/services/downtimes";
+import common from "@/services/common";
+import { queryClient } from "@/composables/query/queryClient";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -82,9 +84,14 @@ const save = async (wrapper: ReturnType<typeof mount>) => {
 
 describe("AddDowntime", () => {
   beforeEach(() => {
+    queryClient.clear();
+    vi.mocked(common.list_Folders).mockImplementation(
+      () => Promise.resolve({ data: { list: [] } }) as any,
+    );
     vi.mocked(downtimes.preview).mockResolvedValue({ data: EMPTY_PREVIEW } as any);
     vi.mocked(downtimes.create).mockResolvedValue({ data: { id: "2f9K" } } as any);
     vi.mocked(downtimes.create).mockClear();
+    vi.mocked(downtimes.preview).mockClear();
     store.state.selectedOrganization = {
       ...store.state.selectedOrganization,
       identifier: "default",
@@ -130,6 +137,29 @@ describe("AddDowntime", () => {
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
     expect(body.targets).toEqual([{ module: "alerts", folders: { kind: "all" } }]);
     expect(body.schedule.repeat).toBe("none");
+    wrapper.unmount();
+  });
+
+  it("files a new downtime in the first folder a folder-scoped user may use", async () => {
+    vi.mocked(common.list_Folders).mockImplementation(
+      (_org: string, type: string) =>
+        Promise.resolve({
+          data: {
+            list:
+              type === "downtimes" ? [{ folderId: "payments", name: "Payments maintenance" }] : [],
+          },
+        }) as any,
+    );
+    const { wrapper } = await mountPage();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await flushPromises();
+    const folders = vi.mocked(downtimes.preview).mock.calls.map((call) => call[2]);
+    expect(folders.length).toBeGreaterThan(0);
+    expect(folders.every((f) => f === "payments")).toBe(true);
+    await save(wrapper);
+    await dialogButton("primary");
+    const [, body] = vi.mocked(downtimes.create).mock.calls[0];
+    expect(body.folder_id).toBe("payments");
     wrapper.unmount();
   });
 

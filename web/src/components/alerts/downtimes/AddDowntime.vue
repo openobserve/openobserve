@@ -313,6 +313,7 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { useAutoName } from "@/composables/useAutoName";
 import { useDowntimeItems } from "@/composables/downtimes/useDowntimeItems";
+import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
 import { foldersQuery } from "@/services/common.queries";
 import {
   downtimeDetailQuery,
@@ -390,9 +391,13 @@ const queryList = (value: unknown): string[] =>
 const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 const prefillModule = MODULE_ORDER.find((m) => m === route.query.module);
 
+// A new downtime without a folder in the URL is filed where the user may create one.
+const folderDefault = useDefaultDowntimeFolder();
+const explicitFolder = String(route.query.folder_id ?? "");
+
 const initialValues = (): DowntimeFormValues => {
   const base = defaultDowntimeValues(Date.now(), browserZone);
-  const folderId = String(route.query.folder_id ?? "") || base.folder_id;
+  const folderId = explicitFolder || folderDefault.folderId.value;
   return applyPrefill(
     { ...base, folder_id: folderId },
     {
@@ -460,6 +465,7 @@ const save = async (submitted: DowntimeFormValues) => {
   const body = buildDowntimeRequest(submitted);
   try {
     await saveMutation.mutateAsync({ id: editId.value || undefined, body });
+    folderDefault.remember(body.folder_id);
     toast({
       variant: "success",
       message: isEdit.value
@@ -519,6 +525,12 @@ watch(
 const folderId = computed(() => values.value.folder_id);
 const setFolder = (value: string) => form.setFieldValue("folder_id", value || "default");
 
+// The folder list can answer after mount; follow it until the user or a loaded row sets one.
+watch(folderDefault.folderId, (next, prev) => {
+  if (explicitFolder || sourceId.value || folderId.value !== prev) return;
+  form.setFieldValue("folder_id", next);
+});
+
 // Edit and Duplicate load the saved row once; the condition builder remounts on it.
 const resetToken = ref(0);
 const loadedFrom = ref("");
@@ -533,6 +545,13 @@ watch(
     resetToken.value += 1;
   },
   { immediate: true },
+);
+
+// Preview and resources are checked against the folder, so neither runs on a guessed one.
+const folderSettled = computed(() =>
+  sourceId.value
+    ? loadedFrom.value === sourceId.value
+    : !!explicitFolder || folderDefault.ready.value,
 );
 
 const editStatus = computed<DowntimeStatus | null>(() =>
@@ -614,7 +633,7 @@ watch(
 const previewQuery = useQuery(() =>
   Object.assign(
     downtimePreviewQuery(orgId.value, previewBody.value ?? { targets: [] }, folderId.value),
-    { enabled: !!orgId.value && !!previewBody.value },
+    { enabled: !!orgId.value && !!previewBody.value && folderSettled.value },
   ),
 );
 
