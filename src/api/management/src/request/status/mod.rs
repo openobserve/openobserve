@@ -32,6 +32,7 @@ use config::{
     get_config, get_instance_id,
     meta::{
         cluster::{NodeStatus, Role, RoleGroup},
+        feature::{Feature, FeatureState},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
@@ -59,6 +60,7 @@ use search::{
     tantivy::cache as tantivy_result_cache,
 };
 use serde::Serialize;
+use strum::IntoEnumIterator;
 use time;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
@@ -76,7 +78,7 @@ use {
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_enterprise::enterprise::license::{
-        block_feature_for_report_failure, last_reported_timestamp,
+        block_feature_for_report_failure, features_enabled, last_reported_timestamp,
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -270,6 +272,7 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
     workflow_hooks_enabled: bool,
+    features: HashMap<Feature, FeatureState>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -600,6 +603,39 @@ pub async fn zo_config(
     #[cfg(not(feature = "enterprise"))]
     let workflow_hooks_enabled = false;
 
+    #[cfg(feature = "enterprise")]
+    let featuremap: HashMap<Feature, FeatureState> = Feature::iter()
+        .filter_map(|variant| {
+            let on = match variant {
+                Feature::All => return None,
+                Feature::Ai => o2cfg.ai.enabled,
+                Feature::Incidents => o2cfg.incidents.enabled,
+                Feature::Oncall => o2cfg.oncall.enabled,
+                Feature::Workflows => o2cfg.common.workflows_enabled,
+            };
+            let key: &str = variant.into();
+            let listed = o2cfg
+                .common
+                .custom_hide_menus
+                .split(',')
+                .any(|m| m.trim() == key);
+            // `on` is license-masked, so off-but-licensed means the operator turned it off
+            let state = if listed || (!on && features_enabled(&[variant])) {
+                FeatureState::Hidden
+            } else if on {
+                FeatureState::Enabled
+            } else {
+                FeatureState::Locked
+            };
+            Some((variant, state))
+        })
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let featuremap: HashMap<Feature, FeatureState> = Feature::iter()
+        .filter(|variant| *variant != Feature::All)
+        .map(|variant| (variant, FeatureState::Locked))
+        .collect();
+
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
         commit_hash: config::COMMIT_HASH.to_string(),
@@ -715,6 +751,7 @@ pub async fn zo_config(
         #[cfg(feature = "enterprise")]
         workflows_enabled,
         workflow_hooks_enabled,
+        features: featuremap,
     })
 }
 

@@ -14,10 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Deserializer, Serialize};
-use strum::{EnumString, IntoStaticStr};
+use strum::{EnumIter, EnumString, IntoStaticStr};
 
 /// License-gated enterprise features, one bit each; the snake_case name is the license key.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, Serialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, Serialize, EnumIter,
+)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 #[repr(u64)]
@@ -34,6 +36,14 @@ pub enum Feature {
 pub fn deserialize_list<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Vec<Feature>>, D::Error> {
     Ok(Option::<Vec<String>>::deserialize(d)?
         .map(|keys| keys.iter().filter_map(|k| k.parse().ok()).collect()))
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FeatureState {
+    Enabled,
+    Locked,
+    Hidden,
 }
 
 #[cfg(test)]
