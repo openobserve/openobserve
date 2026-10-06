@@ -154,7 +154,7 @@ describe("kubernetesUrlState", () => {
       });
     });
 
-    it("a node link replaces the other list filters but keeps the name and scope", () => {
+    it("a node link replaces every list filter and scopes to the node's cluster", () => {
       const from = {
         ...base,
         kind: "nodes" as const,
@@ -168,17 +168,24 @@ describe("kubernetesUrlState", () => {
         workload: null,
         issue: null,
         pod: null,
-        name: "web",
+        name: "",
         cluster: "prod",
-        namespace: "shop",
+        namespace: null,
         sort: null,
         page: 1,
       });
     });
 
-    it("a workload link is the mirror of a node link", () => {
+    it("scopes a link to an unlabelled entity to every cluster", () => {
+      expect(withNodeLink(base, ["", "n1"]).cluster).toBe("*");
+      expect(withWorkloadLink(base, ["", "shop", "Deployment", "web"]).cluster).toBe("*");
+    });
+
+    it("a workload link is the mirror of a node link and scopes to its namespace", () => {
       const from = {
         ...base,
+        cluster: "other",
+        namespace: "elsewhere",
         onNode: ["prod", "n1"] as [string, string],
         pod: ["prod", "shop", "p"] as [string, string, string],
       };
@@ -188,7 +195,9 @@ describe("kubernetesUrlState", () => {
         onNode: null,
         issue: null,
         pod: null,
-        name: "web",
+        name: "",
+        cluster: "prod",
+        namespace: "shop",
       });
     });
 
@@ -219,8 +228,21 @@ describe("kubernetesUrlState", () => {
       });
     });
 
-    it("the all tile clears only the issue", () => {
-      expect(withTile(base, "all")).toMatchObject({ issue: null, name: "web", kind: "pods" });
+    it("the all tile clears the issue and the list-specific filters, like every tile", () => {
+      const filtered = {
+        ...base,
+        onNode: ["prod", "n1"] as [string, string],
+        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
+      };
+      expect(withTile(filtered, "all")).toMatchObject({
+        issue: null,
+        name: "",
+        onNode: null,
+        workload: null,
+        kind: "pods",
+        cluster: "prod",
+        namespace: "shop",
+      });
     });
 
     it("a filter change resets the page", () => {

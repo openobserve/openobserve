@@ -148,9 +148,12 @@ export const withKind = (state: K8sListState, kind: K8sKind): K8sListState => ({
   page: 1,
 });
 
-// A cross-link is a new question about one node or workload, so it replaces the list filters it would otherwise stack on.
+// A cross-link asks about one entity, so its own cluster and namespace replace every filter that could hide its pods.
 export const withNodeLink = (state: K8sListState, onNode: [string, string]): K8sListState => ({
   ...withKind(state, "pods"),
+  cluster: onNode[0] || "*",
+  namespace: null,
+  name: "",
   issue: null,
   onNode,
   workload: null,
@@ -162,6 +165,9 @@ export const withWorkloadLink = (
   workload: [string, string, string, string],
 ): K8sListState => ({
   ...withKind(state, "pods"),
+  cluster: workload[0] || "*",
+  namespace: workload[1] || null,
+  name: "",
   issue: null,
   onNode: null,
   workload,
@@ -170,7 +176,8 @@ export const withWorkloadLink = (
 
 // The list then shows exactly what the tile counted, which uses only the scope facets.
 export const withTile = (state: K8sListState, key: IssueKey | "all"): K8sListState => {
-  if (key === "all") return withFilter(state, { issue: null });
+  const cleared = { name: "", onNode: null, workload: null, page: 1 };
+  if (key === "all") return { ...state, ...cleared, issue: null };
   const moved = ISSUE_KIND[key] === state.kind ? state : withKind(state, ISSUE_KIND[key]);
-  return { ...moved, issue: key, name: "", onNode: null, workload: null, page: 1 };
+  return { ...moved, ...cleared, issue: key };
 };

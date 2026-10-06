@@ -699,7 +699,8 @@ describe("KubernetesExplorerPage", () => {
         .trigger("click");
       await flushPromises();
       expect(query()).toEqual({
-        cluster: "*",
+        cluster: "alpha",
+        namespace: "data",
         workload: "alpha/data/Deployment/recommendation-service",
       });
       expect(
@@ -717,7 +718,7 @@ describe("KubernetesExplorerPage", () => {
         .find(`[data-test="k8s2-node-open-${GEN}/ip-10-0-13-37.ec2.internal"]`)
         .trigger("click");
       await flushPromises();
-      expect(query()).toEqual({ cluster: "*", onNode: `${GEN}/ip-10-0-13-37.ec2.internal` });
+      expect(query()).toEqual({ cluster: GEN, onNode: `${GEN}/ip-10-0-13-37.ec2.internal` });
       expect(
         wrapper.findAll('[data-test^="k8s2-pod-open-"]').map((e) => e.attributes("data-test")),
       ).toEqual([`k8s2-pod-open-${GEN}/data/analytics-service-x6xv7pjxhb-zqcl4`]);
@@ -728,13 +729,17 @@ describe("KubernetesExplorerPage", () => {
       const drawer = wrapper.findComponent({ name: "PodDetailDrawer" });
       drawer.vm.$emit("filter-node", drawer.props("pod"));
       await flushPromises();
-      expect(query()).toEqual({ onNode: `${GEN}/ip-10-0-13-37.ec2.internal` });
+      expect(query()).toEqual({ cluster: GEN, onNode: `${GEN}/ip-10-0-13-37.ec2.internal` });
       await router.replace({ query: { pod: `${GEN}/data/analytics-service-x6xv7pjxhb-zqcl4` } });
       await flushPromises();
       const again = wrapper.findComponent({ name: "PodDetailDrawer" });
       again.vm.$emit("filter-owner", again.props("pod"));
       await flushPromises();
-      expect(query()).toEqual({ workload: `${GEN}/data/Deployment/analytics-service` });
+      expect(query()).toEqual({
+        cluster: GEN,
+        namespace: "data",
+        workload: `${GEN}/data/Deployment/analytics-service`,
+      });
     });
 
     it("round-trips an empty cluster as an empty segment", async () => {
@@ -747,7 +752,7 @@ describe("KubernetesExplorerPage", () => {
       expect(wrapper.find('[data-test="k8s2-node-cluster-/node-1"]').text()).toBe("—");
       await wrapper.find('[data-test="k8s2-node-open-/node-1"]').trigger("click");
       await flushPromises();
-      expect(query()).toEqual({ onNode: "/node-1" });
+      expect(query()).toEqual({ cluster: "*", onNode: "/node-1" });
     });
   });
 
@@ -832,12 +837,16 @@ describe("KubernetesExplorerPage", () => {
       await flushPromises();
       wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "deployments");
       await flushPromises();
-      expect(query()).toEqual({ kind: "deployments" });
+      expect(query()).toEqual({ kind: "deployments", cluster: GEN });
       await wrapper
         .find(`[data-test="k8s2-deployment-open-${GEN}/data/analytics-service"]`)
         .trigger("click");
       await flushPromises();
-      expect(query()).toEqual({ workload: `${GEN}/data/Deployment/analytics-service` });
+      expect(query()).toEqual({
+        cluster: GEN,
+        namespace: "data",
+        workload: `${GEN}/data/Deployment/analytics-service`,
+      });
       expect(listed("pod")).toEqual(["analytics-service-x6xv7pjxhb-zqcl4"]);
     });
 
@@ -849,7 +858,7 @@ describe("KubernetesExplorerPage", () => {
       const drawer = wrapper.findComponent({ name: "PodDetailDrawer" });
       drawer.vm.$emit("filter-node", drawer.props("pod"));
       await flushPromises();
-      expect(query()).toEqual({ onNode: `${GEN}/ip-10-0-13-37.ec2.internal` });
+      expect(query()).toEqual({ cluster: GEN, onNode: `${GEN}/ip-10-0-13-37.ec2.internal` });
     });
 
     it("rewrites a repeated param on any route change, not only on mount", async () => {
