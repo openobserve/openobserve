@@ -62,6 +62,9 @@ pub struct NotificationContext {
     /// Formatted local time; "N/A" when unknown.
     pub alert_start_time: String,
     pub alert_end_time: String,
+    /// The same window bounds in epoch milliseconds; "N/A" when unknown.
+    pub alert_start_time_millis: String,
+    pub alert_end_time_millis: String,
     /// Already shortened; falls back to the long URL when shortening fails.
     pub alert_url: String,
     /// Stateless signed chart-render URL (the URL carries the chart data;

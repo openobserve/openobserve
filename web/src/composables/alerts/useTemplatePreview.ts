@@ -95,6 +95,8 @@ const MOCK_SAMPLE: Record<string, string> = {
   alert_count: "42",
   alert_start_time: "2026-06-28T10:25:00Z",
   alert_end_time: "2026-06-28T10:30:00Z",
+  alert_start_time_millis: "1782642300000",
+  alert_end_time_millis: "1782642600000",
   alert_url: "https://app.openobserve.ai/alerts/example",
   alert_trigger_time: "2026-06-28T10:30:00Z",
   alert_trigger_time_millis: "1782303000000",
