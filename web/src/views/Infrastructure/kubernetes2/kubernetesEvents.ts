@@ -213,10 +213,9 @@ export function warningListRows(
     }
   }
   const pods = inventory.pods.filter((p) => inScope(p, scope));
+  const kept = events.filter((e) => e.kind !== "Pod" || keepPodEvent(e, pods));
   const latest = new Map<string, WarningEvent>();
-  for (const event of events) {
-    if (event.kind === "Pod" && !keepPodEvent(event, pods)) continue;
-    const id = `${event.kind}|${event.namespace}|${event.name}`;
+  const merge = (id: string, event: WarningEvent) => {
     const prev = latest.get(id);
     latest.set(
       id,
@@ -224,9 +223,18 @@ export function warningListRows(
         ? event
         : {
             ...(event.lastSeen >= prev.lastSeen ? event : prev),
+            uid: prev.uid || event.uid,
             events: prev.events + event.events,
           },
     );
+  };
+  const named = (e: WarningEvent) => `${e.kind}|${e.namespace}|${e.name}`;
+  // A uid tells a recreated object from its predecessor; uid-less events join the newest of that name.
+  for (const event of kept) if (event.uid) merge(`${named(event)}|${event.uid}`, event);
+  for (const event of kept.filter((e) => !e.uid)) {
+    const owners = [...latest.entries()].filter(([, e]) => named(e) === named(event));
+    const newest = owners.sort(([, a], [, b]) => b.lastSeen - a.lastSeen)[0];
+    merge(newest ? newest[0] : named(event), event);
   }
   for (const [id, event] of latest) {
     rows.push({

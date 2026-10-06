@@ -342,7 +342,7 @@ describe("ClusterOverview", () => {
       expect(rows().map((r) => r.text())).toEqual(["Service", "Node", "Pod"]);
       expect(wrapper.text()).not.toContain("Event:");
       expect(text("k8s2-overview-warning-age-node|ip-10-0-10-38|MemoryPressure")).toBe("—");
-      expect(text("k8s2-overview-warning-age-Pod|shop|web-3")).toBe("5m");
+      expect(text("k8s2-overview-warning-age-Pod|shop|web-3|web-3-uid")).toBe("5m");
       expect(text("k8s2-overview-warning-message-node|ip-10-0-10-38|MemoryPressure")).toBe(
         "MemoryPressure",
       );
@@ -351,7 +351,7 @@ describe("ClusterOverview", () => {
     it("opens the drawer on a row click when the kind has one", async () => {
       await mountView();
       await wrapper
-        .find('[data-test="k8s2-overview-warning-message-Pod|shop|web-3"]')
+        .find('[data-test="k8s2-overview-warning-message-Pod|shop|web-3|web-3-uid"]')
         .trigger("click");
       expect(wrapper.emitted("open")?.[0]).toEqual([
         { kind: "pod", cluster: "prod", namespace: "shop", name: "web-3" },

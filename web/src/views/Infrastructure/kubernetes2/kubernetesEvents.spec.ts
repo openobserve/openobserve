@@ -232,6 +232,22 @@ describe("Cluster overview warnings", () => {
     expect(rows[0].message.text).toBe("newer");
   });
 
+  it("keeps a recreated object's warnings apart from its predecessor's", () => {
+    const rows = warningListRows(
+      inventory,
+      [
+        event({ kind: "Deployment", name: "web", uid: "old", lastSeen: 10, note: "old" }),
+        event({ kind: "Deployment", name: "web", uid: "new", lastSeen: 20, note: "new" }),
+        event({ kind: "Deployment", name: "web", uid: "", lastSeen: 30, note: "no uid" }),
+      ],
+      "prod",
+    ).filter((r) => r.object.kind === "Deployment");
+    expect(rows.map((r) => [r.object.uid, r.message.text])).toEqual([
+      ["old", "old"],
+      ["new", "no uid"],
+    ]);
+  });
+
   it("keeps a warning on a kind with no drawer, such as a Service", () => {
     const rows = warningListRows(
       inventory,
