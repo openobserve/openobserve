@@ -110,12 +110,14 @@ describe("useLatencyInsightsDashboard — buildComparisonQuery", () => {
       const sql = sqlOf(config({ baselineFilter }));
       expect(sql).toMatch(/^WITH selected AS \(/);
       expect(part(sql, "Selected")).toMatch(
-        /ORDER BY percentile_latency DESC LIMIT 5\)\s*SELECT \* FROM selected\s*$/,
+        /ORDER BY percentile_latency DESC LIMIT 5\)\s*SELECT value, series, percentile_latency FROM selected\s*$/,
       );
       expect(part(sql, "Baseline")).toContain(
         "AND COALESCE(CAST(service_name AS VARCHAR), '(no value)') IN (SELECT value FROM selected)",
       );
       expect(sql.match(/\bLIMIT\b/g)).toHaveLength(1);
+      // The column visitor reads `*` as a stream wildcard, so the CTE's columns are named.
+      expect(sql).not.toContain("SELECT *");
     });
 
     it("leaves the volume and error queries unchanged by baselineFilter", () => {

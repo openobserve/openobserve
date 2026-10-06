@@ -406,6 +406,7 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
         filterClause,
         scopeFilter,
       ]);
+      // Never empty: the baseline time predicate is always present.
       const tracesBaselineWhere = toWhere([baselineTimeFilter, scopeFilter]);
       const inSelected = `${valueExpr} IN (SELECT value FROM selected)`;
 
@@ -418,12 +419,12 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
           ${tracesSelectedWhere}
           GROUP BY ${dimensionName}
           ORDER BY percentile_latency DESC LIMIT 5)
-        SELECT * FROM selected
+        SELECT value, series, percentile_latency FROM selected
         UNION
         SELECT ${valueExpr} AS value, 'Baseline' AS series,
           approx_percentile_cont(duration, \${percentile}) AS percentile_latency
         FROM "${config.streamName}"
-        ${tracesBaselineWhere ? `${tracesBaselineWhere} AND ${inSelected}` : `WHERE ${inSelected}`}
+        ${tracesBaselineWhere} AND ${inSelected}
         GROUP BY ${dimensionName}
         ORDER BY percentile_latency DESC
       `.trim();
