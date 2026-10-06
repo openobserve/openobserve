@@ -1098,6 +1098,8 @@ mod tests {
             (format!("round({series}, {{p}})"), 7.0, 30.0),
             (format!("topk({{p}}, {series})"), 0.0, 1.0),
             (format!("bottomk({{p}}, {series})"), 1.0, 1.0),
+            (format!("limitk({{p}}, {series})"), 1.0, 1.0),
+            (format!("limit_ratio({{p}}, {series})"), -1.0, 1.0),
             (format!("quantile({{p}}, {series})"), 0.0, 0.5),
             (format!("histogram_quantile({{p}}, {buckets})"), 0.1, 0.4),
             (format!("histogram_fraction(0, {{p}}, {buckets})"), 0.5, 0.5),

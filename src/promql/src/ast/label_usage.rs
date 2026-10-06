@@ -165,9 +165,11 @@ fn selectors_grouped(expr: &PromExpr, grouped: bool, labels: &mut HashSet<String
             param,
             modifier,
         }) => {
-            // topk/bottomk and `without` keep labels that were never loaded
-            let collapses = !matches!(op.id(), token::T_TOPK | token::T_BOTTOMK)
-                && !matches!(modifier, Some(LabelModifier::Exclude(_)));
+            // selecting aggregations and `without` keep labels that were never loaded
+            let collapses = !matches!(
+                op.id(),
+                token::T_TOPK | token::T_BOTTOMK | token::T_LIMITK | token::T_LIMIT_RATIO
+            ) && !matches!(modifier, Some(LabelModifier::Exclude(_)));
             if collapses && let Some(LabelModifier::Include(by)) = modifier {
                 labels.extend(by.labels.iter().cloned());
             }
@@ -231,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_grouping_labels() {
-        let cases: [(&str, &[&str]); 30] = [
+        let cases: [(&str, &[&str]); 33] = [
             ("sum by (job) (m)", &["job"]),
             ("sum by (job) (rate(m[5m]))", &["job"]),
             ("sum by (job) (abs(-m))", &["job"]),
@@ -275,6 +277,12 @@ mod tests {
             ("sum by (job) (m) + n", &[]),
             ("m / on (job) group_left n", &[]),
             ("topk by (job) (1, m)", &[]),
+            ("limitk by (job) (1, m)", &[]),
+            ("limit_ratio by (job) (0.5, m)", &[]),
+            (
+                "limitk by (region) (1, sum by (job, instance) (m))",
+                &["instance", "job"],
+            ),
             ("sum without (instance) (m)", &[]),
             ("sum by (job) (sum without (instance) (m))", &[]),
             ("quantile by (job) (scalar(q), m)", &[]),

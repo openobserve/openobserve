@@ -34,6 +34,7 @@ mod count_values;
 mod dispersion;
 mod extrema;
 mod group;
+mod limit;
 mod max;
 mod min;
 mod quantile;
@@ -46,6 +47,7 @@ pub(crate) use avg::Avg;
 pub(crate) use count::Count;
 pub(crate) use count_values::count_values;
 pub(crate) use group::Group;
+pub(crate) use limit::Limit;
 pub(crate) use max::Max;
 pub(crate) use min::Min;
 pub(crate) use quantile::quantile;
@@ -60,8 +62,8 @@ const AGG_PARALLEL_CHUNK: usize = 32768;
 /// Trait for PromQL aggregation operators.
 ///
 /// One implementation per operator (`sum`, `avg`, `min`, `max`, `count`, `group`, `stddev`,
-/// `stdvar`, `topk`/`bottomk`) shared by both evaluation paths: the generic path
-/// folds a materialized matrix through it in [`eval_aggregate`], and the streaming path folds
+/// `stdvar`, `topk`/`bottomk`, `limitk`/`limit_ratio`) shared by both evaluation paths: the generic
+/// path folds a materialized matrix through it in [`eval_aggregate`], and the streaming path folds
 /// each hash partition of a series stream through it in `streaming_eval::aggregate`. The
 /// operator carries only its parameter (k, φ), if any; all per-group state lives in the
 /// [`Accumulate`] it builds, so a query holds one accumulator per label group (and per
@@ -188,6 +190,8 @@ pub(crate) enum AggOp {
     Bottomk(ScalarParam),
     Count,
     Group,
+    Limitk(ScalarParam),
+    LimitRatio(ScalarParam),
     Max,
     Min,
     Stddev,
@@ -208,6 +212,8 @@ impl AggOp {
             token::T_BOTTOMK => Self::Bottomk(k("bottomk")?),
             token::T_COUNT => Self::Count,
             token::T_GROUP => Self::Group,
+            token::T_LIMITK => Self::Limitk(not_nan("limitk", k("limitk")?)?),
+            token::T_LIMIT_RATIO => Self::LimitRatio(not_nan("limit_ratio", k("limit_ratio")?)?),
             token::T_MAX => Self::Max,
             token::T_MIN => Self::Min,
             token::T_STDDEV => Self::Stddev,
@@ -225,7 +231,10 @@ impl AggOp {
     /// Whether the output keeps the input series' own labels, so a source must carry every
     /// label of a series rather than its group projection.
     pub(crate) fn needs_series_labels(&self) -> bool {
-        matches!(self, Self::Topk(_) | Self::Bottomk(_))
+        matches!(
+            self,
+            Self::Topk(_) | Self::Bottomk(_) | Self::Limitk(_) | Self::LimitRatio(_)
+        )
     }
 
     /// The generic fold over a materialized matrix.
@@ -240,6 +249,10 @@ impl AggOp {
             Self::Bottomk(k) => eval_aggregate(modifier, data, Rank::new(k, true), eval_ctx),
             Self::Count => eval_aggregate(modifier, data, Count, eval_ctx),
             Self::Group => eval_aggregate(modifier, data, Group, eval_ctx),
+            Self::Limitk(k) => eval_aggregate(modifier, data, Limit::K(k), eval_ctx),
+            Self::LimitRatio(ratio) => {
+                eval_aggregate(modifier, data, Limit::Ratio(ratio), eval_ctx)
+            }
             Self::Max => eval_aggregate(modifier, data, Max, eval_ctx),
             Self::Min => eval_aggregate(modifier, data, Min, eval_ctx),
             Self::Stddev => eval_aggregate(modifier, data, Stddev, eval_ctx),
@@ -467,6 +480,18 @@ where
         return Ok(Value::None);
     }
     Ok(Value::Matrix(results))
+}
+
+/// A limit's parameter; upstream rejects a NaN one rather than reading it as zero.
+fn not_nan(name: &str, param: ScalarParam) -> Result<ScalarParam> {
+    let nan = match &param {
+        ScalarParam::Const(value) => value.is_nan(),
+        ScalarParam::PerStep { values, .. } => values.iter().any(|value| value.is_nan()),
+    };
+    if nan {
+        return Err(DataFusionError::Plan(format!("[{name}] param is NaN")));
+    }
+    Ok(param)
 }
 
 #[cfg(test)]
@@ -737,6 +762,8 @@ mod tests {
         for op in [
             AggOp::Topk(ScalarParam::Const(1.0)),
             AggOp::Bottomk(ScalarParam::Const(1.0)),
+            AggOp::Limitk(ScalarParam::Const(1.0)),
+            AggOp::LimitRatio(ScalarParam::Const(0.5)),
         ] {
             assert!(op.needs_series_labels());
         }
