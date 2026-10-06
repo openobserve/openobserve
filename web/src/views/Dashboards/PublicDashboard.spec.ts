@@ -277,16 +277,15 @@ describe("PublicDashboard viewer", () => {
     expect(fixed.findComponent(ODropdown).exists()).toBe(false);
   });
 
-  it("shows global values, the open tab's, and those of panels on it", async () => {
+  it("passes frozen values to the grid as read-only constants in their own scope", async () => {
     vi.mocked(service.getConfig).mockResolvedValue({
       data: {
         ...CONFIG,
         variables: [
           { label: "env", value: "prod" },
           { label: "svc", value: "api", tab_id: "t1" },
-          { label: "svc", value: "web", tab_id: "t2" },
-          { label: "pod", value: "a", panel_id: "p1" },
-          { label: "pod", value: "b", panel_id: "p9" },
+          { label: "pod", value: ["a", "b"], panel_id: "p1" },
+          { label: "region", value: null },
         ],
       },
       status: 200,
@@ -295,45 +294,22 @@ describe("PublicDashboard viewer", () => {
       status: 200,
       data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
     } as never);
-    const w = shallowMount(PublicDashboard, {
-      global: {
-        plugins: [i18n],
-        provide: { store },
-        stubs: { RenderDashboardCharts: { template: "<div><slot name='before_panels' /></div>" } },
-      },
-    });
+    const w = buildWrapper();
     await flushPromises();
-    const chips = w
-      .findAllComponents({ name: "OInput" })
-      .map((i) => [i.props("label"), i.props("modelValue")]);
-    expect(chips).toEqual([
-      ["env", "prod"],
-      ["svc", "api"],
-      ["Panel 1 · pod", "a"],
+    const list = grid(w).props("dashboardData").variables.list;
+    expect(list.map((v: { type: string }) => v.type)).toEqual([
+      "constant",
+      "constant",
+      "constant",
+      "constant",
     ]);
-  });
-
-  it("passes frozen variables to the grid as a read-only row", async () => {
-    (service.getConfig as any).mockResolvedValue({
-      data: { ...CONFIG, variables: [{ label: "Namespace", value: "ziox" }] },
-      status: 200,
-    });
-    (service.getData as any).mockResolvedValue({
-      status: 200,
-      data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
-    });
-    const w = shallowMount(PublicDashboard, {
-      global: {
-        plugins: [i18n],
-        provide: { store },
-        stubs: { RenderDashboardCharts: { template: "<div><slot name='before_panels' /></div>" } },
-      },
-    });
-    await flushPromises();
-    const input = w.findComponent({ name: "OInput" });
-    expect(input.props("label")).toBe("Namespace");
-    expect(input.props("modelValue")).toBe("ziox");
-    expect(input.props("readonly")).toBe(true);
+    expect(new Set(list.map((v: { name: string }) => v.name)).size).toBe(4);
+    expect(list.map(({ name: _n, type: _t, ...rest }: Record<string, unknown>) => rest)).toEqual([
+      { label: "env", value: "prod", scope: "global" },
+      { label: "svc", value: "api", scope: "tabs", tabs: ["t1"] },
+      { label: "pod", value: "a, b", scope: "panels", panels: ["p1"] },
+      { label: "region", value: "Not set", scope: "global" },
+    ]);
   });
 
   it("injects a Not-available error for a withheld panel", async () => {

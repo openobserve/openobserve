@@ -116,31 +116,7 @@
         :allow-alert-creation="false"
         :show-legends-button="true"
         data-test="dashboards-public-dashboard-charts"
-      >
-        <template #before_panels>
-          <!-- Same markup the live dashboard uses for a read-only constant variable. -->
-          <div
-            v-if="publicVariables.length"
-            class="mt-1 flex flex-wrap gap-y-1"
-            data-test="dashboards-public-dashboard-variables"
-          >
-            <div
-              v-for="variable in publicVariables"
-              :key="variable.key"
-              class="max-w-[40rem] min-w-37.5"
-            >
-              <OInput
-                class="me-4 mt-1"
-                :model-value="variableValue(variable.value)"
-                :label="raw(variable.label)"
-                label-position="inside"
-                readonly
-                data-test="dashboards-public-dashboard-variable"
-              />
-            </div>
-          </div>
-        </template>
-      </RenderDashboardCharts>
+      />
 
       <footer
         class="border-border-default px-page-edge text-2xs text-text-secondary flex items-center gap-2 border-t py-3"
@@ -169,7 +145,6 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -219,13 +194,40 @@ const builtAt = computed<number | null>(
   () => snapshot.value?.built_at ?? config.value?.built_at ?? null,
 );
 
-// Variables are frozen server-side, so the grid gets none and renders no selectors.
+// A variable missing from the capture falls back to its live default server-side, so empty means unset.
+const variableValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") {
+    return t("dashboard.publicDashboard.variableUnset");
+  }
+  return Array.isArray(value) ? value.join(", ") : String(value);
+};
+
+/** A frozen value as the public config lists it; scoped ones name their tab or panel. */
+type PublicVariable = { label: string; value: unknown; tab_id?: string; panel_id?: string };
+
+// Constants are read-only and query nothing, and the grid places each by scope as the live page does.
+const frozenVariables = computed(() => {
+  const all: PublicVariable[] = Array.isArray(config.value?.variables)
+    ? config.value.variables
+    : [];
+  return all.map((v, i) => ({
+    // Scoped entries repeat a label, and the grid keys variables by name.
+    name: `public_var_${i}`,
+    label: v.label,
+    type: "constant",
+    value: variableValue(v.value),
+    scope: v.tab_id ? "tabs" : v.panel_id ? "panels" : "global",
+    ...(v.tab_id ? { tabs: [v.tab_id] } : {}),
+    ...(v.panel_id ? { panels: [v.panel_id] } : {}),
+  }));
+});
+
 const dashboardData = computed(() => ({
   dashboardId: slug,
   title: config.value.title,
   version: 8,
   tabs: tabs.value,
-  variables: { list: [] },
+  variables: { list: frozenVariables.value },
 }));
 
 // An absolute range's window is fixed; a relative one ends when its snapshot was built.
@@ -289,41 +291,6 @@ const windowLabel = computed<I18nText | "">(() => {
   const fmt = (ms: number) => raw(new Date(ms).toLocaleString(undefined, opts));
   return t("dashboard.publicDashboard.window", { start: fmt(startMs), end: fmt(endMs) });
 });
-
-/** A frozen value as the public config lists it; scoped ones name their tab or panel. */
-type PublicVariable = { label: string; value: unknown; tab_id?: string; panel_id?: string };
-
-// Global values, plus those scoped to the open tab or to a panel on it, as the live page shows.
-const publicVariables = computed<Array<{ key: string; label: string; value: unknown }>>(() => {
-  const all: PublicVariable[] = Array.isArray(config.value?.variables)
-    ? config.value.variables
-    : [];
-  const tab = tabs.value.find((t) => t.tabId === selectedTabId.value);
-  const panelTitle = (id: string) =>
-    (tab?.panels ?? []).find((p: { id: string }) => p.id === id)?.title as string | undefined;
-  return all.flatMap((v) => {
-    if (v.tab_id) {
-      return v.tab_id === selectedTabId.value
-        ? [{ key: `${v.label}.t.${v.tab_id}`, label: v.label, value: v.value }]
-        : [];
-    }
-    if (v.panel_id) {
-      const title = panelTitle(v.panel_id);
-      return title === undefined
-        ? []
-        : [{ key: `${v.label}.p.${v.panel_id}`, label: `${title} · ${v.label}`, value: v.value }];
-    }
-    return [{ key: v.label, label: v.label, value: v.value }];
-  });
-});
-
-// A variable missing from the capture falls back to its live default server-side, so empty means unset.
-const variableValue = (value: unknown): string => {
-  if (value === null || value === undefined || value === "") {
-    return t("dashboard.publicDashboard.variableUnset");
-  }
-  return Array.isArray(value) ? value.join(", ") : String(value);
-};
 
 const selectRange = async (key: string) => {
   selectedKey.value = key;
