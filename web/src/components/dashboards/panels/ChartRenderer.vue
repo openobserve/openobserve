@@ -370,6 +370,8 @@ export default defineComponent({
           seriesIndex: params.seriesIndex,
         });
 
+        // The tooltip sits above every menu, so it would cover the alert items.
+        chart?.dispatchAction({ type: "hideTip" });
         emit("domcontextmenu", {
           x: event.clientX,
           y: event.clientY,
@@ -413,6 +415,7 @@ export default defineComponent({
 
           // Emit domcontextmenu event for alert creation
           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
+            chart.dispatchAction({ type: "hideTip" });
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,

@@ -594,6 +594,23 @@ describe("ChartRenderer", () => {
       });
     });
 
+    it("hides the chart tooltip when the alert menu opens, so the tooltip cannot cover it", async () => {
+      const echarts = await import("echarts/core");
+      const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+      vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line" }] });
+      vi.mocked(mockChart.convertFromPixel).mockReturnValue([1609459200000, 5]);
+      vi.mocked(mockChart.dispatchAction).mockClear();
+
+      await wrapper.find('[data-test="chart-renderer"]').trigger("contextmenu", {
+        clientX: 10,
+        clientY: 20,
+      });
+      await flushPromises();
+
+      expect(wrapper.emitted("domcontextmenu")).toBeTruthy();
+      expect(mockChart.dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+    });
+
     it("should not emit domcontextmenu for non-bar/line chart types", async () => {
       const echarts = await import("echarts/core");
       const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
