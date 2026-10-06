@@ -18,12 +18,23 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import { contrastRatio, resolveColor, resolveTokens } from "@/lib/styles/tokens/colorMath";
+import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
+import { chartColor } from "@/utils/chartTheme";
 import K8sHexMap from "./K8sHexMap.vue";
+import { MAX_ZOOM } from "./hexViewport";
 import type { PodRow } from "./kubernetesModel";
-import { groupRows } from "./mapFill";
+import type { MapGroup } from "./kubernetesQueries";
+import { groupRows, statusCounts, type GroupHeader, type RowGroup } from "./mapFill";
+
+const palette = vi.hoisted(() => ({ dark: false }));
+
+vi.mock("@/utils/chartTheme", () => ({
+  chartColor: (token: string) => `${palette.dark ? "dark" : "light"}:${token}`,
+}));
 
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", async () => {
   const { defineComponent, h } = await import("vue");
@@ -66,24 +77,68 @@ const ROWS = [
 ];
 
 let wrapper: VueWrapper<any>;
+let store: any;
 
-const mountMap = async (rows = ROWS) => {
-  const groups = groupRows(rows, "node");
+const headersOf = (groups: RowGroup[], clickable = (g: RowGroup) => !g.special): GroupHeader[] =>
+  groups.map((g) => ({
+    title: g.special ? "Unscheduled" : g.name,
+    count: String(g.rows.length),
+    summary: statusCounts(g.rows),
+    word: null,
+    tip: `<b>${g.special ? "Unscheduled" : g.name}</b>`,
+    clickable: clickable(g),
+  }));
+
+const mountMap = async (
+  rows = ROWS,
+  over: Partial<{
+    group: MapGroup;
+    selectedKey: string | null;
+    highlight: string[];
+    legend: boolean;
+  }> = {},
+) => {
+  const group = over.group ?? "node";
+  const { groups } = groupRows(rows, group);
+  store = createStore({ state: { theme: "light" } });
   wrapper = mount(K8sHexMap, {
     props: {
       entity: "pods",
-      group: "node",
+      group,
       fill: "memLim",
       groups,
-      frameLabels: groups.map((g) => `${g.name} (${g.rows.length})`),
+      headers: headersOf(groups),
+      highlight: over.highlight ?? [],
+      selectedKey: over.selectedKey ?? null,
       label: raw("Map of 5 pods grouped by node, filled by Memory % of limit"),
     },
-    global: { plugins: [i18n] },
+    slots: over.legend ? { legend: "<span>legend</span>" } : {},
+    global: { plugins: [i18n, store] },
     attachTo: document.body,
   });
   await flushPromises();
   return wrapper;
 };
+
+// A fake ECharts api at `scale` px per layout unit, y flipped as on screen.
+const fakeApi = (data: number[], scale: number) => ({
+  value: (dim: number) => data[dim],
+  coord: ([x, y]: number[]) => [x * scale, -y * scale],
+  size: () => [scale, scale],
+});
+
+const hexAt = (index: number, scale = 10) => {
+  const [hexes] = options().series;
+  return hexes.renderItem({ dataIndex: index }, fakeApi(hexes.data[index], scale));
+};
+
+const cardAt = (index: number, scale: number) => {
+  const frames = options().series[1];
+  return frames.renderItem({ dataIndex: index }, fakeApi(frames.data[index], scale));
+};
+
+const texts = (card: any) =>
+  card.children.filter((c: any) => c.type === "text").map((c: any) => c.style.text as string);
 
 const options = () => wrapper.findComponent({ name: "ChartRenderer" }).props("data").options;
 
@@ -144,7 +199,7 @@ describe("K8sHexMap (AC 52)", () => {
     expect(hexes.data).toHaveLength(5);
     expect(frames.type).toBe("custom");
     expect(frames.data).toHaveLength(2);
-    expect(frames.silent).toBe(true);
+    expect(frames.silent).toBeUndefined();
     expect(opt.xAxis).toMatchObject({ type: "value", show: false });
     expect(opt.yAxis).toMatchObject({ type: "value", show: false });
   });
@@ -177,7 +232,7 @@ describe("K8sHexMap (AC 52)", () => {
     expect((x[1] - x[0]) / WIDTH).toBeCloseTo((y[1] - y[0]) / HEIGHT, 12);
   });
 
-  it("zooms at the cursor on wheel, pans on drag in both axes, and Reset restores the fit", async () => {
+  it("zooms at the cursor on wheel, pans on drag in both axes, and Fit restores the fit", async () => {
     await mountMap();
     const fitRanges = ranges();
     await wheel(-100, 250, 450);
@@ -194,7 +249,7 @@ describe("K8sHexMap (AC 52)", () => {
     expect(panned.x[0]).toBeLessThan(zoomed.x[0]);
     expect(panned.y[0]).toBeGreaterThan(zoomed.y[0]);
 
-    await wrapper.find('[data-test="k8s2-map-reset"]').trigger("click");
+    await wrapper.find('[data-test="k8s2-map-fit"]').trigger("click");
     expect(ranges()).toEqual(fitRanges);
   });
 
@@ -221,7 +276,7 @@ describe("K8sHexMap (AC 52)", () => {
     await pointer("pointermove", 102, 101);
     await pointer("pointerup", 102, 101);
     chart.vm.$emit("click", { seriesIndex: 0, dataIndex: 1 });
-    expect(wrapper.emitted("select")).toEqual([[groupRows(ROWS, "node")[0].rows[1]]]);
+    expect(wrapper.emitted("select")).toEqual([[groupRows(ROWS, "node").groups[0].rows[1]]]);
 
     await pointer("pointerdown", 100, 100);
     await pointer("pointermove", 120, 100);
@@ -242,18 +297,201 @@ describe("K8sHexMap (AC 52)", () => {
     expect(options().tooltip.formatter({ seriesIndex: 0, dataIndex: 2 })).toContain(
       "Memory % of limit: No data",
     );
+    expect(options().tooltip.formatter({ seriesIndex: 1, dataIndex: 1 })).toBe("<b>n2</b>");
   });
 
   it("reuses the layout on a refresh that changes no keys, keeping the zoom", async () => {
     await mountMap();
     await wheel(-100, 500, 300);
     const zoomed = ranges();
-    const groups = groupRows(
+    const { groups } = groupRows(
       ROWS.map((r) => ({ ...r, memoryPctOfLimit: 1 })),
       "node",
     );
     await wrapper.setProps({ groups });
     expect(ranges()).toEqual(zoomed);
+  });
+});
+
+describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
+  it("draws a surface-base card with a subtle stroke, a panel header band and silent text", async () => {
+    await mountMap();
+    const card = cardAt(0, 20);
+    const [rect, band] = card.children;
+    expect(rect).toMatchObject({ type: "rect", silent: true });
+    expect(rect.style).toMatchObject({
+      fill: chartColor("--color-surface-base"),
+      stroke: chartColor("--color-border-subtle"),
+      lineWidth: 1,
+    });
+    expect(rect.emphasis.style.stroke).toBe(chartColor("--color-border-strong"));
+    expect(band.type).toBe("rect");
+    expect(band.silent).toBeFalsy();
+    expect(band.style.fill).toBe(chartColor("--color-surface-panel"));
+    expect(band.shape.r.slice(2)).toEqual([0, 0]);
+    for (const child of card.children.filter((c: any) => c.type === "text"))
+      expect(child.silent).toBe(true);
+  });
+
+  it("shows both header lines at a 40 px band, line 1 at 20 px, and none at 10 px", async () => {
+    await mountMap();
+    const both = texts(cardAt(0, 20));
+    expect(both.some((t) => t === "n1")).toBe(true);
+    expect(both.some((t) => t.includes("✕") && t.includes("!") && t.includes("✓"))).toBe(true);
+    const one = texts(cardAt(0, 10));
+    expect(one).toContain("n1");
+    expect(one.some((t) => t.includes("✓"))).toBe(false);
+    expect(texts(cardAt(0, 5))).toEqual([]);
+    expect(options().tooltip.formatter({ seriesIndex: 1, dataIndex: 0 })).toBe("<b>n1</b>");
+  });
+
+  it("writes the status summary as ✕ ! ✓ with every count, zeros included", async () => {
+    await mountMap();
+    const line2 = texts(cardAt(0, 20)).find((t) => t.includes("✓"))!;
+    const plain = line2.replace(/\{\w+\|([^}]*)\}/g, "$1");
+    const [error, warning, ok] = statusCounts(groupRows(ROWS, "node").groups[0].rows);
+    expect(plain).toBe(`✕ ${error.count}  ! ${warning.count}  ✓ ${ok.count}`);
+  });
+
+  it("keeps the kind on a workload title at a 20 px band, truncating only its middle", async () => {
+    const rows = Array.from({ length: 120 }, (_, i) => ({
+      ...pod(`w${i}`, "n1", 10),
+      workload: { kind: "Deployment", name: "api-gateway" },
+    }));
+    await mountMap(rows as PodRow[], { group: "workload" });
+    const [title] = texts(cardAt(0, 10));
+    expect(title.startsWith("Deployment · ")).toBe(true);
+    expect(texts(cardAt(0, 20))[0]).toBe("Deployment · api-gateway");
+  });
+
+  it("makes only header bands hit targets, with a pointer only where a click goes somewhere", async () => {
+    await mountMap();
+    await wrapper.setProps({
+      headers: headersOf(wrapper.props("groups"), (g) => g.name === "n1"),
+    });
+    expect(cardAt(0, 20).children[1].cursor).toBe("pointer");
+    expect(cardAt(1, 20).children[1].cursor).toBe("default");
+  });
+
+  it("emits header clicks for clickable groups only, and never after a drag", async () => {
+    await mountMap();
+    await wrapper.setProps({
+      headers: headersOf(wrapper.props("groups"), (g) => g.name === "n1"),
+    });
+    const chart = wrapper.findComponent({ name: "ChartRenderer" });
+    chart.vm.$emit("click", { seriesIndex: 1, dataIndex: 0 });
+    chart.vm.$emit("click", { seriesIndex: 1, dataIndex: 1 });
+    expect(wrapper.emitted("header")).toEqual([[0]]);
+    await pointer("pointerdown", 100, 100);
+    await pointer("pointermove", 130, 100);
+    await pointer("pointerup", 130, 100);
+    chart.vm.$emit("click", { seriesIndex: 1, dataIndex: 0 });
+    expect(wrapper.emitted("header")).toHaveLength(1);
+  });
+});
+
+describe("K8sHexMap highlight, selection and hover (AC 86, 88)", () => {
+  it("dims hexes outside the highlighted classes without moving any", async () => {
+    await mountMap();
+    const layout = options().series[0].data.map((d: number[]) => [d[0], d[1]]);
+    await wrapper.setProps({ highlight: ["b5"] });
+    const order: PodRow[] = wrapper.props("groups").flatMap((g: RowGroup) => g.rows);
+    order.forEach((row, i) => {
+      const b5 = (row.memoryPctOfLimit ?? 0) >= 100;
+      expect(hexAt(i).style.opacity).toBe(b5 ? 1 : 0.2);
+    });
+    expect(order.filter((r) => (r.memoryPctOfLimit ?? 0) >= 100)).toHaveLength(1);
+    expect(options().series[0].data.map((d: number[]) => [d[0], d[1]])).toEqual(layout);
+    await wrapper.setProps({ highlight: [] });
+    for (let i = 0; i < ROWS.length; i++) expect(hexAt(i).style.opacity).toBe(1);
+  });
+
+  it("outlines the selected hex in accent above its neighbours, and only it", async () => {
+    await mountMap(ROWS, { selectedKey: "c/shop/b" });
+    const order: PodRow[] = wrapper.props("groups").flatMap((g: RowGroup) => g.rows);
+    order.forEach((row, i) => {
+      const item = hexAt(i);
+      expect(item.emphasis.style).toMatchObject({
+        stroke: chartColor("--color-accent"),
+        lineWidth: 2,
+      });
+      if (row.key === "c/shop/b") {
+        expect(item.style).toMatchObject({ stroke: chartColor("--color-accent"), lineWidth: 2.5 });
+        expect(item.z2).toBe(10);
+      } else if (row.memoryPctOfLimit == null) {
+        expect(item.style.stroke).toBe(chartColor("--color-border-default"));
+      } else {
+        expect(item.style.stroke).toBeUndefined();
+      }
+    });
+  });
+});
+
+describe("K8sHexMap zoom cluster (AC 89)", () => {
+  const centre = (r: ReturnType<typeof ranges>) => [(r.x[0] + r.x[1]) / 2, (r.y[0] + r.y[1]) / 2];
+  const span = (r: ReturnType<typeof ranges>) => r.x[1] - r.x[0];
+
+  it("zooms ×1.5 about the centre, back down to fit, and Fit restores the fit", async () => {
+    await mountMap();
+    const fitRanges = ranges();
+    const zoomOut = () => wrapper.find('[data-test="k8s2-map-zoom-out"]');
+    expect(zoomOut().attributes("disabled")).toBeDefined();
+    await wrapper.find('[data-test="k8s2-map-zoom-in"]').trigger("click");
+    expect(span(fitRanges) / span(ranges())).toBeCloseTo(1.5, 9);
+    expect(centre(ranges())[0]).toBeCloseTo(centre(fitRanges)[0], 6);
+    expect(centre(ranges())[1]).toBeCloseTo(centre(fitRanges)[1], 6);
+    expect(zoomOut().attributes("disabled")).toBeUndefined();
+    await zoomOut().trigger("click");
+    expect(span(ranges())).toBeCloseTo(span(fitRanges), 9);
+    for (let i = 0; i < 12; i++)
+      await wrapper.find('[data-test="k8s2-map-zoom-in"]').trigger("click");
+    expect(span(fitRanges) / span(ranges())).toBeCloseTo(MAX_ZOOM, 6);
+    expect(wrapper.find('[data-test="k8s2-map-zoom-in"]').attributes("disabled")).toBeDefined();
+    await wrapper.find('[data-test="k8s2-map-fit"]').trigger("click");
+    expect(ranges()).toEqual(fitRanges);
+    expect(wrapper.find('[data-test="k8s2-map-reset"]').exists()).toBe(false);
+    expect(iconRegistry["fit-screen"]).toBeTruthy();
+  });
+});
+
+describe("K8sHexMap overlays and theme (AC 90, 98)", () => {
+  it("reserves the taller overlay plus 1rem, in the root font size", async () => {
+    const heights = { legend: 40, zoom: 36 };
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+      configurable: true,
+      get(this: HTMLElement) {
+        const id = this.getAttribute("data-test");
+        return id === "k8s2-map-legend"
+          ? heights.legend
+          : id === "k8s2-map-zoom"
+            ? heights.zoom
+            : 0;
+      },
+    });
+    let fontSize = "16px";
+    const real = window.getComputedStyle;
+    vi.spyOn(window, "getComputedStyle").mockImplementation((el: Element) =>
+      el === document.documentElement ? ({ fontSize } as CSSStyleDeclaration) : real(el),
+    );
+    await mountMap(ROWS, { legend: true });
+    expect(wrapper.vm.bottomInset).toBe(56);
+    fontSize = "20px";
+    wrapper.vm.measure();
+    expect(wrapper.vm.bottomInset).toBe(60);
+    delete (HTMLElement.prototype as any).offsetHeight;
+    vi.restoreAllMocks();
+  });
+
+  it("re-reads the palette when the theme changes", async () => {
+    await mountMap();
+    const before = options();
+    expect(cardAt(0, 20).children[0].style.fill).toBe("light:--color-surface-base");
+    palette.dark = true;
+    store.state.theme = "dark";
+    await flushPromises();
+    expect(options()).not.toBe(before);
+    expect(cardAt(0, 20).children[0].style.fill).toBe("dark:--color-surface-base");
+    palette.dark = false;
   });
 });
 
@@ -265,15 +503,21 @@ describe("map heat tokens", () => {
     ),
   );
   for (const theme of ["light", "dark"] as const) {
-    it.each([1, 2, 3, 4, 5])(
-      `--color-map-seq-%i keeps 3:1 on surface-base in ${theme}`,
-      async (i) => {
-        const scope = themes[theme];
-        const fg = resolveColor(`--color-map-seq-${i}`, scope);
-        const bg = resolveColor("--color-surface-base", scope);
-        expect(fg && bg).toBeTruthy();
-        expect(contrastRatio(fg!, bg!)).toBeGreaterThanOrEqual(3);
-      },
-    );
+    it.each([
+      "--color-map-seq-1",
+      "--color-map-seq-2",
+      "--color-map-seq-3",
+      "--color-map-seq-4",
+      "--color-map-seq-5",
+      "--color-status-positive",
+      "--color-status-warning-text",
+      "--color-status-negative",
+    ])(`%s keeps 3:1 on the surface-base card in ${theme} (AC 100)`, async (token) => {
+      const scope = themes[theme];
+      const fg = resolveColor(token, scope);
+      const bg = resolveColor("--color-surface-base", scope);
+      expect(fg && bg).toBeTruthy();
+      expect(contrastRatio(fg!, bg!)).toBeGreaterThanOrEqual(3);
+    });
   }
 });

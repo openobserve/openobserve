@@ -28,7 +28,7 @@ export interface ViewSize {
 }
 
 // A handful of hexes must not grow huge.
-export const MAX_FIT_SCALE = 18;
+export const MAX_FIT_SCALE = 44;
 
 export const MAX_ZOOM = 20;
 
@@ -38,15 +38,33 @@ const CLICK_SLOP = 4;
 
 const PAD_SHARE = 0.04;
 
-export function fit(bounds: HexBounds, width: number, height: number): ViewState {
+// Uncapped, so callers comparing packings can tell them apart.
+export function fitScale(
+  spanX: number,
+  spanY: number,
+  width: number,
+  height: number,
+  bottomInset = 0,
+) {
   const pad = PAD_SHARE * Math.min(width, height);
-  const spanX = Math.max(bounds.maxX - bounds.minX, 1e-9);
-  const spanY = Math.max(bounds.maxY - bounds.minY, 1e-9);
-  const scale = Math.min((width - 2 * pad) / spanX, (height - 2 * pad) / spanY, MAX_FIT_SCALE);
+  return Math.min(
+    (width - 2 * pad) / Math.max(spanX, 1e-9),
+    (height - bottomInset - 2 * pad) / Math.max(spanY, 1e-9),
+  );
+}
+
+// The bounds are centred in the band above the bottom overlays, so none covers a hex at fit.
+export function fit(bounds: HexBounds, width: number, height: number, bottomInset = 0): ViewState {
+  const spanX = bounds.maxX - bounds.minX;
+  const spanY = bounds.maxY - bounds.minY;
+  const scale = Math.max(
+    Math.min(fitScale(spanX, spanY, width, height, bottomInset), MAX_FIT_SCALE),
+    1e-6,
+  );
   return {
-    scale: Math.max(scale, 1e-6),
+    scale,
     cx: (bounds.minX + bounds.maxX) / 2,
-    cy: (bounds.minY + bounds.maxY) / 2,
+    cy: (bounds.minY + bounds.maxY) / 2 - bottomInset / (2 * scale),
   };
 }
 

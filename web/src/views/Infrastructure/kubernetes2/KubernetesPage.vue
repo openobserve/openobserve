@@ -37,7 +37,9 @@ import K8sDetailsDrawer from "./K8sDetailsDrawer.vue";
 import { useKubernetesInventory, type K8sTime } from "./useKubernetesInventory";
 import { KIND_INFO, MAP_ANCHOR, type View } from "./kubernetesQueries";
 import { INVENTORY_KEY, findRow, rowKey, type AnyRow } from "./kubernetesModel";
+import type { MapObjects } from "./mapFilter";
 import {
+  DEFAULT_GROUP,
   ENTITY_FILLS,
   isCanonical,
   parseUrlState,
@@ -120,10 +122,13 @@ const clusterOptions = computed(() => k8s.clusters.value.map((c) => ({ label: ra
 const onCluster = (value: unknown) =>
   replace({ ...state.value, cluster: value ? String(value) : null, details: null });
 
+// Fills, groups and label keys differ per entity, so an entity change starts from its defaults.
 const onUpdate = (patch: Partial<K8sUrlState>) => {
   const next = { ...state.value, ...patch };
-  if (patch.entity && !ENTITY_FILLS[next.entity].includes(next.fill)) {
-    next.fill = ENTITY_FILLS[next.entity][0];
+  if (patch.entity && patch.entity !== state.value.entity) {
+    if (!ENTITY_FILLS[next.entity].includes(next.fill)) next.fill = ENTITY_FILLS[next.entity][0];
+    next.group = DEFAULT_GROUP[next.entity];
+    next.filter = [];
   }
   replace(next);
 };
@@ -181,6 +186,15 @@ const unscopedChip = computed(() =>
 const mapAnchor = computed(() =>
   k8s.has(MAP_ANCHOR[state.value.entity]) ? null : MAP_ANCHOR[state.value.entity],
 );
+
+const mapObjects = computed<MapObjects>(() => {
+  const name = `O:${state.value.entity === "nodes" ? "node" : "pod"}`;
+  if (!k8s.hasEvents.value) return { state: "skipped", reason: "noStream" };
+  if (!k8s.eventsScoped.value) return { state: "skipped", reason: "unscoped" };
+  if (mapAnchor.value) return { state: "skipped", reason: "anchor" };
+  if (k8s.failed.value.has(name)) return { state: "failed" };
+  return k8s.sql.value.has(name) ? { state: "ok" } : { state: "loading" };
+});
 
 // What a load depends on; search and sort only re-filter rows already loaded.
 const loadKey = computed(() => {
@@ -359,6 +373,7 @@ k8s.loadStreams();
           :nodes="scopedRows(k8s.inventory.value.nodes) as any"
           :namespace-options="k8s.namespaceOptions.value"
           :anchor-missing="mapAnchor"
+          :objects="mapObjects"
           :forbidden="k8s.forbidden.value"
           :loading="k8s.loading.value"
           :last-updated-at="k8s.lastUpdatedAt.value"

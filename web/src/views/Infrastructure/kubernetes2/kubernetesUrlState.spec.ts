@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { VIEWS } from "./kubernetesQueries";
 import {
   decodeCompound,
@@ -21,6 +22,7 @@ import {
   encodeDetails,
   isCanonical,
   parseUrlState,
+  DEFAULT_GROUP,
   stripPageParams,
   toQuery,
   withDetails,
@@ -149,6 +151,95 @@ describe("kubernetesUrlState", () => {
     });
   });
 
+  describe("map filter (AC 76)", () => {
+    const TERMS = "app.kubernetes.io/name:order-service,app.kubernetes.io/name:api";
+
+    it("round-trips comma-joined key:value terms, and the router keeps them literal", () => {
+      const state = parseUrlState({ view: "map", filter: TERMS });
+      expect(state.filter).toEqual([
+        "app.kubernetes.io/name:order-service",
+        "app.kubernetes.io/name:api",
+      ]);
+      const query = toQuery(state, {});
+      expect(query).toEqual({ view: "map", filter: TERMS });
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", component: {} }],
+      });
+      const href = router.resolve({ path: "/", query: query as any }).fullPath;
+      expect(href).toContain(`filter=${TERMS}`);
+      expect(href).not.toMatch(/%2F|%3A|%2C/i);
+    });
+
+    it("splits a term on its first colon", () => {
+      const state = parseUrlState({
+        view: "map",
+        filter: "kubernetes.io/hostname:ip-10-0-11-39.ec2.internal",
+      });
+      expect(state.filter).toEqual(["kubernetes.io/hostname:ip-10-0-11-39.ec2.internal"]);
+      const term = state.filter[0];
+      const at = term.indexOf(":");
+      expect([term.slice(0, at), term.slice(at + 1)]).toEqual([
+        "kubernetes.io/hostname",
+        "ip-10-0-11-39.ec2.internal",
+      ]);
+    });
+
+    it("drops terms without a colon, key or value, keeps unknown keys, and collapses duplicates", () => {
+      const state = parseUrlState({
+        view: "map",
+        filter: "nocolon,:v,k:,zz.io/unknown:x,a:b,a:b",
+      });
+      expect(state.filter).toEqual(["zz.io/unknown:x", "a:b"]);
+      expect(isCanonical({ view: "map", filter: "nocolon,a:b" })).toBe(false);
+    });
+
+    it("emits filter only on the map, and a view change clears it", () => {
+      expect(roundTrip({ view: "pods", filter: "a:b" })).toEqual({ view: "pods" });
+      const state = parseUrlState({ view: "map", filter: "a:b" });
+      expect(withView(state, "map").filter).toEqual([]);
+      expect(toQuery(withView(state, "pods"), {})).toEqual({ view: "pods" });
+    });
+  });
+
+  describe("label group (AC 95)", () => {
+    it("round-trips a node label group literally", () => {
+      const query = { view: "map", entity: "nodes", group: "label.topology.kubernetes.io/zone" };
+      expect(roundTrip(query)).toEqual(query);
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", component: {} }],
+      });
+      expect(router.resolve({ path: "/", query }).fullPath).toContain(
+        "group=label.topology.kubernetes.io/zone",
+      );
+    });
+
+    it("drops group=node for nodes, whose default is none", () => {
+      expect(parseUrlState({ view: "map", entity: "nodes", group: "node" }).group).toBe("none");
+      expect(roundTrip({ view: "map", entity: "nodes", group: "node" })).toEqual({
+        view: "map",
+        entity: "nodes",
+      });
+      expect(roundTrip({ view: "map", entity: "nodes", group: "none" })).toEqual({
+        view: "map",
+        entity: "nodes",
+      });
+    });
+
+    it("round-trips a pod label group and drops an empty label key", () => {
+      const query = { view: "map", group: "label.app.kubernetes.io/name" };
+      expect(roundTrip(query)).toEqual(query);
+      expect(parseUrlState({ view: "map", group: "label." }).group).toBe("node");
+      expect(roundTrip({ view: "map", group: "label." })).toEqual({ view: "map" });
+      expect(roundTrip({ view: "map", group: "none" })).toEqual({ view: "map", group: "none" });
+    });
+
+    it("gives each entity its own default group", () => {
+      expect(DEFAULT_GROUP).toEqual({ pods: "node", nodes: "none" });
+    });
+  });
+
   describe("view change", () => {
     it("clears view-local params and the drawer, and keeps cluster and namespace", () => {
       const state = parseUrlState({
@@ -193,6 +284,7 @@ describe("kubernetesUrlState", () => {
         entity: "nodes",
         fill: "cpu",
         group: "none",
+        filter: "a:b",
         details: "pod/c/n/p",
         org_identifier: "o",
       }),

@@ -63,6 +63,7 @@ import {
 } from "./kubernetesEvents";
 import {
   LIST_OBJECT_KINDS,
+  MAP_COLUMNS,
   joinObjects,
   objectDetailSql,
   objectListSql,
@@ -338,15 +339,20 @@ export function useKubernetesInventory(
         size: W_SIZE,
       });
     };
-    const objects = (kind: DetailKind) => {
-      if (LIST_OBJECT_KINDS.includes(kind)) {
-        out.push({ name: `O:${kind}`, sql: objectListSql(kind, cluster, s.namespaces), ...day });
+    const objects = (kind: DetailKind, columns?: Record<string, string>) => {
+      if (columns || LIST_OBJECT_KINDS.includes(kind)) {
+        const sql = objectListSql(kind, cluster, s.namespaces, columns);
+        out.push({ name: `O:${kind}`, sql, ...day });
       }
     };
     const viewKind = LIST_VIEW_KIND[s.view];
     if (!anchorMissing(s.view)) {
       if (s.view === "cluster") warn(null);
-      if (s.view === "map") warn(s.entity === "nodes" ? "node" : "pod");
+      if (s.view === "map") {
+        const kind = s.entity === "nodes" ? "node" : "pod";
+        warn(kind);
+        objects(kind, MAP_COLUMNS[kind]);
+      }
       if (viewKind) {
         warn(viewKind);
         objects(viewKind);
@@ -632,6 +638,7 @@ export function useKubernetesInventory(
     lastUpdatedAt,
     refreshNonce,
     results,
+    sql,
     failed,
     forbidden,
     clusters,

@@ -14,7 +14,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { HEX_HALF_HEIGHT, HEX_HALF_WIDTH, hexLayout, type LayoutParams } from "./hexLayout";
+import { observed } from "./__fixtures__/mapInventory";
+import {
+  HEX_HALF_HEIGHT,
+  HEX_HALF_WIDTH,
+  hexLayout,
+  middleTruncate,
+  packedSpan,
+  shelfCandidates,
+  shortGroupNames,
+  type LayoutParams,
+} from "./hexLayout";
+import { fit } from "./hexViewport";
+import type { PodRow } from "./kubernetesModel";
+import { groupRows } from "./mapFill";
 
 const keysFor = (sizes: number[]) =>
   sizes.map((size, g) => Array.from({ length: size }, (_, i) => `c/ns-${g}/pod-${i}`));
@@ -25,6 +38,7 @@ const params = (sizes: number[], over: Partial<LayoutParams> = {}): LayoutParams
   groups: keysFor(sizes),
   width: 1280,
   height: 800,
+  bottomInset: 0,
   ...over,
 });
 
@@ -106,12 +120,210 @@ describe("hexLayout (AC 52)", () => {
     expect(b.top).toBe(a.top);
   });
 
-  it("is memoized on entity, group, the ordered row keys and the container size", () => {
+  it("is memoized on entity, group, the ordered row keys, the container size and the inset", () => {
     const first = hexLayout(params([5, 3]));
     expect(hexLayout(params([5, 3]))).toBe(first);
     expect(hexLayout(params([5, 3], { width: 900 }))).not.toBe(first);
+    expect(hexLayout(params([5, 3], { height: 500 }))).not.toBe(hexLayout(params([5, 3])));
+    expect(hexLayout(params([5, 3], { bottomInset: 56 }))).not.toBe(hexLayout(params([5, 3])));
     const reordered = params([5, 3]);
     reordered.groups[0] = [...reordered.groups[0]].reverse();
     expect(hexLayout(reordered)).not.toBe(hexLayout(params([5, 3])));
+  });
+});
+
+// mulberry32: a seeded generator, so the brute-force comparison is repeatable.
+const seeded = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+const INSET = 56;
+
+const scaleOf = (span: { spanX: number; spanY: number }, width: number, height: number) =>
+  fit({ minX: 0, maxX: span.spanX, minY: -span.spanY, maxY: 0 }, width, height, INSET).scale;
+
+function bruteForce(p: LayoutParams) {
+  const widths = hexLayout(p).frames.map((f) => f.right - f.left);
+  const widest = Math.max(...widths);
+  const sums = new Set<number>();
+  let best = 0;
+  for (let i = 0; i < widths.length; i++) {
+    let sum = -1;
+    for (let j = i; j < widths.length; j++) {
+      sum += widths[j] + 1;
+      if (sum < widest - 1e-9) continue;
+      sums.add(Math.round(sum * 1e6));
+      best = Math.max(best, scaleOf(packedSpan(p, sum), p.width, p.height));
+    }
+  }
+  return { best, candidates: sums.size };
+}
+
+describe("hexLayout fills the canvas (AC 82)", () => {
+  it("puts four node groups on the first shelf of a 920×470 canvas, at scale ≥ 24.2", () => {
+    const layout = hexLayout(
+      params([12, 10, 9, 9, 1], { width: 920, height: 470, bottomInset: INSET }),
+    );
+    expect(layout.frames.filter((f) => f.top === layout.frames[0].top)).toHaveLength(4);
+    expect(fit(layout.bounds, 920, 470, INSET).scale).toBeGreaterThanOrEqual(24.2);
+  });
+
+  it("matches a brute force over every run sum for 500 random block sets", () => {
+    const random = seeded(42);
+    for (let set = 0; set < 500; set++) {
+      const count = 2 + Math.floor(random() * 39);
+      const sizes = Array.from({ length: count }, () => 1 + Math.floor(random() * 120));
+      for (const [width, height] of [
+        [920, 470],
+        [1230, 600],
+        [343, 500],
+      ]) {
+        const p = params(sizes, { width, height, bottomInset: INSET });
+        const chosen = fit(hexLayout(p).bounds, width, height, INSET).scale;
+        const { best, candidates } = bruteForce(p);
+        expect(chosen).toBeGreaterThanOrEqual((candidates <= 200 ? 0.999 : 0.95) * best);
+      }
+    }
+  });
+
+  it("beats a prefix-only search on blocks of 65, 15 and 14 at 343×500", () => {
+    const p = params([65, 15, 14], { width: 343, height: 500 });
+    expect(fit(hexLayout(p).bounds, 343, 500).scale).toBeGreaterThanOrEqual(16.9);
+    const widths = hexLayout(p).frames.map((f) => f.right - f.left);
+    const prefix = fit(
+      {
+        minX: 0,
+        maxX: packedSpan(p, widths[0]).spanX,
+        minY: -packedSpan(p, widths[0]).spanY,
+        maxY: 0,
+      },
+      343,
+      500,
+    ).scale;
+    expect(prefix).toBeLessThan(12.5);
+  });
+
+  it("samples exactly 200 run sums, keeping the smallest and largest", () => {
+    const widths = Array.from({ length: 40 }, (_, i) => 8 + i * 0.37);
+    const all = new Set<number>();
+    for (let i = 0; i < widths.length; i++) {
+      let sum = -1;
+      for (let j = i; j < widths.length; j++) all.add((sum += widths[j] + 1));
+    }
+    const sorted = [...all].filter((w) => w >= Math.max(...widths)).sort((a, b) => a - b);
+    expect(sorted.length).toBeGreaterThan(200);
+    const picked = shelfCandidates(widths);
+    expect(picked).toHaveLength(200);
+    expect(picked[0]).toBeCloseTo(sorted[0], 9);
+    expect(picked[199]).toBeCloseTo(sorted[sorted.length - 1], 9);
+  });
+
+  it("insets hexes half a unit from their frame", () => {
+    const layout = hexLayout(params([1, 1], { width: 1000, height: 600 }));
+    const [a, b] = layout.frames;
+    expect(layout.x[0] - HEX_HALF_WIDTH - a.left).toBeCloseTo(0.5, 9);
+    expect(b.left - a.right).toBeCloseTo(1, 9);
+  });
+
+  it("frames grouped nodes too, one frame per group, apart and around their hexes (AC 96)", () => {
+    const sizes = [2, 1, 1];
+    const layout = hexLayout(params(sizes, { entity: "nodes", group: "label.zone" }));
+    expect(layout.frames).toHaveLength(3);
+    let index = 0;
+    sizes.forEach((size, g) => {
+      const f = layout.frames[g];
+      for (let k = 0; k < size; k++, index++) {
+        expect(layout.x[index] - HEX_HALF_WIDTH).toBeGreaterThanOrEqual(f.left);
+        expect(layout.x[index] + HEX_HALF_WIDTH).toBeLessThanOrEqual(f.right);
+        expect(layout.y[index] + HEX_HALF_HEIGHT).toBeLessThanOrEqual(f.headerBottom);
+        expect(layout.y[index] - HEX_HALF_HEIGHT).toBeGreaterThanOrEqual(f.bottom);
+      }
+    });
+    expect(hexLayout(params([4], { entity: "nodes", group: "none" })).frames).toHaveLength(0);
+  });
+});
+
+describe("hexLayout at high cardinality (AC 99)", () => {
+  const pod = (i: number, labels: Record<string, string>, workload: number): PodRow =>
+    ({
+      key: `c/ns/p${i}`,
+      kind: "pod",
+      name: `p${i}`,
+      namespace: "ns",
+      warnings: [],
+      workload: { kind: "Deployment", name: `svc-${workload}` },
+      object: observed(labels),
+    }) as unknown as PodRow;
+  const PODS = Array.from({ length: 5000 }, (_, i) =>
+    pod(
+      i,
+      {
+        build: `b${i % 2000}`,
+        app: `app-${i % 300}`,
+        tier: ["web", "db", "cache"][i % 3],
+        zone: `z${i % 3}`,
+        team: `t${i % 12}`,
+        env: i % 2 ? "prod" : "staging",
+      },
+      i % 300,
+    ),
+  );
+  const timed = (group: "label.build" | "workload") => {
+    hexLayout(params([3, 4]));
+    const start = performance.now();
+    const { groups } = groupRows(PODS, group);
+    const layout = hexLayout({
+      entity: "pods",
+      group,
+      groups: groups.map((g) => g.rows.map((r) => r.key)),
+      width: 1230,
+      height: 600,
+      bottomInset: INSET,
+    });
+    return { elapsed: performance.now() - start, layout };
+  };
+
+  it("lays out a 2,000-value label group as 100 cards within 50 ms", () => {
+    const { elapsed, layout } = timed("label.build");
+    expect(layout.frames).toHaveLength(100);
+    expect(elapsed).toBeLessThanOrEqual(50);
+  });
+
+  it("lays out 300 workload groups uncapped within 50 ms", () => {
+    const { elapsed, layout } = timed("workload");
+    expect(layout.frames).toHaveLength(300);
+    expect(elapsed).toBeLessThanOrEqual(50);
+  });
+});
+
+describe("group titles (AC 83)", () => {
+  const sixPx = (text: string) => text.length * 6;
+
+  it("strips the suffix every node name shares from a dot", () => {
+    expect(shortGroupNames(["ip-10-0-11-39.ec2.internal", "ip-10-0-13-37.ec2.internal"])).toEqual([
+      "ip-10-0-11-39",
+      "ip-10-0-13-37",
+    ]);
+  });
+
+  it("strips no prefix, and leaves one name or names with no shared dotted suffix alone", () => {
+    const gke = ["gke-prod-default-pool-1a2b3c4d-xk9z", "gke-prod-default-pool-1a2b3c4d-m2q8"];
+    expect(shortGroupNames(gke)).toEqual(gke);
+    expect(shortGroupNames(["solo.ec2.internal"])).toEqual(["solo.ec2.internal"]);
+    expect(shortGroupNames(["a.x", "b.y"])).toEqual(["a.x", "b.y"]);
+    expect(shortGroupNames([".x", "a.x"])).toEqual([".x", "a.x"]);
+  });
+
+  it("middle-truncates to fit, keeping the distinguishing tail", () => {
+    const [a, b] = ["gke-prod-default-pool-1a2b3c4d-xk9z", "gke-prod-default-pool-1a2b3c4d-m2q8"];
+    const ta = middleTruncate(a, 72, sixPx);
+    const tb = middleTruncate(b, 72, sixPx);
+    expect(ta).toMatch(/^gke-.+….*xk9z$/);
+    expect(sixPx(ta)).toBeLessThanOrEqual(72);
+    expect(ta).not.toBe(tb);
+    expect(middleTruncate("short", 72, sixPx)).toBe("short");
   });
 });

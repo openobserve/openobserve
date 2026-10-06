@@ -365,6 +365,86 @@ describe("useKubernetesInventory", () => {
     });
   });
 
+  describe("map object queries (AC 81)", () => {
+    const LABELS = "json_get_json(body_object_metadata,'labels') AS labels";
+    const objectSqls = () =>
+      sentSql()
+        .map((q: any) => q)
+        .filter((q: any) => q.sql.includes("k8s_resource_name ="));
+
+    it("sends one map-variant O:pod with QoS and labels over 24 h, and the Pods list stays without labels", async () => {
+      const map = await setup({ view: "map", cluster: "prod" });
+      await map.inv.load();
+      const [o, ...rest] = objectSqls();
+      expect(rest).toHaveLength(0);
+      expect(o.sql).toContain("k8s_resource_name = 'pods'");
+      expect(o.sql).toContain("qosClass");
+      expect(o.sql).toContain(LABELS);
+      expect(o).toMatchObject({ start_time: END - 24 * HOUR, end_time: END });
+      vi.clearAllMocks();
+      queryClient.clear();
+      const list = await setup({ view: "pods", cluster: "prod" });
+      await list.inv.load();
+      const [listO] = objectSqls();
+      expect(listO.sql).toContain("qosClass");
+      expect(listO.sql).not.toContain("labels");
+    });
+
+    it("sends the Nodes list's ON query, byte for byte, for the nodes map", async () => {
+      const map = await setup({ view: "map", entity: "nodes", cluster: "prod" });
+      await map.inv.load();
+      const mapSql = objectSqls().map((q: any) => q.sql);
+      vi.clearAllMocks();
+      queryClient.clear();
+      const list = await setup({ view: "nodes", cluster: "prod" });
+      await list.inv.load();
+      expect(mapSql).toHaveLength(1);
+      expect(mapSql).toEqual(objectSqls().map((q: any) => q.sql));
+    });
+
+    it("sends no object query when k8s_events is unscoped or absent", async () => {
+      const unscoped = await setup({ view: "map", cluster: "prod" }, { eventFields: [] });
+      await unscoped.inv.load();
+      expect(objectSqls()).toHaveLength(0);
+      const absent = await setup({ view: "map", cluster: "prod" }, { logs: [] });
+      await absent.inv.load();
+      expect(objectSqls()).toHaveLength(0);
+    });
+
+    it("joins the map's rows under kind pod, putting labels on the row's object", async () => {
+      fixture = { ...CL(), P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })] };
+      sqlHits = (sql) =>
+        sql.includes("k8s_resource_name = 'pods'")
+          ? [
+              {
+                uid: "u",
+                event_name: "p",
+                k8s_namespace_name: "a",
+                body_type: "ADDED",
+                labels: JSON.stringify({ "app.kubernetes.io/name": "web" }),
+              },
+            ]
+          : [];
+      const { inv } = await setup({ view: "map", cluster: "prod" });
+      await inv.load();
+      expect(inv.inventory.value.pods[0].object?.metadata.labels).toEqual({
+        "app.kubernetes.io/name": "web",
+      });
+    });
+
+    it("sends the same requests for group=none and a label group", async () => {
+      const none = await setup({ view: "map", cluster: "prod", group: "none" });
+      await none.inv.load();
+      const sent = [sentIds().sort(), sentSql().map((q: any) => q.sql)];
+      vi.clearAllMocks();
+      queryClient.clear();
+      const label = await setup({ view: "map", cluster: "prod", group: "label.app" });
+      await label.inv.load();
+      expect([sentIds().sort(), sentSql().map((q: any) => q.sql)]).toEqual(sent);
+      expect(sentIds()).not.toContain("N1");
+    });
+  });
+
   describe("unscoped events (no k8s_cluster field)", () => {
     it("runs E with no cluster term and sends no W, DE, O* or fallback", async () => {
       fixture = {};

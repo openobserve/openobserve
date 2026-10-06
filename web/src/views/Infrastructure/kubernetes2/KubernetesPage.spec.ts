@@ -62,6 +62,7 @@ const recorder = (name: string, emits: string[] = []) =>
       chip: String,
       anchorMissing: String,
       loading: Boolean,
+      objects: Object,
     },
     emits,
     setup(props) {
@@ -299,6 +300,68 @@ describe("KubernetesPage", () => {
       wrapper.findComponent(MapStub).vm.$emit("update", { entity: "nodes" });
       await flushPromises();
       expect(query()).toEqual({ view: "map", entity: "nodes" });
+    });
+
+    it("resets the group and the filter on an entity change (AC 76)", async () => {
+      await mountPage({ view: "map", group: "workload", filter: "app:web" });
+      wrapper.findComponent(MapStub).vm.$emit("update", { entity: "nodes" });
+      await flushPromises();
+      expect(query()).toEqual({ view: "map", entity: "nodes" });
+      wrapper.findComponent(MapStub).vm.$emit("update", { group: "label.zone", filter: ["z:a"] });
+      await flushPromises();
+      wrapper.findComponent(MapStub).vm.$emit("update", { entity: "pods" });
+      await flushPromises();
+      expect(query()).toEqual({ view: "map" });
+    });
+
+    it("re-filters on a filter change without sending a request (AC 81)", async () => {
+      await mountPage({ view: "map", cluster: "alpha" });
+      const sent = metricsQuery.mock.calls.length + search.mock.calls.length;
+      wrapper.findComponent(MapStub).vm.$emit("update", { filter: ["app:web"] });
+      await flushPromises();
+      expect(query().filter).toBe("app:web");
+      expect(metricsQuery.mock.calls.length + search.mock.calls.length).toBe(sent);
+    });
+  });
+
+  describe("map label objects (AC 81)", () => {
+    const POD_OBJECTS = "k8s_resource_name = 'pods'";
+    const objects = () => wrapper.findComponent(MapStub).props("objects");
+
+    it.each([
+      ["noStream", { logs: [] }],
+      ["unscoped", { eventFields: [] }],
+      ["anchor", { metrics: ALL_STREAMS.filter((s) => s !== "kube_pod_status_phase") }],
+    ])("is skipped with reason %s", async (reason, streams) => {
+      await mountPage({ view: "map", cluster: "alpha" }, streams);
+      expect(objects()).toEqual({ state: "skipped", reason });
+    });
+
+    it("is failed when O:pod is rejected, and ok once it settles", async () => {
+      search.mockImplementation((async (args: any) => {
+        if (args.query.query.sql.includes(POD_OBJECTS)) throw new Error("boom");
+        return { data: { hits: [] } };
+      }) as any);
+      await mountPage({ view: "map", cluster: "alpha" });
+      expect(objects()).toEqual({ state: "failed" });
+      wrapper.unmount();
+      queryClient.clear();
+      search.mockResolvedValue({ data: { hits: [] } } as any);
+      await mountPage({ view: "map", cluster: "alpha" });
+      expect(objects()).toEqual({ state: "ok" });
+    });
+
+    it("is loading while O:pod is in flight", async () => {
+      let release: (v: any) => void = () => {};
+      search.mockImplementation(((args: any) =>
+        args.query.query.sql.includes(POD_OBJECTS)
+          ? new Promise((resolve) => (release = resolve))
+          : Promise.resolve({ data: { hits: [] } })) as any);
+      await mountPage({ view: "map", cluster: "alpha" });
+      expect(objects()).toEqual({ state: "loading" });
+      release({ data: { hits: [] } });
+      await flushPromises();
+      expect(objects()).toEqual({ state: "ok" });
     });
   });
 

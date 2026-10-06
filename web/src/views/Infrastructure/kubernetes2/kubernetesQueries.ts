@@ -47,7 +47,9 @@ export type DetailKind =
 
 export type MapEntity = "pods" | "nodes";
 
-export type MapGroup = "node" | "namespace" | "workload" | "none";
+export type BuiltinGroup = "node" | "namespace" | "workload" | "none";
+
+export type MapGroup = BuiltinGroup | `label.${string}`;
 
 export type MetricFamily = "kube-state-metrics" | "kubeletstats";
 

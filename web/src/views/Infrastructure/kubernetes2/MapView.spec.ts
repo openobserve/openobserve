@@ -15,21 +15,31 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import MapView from "./MapView.vue";
 import {
-  buildInventory,
-  severityOf,
-  type Inventory,
-  type QueryResults,
-  type Series,
-} from "./kubernetesModel";
-import type { QueryId } from "./kubernetesQueries";
+  ANSWERED,
+  CRASH,
+  GEN,
+  HEALTHY,
+  INVENTORY,
+  NODES,
+  byName,
+  generatorResults,
+  inventory,
+  labelledInventory,
+  observed,
+} from "./__fixtures__/mapInventory";
+import { buildInventory, severityOf, type QueryResults, type Series } from "./kubernetesModel";
 import { parseUrlState, type K8sUrlState } from "./kubernetesUrlState";
 import { fillClass, fillValue, groupRows, listTarget, statusClass, type MapRow } from "./mapFill";
+import type { MapObjects } from "./mapFilter";
 
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", async () => {
   const { defineComponent, h } = await import("vue");
@@ -43,184 +53,6 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", async () => {
   };
 });
 
-const GEN = "prod-us-east-1";
-const MI = 1024 ** 2;
-const NODES = [
-  "ip-10-0-1-10.ec2.internal",
-  "ip-10-0-13-37.ec2.internal",
-  "ip-10-0-2-20.ec2.internal",
-  "ip-10-0-3-30.ec2.internal",
-];
-const ANSWERED: QueryId[] = [
-  "P1",
-  "P2",
-  "P3",
-  "P4",
-  "P5",
-  "P6",
-  "P7",
-  "P8",
-  "P9",
-  "P10",
-  "P11",
-  "P12",
-  "P15",
-  "K1",
-  "K2",
-  "N1",
-  "N2",
-  "K3",
-  "K4",
-];
-
-const INVENTORY = "commerce/inventory-service-blkdl5tcm2-94jdl";
-const CRASH = "data/recommendation-service-9x58zgdb6z-sclvv";
-const HEALTHY = "gateway/api-gateway-5d8f7c9b4f-x2k9p";
-
-interface PodOpts {
-  phase?: string;
-  ready?: string | null;
-  rs?: string;
-  deployment?: string;
-  ds?: string;
-  ss?: string;
-  job?: string;
-  node?: string;
-  cpuRequest?: number;
-  cpu?: number;
-  memoryLimit?: number;
-  memory?: number;
-}
-
-// Generator-shaped (traces_generator PR #5): KSM carries k8s_cluster, kubeletstats k8s_cluster_name.
-function generatorResults(): QueryResults {
-  const results: QueryResults = new Map(ANSWERED.map((id) => [id, [] as Series[]]));
-  const add = (id: QueryId, metric: Record<string, string>, value = 1) =>
-    results.get(id)!.push({ metric: { k8s_cluster: GEN, ...metric }, value });
-  const usage = (id: QueryId, metric: Record<string, string>, value: number) =>
-    results.get(id)!.push({ metric: { k8s_cluster_name: GEN, ...metric }, value });
-  let spread = 0;
-  const pod = (namespace: string, name: string, opts: PodOpts = {}) => {
-    const p = { namespace, pod: name, uid: name };
-    add("P1", { ...p, phase: opts.phase ?? "Running" });
-    if (opts.ready !== null) add("P11", { ...p, condition: opts.ready ?? "true" });
-    if (opts.rs) {
-      add("P4", { ...p, owner_kind: "ReplicaSet", owner_name: opts.rs });
-      add("P5", {
-        namespace,
-        replicaset: opts.rs,
-        owner_kind: "Deployment",
-        owner_name: opts.deployment!,
-      });
-    }
-    const direct = opts.ds
-      ? ["DaemonSet", opts.ds]
-      : opts.ss
-        ? ["StatefulSet", opts.ss]
-        : opts.job
-          ? ["Job", opts.job]
-          : null;
-    if (direct) add("P4", { ...p, owner_kind: direct[0], owner_name: direct[1] });
-    add("P6", { ...p, node: opts.node ?? NODES[spread++ % NODES.length] });
-    add("P7", { ...p, container: "main" }, 0);
-    add("P10", { ...p, container: "main" });
-    if (opts.cpuRequest !== 0) {
-      add("P8", { ...p, container: "main", resource: "cpu" }, opts.cpuRequest ?? 0.5);
-      add("P9", { ...p, container: "main", resource: "memory" }, opts.memoryLimit ?? 256 * MI);
-    }
-    const k = { k8s_namespace_name: namespace, k8s_pod_name: name, k8s_pod_uid: name };
-    if (opts.cpu !== 0) usage("K1", k, opts.cpu ?? 0.2);
-    if (opts.memory !== 0) usage("K2", k, opts.memory ?? 100 * MI);
-    return p;
-  };
-  const deployment = (namespace: string, name: string, hash: string, suffixes: string[]) => {
-    for (const s of suffixes)
-      pod(namespace, `${name}-${hash}-${s}`, { rs: `${name}-${hash}`, deployment: name });
-  };
-  pod("commerce", "order-service-6xphqm265w-nb2sq", {
-    ready: "false",
-    rs: "order-service-6xphqm265w",
-    deployment: "order-service",
-  });
-  pod("commerce", "inventory-service-blkdl5tcm2-94jdl", {
-    rs: "inventory-service-blkdl5tcm2",
-    deployment: "inventory-service",
-    cpu: 0.4,
-    memoryLimit: 100 * MI,
-    memory: 92 * MI,
-  });
-  deployment("commerce", "cart-service", "7c6d5b4a3z", ["a1", "a2"]);
-  deployment("commerce", "payment-service", "6b5c4d3e2f", ["b1", "b2"]);
-  deployment("commerce", "catalog-service", "5a4b3c2d1e", ["c1", "c2"]);
-  deployment("commerce", "checkout-service", "4z3y2x1w0v", ["d1", "d2"]);
-  const crash = pod("data", "recommendation-service-9x58zgdb6z-sclvv", {
-    ready: "false",
-    rs: "recommendation-service-9x58zgdb6z",
-    deployment: "recommendation-service",
-    cpu: 0.1,
-    memory: 50 * MI,
-  });
-  add("P2", { ...crash, container: "main", reason: "CrashLoopBackOff" });
-  deployment("data", "recommendation-service", "9x58zgdb6z", ["jwhzq"]);
-  deployment("data", "analytics-service", "x6xv7pjxhb", ["zqcl4"]);
-  pod("data", "analytics-backfill-hc9zb", {
-    phase: "Failed",
-    ready: null,
-    job: "analytics-backfill",
-    cpuRequest: 0,
-    cpu: 0,
-    memory: 0,
-  });
-  pod("data", "postgres-0", { ss: "postgres" });
-  pod("data", "postgres-1", { ss: "postgres" });
-  deployment("data", "etl-service", "3q2w1e0r9t", ["e1", "e2"]);
-  pod("chat", "chat-service-8g7f88v79d-2hth6", {
-    rs: "chat-service-8g7f88v79d",
-    deployment: "chat-service",
-    cpu: 0.025,
-  });
-  deployment("chat", "chat-service", "8g7f88v79d", ["k2j4m"]);
-  pod("chat", "user-session-service-rm5b8ldqdv-l4phb", {
-    rs: "user-session-service-rm5b8ldqdv",
-    deployment: "user-session-service",
-    cpu: 0.025,
-  });
-  deployment("chat", "user-session-service", "rm5b8ldqdv", ["p8x7c"]);
-  deployment("chat", "notification-service", "2n3m4b5v6c", ["f1", "f2"]);
-  pod("media", "transcoding-service-nkgbp5xp5l-vwvn2", {
-    phase: "Pending",
-    ready: null,
-    rs: "transcoding-service-nkgbp5xp5l",
-    deployment: "transcoding-service",
-    node: "",
-    cpu: 0,
-    memory: 0,
-  });
-  deployment("media", "media-service", "1a2s3d4f5g", ["g1", "g2"]);
-  deployment("media", "thumbnail-service", "6h7j8k9l0z", ["h1", "h2"]);
-  for (const [i, node] of NODES.entries())
-    pod("monitoring", `fluent-bit-${i}x7q`, { ds: "fluent-bit", node });
-  pod("monitoring", "prometheus-0", { ss: "prometheus" });
-  deployment("gateway", "api-gateway", "5d8f7c9b4f", ["x2k9p", "m3n7q"]);
-  deployment("gateway", "auth-service", "8c7v6b5n4m", ["i1", "i2"]);
-  pod("gateway", "debug-shell", { cpuRequest: 0, cpu: 0 });
-  deployment("gateway", "nginx-test", "0p9o8i7u6y", ["j1", "j2"]);
-  for (const node of NODES) {
-    add("N1", { node, condition: "Ready", status: "true" });
-    add("N2", { node, resource: "cpu" }, 4);
-    add("N2", { node, resource: "memory" }, 16 * 1024 * MI);
-    usage("K3", { k8s_node_name: node }, 1);
-    usage("K4", { k8s_node_name: node }, 4 * 1024 * MI);
-  }
-  add("N1", { node: NODES[1], condition: "MemoryPressure", status: "true" });
-  return results;
-}
-
-const inventory = (results = generatorResults()): Inventory => buildInventory(results);
-
-const byName = (rows: MapRow[], ref: string) =>
-  rows.find((r) => `${r.namespace}/${r.name}` === ref)!;
-
 const mapState = (query: Record<string, string> = {}): K8sUrlState =>
   parseUrlState({ view: "map", cluster: GEN, ...query });
 
@@ -229,7 +61,12 @@ let wrapper: VueWrapper<any>;
 const mountView = async (
   state = mapState(),
   inv = inventory(),
-  over: Partial<{ anchorMissing: string | null; loading: boolean; forbidden: boolean }> = {},
+  over: Partial<{
+    anchorMissing: string | null;
+    loading: boolean;
+    forbidden: boolean;
+    objects: MapObjects;
+  }> = {},
 ) => {
   wrapper = mount(MapView, {
     props: {
@@ -238,12 +75,13 @@ const mountView = async (
       nodes: inv.nodes,
       namespaceOptions: ["chat", "commerce", "data", "default", "gateway", "media", "monitoring"],
       anchorMissing: null,
+      objects: { state: "ok" },
       forbidden: false,
       loading: false,
       lastUpdatedAt: 1_700_000_000_000,
       ...over,
     },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, createStore({ state: { theme: "light" } })] },
     attachTo: document.body,
   });
   await flushPromises();
@@ -259,6 +97,14 @@ const hexRows = (): MapRow[] =>
     .props("groups")
     .flatMap((g: any) => g.rows);
 const hexIndex = (ref: string) => hexRows().findIndex((r) => `${r.namespace}/${r.name}` === ref);
+const countText = () =>
+  wrapper.find('[data-test="k8s2-list-count"]').text().replace(/\s+/g, " ").trim();
+const legendItems = () => wrapper.findAll('[data-test^="k8s2-map-legend-"]');
+const legendCount = (item: any) => Number(item.find('[data-test="k8s2-map-count"]').text());
+const filterOptions = () => byTest(OSelect, "k8s2-map-filter").props("options") as any[];
+const groupOptions = () => byTest(OSelect, "k8s2-map-group").props("options") as any[];
+const updates = () => (wrapper.emitted("update") ?? []).map(([patch]: any) => patch);
+const GATEWAY = "app.kubernetes.io/name:api-gateway";
 
 beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, "clientWidth", {
@@ -349,8 +195,10 @@ describe("MapView fill buckets (AC 43)", () => {
     ).toBe(noData);
     expect(fillClass(byName(hexRows(), "gateway/debug-shell"), "cpuReq")).toBe("noData");
     expect(options().series[0].data[hexIndex(INVENTORY)][2]).not.toBe(noData);
-    expect(wrapper.find('[data-test="k8s2-map-legend-noData"]').text()).toBe("No data");
-    expect(wrapper.find('[data-test="k8s2-map-legend-b5"]').text()).toBe("≥ 100%");
+    const range = (cls: string) =>
+      wrapper.find(`[data-test="k8s2-map-legend-${cls}"] [data-test="k8s2-map-range"]`).text();
+    expect(range("noData")).toBe("No data");
+    expect(range("b5")).toBe("≥ 100%");
   });
 });
 
@@ -367,40 +215,57 @@ describe("MapView groups (AC 44, 45)", () => {
       ["monitoring", 5],
     ]);
     expect(wrapper.findAll('[data-test="k8s2-map-group-link"]')).toHaveLength(6);
+    expect(
+      hexMap()
+        .props("headers")
+        .map((h: any) => h.title),
+    ).toEqual(["commerce", "data", "gateway", "chat", "media", "monitoring"]);
   });
 
-  it('puts each pod in its node\'s frame with the node status word, and node="" in Unscheduled', async () => {
+  it('puts each pod in its node\'s card, with the node status word on line 2, and node="" in Unscheduled', async () => {
     await mountView();
     const groups = hexMap().props("groups");
-    const labels: string[] = hexMap().props("frameLabels");
+    const headers = hexMap().props("headers");
     for (const g of groups) {
       for (const row of g.rows) expect(g.special ? "" : g.name).toBe(row.node);
     }
-    const unscheduled = groups.find((g: any) => g.special === "unscheduled");
-    expect(unscheduled.rows.map((r: MapRow) => r.name)).toEqual([
+    const unscheduled = groups.findIndex((g: any) => g.special === "unscheduled");
+    expect(groups[unscheduled].rows.map((r: MapRow) => r.name)).toEqual([
       "transcoding-service-nkgbp5xp5l-vwvn2",
     ]);
-    expect(labels[groups.indexOf(unscheduled)]).toBe("Unscheduled (1)");
+    expect(headers[unscheduled]).toMatchObject({ title: "Unscheduled", count: "1", word: null });
     const pressured = groups.findIndex((g: any) => g.name === NODES[1]);
-    expect(labels[pressured]).toBe(
-      `MemoryPressure · ${NODES[1]} (${groups[pressured].rows.length})`,
-    );
+    expect(headers[pressured]).toMatchObject({
+      title: "ip-10-0-13-37",
+      count: String(groups[pressured].rows.length),
+      word: { text: "MemoryPressure", tone: "warning" },
+    });
     const ready = groups.findIndex((g: any) => g.name === NODES[0]);
-    expect(labels[ready]).toBe(`Ready · ${NODES[0]} (${groups[ready].rows.length})`);
+    expect(headers[ready]).toMatchObject({ title: "ip-10-0-10-38", word: { text: "Ready" } });
+    const short = headers
+      .filter((h: any, i: number) => !groups[i].special)
+      .map((h: any) => h.title);
+    expect(short.sort()).toEqual([
+      "ip-10-0-10-38",
+      "ip-10-0-11-39",
+      "ip-10-0-12-36",
+      "ip-10-0-13-37",
+    ]);
+    expect(headers[pressured].tip).toContain(NODES[1]);
   });
 
   it("groups by workload: Deployment via ReplicaSet, DaemonSet, and No owner", async () => {
-    const groups = groupRows(inventory().pods, "workload");
+    const { groups } = groupRows(inventory().pods, "workload");
     const named = (name: string) => groups.find((g) => g.name === name)!;
     expect(
-      named("Deployment api-gateway")
+      named("Deployment · api-gateway")
         .rows.map((r) => r.name)
         .sort(),
     ).toEqual(["api-gateway-5d8f7c9b4f-m3n7q", "api-gateway-5d8f7c9b4f-x2k9p"]);
-    expect(named("DaemonSet fluent-bit").rows.every((r) => r.name.startsWith("fluent-bit-"))).toBe(
-      true,
-    );
-    expect(named("DaemonSet fluent-bit").rows).toHaveLength(4);
+    expect(
+      named("DaemonSet · fluent-bit").rows.every((r) => r.name.startsWith("fluent-bit-")),
+    ).toBe(true);
+    expect(named("DaemonSet · fluent-bit").rows).toHaveLength(4);
     expect(groups.find((g) => g.special === "noOwner")!.rows.map((r) => r.name)).toEqual([
       "debug-shell",
     ]);
@@ -453,7 +318,7 @@ describe("MapView status fill (AC 46)", () => {
 
   it("draws the status legend as ok, warning, error and No data", async () => {
     await mountView(mapState({ fill: "status" }));
-    const tags = wrapper.findAll('[data-test^="k8s2-map-legend-"]').map((w) => w.text());
+    const tags = legendItems().map((w) => w.find('[data-test="k8s2-map-range"]').text());
     expect(tags).toEqual(["OK", "Warning", "Error", "No data"]);
   });
 });
@@ -467,10 +332,10 @@ describe("MapView hover and click (AC 47)", () => {
       dataIndex: hexIndex(INVENTORY),
     });
     expect(tip).toContain("inventory-service-blkdl5tcm2-94jdl");
-    expect(tip).toContain("Namespace: commerce");
+    expect(tip).toContain("commerce · Deployment/inventory-service");
     expect(tip).toContain(`Node: ${row.node}`);
     expect(tip).toContain("Memory % of limit: 92%");
-    expect(tip).toContain("Status: Running");
+    expect(tip).toContain("Running");
   });
 
   it("opens the pod's drawer on a hex click", async () => {
@@ -519,13 +384,17 @@ describe("MapView URL updates (AC 48)", () => {
     ]);
   });
 
-  it("offers the node fills and no Group by or namespace filter for nodes", async () => {
-    await mountView(mapState({ entity: "nodes", fill: "memory" }));
+  it("offers the node fills, None or a label as the node grouping, and no namespace filter", async () => {
+    await mountView(mapState({ entity: "nodes", fill: "memory" }), labelledInventory());
     const fills = byTest(OSelect, "k8s2-map-fill")
       .props("options")
       .map((o: any) => o.value);
     expect(fills).toEqual(["cpu", "memory", "status"]);
-    expect(wrapper.find('[data-test="k8s2-map-group"]').exists()).toBe(false);
+    const groups = groupOptions();
+    expect(groups[0].value).toBe("none");
+    expect(groups.find((o) => o.header).label).toBe("Labels (seen on 4 of 4 nodes)");
+    expect(groups.map((o) => o.value)).toContain("label.topology.kubernetes.io/zone");
+    expect(groups.map((o) => o.value)).not.toContain("node");
     expect(wrapper.find('[data-test="k8s2-namespace-select"]').exists()).toBe(false);
   });
 
@@ -536,13 +405,11 @@ describe("MapView URL updates (AC 48)", () => {
   });
 });
 
-describe("MapView on phones", () => {
-  it("keeps the group links to one horizontally scrolling row below md", async () => {
+describe("MapView on phones (§4.8)", () => {
+  it("keeps the canvas at least 24rem tall and gives the filter its own row", async () => {
     await mountView();
-    const links = wrapper.find('[data-test="k8s2-map-groups"]').classes();
-    expect(links).toEqual(
-      expect.arrayContaining(["flex-wrap", "max-md:flex-nowrap", "max-md:overflow-x-auto"]),
-    );
+    expect(wrapper.find('[data-test="k8s2-map-area"]').classes()).toContain("max-md:min-h-96");
+    expect(wrapper.find('[data-test="k8s2-map-filter"]').classes()).toContain("max-md:w-full");
   });
 });
 
@@ -567,7 +434,7 @@ describe("MapView empty states (AC 49)", () => {
     expect(empty.text()).toContain("No pods match");
     expect(empty.props("filtered")).toBe(true);
     empty.vm.$emit("action", "clear-filters");
-    expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "" }]]);
+    expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "", filter: [] }]]);
   });
 
   it("draws every hex as No data with fill=cpuReq when k8s_pod_cpu_usage is absent", async () => {
@@ -632,20 +499,22 @@ describe("MapView accessibility and fallback (AC 51)", () => {
     expect(wrapper.emitted("open")).toEqual([
       [{ kind: "node", cluster: GEN, namespace: "", name: NODES[0] }],
     ]);
-    expect(wrapper.find('[data-test="k8s2-map-group-text"]').text()).toBe("Unscheduled (1)");
+    expect(wrapper.find('[data-test="k8s2-map-group-disclosure"]').text()).toContain(
+      "Unscheduled (1)",
+    );
     wrapper.unmount();
 
     await mountView(mapState({ group: "workload" }));
     const gateway = wrapper
       .findAll('[data-test="k8s2-map-group-link"]')
-      .find((l) => l.text().startsWith("Deployment api-gateway"))!;
+      .find((l) => l.text().startsWith("Deployment · api-gateway"))!;
     await gateway.trigger("click");
     expect(wrapper.emitted("open")).toEqual([
       [{ kind: "deployment", cluster: GEN, namespace: "gateway", name: "api-gateway" }],
     ]);
-    expect(wrapper.findAll('[data-test="k8s2-map-group-text"]').map((w) => w.text())).toEqual([
-      "No owner (1)",
-    ]);
+    expect(wrapper.findAll('[data-test="k8s2-map-group-disclosure"]').map((w) => w.text())).toEqual(
+      ["No owner (1)"],
+    );
   });
 
   it("caps the group links at 50, then offers Show all 300 in list", async () => {
@@ -670,9 +539,358 @@ describe("MapView accessibility and fallback (AC 51)", () => {
     const state = mapState({ group: "workload" });
     await mountView(state, buildInventory(results));
     expect(wrapper.findAll('[data-test="k8s2-map-group-link"]')).toHaveLength(50);
+    expect(hexMap().props("groups")).toHaveLength(300);
     const all = wrapper.find('[data-test="k8s2-map-show-all"]');
     expect(all.text()).toBe("Show all 300 in list");
     await all.trigger("click");
     expect(wrapper.emitted("navigate")).toEqual([[listTarget(state)]]);
+  });
+});
+
+describe("MapView label filter: hidden, not dimmed (AC 79)", () => {
+  it("draws only the matching pods and re-counts header and legend", async () => {
+    await mountView(mapState({ filter: GATEWAY }), labelledInventory());
+    expect(
+      hexRows()
+        .map((r) => r.name)
+        .sort(),
+    ).toEqual(["api-gateway-5d8f7c9b4f-m3n7q", "api-gateway-5d8f7c9b4f-x2k9p"]);
+    expect(countText()).toContain("Filtered: 2 / 41");
+    expect(legendItems().reduce((sum, item) => sum + legendCount(item), 0)).toBe(2);
+    await wrapper.find('[data-test="k8s2-list-filtered-clear"]').trigger("click");
+    expect(updates()).toEqual([{ namespaces: [], search: "", filter: [] }]);
+  });
+
+  it("keeps the trigger plain: Filter (1), with no chip or nested button", async () => {
+    await mountView(mapState({ filter: GATEWAY }), labelledInventory());
+    const select = wrapper.find('[data-test="k8s2-map-filter"]');
+    const trigger = select.find("button");
+    expect(trigger.text()).toBe("Filter (1)");
+    expect(trigger.findAll("button")).toHaveLength(0);
+    expect(select.findComponent(ODimensionChip).exists()).toBe(false);
+  });
+
+  it("shows one removable chip per term, with Clear, only while the filter is set", async () => {
+    await mountView(mapState({ filter: GATEWAY }), labelledInventory());
+    const row = wrapper.find('[data-test="k8s2-map-filter-chips"]');
+    const chips = row.findAllComponents(ODimensionChip);
+    expect(chips).toHaveLength(1);
+    expect(chips[0].props()).toMatchObject({
+      dimKey: "app.kubernetes.io/name",
+      value: "api-gateway",
+      removable: true,
+      removeDataTest: "k8s2-map-filter-chip-remove",
+    });
+    await row.find('[data-test="k8s2-map-filter-chip-remove"]').trigger("click");
+    await row.find('[data-test="k8s2-map-filter-clear"]').trigger("click");
+    expect(updates()).toEqual([{ filter: [] }, { filter: [] }]);
+    wrapper.unmount();
+    await mountView(mapState(), labelledInventory());
+    expect(wrapper.find('[data-test="k8s2-map-filter-chips"]').exists()).toBe(false);
+  });
+
+  it("notes that the list ignores the filter, and Show as list stays enabled", async () => {
+    await mountView(mapState({ filter: GATEWAY }), labelledInventory());
+    expect(wrapper.find('[data-test="k8s2-map-list-note"]').text()).toBe(
+      "List ignores the map filter",
+    );
+    expect(wrapper.find('[data-test="k8s2-map-show-list"]').attributes("disabled")).toBeUndefined();
+    wrapper.unmount();
+    await mountView(mapState(), labelledInventory());
+    expect(wrapper.find('[data-test="k8s2-map-list-note"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="k8s2-map-show-list"]').attributes("disabled")).toBeUndefined();
+  });
+
+  it("emits picked terms, and builds options before search and the filter (AC 78)", async () => {
+    await mountView(mapState({ filter: GATEWAY, search: "inventory" }), labelledInventory());
+    const values = filterOptions().map((o) => o.value);
+    expect(values).toContain("app.kubernetes.io/name:cart-service");
+    expect(values).toContain(GATEWAY);
+    byTest(OSelect, "k8s2-map-filter").vm.$emit("update:modelValue", [
+      GATEWAY,
+      "app.kubernetes.io/name:cart-service",
+    ]);
+    expect(updates()).toEqual([{ filter: [GATEWAY, "app.kubernetes.io/name:cart-service"] }]);
+  });
+});
+
+describe("MapView label states (AC 80)", () => {
+  const unlabelled = () => inventory();
+  const pickerText = () =>
+    filterOptions()
+      .map((o) => String(o.label))
+      .join(" | ");
+
+  it("says no pod labels were seen when the query ran and found none", async () => {
+    await mountView(mapState(), unlabelled());
+    expect(filterOptions()).toEqual([
+      expect.objectContaining({
+        label: "No pod labels seen in the last 24 hours",
+        disabled: true,
+      }),
+    ]);
+  });
+
+  it.each([
+    [{ state: "skipped", reason: "noStream" }, "Labels need Kubernetes objects in k8s_events"],
+    [
+      { state: "skipped", reason: "unscoped" },
+      "Labels unavailable: k8s_events has no cluster label",
+    ],
+    [{ state: "loading" }, "Loading labels…"],
+    [{ state: "failed" }, "Labels could not be loaded (query failed)"],
+  ] as [MapObjects, string][])("explains %j in one disabled row", async (objects, text) => {
+    await mountView(mapState(), labelledInventory(), { objects });
+    expect(pickerText()).toBe(text);
+    expect(pickerText()).not.toContain("seen");
+    expect(groupOptions().map((o) => String(o.label))).toContain(text);
+  });
+
+  it.each([
+    [{ state: "loading" }],
+    [{ state: "skipped", reason: "unscoped" }],
+    [{ state: "failed" }],
+  ] as [MapObjects][])(
+    "replaces the canvas with Filter unavailable while %j, and its action clears the filter",
+    async (objects) => {
+      await mountView(mapState({ filter: GATEWAY }), labelledInventory(), { objects });
+      const empty = byTest(OEmptyState, "k8s2-map-filter-unavailable");
+      expect(empty.text()).toContain("Filter unavailable");
+      expect(wrapper.find('[data-test="k8s2-map-empty"]').exists()).toBe(false);
+      expect(hexMap().exists()).toBe(false);
+      empty.vm.$emit("action");
+      expect(updates()).toEqual([{ filter: [] }]);
+    },
+  );
+
+  it("resets a label grouping from Filter unavailable", async () => {
+    const state = mapState({ group: "label.app.kubernetes.io/name" });
+    await mountView(state, labelledInventory(), { objects: { state: "failed" } });
+    byTest(OEmptyState, "k8s2-map-filter-unavailable").vm.$emit("action");
+    expect(updates()).toEqual([{ group: "node" }]);
+  });
+
+  it("filters once labels are ok, with the coverage header", async () => {
+    await mountView(mapState({ filter: GATEWAY }), labelledInventory());
+    expect(hexRows()).toHaveLength(2);
+    expect(filterOptions()[0]).toMatchObject({
+      header: true,
+      label: "Labels (seen on 39 of 41 pods)",
+    });
+  });
+
+  it("adds the coverage suffix while a label term or group is active, and only then", async () => {
+    await mountView(mapState({ filter: GATEWAY }), labelledInventory());
+    expect(countText()).toBe("Filtered: 2 / 41 · labels seen on 39 of 41");
+    wrapper.unmount();
+    await mountView(mapState({ group: "label.app.kubernetes.io/name" }), labelledInventory());
+    expect(countText()).toBe("41 pods · labels seen on 39 of 41");
+    wrapper.unmount();
+    await mountView(mapState(), labelledInventory());
+    expect(countText()).toBe("41 pods");
+  });
+
+  it("keeps a URL value missing from the data as a chip, matching nothing", async () => {
+    await mountView(mapState({ filter: "app.kubernetes.io/name:ghost" }), labelledInventory());
+    expect(wrapper.findAllComponents(ODimensionChip)[0].props("value")).toBe("ghost");
+    const empty = byTest(OEmptyState, "k8s2-map-empty");
+    expect(empty.props("filtered")).toBe(true);
+    empty.vm.$emit("action", "clear-filters");
+    expect(updates()).toEqual([{ namespaces: [], search: "", filter: [] }]);
+  });
+});
+
+describe("MapView group headers and nav (AC 85)", () => {
+  const clickHeader = (dataIndex: number) =>
+    wrapper
+      .findComponent({ name: "ChartRenderer" })
+      .vm.$emit("click", { seriesIndex: 1, dataIndex });
+  const indexOf = (pred: (g: any) => boolean) => hexMap().props("groups").findIndex(pred);
+
+  it("navigates from a namespace header, opens a node's drawer, and ignores Unscheduled", async () => {
+    await mountView(mapState({ group: "namespace" }));
+    clickHeader(indexOf((g) => g.name === "commerce"));
+    expect((wrapper.emitted("navigate") as any)[0][0]).toMatchObject({
+      view: "pods",
+      namespaces: ["commerce"],
+    });
+    wrapper.unmount();
+    await mountView();
+    clickHeader(indexOf((g) => g.name === NODES[2]));
+    clickHeader(indexOf((g) => g.special === "unscheduled"));
+    expect(wrapper.emitted("open")).toEqual([
+      [{ kind: "node", cluster: GEN, namespace: "", name: NODES[2] }],
+    ]);
+    const headers = hexMap().props("headers");
+    expect(headers[indexOf((g) => g.special === "unscheduled")].clickable).toBe(false);
+    expect(headers[indexOf((g) => g.name === NODES[2])].clickable).toBe(true);
+  });
+
+  it("gives every header a tooltip with the full title, count and summary", async () => {
+    await mountView(mapState({ group: "label.app.kubernetes.io/name" }), labelledInventory());
+    const groups = hexMap().props("groups");
+    const headers = hexMap().props("headers");
+    const last = headers[groups.length - 1].tip;
+    expect(last).toContain("No app.kubernetes.io/name");
+    expect(last).toContain("2 pods");
+    expect(last).toContain("0 without the label, 2 not observed");
+    for (const h of headers) expect(h.tip).toMatch(/error, \d+ warning, \d+ OK/);
+  });
+
+  it("keeps the nav in the DOM, visually hidden, with ≤ 50 entries", async () => {
+    await mountView(mapState({ group: "namespace" }));
+    const nav = wrapper.find('[data-test="k8s2-map-groups"]');
+    expect(nav.classes()).toEqual(expect.arrayContaining(["sr-only", "focus-within:not-sr-only"]));
+    expect(nav.findAll('[data-test="k8s2-map-group-link"]')).toHaveLength(6);
+  });
+
+  it("draws 100 cards for a 2,000-value label and offers all 2,000 in the list", async () => {
+    const inv = labelledInventory();
+    const pods = Array.from({ length: 2000 }, (_, i) => ({
+      ...inv.pods[0],
+      key: `${GEN}/bulk/p${i}`,
+      name: `p${i}`,
+      namespace: "bulk",
+      object: observed({ build: `b${i}` }),
+    }));
+    await mountView(mapState({ group: "label.build" }), { ...inv, pods } as any);
+    expect(hexMap().props("groups")).toHaveLength(100);
+    expect(wrapper.find('[data-test="k8s2-map-show-all"]').text()).toBe("Show all 2000 in list");
+  });
+
+  it("renders no nav entries while ungrouped", async () => {
+    await mountView(mapState({ entity: "nodes" }));
+    expect(wrapper.find('[data-test="k8s2-map-groups"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="k8s2-map-group-link"]')).toHaveLength(0);
+  });
+
+  it("lists a label group's members in a closed disclosure that opens drawers", async () => {
+    await mountView(mapState({ group: "label.app.kubernetes.io/name" }), labelledInventory());
+    const disclosures = wrapper.findAllComponents(OCollapsible);
+    expect(disclosures.length).toBe(hexMap().props("groups").length);
+    expect(wrapper.findAll('[data-test="k8s2-map-group-member"]')).toHaveLength(0);
+    const gateway = disclosures.find((d) => d.text().startsWith("api-gateway (2)"))!;
+    await gateway.find("button").trigger("click");
+    await flushPromises();
+    const members = gateway.findAll('[data-test="k8s2-map-group-member"]');
+    expect(members).toHaveLength(2);
+    await members[0].trigger("click");
+    expect((wrapper.emitted("open") as any)[0][0]).toMatchObject({
+      kind: "pod",
+      namespace: "gateway",
+    });
+  });
+
+  it("caps a disclosure at 50 members, then says how many more", async () => {
+    const inv = labelledInventory();
+    const pods = Array.from({ length: 60 }, (_, i) => ({
+      ...inv.pods[0],
+      key: `${GEN}/bulk/p${i}`,
+      name: `p${i}`,
+      object: observed({ app: "big" }),
+    }));
+    await mountView(mapState({ group: "label.app" }), { ...inv, pods } as any);
+    const big = wrapper.findAllComponents(OCollapsible)[0];
+    await big.find("button").trigger("click");
+    await flushPromises();
+    expect(big.findAll('[data-test="k8s2-map-group-member"]')).toHaveLength(50);
+    expect(big.text()).toContain("10 more: use search");
+  });
+
+  it("lists the transcoding pod under the Unscheduled disclosure", async () => {
+    await mountView();
+    const unscheduled = wrapper.findAllComponents(OCollapsible)[0];
+    expect(unscheduled.text()).toContain("Unscheduled (1)");
+    await unscheduled.find("button").trigger("click");
+    await flushPromises();
+    expect(unscheduled.find('[data-test="k8s2-map-group-member"]').text()).toBe(
+      "transcoding-service-nkgbp5xp5l-vwvn2",
+    );
+  });
+});
+
+describe("MapView legend (AC 86)", () => {
+  it("scales cpuReq in 6 steps and status in 4, each with a range and a count summing to the hexes", async () => {
+    await mountView();
+    expect(legendItems()).toHaveLength(6);
+    expect(legendItems().reduce((sum, item) => sum + legendCount(item), 0)).toBe(41);
+    for (const item of legendItems())
+      expect(item.find('[data-test="k8s2-map-range"]').text()).not.toBe("");
+    wrapper.unmount();
+    await mountView(mapState({ fill: "status" }));
+    expect(legendItems()).toHaveLength(4);
+    expect(wrapper.find('[data-test="k8s2-map-scale"]').attributes("aria-label")).toBe(
+      "Legend: Status",
+    );
+  });
+
+  it("highlights the picked classes and clears them on a fill change", async () => {
+    await mountView();
+    byTest(OToggleGroup, "k8s2-map-scale").vm.$emit("update:modelValue", ["b5"]);
+    await flushPromises();
+    expect(hexMap().props("highlight")).toEqual(["b5"]);
+    await wrapper.setProps({ state: mapState({ fill: "memLim" }) });
+    expect(hexMap().props("highlight")).toEqual([]);
+  });
+});
+
+describe("MapView selection (AC 88)", () => {
+  it("passes the open drawer's row as the selected hex", async () => {
+    const pod = byName(inventory().pods, CRASH);
+    await mountView(mapState({ details: `pod/${GEN}/data/${pod.name}` }));
+    expect(hexMap().props("selectedKey")).toBe(pod.key);
+    wrapper.unmount();
+    await mountView();
+    expect(hexMap().props("selectedKey")).toBeNull();
+  });
+});
+
+describe("MapView label grouping (AC 96)", () => {
+  it("lists built-ins, then the Labels header, then keys by coverage without noise keys", async () => {
+    await mountView(mapState(), labelledInventory());
+    const options = groupOptions();
+    expect(options.slice(0, 4).map((o) => o.value)).toEqual([
+      "node",
+      "namespace",
+      "workload",
+      "none",
+    ]);
+    expect(options[4]).toMatchObject({ header: true, label: "Labels (seen on 39 of 41 pods)" });
+    const keys = options.slice(5).map((o) => o.value);
+    expect(keys[0]).toBe("label.app.kubernetes.io/name");
+    expect(keys).toContain("label.statefulset.kubernetes.io/pod-name");
+    expect(keys).not.toContain("label.pod-template-hash");
+  });
+
+  it("puts the unobserved pods last, labels the canvas by key, and ignores a label header click", async () => {
+    await mountView(mapState({ group: "label.app.kubernetes.io/name" }), labelledInventory());
+    const groups = hexMap().props("groups");
+    expect(groups[groups.length - 1]).toMatchObject({ special: "noLabel" });
+    expect(groups[groups.length - 1].rows).toHaveLength(2);
+    expect(wrapper.find('[data-test="k8s2-map-canvas"]').attributes("aria-label")).toBe(
+      "Map of 41 pods grouped by label app.kubernetes.io/name, filled by CPU % of request",
+    );
+    wrapper
+      .findComponent({ name: "ChartRenderer" })
+      .vm.$emit("click", { seriesIndex: 1, dataIndex: 0 });
+    expect(wrapper.emitted("open")).toBeUndefined();
+    expect(wrapper.emitted("navigate")).toBeUndefined();
+  });
+
+  it("groups nodes by zone into framed cards", async () => {
+    await mountView(
+      mapState({ entity: "nodes", group: "label.topology.kubernetes.io/zone" }),
+      labelledInventory(),
+    );
+    expect(
+      hexMap()
+        .props("headers")
+        .map((h: any) => [h.title, h.count]),
+    ).toEqual([
+      ["us-east-1a", "2"],
+      ["us-east-1b", "1"],
+      ["us-east-1c", "1"],
+    ]);
+    expect(options().series[1].data).toHaveLength(3);
   });
 });

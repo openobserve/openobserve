@@ -16,12 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, markRaw, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { format } from "echarts/core";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import useTheme from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
-import { hexLayout, type HexLayout } from "./hexLayout";
+import { hexLayout, middleTruncate, type HexLayout } from "./hexLayout";
 import {
+  MAX_ZOOM,
   WHEEL_FACTOR,
   axisRanges,
   fit,
@@ -31,16 +35,16 @@ import {
   zoomAt,
   type ViewState,
 } from "./hexViewport";
-import { chipLabel, formatPct } from "./kubernetesModel";
+import { nodeCard, podCard, tooltipStyle } from "./hoverCard";
 import type { MapEntity, MapGroup } from "./kubernetesQueries";
 import type { MapFill } from "./kubernetesUrlState";
 import {
-  FILL_LABEL,
   fillClass,
-  fillValue,
   type FillClass,
+  type GroupHeader,
   type MapRow,
   type RowGroup,
+  type StatusClass,
 } from "./mapFill";
 
 const props = defineProps<{
@@ -48,11 +52,13 @@ const props = defineProps<{
   group: MapGroup;
   fill: MapFill;
   groups: RowGroup[];
-  frameLabels: string[];
+  headers: GroupHeader[];
+  highlight: FillClass[];
+  selectedKey: string | null;
   label: I18nText;
 }>();
 
-const emit = defineEmits<{ select: [row: MapRow] }>();
+const emit = defineEmits<{ select: [row: MapRow]; header: [index: number] }>();
 
 const CLASSES: readonly FillClass[] = [
   "b1",
@@ -78,14 +84,47 @@ const CLASS_TOKEN: Record<FillClass, `--${string}`> = {
   noData: "--color-surface-subtle",
 };
 
+const GLYPH: Record<StatusClass, string> = { error: "✕", warning: "!", ok: "✓" };
+
 const NO_DATA = CLASSES.indexOf("noData");
 
 const HEX_SCALE = 0.9;
 
+const ZOOM_STEP = 1.5;
+
+const DIMMED = 0.2;
+
+// eslint-disable-next-line local/no-hardcoded-px -- canvas geometry
+const TITLE_FONT = "600 13px sans-serif";
+
+// eslint-disable-next-line local/no-hardcoded-px -- canvas geometry
+const COUNT_FONT = "400 12px sans-serif";
+
+// eslint-disable-next-line local/no-hardcoded-px -- canvas geometry
+const SUMMARY_FONT = "400 11px sans-serif";
+
+// Header text is fixed-size while the band scales, so each line needs a minimum band height.
+const LINE_ONE_MIN_PX = 16;
+
+const LINE_TWO_MIN_PX = 34;
+
+const HEADER_PAD_PX = 8;
+
+const LINE_OFFSET_PX = 8;
+
+const CARD_RADIUS_PX = 12;
+
+// 16px is the CSS default root size when no stylesheet sets one.
+const DEFAULT_REM_PX = 16;
+
 const { t } = useI18nTyped();
+const { isDark } = useTheme();
 
 const canvasRef = ref<HTMLElement | null>(null);
+const legendRef = ref<HTMLElement | null>(null);
+const zoomRef = ref<HTMLElement | null>(null);
 const size = shallowRef({ width: 0, height: 0 });
+const bottomInset = ref(0);
 const view = shallowRef<ViewState | null>(null);
 const options = shallowRef<Record<string, any>>({});
 
@@ -107,19 +146,32 @@ const layout = computed<HexLayout | null>(() =>
         groups: props.groups.map((g) => g.rows.map((r) => r.key)),
         width: size.value.width,
         height: size.value.height,
+        bottomInset: bottomInset.value,
       })
     : null,
 );
 
 const fitState = computed(() =>
-  layout.value ? fit(layout.value.bounds, size.value.width, size.value.height) : null,
+  layout.value
+    ? fit(layout.value.bounds, size.value.width, size.value.height, bottomInset.value)
+    : null,
 );
 
 const hexData = computed(() => {
   const l = layout.value;
   if (!l) return markRaw([] as number[][]);
+  const lit = new Set(props.highlight);
   return markRaw(
-    rows.value.map((row, i) => [l.x[i], l.y[i], CLASSES.indexOf(fillClass(row, props.fill))]),
+    rows.value.map((row, i) => {
+      const cls = fillClass(row, props.fill);
+      return [
+        l.x[i],
+        l.y[i],
+        CLASSES.indexOf(cls),
+        Number(row.key === props.selectedKey),
+        Number(lit.size > 0 && !lit.has(cls)),
+      ];
+    }),
   );
 });
 
@@ -130,14 +182,31 @@ const frameData = computed(() =>
       f.top,
       f.right,
       f.bottom,
-      f.labelX,
-      f.labelY,
+      f.headerBottom,
       i,
     ]),
   ),
 );
 
-const tips = computed(() => markRaw(rows.value.map(tooltipOf)));
+const tips = computed(() => {
+  const endUs = Date.now() * 1000;
+  return markRaw(
+    rows.value.map((row) =>
+      row.kind === "pod" ? podCard(row, props.fill, t, endUs) : nodeCard(row, t),
+    ),
+  );
+});
+
+const atFit = computed(
+  () => !!view.value && !!fitState.value && view.value.scale <= fitState.value.scale * (1 + 1e-9),
+);
+
+const atMax = computed(
+  () =>
+    !!view.value &&
+    !!fitState.value &&
+    view.value.scale >= fitState.value.scale * MAX_ZOOM * (1 - 1e-9),
+);
 
 watch(
   [layout, () => size.value.width, () => size.value.height],
@@ -147,16 +216,13 @@ watch(
   { immediate: true },
 );
 
-watch([hexData, frameData, view], requestRender, { immediate: true });
+watch([hexData, frameData, view, () => props.headers, isDark], requestRender, { immediate: true });
 
 onMounted(() => {
-  const el = canvasRef.value;
-  if (!el) return;
   measure();
-  if (typeof ResizeObserver !== "undefined") {
-    observer = new ResizeObserver(measure);
-    observer.observe(el);
-  }
+  if (typeof ResizeObserver === "undefined") return;
+  observer = new ResizeObserver(measure);
+  for (const el of [canvasRef.value, legendRef.value, zoomRef.value]) if (el) observer.observe(el);
 });
 
 onBeforeUnmount(() => {
@@ -169,6 +235,9 @@ function measure() {
   if (!el) return;
   const next = { width: el.clientWidth, height: el.clientHeight };
   if (next.width !== size.value.width || next.height !== size.value.height) size.value = next;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || DEFAULT_REM_PX;
+  const overlay = Math.max(legendRef.value?.offsetHeight ?? 0, zoomRef.value?.offsetHeight ?? 0);
+  bottomInset.value = overlay + rem;
 }
 
 function requestRender() {
@@ -180,35 +249,75 @@ function requestRender() {
   });
 }
 
-function escapeHtml(text: string) {
-  return text.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
-  );
+function textWidth(text: string, font: string) {
+  return format.getTextRect(text, font).width;
 }
 
-function fillText(row: MapRow): string {
-  if (props.fill === "status") return "";
-  const value = fillValue(row, props.fill);
-  const cls = fillClass(row, props.fill);
-  if (cls === "noData") return t("infra.k8s2.mapNoData");
-  return props.fill === "restarts" ? String(value) : formatPct(value);
+function summaryText(header: GroupHeader) {
+  const word = header.word ? `{${header.word.tone ?? "neutral"}|${header.word.text}}  ` : "";
+  return word + header.summary.map((s) => `{${s.cls}|${GLYPH[s.cls]}} ${s.count}`).join("  ");
 }
 
-function tooltipOf(row: MapRow): string {
-  const lines = [`<b>${escapeHtml(row.name)}</b>`];
-  if (row.kind === "pod") {
-    lines.push(escapeHtml(t("infra.k8s2.mapTipNamespace", { name: row.namespace })));
-    const node = row.node || t("infra.k8s2.mapUnscheduled");
-    lines.push(escapeHtml(t("infra.k8s2.mapTipNode", { name: node })));
+function headerTexts(
+  header: GroupHeader | undefined,
+  box: number[],
+  colors: Record<string, string>,
+) {
+  const [x0, x1, y0, band] = box;
+  if (!header || band < LINE_ONE_MIN_PX) return [];
+  const twoLines = band >= LINE_TWO_MIN_PX;
+  const lineOne = twoLines ? y0 + band / 2 - LINE_OFFSET_PX : y0 + band / 2;
+  const countWidth = textWidth(header.count, COUNT_FONT);
+  const titleWidth = x1 - x0 - 3 * HEADER_PAD_PX - countWidth;
+  const base = { type: "text", silent: true };
+  const out: Record<string, any>[] = [
+    {
+      ...base,
+      x: x0 + HEADER_PAD_PX,
+      y: lineOne,
+      style: {
+        text: middleTruncate(header.title, titleWidth, (s) => textWidth(s, TITLE_FONT)),
+        fill: colors.heading,
+        font: TITLE_FONT,
+        verticalAlign: "middle",
+      },
+    },
+    {
+      ...base,
+      x: x1 - HEADER_PAD_PX,
+      y: lineOne,
+      style: {
+        text: header.count,
+        fill: colors.secondary,
+        font: COUNT_FONT,
+        align: "right",
+        verticalAlign: "middle",
+      },
+    },
+  ];
+  if (twoLines) {
+    const rich = Object.fromEntries(
+      ["error", "warning", "ok", "neutral"].map((k) => [
+        k,
+        { fill: colors[k], font: SUMMARY_FONT },
+      ]),
+    );
+    out.push({
+      ...base,
+      x: x0 + HEADER_PAD_PX,
+      y: y0 + band / 2 + LINE_OFFSET_PX,
+      style: {
+        text: summaryText(header),
+        rich,
+        fill: colors.secondary,
+        font: SUMMARY_FONT,
+        verticalAlign: "middle",
+        width: Math.max(0, x1 - x0 - 2 * HEADER_PAD_PX),
+        overflow: "truncate",
+      },
+    });
   }
-  if (props.fill !== "status") {
-    const label = t(FILL_LABEL[props.fill]);
-    lines.push(escapeHtml(t("infra.k8s2.mapTipValue", { label, value: fillText(row) })));
-  }
-  const status = row.status ? chipLabel(row.status, t) : t("infra.k8s2.mapNoData");
-  lines.push(escapeHtml(t("infra.k8s2.mapTipStatus", { status })));
-  return lines.join("<br/>");
+  return out;
 }
 
 function buildOptions() {
@@ -216,9 +325,23 @@ function buildOptions() {
   const state = view.value;
   if (!state || !width || !height) return {};
   const palette = CLASSES.map((c) => chartColor(CLASS_TOKEN[c]));
+  const accent = chartColor("--color-accent");
   const border = chartColor("--color-border-default");
-  const labelColor = chartColor("--color-text-secondary");
-  const labels = props.frameLabels;
+  const card = {
+    fill: chartColor("--color-surface-base"),
+    band: chartColor("--color-surface-panel"),
+    stroke: chartColor("--color-border-subtle"),
+    hover: chartColor("--color-border-strong"),
+  };
+  const colors: Record<string, string> = {
+    heading: chartColor("--color-text-heading"),
+    secondary: chartColor("--color-text-secondary"),
+    neutral: chartColor("--color-text-secondary"),
+    error: chartColor(CLASS_TOKEN.error),
+    warning: chartColor(CLASS_TOKEN.warning),
+    ok: chartColor(CLASS_TOKEN.ok),
+  };
+  const headers = props.headers;
   const tipList = tips.value;
   const range = axisRanges(state, width, height);
   return {
@@ -229,34 +352,40 @@ function buildOptions() {
     tooltip: {
       trigger: "item",
       confine: true,
+      ...tooltipStyle(),
       formatter: (p: { seriesIndex: number; dataIndex: number }) =>
-        p.seriesIndex === 0 ? (tipList[p.dataIndex] ?? "") : "",
+        (p.seriesIndex === 0 ? tipList[p.dataIndex] : headers[p.dataIndex]?.tip) ?? "",
     },
     series: [
       {
         type: "custom",
         progressive: 2000,
         clip: true,
+        z: 2,
         data: hexData.value,
         encode: { x: 0, y: 1 },
         renderItem: (_params: unknown, api: any) => {
           const [cx, cy] = api.coord([api.value(0), api.value(1)]);
           const unit = api.size([1, 1])[0] * HEX_SCALE;
           const cls = api.value(2);
+          const selected = api.value(3) === 1;
           return {
             type: "polygon",
             shape: { points: hexPoints(cx, cy, unit) },
+            z2: selected ? 10 : 0,
+            cursor: "pointer",
             style: {
               fill: palette[cls],
-              stroke: cls === NO_DATA ? border : undefined,
-              lineWidth: cls === NO_DATA ? 1 : 0,
+              stroke: selected ? accent : cls === NO_DATA ? border : undefined,
+              lineWidth: selected ? 2.5 : cls === NO_DATA ? 1 : 0,
+              opacity: api.value(4) === 1 ? DIMMED : 1,
             },
+            emphasis: { style: { stroke: accent, lineWidth: 2 } },
           };
         },
       },
       {
         type: "custom",
-        silent: true,
         clip: true,
         z: 1,
         data: frameData.value,
@@ -264,29 +393,33 @@ function buildOptions() {
         renderItem: (_params: unknown, api: any) => {
           const [x0, y0] = api.coord([api.value(0), api.value(1)]);
           const [x1, y1] = api.coord([api.value(2), api.value(3)]);
-          const [lx, ly] = api.coord([api.value(4), api.value(5)]);
+          const [, yb] = api.coord([api.value(0), api.value(4)]);
+          const header = headers[api.value(5)];
+          const r = Math.min(CARD_RADIUS_PX, 0.15 * (y1 - y0));
           return {
             type: "group",
             children: [
               {
                 type: "rect",
-                shape: { x: x0, y: y0, width: x1 - x0, height: y1 - y0, r: 4 },
-                style: { fill: "transparent", stroke: border, lineWidth: 1 },
+                silent: true,
+                shape: { x: x0, y: y0, width: x1 - x0, height: y1 - y0, r },
+                style: { fill: card.fill, stroke: card.stroke, lineWidth: 1 },
+                emphasis: { style: { stroke: card.hover } },
               },
               {
-                type: "text",
-                x: lx,
-                y: ly,
-                style: {
-                  text: labels[api.value(6)] ?? "",
-                  fill: labelColor,
-                  // eslint-disable-next-line local/no-hardcoded-px -- canvas geometry
-                  font: "12px sans-serif",
-                  verticalAlign: "middle",
-                  width: Math.max(0, x1 - lx),
-                  overflow: "truncate",
+                type: "rect",
+                cursor: header?.clickable ? "pointer" : "default",
+                shape: {
+                  x: x0 + 1,
+                  y: y0 + 1,
+                  width: x1 - x0 - 2,
+                  height: yb - y0 - 1,
+                  r: [r, r, 0, 0],
                 },
+                style: { fill: card.band },
+                emphasis: { style: { fill: card.band } },
               },
+              ...headerTexts(header, [x0, x1, y0, yb - y0], colors),
             ],
           };
         },
@@ -313,6 +446,10 @@ function zoomBy(px: number, py: number, factor: number) {
   const fitScale = fitState.value?.scale;
   if (!view.value || !fitScale) return;
   view.value = zoomAt(view.value, px, py, factor, { ...size.value, fit: fitScale });
+}
+
+function zoomStep(factor: number) {
+  zoomBy(size.value.width / 2, size.value.height / 2, factor);
 }
 
 function onWheel(e: WheelEvent) {
@@ -360,8 +497,12 @@ function onChartClick(params: { seriesIndex?: number; dataIndex?: number }) {
     suppressClick = false;
     return;
   }
-  if (params.seriesIndex !== 0 || params.dataIndex == null) return;
-  const row = rows.value[params.dataIndex];
+  if (params.dataIndex == null) return;
+  if (params.seriesIndex === 1) {
+    if (props.headers[params.dataIndex]?.clickable) emit("header", params.dataIndex);
+    return;
+  }
+  const row = params.seriesIndex === 0 ? rows.value[params.dataIndex] : null;
   if (row) emit("select", row);
 }
 
@@ -388,9 +529,49 @@ function resetZoom() {
       <!-- ChartRenderer, not PanelSchemaRenderer: hex clicks must be forwarded to open the drawer. -->
       <ChartRenderer :data="{ options }" @click="onChartClick" />
     </div>
-    <div class="absolute end-2 top-2">
-      <OButton variant="outline" size="xs" data-test="k8s2-map-reset" @click="resetZoom">
-        {{ t("infra.k8s2.mapResetZoom") }}
+    <div
+      v-if="$slots.legend"
+      ref="legendRef"
+      class="bg-surface-overlay border-border-subtle rounded-surface absolute start-3 bottom-3 flex max-w-[calc(100%-10rem)] items-center gap-2 overflow-x-auto border px-3 py-1.5 whitespace-nowrap shadow-sm max-md:max-w-[calc(100%-4.5rem)]"
+      data-test="k8s2-map-legend"
+    >
+      <slot name="legend" />
+    </div>
+    <div
+      ref="zoomRef"
+      class="bg-surface-overlay border-border-subtle rounded-surface absolute end-3 bottom-3 flex items-center border shadow-sm"
+      data-test="k8s2-map-zoom"
+    >
+      <OButton
+        class="max-md:hidden"
+        variant="ghost"
+        size="icon-sm"
+        :aria-label="t('infra.k8s2.mapZoomIn')"
+        :disabled="atMax"
+        data-test="k8s2-map-zoom-in"
+        @click="zoomStep(ZOOM_STEP)"
+      >
+        <OIcon name="add" size="sm" />
+      </OButton>
+      <OButton
+        class="max-md:hidden"
+        variant="ghost"
+        size="icon-sm"
+        :aria-label="t('infra.k8s2.mapZoomOut')"
+        :disabled="atFit"
+        data-test="k8s2-map-zoom-out"
+        @click="zoomStep(1 / ZOOM_STEP)"
+      >
+        <OIcon name="remove" size="sm" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        :aria-label="t('infra.k8s2.mapFit')"
+        data-test="k8s2-map-fit"
+        @click="resetZoom"
+      >
+        <OIcon name="fit-screen" size="sm" />
       </OButton>
     </div>
   </div>

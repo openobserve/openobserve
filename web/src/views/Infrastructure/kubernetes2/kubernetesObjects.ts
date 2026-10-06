@@ -45,6 +45,12 @@ const LIST_COLUMNS: Partial<Record<DetailKind, Record<string, string>>> = {
   namespace: { labels: "json_get_json(body_object_metadata,'labels')" },
 };
 
+// The map variant reads only what the map filters or groups on.
+export const MAP_COLUMNS: Record<"pod" | "node", Record<string, string> | undefined> = {
+  pod: { ...LIST_COLUMNS.pod, labels: "json_get_json(body_object_metadata,'labels')" },
+  node: LIST_COLUMNS.node,
+};
+
 const CREATED = "json_get_str(body_object_metadata,'creationTimestamp')";
 
 const OBJECT_LIST_LIMIT = 5000;
@@ -53,8 +59,13 @@ const q = (value: string) => `'${escapeSingleQuotes(value)}'`;
 
 export const LIST_OBJECT_KINDS = Object.keys(LIST_COLUMNS) as DetailKind[];
 
-export function objectListSql(kind: DetailKind, cluster: string, namespaces: string[]) {
-  const columns = Object.entries({ ...LIST_COLUMNS[kind], created: CREATED });
+export function objectListSql(
+  kind: DetailKind,
+  cluster: string,
+  namespaces: string[],
+  variant = LIST_COLUMNS[kind],
+) {
+  const columns = Object.entries({ ...variant, created: CREATED });
   const nsTerm =
     KIND_INFO[kind].namespaced && namespaces.length
       ? ` AND k8s_namespace_name IN (${namespaces.map(q).join(", ")})`

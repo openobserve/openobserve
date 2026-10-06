@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import { hexLayout } from "./hexLayout";
 import {
   MAX_FIT_SCALE,
   axisRanges,
@@ -48,11 +49,45 @@ describe("hexViewport (AC 52)", () => {
     expect(state.cy).toBe(-40);
   });
 
-  it("pads the shorter side and caps the fit scale", () => {
+  it("pads the shorter side and caps the fit scale at 44", () => {
     const state = fit(BOUNDS, 1200, 700);
     expect(state.scale * 80).toBeLessThan(700);
     expect(state.scale * 80).toBeGreaterThan(600);
+    expect(MAX_FIT_SCALE).toBe(44);
     expect(fit({ minX: 0, maxX: 2, minY: -2, maxY: 0 }, 1200, 700).scale).toBe(MAX_FIT_SCALE);
+  });
+
+  it("fits 4 ungrouped hexes at the cap (AC 82)", () => {
+    const layout = hexLayout({
+      entity: "nodes",
+      group: "none",
+      groups: [["a", "b", "c", "d"]],
+      width: 1000,
+      height: 600,
+      bottomInset: 0,
+    });
+    expect(fit(layout.bounds, 1000, 600).scale).toBe(44);
+  });
+
+  describe("reserves the bottom overlay band (AC 98)", () => {
+    const INSET = 56;
+    it.each([
+      [1230, 600],
+      [343, 600],
+    ])("keeps the bounds above both overlays at %ix%i", (width, height) => {
+      const state = fit(BOUNDS, width, height, INSET);
+      const { y } = axisRanges(state, width, height);
+      const toPx = (ly: number) => ((y[1] - ly) / (y[1] - y[0])) * height;
+      const legend = { left: 12, top: height - INSET, width: 300, height: 44 };
+      const zoom = { right: 12, top: height - INSET, width: 104, height: 44 };
+      const bottom = toPx(BOUNDS.minY);
+      expect(bottom).toBeLessThanOrEqual(legend.top);
+      expect(bottom).toBeLessThanOrEqual(zoom.top);
+      expect((toPx(BOUNDS.maxY) + bottom) / 2).toBeCloseTo((height - INSET) / 2, 6);
+      const centre = (BOUNDS.minY + BOUNDS.maxY) / 2;
+      expect(state.cy).toBeCloseTo(centre - INSET / (2 * state.scale), 9);
+      expect(fit(BOUNDS, width, height, 0).cy).toBe(centre);
+    });
   });
 
   it("horizontal pan: a 100px drag right moves cx by −100/scale, y unchanged", () => {

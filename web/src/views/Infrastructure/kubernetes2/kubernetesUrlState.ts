@@ -17,6 +17,7 @@ import type { LocationQuery, LocationQueryRaw } from "vue-router";
 import {
   DETAIL_KINDS,
   VIEWS,
+  type BuiltinGroup,
   type DetailKind,
   type MapEntity,
   type MapGroup,
@@ -43,6 +44,7 @@ export interface K8sUrlState {
   entity: MapEntity;
   fill: MapFill;
   group: MapGroup;
+  filter: string[];
   details: DetailsRef | null;
 }
 
@@ -59,6 +61,7 @@ const PAGE_PARAMS = [
   "entity",
   "fill",
   "group",
+  "filter",
   "details",
   "kind",
   "name",
@@ -74,7 +77,14 @@ export const ENTITY_FILLS: Record<MapEntity, readonly MapFill[]> = {
   nodes: ["cpu", "memory", "status"],
 };
 
-export const MAP_GROUPS: readonly MapGroup[] = ["node", "namespace", "workload", "none"];
+export const MAP_GROUPS: Record<MapEntity, readonly BuiltinGroup[]> = {
+  pods: ["node", "namespace", "workload", "none"],
+  nodes: ["none"],
+};
+
+export const DEFAULT_GROUP: Record<MapEntity, BuiltinGroup> = { pods: "node", nodes: "none" };
+
+const LABEL_GROUP = "label.";
 
 const first = (value: unknown): string | null => {
   const flat = [value].flat();
@@ -104,12 +114,35 @@ export const parseDetails = (value: string | null): DetailsRef | null => {
   return { kind: parts[0] as DetailKind, cluster: parts[1], namespace: parts[2], name: parts[3] };
 };
 
+export const isLabelGroup = (group: MapGroup): group is `label.${string}` =>
+  group.startsWith(LABEL_GROUP);
+
+export const labelGroupKey = (group: MapGroup) =>
+  isLabelGroup(group) ? group.slice(LABEL_GROUP.length) : null;
+
+// Label keys and values cannot contain "," or ":", so terms need no encoding of their own.
+const parseFilter = (value: string | null): string[] => {
+  const terms = (value ?? "").split(",").filter((term) => {
+    const at = term.indexOf(":");
+    return at > 0 && at < term.length - 1;
+  });
+  return [...new Set(terms)];
+};
+
+const parseGroup = (entity: MapEntity, value: string | null): MapGroup => {
+  if (value && value.length > LABEL_GROUP.length && value.startsWith(LABEL_GROUP)) {
+    return value as MapGroup;
+  }
+  return MAP_GROUPS[entity].includes(value as BuiltinGroup)
+    ? (value as BuiltinGroup)
+    : DEFAULT_GROUP[entity];
+};
+
 export const parseUrlState = (query: Query): K8sUrlState => {
   const viewParam = first(query.view);
   const view: View = VIEWS.includes(viewParam as View) ? (viewParam as View) : "cluster";
   const entity: MapEntity = first(query.entity) === "nodes" ? "nodes" : "pods";
   const fillParam = first(query.fill) as MapFill | null;
-  const groupParam = first(query.group) as MapGroup | null;
   const details = parseDetails(first(query.details));
   const clusterParam = first(query.cluster);
   return {
@@ -123,7 +156,8 @@ export const parseUrlState = (query: Query): K8sUrlState => {
     entity,
     fill:
       fillParam && ENTITY_FILLS[entity].includes(fillParam) ? fillParam : ENTITY_FILLS[entity][0],
-    group: entity === "pods" && groupParam && MAP_GROUPS.includes(groupParam) ? groupParam : "node",
+    group: parseGroup(entity, first(query.group)),
+    filter: parseFilter(first(query.filter)),
     details,
   };
 };
@@ -147,7 +181,8 @@ export const toQuery = (state: K8sUrlState, base: Query): LocationQueryRaw => {
   if (state.view === "map") {
     if (state.entity !== "pods") out.entity = state.entity;
     if (state.fill !== ENTITY_FILLS[state.entity][0]) out.fill = state.fill;
-    if (state.entity === "pods" && state.group !== "node") out.group = state.group;
+    if (state.group !== DEFAULT_GROUP[state.entity]) out.group = state.group;
+    if (state.filter.length) out.filter = state.filter.join(",");
   }
   if (state.details) out.details = encodeDetails(state.details);
   return out;
@@ -167,7 +202,8 @@ export const withView = (state: K8sUrlState, view: View): K8sUrlState => ({
   desc: false,
   entity: "pods",
   fill: ENTITY_FILLS.pods[0],
-  group: "node",
+  group: DEFAULT_GROUP.pods,
+  filter: [],
   details: null,
 });
 

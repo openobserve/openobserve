@@ -22,7 +22,8 @@ import {
   type PodRow,
 } from "./kubernetesModel";
 import type { MapGroup } from "./kubernetesQueries";
-import { withView, type K8sUrlState, type MapFill } from "./kubernetesUrlState";
+import { labelGroupKey, withView, type K8sUrlState, type MapFill } from "./kubernetesUrlState";
+import { rowLabels } from "./mapFilter";
 
 export type MapRow = PodRow | NodeRow;
 
@@ -37,11 +38,31 @@ export type NumericFill = Exclude<MapFill, "status">;
 export interface RowGroup {
   id: string;
   name: string;
-  special: "unscheduled" | "noOwner" | null;
+  special: "unscheduled" | "noOwner" | "noLabel" | "other" | null;
   owner: Owner | null;
   namespace: string;
   rows: MapRow[];
+  // How many label-value groups an "other" group stands for.
+  merged?: number;
 }
+
+// What a group card's header shows; built by the view, drawn by the canvas.
+export interface GroupHeader {
+  title: string;
+  count: string;
+  summary: { cls: StatusClass; count: number }[];
+  word: { text: string; tone: StatusClass | null } | null;
+  tip: string;
+  clickable: boolean;
+}
+
+export interface GroupedRows {
+  groups: RowGroup[];
+  totalGroups: number;
+}
+
+// A label key can have thousands of values; this bounds the cards drawn and laid out.
+export const MAX_LABEL_GROUPS = 100;
 
 const REQUEST_EDGES = [25, 50, 75, 100];
 
@@ -132,21 +153,40 @@ export function bucketRanges(fill: NumericFill): string[] {
   return [`< ${a}%`, `${a}–${b}%`, `${b}–${c}%`, `${c}–${d}%`, `≥ ${d}%`];
 }
 
-export function groupRows(rows: MapRow[], group: MapGroup): RowGroup[] {
+export function groupRows(rows: MapRow[], group: MapGroup): GroupedRows {
   const groups = new Map<string, RowGroup>();
+  const key = labelGroupKey(group);
   for (const row of rows) {
-    const spec = groupOf(row, group);
+    const spec = key == null ? groupOf(row, group) : labelGroupOf(row, key);
     let entry = groups.get(spec.id);
     if (!entry) groups.set(spec.id, (entry = { ...spec, rows: [] }));
     entry.rows.push(row);
   }
-  return [...groups.values()].sort(
+  const sorted = [...groups.values()].sort(
     (a, b) =>
+      Number(a.special === "noLabel") - Number(b.special === "noLabel") ||
       b.rows.length - a.rows.length ||
       Number(a.special != null) - Number(b.special != null) ||
       a.name.localeCompare(b.name) ||
       a.namespace.localeCompare(b.namespace),
   );
+  if (group === "workload") disambiguateWorkloads(sorted);
+  return { groups: key == null ? sorted : capLabelGroups(sorted), totalGroups: sorted.length };
+}
+
+export function noLabelCounts(group: RowGroup) {
+  let notObserved = 0;
+  for (const row of group.rows) if (!rowLabels(row)) notObserved++;
+  return { without: group.rows.length - notObserved, notObserved };
+}
+
+export function statusCounts(rows: readonly MapRow[]) {
+  const counts = { error: 0, warning: 0, ok: 0 };
+  for (const row of rows) {
+    const cls = statusClass(row);
+    if (cls !== "noData") counts[cls]++;
+  }
+  return (["error", "warning", "ok"] as const).map((cls) => ({ cls, count: counts[cls] }));
 }
 
 export function listTarget(state: K8sUrlState): K8sUrlState {
@@ -171,9 +211,43 @@ function groupOf(row: MapRow, group: MapGroup): Omit<RowGroup, "rows"> {
   if (!owner) return { ...blank, id: "noOwner", special: "noOwner" };
   return {
     id: `wl|${row.namespace}|${owner.kind}|${owner.name}`,
-    name: `${owner.kind} ${owner.name}`,
+    name: `${owner.kind} · ${owner.name}`,
     special: null,
     owner,
     namespace: row.namespace,
   };
+}
+
+function labelGroupOf(row: MapRow, key: string): Omit<RowGroup, "rows"> {
+  const value = rowLabels(row)?.[key];
+  const blank = { special: null, owner: null, namespace: "" };
+  return typeof value === "string" && value !== ""
+    ? { ...blank, id: `label|${value}`, name: value }
+    : { ...blank, id: "noLabel", name: "", special: "noLabel" };
+}
+
+// The same kind and name in two namespaces would otherwise draw two identical titles.
+function disambiguateWorkloads(groups: RowGroup[]) {
+  const seen = new Map<string, number>();
+  for (const g of groups) if (!g.special) seen.set(g.name, (seen.get(g.name) ?? 0) + 1);
+  for (const g of groups) if (!g.special && seen.get(g.name)! > 1) g.name += ` (${g.namespace})`;
+}
+
+function capLabelGroups(sorted: RowGroup[]): RowGroup[] {
+  const noLabel = sorted.filter((g) => g.special === "noLabel");
+  const regular = sorted.filter((g) => g.special !== "noLabel");
+  const room = MAX_LABEL_GROUPS - noLabel.length;
+  if (regular.length <= room) return sorted;
+  const kept = regular.slice(0, room - 1);
+  const rest = regular.slice(room - 1);
+  const other: RowGroup = {
+    id: "other",
+    name: "",
+    special: "other",
+    owner: null,
+    namespace: "",
+    rows: rest.flatMap((g) => g.rows),
+    merged: rest.length,
+  };
+  return [...kept, other, ...noLabel];
 }

@@ -32,6 +32,8 @@ const props = withDefaults(
     count: number;
     total: number;
     countLabel?: I18nText;
+    countSuffix?: I18nText;
+    filtered?: boolean;
     capped?: boolean;
     chip?: I18nText;
     namespaced?: boolean;
@@ -43,6 +45,8 @@ const props = withDefaults(
   }>(),
   {
     countLabel: undefined,
+    countSuffix: undefined,
+    filtered: false,
     capped: false,
     chip: undefined,
     namespaced: false,
@@ -65,7 +69,7 @@ const { t } = useI18nTyped();
 const rowRef = ref<HTMLElement | null>(null);
 const filterOpen = ref(false);
 
-const filtered = computed(() => !!props.search || props.namespaces.length > 0);
+const filtered = computed(() => props.filtered || !!props.search || props.namespaces.length > 0);
 
 const options = computed(() => props.namespaceOptions.map((ns) => ({ label: raw(ns), value: ns })));
 
@@ -101,6 +105,7 @@ const onNamespaces = (value: unknown) =>
         <OTooltip :content="t('infra.k8s2.itemsCappedTip')" />
       </span>
       <template v-else>{{ countLabel ?? t("infra.k8s2.items", { count }, count) }}</template>
+      <template v-if="countSuffix">{{ raw(" · ") }}{{ countSuffix }}</template>
     </span>
     <OTag
       v-if="chip"
