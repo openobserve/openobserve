@@ -197,6 +197,8 @@ fn with_headers(mut resp: Response) -> Response {
         header::REFERRER_POLICY,
         HeaderValue::from_static("no-referrer"),
     );
+    // A CDN or proxy copy would outlive a revoke, pause or expiry and serve stale data.
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     resp
 }
 
@@ -387,10 +389,19 @@ mod tests {
 
     #[test]
     fn every_public_response_carries_the_privacy_headers() {
-        let resp = with_headers(StatusCode::NOT_FOUND.into_response());
-        let h = resp.headers();
-        assert_eq!(h[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
-        assert_eq!(h["x-robots-tag"], "noindex, nofollow");
-        assert_eq!(h[header::REFERRER_POLICY], "no-referrer");
+        for resp in [
+            StatusCode::OK.into_response(),
+            StatusCode::NOT_FOUND.into_response(),
+            expired(),
+            unavailable(),
+            too_many_requests(),
+        ] {
+            let resp = with_headers(resp);
+            let h = resp.headers();
+            assert_eq!(h[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+            assert_eq!(h["x-robots-tag"], "noindex, nofollow");
+            assert_eq!(h[header::REFERRER_POLICY], "no-referrer");
+            assert_eq!(h[header::CACHE_CONTROL], "no-store", "{}", resp.status());
+        }
     }
 }
