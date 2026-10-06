@@ -68,6 +68,26 @@ const expectHighlights = (page, column) =>
   expect.poll(async () => highlightsIn(page, column).allInnerTexts(), { timeout: 20000 });
 
 /**
+ * Asserts nothing is highlighted, and keeps asserting it across a settled window.
+ *
+ * The same async pass is why this cannot be a single count(): a zero read before
+ * processHitsInChunks runs is indistinguishable from "never highlighted", so a one-shot
+ * assertion passes for the wrong reason and a regression that started highlighting
+ * negative filters would still go green. Sampling until the window closes can tell them
+ * apart.
+ */
+async function expectNoHighlights(page, windowMs = 5000) {
+  const highlights = page.locator(`${RESULTS_TABLE} .log-highlighted`);
+  const deadline = Date.now() + windowMs;
+  let worst = 0;
+  do {
+    worst = Math.max(worst, await highlights.count());
+    await page.waitForTimeout(250);
+  } while (Date.now() < deadline);
+  expect(worst, 'a highlight appeared where a negative filter should mark nothing').toBe(0);
+}
+
+/**
  * Drives a search through the URL rather than the editor: the query lands base64-encoded
  * in `query`, exactly as a shared/bookmarked logs link does, which keeps the filter text
  * verbatim. Typing into the Monaco editor re-tokenises and is far flakier for a test
@@ -173,7 +193,12 @@ test.describe('Logs search-term highlighting', () => {
     await expect(page.locator(RESULTS_TABLE)).toContainText('kelvin reading stable', {
       timeout: 20000,
     });
-    expect(await page.locator(`${RESULTS_TABLE} .log-highlighted`).count()).toBe(0);
+    // Every row the filter keeps must be rendered before the window opens, or the window
+    // could close while the table is still filling.
+    await expect(page.locator(`${RESULTS_TABLE} td[data-test="o2-table-cell-body"]`)).toHaveCount(3, {
+      timeout: 20000,
+    });
+    await expectNoHighlights(page);
   });
 
   // ---------------------------------------------------------------------------
@@ -220,6 +245,6 @@ test.describe('Logs search-term highlighting', () => {
     await expect(page.locator(RESULTS_TABLE)).toContainText('<script>alert(1)</script>', {
       timeout: 20000,
     });
-    expect(await page.locator(`${RESULTS_TABLE} script`).count()).toBe(0);
+    await expect(page.locator(`${RESULTS_TABLE} script`)).toHaveCount(0);
   });
 });

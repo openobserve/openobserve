@@ -104,6 +104,32 @@ def _search(session, base_url, sql, minutes=60):
     )
 
 
+def _poll_search(session, base_url, sql, predicate, timeout=45, what="condition", required=True):
+    """Searches until `predicate(hits)` holds; returns the last hits either way when not required.
+
+    The association has to reach the pattern manager, and a fresh row has to reach search,
+    before either is observable. A fixed sleep either wastes time or — under CI load —
+    expires early and fails as "nothing was redacted", which reads like a redaction defect
+    rather than a timing one.
+
+    `required=False` is for the fixture: it waits for propagation without owning the
+    verdict, so a real redaction regression still fails SDR-01 by name instead of erroring
+    every test that shares the fixture.
+    """
+    deadline = time.time() + timeout
+    hits = []
+    while time.time() < deadline:
+        resp = _search(session, base_url, sql)
+        if resp.status_code == 200:
+            hits = resp.json().get("hits", [])
+            if predicate(hits):
+                return hits
+        time.sleep(1)
+    if required:
+        raise AssertionError(f"{what} did not happen within {timeout}s; last hits: {hits}")
+    return hits
+
+
 @pytest.fixture(scope="module")
 def redacted_stream(create_session, base_url):
     """A stream with one card-number pattern associated to `body` at Both."""
@@ -126,7 +152,14 @@ def redacted_stream(create_session, base_url):
         == 200
     )
     # The association has to reach the pattern manager before a search reflects it.
-    time.sleep(5)
+    # Not required: SDR-01 is the test that judges whether redaction happened.
+    _poll_search(
+        create_session,
+        base_url,
+        f'SELECT body FROM "{stream}"',
+        lambda hits: any("[REDACTED]" in h.get("body", "") for h in hits),
+        required=False,
+    )
 
     yield {"stream": stream, "name": name, "id": pattern_id}
 
@@ -171,13 +204,17 @@ def redacted_stream(create_session, base_url):
 
 def test_sdr_01_search_returns_redacted_values(create_session, base_url, redacted_stream):
     """A card number ingested into an associated field must never come back in a search."""
-    resp = _search(create_session, base_url, f'SELECT body FROM "{redacted_stream["stream"]}"')
-    assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text}"
+    hits = _poll_search(
+        create_session,
+        base_url,
+        f'SELECT body FROM "{redacted_stream["stream"]}"',
+        lambda h: any("[REDACTED]" in r.get("body", "") for r in h),
+        what="the card number was redacted",
+    )
 
-    bodies = [h.get("body", "") for h in resp.json().get("hits", [])]
+    bodies = [h.get("body", "") for h in hits]
     assert bodies, "no hits came back; the fixture row should be searchable"
     assert all(CARD not in b for b in bodies), f"unredacted card number in {bodies}"
-    assert any("[REDACTED]" in b for b in bodies), f"nothing was redacted: {bodies}"
 
 
 def test_sdr_02_redaction_applies_to_rows_ingested_after_association(
@@ -189,13 +226,15 @@ def test_sdr_02_redaction_applies_to_rows_ingested_after_association(
         json=[{"body": f"second charge {CARD} ok", "service": "billing"}],
     )
     assert resp.status_code == 200
-    time.sleep(5)
 
-    hits = _search(
-        create_session, base_url, f'SELECT body FROM "{redacted_stream["stream"]}"'
-    ).json().get("hits", [])
+    hits = _poll_search(
+        create_session,
+        base_url,
+        f'SELECT body FROM "{redacted_stream["stream"]}"',
+        lambda h: any("second charge" in r.get("body", "") for r in h),
+        what="the row ingested after association became searchable",
+    )
     later = [h.get("body", "") for h in hits if "second charge" in h.get("body", "")]
-    assert later, "the row ingested after association is not searchable"
     assert all(CARD not in b for b in later), f"unredacted card number in {later}"
 
 
@@ -300,4 +339,16 @@ def test_sdr_08_search_around_is_single_stream(create_session, base_url, redacte
         f"?key={key}&size=10&sql={encoded}&type=logs"
     )
     assert resp.status_code == 200, f"search around failed: {resp.status_code} {resp.text}"
-    assert "hits" in resp.json(), f"unexpected around response: {resp.text[:200]}"
+
+    around = resp.json().get("hits")
+    # An empty list satisfies "hits is present", so it cannot stand in for "returned this
+    # stream's neighbours": the key row has to be among them, and nothing may come back
+    # from anywhere else.
+    assert around, f"search around returned no rows: {resp.text[:200]}"
+    assert any(h.get("_timestamp") == key for h in around), (
+        f"the key row {key} is not among the {len(around)} rows returned"
+    )
+    foreign = {h["_stream_name"] for h in around if h.get("_stream_name")} - {
+        redacted_stream["stream"]
+    }
+    assert not foreign, f"rows from other streams came back: {sorted(foreign)}"
