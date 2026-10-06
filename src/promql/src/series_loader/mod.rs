@@ -25,7 +25,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
         EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
-        value::{Exemplar, Label, Labels, QueryContext, RangeValue, Sample},
+        value::{Exemplar, Label, Labels, QueryContext, RangeValue},
     },
     utils::{
         hash::{Sum64, gxhash},
@@ -35,7 +35,7 @@ use config::{
 };
 use datafusion::{
     arrow::{
-        array::{Array, AsArray, RecordBatch},
+        array::{Array, AsArray, Float64Array, RecordBatch},
         datatypes::{DataType, Float64Type, Int64Type, Schema, UInt64Type},
     },
     error::{DataFusionError, Result},
@@ -51,6 +51,7 @@ use promql_parser::parser::VectorSelector;
 use self::labels::load_series_labels;
 use super::utils::{
     apply_label_selector, apply_matchers, apply_time_window, batch_run_len, exemplar_load_step,
+    extend_samples,
 };
 
 const MAX_SERIES_FRAGMENT_HINT: usize = 24;
@@ -219,6 +220,7 @@ pub(super) async fn load_samples_from_datafusion(
     query_duration: i64,
 ) -> Result<(PartitionedMetrics, HashSet<i64>)> {
     let df = df.select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?;
+    let stale_markers = config::get_config().prom.staleness_markers_enabled;
     load_metric_partitions(
         trace_id,
         hash_field_type,
@@ -233,9 +235,10 @@ pub(super) async fn load_samples_from_datafusion(
                 metrics,
                 &hashes,
                 time_values.values(),
-                value_values.values(),
+                value_values,
                 fragment_hint,
                 query_duration,
+                stale_markers,
             );
         },
         |metric| metric.samples.iter().map(|sample| sample.timestamp).max(),
@@ -247,9 +250,10 @@ fn append_batch_samples(
     metrics: &mut HashMap<u64, RangeValue>,
     hashes: &[u64],
     timestamps: &[i64],
-    values: &[f64],
+    values: &Float64Array,
     fragment_hint: usize,
     query_duration: i64,
+    stale_markers: bool,
 ) {
     let mut i = 0;
     while i < hashes.len() {
@@ -272,11 +276,13 @@ fn append_batch_samples(
                 })
             }
         };
-        entry.samples.extend(
-            timestamps[i..i + run_len]
-                .iter()
-                .zip(&values[i..i + run_len])
-                .map(|(&timestamp, &value)| Sample::new(timestamp, value)),
+        extend_samples(
+            &mut entry.samples,
+            timestamps,
+            values,
+            i..i + run_len,
+            0,
+            stale_markers,
         );
         i += run_len;
     }
@@ -583,6 +589,48 @@ mod tests {
         assert_eq!(timestamps, HashSet::from([150, 200]));
         assert_eq!(metrics[&11].samples.len(), 2);
         assert_eq!(metrics[&22].samples.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_load_samples_reads_a_null_value_as_a_stale_marker() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(vec![100, 200])),
+                Arc::new(UInt64Array::from(vec![11, 11])),
+                Arc::new(Float64Array::from(vec![Some(1.0), None])),
+            ],
+        )
+        .unwrap();
+        let df = SessionContext::new().read_batch(batch).unwrap();
+
+        let (metrics, _) = load_samples_from_datafusion("test", &DataType::UInt64, df, false, 1, 0)
+            .await
+            .unwrap();
+        let metrics = merge_partitioned_metrics(metrics);
+
+        let samples = &metrics[&11].samples;
+        assert_eq!(samples.len(), 2);
+        assert_eq!(samples[0].value, 1.0);
+        assert!(config::meta::promql::is_stale_marker(samples[1].value));
+    }
+
+    #[test]
+    fn test_append_batch_samples_drops_null_values_with_markers_off() {
+        let mut metrics = HashMap::new();
+        let values = Float64Array::from(vec![Some(1.0), None, Some(3.0)]);
+        append_batch_samples(&mut metrics, &[7, 7, 7], &[1, 2, 3], &values, 1, 0, false);
+        let kept: Vec<_> = metrics[&7]
+            .samples
+            .iter()
+            .map(|s| (s.timestamp, s.value))
+            .collect();
+        assert_eq!(kept, vec![(1, 1.0), (3, 3.0)]);
     }
 
     #[tokio::test]

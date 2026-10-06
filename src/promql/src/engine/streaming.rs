@@ -15,7 +15,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use config::meta::promql::value::*;
+use config::meta::promql::{is_stale_marker, value::*};
 use datafusion::error::{DataFusionError, Result};
 use futures::future::pending;
 use infra::errors::ErrorCodes;
@@ -84,12 +84,18 @@ impl functions::RangeFunc for InstantSelectorFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        let sample = samples.last()?;
+        let sample = samples
+            .last()
+            .filter(|sample| !is_stale_marker(sample.value))?;
         // Streaming windows shift sample times by the offset; projection needs the stored time.
         Some(
             self.output
                 .project(&Sample::new(sample.timestamp - self.offset, sample.value)),
         )
+    }
+
+    fn reads_stale_markers(&self) -> bool {
+        true
     }
 }
 
@@ -372,7 +378,7 @@ mod tests {
     use config::{
         TIMESTAMP_COL_NAME,
         meta::{
-            promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+            promql::{HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL, is_stale_marker},
             search::ScanStats,
         },
     };
@@ -451,7 +457,7 @@ mod tests {
         Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new(HASH_LABEL, DataType::UInt64, false),
-            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
             Field::new("instance", DataType::Utf8, true),
             Field::new(NAME_LABEL, DataType::Utf8, true),
         ]))
@@ -482,7 +488,11 @@ mod tests {
             vec![
                 Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
                 Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.1))),
-                Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
+                // a stale marker is stored as a NULL value
+                Arc::new(Float64Array::from_iter(
+                    rows.iter()
+                        .map(|row| (!is_stale_marker(row.2)).then_some(row.2)),
+                )),
                 Arc::new(StringArray::from_iter_values(
                     rows.iter().map(|row| if row.1 == 7 { "a" } else { "b" }),
                 )),
@@ -1526,6 +1536,105 @@ mod tests {
                 .expect_err(query)
                 .to_string();
             assert!(err.contains(expected), "{query}: {err}");
+        }
+    }
+
+    /// `a` samples every 20 s to 100 s, then with `marker` goes stale at 120 s; `b` never ends.
+    fn stale_provider(streams: bool, marker: bool) -> StreamingProvider {
+        let mut rows: Vec<(i64, u64, f64)> = (0..=5)
+            .map(|step| (BASE + step * 20 * SECOND, 7, (step * 3) as f64))
+            .collect();
+        if marker {
+            rows.push((BASE + 120 * SECOND, 7, f64::from_bits(STALE_NAN_BITS)));
+        }
+        rows.extend(
+            (0..10).map(|step| (BASE + step * 20 * SECOND, u64::MAX / 2, (step * 3) as f64)),
+        );
+        provider_rows(streams, false, &rows)
+    }
+
+    fn series_samples(value: Value, instance: &str) -> Vec<(i64, f64)> {
+        canonical(value)
+            .into_iter()
+            .find(|(labels, _)| labels.contains(&("instance".to_string(), instance.to_string())))
+            .map(|(_, samples)| samples)
+            .unwrap_or_default()
+    }
+
+    #[tokio::test]
+    async fn test_stale_marker_ends_the_series_at_once() {
+        let at = |seconds: i64| BASE + seconds * SECOND;
+        for streams in [true, false] {
+            let context = format!("streams: {streams}");
+            let ended = eval_query(stale_provider(streams, true), 30, "m")
+                .await
+                .unwrap();
+            assert_eq!(
+                series_samples(ended.clone(), "a"),
+                vec![(at(60), 9.0)],
+                "{context}"
+            );
+            assert_eq!(series_samples(ended, "b").len(), 3, "{context}");
+            let held = eval_query(stale_provider(streams, false), 30, "m")
+                .await
+                .unwrap();
+            assert_eq!(series_samples(held, "a").len(), 3, "{context}");
+
+            let count = eval_query(stale_provider(streams, true), 30, "count(m)")
+                .await
+                .unwrap();
+            assert_eq!(
+                canonical(count)[0].1,
+                vec![(at(60), 2.0), (at(120), 1.0), (at(180), 1.0)],
+                "{context}"
+            );
+            let timestamps = eval_query(stale_provider(streams, true), 30, "timestamp(m)")
+                .await
+                .unwrap();
+            let timestamps: Vec<_> = canonical(timestamps)
+                .into_iter()
+                .map(|(_, samples)| samples.len())
+                .collect();
+            assert_eq!(timestamps, vec![1, 3], "{context}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_range_functions_ignore_stale_markers() {
+        let queries = [
+            "rate(m[2m])",
+            "increase(m[2m])",
+            "rate(m[1m])",
+            "last_over_time(m[10m])",
+            "count_over_time(m[10m])",
+            "sum(rate(m[2m]))",
+            "sum(count_over_time(m[10m]))",
+        ];
+        for streams in [true, false] {
+            for query in queries {
+                let context = format!("{query} (streams: {streams})");
+                let marked = eval_query(stale_provider(streams, true), 30, query)
+                    .await
+                    .unwrap();
+                let unmarked = eval_query(stale_provider(streams, false), 30, query)
+                    .await
+                    .unwrap();
+                assert_same_matrix(unmarked, marked, &context);
+            }
+            let last = eval_query(stale_provider(streams, true), 30, "last_over_time(m[10m])")
+                .await
+                .unwrap();
+            assert_eq!(
+                series_samples(last, "a").last(),
+                Some(&(BASE + 180 * SECOND, 15.0))
+            );
+            let count = eval_query(stale_provider(streams, true), 30, "count_over_time(m[10m])")
+                .await
+                .unwrap();
+            assert_eq!(
+                series_samples(count, "a").last(),
+                Some(&(BASE + 180 * SECOND, 6.0))
+            );
         }
     }
 }

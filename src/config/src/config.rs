@@ -3367,6 +3367,12 @@ pub struct Prometheus {
     /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
     #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
     pub native_histogram_max_buckets: usize,
+    #[env_config(
+        name = "ZO_METRICS_STALENESS_MARKERS_ENABLED",
+        default = true,
+        help = "Store Prometheus staleness markers and end a series at its marker in PromQL. Off drops markers on ingest and ignores stored ones on read."
+    )]
+    pub staleness_markers_enabled: bool,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]

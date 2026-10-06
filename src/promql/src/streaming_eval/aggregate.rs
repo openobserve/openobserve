@@ -119,7 +119,7 @@ async fn aggregate_partial<A: AggFunc, S: SeriesStream>(
         source.consume(&mut samples).await?;
         entry
             .acc
-            .push_series(eval.values(&samples), || source.labels());
+            .push_series(eval.values(&mut samples), || source.labels());
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;

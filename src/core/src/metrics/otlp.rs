@@ -135,6 +135,16 @@ impl MetricRecords<'_> {
                 .any(|point| number_point_value(point).is_some()),
         }
     }
+
+    /// Whether every row the metric writes is a stale marker.
+    fn only_stale(&self) -> bool {
+        match self {
+            Self::Json(_) => false,
+            Self::NumberPoints(points) => !points
+                .iter()
+                .any(|point| matches!(number_point_value(point), Some(Some(_)))),
+        }
+    }
 }
 
 pub async fn otlp_proto(org_id: &str, body: Bytes, user: IngestUser) -> HttpResponse {
@@ -351,6 +361,12 @@ pub async fn handle_otlp_request(
                     &mut metric_schema_map,
                 )
                 .await;
+                // stale markers alone must not create a stream, not even its metadata
+                if records.only_stale()
+                    && !ingest::has_value_column(metric_schema_map.get(&metric_name))
+                {
+                    continue;
+                }
 
                 // get partition keys
                 if !stream_partitioning_map.contains_key(&metric_name) {
@@ -865,12 +881,15 @@ fn append_number_point(
     true
 }
 
-/// A gauge or sum point's value under the shared policy, `None` for one that writes no record.
-fn number_point_value(data_point: &NumberDataPoint) -> Option<f64> {
-    if no_recorded_value(data_point.flags) {
-        return None;
-    }
-    get_metric_val(&data_point.value).and_then(super::sanitize_metric_value)
+/// A gauge or sum point's `value` cell, `None` for no record; no recorded value is a stale marker.
+fn number_point_value(data_point: &NumberDataPoint) -> Option<Option<f64>> {
+    let value = if no_recorded_value(data_point.flags) {
+        super::SanitizedValue::Stale
+    } else {
+        get_metric_val(&data_point.value)
+            .map_or(super::SanitizedValue::Drop, super::sanitize_metric_value)
+    };
+    value.row_value()
 }
 
 fn process_histogram(
@@ -965,7 +984,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bo
     let Some(value) = number_point_value(data_point) else {
         return false;
     };
-    rec[VALUE_LABEL] = value.into();
+    rec[VALUE_LABEL] = value.map_or(json::Value::Null, Into::into);
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = data_point_flag(data_point.flags).into();
@@ -2006,7 +2025,8 @@ mod tests {
 
         assert_eq!(rejected, json_records[json_records.len() - 6..]);
         let accepted = &json_records[..json_records.len() - 6];
-        assert_eq!(written.len(), 4);
+        // the flagged point is a stale marker, written on both paths
+        assert_eq!(written.len(), 5);
         for (row, record) in written.iter().zip(accepted) {
             assert_eq!(row, record.as_object().unwrap());
         }
@@ -3125,8 +3145,8 @@ mod tests {
                 ),
             };
 
-            assert!(!process_data_point(&mut rec, &data_point_flag1));
-            assert!(rec.get(VALUE_LABEL).is_none());
+            assert!(process_data_point(&mut rec, &data_point_flag1));
+            assert_eq!(rec[VALUE_LABEL], json::Value::Null);
             assert_eq!(
                 data_point_flag(1),
                 "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK"
@@ -3759,18 +3779,21 @@ mod tests {
             );
         }
 
-        /// A staleness marker carries `NO_RECORDED_VALUE`; storing its value as a sample would
-        /// make a gap look like a real reading.
+        /// A `NO_RECORDED_VALUE` point ends the series with a NULL, never with its own value.
         #[test]
-        fn test_process_gauge_no_recorded_value_writes_no_record() {
+        fn test_process_gauge_no_recorded_value_writes_a_stale_marker() {
             let stale = NumberDataPoint {
                 flags: DataPointFlags::NoRecordedValueMask as u32,
+                time_unix_nano: 1640995260000000000,
                 ..number_dp(2.0, vec![attr("pod", "a")])
             };
             let records = gauge_records(vec![number_dp(1.0, vec![attr("pod", "a")]), stale]);
 
-            assert_eq!(records.len(), 1);
+            assert_eq!(records.len(), 2);
             assert_eq!(records[0][VALUE_LABEL], json!(1.0));
+            assert_eq!(records[1][VALUE_LABEL], json::Value::Null);
+            assert_eq!(records[1][TIMESTAMP_COL_NAME], json!(1640995260000000_i64));
+            assert_eq!(records[0][HASH_LABEL], records[1][HASH_LABEL]);
         }
 
         /// The flag is a bit mask, so it must be honoured when other bits are set too.
@@ -3781,7 +3804,56 @@ mod tests {
                 ..number_dp(2.0, vec![])
             };
 
-            assert!(sum_records(vec![stale]).is_empty());
+            let records = sum_records(vec![stale]);
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0][VALUE_LABEL], json::Value::Null);
+        }
+
+        #[test]
+        fn test_append_number_points_writes_a_stale_marker_as_a_null_value() {
+            use arrow::{
+                array::{Array, AsArray},
+                datatypes::Float64Type,
+            };
+
+            let rec = json!({"__name__": "requests"});
+            let stale = NumberDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                ..number_dp(2.0, vec![])
+            };
+            let fields = vec![
+                Field::new(NAME_LABEL, DataType::Utf8, true),
+                Field::new("start_time", DataType::Utf8, true),
+                Field::new("flag", DataType::Utf8, true),
+                Field::new(VALUE_LABEL, DataType::Float64, true),
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, true),
+            ];
+            let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
+
+            let rejected = append_number_points(&mut columnar, &rec, &[stale]);
+            assert!(rejected.is_empty());
+            let entries = columnar.into_entries("org", "requests").unwrap();
+            let batch = entries[0].batch.as_ref().unwrap();
+            let values = batch.column(3).as_primitive::<Float64Type>();
+            assert_eq!(values.len(), 1);
+            assert!(values.is_null(0));
+        }
+
+        #[test]
+        fn test_metric_records_with_only_stale_points_are_not_empty_but_only_stale() {
+            let stale = NumberDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                ..number_dp(2.0, vec![])
+            };
+            let points = [stale.clone()];
+            let records = MetricRecords::NumberPoints(&points);
+            assert!(!records.is_empty());
+            assert!(records.only_stale());
+
+            let points = [stale, number_dp(1.0, vec![])];
+            assert!(!MetricRecords::NumberPoints(&points).only_stale());
+            assert!(!MetricRecords::Json(vec![json!({})]).only_stale());
         }
 
         /// A flagged histogram would otherwise write zero `_count`/`_sum`/bucket rows, which

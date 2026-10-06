@@ -269,7 +269,7 @@ fn shape_instant_result(
     // in its window, so the matrix evaluation produced is already the answer. Collapsing it
     // would keep an arbitrary one of those samples and drop the rest.
     if expr.value_type() == ValueType::Matrix {
-        return (value, Some("matrix".to_string()));
+        return (without_stale_markers(value), Some("matrix".to_string()));
     }
 
     match value {
@@ -293,6 +293,22 @@ fn shape_instant_result(
         Value::None => (Value::None, Some("vector".to_string())),
         other => (other, result_type_exec),
     }
+}
+
+/// A range selector's samples as the answer shows them: stale markers are not samples.
+fn without_stale_markers(value: Value) -> Value {
+    let Value::Matrix(mut matrix) = value else {
+        return value;
+    };
+    // a series left with no sample is dropped, one that had none (exemplars only) is kept
+    matrix.retain_mut(|series| {
+        let loaded = series.samples.len();
+        series
+            .samples
+            .retain(|sample| !config::meta::promql::is_stale_marker(sample.value));
+        loaded == 0 || !series.samples.is_empty()
+    });
+    Value::Matrix(matrix)
 }
 
 #[cfg(test)]
@@ -454,6 +470,25 @@ mod tests {
 
         assert_eq!(result_type.as_deref(), Some("matrix"));
         assert_eq!(samples(&value), vec![(1000, 14.0), (3000, 45.0)]);
+    }
+
+    #[test]
+    fn test_instant_range_selector_leaves_out_stale_markers() {
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let value = Value::Matrix(vec![
+            RangeValue::new(
+                Labels::default(),
+                vec![Sample::new(1000, 14.0), Sample::new(3000, stale)],
+            ),
+            RangeValue::new(Labels::default(), vec![Sample::new(2000, stale)]),
+        ]);
+        let (value, _) = shaped("m[5m]", value);
+
+        let Value::Matrix(series) = &value else {
+            panic!("expected a matrix");
+        };
+        assert_eq!(series.len(), 1, "a series of only a marker has no samples");
+        assert_eq!(samples(&value), vec![(1000, 14.0)]);
     }
 
     #[test]

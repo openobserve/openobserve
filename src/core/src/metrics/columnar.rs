@@ -113,11 +113,12 @@ impl ColumnarStream {
     }
 
     /// `resolve_columns` must have accepted these labels first, and returned `label_bytes`.
+    /// A `None` value is a stale marker, written as a NULL cell.
     pub(super) fn append<L: LabelPair>(
         &mut self,
         labels: &[L],
         label_bytes: usize,
-        value: f64,
+        value: Option<f64>,
         timestamp: i64,
         hash: u64,
     ) {
@@ -127,9 +128,12 @@ impl ColumnarStream {
                 .column(*col, ColumnKind::Utf8)
                 .append_str(label.value());
         }
-        bucket
-            .column(self.value_col, ColumnKind::Float64)
-            .append_f64(value);
+        // a column the row gives no value reads NULL
+        if let Some(value) = value {
+            bucket
+                .column(self.value_col, ColumnKind::Float64)
+                .append_f64(value);
+        }
         bucket
             .column(self.timestamp_col, ColumnKind::Int64)
             .append_i64(timestamp);
@@ -256,9 +260,18 @@ fn estimated_label_bytes<L: LabelPair>(labels: &[L]) -> usize {
 }
 
 /// What `estimate_json_bytes` would count for this record, without building it.
-fn estimated_record_bytes(label_bytes: usize, value: f64, timestamp: i64, hash: u64) -> usize {
+fn estimated_record_bytes(
+    label_bytes: usize,
+    value: Option<f64>,
+    timestamp: i64,
+    hash: u64,
+) -> usize {
+    // OTLP's JSON path flattens a stale marker's NULL `value` away
+    let value_entry = value.map_or(0, |value| {
+        estimate_json_entry_bytes(VALUE_LABEL, value.json_bytes())
+    });
     let entries = label_bytes
-        + estimate_json_entry_bytes(VALUE_LABEL, value.json_bytes())
+        + value_entry
         + estimate_json_entry_bytes(TIMESTAMP_COL_NAME, timestamp.json_bytes())
         + estimate_json_entry_bytes(HASH_LABEL, hash.json_bytes());
     // {?} extra 2, less the ',' the entry rule counts for the last entry
@@ -296,10 +309,41 @@ mod tests {
         ];
 
         let label_bytes = columnar.resolve_columns(&labels).unwrap();
-        columnar.append(&labels, label_bytes, 1.5, 1_700_000_000_000_000, 42);
+        columnar.append(&labels, label_bytes, Some(1.5), 1_700_000_000_000_000, 42);
         let entries = columnar.into_entries("nexus", "http_requests").unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].batch.as_ref().unwrap().num_rows(), 1);
+    }
+
+    #[test]
+    fn test_append_writes_a_stale_marker_as_a_null_value() {
+        use datafusion::arrow::{
+            array::{Array, AsArray},
+            datatypes::Float64Type,
+        };
+
+        let schema = columnar_schema(&[NAME_LABEL]);
+        let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
+        let labels = vec![(NAME_LABEL.to_string(), "up".to_string())];
+        let label_bytes = columnar.resolve_columns(&labels).unwrap();
+        columnar.append(&labels, label_bytes, Some(1.0), 1_700_000_000_000_000, 42);
+        columnar.append(&labels, label_bytes, None, 1_700_000_000_000_001, 42);
+
+        let entries = columnar.into_entries("nexus", "up").unwrap();
+        let batch = entries[0].batch.as_ref().unwrap();
+        let values = batch
+            .column(schema.index_of(VALUE_LABEL).unwrap())
+            .as_primitive::<Float64Type>();
+        assert_eq!(values.len(), 2);
+        assert!(values.is_valid(0));
+        assert!(values.is_null(1));
+    }
+
+    #[test]
+    fn test_estimated_record_bytes_counts_no_value_for_a_stale_marker() {
+        let marker = estimated_record_bytes(0, None, 5, 42);
+        let sample = estimated_record_bytes(0, Some(1.0), 5, 42);
+        assert_eq!(sample - marker, estimate_json_entry_bytes(VALUE_LABEL, 3));
     }
 
     #[test]
@@ -351,7 +395,7 @@ mod tests {
         let record = map;
 
         assert_eq!(
-            estimated_record_bytes(estimated_label_bytes(&labels), value, timestamp, hash),
+            estimated_record_bytes(estimated_label_bytes(&labels), Some(value), timestamp, hash),
             json::estimate_json_bytes(&json::Value::Object(record))
         );
     }
@@ -426,7 +470,7 @@ mod tests {
         let timestamps = [-3_601_000_000_i64, -1_000_000, 1_000_000];
         let label_bytes = columnar.resolve_columns(&labels).unwrap();
         for ts in timestamps {
-            columnar.append(&labels, label_bytes, 1.0, ts, 42);
+            columnar.append(&labels, label_bytes, Some(1.0), ts, 42);
         }
 
         let entries = columnar.into_entries("nexus", "http_requests").unwrap();

@@ -15,9 +15,12 @@
 
 use std::{sync::Arc, time::Duration};
 
-use config::meta::promql::value::{
-    CounterSeries, EvalContext, ExtrapolationKind, Label, Labels, LabelsExt, RangeValue, Sample,
-    Value,
+use config::meta::promql::{
+    is_stale_marker,
+    value::{
+        CounterSeries, EvalContext, ExtrapolationKind, Label, Labels, LabelsExt, RangeValue,
+        Sample, Value,
+    },
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
@@ -213,6 +216,10 @@ impl<T: RangeFunc + ?Sized> RangeFunc for Box<T> {
     fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
         (**self).counter_extrapolation()
     }
+
+    fn reads_stale_markers(&self) -> bool {
+        (**self).reads_stale_markers()
+    }
 }
 
 impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
@@ -226,6 +233,10 @@ impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
 
     fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
         (**self).counter_extrapolation()
+    }
+
+    fn reads_stale_markers(&self) -> bool {
+        (**self).reads_stale_markers()
     }
 }
 
@@ -297,6 +308,11 @@ pub trait RangeFunc: Send + Sync {
     /// replace the per-window reset scan with a per-series prefix.
     fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
         None
+    }
+
+    /// Only a bare selector's lookback reads stale markers; every range function ignores them.
+    fn reads_stale_markers(&self) -> bool {
+        false
     }
 }
 
@@ -386,7 +402,14 @@ pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
 
 /// The range function a bare instant selector streams as; it keeps the metric name.
 pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
-    std::sync::Arc::new(last_over_time::LastOverTimeFunc)
+    std::sync::Arc::new(last_over_time::InstantLookbackFunc)
+}
+
+/// Removes the stale markers `func` ignores, before its windows or its `CounterSeries` see them.
+pub(crate) fn drop_stale_markers<F: RangeFunc + ?Sized>(samples: &mut Vec<Sample>, func: &F) {
+    if !func.reads_stale_markers() {
+        samples.retain(|sample| !is_stale_marker(sample.value));
+    }
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -444,6 +467,7 @@ where
             }
             let time_window = metric.time_window.as_ref().unwrap();
             let range = time_window.range;
+            drop_stale_markers(&mut metric.samples, &func);
             let mut result_samples = Vec::with_capacity(timestamps.len());
             result_samples.extend(
                 SeriesRange::new(&metric.samples, &func, range, eval_ctx, &timestamps)

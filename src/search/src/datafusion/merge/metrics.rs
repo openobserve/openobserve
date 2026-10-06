@@ -1059,17 +1059,49 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_samples_fail_merge() {
+    async fn stale_marker_compacts_into_the_block() {
+        let stale = config::meta::promql::STALE_NAN_BITS;
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let schema = block_schema(None, false);
-            let rows = [(1, 10, Some(1f64.to_bits())), (2, 20, None)];
+            let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, None), (2, 20, None)];
             let mut output = block_output();
             output.file_format = format;
-            let error = produce(&schema, vec![block_batch(&schema, &rows)], output)
+            let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
-                .err()
-                .expect("invalid samples must fail the merge");
-            assert!(error.to_string().contains("nullable samples unsupported"));
+                .unwrap()
+                .remove(0);
+            assert!(matches!(file, MergedFile::MetricsIndexed { .. }));
+            let (data, meta, path) = file.into_upload_parts().await.unwrap();
+            let data = bytes::Bytes::from(data);
+            assert_eq!(sample_rows_for(format, data.clone()).await, rows);
+            let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
+            let parent = metrics_index::block::ParentMetadata {
+                rows: meta.records as u64,
+                compressed_size: data.len() as u64,
+            };
+            let index =
+                metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
+            let mut decoded = Vec::new();
+            for block in &index.blocks {
+                let range = block.block_range();
+                let samples = metrics_index::block::decode_block(
+                    &encoded[range.start as usize..range.end as usize],
+                    &block,
+                )
+                .unwrap();
+                decoded.extend(
+                    samples
+                        .timestamps
+                        .into_iter()
+                        .zip(samples.value_bits)
+                        .map(|(time, value)| (block.hash, time, value)),
+                );
+            }
+            assert_eq!(
+                decoded,
+                vec![(1, 10, 1f64.to_bits()), (1, 20, stale), (2, 20, stale)],
+                "{format:?}"
+            );
         }
     }
 

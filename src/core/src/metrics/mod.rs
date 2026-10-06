@@ -19,7 +19,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         alerts::{alert, level::PAYLOAD_SAMPLE_ROWS},
-        promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata, VALUE_LABEL},
+        promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata, VALUE_LABEL, is_stale_marker},
     },
     utils::{
         hash::{Sum64, gxhash},
@@ -70,6 +70,37 @@ impl LabelPair for (std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>) {
     }
 }
 
+/// What the value policy makes of one sample.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SanitizedValue {
+    Value(f64),
+    /// A Prometheus staleness marker, stored as a NULL `value`.
+    Stale,
+    Drop,
+}
+
+impl SanitizedValue {
+    /// The row's `value` cell: `Some(None)` is a stale marker's NULL, `None` writes no row.
+    pub fn row_value(self) -> Option<Option<f64>> {
+        match self {
+            Self::Value(v) => Some(Some(v)),
+            Self::Stale => config::get_config()
+                .prom
+                .staleness_markers_enabled
+                .then_some(None),
+            Self::Drop => None,
+        }
+    }
+
+    /// The value for a path that cannot carry a stale marker.
+    pub fn value(self) -> Option<f64> {
+        match self {
+            Self::Value(v) => Some(v),
+            Self::Stale | Self::Drop => None,
+        }
+    }
+}
+
 /// An alert's pending notification for the request being ingested.
 struct TriggerSlot {
     idx: usize,
@@ -83,28 +114,34 @@ struct TriggerSlot {
 /// itself represents no data, and a NaN written through serde_json becomes `Value::Null` --
 /// an all-null column is never inferred into the Arrow schema, so the stream it lands in can
 /// never be read by PromQL while still costing full ingest, storage and replication.
+/// The one exception is the staleness-marker NaN, which is [`SanitizedValue::Stale`].
 /// Infinities clamp to the f64 bounds.
 ///
 /// All three ingestion paths go through here: OTLP (`otlp.rs`), remote-write (`prom.rs`) and
 /// JSON (`json.rs`). JSON has no NaN or infinity *literal*, but `1e400` is a valid JSON number
 /// whose value is an infinity, so it is not exempt.
-pub fn sanitize_metric_value(v: f64) -> Option<f64> {
+pub fn sanitize_metric_value(v: f64) -> SanitizedValue {
+    if is_stale_marker(v) {
+        return SanitizedValue::Stale;
+    }
     if v.is_nan() {
-        return None;
+        return SanitizedValue::Drop;
     }
     if v == f64::INFINITY {
-        Some(f64::MAX)
+        SanitizedValue::Value(f64::MAX)
     } else if v == f64::NEG_INFINITY {
-        Some(f64::MIN)
+        SanitizedValue::Value(f64::MIN)
     } else {
-        Some(v)
+        SanitizedValue::Value(v)
     }
 }
 
 /// [`sanitize_metric_value`], as the JSON a record carries. `None` means the record must not
 /// be written at all.
 pub fn metric_value(v: f64) -> Option<config::utils::json::Value> {
-    sanitize_metric_value(v).map(|v| config::utils::json::json!(v))
+    sanitize_metric_value(v)
+        .value()
+        .map(|v| config::utils::json::json!(v))
 }
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
@@ -365,22 +402,42 @@ mod tests {
     /// back), so it is asserted on its own and not only through `metric_value`.
     #[test]
     fn test_sanitize_metric_value() {
-        assert!(sanitize_metric_value(f64::NAN).is_none());
-        assert_eq!(sanitize_metric_value(f64::INFINITY), Some(f64::MAX));
-        assert_eq!(sanitize_metric_value(f64::NEG_INFINITY), Some(f64::MIN));
-        assert_eq!(sanitize_metric_value(0.0), Some(0.0));
-        assert_eq!(sanitize_metric_value(-1.5), Some(-1.5));
-        assert_eq!(sanitize_metric_value(f64::MAX), Some(f64::MAX));
-        assert_eq!(sanitize_metric_value(f64::MIN), Some(f64::MIN));
+        use SanitizedValue::*;
+        assert_eq!(sanitize_metric_value(f64::NAN), Drop);
+        assert_eq!(sanitize_metric_value(f64::INFINITY), Value(f64::MAX));
+        assert_eq!(sanitize_metric_value(f64::NEG_INFINITY), Value(f64::MIN));
+        assert_eq!(sanitize_metric_value(0.0), Value(0.0));
+        assert_eq!(sanitize_metric_value(-1.5), Value(-1.5));
+        assert_eq!(sanitize_metric_value(f64::MAX), Value(f64::MAX));
+        assert_eq!(sanitize_metric_value(f64::MIN), Value(f64::MIN));
         assert_eq!(
             sanitize_metric_value(f64::MIN_POSITIVE),
-            Some(f64::MIN_POSITIVE)
+            Value(f64::MIN_POSITIVE)
         );
+    }
+
+    #[test]
+    fn test_sanitize_metric_value_keeps_only_the_stale_nan_as_a_marker() {
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        assert_eq!(sanitize_metric_value(stale), SanitizedValue::Stale);
+        // a quiet NaN with another payload is an ordinary NaN
+        assert_eq!(
+            sanitize_metric_value(f64::from_bits(0x7ff8_0000_0000_0002)),
+            SanitizedValue::Drop
+        );
+    }
+
+    #[test]
+    fn test_row_value_writes_a_stale_marker_as_a_null_cell() {
+        assert_eq!(SanitizedValue::Value(1.5).row_value(), Some(Some(1.5)));
+        assert_eq!(SanitizedValue::Stale.row_value(), Some(None));
+        assert_eq!(SanitizedValue::Drop.row_value(), None);
     }
 
     #[test]
     fn test_metric_value_drops_nan() {
         assert!(metric_value(f64::NAN).is_none());
+        assert!(metric_value(f64::from_bits(config::meta::promql::STALE_NAN_BITS)).is_none());
     }
 
     #[test]
