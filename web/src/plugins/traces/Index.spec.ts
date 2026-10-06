@@ -14,10 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
+import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import Index from "@/plugins/traces/Index.vue";
 import DateTime from "@/components/DateTime.vue";
+import QueryErrorState from "@/components/common/QueryErrorState.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -963,12 +965,9 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Error Handling", () => {
-    it("should display error message when query fails", async () => {
+    const mountForErrors = async () => {
       mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
-      mockSearchObj.data.errorMsg = "Query failed";
-      mockSearchObj.data.errorCode = 429; // Non-zero code → real error, not "no data"
-      mockSearchObj.loading = false;
-
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -980,72 +979,109 @@ describe("Index.vue (Main Traces Page)", () => {
             "search-result": true,
             "service-graph": true,
             "services-catalog": true,
-            SanitizedHtmlRenderer: true,
           },
         },
       });
-
       await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+    };
 
-      expect(wrapper.find('[data-test="traces-search-error-message"]').exists()).toBe(true);
-    });
+    // searchObj.data is a plain object in this suite, so the page and its splitter slots re-render by hand.
+    const rerender = async () => {
+      wrapper.vm.$forceUpdate();
+      wrapper.findAllComponents(OSplitter).forEach((splitter) => splitter.vm.$forceUpdate());
+      await nextTick();
+    };
 
-    it("should show no traces found when errorCode is 0", async () => {
-      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
-      mockSearchObj.data.errorMsg = "No data found";
+    const failSearch = async (err: unknown) => {
+      const handlers: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation(function (
+        this: unknown,
+        _req: unknown,
+        h: any,
+      ) {
+        if (this === wrapper.vm.$) handlers.push(h);
+      });
+      await wrapper.vm.getQueryData();
+      await rerender();
+      handlers[handlers.length - 1].error({}, err);
+      await rerender();
+    };
+
+    const errorState = () =>
+      wrapper.find('[data-test="traces-search-error-message"] [data-test="query-error-state"]');
+
+    afterEach(() => {
+      mockFetchQueryDataWithHttpStream.mockReset();
       mockSearchObj.data.errorCode = 0;
-      mockSearchObj.loading = false;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="traces-search-error-text"]').exists()).toBe(true);
+      mockSearchObj.data.errorDetail = "";
     });
 
-    it("should display error code 20003 with configuration link", async () => {
-      mockSearchObj.data.stream.streamLists = [{ label: "test-stream", value: "test-stream" }];
-      mockSearchObj.data.stream.selectedStream = {
-        label: "test-stream",
-        value: "test-stream",
-      };
-      mockSearchObj.data.errorMsg = "Full text search not configured";
-      mockSearchObj.data.errorCode = 20003;
-      mockSearchObj.loading = false;
+    it("renders a planning error with its raw detail hidden", async () => {
+      await mountForErrors();
 
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
+      await failSearch({
+        content: {
+          message: "Search SQL execute error",
+          code: 400,
+          error_detail: "Error during planning: No field named foo",
         },
       });
 
-      await flushPromises();
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-detail-summary"]').text()).toContain(
+        "Search SQL execute error",
+      );
+      expect(wrapper.find('[data-test="error-detail-body"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Error during planning");
+      expect(wrapper.findComponent(QueryErrorState).props("errorCode")).toBe(0);
+    });
 
-      expect(wrapper.find('[data-test="traces-search-error-20003"]').exists()).toBe(true);
+    it("hides the details again on a later error after they were opened", async () => {
+      await mountForErrors();
+      const planningError = {
+        content: { message: "Search SQL execute error", code: 400, error_detail: "raw planner" },
+      };
+
+      await failSearch(planningError);
+      await wrapper.find('[data-test="error-detail-toggle-btn"]').trigger("click");
+      expect(wrapper.find('[data-test="error-detail-body"]').text()).toContain("raw planner");
+
+      await failSearch(planningError);
+
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-detail-body"]').exists()).toBe(false);
+    });
+
+    it("shows the summary of an unauthorized error", async () => {
+      await mountForErrors();
+
+      await failSearch({ content: { message: "Unauthorized Access", code: 403 } });
+
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-detail-summary"]').text()).toBe("Unauthorized Access");
+    });
+
+    it("shows generic text for a network error without a code", async () => {
+      await mountForErrors();
+
+      await failSearch({});
+
+      expect(errorState().exists()).toBe(true);
+      expect(errorState().text()).toContain(i18n.global.t("queryError.generic"));
+      expect(wrapper.find('[data-test="error-detail-summary"]').text()).toBe(
+        i18n.global.t("traces.index.errorProcessingRequest"),
+      );
+    });
+
+    it("keeps an application error code for the shared error state", async () => {
+      await mountForErrors();
+
+      await failSearch({ content: { message: "Full text search not configured", code: 20003 } });
+
+      expect(wrapper.findComponent(QueryErrorState).props("errorCode")).toBe(20003);
     });
   });
 
@@ -3310,6 +3346,135 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.editorValue).toBe(before);
       expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
       expect(ownSearches()).toHaveLength(0);
+    });
+
+    describe("keeps datetime on the searched window", () => {
+      const NOW = Date.UTC(2026, 9, 6, 12, 0, 0);
+      const MIN = 60 * 1000;
+      const THREE_DAYS = 3 * 24 * 60 * MIN;
+      const staleRelative = {
+        type: "relative",
+        relativeTimePeriod: "15m",
+        startTime: (NOW - THREE_DAYS - 15 * MIN) * 1000,
+        endTime: (NOW - THREE_DAYS) * 1000,
+      };
+
+      const ownRequests = () => {
+        const { calls, contexts } = mockFetchQueryDataWithHttpStream.mock;
+        return calls.filter((_c, i) => contexts[i] === wrapper.vm.$).map((c: any) => c[0].queryReq);
+      };
+      const lastWindow = () => {
+        const req = ownRequests().at(-1);
+        return {
+          startTime: req.query?.start_time ?? req.start_time,
+          endTime: req.query?.end_time ?? req.end_time,
+        };
+      };
+      const datetimeWindow = () => ({
+        startTime: mockSearchObj.data.datetime.startTime,
+        endTime: mockSearchObj.data.datetime.endTime,
+      });
+
+      beforeEach(() => {
+        vi.setSystemTime(NOW);
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("moves a stale relative view's datetime onto the request window ending now", async () => {
+        await mountPage();
+
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        expect(datetimeWindow()).toEqual(lastWindow());
+        expect(datetimeWindow()).toEqual({
+          startTime: (NOW - 15 * MIN) * 1000,
+          endTime: NOW * 1000,
+        });
+      });
+
+      it("moves the window forward when the view is applied again later", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        vi.setSystemTime(NOW + 5 * MIN);
+        mockFetchQueryDataWithHttpStream.mockClear();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        expect(datetimeWindow().endTime).toBe((NOW + 5 * MIN) * 1000);
+        expect(datetimeWindow()).toEqual(lastWindow());
+      });
+
+      it("updates datetime when Run query fires after time has passed", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+
+        vi.setSystemTime(NOW + 7 * MIN);
+        wrapper.vm.searchData();
+        await drain();
+
+        expect(datetimeWindow().endTime).toBe((NOW + 7 * MIN) * 1000);
+        expect(datetimeWindow()).toEqual(lastWindow());
+      });
+
+      it("leaves an absolute view's datetime unchanged", async () => {
+        await mountPage();
+
+        await applyViewAndWaitForSearch(savedView());
+
+        expect(datetimeWindow()).toEqual({ startTime: 111, endTime: 222 });
+        expect(lastWindow()).toEqual({ startTime: 111, endTime: 222 });
+      });
+
+      it("sorts on the last request's window without moving datetime", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(savedView({ datetime: staleRelative }));
+        const searched = lastWindow();
+
+        vi.setSystemTime(NOW + 5 * MIN);
+        wrapper.vm.runQueryOnSort();
+        await drain();
+
+        expect(datetimeWindow()).toEqual(searched);
+        expect(lastWindow()).toEqual(searched);
+      });
+    });
+
+    describe("paging keeps page 1's filter", () => {
+      const lastFilter = () => {
+        const { calls, contexts } = mockFetchQueryDataWithHttpStream.mock;
+        const own = calls.filter((_c, i) => contexts[i] === wrapper.vm.$);
+        return (own.at(-1) as any)[0].queryReq.filter;
+      };
+
+      afterEach(() => {
+        mockSearchObj.data.resultGrid.currentPage = 0;
+      });
+
+      it("pages with the submitted filter after the editor changes, until a new Run", async () => {
+        await mountPage();
+        await applyViewAndWaitForSearch(
+          savedView({ searchMode: "traces", editorValue: "service_name = 'a'" }),
+        );
+        expect(lastFilter()).toBe("service_name = 'a'");
+
+        mockSearchObj.data.editorValue = "service_name = 'b'";
+        mockSearchObj.data.resultGrid.currentPage = 1;
+        wrapper.vm.getMoreData();
+        await drain();
+        expect(lastFilter()).toBe("service_name = 'a'");
+
+        wrapper.vm.searchData();
+        await drain();
+        expect(lastFilter()).toBe("service_name = 'b'");
+
+        mockSearchObj.data.resultGrid.currentPage = 1;
+        wrapper.vm.getMoreData();
+        await drain();
+        expect(lastFilter()).toBe("service_name = 'b'");
+      });
     });
   });
 

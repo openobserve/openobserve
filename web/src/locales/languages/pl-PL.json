@@ -10525,11 +10525,9 @@
       "or": "Lub:",
       "askAi": "Poproś AI o skonfigurowanie śledzenia"
     },
-    "configureFullTextSearch": "aby skonfigurować pole wyszukiwania pełnotekstowego dla strumienia.",
     "collapseFields": "Zwiń pola",
     "openFields": "Rozwiń pola",
     "timeRangeUpdated": "Wybrany zakres czasu nie obejmował tego śladu. Zakres czasu został zaktualizowany, aby pasował do znacznika czasu śladu.",
-    "errorRetrievingTraces": "Wystąpił błąd podczas pobierania śladów.",
     "fetchingTraces": "Ładowanie śladów...",
     "noStream": {
       "title": "Wybierz strumień, aby rozpocząć eksplorację",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Zobacz trend zapytań w monitorowaniu bazy danych"
     },
     "index": {
-      "clickHere": "Kliknij tutaj",
       "changeStreamTitle": "Zmienić strumień?",
       "switchStream": "Przełącz strumień",
       "cancel": "Anuluj",
