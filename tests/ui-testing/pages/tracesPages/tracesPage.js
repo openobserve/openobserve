@@ -6,7 +6,7 @@ import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocat
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 
-// Panel titles rendered by web/src/plugins/traces/metrics/metrics.json.
+// Rate and Errors come from web/src/plugins/traces/metrics/metrics.json; Duration is the latency heatmap.
 const TRACES_METRICS_PANELS = ['Rate', 'Errors', 'Duration'];
 const CHART_ZOOM_START_RATIO = 0.35;
 const CHART_ZOOM_END_RATIO = 0.75;
@@ -132,11 +132,10 @@ export class TracesPage {
     // No-stream prompt rendered before a stream is selected
     // Source: web/src/plugins/traces/TracesNoStreamState.vue
     this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
-    // Right-click Duration gte/lte context menu
-    // Source: web/src/plugins/traces/metrics/TracesMetricsContextMenu.vue
-    this.metricsContextMenu = '[data-test="traces-metrics-context-menu"]';
-    this.metricsContextMenuGte = '[data-test="context-menu-gte"]';
-    this.metricsContextMenuLte = '[data-test="context-menu-lte"]';
+    // Duration latency heatmap — source: web/src/plugins/traces/metrics/TracesLatencyHeatmap.vue
+    this.latencyHeatmap = '[data-test="traces-latency-heatmap"]';
+    // Auto Run (live mode) toggle in the Run Query dropdown — source: web/src/plugins/traces/SearchBar.vue
+    this.liveModeToggleItem = '[data-test="traces-search-bar-live-mode-toggle-btn"]';
     // Analysis Dashboard Tabs — source: web/src/plugins/traces/metrics/TracesAnalysisDashboard.vue
     // Tabs render as <OTab data-test="traces-analysis-dashboard-${name}-tab"> where name ∈ {volume,duration,error}
     this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"]';
@@ -2221,6 +2220,9 @@ export class TracesPage {
    * @param {string} title - Panel title: 'Rate', 'Errors' or 'Duration'
    */
   metricsPanelLocator(title) {
+    if (title === 'Duration') {
+      return this.page.locator(`${this.tracesMetricsDashboard} ${this.latencyHeatmap}`);
+    }
     return this.page.locator(
       `${this.tracesMetricsDashboard} [data-test-panel-title="${title}"]`
     );
@@ -2542,174 +2544,32 @@ export class TracesPage {
       .catch(() => false);
   }
 
-  // --- Right-click Context Menu (TracesMetricsContextMenu.vue) ---
+  // --- Auto Run (live mode) ---
 
   /**
-   * Record which metrics panel each contextmenu event reaches.
-   * Capture phase runs before ChartRenderer's handler, so the record survives its
-   * stopPropagation() and a "menu did not open" result can be told apart from a
-   * right-click that simply missed the canvas.
+   * Switch Auto Run on or off through the Run Query dropdown.
+   * @param {boolean} on - Desired state
+   * @returns {Promise<boolean>} false when the env has auto_query_enabled off, so live mode cannot be turned on
    */
-  async armMetricsContextMenuProbe() {
-    await this.page.evaluate(() => {
-      window.__o2CtxMenuHits = [];
-      if (window.__o2CtxMenuProbe) return;
-      window.__o2CtxMenuProbe = (e) => {
-        const panel = e.target && e.target.closest && e.target.closest('[data-test-panel-title]');
-        if (panel) window.__o2CtxMenuHits.push(panel.getAttribute('data-test-panel-title'));
-      };
-      document.addEventListener('contextmenu', window.__o2CtxMenuProbe, true);
+  async setLiveMode(on) {
+    const enabled = await this.page.evaluate(async () => {
+      try {
+        const org = new URLSearchParams(location.search).get('org_identifier') || 'default';
+        const res = await fetch(`/api/${org}/config`, { credentials: 'include' });
+        return res.ok && (await res.json())?.auto_query_enabled === true;
+      } catch {
+        return false;
+      }
     });
-  }
-
-  /**
-   * Panel titles that received a contextmenu event since the probe was armed.
-   * @returns {Promise<string[]>}
-   */
-  async getMetricsContextMenuProbeHits() {
-    return await this.page.evaluate(() => window.__o2CtxMenuHits || []);
-  }
-
-  /**
-   * Viewport points on a panel canvas that sit on a plotted series mark.
-   * ECharts fires its contextmenu event only on a data item, and Duration is a
-   * scatter of 5px dots, so a right-click on empty plot space never reaches it.
-   * Scans the canvas for saturated (series-coloured) pixels whose 3x3 neighbourhood
-   * is also coloured, i.e. the inside of a mark rather than an anti-aliased edge.
-   * @param {import('@playwright/test').Locator} canvas
-   * @param {number} max - Maximum number of points to return
-   * @returns {Promise<{x: number, y: number}[]>}
-   */
-  async findPlottedPoints(canvas, max = 5) {
-    return await canvas.evaluate((el, limit) => {
-      const ctx = el.getContext('2d');
-      if (!ctx || !el.width || !el.height) return [];
-      const { data, width, height } = ctx.getImageData(0, 0, el.width, el.height);
-      const coloured = (x, y) => {
-        const i = (y * width + x) * 4;
-        const r = data[i], g = data[i + 1], b = data[i + 2];
-        return data[i + 3] > 200 && Math.max(r, g, b) - Math.min(r, g, b) > 60;
-      };
-      const rect = el.getBoundingClientRect();
-      const sx = rect.width / width, sy = rect.height / height;
-      const points = [];
-      const step = Math.max(1, Math.floor(width / 200));
-      for (let x = 1; x < width - 1 && points.length < limit; x += step) {
-        for (let y = 1; y < height - 1; y++) {
-          if (!coloured(x, y)) continue;
-          let solid = true;
-          for (let dx = -1; dx <= 1 && solid; dx++) {
-            for (let dy = -1; dy <= 1 && solid; dy++) solid = coloured(x + dx, y + dy);
-          }
-          if (!solid) continue;
-          points.push({ x: rect.left + x * sx, y: rect.top + y * sy });
-          x += Math.floor(width / limit);
-          break;
-        }
-      }
-      return points;
-    }, max);
-  }
-
-  /**
-   * Right-click a plotted point of a metrics panel chart to open the Duration-only
-   * gte/lte context menu, retrying because ECharts arms its contextmenu handler a
-   * beat after the panel data resolves. Falls back to the canvas centre when no
-   * plotted point can be located.
-   * @param {string} title - Panel title ('Duration', 'Rate', 'Errors')
-   * @returns {Promise<{ dispatched: boolean, opened: boolean }>} whether the
-   *   right-click reached the panel, and whether the menu opened
-   */
-  async openMetricsContextMenu(title = 'Duration') {
-    await this.armMetricsContextMenuProbe();
-    const canvas = this.metricsPanelLocator(title).locator('canvas').first();
-    const ready = await canvas
-      .waitFor({ state: 'visible', timeout: 10000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!ready) return { dispatched: false, opened: false };
-    const box = await canvas.boundingBox();
-    if (!box) return { dispatched: false, opened: false };
-    // ECharts stacks canvas layers, so a locator click hits the wrong one — drive the mouse instead.
-    const points = await this.findPlottedPoints(canvas);
-    const targets = points.length ? points : [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
-    let opened = false;
-    for (let attempt = 0; attempt < 3 && !opened; attempt++) {
-      for (const point of targets) {
-        await this.page.mouse.click(point.x, point.y, { button: 'right' });
-        opened = await this.isMetricsContextMenuVisible(1000);
-        if (opened) break;
-      }
-    }
-    const hits = await this.getMetricsContextMenuProbeHits();
-    return { dispatched: hits.includes(title), opened };
-  }
-
-  /**
-   * Whether the metrics context menu is currently open.
-   * @param {number} timeout - How long to wait for it to appear
-   * @returns {Promise<boolean>}
-   */
-  async isMetricsContextMenuVisible(timeout = 3000) {
-    return await this.page
-      .locator(this.metricsContextMenu)
-      .waitFor({ state: 'visible', timeout })
-      .then(() => true)
-      .catch(() => false);
-  }
-
-  /**
-   * Assert the metrics context menu is visible.
-   */
-  async expectMetricsContextMenuVisible() {
-    await expect(this.page.locator(this.metricsContextMenu)).toBeVisible({ timeout: 10000 });
-  }
-
-  /**
-   * Assert the metrics context menu is hidden.
-   */
-  async expectMetricsContextMenuHidden() {
-    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 5000 });
-  }
-
-  /**
-   * Assert the metrics context menu never opens. A right-click on a non-Duration
-   * panel must be a no-op, so settle briefly (a buggy late render is caught) then
-   * assert the menu is still absent.
-   */
-  async expectMetricsContextMenuStaysHidden() {
-    await this.page.waitForTimeout(600);
-    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 1000 });
-  }
-
-  /**
-   * Whether a context menu item is visible.
-   * @param {'gte'|'lte'} condition
-   * @returns {Promise<boolean>}
-   */
-  async isMetricsContextMenuItemVisible(condition) {
-    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
-    return await this.page
-      .locator(selector)
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
-  }
-
-  /**
-   * Click a context menu item to write a single-sided duration bound.
-   * @param {'gte'|'lte'} condition
-   */
-  async selectMetricsContextMenuItem(condition) {
-    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
-    await this.page.locator(selector).click();
-  }
-
-  /**
-   * Dismiss the metrics context menu with Escape.
-   */
-  async dismissMetricsContextMenu() {
-    await this.page.keyboard.press('Escape');
+    if (!enabled) return !on;
+    await this.page.locator(this.refreshButton).locator('xpath=following::button[1]').click();
+    const item = this.page.locator(this.liveModeToggleItem);
+    await expect(item).toBeVisible({ timeout: 5000 });
+    const wanted = on ? 'Turn on' : 'Turn off';
+    if (((await item.textContent()) || '').includes(wanted)) await item.click();
+    else await this.page.keyboard.press('Escape');
+    await item.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    return true;
   }
 
   /**

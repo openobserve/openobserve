@@ -5,12 +5,12 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ingestTraces } = require('../utils/trace-ingestion.js');
 
-// TracesMetricsDashboard.emitFiltersToQueryEditor writes duration filters as human-readable strings.
-const DURATION_FILTER_PATTERN = /duration\s*(>=|<=)\s*'[\d.]+(us|ms|s|m)'/;
-const DURATION_GTE_PATTERN = /duration\s*>=\s*'[\d.]+(us|ms|s|m)'/;
-const DURATION_LTE_PATTERN = /duration\s*<=\s*'[\d.]+(us|ms|s|m)'/;
-// A two-sided bound; a context-menu selection must be single-sided, never this.
-const DURATION_RANGE_PATTERN = /and\s+duration\s*(>=|<=)/;
+// A heatmap box writes its half-open band with exact 1-2-5 bounds.
+const DURATION_FILTER_PATTERN = /duration\s*(>=|<)\s*'\d+(us|ms|s)'/;
+const HEATMAP_BAND_PATTERN =
+  /^duration >= '\d+(us|ms|s)'( and duration < '\d+(us|ms|s)')?$|^duration < '\d+(us|ms|s)'$/;
+const USER_DURATION_FILTER = "duration >= '1ms'";
+const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
 // The Insights query fails server-side when that string is not decoded back to µs.
 const CAST_ERROR_PATTERN = /Cannot cast string|simplify_expressions|Arrow error/i;
 const RED_PANELS = ['Rate', 'Errors', 'Duration'];
@@ -484,89 +484,104 @@ test.describe("Traces Charts testcases", () => {
     expect(pageErrors, `Uncaught errors: ${pageErrors.join(' | ')}`).toHaveLength(0);
   });
 
-  // ─── Right-click Duration gte/lte context menu (Workflow 3) ────────────────
+  // ─── Heatmap box → span table → Drill down (triage loop) ─────────────────
 
-  test("P1: Right-click Duration opens the gte/lte context menu and dismisses on Escape", {
-    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
+  // The table search: traces mode posts `filter`, spans mode posts a base64 `SELECT *` SQL.
+  const tableFilterOf = (request) => {
+    if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
+    const body = request.postDataJSON?.() ?? null;
+    if (!body) return null;
+    if (typeof body.filter === 'string' && body.stream_name) return body.filter;
+    const sql = decodedSqlOf(body);
+    return sql && /^SELECT \* FROM/.test(sql) ? sql : null;
+  };
 
-    await searchAndShowCharts();
+  function decodedSqlOf(body) {
+    const query = body?.query ?? {};
+    const sql = query.sql ?? body?.sql;
+    if (typeof sql !== 'string') return null;
+    const base64 = body.encoding === 'base64' || query.encoding === 'base64';
+    return base64 ? Buffer.from(sql, 'base64').toString('utf8') : sql;
+  }
 
-    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Duration');
-    expect(dispatched, 'Right-click must reach the Duration panel').toBeTruthy();
-    expect(opened, 'Duration right-click must open the gte/lte menu').toBeTruthy();
+  const comparisonSqlOf = (request) => {
+    if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
+    const sql = decodedSqlOf(request.postDataJSON?.() ?? null);
+    return sql && sql.includes("'Selected' AS series") ? sql : null;
+  };
 
-    await pm.tracesPage.expectMetricsContextMenuVisible();
-    expect(await pm.tracesPage.isMetricsContextMenuItemVisible('gte'), 'gte item must render').toBeTruthy();
-    expect(await pm.tracesPage.isMetricsContextMenuItemVisible('lte'), 'lte item must render').toBeTruthy();
+  // The band's bounds in µs; a missing side is 0 below and unbounded above.
+  const bandBoundsUs = (band) => {
+    const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
+    return {
+      lo: toUs(band.match(/duration >= '(\d+)(us|ms|s)'/)) ?? 0,
+      hi: toUs(band.match(/duration < '(\d+)(us|ms|s)'/)),
+    };
+  };
 
-    await pm.tracesPage.dismissMetricsContextMenu();
-    await pm.tracesPage.expectMetricsContextMenuHidden();
-  });
+  for (const live of [false, true]) {
+    test(`P1: A heatmap box filters the table and Drill down compares it to the pre-box filter (live mode ${live ? 'on' : 'off'})`, {
+      tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
+    }, async ({ page }) => {
+      test.setTimeout(180000);
 
-  test("P1: Right-click Duration then gte writes a single-sided duration >= filter", {
-    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
+      await searchAndShowCharts();
+      const liveModeSet = await pm.tracesPage.setLiveMode(live);
+      test.skip(!liveModeSet, 'auto_query_enabled is off on this environment, so live mode cannot be turned on');
 
-    await searchAndShowCharts();
+      expect(await pm.tracesPage.typeTraceQuery(USER_DURATION_FILTER), 'User filter must land').toBeTruthy();
+      await pm.tracesPage.runTraceSearch();
+      await pm.tracesPage.waitForTraceSearchResults();
+      expect((await pm.tracesPage.waitForMetricsPanels()).includes('Duration'), 'Heatmap must render').toBeTruthy();
 
-    const before = await pm.tracesPage.getQueryEditorContent();
-    expect(before, 'Editor must start without a duration filter').not.toMatch(DURATION_FILTER_PATTERN);
+      const tableRequest = page.waitForRequest((r) => tableFilterOf(r) !== null, { timeout: 45000 });
+      expect(await pm.tracesPage.zoomDurationBand(), 'Heatmap must accept the box drag').toBeTruthy();
+      if (!live) await pm.tracesPage.runQuery();
 
-    await pm.tracesPage.openMetricsContextMenu('Duration');
-    await pm.tracesPage.expectMetricsContextMenuVisible();
-    await pm.tracesPage.selectMetricsContextMenuItem('gte');
+      // Editor: the user condition is kept, grouped, and intersected with the band.
+      const editor = (await pm.tracesPage.getQueryEditorContent()).trim();
+      testLogger.info('Query editor after the heatmap box', { editor, live });
+      const prefix = `(${USER_DURATION_FILTER}) and `;
+      expect(editor.startsWith(prefix), `Editor must keep the user filter: ${editor}`).toBeTruthy();
+      const band = editor.slice(prefix.length);
+      expect(band).toMatch(HEATMAP_BAND_PATTERN);
+      const { lo, hi } = bandBoundsUs(band);
 
-    await expect
-      .poll(async () => pm.tracesPage.getQueryEditorContent(), { timeout: 8000 })
-      .toMatch(DURATION_GTE_PATTERN);
+      // Table: both the user condition and the band reach the search, decoded to µs.
+      const tableFilter = tableFilterOf(await tableRequest);
+      testLogger.info('Table search filter after the box', { tableFilter });
+      expect(tableFilter).toMatch(/duration >= 1000\b/);
+      if (lo) expect(tableFilter).toMatch(new RegExp(`duration >= ${lo}\\b`));
+      if (hi !== null) expect(tableFilter).toMatch(new RegExp(`duration < ${hi}\\b`));
+      await pm.tracesPage.waitForTraceSearchResults();
 
-    const after = await pm.tracesPage.getQueryEditorContent();
-    testLogger.info('Query editor after gte context-menu selection', { after });
-    expect(after, 'gte must write a single-sided bound (no upper bound)')
-      .not.toMatch(DURATION_RANGE_PATTERN);
+      // Drill down: Selected is the box under the pre-box filter, Baseline the pre-box filter alone.
+      const comparisonRequest = page.waitForRequest((r) => comparisonSqlOf(r) !== null, { timeout: 60000 });
+      const comparisonResponse = page.waitForResponse(
+        (r) => comparisonSqlOf(r.request()) !== null,
+        { timeout: 60000 }
+      );
+      await pm.tracesPage.clickInsightsButton();
+      await pm.tracesPage.waitForAnalysisDashboardLoad();
 
-    const panelError = await pm.tracesPage.getMetricsPanelErrorText();
-    expect(panelError, 'No RED panel may error after a gte context-menu selection').toBe('');
-  });
+      const sql = comparisonSqlOf(await comparisonRequest);
+      testLogger.info('Drill-down comparison SQL', { sql });
+      const selected = sql.split(/\bUNION\b/).find((p) => p.includes("'Selected' AS series"));
+      const baseline = sql.split(/\bUNION\b/).find((p) => p.includes("'Baseline' AS series"));
+      const selectedBand = `duration >= ${lo} AND duration < ${hi ?? Number.MAX_SAFE_INTEGER}`;
+      expect(selected).toContain(selectedBand);
+      expect(selected).toMatch(/duration >= 1000\b/);
+      expect(selected).toContain('_timestamp < ');
+      expect(baseline).toMatch(/duration >= 1000\b/);
+      expect(baseline).not.toContain(selectedBand);
+      if (hi !== null) expect(baseline).not.toMatch(new RegExp(`duration < ${hi}\\b`));
 
-  test("P1: Right-click Duration then lte writes a single-sided duration <= filter", {
-    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
+      const responseText = await (await comparisonResponse).text();
+      expect(responseText, 'Comparison hits must carry Selected rows').toContain('"series":"Selected"');
+      expect(responseText, 'Comparison hits must carry Baseline rows').toContain('"series":"Baseline"');
 
-    await searchAndShowCharts();
-
-    const before = await pm.tracesPage.getQueryEditorContent();
-    expect(before, 'Editor must start without a duration filter').not.toMatch(DURATION_FILTER_PATTERN);
-
-    await pm.tracesPage.openMetricsContextMenu('Duration');
-    await pm.tracesPage.expectMetricsContextMenuVisible();
-    await pm.tracesPage.selectMetricsContextMenuItem('lte');
-
-    await expect
-      .poll(async () => pm.tracesPage.getQueryEditorContent(), { timeout: 8000 })
-      .toMatch(DURATION_LTE_PATTERN);
-
-    const after = await pm.tracesPage.getQueryEditorContent();
-    testLogger.info('Query editor after lte context-menu selection', { after });
-    expect(after, 'lte must write a single-sided bound (no lower bound)')
-      .not.toMatch(DURATION_RANGE_PATTERN);
-
-    const panelError = await pm.tracesPage.getMetricsPanelErrorText();
-    expect(panelError, 'No RED panel may error after an lte context-menu selection').toBe('');
-  });
-
-  test("P2: Right-click Rate does not open the gte/lte context menu", {
-    tag: ['@tracesCharts', '@traces', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-
-    await searchAndShowCharts();
-
-    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Rate');
-    // Without this the assertion below would also pass on a right-click that missed the canvas.
-    expect(dispatched, 'Right-click must reach the Rate panel for this test to mean anything').toBeTruthy();
-    expect(opened, 'Rate must not open the Duration-only context menu').toBeFalsy();
-
-    await pm.tracesPage.expectMetricsContextMenuStaysHidden();
-  });
+      await pm.tracesPage.closeAnalysisDashboard();
+      if (live) await pm.tracesPage.setLiveMode(false);
+    });
+  }
 });
