@@ -161,7 +161,6 @@ const layerOf = (node: PromqlTree): Layer => {
   }
 };
 
-/** Walks inward from the root: each layer one catalog step, the innermost one selector. */
 export const treeToBuilder = (tree: PromqlTree): BuilderMapping => {
   const steps: PromqlStep[] = [];
   let node = stripParens(tree);

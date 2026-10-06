@@ -13,13 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! A small, stable JSON tree of a PromQL query, in OpenObserve's own shape.
-
 use std::time::Duration;
 
 use config::utils::json::{Value, json};
 use promql_parser::{
-    label::Matchers,
+    label::{METRIC_NAME, MatchOp, Matcher},
     parser::{
         AggregateExpr, BinaryExpr, Call, Expr, LabelModifier, MatrixSelector,
         VectorMatchCardinality, VectorSelector,
@@ -128,7 +126,21 @@ fn selector_modifier(vs: &VectorSelector) -> Option<&'static str> {
 }
 
 fn selector_fields(vs: &VectorSelector) -> Value {
-    json!({ "name": vs.name, "matchers": matchers(&vs.matchers) })
+    let is_name = |m: &&Matcher| m.name == METRIC_NAME && matches!(m.op, MatchOp::Equal);
+    let named: Vec<&Matcher> = vs.matchers.matchers.iter().filter(is_name).collect();
+    // `{__name__="x"}` is the selector `x`; normalising it lets both spellings round-trip.
+    let (name, rest): (Option<String>, Vec<&Matcher>) = match (&vs.name, named.as_slice()) {
+        (None, [only]) => (
+            Some(only.value.clone()),
+            vs.matchers
+                .matchers
+                .iter()
+                .filter(|m| !is_name(m))
+                .collect(),
+        ),
+        _ => (vs.name.clone(), vs.matchers.matchers.iter().collect()),
+    };
+    json!({ "name": name, "matchers": matchers(&rest) })
 }
 
 fn selector_node(vs: &VectorSelector) -> Value {
@@ -151,9 +163,8 @@ fn matrix_node(ms: &MatrixSelector, tokens: &RangeTokens) -> Value {
     })
 }
 
-fn matchers(matchers: &Matchers) -> Vec<Value> {
+fn matchers(matchers: &[&Matcher]) -> Vec<Value> {
     matchers
-        .matchers
         .iter()
         .map(|m| json!({ "label": m.name, "op": m.op.to_string(), "value": m.value }))
         .collect()
@@ -344,6 +355,22 @@ mod tests {
         assert_eq!(
             tree("a * on(job) group_left b"),
             json!({ "type": "unsupported", "kind": "vector matching" })
+        );
+    }
+
+    #[test]
+    fn a_negative_number_is_a_number() {
+        assert_eq!(
+            tree("x * -2")["rhs"],
+            json!({ "type": "number", "value": -2.0 })
+        );
+    }
+
+    #[test]
+    fn an_exact_name_matcher_names_the_selector() {
+        assert_eq!(
+            tree(r#"{__name__="foo_bytes",job="a"}"#),
+            tree(r#"foo_bytes{job="a"}"#)
         );
     }
 
