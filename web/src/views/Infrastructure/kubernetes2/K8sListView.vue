@@ -128,10 +128,15 @@ const filtered = computed<any[]>(() => {
 
 const narrowed = computed(() => !!props.state.search || props.state.namespaces.length > 0);
 
-const sortBy = computed(() => props.state.sort ?? defaultSort(props.view).sort);
+// A hand-edited or stale sort id names no column, and TanStack would warn and sort nothing.
+const urlSort = computed(() =>
+  columns.value.some((c) => c.id === props.state.sort && c.sortable) ? props.state.sort : null,
+);
+
+const sortBy = computed(() => urlSort.value ?? defaultSort(props.view).sort);
 
 const sortOrder = computed(() =>
-  (props.state.sort ? props.state.desc : defaultSort(props.view).desc) ? "desc" : "asc",
+  (urlSort.value ? props.state.desc : defaultSort(props.view).desc) ? "desc" : "asc",
 );
 
 const onSort = ({ column, order }: OTableSortParams) => {
@@ -197,7 +202,9 @@ const namespaceOf = (row: any): string =>
 </script>
 
 <template>
+  <!-- OTable reads its table-id once at setup, so each view needs its own instance to persist its columns. -->
   <OTable
+    :key="tableId"
     ref="tableRef"
     :data="filtered"
     :columns="columns"

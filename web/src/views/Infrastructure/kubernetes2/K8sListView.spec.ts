@@ -123,6 +123,12 @@ describe("K8sListView", () => {
     expect(order()).toEqual(["web", "api", "db"]);
   });
 
+  it("falls back to the default sort for an unknown sort id", async () => {
+    await mountList({}, { sort: "bogus", desc: "true" });
+    expect(table().props()).toMatchObject({ sortBy: "name", sortOrder: "asc" });
+    expect(order()).toEqual(["api", "db", "web"]);
+  });
+
   it("defaults to name ascending", async () => {
     await mountList();
     expect(order()).toEqual(["api", "db", "web"]);
@@ -210,6 +216,19 @@ describe("K8sListView", () => {
     expect(JSON.parse(localStorage.getItem(STORAGE) ?? "{}")["k8s2-pods"].visibility).toEqual({
       ip: true,
     });
+  });
+
+  it("persists a column toggle under the new view's table id after a view switch", async () => {
+    await mountList();
+    await wrapper.setProps({ view: "nodes", rows: [], state: parseUrlState({ view: "nodes" }) });
+    await flushPromises();
+    wrapper.findComponent({ name: "OTableColumnToggle" }).vm.$emit("update:column-visibility", {
+      taints: false,
+    });
+    await flushPromises();
+    const stored = JSON.parse(localStorage.getItem(STORAGE) ?? "{}");
+    expect(stored["k8s2-nodes"]?.visibility).toEqual({ taints: false });
+    expect(stored["k8s2-pods"]).toBeUndefined();
   });
 
   it("shows the forbidden state instead of the empty state on a 403", async () => {
