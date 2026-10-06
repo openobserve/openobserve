@@ -1612,6 +1612,16 @@ describe("SearchBar", () => {
       expect((wrapper.vm as any).saveViewDialogOpen).toBe(true);
     });
 
+    it("separates the menu and the save button with a divider", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const group = wrapper.find('[data-test="traces-search-bar-saved-views"]');
+      const separator = group.findComponent({ name: "OSeparator" });
+      expect(separator.exists()).toBe(true);
+      expect(separator.props("vertical")).toBe(true);
+    });
+
     it.each(["service-graph", "services-catalog"])("is hidden on the %s tab", async (mode) => {
       searchObjInstance.meta.searchMode = mode as any;
       wrapper = mountSearchBar();

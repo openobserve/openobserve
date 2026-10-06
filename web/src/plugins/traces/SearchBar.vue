@@ -331,6 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("search.createSavedView") }}
               </ODropdownItem>
             </ODropdown>
+            <OSeparator vertical />
             <OButton
               data-test="traces-search-bar-saved-views-create-btn"
               variant="ghost"
