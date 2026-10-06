@@ -41,6 +41,7 @@ import {
   type Amount,
   type ContainerRow,
   type PodRow,
+  type SeriesMatcher,
 } from "./kubernetesModel";
 import { resolvePodLogs } from "./podLogsLink";
 
@@ -172,6 +173,8 @@ const containerColumns = computed<OTableColumnDef<ContainerRow>[]>(() => [
 
 const trends = ref<Trend[]>([]);
 
+const hasUsage = computed(() => !!(props.pod?.series.cpu || props.pod?.series.memory));
+
 // Bumped on every pod or range change so a slow response never paints the previous pod.
 let trendGeneration = 0;
 
@@ -179,23 +182,33 @@ const loadTrends = async () => {
   const gen = ++trendGeneration;
   trends.value = [];
   const pod = props.pod;
-  if (!pod?.usage) return;
-  const target = {
-    clusterLabel: pod.usage.clusterLabel,
+  if (!pod) return;
+  const wanted = [
+    {
+      id: "cpu" as const,
+      metric: "k8s_pod_cpu_usage",
+      matcher: pod.series.cpu,
+      on: props.usageStreams.cpu,
+    },
+    {
+      id: "memory" as const,
+      metric: "k8s_pod_memory_working_set",
+      matcher: pod.series.memory,
+      on: props.usageStreams.memory,
+    },
+  ].filter((w) => w.on && w.matcher);
+  const targetFor = (matcher: SeriesMatcher) => ({
+    clusterLabel: matcher.clusterLabel,
     cluster: pod.cluster,
     namespace: pod.namespace,
     pod: pod.name,
-    uid: pod.usage.uid,
-  };
-  const wanted = [
-    { id: "cpu" as const, metric: "k8s_pod_cpu_usage", on: props.usageStreams.cpu },
-    { id: "memory" as const, metric: "k8s_pod_memory_working_set", on: props.usageStreams.memory },
-  ].filter((w) => w.on);
+    uid: matcher.uid,
+  });
   const settled = await Promise.allSettled(
     wanted.map((w) =>
       searchService.metrics_query_range({
         org_identifier: props.orgId,
-        query: podTrendQuery(w.metric, target),
+        query: podTrendQuery(w.metric, targetFor(w.matcher!)),
         start_time: props.range.start,
         end_time: props.range.end,
         step: "0",
@@ -228,8 +241,7 @@ const loadTrends = async () => {
 watch(
   () => [
     props.pod?.key,
-    props.pod?.usage?.uid,
-    props.pod?.usage == null,
+    JSON.stringify(props.pod?.series ?? null),
     props.range.start,
     props.range.end,
   ],
@@ -361,7 +373,7 @@ const viewLogs = async () => {
 
       <section class="flex flex-col gap-2">
         <OText tag="h3" class="text-sm font-semibold">{{ t("infra.k8s2.sectionTrends") }}</OText>
-        <OText v-if="!pod?.usage" variant="meta" data-test="k8s2-drawer-no-usage">{{
+        <OText v-if="!hasUsage" variant="meta" data-test="k8s2-drawer-no-usage">{{
           t("infra.k8s2.noUsageData")
         }}</OText>
         <div

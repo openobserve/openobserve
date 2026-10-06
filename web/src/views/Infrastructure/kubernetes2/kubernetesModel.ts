@@ -56,6 +56,11 @@ export interface ContainerRow {
   memoryLimit: number | null;
 }
 
+export interface SeriesMatcher {
+  clusterLabel: "k8s_cluster" | "k8s_cluster_name" | null;
+  uid: string | null;
+}
+
 export interface PodRow {
   key: string;
   cluster: string;
@@ -82,7 +87,8 @@ export interface PodRow {
   memoryLimit: Amount;
   memoryPctOfRequest: number | null;
   memoryPctOfLimit: number | null;
-  usage: { clusterLabel: "k8s_cluster" | "k8s_cluster_name" | null; uid: string | null } | null;
+  // Each usage stream keeps its own matcher: the two can carry different labels for one pod.
+  series: { cpu: SeriesMatcher | null; memory: SeriesMatcher | null };
   issues: IssueKey[];
 }
 
@@ -426,7 +432,6 @@ function buildPodRow(
     ...(acc?.restarts.keys() ?? []),
     ...(acc?.limits.keys() ?? []),
   ]);
-  const usageSeries = cpu ?? memory;
   const row: Omit<PodRow, "issues"> = {
     key,
     cluster,
@@ -462,7 +467,10 @@ function buildPodRow(
     memoryLimit,
     memoryPctOfRequest: pct(memoryBytes, memoryRequest),
     memoryPctOfLimit: pct(memoryBytes, memoryLimit),
-    usage: usageSeries ? { clusterLabel: usageSeries.clusterLabel, uid: usageSeries.uid } : null,
+    series: {
+      cpu: cpu ? { clusterLabel: cpu.clusterLabel, uid: cpu.uid } : null,
+      memory: memory ? { clusterLabel: memory.clusterLabel, uid: memory.uid } : null,
+    },
   };
   return { ...row, issues: podIssues(row, acc) };
 }

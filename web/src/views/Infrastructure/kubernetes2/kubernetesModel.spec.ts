@@ -123,7 +123,10 @@ describe("buildInventory — pods", () => {
       expect(row.owner).toEqual({ kind: "Deployment", name: "db" });
       expect(row.memoryLimit).toBe(1 * GI);
       expect(row.memoryBytes).toBe(100 * MI);
-      expect(row.usage).toEqual({ clusterLabel: "k8s_cluster_name", uid: "B" });
+      expect(row.series).toEqual({
+        cpu: null,
+        memory: { clusterLabel: "k8s_cluster_name", uid: "B" },
+      });
     });
 
     it("joins a usage series without k8s_pod_uid by name and namespace", () => {
@@ -131,7 +134,7 @@ describe("buildInventory — pods", () => {
         fixture({ K2: [kub({ k8s_namespace_name: "data", k8s_pod_name: "db-0" }, 42)] }),
       );
       expect(row.memoryBytes).toBe(42);
-      expect(row.usage?.uid).toBeNull();
+      expect(row.series.memory?.uid).toBeNull();
     });
 
     it("marks the pod ambiguous when several uids exist and P12 is unavailable", () => {
@@ -438,6 +441,28 @@ describe("buildInventory — pods", () => {
   });
 
   describe("uid handling", () => {
+    it("keeps the CPU and memory matchers apart when their series differ", () => {
+      const row = onlyPod({
+        P1: [ksm({ namespace: "shop", pod: "p", uid: "B", phase: "Running" })],
+        K1: [
+          {
+            metric: {
+              k8s_cluster: "prod",
+              k8s_namespace_name: "shop",
+              k8s_pod_name: "p",
+              k8s_pod_uid: "B",
+            },
+            value: 1,
+          },
+        ],
+        K2: [kub({ k8s_namespace_name: "shop", k8s_pod_name: "p" }, 2)],
+      });
+      expect(row.series).toEqual({
+        cpu: { clusterLabel: "k8s_cluster", uid: "B" },
+        memory: { clusterLabel: "k8s_cluster_name", uid: null },
+      });
+    });
+
     it("joins uid-labelled usage when the KSM series carry no uid", () => {
       const row = onlyPod({
         P1: [ksm({ namespace: "shop", pod: "p", phase: "Running" })],
@@ -455,7 +480,7 @@ describe("buildInventory — pods", () => {
       });
       expect(row.ambiguous).toBe(true);
       expect(row.memoryBytes).toBeNull();
-      expect(row.usage).toBeNull();
+      expect(row.series).toEqual({ cpu: null, memory: null });
     });
 
     it("counts the same tiles on every tab when only tab or range queries see an old uid", () => {
@@ -494,7 +519,7 @@ describe("buildInventory — pods", () => {
         ],
       });
       expect(row.cluster).toBe("a");
-      expect(row.usage?.clusterLabel).toBe("k8s_cluster");
+      expect(row.series.memory?.clusterLabel).toBe("k8s_cluster");
     });
 
     it("leaves unlabelled kubeletstats rows unjoined and reports the family", () => {

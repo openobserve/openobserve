@@ -47,7 +47,7 @@ const pod = {
   cluster: "prod",
   namespace: "shop",
   name: "web-1",
-  usage: null,
+  series: { cpu: null, memory: null },
   containers: [],
   status: null,
 } as unknown as PodRow;

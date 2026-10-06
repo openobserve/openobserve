@@ -71,7 +71,10 @@ const makePod = (over: Partial<PodRow> = {}): PodRow => ({
   memoryLimit: 128 * 1024 ** 2,
   memoryPctOfRequest: 100,
   memoryPctOfLimit: 50,
-  usage: { clusterLabel: "k8s_cluster_name", uid: "B" },
+  series: {
+    cpu: { clusterLabel: "k8s_cluster_name", uid: "B" },
+    memory: { clusterLabel: "k8s_cluster_name", uid: "B" },
+  },
   issues: [],
   ...over,
 });
@@ -182,7 +185,10 @@ describe("PodDetailDrawer", () => {
       pod: makePod({
         key: "dev/shop/web-1",
         cluster: "dev",
-        usage: { clusterLabel: "k8s_cluster", uid: null },
+        series: {
+          cpu: { clusterLabel: "k8s_cluster", uid: null },
+          memory: { clusterLabel: "k8s_cluster", uid: null },
+        },
       }),
     });
     for (const [args] of rangeQuery.mock.calls) {
@@ -190,6 +196,29 @@ describe("PodDetailDrawer", () => {
       expect(args.query).not.toContain("prod");
       expect(args.query).not.toContain("k8s_pod_uid");
     }
+  });
+
+  it("points each trend at its own series' cluster spelling and uid", async () => {
+    await mountDrawer({
+      pod: makePod({
+        series: {
+          cpu: { clusterLabel: "k8s_cluster", uid: "B" },
+          memory: { clusterLabel: "k8s_cluster_name", uid: null },
+        },
+      }),
+    });
+    expect(rangeQuery.mock.calls.map(([args]) => args.query).sort()).toEqual([
+      'sum(k8s_pod_cpu_usage{k8s_cluster="prod",k8s_namespace_name="shop",k8s_pod_name="web-1",k8s_pod_uid="B"})',
+      'sum(k8s_pod_memory_working_set{k8s_cluster_name="prod",k8s_namespace_name="shop",k8s_pod_name="web-1"})',
+    ]);
+  });
+
+  it("skips the trend of a stream with no series for this pod", async () => {
+    await mountDrawer({
+      pod: makePod({ series: { cpu: null, memory: { clusterLabel: "k8s_cluster", uid: null } } }),
+    });
+    expect(rangeQuery).toHaveBeenCalledTimes(1);
+    expect(rangeQuery.mock.calls[0][0].query).toContain("k8s_pod_memory_working_set");
   });
 
   it("renders only the newest pod's trends when responses arrive out of order", async () => {
@@ -213,7 +242,9 @@ describe("PodDetailDrawer", () => {
   });
 
   it("shows No usage data and sends no range query for a pod without a usage row", async () => {
-    await mountDrawer({ pod: makePod({ usage: null, cpuCores: null, memoryBytes: null }) });
+    await mountDrawer({
+      pod: makePod({ series: { cpu: null, memory: null }, cpuCores: null, memoryBytes: null }),
+    });
     expect(wrapper.find('[data-test="k8s2-drawer-no-usage"]').text()).toBe("No usage data");
     expect(rangeQuery).not.toHaveBeenCalled();
   });
