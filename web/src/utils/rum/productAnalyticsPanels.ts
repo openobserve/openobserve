@@ -105,10 +105,9 @@ export function buildTrendsPanel(
   events: NamedEvent[],
   interval: "1 day" | "1 week",
   tz: string,
-  referenceUs: number,
   t: TranslateFn,
 ): Record<string, unknown> {
-  const sql = trendSql(scope, id, interval, tz, referenceUs, series, events);
+  const sql = trendSql(scope, id, interval, tz, series, events);
   const x = axis("x_axis_1", t("rum.analytics.trends.time"));
   const y = series.length
     ? series.slice(0, 5).map((s, i) => axis(`y_axis_${i + 1}`, raw(stepLabel(s, events))))
