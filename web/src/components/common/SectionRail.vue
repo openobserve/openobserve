@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="collapsed ? undefined : item.label"
               :tooltip="!item.locked && collapsed ? item.label : undefined"
               :icon="item.icon"
+              :suffix-icon="item.locked && !collapsed ? 'lock' : undefined"
               :disable="item.locked"
               :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
               class="w-full"

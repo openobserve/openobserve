@@ -226,6 +226,7 @@ const heightClasses = computed<string>(() => {
           :class="context?.collapseLabels && !isActive ? 'max-md:hidden' : ''"
           >{{ label }}</span
         >
+        <OIcon v-if="suffixIcon" :name="suffixIcon as any" size="xs" class="ms-auto shrink-0" />
       </template>
       <slot v-else />
     </TabsTrigger>
