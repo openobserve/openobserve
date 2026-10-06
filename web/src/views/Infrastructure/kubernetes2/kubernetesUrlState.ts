@@ -14,45 +14,72 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { LocationQuery, LocationQueryRaw } from "vue-router";
-import { ISSUE_KIND, type IssueKey, type K8sKind } from "./kubernetesQueries";
+import {
+  DETAIL_KINDS,
+  VIEWS,
+  type DetailKind,
+  type MapEntity,
+  type MapGroup,
+  type View,
+} from "./kubernetesQueries";
 
-export interface K8sListState {
-  kind: K8sKind;
+export type MapFill =
+  "cpuReq" | "cpuLim" | "memReq" | "memLim" | "restarts" | "cpu" | "memory" | "status";
+
+export interface DetailsRef {
+  kind: DetailKind;
+  cluster: string;
+  namespace: string;
   name: string;
-  cluster: string | null;
-  namespace: string | null;
-  issue: IssueKey | null;
-  onNode: [string, string] | null;
-  workload: [string, string, string, string] | null;
-  sort: string | null;
-  desc: boolean;
-  page: number;
-  pod: [string, string, string] | null;
 }
 
-const LIST_PARAMS = [
-  "kind",
-  "name",
+export interface K8sUrlState {
+  view: View;
+  cluster: string | null;
+  namespaces: string[];
+  search: string;
+  sort: string | null;
+  desc: boolean;
+  entity: MapEntity;
+  fill: MapFill;
+  group: MapGroup;
+  details: DetailsRef | null;
+}
+
+type Query = LocationQuery | LocationQueryRaw;
+
+// Every param this page owns, including the MVP's removed ones so an old link is cleaned up.
+const PAGE_PARAMS = [
+  "view",
   "cluster",
   "namespace",
+  "search",
+  "sort",
+  "desc",
+  "entity",
+  "fill",
+  "group",
+  "details",
+  "kind",
+  "name",
   "issue",
   "onNode",
   "workload",
-  "sort",
-  "desc",
   "page",
   "pod",
 ] as const;
 
-const KINDS: readonly K8sKind[] = ["pods", "nodes", "deployments"];
+export const ENTITY_FILLS: Record<MapEntity, readonly MapFill[]> = {
+  pods: ["cpuReq", "cpuLim", "memReq", "memLim", "restarts", "status"],
+  nodes: ["cpu", "memory", "status"],
+};
+
+export const MAP_GROUPS: readonly MapGroup[] = ["node", "namespace", "workload", "none"];
 
 const first = (value: unknown): string | null => {
   const flat = [value].flat();
   return flat[0] != null && flat[0] !== "" ? String(flat[0]) : null;
 };
-
-const isIssue = (value: string | null): value is IssueKey =>
-  value != null && Object.prototype.hasOwnProperty.call(ISSUE_KIND, value);
 
 export const encodeCompound = (parts: readonly string[]) =>
   parts.map((part) => encodeURIComponent(part)).join("/");
@@ -68,116 +95,84 @@ export const decodeCompound = (value: string | null, segments: number): string[]
   }
 };
 
-export const parseListState = (query: LocationQuery | LocationQueryRaw): K8sListState => {
-  const kindParam = first(query.kind);
-  let kind: K8sKind = KINDS.includes(kindParam as K8sKind) ? (kindParam as K8sKind) : "pods";
-  const issueParam = first(query.issue);
-  let issue = isIssue(issueParam) ? issueParam : null;
-  if (issue) kind = ISSUE_KIND[issue];
-  const pod = decodeCompound(first(query.pod), 3) as K8sListState["pod"];
-  // The drawer needs the Pods-tab queries behind it.
-  if (pod) {
-    kind = "pods";
-    if (issue && ISSUE_KIND[issue] !== "pods") issue = null;
-  }
-  const page = Number(first(query.page));
+export const encodeDetails = (d: DetailsRef) =>
+  `${d.kind}/${encodeCompound([d.cluster, d.namespace, d.name])}`;
+
+export const parseDetails = (value: string | null): DetailsRef | null => {
+  const parts = decodeCompound(value, 4);
+  if (!parts || !DETAIL_KINDS.includes(parts[0] as DetailKind) || !parts[3]) return null;
+  return { kind: parts[0] as DetailKind, cluster: parts[1], namespace: parts[2], name: parts[3] };
+};
+
+export const parseUrlState = (query: Query): K8sUrlState => {
+  const viewParam = first(query.view);
+  const view: View = VIEWS.includes(viewParam as View) ? (viewParam as View) : "cluster";
+  const entity: MapEntity = first(query.entity) === "nodes" ? "nodes" : "pods";
+  const fillParam = first(query.fill) as MapFill | null;
+  const groupParam = first(query.group) as MapGroup | null;
+  const details = parseDetails(first(query.details));
+  const clusterParam = first(query.cluster);
   return {
-    kind,
-    name: first(query.name) ?? "",
-    cluster: first(query.cluster),
-    namespace: first(query.namespace),
-    issue,
-    onNode: decodeCompound(first(query.onNode), 2) as K8sListState["onNode"],
-    workload: decodeCompound(first(query.workload), 4) as K8sListState["workload"],
+    view,
+    // A shared drawer link opens in its own cluster.
+    cluster: details?.cluster || (clusterParam === "*" ? null : clusterParam),
+    namespaces: (first(query.namespace) ?? "").split(",").filter(Boolean),
+    search: first(query.search) ?? "",
     sort: first(query.sort),
-    desc: first(query.desc) === "true",
-    page: Number.isInteger(page) && page > 1 ? page : 1,
-    pod,
+    desc: first(query.sort) != null && first(query.desc) === "true",
+    entity,
+    fill:
+      fillParam && ENTITY_FILLS[entity].includes(fillParam) ? fillParam : ENTITY_FILLS[entity][0],
+    group: entity === "pods" && groupParam && MAP_GROUPS.includes(groupParam) ? groupParam : "node",
+    details,
   };
 };
 
-export const stripListParams = (query: LocationQuery | LocationQueryRaw): LocationQueryRaw => {
+export const stripPageParams = (query: Query): LocationQueryRaw => {
   const out: LocationQueryRaw = { ...query };
-  for (const key of LIST_PARAMS) delete out[key];
+  for (const key of PAGE_PARAMS) delete out[key];
   return out;
 };
 
-export const toQuery = (
-  state: K8sListState,
-  base: LocationQuery | LocationQueryRaw,
-): LocationQueryRaw => {
-  const out = stripListParams(base);
-  if (state.kind !== "pods") out.kind = state.kind;
-  if (state.name) out.name = state.name;
+export const toQuery = (state: K8sUrlState, base: Query): LocationQueryRaw => {
+  const out = stripPageParams(base);
+  if (state.view !== "cluster") out.view = state.view;
   if (state.cluster) out.cluster = state.cluster;
-  if (state.namespace) out.namespace = state.namespace;
-  if (state.issue) out.issue = state.issue;
-  if (state.onNode) out.onNode = encodeCompound(state.onNode);
-  if (state.workload) out.workload = encodeCompound(state.workload);
+  if (state.namespaces.length) out.namespace = state.namespaces.join(",");
+  if (state.search) out.search = state.search;
   if (state.sort) {
     out.sort = state.sort;
     if (state.desc) out.desc = "true";
   }
-  if (state.page > 1) out.page = String(state.page);
-  if (state.pod) out.pod = encodeCompound(state.pod);
+  if (state.view === "map") {
+    if (state.entity !== "pods") out.entity = state.entity;
+    if (state.fill !== ENTITY_FILLS[state.entity][0]) out.fill = state.fill;
+    if (state.entity === "pods" && state.group !== "node") out.group = state.group;
+  }
+  if (state.details) out.details = encodeDetails(state.details);
   return out;
 };
 
-export const isCanonical = (query: LocationQuery | LocationQueryRaw) => {
-  const canonical = toQuery(parseListState(query), query);
-  return LIST_PARAMS.every((key) => {
-    const current = query[key];
-    return (current ?? null) === (canonical[key] ?? null);
-  });
+export const isCanonical = (query: Query) => {
+  const canonical = toQuery(parseUrlState(query), query);
+  return PAGE_PARAMS.every((key) => (query[key] ?? null) === (canonical[key] ?? null));
 };
 
-export const withFilter = (state: K8sListState, patch: Partial<K8sListState>): K8sListState => ({
+// The drawer belongs to the view it was opened from, so a view change closes it.
+export const withView = (state: K8sUrlState, view: View): K8sUrlState => ({
   ...state,
-  ...patch,
-  page: 1,
-});
-
-export const withKind = (state: K8sListState, kind: K8sKind): K8sListState => ({
-  ...state,
-  kind,
-  issue: state.issue && ISSUE_KIND[state.issue] === kind ? state.issue : null,
-  onNode: kind === "pods" ? state.onNode : null,
-  workload: kind === "pods" ? state.workload : null,
+  view,
+  search: "",
   sort: null,
   desc: false,
-  page: 1,
+  entity: "pods",
+  fill: ENTITY_FILLS.pods[0],
+  group: "node",
+  details: null,
 });
 
-// A cross-link asks about one entity, so its own cluster and namespace replace every filter that could hide its pods.
-export const withNodeLink = (state: K8sListState, onNode: [string, string]): K8sListState => ({
-  ...withKind(state, "pods"),
-  cluster: onNode[0] || "*",
-  namespace: null,
-  name: "",
-  issue: null,
-  onNode,
-  workload: null,
-  pod: null,
+export const withDetails = (state: K8sUrlState, details: DetailsRef | null): K8sUrlState => ({
+  ...state,
+  cluster: details?.cluster || state.cluster,
+  details,
 });
-
-export const withWorkloadLink = (
-  state: K8sListState,
-  workload: [string, string, string, string],
-): K8sListState => ({
-  ...withKind(state, "pods"),
-  cluster: workload[0] || "*",
-  namespace: workload[1] || null,
-  name: "",
-  issue: null,
-  onNode: null,
-  workload,
-  pod: null,
-});
-
-// The list then shows exactly what the tile counted, which uses only the scope facets.
-export const withTile = (state: K8sListState, key: IssueKey | "all"): K8sListState => {
-  const cleared = { name: "", onNode: null, workload: null, page: 1 };
-  if (key === "all") return { ...state, ...cleared, issue: null };
-  const moved = ISSUE_KIND[key] === state.kind ? state : withKind(state, ISSUE_KIND[key]);
-  return { ...moved, ...cleared, issue: key };
-};

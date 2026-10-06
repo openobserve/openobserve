@@ -17,16 +17,19 @@ import { describe, expect, it } from "vitest";
 import type { QueryId } from "./kubernetesQueries";
 import {
   buildInventory,
-  filterRows,
+  formatAge,
   formatBytes,
   formatCores,
   formatPct,
-  issueCounts,
+  inScope,
+  lensPodStatus,
+  nodeConditionWords,
   parseVector,
   sortRows,
   usageBarVariant,
   type PodRow,
   type Series,
+  type WarningEvent,
 } from "./kubernetesModel";
 
 const GI = 1024 ** 3;
@@ -58,7 +61,7 @@ const onlyPod = (data: Partial<Record<QueryId, Series[]>>) => {
   return inventory.pods[0];
 };
 
-const allIssuesVisible = () => true;
+const keys = (row: { warnings: { key: string }[] }) => row.warnings.map((w) => w.key);
 
 describe("buildInventory — pods", () => {
   it("joins a KSM row and a kubeletstats row with the same values into one row", () => {
@@ -120,7 +123,8 @@ describe("buildInventory — pods", () => {
       const row = onlyPod(fixture());
       expect(row.uid).toBe("B");
       expect(row.status).toEqual({ text: "Running", variant: "success-soft" });
-      expect(row.owner).toEqual({ kind: "Deployment", name: "db" });
+      expect(row.controller).toEqual({ kind: "ReplicaSet", name: "rs-b" });
+      expect(row.workload).toEqual({ kind: "Deployment", name: "db" });
       expect(row.memoryLimit).toBe(1 * GI);
       expect(row.memoryBytes).toBe(100 * MI);
       expect(row.series).toEqual({
@@ -152,11 +156,9 @@ describe("buildInventory — pods", () => {
       expect(row.ambiguous).toBe(true);
       expect(row.status).toBeNull();
       expect(row.uid).toBeNull();
-      expect(row.owner).toBeNull();
+      expect(row.controller).toBeNull();
       expect(row.memoryLimit).toBeNull();
-      expect(row.issues).toEqual([]);
-      const counts = issueCounts(inventory, { cluster: null, namespace: null }, allIssuesVisible);
-      expect(counts.podsNotRunning).toBe(0);
+      expect(row.warnings).toEqual([]);
     });
   });
 
@@ -167,7 +169,7 @@ describe("buildInventory — pods", () => {
         P2: [ksm({ ...pod("rec"), container: "main", reason: "CrashLoopBackOff" })],
       });
       expect(row.status).toEqual({ text: "CrashLoopBackOff", variant: "error-soft" });
-      expect(row.issues).toContain("podsContainerErrors");
+      expect(row.warnings[0]).toMatchObject({ key: "infra.k8s2.warnWaiting", severity: "error" });
     });
 
     it.each([
@@ -185,9 +187,9 @@ describe("buildInventory — pods", () => {
         P1: [ksm({ ...pod("rec"), phase: "Running" })],
         P2: [ksm({ ...pod("rec"), container: "main", reason: "CrashLoopBackOff" })],
       });
-      expect(before.issues).toContain("podsContainerErrors");
+      expect(keys(before)).toContain("infra.k8s2.warnWaiting");
       const after = onlyPod({ P1: [ksm({ ...pod("rec"), phase: "Running" })], P2: [] });
-      expect(after.issues).not.toContain("podsContainerErrors");
+      expect(keys(after)).not.toContain("infra.k8s2.warnWaiting");
       expect(after.status?.text).toBe("Running");
     });
   });
@@ -205,13 +207,13 @@ describe("buildInventory — pods", () => {
     it("Running and not ready is a warning counted as not running", () => {
       const row = onlyPod(running("false"));
       expect(row.status).toEqual({ key: "infra.k8s2.podRunningNotReady", variant: "warning-soft" });
-      expect(row.issues).toContain("podsNotRunning");
+      expect(keys(row)).toContain("infra.k8s2.warnNotReady");
     });
 
     it("Running with no ready series is neutral and not counted", () => {
       const row = onlyPod(running());
       expect(row.status).toEqual({ text: "Running", variant: "default-soft" });
-      expect(row.issues).not.toContain("podsNotRunning");
+      expect(row.warnings).toEqual([]);
     });
 
     it("a waiting reason outside the error set is a warning", () => {
@@ -220,7 +222,7 @@ describe("buildInventory — pods", () => {
         P2: [ksm({ ...pod("o"), container: "main", reason: "ContainerCreating" })],
       });
       expect(row.status).toEqual({ text: "ContainerCreating", variant: "warning-soft" });
-      expect(row.issues).not.toContain("podsContainerErrors");
+      expect(keys(row)).not.toContain("infra.k8s2.warnWaiting");
     });
 
     it.each([
@@ -257,7 +259,7 @@ describe("buildInventory — pods", () => {
       });
       expect(row.memoryLimit).toBe("missing");
       expect(row.memoryPctOfLimit).toBeNull();
-      expect(row.issues).not.toContain("podsNearMemoryLimit");
+      expect(keys(row)).not.toContain("infra.k8s2.warnNearMemoryLimit");
     });
 
     it("uses the full sums when every container has both", () => {
@@ -282,7 +284,11 @@ describe("buildInventory — pods", () => {
       expect(row.cpuPctOfRequest).toBe(50);
       expect(row.memoryLimit).toBe(200);
       expect(row.memoryPctOfLimit).toBe(95);
-      expect(row.issues).toContain("podsNearMemoryLimit");
+      expect(row.warnings).toContainEqual({
+        key: "infra.k8s2.warnNearMemoryLimit",
+        params: { pct: "95%" },
+        severity: "warning",
+      });
     });
 
     it("an empty sparse limits result reads 'missing' for every pod", () => {
@@ -305,13 +311,12 @@ describe("buildInventory — pods", () => {
     });
   });
 
-  it("sums per-container restarts and rounds the pod total", () => {
+  it("sums lifetime per-container restarts and rounds the pod total", () => {
     const row = onlyPod({
       P1: [ksm({ ...pod("r"), phase: "Running" })],
       P7: [ksm({ ...pod("r"), container: "a" }, 0.6), ksm({ ...pod("r"), container: "b" }, 1.3)],
     });
     expect(row.restarts).toBe(2);
-    expect(row.issues).toContain("podsRestarting");
   });
 
   it.each([
@@ -328,25 +333,13 @@ describe("buildInventory — pods", () => {
     expect(row.lastTerminatedReason).toBe(expected);
   });
 
-  describe("OOMKilled per container", () => {
-    const base = (restartsA: number, restartsB: number) => ({
+  it("flags the last termination OOMKilled for as long as KSM reports it", () => {
+    const row = onlyPod({
       P1: [ksm({ ...pod("an"), phase: "Running" })],
       P3: [ksm({ ...pod("an"), container: "a", reason: "OOMKilled" })],
-      P7: [
-        ksm({ ...pod("an"), container: "a" }, restartsA),
-        ksm({ ...pod("an"), container: "b" }, restartsB),
-      ],
+      P7: [ksm({ ...pod("an"), container: "a" }, 0)],
     });
-
-    it("an old OOM in one container with a restart in another does not count", () => {
-      const row = onlyPod(base(0, 2));
-      expect(row.issues).not.toContain("podsOomKilled");
-      expect(row.lastTerminatedReason).toBe("OOMKilled");
-    });
-
-    it("an OOM with a restart of the same container counts", () => {
-      expect(onlyPod(base(1, 0)).issues).toContain("podsOomKilled");
-    });
+    expect(keys(row)).toContain("infra.k8s2.warnOomKilled");
   });
 
   describe("owners", () => {
@@ -386,23 +379,22 @@ describe("buildInventory — pods", () => {
           D2: [ksm({ namespace: "shop", deployment: "web" }, 2)],
         }),
       );
-      expect(inventory.pods.map((p) => p.owner)).toEqual([
+      expect(inventory.pods.map((p) => p.workload)).toEqual([
         { kind: "Deployment", name: "web" },
         { kind: "Deployment", name: "web" },
       ]);
-      expect(inventory.deployments[0].pods).toBe(2);
+      expect(inventory.pods.map((p) => p.controller)).toEqual([
+        { kind: "ReplicaSet", name: "web-rs" },
+        { kind: "ReplicaSet", name: "web-rs" },
+      ]);
     });
 
-    it("leaves the Deployment pod count unknown without the ReplicaSet owner join", () => {
-      const inventory = buildInventory(
-        results({
-          P1: [ksm({ ...pod("web-a"), phase: "Running" })],
-          P4: [ksm({ ...pod("web-a"), owner_kind: "ReplicaSet", owner_name: "web-rs" })],
-          D1: [ksm({ namespace: "shop", deployment: "web" }, 1)],
-          D2: [ksm({ namespace: "shop", deployment: "web" }, 1)],
-        }),
-      );
-      expect(inventory.deployments[0].pods).toBeNull();
+    it("resolves the workload to the ReplicaSet itself without the owner join", () => {
+      const row = onlyPod({
+        P1: [ksm({ ...pod("web-a"), phase: "Running" })],
+        P4: [ksm({ ...pod("web-a"), owner_kind: "ReplicaSet", owner_name: "web-rs" })],
+      });
+      expect(row.workload).toEqual({ kind: "ReplicaSet", name: "web-rs" });
     });
 
     it("keeps a Job owner as it is", () => {
@@ -411,7 +403,8 @@ describe("buildInventory — pods", () => {
         P4: [ksm({ ...pod("backfill"), owner_kind: "Job", owner_name: "backfill" })],
         P5: [],
       });
-      expect(row.owner).toEqual({ kind: "Job", name: "backfill" });
+      expect(row.controller).toEqual({ kind: "Job", name: "backfill" });
+      expect(row.workload).toEqual({ kind: "Job", name: "backfill" });
     });
   });
 
@@ -443,7 +436,7 @@ describe("buildInventory — pods", () => {
         results({ K1: [kub({ k8s_namespace_name: "shop", k8s_pod_name: "u" }, 0.1)] }),
       );
       expect(inventory.pods[0].status).toBeNull();
-      expect(inventory.pods[0].issues).toEqual([]);
+      expect(inventory.pods[0].warnings).toEqual([]);
     });
   });
 
@@ -489,25 +482,6 @@ describe("buildInventory — pods", () => {
       expect(row.memoryBytes).toBeNull();
       expect(row.series).toEqual({ cpu: null, memory: null });
     });
-
-    it("counts the same tiles on every tab when only tab or range queries see an old uid", () => {
-      const current = { namespace: "shop", pod: "db-0", uid: "B" };
-      const old = { ...current, uid: "A" };
-      const always = {
-        P1: [ksm({ ...current, phase: "Pending" })],
-        P7: [ksm({ ...old, container: "c" }, 3), ksm({ ...current, container: "c" }, 0)],
-      };
-      const podsTab = buildInventory(
-        results({ ...always, P6: [ksm({ ...old, node: "n1" })], P4: [], P8: [] }),
-      );
-      const deploymentsTab = buildInventory(results({ ...always, P4: [] }));
-      const scope = { cluster: null, namespace: null };
-      expect(issueCounts(podsTab, scope, allIssuesVisible)).toEqual(
-        issueCounts(deploymentsTab, scope, allIssuesVisible),
-      );
-      expect(podsTab.pods[0].ambiguous).toBe(false);
-      expect(issueCounts(podsTab, scope, allIssuesVisible).podsNotRunning).toBe(1);
-    });
   });
 
   describe("cluster labels", () => {
@@ -542,7 +516,315 @@ describe("buildInventory — pods", () => {
   });
 });
 
-describe("buildInventory — nodes", () => {
+describe("pods — Lens redesign", () => {
+  it.each([
+    [
+      "Evicted beats a waiting reason",
+      { reason: "Evicted", waiting: "CrashLoopBackOff", phase: "Failed" },
+      { text: "Evicted", variant: "error-soft" },
+    ],
+    [
+      "a waiting reason beats Failed",
+      { waiting: "CrashLoopBackOff", phase: "Failed" },
+      { text: "CrashLoopBackOff", variant: "error-soft" },
+    ],
+    [
+      "Failed beats readiness",
+      { phase: "Failed", ready: "true" },
+      { text: "Failed", variant: "error-soft" },
+    ],
+    ["Pending", { phase: "Pending" }, { text: "Pending", variant: "warning-soft" }],
+    ["Unknown", { phase: "Unknown" }, { text: "Unknown", variant: "amber-soft" }],
+    [
+      "Running not ready",
+      { phase: "Running", ready: "false" },
+      { key: "infra.k8s2.podRunningNotReady", variant: "warning-soft" },
+    ],
+    [
+      "Running ready",
+      { phase: "Running", ready: "true" },
+      { text: "Running", variant: "success-soft" },
+    ],
+  ] as const)("status precedence: %s", (_name, f: any, expected) => {
+    const p = pod("s");
+    const row = onlyPod({
+      P1: [ksm({ ...p, phase: f.phase })],
+      P11: f.ready ? [ksm({ ...p, condition: f.ready })] : [],
+      P2: f.waiting ? [ksm({ ...p, container: "main", reason: f.waiting })] : [],
+      P15: f.reason ? [ksm({ ...p, reason: f.reason })] : [],
+    });
+    expect(row.status).toEqual(expected);
+  });
+
+  describe("container squares", () => {
+    const p = pod("sq");
+    const fixture = (extra: Partial<Record<QueryId, Series[]>>) =>
+      onlyPod({ P1: [ksm({ ...p, phase: "Running" })], P7: [], ...extra });
+
+    it("orders the states terminated, restarted, ready, waiting, unknown", () => {
+      const row = fixture({
+        P10: ["a", "b", "c", "d"].map((container) =>
+          ksm({ ...p, container, image: `img-${container}` }),
+        ),
+        P8: [ksm({ ...p, container: "e", resource: "cpu" }, 0.1)],
+        P13: [
+          ksm({ ...p, container: "a" }, 1),
+          ksm({ ...p, container: "b" }, 1),
+          ksm({ ...p, container: "c" }, 1),
+          ksm({ ...p, container: "d" }, 0),
+        ],
+        P14: [ksm({ ...p, container: "a", reason: "Completed" })],
+        P7: [ksm({ ...p, container: "b" }, 2), ksm({ ...p, container: "a" }, 3)],
+      });
+      expect(row.containers.map((c) => [c.name, c.state])).toEqual([
+        ["a", "terminated"],
+        ["b", "restarted"],
+        ["c", "ready"],
+        ["d", "waiting"],
+        ["e", "unknown"],
+      ]);
+      expect(row.containers[0].image).toBe("img-a");
+    });
+
+    it("shows a CrashLoopBackOff container as waiting", () => {
+      const row = fixture({
+        P10: [ksm({ ...p, container: "main" })],
+        P13: [ksm({ ...p, container: "main" }, 0)],
+        P2: [ksm({ ...p, container: "main", reason: "CrashLoopBackOff" })],
+      });
+      expect(row.containers[0].state).toBe("waiting");
+      expect(row.containers[0].running).toBe(false);
+    });
+
+    it("gives a Pending pod with requests only an unknown square per requested container", () => {
+      const row = onlyPod({
+        P1: [ksm({ ...p, phase: "Pending" })],
+        P8: [
+          ksm({ ...p, container: "x", resource: "cpu" }, 1),
+          ksm({ ...p, container: "y", resource: "cpu" }, 1),
+        ],
+      });
+      expect(row.containers.map((c) => c.state)).toEqual(["unknown", "unknown"]);
+    });
+  });
+
+  describe("controlled by", () => {
+    it("keeps the direct ReplicaSet owner, and resolves the Deployment as the workload", () => {
+      const row = onlyPod({
+        P1: [ksm({ ...pod("w"), phase: "Running" })],
+        P4: [ksm({ ...pod("w"), owner_kind: "ReplicaSet", owner_name: "w-rs" })],
+        P5: [
+          ksm({ namespace: "shop", replicaset: "w-rs", owner_kind: "Deployment", owner_name: "w" }),
+        ],
+      });
+      expect(row.controller).toEqual({ kind: "ReplicaSet", name: "w-rs" });
+      expect(row.workload).toEqual({ kind: "Deployment", name: "w" });
+    });
+
+    it.each(["<none>", ""])("treats a P4 owner of %j as absent", (name) => {
+      const row = onlyPod({
+        P1: [ksm({ ...pod("w"), phase: "Running" })],
+        P4: [ksm({ ...pod("w"), owner_kind: name, owner_name: name })],
+      });
+      expect(row.controller).toBeNull();
+      expect(row.workload).toBeNull();
+    });
+
+    it.each(["<none>", ""])("treats a P5 and J7 owner of %j as absent", (name) => {
+      const inventory = buildInventory(
+        results({
+          RS2: [ksm({ namespace: "shop", replicaset: "rs" }, 1)],
+          P5: [ksm({ namespace: "shop", replicaset: "rs", owner_kind: name, owner_name: name })],
+          J1: [ksm({ namespace: "shop", job_name: "j" }, 0)],
+          J7: [ksm({ namespace: "shop", job_name: "j", owner_kind: name, owner_name: name })],
+        }),
+      );
+      expect(inventory.replicasets[0].owner).toBeNull();
+      expect(inventory.jobs[0].owner).toBeNull();
+    });
+  });
+
+  describe("QoS estimate", () => {
+    const qos = (p8: Series[], p9: Series[]) =>
+      onlyPod({
+        P1: [ksm({ ...pod("q"), phase: "Running" })],
+        P10: [ksm({ ...pod("q"), container: "c" })],
+        P8: p8,
+        P9: p9,
+      }).qos;
+
+    it("is BestEffort without any request or limit", () => {
+      expect(qos([], [])).toEqual({ cls: "BestEffort", estimated: true });
+    });
+
+    it("is Guaranteed when limits equal requests for cpu and memory", () => {
+      const both = (id: "cpu" | "memory", v: number) =>
+        ksm({ ...pod("q"), container: "c", resource: id }, v);
+      expect(qos([both("cpu", 1), both("memory", 5)], [both("cpu", 1), both("memory", 5)])).toEqual(
+        {
+          cls: "Guaranteed",
+          estimated: true,
+        },
+      );
+    });
+
+    it("is Burstable for the coredns shape (requests, and a memory limit only)", () => {
+      const r = (id: "cpu" | "memory", v: number) =>
+        ksm({ ...pod("q"), container: "c", resource: id }, v);
+      expect(qos([r("cpu", 0.1), r("memory", 70 * MI)], [r("memory", 170 * MI)])?.cls).toBe(
+        "Burstable",
+      );
+    });
+
+    it("is unknown when requests or limits are unavailable", () => {
+      const row = onlyPod({
+        P1: [ksm({ ...pod("q"), phase: "Running" })],
+        P10: [ksm({ ...pod("q"), container: "c" })],
+      });
+      expect(row.qos).toBeNull();
+    });
+  });
+
+  it("reads pod age, IP, priority class and node from P12 and P6", () => {
+    const row = onlyPod({
+      P1: [ksm({ ...pod("a"), phase: "Running" })],
+      P12: [ksm(pod("a"), 1_700_000_000)],
+      P6: [ksm({ ...pod("a"), node: "n1", pod_ip: "10.0.0.5", priority_class: "high" })],
+    });
+    expect(row).toMatchObject({
+      createdAt: 1_700_000_000_000_000,
+      ip: "10.0.0.5",
+      priorityClass: "high",
+      node: "n1",
+    });
+  });
+
+  describe("⚠ reasons", () => {
+    const p = pod("w");
+    it.each([
+      ["Failed", { P1: [ksm({ ...p, phase: "Failed" })] }, "infra.k8s2.warnFailed", "error"],
+      [
+        "Evicted",
+        { P1: [ksm({ ...p, phase: "Failed" })], P15: [ksm({ ...p, reason: "Evicted" })] },
+        "infra.k8s2.warnEvicted",
+        "error",
+      ],
+      ["Pending", { P1: [ksm({ ...p, phase: "Pending" })] }, "infra.k8s2.warnPhase", "warning"],
+      ["Unknown", { P1: [ksm({ ...p, phase: "Unknown" })] }, "infra.k8s2.warnPhase", "warning"],
+      [
+        "not ready",
+        { P1: [ksm({ ...p, phase: "Running" })], P11: [ksm({ ...p, condition: "unknown" })] },
+        "infra.k8s2.warnNotReady",
+        "warning",
+      ],
+      [
+        "image pull",
+        {
+          P1: [ksm({ ...p, phase: "Pending" })],
+          P2: [ksm({ ...p, container: "c", reason: "ImagePullBackOff" })],
+        },
+        "infra.k8s2.warnWaiting",
+        "error",
+      ],
+    ] as const)("%s yields its line and severity", (_n, data: any, key, severity) => {
+      expect(onlyPod(data).warnings).toContainEqual(expect.objectContaining({ key, severity }));
+    });
+
+    const END = 1_700_000_000_000_000;
+    const event = (extra: Partial<WarningEvent>): WarningEvent => ({
+      cluster: "prod",
+      kind: "Pod",
+      name: "w",
+      namespace: "shop",
+      uid: "w-uid",
+      events: 3,
+      lastSeen: END - 59 * 60_000_000,
+      reason: "BackOff",
+      note: "Back-off restarting failed container",
+      ...extra,
+    });
+    const withEvents = (events: WarningEvent[], uid = "w-uid") =>
+      buildInventory(
+        results({
+          P1: [ksm({ ...p, uid, phase: "Running" })],
+          P11: [ksm({ ...p, uid, condition: "true" })],
+        }),
+        events,
+      ).pods[0];
+
+    it("attaches a Warning event on the current uid with its reason, count and time", () => {
+      expect(withEvents([event({})]).warnings).toEqual([
+        {
+          key: "infra.k8s2.warnEvents",
+          params: { reason: "BackOff", note: "Back-off restarting failed container", count: "3" },
+          severity: "warning",
+          lastSeen: END - 59 * 60_000_000,
+        },
+      ]);
+    });
+
+    it("never attaches an event on a previous uid of the same name", () => {
+      expect(withEvents([event({ uid: "old-uid" })]).warnings).toEqual([]);
+    });
+
+    it("attaches an event without a uid by namespace and name", () => {
+      expect(keys(withEvents([event({ uid: "" })]))).toEqual(["infra.k8s2.warnEvents"]);
+    });
+
+    it("merges a uid-bearing and a uid-less group into one entry with the summed count", () => {
+      const row = withEvents([
+        event({ events: 2, lastSeen: END - 120_000_000, reason: "Old" }),
+        event({ uid: "", events: 5, lastSeen: END - 60_000_000, reason: "BackOff" }),
+      ]);
+      expect(row.warnings).toHaveLength(1);
+      expect(row.warnings[0].params).toMatchObject({ reason: "BackOff", count: "7" });
+      expect(row.warnings[0].lastSeen).toBe(END - 60_000_000);
+    });
+
+    it("leaves an event for another cluster unattached", () => {
+      expect(withEvents([event({ uid: "", cluster: "dev" })]).warnings).toEqual([]);
+    });
+  });
+});
+
+describe("pod status rules (Workloads overview)", () => {
+  const p = pod("x");
+  it.each([
+    ["Running and Ready", { phase: "Running", ready: "true" }, "running"],
+    ["Running not Ready", { phase: "Running", ready: "false" }, "pending"],
+    ["Running without readiness", { phase: "Running" }, "unknown"],
+    ["phase Unknown", { phase: "Unknown" }, "unknown"],
+    ["Evicted", { phase: "Failed", reason: "Evicted" }, "evicted"],
+    ["Failed", { phase: "Failed" }, "failed"],
+    ["Succeeded", { phase: "Succeeded" }, "succeeded"],
+    ["Pending", { phase: "Pending" }, "pending"],
+  ] as const)("%s → %s", (_n, f: any, expected) => {
+    const row = onlyPod({
+      P1: [ksm({ ...p, phase: f.phase })],
+      ...(f.ready ? { P11: [ksm({ ...p, condition: f.ready })] } : {}),
+      P15: f.reason ? [ksm({ ...p, reason: f.reason })] : [],
+    });
+    expect(lensPodStatus(row)).toBe(expected);
+  });
+
+  it("needs Initialized True as well when the pod object was observed", () => {
+    const row = onlyPod({
+      P1: [ksm({ ...p, phase: "Running" })],
+      P11: [ksm({ ...p, condition: "true" })],
+    });
+    row.object = {
+      uid: "x-uid",
+      metadata: {},
+      spec: {},
+      status: { conditions: [{ type: "Initialized", status: "False" }] },
+    };
+    expect(lensPodStatus(row)).toBe("pending");
+    row.object.status.conditions[0].status = "True";
+    expect(lensPodStatus(row)).toBe("running");
+  });
+});
+
+describe("nodes", () => {
   const n1 = (node: string, condition: string, status: string) => ksm({ node, condition, status });
 
   it.each([
@@ -554,43 +836,83 @@ describe("buildInventory — nodes", () => {
     expect(inventory.nodes[0].status).toEqual({ key, variant });
   });
 
-  it("counts NotReady and Unknown only, and pressure separately", () => {
+  it("flags NotReady as an error, Unknown and pressure as warnings", () => {
     const inventory = buildInventory(
       results({
         N1: [
-          n1("ok", "Ready", "true"),
           n1("bad", "Ready", "false"),
           n1("unk", "Ready", "unknown"),
           n1("hot", "Ready", "true"),
           n1("hot", "MemoryPressure", "true"),
-          n1("ok", "DiskPressure", "false"),
         ],
       }),
     );
-    const counts = issueCounts(inventory, { cluster: null, namespace: null }, allIssuesVisible);
-    expect(counts.nodesNotReady).toBe(2);
-    expect(counts.nodesPressure).toBe(1);
-    expect(inventory.nodes.find((n) => n.name === "hot")?.pressures).toEqual(["MemoryPressure"]);
+    const byName = Object.fromEntries(inventory.nodes.map((n) => [n.name, n.warnings]));
+    expect(byName.bad).toEqual([{ key: "infra.k8s2.warnNodeNotReady", severity: "error" }]);
+    expect(byName.unk[0].severity).toBe("warning");
+    expect(byName.hot).toEqual([
+      {
+        key: "infra.k8s2.warnCondition",
+        params: { condition: "MemoryPressure" },
+        severity: "warning",
+      },
+    ]);
   });
 
-  it("has a null status without an N1 series and divides usage by allocatable", () => {
-    const inventory = buildInventory(
-      results({
-        N1: [],
-        N2: [
-          ksm({ node: "n1", resource: "cpu" }, 4),
-          ksm({ node: "n1", resource: "memory" }, 8 * GI),
-        ],
-        K3: [kub({ k8s_node_name: "n1" }, 1)],
-        K4: [kub({ k8s_node_name: "n1" }, 2 * GI)],
-      }),
-    );
-    expect(inventory.nodes[0]).toMatchObject({
+  it("divides CPU, memory and disk by allocatable and capacity, with null for a missing stream", () => {
+    const fixture = {
+      N1: [],
+      N2: [
+        ksm({ node: "n1", resource: "cpu" }, 4),
+        ksm({ node: "n1", resource: "memory" }, 8 * GI),
+      ],
+      K3: [kub({ k8s_node_name: "n1" }, 1)],
+      K4: [kub({ k8s_node_name: "n1" }, 2 * GI)],
+      K5: [kub({ k8s_node_name: "n1" }, 30)],
+      K6: [kub({ k8s_node_name: "n1" }, 120)],
+    };
+    expect(buildInventory(results(fixture)).nodes[0]).toMatchObject({
       name: "n1",
-      cluster: "prod",
       status: null,
       cpuPct: 25,
       memoryPct: 25,
+      diskPct: 25,
+      clusterLabel: "k8s_cluster_name",
+    });
+    const { K6: _k6, ...noCapacity } = fixture;
+    expect(buildInventory(results(noCapacity)).nodes[0].diskPct).toBeNull();
+  });
+
+  it("reads taints, kubelet info and age, and words the true conditions", () => {
+    const node = buildInventory(
+      results({
+        N1: [
+          n1("n1", "Ready", "true"),
+          n1("n1", "MemoryPressure", "true"),
+          n1("n1", "DiskPressure", "false"),
+        ],
+        N3: [ksm({ node: "n1", kubelet_version: "v1.29.0", internal_ip: "10.0.10.38" })],
+        N4: [
+          ksm({ node: "n1", key: "node.kubernetes.io/memory-pressure", effect: "NoSchedule" }),
+          ksm({ node: "n1", key: "dedicated", value: "gpu", effect: "NoExecute" }),
+        ],
+        N5: [ksm({ node: "n1" }, 1_600_000_000)],
+      }),
+    ).nodes[0];
+    expect(node.taints).toEqual([
+      { key: "node.kubernetes.io/memory-pressure", value: "", effect: "NoSchedule" },
+      { key: "dedicated", value: "gpu", effect: "NoExecute" },
+    ]);
+    expect(node.info?.kubelet_version).toBe("v1.29.0");
+    expect(node.createdAt).toBe(1_600_000_000_000_000);
+    expect(nodeConditionWords(node)).toEqual([
+      { text: "Ready", variant: "success-soft" },
+      { text: "MemoryPressure", variant: "warning-soft" },
+    ]);
+    node.unschedulable = true;
+    expect(nodeConditionWords(node).at(-1)).toEqual({
+      text: "SchedulingDisabled",
+      variant: "warning-soft",
     });
   });
 
@@ -603,143 +925,274 @@ describe("buildInventory — nodes", () => {
     );
     expect(inventory.nodes[0]).toMatchObject({ memoryPct: 50, cpuPct: null });
   });
+});
 
-  it("counts current-uid pods per node", () => {
+describe("workload kinds", () => {
+  const ns = { namespace: "shop" };
+
+  it("deployments: available/replicas, derived Available, and ⚠ when available < desired", () => {
+    const dep = (desired: number, available: number) =>
+      buildInventory(
+        results({
+          D1: [ksm({ ...ns, deployment: "web" }, desired)],
+          D2: [ksm({ ...ns, deployment: "web" }, available)],
+          D3: [ksm({ ...ns, deployment: "web" }, desired + 1)],
+          D5: [ksm({ ...ns, deployment: "web" }, 1_000)],
+        }),
+      ).deployments[0];
+    expect(dep(3, 3)).toMatchObject({
+      available: 3,
+      replicas: 4,
+      createdAt: 1_000_000_000,
+      conditions: [{ text: "Available", variant: "success-soft" }],
+      conditionsDerived: true,
+      warnings: [],
+    });
+    expect(dep(3, 1).conditions).toEqual([]);
+    expect(dep(3, 1).warnings[0].severity).toBe("warning");
+    expect(dep(3, 0).warnings[0].severity).toBe("error");
+  });
+
+  it("daemonsets: current scheduled and ⚠ when ready < desired", () => {
+    const row = buildInventory(
+      results({
+        DS1: [ksm({ ...ns, daemonset: "fluent-bit" }, 4)],
+        DS3: [ksm({ ...ns, daemonset: "fluent-bit" }, 4)],
+        DS5: [ksm({ ...ns, daemonset: "fluent-bit" }, 3)],
+      }),
+    ).daemonsets[0];
+    expect(row).toMatchObject({ desired: 4, current: 4, ready: 3, nodeSelector: null });
+    expect(keys(row)).toEqual(["infra.k8s2.warnNotAllReady"]);
+  });
+
+  it("statefulsets: ready/current", () => {
+    const row = buildInventory(
+      results({
+        SS1: [ksm({ ...ns, statefulset: "db" }, 3)],
+        SS2: [ksm({ ...ns, statefulset: "db" }, 2)],
+        SS3: [ksm({ ...ns, statefulset: "db" }, 3)],
+      }),
+    ).statefulsets[0];
+    expect(row).toMatchObject({ replicas: 3, ready: 2, current: 3 });
+    expect(row.warnings).toHaveLength(1);
+  });
+
+  it("replicasets: desired, current from status_replicas, ready, and an ownerless one is listed", () => {
     const inventory = buildInventory(
       results({
-        N1: [n1("n1", "Ready", "true")],
-        P1: [ksm({ ...pod("a"), phase: "Running" }), ksm({ ...pod("b"), phase: "Running" })],
-        P6: [ksm({ ...pod("a"), node: "n1" }), ksm({ ...pod("b"), node: "n2" })],
+        RS2: [ksm({ ...ns, replicaset: "a" }, 2), ksm({ ...ns, replicaset: "lone" }, 1)],
+        RS3: [ksm({ ...ns, replicaset: "a" }, 2)],
+        RS4: [ksm({ ...ns, replicaset: "a" }, 1)],
+        P5: [ksm({ ...ns, replicaset: "a", owner_kind: "Deployment", owner_name: "web" })],
       }),
     );
-    expect(inventory.nodes.find((n) => n.name === "n1")?.pods).toBe(1);
+    const byName = Object.fromEntries(inventory.replicasets.map((r) => [r.name, r]));
+    expect(byName.a).toMatchObject({
+      desired: 2,
+      current: 2,
+      ready: 1,
+      owner: { kind: "Deployment", name: "web" },
+    });
+    expect(byName.lone.owner).toBeNull();
   });
-});
 
-describe("buildInventory — deployments", () => {
-  const dep = (
-    desired: number,
-    available?: number,
-    extra: Partial<Record<QueryId, Series[]>> = {},
-  ) =>
-    buildInventory(
+  it("jobs: membership from any status series, Failed reasons only above zero, Complete", () => {
+    const inventory = buildInventory(
       results({
-        D1: [ksm({ namespace: "shop", deployment: "web" }, desired)],
-        D2: available == null ? [] : [ksm({ namespace: "shop", deployment: "web" }, available)],
-        ...extra,
+        J1: [ksm({ ...ns, job_name: "nightly" }, 0)],
+        J2: [ksm({ ...ns, job_name: "nightly" }, 1)],
+        J3: [
+          ksm({ ...ns, job_name: "backfill", reason: "BackoffLimitExceeded" }, 1),
+          ksm({ ...ns, job_name: "backfill", reason: "DeadlineExceeded" }, 0),
+        ],
+        J4: [ksm({ ...ns, job_name: "nightly" }, 1)],
+        J5: [ksm({ ...ns, job_name: "nightly" }, 1)],
       }),
-    ).deployments[0];
-
-  it.each([
-    [3, 3, "Available", "success-soft"],
-    [3, 4, "Available", "success-soft"],
-    [3, 1, "Degraded", "warning-soft"],
-    [3, 0, "Unavailable", "error-soft"],
-    [0, 0, "ScaledToZero", "default-soft"],
-  ])("desired %i available %i is %s", (desired, available, state, variant) => {
-    expect(dep(desired, available).status).toEqual({ state, variant });
+    );
+    const byName = Object.fromEntries(inventory.jobs.map((r) => [r.name, r]));
+    expect(byName.nightly).toMatchObject({
+      succeeded: 1,
+      completions: 1,
+      complete: true,
+      failed: 0,
+    });
+    expect(byName.backfill).toMatchObject({
+      failed: 1,
+      failedReasons: ["BackoffLimitExceeded"],
+      complete: false,
+    });
+    expect(byName.backfill.warnings[0]).toMatchObject({
+      key: "infra.k8s2.warnJobFailed",
+      severity: "error",
+    });
   });
 
-  it("ready but not yet available is Degraded, because availability is the source", () => {
-    // kube_deployment_status_replicas_ready is not queried at all; a ready-3 fixture cannot leak in.
-    expect(dep(3, 1).status?.state).toBe("Degraded");
-    expect(dep(3, 1).issues).toEqual(["deploymentsUnavailable"]);
+  it("cronjobs: schedule, suspend, active, and last schedule from the newest owned job", () => {
+    const inventory = buildInventory(
+      results({
+        CJ1: [ksm({ namespace: "data", cronjob: "nightly-report", schedule: "0 2 * * *" })],
+        CJ2: [ksm({ namespace: "data", cronjob: "nightly-report" }, 0)],
+        CJ3: [ksm({ namespace: "data", cronjob: "nightly-report" }, 0)],
+        J6: [
+          ksm({ namespace: "data", job_name: "nightly-report-1" }, 100),
+          ksm({ namespace: "data", job_name: "nightly-report-2" }, 200),
+        ],
+        J7: [
+          ksm({
+            namespace: "data",
+            job_name: "nightly-report-1",
+            owner_kind: "CronJob",
+            owner_name: "nightly-report",
+          }),
+          ksm({
+            namespace: "data",
+            job_name: "nightly-report-2",
+            owner_kind: "CronJob",
+            owner_name: "nightly-report",
+          }),
+        ],
+      }),
+    );
+    expect(inventory.cronjobs[0]).toMatchObject({
+      schedule: "0 2 * * *",
+      suspend: false,
+      active: 0,
+      lastSchedule: 200_000_000,
+      jobs: ["nightly-report-1", "nightly-report-2"],
+    });
+    expect(
+      buildInventory(
+        results({
+          CJ1: inventory.cronjobs.length
+            ? [ksm({ namespace: "data", cronjob: "x", schedule: "*" })]
+            : [],
+        }),
+      ).cronjobs[0].lastSchedule,
+    ).toBeNull();
   });
 
-  it("has a null status and no issue without a D2 series", () => {
-    const row = dep(3);
-    expect(row.status).toBeNull();
-    expect(row.issues).toEqual([]);
+  it("pvcs: storage class, size, pods from K7 and phase warnings", () => {
+    const inventory = buildInventory(
+      results({
+        V1: [
+          ksm({ namespace: "data", persistentvolumeclaim: "data-postgres-0", phase: "Bound" }),
+          ksm({ namespace: "data", persistentvolumeclaim: "lost", phase: "Lost" }),
+        ],
+        V2: [
+          ksm({ namespace: "data", persistentvolumeclaim: "data-postgres-0", storageclass: "gp3" }),
+        ],
+        V3: [ksm({ namespace: "data", persistentvolumeclaim: "data-postgres-0" }, 10 * GI)],
+        K7: [
+          kub(
+            {
+              k8s_namespace_name: "data",
+              k8s_pod_name: "postgres-0",
+              k8s_persistentvolumeclaim_name: "data-postgres-0",
+            },
+            10 * GI,
+          ),
+        ],
+      }),
+    );
+    const byName = Object.fromEntries(inventory.pvcs.map((r) => [r.name, r]));
+    expect(byName["data-postgres-0"]).toMatchObject({
+      phase: "Bound",
+      storageClass: "gp3",
+      size: 10 * GI,
+      pods: ["postgres-0"],
+      warnings: [],
+    });
+    expect(byName.lost.warnings[0].severity).toBe("error");
+  });
+
+  it("hpas: min, max, replicas, true conditions, target and ScalingLimited", () => {
+    const row = buildInventory(
+      results({
+        H1: [ksm({ namespace: "media", horizontalpodautoscaler: "transcoding-service" }, 5)],
+        H2: [ksm({ namespace: "media", horizontalpodautoscaler: "transcoding-service" }, 1)],
+        H3: [ksm({ namespace: "media", horizontalpodautoscaler: "transcoding-service" }, 5)],
+        H4: [
+          ksm({
+            namespace: "media",
+            horizontalpodautoscaler: "transcoding-service",
+            condition: "AbleToScale",
+            status: "true",
+          }),
+          ksm({
+            namespace: "media",
+            horizontalpodautoscaler: "transcoding-service",
+            condition: "ScalingLimited",
+            status: "true",
+          }),
+          ksm({
+            namespace: "media",
+            horizontalpodautoscaler: "transcoding-service",
+            condition: "ScalingActive",
+            status: "false",
+          }),
+        ],
+        H8: [
+          ksm({
+            namespace: "media",
+            horizontalpodautoscaler: "transcoding-service",
+            scaletargetref_kind: "Deployment",
+            scaletargetref_name: "transcoding-service",
+          }),
+        ],
+      }),
+    ).hpas[0];
+    expect(row).toMatchObject({
+      min: 1,
+      max: 5,
+      current: 5,
+      conditions: [
+        { condition: "AbleToScale", status: "true" },
+        { condition: "ScalingLimited", status: "true" },
+      ],
+      target: { kind: "Deployment", name: "transcoding-service" },
+    });
+    expect(keys(row)).toEqual(["infra.k8s2.warnScalingLimited"]);
+  });
+
+  it("namespaces: cluster-scoped rows with their phase", () => {
+    const row = buildInventory(
+      results({
+        NS1: [ksm({ namespace: "data", phase: "Active" })],
+        NS2: [ksm({ namespace: "data" }, 10)],
+      }),
+    ).namespaces[0];
+    expect(row).toMatchObject({
+      name: "data",
+      namespace: "",
+      phase: "Active",
+      createdAt: 10_000_000,
+    });
   });
 });
 
-describe("issue counts, filtering and sorting", () => {
-  const twoClusters = () =>
-    buildInventory(
+describe("scope and sorting", () => {
+  it("scopes by cluster and the namespace selection, never filtering nodes or namespaces by namespace", () => {
+    const inventory = buildInventory(
       results({
         P1: [
           ksm({ ...pod("a"), phase: "Pending" }),
           ksm({ k8s_cluster: "dev", namespace: "data", pod: "b", uid: "b", phase: "Pending" }),
         ],
-        N1: [
-          ksm({ node: "n1", condition: "Ready", status: "false" }),
-          ksm({ k8s_cluster: "dev", node: "n1", condition: "Ready", status: "false" }),
-        ],
-        P6: [
-          ksm({ ...pod("a"), node: "n1" }),
-          ksm({ k8s_cluster: "dev", namespace: "data", pod: "b", uid: "b", node: "n1" }),
-        ],
+        N1: [ksm({ node: "n1", condition: "Ready", status: "true" })],
       }),
     );
-
-  it("applies only the scope facets, and namespace never touches node tiles", () => {
-    const inventory = twoClusters();
+    const scope = { cluster: "prod", namespaces: ["data"] };
+    expect(inventory.pods.filter((r) => inScope(r, scope))).toEqual([]);
     expect(
-      issueCounts(inventory, { cluster: "prod", namespace: null }, allIssuesVisible),
-    ).toMatchObject({
-      podsNotRunning: 1,
-      nodesNotReady: 1,
-    });
-    expect(
-      issueCounts(inventory, { cluster: null, namespace: "shop" }, allIssuesVisible),
-    ).toMatchObject({
-      podsNotRunning: 1,
-      nodesNotReady: 2,
-    });
-  });
-
-  it("reports a hidden tile as null", () => {
-    const counts = issueCounts(
-      twoClusters(),
-      { cluster: null, namespace: null },
-      (key) => key !== "podsOomKilled",
-    );
-    expect(counts.podsOomKilled).toBeNull();
-    expect(counts.podsNotRunning).toBe(2);
-  });
-
-  it("filters pods by onNode and workload within one cluster", () => {
-    const inventory = twoClusters();
-    const base = {
-      scope: { cluster: null, namespace: null },
-      issue: null,
-      name: "",
-      onNode: null,
-      workload: null,
-    };
-    expect(
-      filterRows("pods", inventory.pods, { ...base, onNode: ["dev", "n1"] }).map((p) => p.name),
-    ).toEqual(["b"]);
-    expect(filterRows("pods", inventory.pods, { ...base, name: "A" }).map((p) => p.name)).toEqual([
-      "a",
-    ]);
-    expect(
-      filterRows("nodes", inventory.nodes, {
-        ...base,
-        scope: { cluster: "dev", namespace: "shop" },
-      }),
+      inventory.pods.filter((r) => inScope(r, { cluster: "dev", namespaces: ["data"] })),
     ).toHaveLength(1);
+    expect(inventory.nodes.filter((r) => inScope(r, scope))).toHaveLength(1);
   });
 
   it("puts null values last in both directions", () => {
     const rows = [{ v: 2 }, { v: null }, { v: 1 }] as { v: number | null }[];
     expect(sortRows(rows, (r) => r.v, false).map((r) => r.v)).toEqual([1, 2, null]);
     expect(sortRows(rows, (r) => r.v, true).map((r) => r.v)).toEqual([2, 1, null]);
-  });
-
-  it("filters a list to exactly the rows a tile counted", () => {
-    const inventory = twoClusters();
-    const scope = { cluster: "prod", namespace: null };
-    const listed = filterRows("pods", inventory.pods, {
-      scope,
-      issue: "podsNotRunning",
-      name: "",
-      onNode: null,
-      workload: null,
-    });
-    expect(listed).toHaveLength(
-      issueCounts(inventory, scope, allIssuesVisible).podsNotRunning as number,
-    );
   });
 
   it("keeps PodRow sortable on the CPU % of request", () => {
@@ -759,6 +1212,14 @@ describe("formatters", () => {
     expect(formatPct(4.6)).toBe("5%");
     expect(formatPct(null)).toBe("—");
     expect(formatBytes(1024 ** 3)).toBe("1.0GB");
+  });
+
+  it("formats ages kubectl-style", () => {
+    expect(formatAge(59_000_000)).toBe("59s");
+    expect(formatAge(45 * 60_000_000)).toBe("45m");
+    expect(formatAge(3600_000_000)).toBe("1h");
+    expect(formatAge(12 * 86400_000_000)).toBe("12d");
+    expect(formatAge(null)).toBe("—");
   });
 
   it("tints usage bars with the Hosts thresholds", () => {

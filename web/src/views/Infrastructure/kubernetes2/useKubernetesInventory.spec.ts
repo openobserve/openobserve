@@ -16,486 +16,554 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import searchService from "@/services/search";
-import { useKubernetesInventory } from "./useKubernetesInventory";
-import { QUERY_STREAM, type QueryId } from "./kubernetesQueries";
-import { parseListState, type K8sListState } from "./kubernetesUrlState";
+import { queryClient } from "@/composables/query/queryClient";
+import * as queries from "@/services/kubernetes.queries";
+import { useKubernetesInventory, type K8sTime } from "./useKubernetesInventory";
+import { CLUSTER_QUERIES, QUERY_STREAM, queryText, type QueryId } from "./kubernetesQueries";
+import { parseUrlState, type K8sUrlState } from "./kubernetesUrlState";
 
 const getStreams = vi.fn();
+const getStream = vi.fn();
 
-vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn() } }));
-vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams }) }));
+vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn(), search: vi.fn() } }));
+vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams, getStream }) }));
 
 const metricsQuery = vi.mocked(searchService.metrics_query);
+const search = vi.mocked(searchService.search);
 
-const START = 1_700_000_000_000_000;
-const END = START + 3_600_000_000;
+const END = 1_700_000_000_000_000;
+const START = END - 3_600_000_000;
+const HOUR = 3_600_000_000;
 
-const ALL_STREAMS = Object.values(QUERY_STREAM);
-const KUBELET = ALL_STREAMS.filter((s) => s.startsWith("k8s_"));
-const KSM = ALL_STREAMS.filter((s) => s.startsWith("kube_"));
+const ALL_IDS = Object.keys(QUERY_STREAM) as QueryId[];
+const ALL_STREAMS = [...new Set(Object.values(QUERY_STREAM))];
 
-type Fixture = Partial<Record<QueryId, Array<{ metric: Record<string, string>; value: number }>>>;
+type Row = { metric: Record<string, string>; value: number };
+type Fixture = Partial<Record<QueryId, Row[]>>;
+
+// Strips the injected cluster matchers so a sent query maps back to its id.
+const unscope = (text: string) =>
+  text
+    .replace(/,?k8s_cluster(_name)?="(?:[^"\\]|\\.)*"/g, "")
+    .replace(/\{,/g, "{")
+    .replace(/\{\}/g, "");
 
 const idOf = (query: string): QueryId => {
-  const decoded = decodeURIComponent(query);
-  const id = (Object.keys(QUERY_STREAM) as QueryId[]).find((q) =>
-    new RegExp(`\\b${QUERY_STREAM[q]}\\b`).test(decoded),
-  );
-  if (!id) throw new Error(`unknown query ${decoded}`);
+  const text = unscope(decodeURIComponent(query));
+  const id = ALL_IDS.find((q) => queryText(q) === text);
+  if (!id) throw new Error(`unknown query ${text}`);
   return id;
 };
 
-const vector = (rows: Array<{ metric: Record<string, string>; value: number }> = []) => ({
+const vector = (rows: Row[] = []) => ({
   data: { data: { result: rows.map((r) => ({ metric: r.metric, value: [1, String(r.value)] })) } },
 });
 
-const respond = (fixture: Fixture, reject: QueryId[] = []) =>
-  metricsQuery.mockImplementation((({ query }: { query: string }) => {
-    const id = idOf(query);
-    if (reject.includes(id)) return Promise.reject(new Error(`boom ${id}`));
-    return Promise.resolve(vector(fixture[id]));
-  }) as any);
+let fixture: Fixture = {};
+let sqlHits: (sql: string) => any[] = () => [];
+let reject: QueryId[] = [];
 
-const sentIds = () => metricsQuery.mock.calls.map(([args]: any[]) => idOf(args.query)).sort();
+const sentQueries = () =>
+  metricsQuery.mock.calls.map(([args]: any[]) => decodeURIComponent(args.query));
+const sentIds = () => sentQueries().map((q) => idOf(encodeURIComponent(q)));
+const sentSql = () => search.mock.calls.map(([args]: any[]) => args.query.query);
 
-const ksm = (metric: Record<string, string>, value = 1) => ({
+const ksm = (metric: Record<string, string>, value = 1): Row => ({
   metric: { k8s_cluster: "prod", ...metric },
   value,
 });
 
-const setup = async (streams: string[], query: Record<string, string> = {}) => {
-  getStreams.mockResolvedValue({ list: streams.map((name) => ({ name })) });
-  const state = ref<K8sListState>(parseListState(query));
-  const inventory = useKubernetesInventory(() => state.value);
-  await inventory.loadStreams();
-  return { inventory, state };
-};
+const CL = (cluster = "prod", label = "k8s_cluster"): Fixture => ({
+  CL1N: [{ metric: { [label]: cluster }, value: 1 }],
+  CL1P: [{ metric: { [label]: cluster }, value: 1 }],
+  CL1D: [{ metric: { [label]: cluster }, value: 1 }],
+  CL2N: [{ metric: { k8s_cluster_name: cluster }, value: 1 }],
+  CL2P: [{ metric: { k8s_cluster_name: cluster }, value: 1 }],
+});
 
-const refresh = (inventory: ReturnType<typeof useKubernetesInventory>, kind = "pods" as const) =>
-  inventory.refresh({ orgId: "org1", start: START, end: END, kind });
+const setup = async (
+  query: Record<string, string> = {},
+  {
+    metrics = ALL_STREAMS,
+    logs = ["k8s_events"],
+    eventFields = ["k8s_cluster", "body_object_note"],
+    relative = true,
+  }: { metrics?: string[]; logs?: string[]; eventFields?: string[]; relative?: boolean } = {},
+) => {
+  getStreams.mockImplementation(async (type: string) => ({
+    list: (type === "metrics" ? metrics : logs).map((name) => ({ name })),
+  }));
+  getStream.mockResolvedValue({ schema: eventFields.map((name) => ({ name })) });
+  const state = ref<K8sUrlState>(parseUrlState(query));
+  const time = ref<K8sTime>({ start: START, end: END, relative });
+  const org = ref("org1");
+  const inv = useKubernetesInventory(
+    () => state.value,
+    () => time.value,
+    () => org.value,
+  );
+  await inv.loadStreams();
+  return { inv, state, time, org };
+};
 
 describe("useKubernetesInventory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    respond({});
+    queryClient.clear();
+    fixture = CL();
+    sqlHits = () => [];
+    reject = [];
+    metricsQuery.mockImplementation((async ({ query }: { query: string }) => {
+      const id = idOf(query);
+      if (reject.includes(id))
+        throw Object.assign(new Error(`boom ${id}`), { response: { status: 500 } });
+      return vector(fixture[id]);
+    }) as any);
+    search.mockImplementation((async (args: any) => ({
+      data: { hits: sqlHits(args.query.query.sql) },
+    })) as any);
   });
 
   describe("detection", () => {
-    it("is unknown before the stream list resolves", () => {
-      const inventory = useKubernetesInventory(() => parseListState({}));
-      expect(inventory.detection.value).toBe("unknown");
-    });
-
-    it("is an error when listing streams rejects, and Retry forces a refetch", async () => {
+    it("is unknown before the stream lists resolve, and an error when listing rejects", async () => {
+      const inv = useKubernetesInventory(
+        () => parseUrlState({}),
+        () => ({ start: START, end: END, relative: true }),
+        () => "org1",
+      );
+      expect(inv.detection.value).toBe("unknown");
       getStreams.mockRejectedValueOnce(new Error("down"));
-      const inventory = useKubernetesInventory(() => parseListState({}));
-      await inventory.loadStreams();
-      expect(inventory.detection.value).toBe("error");
-      getStreams.mockResolvedValueOnce({ list: [{ name: "kube_pod_status_phase" }] });
-      await inventory.loadStreams({ force: true });
-      expect(getStreams).toHaveBeenLastCalledWith("metrics", false, false, true);
-      expect(inventory.detection.value).toBe("detected");
+      await inv.loadStreams();
+      expect(inv.detection.value).toBe("error");
     });
 
-    it("is undetected without any of the seven streams", async () => {
-      const { inventory } = await setup(["kube_pod_owner", "system_cpu_time"]);
-      expect(inventory.detection.value).toBe("undetected");
+    it("detects an events-only org from the k8s_events logs stream", async () => {
+      const { inv } = await setup({}, { metrics: ["system_cpu"], logs: ["k8s_events"] });
+      expect(inv.detection.value).toBe("detected");
+      expect(inv.metricsDetected.value).toBe(false);
+      expect(inv.anchorMissing("pods")).toBe("kube_pod_status_phase");
+      expect(inv.anchorMissing("events")).toBeNull();
     });
 
-    it("ignores a stream list that resolves after a newer request started", async () => {
-      let releaseOld: (v: any) => void = () => {};
-      getStreams.mockReturnValueOnce(new Promise((resolve) => (releaseOld = resolve)));
-      getStreams.mockResolvedValueOnce({ list: [] });
-      const inventory = useKubernetesInventory(() => parseListState({}));
-      const old = inventory.loadStreams();
-      await inventory.loadStreams({ force: true });
-      releaseOld({ list: [{ name: "kube_pod_status_phase" }] });
-      await old;
-      expect(inventory.detection.value).toBe("undetected");
-    });
-
-    it("reset forgets the org's streams, results and errors and drops an in-flight refresh", async () => {
-      respond({ P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })] });
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.loaded.value).toBe(true);
-      const inFlight = refresh(inventory);
-      inventory.reset();
-      await inFlight;
-      expect(inventory.detection.value).toBe("unknown");
-      expect(inventory.inventory.value.pods).toEqual([]);
-      expect(inventory.pageError.value).toBeNull();
-      expect(inventory.banners.value).toEqual([]);
-      expect(inventory.loaded.value).toBe(false);
-    });
-
-    it("detects a KSM-only org from the pod anchor alone", async () => {
-      const { inventory } = await setup(["kube_pod_status_phase"]);
-      expect(inventory.detection.value).toBe("detected");
+    it("is undetected with no metric detection stream and no k8s_events", async () => {
+      const { inv } = await setup({}, { metrics: ["kube_pod_owner"], logs: ["default"] });
+      expect(inv.detection.value).toBe("undetected");
     });
   });
 
-  describe("fan-out", () => {
-    it("sends every instant query encoded, at the picker END in µs", async () => {
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(metricsQuery).toHaveBeenCalled();
-      for (const [args] of metricsQuery.mock.calls as any[]) {
-        expect(args.org_identifier).toBe("org1");
-        expect(args.end_time).toBe(END);
-        expect(args.query).toBe(encodeURIComponent(decodeURIComponent(args.query)));
-        expect(args.query).not.toContain(" ");
-      }
-      const restarts = (metricsQuery.mock.calls as any[]).find(
-        ([args]) => idOf(args.query) === "P7",
-      );
-      expect(decodeURIComponent(restarts[0].query)).toContain("[3600s]");
-    });
-
+  describe("per-view sets (§7.2) plus CL and NS1", () => {
+    const CL_IDS = [...CLUSTER_QUERIES];
     it.each([
-      ["pods", ["P4", "P5", "P6", "P8", "K1"]],
-      ["nodes", ["P6", "N2", "K3", "K4"]],
-      ["deployments", ["P4", "P5"]],
-    ] as const)("on %s sends the 12 always-fetched queries plus %j", async (kind, extra) => {
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory, kind as any);
-      const always = ["P1", "P2", "P3", "P7", "P9", "P10", "P11", "P12", "K2", "N1", "D1", "D2"];
-      expect(sentIds()).toEqual([...always, ...extra].sort());
+      ["pods", 17 + 6, ["W:Pod", "O:pod"]],
+      ["cluster", 10 + 6, ["W:*"]],
+      ["workloads", 16 + 6, ["E"]],
+      ["hpas", 5 + 6, ["W:HorizontalPodAutoscaler"]],
+      ["replicasets", 5 + 6, ["W:ReplicaSet"]],
+      ["nodes", 9 + 6, ["W:Node", "O:node"]],
+      ["events", 0 + 6, ["E"]],
+    ] as const)("%s sends %i PromQL and %j", async (view, count, sqlNames) => {
+      const { inv } = await setup({ view });
+      await inv.load();
+      expect(sentIds().length).toBe(count);
+      expect(sentIds()).toEqual(expect.arrayContaining([...CL_IDS, "NS1"]));
+      const names = search.mock.calls.map(([args]: any[]) => args.query.query.sql);
+      expect(names).toHaveLength(sqlNames.length);
     });
 
-    it("sends no kubeletstats query when only kube_* streams exist", async () => {
-      const { inventory } = await setup(KSM);
-      await refresh(inventory, "nodes");
-      expect(sentIds().some((id) => id.startsWith("K"))).toBe(false);
-      expect(sentIds()).toContain("N2");
+    it("sends the map's pod set with N1 only when grouped by node, and the node set", async () => {
+      const pods = await setup({ view: "map", group: "namespace" });
+      await pods.inv.load();
+      expect(
+        sentIds()
+          .filter((id) => !CL_IDS.includes(id) && id !== "NS1")
+          .sort(),
+      ).toEqual(
+        [
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5",
+          "P6",
+          "P7",
+          "P8",
+          "P9",
+          "P10",
+          "P11",
+          "P12",
+          "P15",
+          "K1",
+          "K2",
+        ].sort(),
+      );
+      vi.clearAllMocks();
+      queryClient.clear();
+      const nodes = await setup({ view: "map", entity: "nodes" });
+      await nodes.inv.load();
+      expect(
+        sentIds()
+          .filter((id) => !CL_IDS.includes(id) && id !== "NS1")
+          .sort(),
+      ).toEqual(["N1", "N2", "K3", "K4"].sort());
     });
 
-    it("sends no KSM query when only k8s_* streams exist", async () => {
-      const { inventory } = await setup(KUBELET);
-      await refresh(inventory);
-      expect(sentIds()).toEqual(["K1", "K2"]);
+    it("adds exactly a drawer's additions on top of its kind's set", async () => {
+      fixture = { ...CL(), H1: [ksm({ namespace: "m", horizontalpodautoscaler: "h" }, 3)] };
+      const { inv } = await setup({ view: "hpas", details: "hpa/prod/m/h" });
+      await inv.load();
+      expect(sentIds()).toContain("H8");
+      const sqls = sentSql().map((q: any) => q.sql);
+      expect(
+        sqls.some(
+          (s: string) =>
+            s.includes("k8s_resource_name = 'horizontalpodautoscalers'") && s.endsWith("LIMIT 1"),
+        ),
+      ).toBe(true);
+      expect(sqls.some((s: string) => s.includes("LIMIT 100"))).toBe(true);
     });
 
-    it("gates a KSM family on its anchor, not on its own stream", async () => {
-      const { inventory } = await setup(KSM.filter((s) => s !== "kube_deployment_spec_replicas"));
-      await refresh(inventory, "deployments");
-      expect(sentIds()).not.toContain("D1");
-      expect(sentIds()).not.toContain("D2");
-      expect(inventory.banners.value.map((b) => b.id)).toContain("anchor-deployments");
-      const anchor = inventory.banners.value.find((b) => b.id === "anchor-deployments");
-      expect(anchor?.kind).toBe("deployments");
-      expect(anchor?.params).toEqual({ stream: "kube_deployment_spec_replicas" });
+    it("sends no query of a view whose anchor stream is absent, and counts Jobs present on any status stream", async () => {
+      const { inv } = await setup(
+        { view: "deployments" },
+        { metrics: ALL_STREAMS.filter((s) => s !== "kube_deployment_spec_replicas") },
+      );
+      await inv.load();
+      expect(sentIds().some((id) => /^D\d/.test(id))).toBe(false);
+      expect(inv.anchorMissing("deployments")).toBe("kube_deployment_spec_replicas");
+      const jobs = await setup(
+        { view: "jobs" },
+        { metrics: ["kube_job_status_succeeded", "kube_pod_status_phase"] },
+      );
+      expect(jobs.inv.anchorMissing("jobs")).toBeNull();
+    });
+  });
+
+  describe("cluster scope", () => {
+    it("lists clusters from CL1 ∪ CL2, defaults to the first alphabetically, and scopes the SQL", async () => {
+      fixture = {
+        CL1P: [ksm({}), { metric: { k8s_cluster: "alpha" }, value: 1 }],
+        CL2N: [{ metric: { k8s_cluster_name: "zeta" }, value: 1 }],
+      };
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.clusters.value).toEqual(["alpha", "prod", "zeta"]);
+      expect(inv.effectiveCluster.value).toBe("alpha");
+      expect(sentSql()[0].sql).toContain("k8s_cluster = 'alpha'");
+    });
+
+    it("finds the cluster of a pod-only org", async () => {
+      fixture = {
+        CL1P: [ksm({})],
+        P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })],
+      };
+      const { inv } = await setup({ view: "pods" }, { metrics: ["kube_pod_status_phase"] });
+      await inv.load();
+      expect(sentIds().filter((id) => id.startsWith("CL"))).toEqual(["CL1P"]);
+      expect(inv.clusters.value).toEqual(["prod"]);
+      expect(inv.inventory.value.pods).toHaveLength(1);
+    });
+
+    it("falls back to the events stream when no CL series exists", async () => {
+      fixture = {};
+      sqlHits = (sql) => (sql.startsWith("SELECT DISTINCT") ? [{ c: "ev" }] : []);
+      const { inv } = await setup({ view: "events" }, { metrics: [] });
+      await inv.load();
+      expect(inv.clusters.value).toEqual(["ev"]);
+      const fallback = sentSql().find((q: any) => q.sql.startsWith("SELECT DISTINCT"));
+      expect(fallback).toMatchObject({ start_time: END - 24 * HOUR, end_time: END });
+    });
+
+    it("injects k8s_cluster into KSM and the CL2 spelling into kubeletstats queries", async () => {
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      const sent = sentQueries();
+      expect(
+        sent.find((q) => q.includes("kube_pod_status_phase") && !q.startsWith("count")),
+      ).toContain('kube_pod_status_phase{k8s_cluster="prod"}');
+      expect(sent.find((q) => q.includes("k8s_pod_cpu_usage") && !q.startsWith("count"))).toContain(
+        'k8s_pod_cpu_usage{k8s_cluster_name="prod"}',
+      );
+    });
+
+    it("sends a family with unlabelled CL rows unscoped, and banners it", async () => {
+      fixture = {
+        ...CL(),
+        CL2P: [
+          { metric: { k8s_cluster_name: "prod" }, value: 1 },
+          { metric: {}, value: 1 },
+        ],
+        K1: [{ metric: { k8s_namespace_name: "a", k8s_pod_name: "x" }, value: 1 }],
+        P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })],
+      };
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(
+        sentQueries().find((q) => q.startsWith("sum by") && q.includes("k8s_pod_cpu_usage")),
+      ).not.toContain("{");
+      expect(inv.banners.value.map((b) => b.id)).toContain("no-cluster-kubeletstats");
+    });
+  });
+
+  describe("unscoped events (no k8s_cluster field)", () => {
+    it("runs E with no cluster term and sends no W, DE, O* or fallback", async () => {
+      fixture = {};
+      const { inv } = await setup(
+        { view: "events" },
+        { eventFields: ["body_object_note"], metrics: [] },
+      );
+      await inv.load();
+      const sqls = sentSql().map((q: any) => q.sql);
+      expect(sqls).toHaveLength(1);
+      expect(sqls[0]).not.toContain("k8s_cluster");
+      expect(inv.eventsScoped.value).toBe(false);
+      expect(inv.eventLinksEnabled.value).toBe(false);
+      fixture = CL();
+      const pods = await setup({ view: "pods", details: "pod/prod/a/p" }, { eventFields: [] });
+      search.mockClear();
+      await pods.inv.load();
+      expect(search).not.toHaveBeenCalled();
+      expect(pods.inv.eventLinksEnabled.value).toBe(true);
+    });
+  });
+
+  describe("SQL windows and W", () => {
+    it("sends W over the last hour with size 20001, E over the picker range and O over 24h", async () => {
+      const pods = await setup({ view: "pods" });
+      await pods.inv.load();
+      const w = sentSql().find((q: any) => q.sql.includes("body_object_type = 'Warning'"));
+      expect(w).toMatchObject({ start_time: END - HOUR, end_time: END, size: 20001 });
+      const o = sentSql().find((q: any) => q.sql.includes("k8s_resource_name"));
+      expect(o).toMatchObject({ start_time: END - 24 * HOUR, end_time: END });
+      const events = await setup({ view: "events" });
+      search.mockClear();
+      await events.inv.load();
+      expect(sentSql()[0]).toMatchObject({ start_time: START, end_time: END });
+    });
+
+    it("marks all of 1,200 affected objects, and banners a truncated W", async () => {
+      const pods = Array.from({ length: 1200 }, (_, i) => `p${i}`);
+      fixture = {
+        ...CL(),
+        P1: pods.map((pod) => ksm({ namespace: "a", pod, uid: pod, phase: "Running" })),
+      };
+      sqlHits = (sql) =>
+        sql.includes("'Warning'")
+          ? pods.map((name) => ({
+              kind: "Pod",
+              name,
+              namespace: "a",
+              uid: name,
+              events: 1,
+              last_seen: END - 1,
+              reason: "R",
+              note: "n",
+            }))
+          : [];
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.inventory.value.pods.filter((p) => p.warnings.length > 0)).toHaveLength(1200);
+      expect(inv.banners.value.map((b) => b.id)).not.toContain("warnings-truncated");
+      sqlHits = (sql) =>
+        sql.includes("'Warning'")
+          ? Array.from({ length: 20001 }, (_, i) => ({ kind: "Pod", name: `x${i}` }))
+          : [];
+      const big = await setup({ view: "pods" }, { relative: false });
+      big.time.value = { start: START, end: END + 1, relative: false };
+      await big.inv.load();
+      expect(big.inv.banners.value.map((b) => b.id)).toContain("warnings-truncated");
+    });
+
+    it("does not attach a Warning older than the hour", async () => {
+      fixture = { ...CL(), P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })] };
+      sqlHits = (sql) =>
+        sql.includes("'Warning'")
+          ? [
+              {
+                kind: "Pod",
+                name: "p",
+                namespace: "a",
+                uid: "u",
+                events: 1,
+                last_seen: END - 61 * 60_000_000,
+                reason: "R",
+                note: "n",
+              },
+            ]
+          : [];
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.inventory.value.pods[0].warnings).toEqual([]);
     });
   });
 
   describe("sparse and optional streams", () => {
-    const streams = ALL_STREAMS.filter(
-      (s) =>
-        ![
-          "kube_pod_container_status_waiting_reason",
-          "kube_pod_container_status_last_terminated_reason",
-          "kube_pod_container_resource_limits",
-        ].includes(s),
-    );
-
-    it("treats absent sparse streams as empty and hides the OOM tile behind its explainer", async () => {
-      respond({
-        P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
-        P10: [ksm({ namespace: "shop", pod: "web", uid: "u", container: "main" })],
-      });
-      const { inventory } = await setup(streams);
-      await refresh(inventory);
-      expect(sentIds()).not.toContain("P2");
-      expect(sentIds()).not.toContain("P3");
-      expect(sentIds()).not.toContain("P9");
-      expect(inventory.counts.value.podsContainerErrors).toBe(0);
-      expect(inventory.counts.value.podsOomKilled).toBeNull();
-      expect(inventory.inventory.value.pods[0].memoryLimit).toBe("missing");
-      const ids = inventory.banners.value.map((b) => b.id);
-      expect(ids).toEqual(["oom-stream"]);
-    });
-  });
-
-  describe("single-stream usage", () => {
-    const usage = {
-      K1: [
-        {
-          metric: { k8s_cluster_name: "prod", k8s_namespace_name: "shop", k8s_pod_name: "a" },
-          value: 0.5,
-        },
-      ],
-      K2: [
-        {
-          metric: { k8s_cluster_name: "prod", k8s_namespace_name: "shop", k8s_pod_name: "a" },
-          value: 9,
-        },
-      ],
-      K4: [{ metric: { k8s_cluster_name: "prod", k8s_node_name: "n1" }, value: 2 }],
-    };
-
-    it("lists pods with CPU and a memory banner when only the CPU stream exists", async () => {
-      respond(usage);
-      const { inventory } = await setup(["k8s_pod_cpu_usage"]);
-      await refresh(inventory);
-      const pod = inventory.inventory.value.pods[0];
-      expect(pod.cpuCores).toBe(0.5);
-      expect(pod.memoryBytes).toBeNull();
-      const banner = inventory.banners.value.find((b) => b.id === "usage-K2");
-      expect(banner?.params).toEqual({ stream: "k8s_pod_memory_working_set" });
-      expect(inventory.counts.value.podsNearMemoryLimit).toBeNull();
-    });
-
-    it("lists pods with memory and CPU blank when only the memory stream exists", async () => {
-      respond(usage);
-      const { inventory } = await setup(["k8s_pod_memory_working_set"]);
-      await refresh(inventory);
-      const pod = inventory.inventory.value.pods[0];
-      expect(pod.memoryBytes).toBe(9);
-      expect(pod.cpuCores).toBeNull();
-    });
-
-    it("lists a memory-only node with CPU blank", async () => {
-      respond(usage);
-      const { inventory } = await setup(["k8s_node_memory_working_set"]);
-      await refresh(inventory, "nodes");
-      expect(inventory.inventory.value.nodes).toHaveLength(1);
-      expect(inventory.inventory.value.nodes[0].cpuPct).toBeNull();
-    });
-  });
-
-  describe("degradation", () => {
-    it("hides the not-running tile without readiness, absent or failed", async () => {
-      const pending = { P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Pending" })] };
-      respond(pending);
-      const absent = await setup(ALL_STREAMS.filter((s) => s !== "kube_pod_status_ready"));
-      await refresh(absent.inventory);
-      expect(absent.inventory.counts.value.podsNotRunning).toBeNull();
-      respond(pending, ["P11"]);
-      const failing = await setup(ALL_STREAMS);
-      await refresh(failing.inventory);
-      expect(failing.inventory.counts.value.podsNotRunning).toBeNull();
-      respond(pending);
-      const healthy = await setup(ALL_STREAMS);
-      await refresh(healthy.inventory);
-      expect(healthy.inventory.counts.value.podsNotRunning).toBe(1);
-    });
-
-    it("hides every pod tile without the pod anchor", async () => {
-      const { inventory } = await setup(KUBELET);
-      await refresh(inventory);
-      for (const key of [
-        "podsNotRunning",
-        "podsContainerErrors",
-        "podsOomKilled",
-        "podsRestarting",
-        "podsNearMemoryLimit",
-      ] as const) {
-        expect(inventory.counts.value[key], key).toBeNull();
-      }
-      expect(inventory.banners.value.map((b) => b.id)).toContain("anchor-pods");
-    });
-
-    it("blanks only a rejected query's columns and explains it", async () => {
-      respond(
-        {
-          P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
-          P7: [ksm({ namespace: "shop", pod: "web", uid: "u", container: "c" }, 2)],
-        },
-        ["P6"],
+    it("treats absent waiting, limits and terminated reasons as empty, and leaves P3 unavailable", async () => {
+      fixture = {
+        ...CL(),
+        P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })],
+        P10: [ksm({ namespace: "a", pod: "p", uid: "u", container: "c" })],
+      };
+      const absent = [
+        "kube_pod_container_status_waiting_reason",
+        "kube_pod_container_resource_limits",
+        "kube_pod_container_status_terminated_reason",
+        "kube_pod_container_status_last_terminated_reason",
+      ];
+      const { inv } = await setup(
+        { view: "pods" },
+        { metrics: ALL_STREAMS.filter((s) => !absent.includes(s)) },
       );
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      const pod = inventory.inventory.value.pods[0];
-      expect(pod.node).toBeNull();
-      expect(pod.restarts).toBe(2);
-      expect(inventory.pageError.value).toBeNull();
-      expect(inventory.banners.value.map((b) => b.id)).toContain("partial-failure");
+      await inv.load();
+      for (const id of ["P2", "P3", "P9", "P14"]) expect(sentIds()).not.toContain(id);
+      expect(inv.results.value.get("P2")).toEqual([]);
+      expect(inv.results.value.get("P9")).toEqual([]);
+      expect(inv.results.value.get("P14")).toEqual([]);
+      expect(inv.results.value.has("P3")).toBe(false);
+      expect(inv.inventory.value.pods[0].memoryLimit).toBe("missing");
+      expect(inv.banners.value.filter((b) => b.variant === "warning")).toEqual([]);
+    });
+  });
+
+  describe("failures", () => {
+    it("blanks only a rejected query and banners it", async () => {
+      fixture = { ...CL(), P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })] };
+      reject = ["P6"];
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.inventory.value.pods[0].node).toBeNull();
+      expect(inv.pageError.value).toBeNull();
+      expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
     });
 
     it("shows one page error when every query is rejected", async () => {
       metricsQuery.mockRejectedValue(new Error("all down"));
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.pageError.value).toBe("all down");
+      search.mockRejectedValue(new Error("all down"));
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.pageError.value).toBe("all down");
     });
 
-    it("says unlabelled rows are hidden while a single cluster is in scope", async () => {
-      respond({
-        P1: [
-          ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" }),
-          ksm({ k8s_cluster: "alpha", namespace: "shop", pod: "a", uid: "a", phase: "Running" }),
-        ],
-        K2: [{ metric: { k8s_namespace_name: "shop", k8s_pod_name: "web" }, value: 1 }],
-      });
-      const { inventory, state } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.banners.value.find((b) => b.id === "no-cluster-kubeletstats")?.key).toBe(
-        "infra.k8s2.noClusterLabelScoped",
-      );
-      state.value = parseListState({ cluster: "*" });
-      expect(inventory.banners.value.find((b) => b.id === "no-cluster-kubeletstats")?.key).toBe(
-        "infra.k8s2.noClusterLabel",
-      );
-    });
-
-    it("warns when one family has no cluster label next to a labelled one", async () => {
-      respond({
-        P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
-        K2: [{ metric: { k8s_namespace_name: "shop", k8s_pod_name: "web" }, value: 1 }],
-      });
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      const banner = inventory.banners.value.find((b) => b.id === "no-cluster-kubeletstats");
-      expect(banner?.params).toEqual({ family: "kubeletstats" });
-      expect(inventory.inventory.value.pods).toHaveLength(2);
+    it("reports forbidden when the view's anchor query is rejected with 403", async () => {
+      metricsQuery.mockImplementation((async ({ query }: { query: string }) => {
+        const id = idOf(query);
+        if (id === "P1") throw Object.assign(new Error("no"), { response: { status: 403 } });
+        return vector(fixture[id]);
+      }) as any);
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.forbidden.value).toBe(true);
     });
   });
 
-  it("discards a response from an older refresh that lands after a newer one started", async () => {
-    let releaseOld: () => void = () => {};
-    const gate = new Promise<void>((resolve) => (releaseOld = resolve));
-    let call = 0;
-    metricsQuery.mockImplementation((async ({ query }: { query: string }) => {
-      const first = call++ < 2;
-      if (first) await gate;
-      const phase = first ? "Failed" : "Running";
-      return idOf(query) === "P1"
-        ? vector([ksm({ namespace: "shop", pod: "web", uid: "u", phase })])
-        : vector([]);
-    }) as any);
-    const { inventory } = await setup(["kube_pod_status_phase", "kube_pod_status_ready"]);
-    const old = refresh(inventory);
-    await refresh(inventory);
-    releaseOld();
-    await old;
-    expect(inventory.inventory.value.pods[0].phase).toBe("Running");
+  describe("TanStack", () => {
+    it("reads every query through the declared factories", async () => {
+      const instant = vi.spyOn(queries, "k8sInstantQuery");
+      const sqlQuery = vi.spyOn(queries, "k8sSqlQuery");
+      const fetch = vi.spyOn(queryClient, "fetchQuery");
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(instant).toHaveBeenCalledTimes(metricsQuery.mock.calls.length);
+      expect(sqlQuery).toHaveBeenCalledTimes(search.mock.calls.length);
+      expect(fetch).toHaveBeenCalledTimes(
+        metricsQuery.mock.calls.length + search.mock.calls.length,
+      );
+      for (const [options] of fetch.mock.calls as any[])
+        expect(options.queryKey.slice(0, 3)).toEqual(["org", "org1", "kubernetes"]);
+    });
+
+    it("serves a revisit inside the stale time from the cache, and Refresh re-sends everything", async () => {
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      const first = metricsQuery.mock.calls.length + search.mock.calls.length;
+      await inv.load();
+      expect(metricsQuery.mock.calls.length + search.mock.calls.length).toBe(first);
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      const nonce = inv.refreshNonce.value;
+      await inv.load({ force: true });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ["org", "org1", "kubernetes"],
+        refetchType: "none",
+      });
+      expect(metricsQuery.mock.calls.length + search.mock.calls.length).toBe(2 * first);
+      expect(inv.refreshNonce.value).toBe(nonce + 1);
+    });
+
+    it("drops a late response from an older generation", async () => {
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      metricsQuery.mockImplementation((async ({ query, end_time }: any) => {
+        const id = idOf(query);
+        const old = end_time === END;
+        if (old && id === "P1") await gate;
+        if (id === "P1")
+          return vector([
+            ksm({ namespace: "a", pod: "p", uid: "u", phase: old ? "Failed" : "Running" }),
+          ]);
+        return vector(fixture[id]);
+      }) as any);
+      const { inv, time } = await setup({ view: "pods" }, { metrics: ["kube_pod_status_phase"] });
+      const old = inv.load();
+      time.value = { start: START, end: END + HOUR, relative: true };
+      await inv.load();
+      release();
+      await old;
+      expect(inv.inventory.value.pods[0].phase).toBe("Running");
+    });
+
+    it("reset forgets the org's streams, results and errors", async () => {
+      fixture = { ...CL(), P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })] };
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      inv.reset();
+      expect(inv.detection.value).toBe("unknown");
+      expect(inv.inventory.value.pods).toEqual([]);
+      expect(inv.loaded.value).toBe(false);
+    });
   });
 
-  describe("scope, list and facets", () => {
-    const twoClusters = {
-      P1: [
-        ksm({ namespace: "shop", pod: "a", uid: "a", phase: "Pending" }),
-        ksm({ k8s_cluster: "beta", namespace: "shop", pod: "b", uid: "b", phase: "Running" }),
-        ksm({ k8s_cluster: "beta", namespace: "data", pod: "c", uid: "c", phase: "Failed" }),
+  describe("drawer", () => {
+    it("fetches the kind's set for a drawer opened from another view, then the object by KSM uid", async () => {
+      fixture = {
+        ...CL(),
+        P1: [ksm({ namespace: "a", pod: "p", uid: "u1", phase: "Running" })],
+      };
+      sqlHits = (sql) =>
+        sql.includes("LIMIT 1") && sql.includes("'pods'")
+          ? [
+              {
+                uid: "u1",
+                event_name: "p",
+                k8s_namespace_name: "a",
+                body_type: "MODIFIED",
+                body_object_metadata: '{"labels":{"app":"x"}}',
+                body_object_spec: "{}",
+                body_object_status: "{}",
+              },
+            ]
+          : [];
+      const { inv } = await setup({ view: "nodes", details: "pod/prod/a/p" });
+      await inv.load();
+      expect(sentIds()).toContain("P1");
+      const obj = sentSql().find((q: any) => q.sql.endsWith("LIMIT 1"));
+      expect(obj.sql).toContain("json_get_str(body_object_metadata,'uid') = 'u1'");
+      const de = sentSql().find((q: any) => q.sql.endsWith("LIMIT 100"));
+      expect(de.sql).toContain("json_get_str(body_object_regarding,'uid') = 'u1'");
+      expect(inv.inventory.value.pods[0].object?.metadata.labels).toEqual({ app: "x" });
+      expect(inv.detailObserved.value).toBe(true);
+      expect(inv.detailLoading.value).toBe(false);
+    });
+  });
+
+  it("lists namespace options from NS1 plus the current selection", async () => {
+    fixture = {
+      ...CL(),
+      NS1: [
+        ksm({ namespace: "data", phase: "Active" }),
+        ksm({ k8s_cluster: "dev", namespace: "devns", phase: "Active" }),
       ],
     };
-
-    it("defaults to the alphabetically first of several clusters", async () => {
-      respond(twoClusters);
-      const { inventory, state } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.clusters.value).toEqual(["beta", "prod"]);
-      expect(inventory.effectiveCluster.value).toBe("beta");
-      expect(inventory.rows.value.map((r) => r.name).sort()).toEqual(["b", "c"]);
-      state.value = parseListState({ cluster: "*" });
-      expect(inventory.effectiveCluster.value).toBeNull();
-      expect(inventory.rows.value).toHaveLength(3);
-    });
-
-    it("applies no default with a single cluster and names it in the scope", async () => {
-      respond({ P1: [ksm({ namespace: "shop", pod: "a", uid: "a", phase: "Running" })] });
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.effectiveCluster.value).toBe("prod");
-      expect(inventory.rows.value).toHaveLength(1);
-    });
-
-    it("leaves unlabelled rows out when the lone labelled cluster is the scope", async () => {
-      respond({
-        P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
-        K2: [{ metric: { k8s_namespace_name: "shop", k8s_pod_name: "orphan" }, value: 1 }],
-      });
-      const { inventory, state } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.effectiveCluster.value).toBe("prod");
-      expect(inventory.rows.value.map((r) => r.name)).toEqual(["web"]);
-      expect(inventory.banners.value.find((b) => b.id === "no-cluster-kubeletstats")?.key).toBe(
-        "infra.k8s2.noClusterLabelScoped",
-      );
-      state.value = parseListState({ cluster: "*" });
-      expect(inventory.rows.value.map((r) => r.name).sort()).toEqual(["orphan", "web"]);
-    });
-
-    it("counts tiles over the scope facets only", async () => {
-      respond(twoClusters);
-      const { inventory, state } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.counts.value.podsNotRunning).toBe(1);
-      state.value = parseListState({ cluster: "*", namespace: "shop" });
-      expect(inventory.counts.value.podsNotRunning).toBe(1);
-      state.value = parseListState({ cluster: "*" });
-      expect(inventory.counts.value.podsNotRunning).toBe(2);
-      state.value = parseListState({ cluster: "*", name: "zzz", issue: "podsNotRunning" });
-      expect(inventory.counts.value.podsNotRunning).toBe(2);
-      expect(inventory.rows.value).toHaveLength(0);
-    });
-
-    it("counts the All facet rows", async () => {
-      respond(twoClusters);
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.clusterTotal.value).toBe(3);
-      expect(inventory.namespaceTotal.value).toBe(2);
-    });
-
-    it("lists namespace facets for the scoped cluster with counts", async () => {
-      respond(twoClusters);
-      const { inventory } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.namespaceFacet.value).toEqual([
-        { value: "data", count: 1 },
-        { value: "shop", count: 1 },
-      ]);
-      expect(inventory.clusterFacet.value).toEqual([
-        { value: "beta", count: 2 },
-        { value: "prod", count: 1 },
-      ]);
-    });
-
-    it("pages 50 rows at a time and never strands the pager", async () => {
-      respond({
-        P1: Array.from({ length: 60 }, (_, i) =>
-          ksm({
-            namespace: "shop",
-            pod: `p${String(i).padStart(2, "0")}`,
-            uid: `${i}`,
-            phase: "Running",
-          }),
-        ),
-      });
-      const { inventory, state } = await setup(ALL_STREAMS);
-      await refresh(inventory);
-      expect(inventory.pagedRows.value).toHaveLength(50);
-      state.value = parseListState({ page: "2" });
-      expect(inventory.pagedRows.value).toHaveLength(10);
-      state.value = parseListState({ page: "9" });
-      expect(inventory.pagedRows.value).toHaveLength(10);
-    });
-
-    it("sorts by the CPU % of request with nulls last", async () => {
-      respond({
-        P1: [
-          ksm({ namespace: "shop", pod: "idle", uid: "1", phase: "Running" }),
-          ksm({ namespace: "shop", pod: "busy", uid: "2", phase: "Running" }),
-          ksm({ namespace: "shop", pod: "none", uid: "3", phase: "Running" }),
-        ],
-        P10: ["idle", "busy", "none"].map((pod, i) =>
-          ksm({ namespace: "shop", pod, uid: `${i + 1}`, container: "c" }),
-        ),
-        P8: [
-          ksm({ namespace: "shop", pod: "idle", uid: "1", container: "c", resource: "cpu" }, 1),
-          ksm({ namespace: "shop", pod: "busy", uid: "2", container: "c", resource: "cpu" }, 1),
-        ],
-        K1: ["idle", "busy", "none"].map((pod, i) => ({
-          metric: { k8s_cluster_name: "prod", k8s_namespace_name: "shop", k8s_pod_name: pod },
-          value: [0.05, 0.9, 0.3][i],
-        })),
-      });
-      const { inventory, state } = await setup(ALL_STREAMS, { sort: "cpu" });
-      await refresh(inventory);
-      expect(inventory.rows.value.map((r) => r.name)).toEqual(["idle", "busy", "none"]);
-      state.value = parseListState({ sort: "cpu", desc: "true" });
-      expect(inventory.rows.value.map((r) => r.name)).toEqual(["busy", "idle", "none"]);
-    });
+    const { inv } = await setup({ view: "pods", namespace: "gone" });
+    await inv.load();
+    expect(inv.namespaceOptions.value).toEqual(["data", "gone"]);
   });
 });

@@ -15,168 +15,192 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  ALWAYS_QUERIES,
+  CLUSTER_QUERIES,
   DETECTION_STREAMS,
-  KSM_ANCHOR,
   OPTIONAL_STREAM,
-  QUERY_FAMILY,
   QUERY_STREAM,
   SPARSE_STREAMS,
-  TAB_QUERIES,
+  VIEW_ANCHORS,
+  VIEW_QUERIES,
+  detailQueries,
+  familyOf,
+  mapQueries,
   podTrendQuery,
   queryText,
-  rangeSeconds,
   type QueryId,
 } from "./kubernetesQueries";
 
-const ALL_IDS: QueryId[] = [
-  "P1",
-  "P2",
-  "P3",
-  "P4",
-  "P5",
-  "P6",
-  "P7",
-  "P8",
-  "P9",
-  "P10",
-  "P11",
-  "P12",
-  "K1",
-  "K2",
-  "K3",
-  "K4",
-  "N1",
-  "N2",
-  "D1",
-  "D2",
-];
+const ALL_IDS = Object.keys(QUERY_STREAM) as QueryId[];
+const SCOPED_IDS = ALL_IDS.filter((id) => !CLUSTER_QUERIES.includes(id));
+const MATCHERS = { ksm: 'k8s_cluster="c"', kubelet: 'k8s_cluster_name="c"' };
+
+// Every `metric{…}` or bare `metric` selector in a query.
+const selectors = (text: string) =>
+  [
+    ...text.replace(/^[a-z]+ by \([^)]*\) /, "").matchAll(/\b((?:kube|k8s)_[a-z_]+)(\{[^}]*\})?/g),
+  ].map((m) => ({ metric: m[1], inner: m[2] ?? "" }));
 
 describe("kubernetesQueries", () => {
   it("groups every query by both cluster spellings", () => {
-    for (const id of ALL_IDS) {
-      expect(queryText(id, 3600), id).toContain("k8s_cluster, k8s_cluster_name");
-    }
+    for (const id of ALL_IDS) expect(queryText(id), id).toContain("k8s_cluster, k8s_cluster_name");
   });
 
   it("keeps uid in every KSM pod query except the replicaset owner join", () => {
-    for (const id of ALL_IDS.filter((q) => q.startsWith("P") && q !== "P5")) {
-      expect(queryText(id, 3600), id).toMatch(/\buid\b/);
+    for (const id of ALL_IDS.filter((q) => /^P\d+$/.test(q) && q !== "P5")) {
+      expect(queryText(id), id).toMatch(/\buid\b/);
     }
-    expect(queryText("P5", 3600)).toContain("replicaset");
-  });
-
-  it("keeps k8s_pod_uid on the pod usage queries", () => {
-    expect(queryText("K1", 3600)).toBe(
-      "sum by (k8s_cluster, k8s_cluster_name, k8s_namespace_name, k8s_pod_name, k8s_pod_uid) (k8s_pod_cpu_usage)",
-    );
-    expect(queryText("K2", 3600)).toBe(
-      "sum by (k8s_cluster, k8s_cluster_name, k8s_namespace_name, k8s_pod_name, k8s_pod_uid) (k8s_pod_memory_working_set)",
-    );
   });
 
   it("reads current container reasons from the bare selector, never last_over_time", () => {
-    expect(queryText("P2", 3600)).toBe(
-      "max by (k8s_cluster, k8s_cluster_name, namespace, pod, uid, container, reason) (kube_pod_container_status_waiting_reason == 1)",
+    for (const id of ["P2", "P3", "P14"] as QueryId[]) {
+      expect(queryText(id), id).not.toContain("last_over_time");
+      expect(queryText(id), id).toContain("== 1");
+    }
+    expect(queryText("P14")).toBe(
+      "max by (k8s_cluster, k8s_cluster_name, namespace, pod, uid, container, reason) (kube_pod_container_status_terminated_reason == 1)",
     );
-    expect(queryText("P3", 3600)).not.toContain("last_over_time");
   });
 
-  it("wraps slow-changing state in a 10m last_over_time", () => {
-    for (const id of [
-      "P1",
-      "P4",
-      "P5",
-      "P6",
-      "P8",
-      "P9",
-      "P10",
-      "P11",
-      "P12",
-      "N1",
-      "N2",
-      "D1",
-      "D2",
-    ] as QueryId[]) {
-      expect(queryText(id, 3600), id).toContain("[10m]");
-    }
+  it("reads lifetime restarts per container with no increase()", () => {
+    expect(queryText("P7")).toBe(
+      "max by (k8s_cluster, k8s_cluster_name, namespace, pod, uid, container) (last_over_time(kube_pod_container_status_restarts_total[10m]))",
+    );
+    expect(queryText("P7")).not.toContain("increase");
+  });
+
+  it("matches the §7.3 text of the changed and new queries", () => {
+    expect(queryText("P6")).toBe(
+      "max by (k8s_cluster, k8s_cluster_name, namespace, pod, uid, node, pod_ip, priority_class) (last_over_time(kube_pod_info[10m]))",
+    );
+    expect(queryText("P10")).toContain("container, image)");
+    expect(queryText("P15")).toBe(
+      "max by (k8s_cluster, k8s_cluster_name, namespace, pod, uid, reason) (last_over_time(kube_pod_status_reason[10m]) == 1)",
+    );
+    expect(queryText("N2")).toContain('resource=~"cpu|memory|pods|ephemeral_storage"');
+    expect(queryText("J5")).toBe(
+      'max by (k8s_cluster, k8s_cluster_name, namespace, job_name) (last_over_time(kube_job_complete{condition="true"}[10m]))',
+    );
+    expect(queryText("V1")).toBe(
+      "max by (k8s_cluster, k8s_cluster_name, namespace, persistentvolumeclaim, phase) (last_over_time(kube_persistentvolumeclaim_status_phase[10m]) == 1)",
+    );
+    expect(queryText("NS2")).toBe(
+      "max by (k8s_cluster, k8s_cluster_name, namespace) (last_over_time(kube_namespace_created[10m]))",
+    );
+    expect(queryText("K7")).toBe(
+      "max by (k8s_cluster, k8s_cluster_name, k8s_namespace_name, k8s_pod_name, k8s_persistentvolumeclaim_name) (k8s_volume_capacity)",
+    );
+    expect(queryText("CL1P")).toBe(
+      "count by (k8s_cluster, k8s_cluster_name) (last_over_time(kube_pod_status_phase[10m]))",
+    );
+    expect(queryText("CL2N")).toBe("count by (k8s_cluster, k8s_cluster_name) (k8s_node_cpu_usage)");
   });
 
   it("uses only controller owner references", () => {
-    expect(queryText("P4", 3600)).toContain('kube_pod_owner{owner_is_controller="true"}');
-    expect(queryText("P5", 3600)).toContain('kube_replicaset_owner{owner_is_controller="true"}');
+    expect(queryText("P4")).toContain('kube_pod_owner{owner_is_controller="true"}');
+    expect(queryText("P5")).toContain('kube_replicaset_owner{owner_is_controller="true"}');
   });
 
-  it("measures restarts as a per-container increase over the picker range", () => {
-    expect(queryText("P7", 5400)).toBe(
-      "sum by (k8s_cluster, k8s_cluster_name, namespace, pod, uid, container) (increase(kube_pod_container_status_restarts_total[5400s]))",
-    );
-  });
-
-  it("reads deployment availability from the available-replicas metric", () => {
-    expect(queryText("D2", 3600)).toContain("kube_deployment_status_replicas_available");
-    expect(queryText("D2", 3600)).not.toContain("replicas_ready");
-  });
-
-  it("converts the picker range to whole seconds", () => {
-    expect(rangeSeconds(0, 3_600_000_000)).toBe(3600);
-    expect(rangeSeconds(0, 1_400_000)).toBe(1);
-    expect(rangeSeconds(5, 5)).toBe(1);
-  });
-
-  it("splits the always-fetched set from the per-tab extras (§6.2)", () => {
-    expect(ALWAYS_QUERIES).toEqual([
-      "P1",
-      "P2",
-      "P3",
-      "P7",
-      "P9",
-      "P10",
-      "P11",
-      "P12",
-      "K2",
-      "N1",
-      "D1",
-      "D2",
-    ]);
-    expect(TAB_QUERIES.pods).toEqual(["P4", "P5", "P6", "P8", "K1"]);
-    expect(TAB_QUERIES.nodes).toEqual(["P6", "N2", "K3", "K4"]);
-    expect(TAB_QUERIES.deployments).toEqual(["P4", "P5"]);
-  });
-
-  it("gates KSM families on their anchors and usage on its own stream", () => {
-    expect(KSM_ANCHOR).toEqual({
-      pods: "kube_pod_status_phase",
-      nodes: "kube_node_status_condition",
-      deployments: "kube_deployment_spec_replicas",
+  describe("server-side cluster scoping", () => {
+    it("injects the KSM matcher inside every KSM selector, beside its own matchers", () => {
+      for (const id of SCOPED_IDS.filter((q) => familyOf(q) === "kube-state-metrics")) {
+        const found = selectors(queryText(id, MATCHERS));
+        expect(found.length, id).toBeGreaterThan(0);
+        for (const s of found) expect(s.inner, `${id} ${s.metric}`).toContain('k8s_cluster="c"');
+      }
+      expect(queryText("P4", MATCHERS)).toContain(
+        'kube_pod_owner{owner_is_controller="true",k8s_cluster="c"}',
+      );
     });
-    expect(QUERY_FAMILY.P9).toBe("pods");
-    expect(QUERY_FAMILY.N2).toBe("nodes");
-    expect(QUERY_FAMILY.D2).toBe("deployments");
-    expect(QUERY_FAMILY.K1).toBeUndefined();
-    expect(QUERY_STREAM.K1).toBe("k8s_pod_cpu_usage");
-    expect(QUERY_STREAM.K2).toBe("k8s_pod_memory_working_set");
-    expect(QUERY_STREAM.K3).toBe("k8s_node_cpu_usage");
-    expect(QUERY_STREAM.K4).toBe("k8s_node_memory_working_set");
-    expect([...SPARSE_STREAMS]).toEqual([
-      "kube_pod_container_status_waiting_reason",
-      "kube_pod_container_resource_limits",
-    ]);
-    expect(OPTIONAL_STREAM).toBe("kube_pod_container_status_last_terminated_reason");
+
+    it("injects the kubeletstats spelling into every kubeletstats selector", () => {
+      for (const id of SCOPED_IDS.filter((q) => familyOf(q) === "kubeletstats")) {
+        for (const s of selectors(queryText(id, MATCHERS))) {
+          expect(s.inner, id).toBe('{k8s_cluster_name="c"}');
+        }
+      }
+    });
+
+    it("sends a family without a matcher unscoped, and never scopes the CL queries", () => {
+      expect(queryText("D1", { ksm: null, kubelet: 'k8s_cluster="c"' })).toBe(queryText("D1"));
+      for (const id of CLUSTER_QUERIES) expect(queryText(id, MATCHERS)).toBe(queryText(id));
+    });
+
+    it("keeps the by() grouping so client normalization still runs", () => {
+      expect(queryText("K1", MATCHERS)).toBe(
+        'sum by (k8s_cluster, k8s_cluster_name, k8s_namespace_name, k8s_pod_name, k8s_pod_uid) (k8s_pod_cpu_usage{k8s_cluster_name="c"})',
+      );
+    });
   });
 
-  it("detects on any of the seven anchor or usage streams", () => {
-    expect([...DETECTION_STREAMS].sort()).toEqual(
+  describe("per-view sets (§7.2)", () => {
+    it.each([
+      ["cluster", ["O1", "O2", "O3", "O4", "O5", "N1", "P1", "P2", "P11", "P12"]],
+      ["nodes", ["N1", "N2", "N3", "N4", "N5", "K3", "K4", "K5", "K6"]],
+      ["deployments", ["D1", "D2", "D3", "D5"]],
+      ["daemonsets", ["DS1", "DS2", "DS3", "DS5"]],
+      ["statefulsets", ["SS1", "SS2", "SS3", "SS4"]],
+      ["replicasets", ["RS2", "RS3", "RS4", "RS5", "P5"]],
+      ["jobs", ["J1", "J2", "J3", "J4", "J5", "J6"]],
+      ["cronjobs", ["CJ1", "CJ2", "CJ3", "CJ4", "J6", "J7"]],
+      ["pvcs", ["V1", "V2", "V3", "V4", "K7"]],
+      ["hpas", ["H1", "H2", "H3", "H4", "H5"]],
+      ["namespaces", ["NS1", "NS2"]],
+      ["events", []],
+    ] as const)("%s sends exactly %j", (view, ids) => {
+      expect([...VIEW_QUERIES[view]].sort()).toEqual([...ids].sort());
+    });
+
+    it("sends P1–P15, K1 and K2 on Pods, and the workloads overview sends P5 once", () => {
+      expect(VIEW_QUERIES.pods).toHaveLength(17);
+      expect(VIEW_QUERIES.workloads).toHaveLength(16);
+      expect(VIEW_QUERIES.workloads.filter((id) => id === "P5")).toHaveLength(1);
+    });
+
+    it("sends the Map's pod set, plus N1 only when grouped by node", () => {
+      const pods = mapQueries("pods", "namespace");
+      expect(pods).toHaveLength(15);
+      expect(pods).not.toContain("P13");
+      expect(pods).not.toContain("P14");
+      expect(mapQueries("pods", "node")).toEqual([...pods, "N1"]);
+      expect(mapQueries("nodes", "node")).toEqual(["N1", "N2", "K3", "K4"]);
+    });
+
+    it("adds each drawer's extras and the Pods set where the drawer lists pods", () => {
+      expect(detailQueries("deployment")).toEqual(
+        expect.arrayContaining(["D1", "D4", "D6", "P5", "RS2", "RS4", "P13", "K1"]),
+      );
+      expect(detailQueries("cronjob").sort()).toEqual(
+        ["CJ1", "CJ2", "CJ3", "CJ4", "J6", "J7", "J1", "J2", "J3"].sort(),
+      );
+      expect(detailQueries("hpa").sort()).toEqual(["H1", "H2", "H3", "H4", "H5", "H8"].sort());
+      expect(detailQueries("pvc")).not.toContain("P1");
+      expect(detailQueries("node")).toContain("P6");
+    });
+  });
+
+  it("anchors Jobs on any of its three status streams and the Events view on none", () => {
+    expect(VIEW_ANCHORS.jobs).toEqual([
+      "kube_job_status_failed",
+      "kube_job_status_succeeded",
+      "kube_job_status_active",
+    ]);
+    expect(VIEW_ANCHORS.events).toBeNull();
+    expect(VIEW_ANCHORS.pods).toEqual(["kube_pod_status_phase"]);
+  });
+
+  it("treats waiting, limits and terminated reasons as sparse, and the last-terminated reason as optional", () => {
+    expect([...SPARSE_STREAMS].sort()).toEqual(
       [
-        "kube_pod_status_phase",
-        "kube_node_status_condition",
-        "kube_deployment_spec_replicas",
-        "k8s_pod_cpu_usage",
-        "k8s_pod_memory_working_set",
-        "k8s_node_cpu_usage",
-        "k8s_node_memory_working_set",
+        "kube_pod_container_status_waiting_reason",
+        "kube_pod_container_resource_limits",
+        "kube_pod_container_status_terminated_reason",
       ].sort(),
     );
+    expect(OPTIONAL_STREAM).toBe("kube_pod_container_status_last_terminated_reason");
+    expect(QUERY_STREAM.P14).toBe("kube_pod_container_status_terminated_reason");
+    expect(QUERY_STREAM.CL2P).toBe("k8s_pod_cpu_usage");
+    expect(QUERY_STREAM.J5).toBe("kube_job_complete");
+    expect(DETECTION_STREAMS).toContain("kube_pod_status_phase");
   });
 
   describe("podTrendQuery", () => {

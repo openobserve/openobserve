@@ -14,268 +14,194 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import { VIEWS } from "./kubernetesQueries";
 import {
   decodeCompound,
   encodeCompound,
+  encodeDetails,
   isCanonical,
-  parseListState,
-  stripListParams,
+  parseUrlState,
+  stripPageParams,
   toQuery,
-  withFilter,
-  withKind,
-  withNodeLink,
-  withTile,
-  withWorkloadLink,
+  withDetails,
+  withView,
 } from "./kubernetesUrlState";
 
+const roundTrip = (query: Record<string, string>) => toQuery(parseUrlState(query), {});
+
 describe("kubernetesUrlState", () => {
-  describe("compound values", () => {
-    it("encodes each segment and joins with a slash", () => {
-      expect(encodeCompound(["prod", "shop", "a/b"])).toBe("prod/shop/a%2Fb");
-    });
-
-    it("round-trips a value containing a slash", () => {
-      expect(decodeCompound(encodeCompound(["prod", "shop", "a/b"]), 3)).toEqual([
-        "prod",
-        "shop",
-        "a/b",
-      ]);
-    });
-
-    it("keeps an empty cluster as an empty segment", () => {
-      expect(encodeCompound(["", "node-1"])).toBe("/node-1");
-      expect(decodeCompound("/node-1", 2)).toEqual(["", "node-1"]);
-    });
-
-    it("rejects the wrong number of segments", () => {
-      expect(decodeCompound("a/b/c", 2)).toBeNull();
-      expect(decodeCompound("a", 2)).toBeNull();
-    });
+  it("defaults to the Cluster overview with every default omitted", () => {
+    const state = parseUrlState({});
+    expect(state.view).toBe("cluster");
+    expect(toQuery(state, {})).toEqual({});
   });
 
-  describe("parseListState", () => {
-    it("reads defaults from an empty query", () => {
-      expect(parseListState({})).toEqual({
-        kind: "pods",
-        name: "",
-        cluster: null,
-        namespace: null,
-        issue: null,
-        onNode: null,
-        workload: null,
-        sort: null,
-        desc: false,
-        page: 1,
-        pod: null,
-      });
-    });
-
-    it("keeps the first of a repeated single-select param and flags the URL for rewrite", () => {
-      const query = { cluster: ["a", "b"] };
-      expect(parseListState(query).cluster).toBe("a");
-      expect(isCanonical(query)).toBe(false);
-      expect(toQuery(parseListState(query), query)).toEqual({ cluster: "a" });
-    });
-
-    it("lets the issue imply its kind", () => {
-      expect(parseListState({ issue: "nodesNotReady" }).kind).toBe("nodes");
-      expect(parseListState({ kind: "pods", issue: "deploymentsUnavailable" }).kind).toBe(
-        "deployments",
-      );
-    });
-
-    it("normalizes a pod deep link to the pods kind", () => {
-      const query = { kind: "nodes", pod: "prod/shop/web-1" };
-      const state = parseListState(query);
-      expect(state.kind).toBe("pods");
-      expect(state.pod).toEqual(["prod", "shop", "web-1"]);
-      expect(isCanonical(query)).toBe(false);
-      expect(toQuery(state, query)).toEqual({ pod: "prod/shop/web-1" });
-    });
-
-    it("drops a compound param with the wrong number of segments", () => {
-      const query = { onNode: "a/b/c", workload: "a/b" };
-      const state = parseListState(query);
-      expect(state.onNode).toBeNull();
-      expect(state.workload).toBeNull();
-      expect(toQuery(state, query)).toEqual({});
-    });
-
-    it("ignores an unknown kind or issue", () => {
-      expect(parseListState({ kind: "jobs", issue: "nope" })).toMatchObject({
-        kind: "pods",
-        issue: null,
-      });
-    });
-
-    it("leaves unrelated params alone", () => {
-      const query = { org_identifier: "o1", kind: "nodes" };
-      expect(isCanonical(query)).toBe(true);
-      expect(toQuery(parseListState(query), query)).toEqual(query);
-    });
+  it.each(VIEWS.filter((v) => v !== "cluster"))("keeps view=%s", (view) => {
+    expect(roundTrip({ view })).toEqual({ view });
   });
 
-  describe("transitions", () => {
-    const base = parseListState({
-      kind: "pods",
-      name: "web",
-      cluster: "prod",
-      namespace: "shop",
-      issue: "podsRestarting",
-      sort: "cpu",
+  it("rewrites an unknown view to the Cluster overview", () => {
+    expect(parseUrlState({ view: "configmaps" }).view).toBe("cluster");
+    expect(isCanonical({ view: "configmaps" })).toBe(false);
+  });
+
+  it("round-trips a comma-joined namespace selection", () => {
+    const state = parseUrlState({ view: "pods", namespace: "a,b" });
+    expect(state.namespaces).toEqual(["a", "b"]);
+    expect(toQuery(state, {}).namespace).toBe("a,b");
+  });
+
+  it("rewrites the removed All-clusters value to the default", () => {
+    expect(parseUrlState({ cluster: "*" }).cluster).toBeNull();
+    expect(isCanonical({ cluster: "*" })).toBe(false);
+  });
+
+  it("keeps search, sort and desc, and drops desc without a sort", () => {
+    expect(roundTrip({ view: "pods", search: "web", sort: "memLim", desc: "true" })).toEqual({
+      view: "pods",
+      search: "web",
+      sort: "memLim",
       desc: "true",
-      page: "3",
     });
+    expect(roundTrip({ view: "pods", desc: "true" })).toEqual({ view: "pods" });
+  });
 
-    it("changing kind keeps the scope and name, clears sort, page and another kind's issue", () => {
-      const next = withKind(base, "nodes");
-      expect(next).toMatchObject({
-        kind: "nodes",
-        name: "web",
-        cluster: "prod",
-        namespace: "shop",
-        issue: null,
-        sort: null,
-        desc: false,
-        page: 1,
-      });
-    });
-
-    it("drops the pods-only link filters when leaving the Pods tab", () => {
-      const linked = {
-        ...base,
-        onNode: ["prod", "n1"] as [string, string],
-        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
-      };
-      expect(withKind(linked, "deployments")).toMatchObject({ onNode: null, workload: null });
-      expect(withKind(linked, "pods")).toMatchObject({
-        onNode: ["prod", "n1"],
-        workload: ["prod", "shop", "Deployment", "web"],
-      });
-    });
-
-    it("a node link replaces every list filter and scopes to the node's cluster", () => {
-      const from = {
-        ...base,
-        kind: "nodes" as const,
-        issue: "nodesPressure" as const,
-        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
-        pod: ["prod", "shop", "p"] as [string, string, string],
-      };
-      expect(withNodeLink(from, ["prod", "n1"])).toMatchObject({
+  it("drops the removed MVP params", () => {
+    expect(
+      roundTrip({
+        view: "pods",
         kind: "pods",
-        onNode: ["prod", "n1"],
-        workload: null,
-        issue: null,
-        pod: null,
-        name: "",
-        cluster: "prod",
-        namespace: null,
-        sort: null,
-        page: 1,
-      });
+        name: "x",
+        issue: "podsNotRunning",
+        onNode: "a/b",
+        workload: "a/b/c/d",
+        page: "2",
+        pod: "a/b/c",
+      }),
+    ).toEqual({ view: "pods" });
+  });
+
+  describe("details", () => {
+    it("opens a node drawer with an empty namespace segment", () => {
+      const state = parseUrlState({ details: "node/prod//ip-1", cluster: "prod" });
+      expect(state.details).toEqual({ kind: "node", cluster: "prod", namespace: "", name: "ip-1" });
     });
 
-    it("scopes a link to an unlabelled entity to every cluster", () => {
-      expect(withNodeLink(base, ["", "n1"]).cluster).toBe("*");
-      expect(withWorkloadLink(base, ["", "shop", "Deployment", "web"]).cluster).toBe("*");
+    it("round-trips a segment containing a slash, encoded", () => {
+      const details = { kind: "pod" as const, cluster: "c/1", namespace: "ns", name: "a/b" };
+      const encoded = encodeDetails(details);
+      expect(encoded).toBe("pod/c%2F1/ns/a%2Fb");
+      expect(parseUrlState({ details: encoded }).details).toEqual(details);
     });
 
-    it("a workload link is the mirror of a node link and scopes to its namespace", () => {
-      const from = {
-        ...base,
-        cluster: "other",
-        namespace: "elsewhere",
-        onNode: ["prod", "n1"] as [string, string],
-        pod: ["prod", "shop", "p"] as [string, string, string],
-      };
-      expect(withWorkloadLink(from, ["prod", "shop", "Deployment", "web"])).toMatchObject({
-        kind: "pods",
-        workload: ["prod", "shop", "Deployment", "web"],
-        onNode: null,
-        issue: null,
-        pod: null,
-        name: "",
-        cluster: "prod",
-        namespace: "shop",
-      });
-    });
+    it.each(["pod/prod/ns", "pod/prod/ns/a/b", "secret/prod/ns/a", "pod/%E0%A4%A/ns/a"])(
+      "drops a malformed details %s",
+      (details) => {
+        expect(parseUrlState({ details }).details).toBeNull();
+        expect(isCanonical({ details })).toBe(false);
+      },
+    );
 
-    it("keeps an issue that belongs to the new kind", () => {
-      expect(withKind({ ...base, issue: "nodesPressure", kind: "nodes" }, "nodes").issue).toBe(
-        "nodesPressure",
-      );
-    });
-
-    it("a tile sets kind and issue and clears the list-specific filters", () => {
-      const filtered = {
-        ...base,
-        onNode: ["prod", "n1"] as [string, string],
-        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
-      };
-      expect(withTile(filtered, "podsContainerErrors")).toMatchObject({
-        kind: "pods",
-        issue: "podsContainerErrors",
-        name: "",
-        onNode: null,
-        workload: null,
-        page: 1,
-      });
-      expect(withTile(filtered, "nodesNotReady")).toMatchObject({
-        kind: "nodes",
-        issue: "nodesNotReady",
-        sort: null,
-      });
-    });
-
-    it("the all tile clears the issue and the list-specific filters, like every tile", () => {
-      const filtered = {
-        ...base,
-        onNode: ["prod", "n1"] as [string, string],
-        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
-      };
-      expect(withTile(filtered, "all")).toMatchObject({
-        issue: null,
-        name: "",
-        onNode: null,
-        workload: null,
-        kind: "pods",
-        cluster: "prod",
-        namespace: "shop",
-      });
-    });
-
-    it("a filter change resets the page", () => {
-      expect(withFilter(base, { namespace: "data" })).toMatchObject({ namespace: "data", page: 1 });
+    it("rewrites cluster to the cluster the drawer link names", () => {
+      const state = parseUrlState({ cluster: "a", details: "pod/b/ns/x" });
+      expect(state.cluster).toBe("b");
+      expect(isCanonical({ cluster: "a", details: "pod/b/ns/x" })).toBe(false);
+      expect(isCanonical({ cluster: "b", details: "pod/b/ns/x" })).toBe(true);
     });
   });
 
-  describe("toQuery", () => {
-    it("omits defaults and writes compound values encoded", () => {
-      const state = {
-        ...parseListState({}),
-        kind: "pods" as const,
-        cluster: "*",
-        onNode: ["", "node/1"] as [string, string],
-        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
-        sort: "cpu",
-        desc: true,
-        page: 2,
-      };
-      expect(toQuery(state, {})).toEqual({
-        cluster: "*",
-        onNode: "/node%2F1",
-        workload: "prod/shop/Deployment/web",
+  describe("map params", () => {
+    it("round-trips view=map&entity=nodes&fill=memory", () => {
+      expect(roundTrip({ view: "map", entity: "nodes", fill: "memory" })).toEqual({
+        view: "map",
+        entity: "nodes",
+        fill: "memory",
+      });
+    });
+
+    it("rewrites a fill that does not belong to the entity to the entity's default", () => {
+      const state = parseUrlState({ view: "map", entity: "nodes", fill: "memLim" });
+      expect(state.fill).toBe("cpu");
+      expect(toQuery(state, {})).toEqual({ view: "map", entity: "nodes" });
+    });
+
+    it("ignores and drops group for nodes, and drops an unknown fill or group", () => {
+      expect(roundTrip({ view: "map", entity: "nodes", group: "namespace" })).toEqual({
+        view: "map",
+        entity: "nodes",
+      });
+      expect(parseUrlState({ view: "map", fill: "zzz", group: "zzz" })).toMatchObject({
+        entity: "pods",
+        fill: "cpuReq",
+        group: "node",
+      });
+      expect(roundTrip({ view: "map", fill: "memLim", group: "workload" })).toEqual({
+        view: "map",
+        fill: "memLim",
+        group: "workload",
+      });
+    });
+
+    it("keeps map params only on the map", () => {
+      expect(roundTrip({ view: "pods", entity: "nodes", fill: "cpu", group: "none" })).toEqual({
+        view: "pods",
+      });
+    });
+  });
+
+  describe("view change", () => {
+    it("clears view-local params and the drawer, and keeps cluster and namespace", () => {
+      const state = parseUrlState({
+        view: "map",
+        cluster: "prod",
+        namespace: "a",
+        search: "x",
         sort: "cpu",
         desc: "true",
-        page: "2",
+        entity: "nodes",
+        fill: "memory",
+        details: "node/prod//n1",
+      });
+      expect(toQuery(withView(state, "nodes"), {})).toEqual({
+        view: "nodes",
+        cluster: "prod",
+        namespace: "a",
       });
     });
+  });
 
-    it("strips every Kubernetes 2 param", () => {
-      expect(
-        stripListParams({ kind: "nodes", cluster: "*", pod: "a/b/c", org_identifier: "o" }),
-      ).toEqual({ org_identifier: "o" });
+  it("opening a drawer sets details and keeps everything else", () => {
+    const state = parseUrlState({ view: "pods", cluster: "prod", search: "x" });
+    const next = withDetails(state, { kind: "pod", cluster: "prod", namespace: "ns", name: "p" });
+    expect(toQuery(next, {})).toEqual({
+      view: "pods",
+      cluster: "prod",
+      search: "x",
+      details: "pod/prod/ns/p",
     });
+  });
+
+  it("strips every page param on an org switch and keeps the rest", () => {
+    expect(
+      stripPageParams({
+        view: "pods",
+        cluster: "c",
+        namespace: "n",
+        search: "s",
+        sort: "x",
+        desc: "true",
+        entity: "nodes",
+        fill: "cpu",
+        group: "none",
+        details: "pod/c/n/p",
+        org_identifier: "o",
+      }),
+    ).toEqual({ org_identifier: "o" });
+  });
+
+  it("keeps compound encoding helpers", () => {
+    expect(encodeCompound(["a/b", "c"])).toBe("a%2Fb/c");
+    expect(decodeCompound("a%2Fb/c", 2)).toEqual(["a/b", "c"]);
+    expect(decodeCompound("a/b/c", 2)).toBeNull();
   });
 });
