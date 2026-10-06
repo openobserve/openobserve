@@ -109,23 +109,11 @@ export class TracesPage {
     // Standalone Service Graph page (rail-flyout route /traces/service-graph).
     this.serviceGraphPage = '[data-test="service-graph-page"]';
 
-    // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
+    // ===== DRILL DOWN AND RED CHART SELECTORS (VERIFIED against Vue source) =====
     this.insightsButton = '[data-test="insights-button"]';
     // SearchResult.vue: error-count badge doubles as the error-only toggle
     this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
-    this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-drill-down-back-btn"]';
-    // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
-    this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
-    this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
-    this.dimensionSearchInput = '[data-test="dimension-search-input"]';
-    // OInput inner native <input> — fill the -field variant per §4 OInput convention
-    this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
-    // TracesAnalysisDashboard.vue: data-test="percentile-refresh-button"
-    this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
-    // Analysis dashboard card (container) — alias to the drawer slug for backwards-compat
-    this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
     // Metrics dashboard container
     // Source: web/src/plugins/traces/metrics/TracesMetricsDashboard.vue
     this.tracesMetricsDashboard = '[data-test="traces-metrics-dashboard"]';
@@ -136,16 +124,6 @@ export class TracesPage {
     this.latencyHeatmap = '[data-test="traces-latency-heatmap"]';
     // Auto Run (live mode) toggle in the Run Query dropdown — source: web/src/plugins/traces/SearchBar.vue
     this.liveModeToggleItem = '[data-test="traces-search-bar-live-mode-toggle-btn"]';
-    // Analysis Dashboard Tabs — source: web/src/plugins/traces/metrics/TracesAnalysisDashboard.vue
-    // Tabs render as <OTab data-test="traces-analysis-dashboard-${name}-tab"> where name ∈ {volume,duration,error}
-    this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"]';
-    this.rateTab = '[data-test="traces-analysis-dashboard-volume-tab"]';
-    this.latencyTab = '[data-test="traces-analysis-dashboard-duration-tab"]';
-    this.errorsTab = '[data-test="traces-analysis-dashboard-error-tab"]';
-    // Analysis dashboard states — scope inside the drawer
-    this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-    this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-error"]';
-    this.analysisDashboardRetryBtn = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-retry-btn"]';
 
     // ===== DRILL DOWN COMPARISON (web/src/plugins/traces/metrics/TracesComparison.vue) =====
     this.comparisonPage = '[data-test="traces-comparison"]';
@@ -2051,84 +2029,7 @@ export class TracesPage {
     await this.page.locator(`[data-test="traces-comparison-include-${field}-0"]`).click();
   }
 
-  async clickInsightsButton() {
-    await this.page.locator(this.insightsButton).click();
-    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-  }
-
   // --- Analysis Dashboard (TracesAnalysisDashboard.vue) ---
-
-  /**
-   * Check if Analysis Dashboard is visible
-   * @returns {Promise<boolean>}
-   */
-  async isAnalysisDashboardVisible() {
-    return await this.page.locator(this.analysisDashboardCard).isVisible({ timeout: 10000 }).catch(() => false);
-  }
-
-  /**
-   * Close the Drill down view via its Back button
-   */
-  async closeAnalysisDashboard() {
-    const closeBtn = this.page.locator(this.analysisDashboardClose);
-    if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await closeBtn.click();
-      await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    }
-  }
-
-  /**
-   * Wait for Analysis Dashboard to fully load (spinner gone + content visible)
-   */
-  async waitForAnalysisDashboardLoad() {
-    const spinner = this.page.locator(this.analysisDashboardLoading);
-    try {
-      if (await spinner.isVisible({ timeout: 2000 })) {
-        await spinner.waitFor({ state: 'hidden', timeout: 30000 });
-      }
-    } catch {
-      // Spinner might not appear or already hidden
-    }
-    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-  }
-
-  /**
-   * Check if the analysis dashboard is in loading state
-   * @returns {Promise<boolean>}
-   */
-  async isAnalysisDashboardLoading() {
-    return await this.page.locator(this.analysisDashboardLoading).isVisible({ timeout: 2000 }).catch(() => false);
-  }
-
-  /**
-   * Check if the analysis dashboard shows an error state
-   * @returns {Promise<boolean>}
-   */
-  async isAnalysisDashboardError() {
-    return await this.page.locator(this.analysisDashboardError).isVisible({ timeout: 2000 }).catch(() => false);
-  }
-
-  /**
-   * Click the Retry button when analysis dashboard shows an error
-   */
-  async clickAnalysisDashboardRetry() {
-    const retryBtn = this.page.locator(this.analysisDashboardRetryBtn);
-    if (await retryBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await retryBtn.click();
-      await this.page.waitForTimeout(2000);
-    }
-  }
-
-  /**
-   * Check if analysis dashboard has chart panels rendered (actual content loaded)
-   * @returns {Promise<boolean>}
-   */
-  async hasAnalysisDashboardCharts() {
-    const chartPanel = this.page.locator(
-      `${this.analysisDashboardDrawer} canvas, ${this.analysisDashboardDrawer} [data-test*="chart"]`
-    );
-    return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
-  }
 
   // --- Error Only Toggle (SearchResult.vue — error-count badge) ---
 
@@ -2198,58 +2099,6 @@ export class TracesPage {
    */
   async isTracesMetricsDashboardVisible() {
     return await this.page.locator(this.tracesMetricsDashboard).isVisible({ timeout: 10000 }).catch(() => false);
-  }
-
-  /**
-   * Perform brush selection on metrics chart (simulated via click and drag)
-   * @returns {Promise<boolean>} true if brush selection triggered a UI change
-   */
-  async performBrushSelectionOnChart() {
-    const chartSelectors = [
-      this.page.locator(this.tracesMetricsDashboard).locator('canvas').first(),
-      this.page.locator('[data-test="chart-renderer"] canvas').first(),
-    ];
-
-    let chart = null;
-    for (const selector of chartSelectors) {
-      if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
-        chart = selector;
-        break;
-      }
-    }
-
-    if (!chart) return false;
-
-    const box = await chart.boundingBox();
-    if (!box) return false;
-
-    await this.page.waitForTimeout(2000);
-
-    // Use coordinate-based mouse operations only — no element references after
-    // bounding box capture, since ECharts may re-render and detach the element
-    const startX = box.x + box.width * 0.25;
-    const endX = box.x + box.width * 0.75;
-    const y = box.y + box.height / 2;
-
-    await this.page.mouse.move(startX, y);
-    await this.page.waitForTimeout(100);
-    await this.page.mouse.down();
-    await this.page.waitForTimeout(100);
-
-    const steps = 20;
-    for (let i = 1; i <= steps; i++) {
-      const currentX = startX + (endX - startX) * (i / steps);
-      await this.page.mouse.move(currentX, y);
-      await this.page.waitForTimeout(20);
-    }
-
-    await this.page.waitForTimeout(100);
-    await this.page.mouse.up();
-    await this.page.waitForTimeout(1500);
-
-    // Verify the page is still functional after brush interaction
-    const insightsVisible = await this.isInsightsButtonVisible();
-    return insightsVisible;
   }
 
   // --- RED Metrics Charts (TracesMetricsDashboard.vue + PanelContainer.vue) ---
@@ -2607,283 +2456,12 @@ export class TracesPage {
     return true;
   }
 
-  /**
-   * Per-dimension panel tally inside the Insights drawer.
-   * @returns {Promise<{ panels: number, charts: number, errors: number, errorText: string }>}
-   */
-  async getAnalysisPanelStates() {
-    return await this.page.evaluate((drawerSel) => {
-      const drawer = document.querySelector(drawerSel);
-      if (!drawer) return { panels: 0, charts: 0, errors: 0, errorText: '' };
-      const panels = [...drawer.querySelectorAll('[data-test-panel-title]')];
-      const errored = panels.filter((p) =>
-        p.querySelector('[data-test="panel-schema-renderer-error-message"]')
-      );
-      // The no-data overlay coexists with an empty canvas, so exclude it to keep charts/noData disjoint.
-      return {
-        panels: panels.length,
-        charts: panels.filter(
-          (p) => p.querySelector('canvas') && !p.querySelector('[data-test="no-data"]')
-        ).length,
-        noData: panels.filter((p) => p.querySelector('[data-test="no-data"]')).length,
-        errors: errored.length,
-        errorText: errored.length ? errored[0].textContent.trim().slice(0, 300) : '',
-      };
-    }, this.analysisDashboardDrawer);
-  }
-
-  /**
-   * Open one Insights tab and wait for its panels to settle.
-   * @param {'volume'|'duration'|'error'} name - Tab slug from TracesAnalysisDashboard.vue
-   */
-  async openAnalysisTab(name) {
-    await this.page.locator(`[data-test="traces-analysis-dashboard-${name}-tab"]`).click();
-    await this.waitForAnalysisDashboardLoad();
-    return await this.waitForAnalysisPanelsSettled();
-  }
-
-  /**
-   * Wait until every dimension panel has resolved and stopped changing, then report it.
-   * The previous tab's panels stay mounted for a beat after a tab switch, so a single
-   * resolved read can describe the old tab; two matching reads cannot.
-   * @returns {Promise<{ panels: number, charts: number, noData: number, errors: number, errorText: string }>}
-   */
-  async waitForAnalysisPanelsSettled(timeout = 45000) {
-    const deadline = Date.now() + timeout;
-    let previous = null;
-    while (Date.now() < deadline) {
-      const states = await this.getAnalysisPanelStates();
-      const resolved =
-        states.panels > 0 && states.charts + states.noData + states.errors === states.panels;
-      if (resolved && previous && JSON.stringify(previous) === JSON.stringify(states)) {
-        return states;
-      }
-      previous = resolved ? states : null;
-      await this.page.waitForTimeout(1000);
-    }
-    return await this.getAnalysisPanelStates();
-  }
-
-  /**
-   * Rendered text of the Insights drawer; per-panel query errors land in the panel
-   * body rather than the drawer's error slot, so the whole drawer is the safe source.
-   * @returns {Promise<string>}
-   */
-  async getAnalysisDashboardText() {
-    return (
-      (await this.page
-        .locator(this.analysisDashboardDrawer)
-        .innerText()
-        .catch(() => '')) || ''
-    );
-  }
-
   // --- Dimension Selector Sidebar (TracesAnalysisDashboard.vue) ---
-
-  /**
-   * Check if dimension selector sidebar is visible in Analysis Dashboard
-   * @returns {Promise<boolean>}
-   */
-  async isDimensionSidebarVisible() {
-    return await this.page.locator(this.dimensionSelectorSidebar).isVisible().catch(() => false);
-  }
-
-  /**
-   * Toggle dimension selector sidebar via collapse button
-   */
-  async toggleDimensionSidebar() {
-    const sidebar = this.page.locator(this.dimensionSelectorSidebar);
-    const sidebarVisible = await sidebar.isVisible().catch(() => false);
-    if (sidebarVisible) {
-      // Sidebar is open — click the collapse btn inside it
-      const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
-      await btn.click();
-      await sidebar.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    } else {
-      // Sidebar is collapsed — click the collapsed bar to expand
-      const collapsedBar = this.page.locator('[data-test="dimension-selector-collapsed-bar"]');
-      await collapsedBar.click();
-      await sidebar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    }
-  }
-
-  /**
-   * Check if dimension search input is visible in sidebar
-   * @returns {Promise<boolean>}
-   */
-  async isDimensionSearchInputVisible() {
-    return await this.page.locator(this.dimensionSearchInput).isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Search for a dimension in the sidebar
-   * @param {string} searchText - text to type in dimension search
-   */
-  async searchDimension(searchText) {
-    // OInput: fill the -field native <input>, not the wrapper <div>
-    const input = this.page.locator(this.dimensionSearchInputField);
-    await input.click();
-    await input.fill(searchText);
-    // Deterministic wait: matching checkbox must be visible AND the visible checkbox
-    // count must converge (debounced filter has settled).
-    await this.page.locator(`[data-test="dimension-checkbox-${searchText}"]`).waitFor({ state: 'visible', timeout: 5000 });
-    let lastCount = -1;
-    await expect.poll(async () => {
-      const current = await this.page.locator('[data-test^="dimension-checkbox-"]').count();
-      const stable = current === lastCount;
-      lastCount = current;
-      return stable;
-    }, { intervals: [100, 150, 200, 250], timeout: 5000 }).toBe(true);
-  }
-
-  /**
-   * Get the count of dimension checkboxes visible in sidebar
-   * @returns {Promise<number>}
-   */
-  async getDimensionCheckboxCount() {
-    return await this.page.locator('[data-test^="dimension-checkbox-"]').count();
-  }
-
-  /**
-   * Toggle a specific dimension checkbox by its value
-   * @param {string} dimensionValue - the dimension value (used in data-test="dimension-checkbox-{value}")
-   * @returns {Promise<boolean>} true if toggled
-   */
-  async toggleDimensionCheckbox(dimensionValue) {
-    const checkbox = this.page.locator(`[data-test="dimension-checkbox-${dimensionValue}"]`);
-    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await checkbox.click();
-      await this.page.waitForTimeout(500);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Get the first dimension checkbox value that is visible
-   * @returns {Promise<string|null>}
-   */
-  async getFirstDimensionValue() {
-    const firstCheckbox = this.page.locator('[data-test^="dimension-checkbox-"]').first();
-    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const testAttr = await firstCheckbox.getAttribute('data-test');
-      return testAttr ? testAttr.replace('dimension-checkbox-', '') : null;
-    }
-    return null;
-  }
 
   // --- Tab Navigation (TracesAnalysisDashboard.vue) ---
   // Tab labels from i18n: "Rate" (volume), "Latency" (latency), "Errors" (error)
 
-  /**
-   * Check if Rate tab is visible
-   * @returns {Promise<boolean>}
-   */
-  async isRateTabVisible() {
-    return await this.page.locator(this.rateTab).first().isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Check if Latency tab is visible
-   * @returns {Promise<boolean>}
-   */
-  async isLatencyTabVisible() {
-    return await this.page.locator(this.latencyTab).first().isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Check if Errors tab is visible
-   * @returns {Promise<boolean>}
-   */
-  async isErrorsTabVisible() {
-    return await this.page.locator(this.errorsTab).first().isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Click Rate tab
-   */
-  async clickRateTab() {
-    await this.page.locator(this.rateTab).first().click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Click Latency tab
-   */
-  async clickLatencyTab() {
-    await this.page.locator(this.latencyTab).first().click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Click Errors tab
-   */
-  async clickErrorsTab() {
-    await this.page.locator(this.errorsTab).first().click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Check if a specific tab is active in Analysis Dashboard
-   * @param {string} tabLabel - 'Rate', 'Latency'/'Duration', or 'Errors'
-   * @returns {Promise<boolean>}
-   */
-  async isTabActive(tabLabel) {
-    // Each OTab carries data-test="traces-analysis-dashboard-${name}-tab"; map
-    // the labels used by callers (Rate/Latency/Errors) to internal names
-    // (volume/duration/error) and rely on data-state for active.
-    // OTab wraps the Reka TabsTrigger in a <span> for disabled-tooltip support,
-    // so the consumer's data-test lands on the wrapper while data-state="active"
-    // is on the inner button. Poll the DOM for active state on either the
-    // wrapper itself OR a descendant (mirrors the metricsBuilderPage pattern
-    // for OToggleGroupItem).
-    const labelToName = { rate: 'volume', latency: 'duration', duration: 'duration', errors: 'error', error: 'error' };
-    const name = labelToName[tabLabel.toLowerCase()] || tabLabel.toLowerCase();
-    const testId = `traces-analysis-dashboard-${name}-tab`;
-    const drawerSel = this.analysisDashboardDrawer;
-    const isActive = await this.page.waitForFunction(
-      ({ drawerSel, testId }) => {
-        const drawer = document.querySelector(drawerSel);
-        if (!drawer) return null;
-        const el = drawer.querySelector(`[data-test="${testId}"]`);
-        if (!el) return null;
-        if (el.getAttribute('data-state') === 'active') return true;
-        const inner = el.querySelector('[data-state="active"]');
-        return inner ? true : null;
-      },
-      { drawerSel, testId },
-      { timeout: 3000 }
-    ).then(h => h.jsonValue()).catch(() => null);
-    return Boolean(isActive);
-  }
-
-  /**
-   * Get the count of visible tabs in Analysis Dashboard
-   * @returns {Promise<number>}
-   */
-  async getVisibleTabCount() {
-    return await this.page
-      .locator(`${this.analysisDashboardDrawer} [data-test^="traces-analysis-dashboard-"][data-test$="-tab"]`)
-      .count();
-  }
-
   // --- Percentile Refresh (Latency tab only) ---
-
-  /**
-   * Check if percentile refresh button is visible (only on latency tab after percentile change)
-   * @returns {Promise<boolean>}
-   */
-  async isPercentileRefreshVisible() {
-    return await this.page.locator(this.percentileRefreshButton).isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Click percentile refresh button
-   */
-  async clickPercentileRefresh() {
-    await this.page.locator(this.percentileRefreshButton).click();
-    await this.page.waitForTimeout(2000);
-  }
 
   // --- Composite Helper Methods ---
 
@@ -2918,32 +2496,6 @@ export class TracesPage {
       visible = await this.isTracesMetricsDashboardVisible();
     }
     return visible;
-  }
-
-  /**
-   * Open insights dashboard from traces metrics.
-   * Sets up search, ensures metrics visible, clicks insights button, waits for load.
-   * @returns {Promise<boolean>} true if dashboard opened successfully
-   */
-  async openInsightsDashboard() {
-    await this.setupTraceSearch();
-    await this.waitForTraceSearchResults();
-    const metricsVisible = await this.ensureMetricsDashboardVisible();
-    if (!metricsVisible) return false;
-
-    const insightsVisible = await this.isInsightsButtonVisible();
-    if (!insightsVisible) return false;
-
-    await this.clickInsightsButton();
-    await this.waitForAnalysisDashboardLoad();
-    return await this.isAnalysisDashboardVisible();
-  }
-
-  /**
-   * Wait for dashboard close to complete
-   */
-  async waitForDashboardClose() {
-    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   // ============================================

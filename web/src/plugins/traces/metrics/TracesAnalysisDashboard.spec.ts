@@ -94,7 +94,6 @@ vi.mock("@/composables/useLatencyInsightsAnalysis", () => ({
 // ---------------------------------------------------------------------------
 vi.mock("@/composables/useDimensionSelector", () => ({
   selectDimensionsFromData: vi.fn().mockReturnValue(["service_name", "span_status"]),
-  selectTraceDimensions: vi.fn().mockReturnValue(["service_name", "span_status"]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -147,50 +146,12 @@ const defaultProps = {
   streamType: "traces",
   timeRange: { startTime: 1_000_000_000, endTime: 2_000_000_000 },
   analysisType: "duration" as const,
-  availableAnalysisTypes: ["duration"] as Array<"duration" | "volume" | "error">,
 };
 
 // ---------------------------------------------------------------------------
 // Component stubs — declared at module scope so every mount uses the same
 // shape and tests can locate them via findComponent({ name })
 // ---------------------------------------------------------------------------
-
-// ODrawer stub: render slots inline (no portal) and forward open/update:open
-// so the host component's `@update:open` listener can be exercised by tests.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: [
-    "open",
-    "width",
-    "title",
-    "subTitle",
-    "showClose",
-    "persistent",
-    "size",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div data-test-stub="o-drawer" :data-open="open">
-      <div data-test-stub="o-drawer-title">{{ title }}</div>
-      <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
-    </div>
-  `,
-};
 
 // OButton stub: render a real <button> so @click bindings fire, and forward
 // the data-test attribute so component-level selectors keep working.
@@ -209,22 +170,6 @@ const OButtonStub = {
   `,
 };
 
-// OTabs / OTab stubs: render slot content so the surrounding DOM (search
-// input, sidebar) is reachable. The tabs themselves do not drive any of
-// the assertions in this file.
-const OTabsStub = {
-  name: "OTabs",
-  props: ["modelValue", "dense", "align"],
-  emits: ["update:modelValue"],
-  template: '<div data-test-stub="o-tabs"><slot /></div>',
-};
-
-const OTabStub = {
-  name: "OTab",
-  props: ["name", "label", "icon"],
-  template: '<div data-test-stub="o-tab" :data-name="name" />',
-};
-
 // ---------------------------------------------------------------------------
 // Mount factory
 // ---------------------------------------------------------------------------
@@ -234,11 +179,7 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
     global: {
       plugins: [mockStore, i18n],
       stubs: {
-        // Migrated drawer component — render slots inline, drive via emits
-        ODrawer: ODrawerStub,
         OButton: OButtonStub,
-        OTabs: OTabsStub,
-        OTab: OTabStub,
         // Heavy custom child — already mocked at module level
         RenderDashboardCharts: {
           template: '<div data-test="render-dashboard-charts"></div>',
@@ -282,57 +223,6 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render the ODrawer wrapper", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.exists()).toBe(true);
-    });
-
-    it("should pass open=true to ODrawer on initial mount", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("open")).toBe(true);
-    });
-
-    it("should pass width=80 to ODrawer", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("width")).toBe(80);
-    });
-
-    it("should render the full-page shell instead of ODrawer when fullPage is set", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ fullPage: true });
-      await flushPromises();
-
-      expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(false);
-      const page = wrapper.findComponent({ name: "TracesDrillDownPage" });
-      expect(page.exists()).toBe(true);
-      expect(page.attributes("data-test")).toBe("traces-analysis-dashboard-drawer");
-      expect(page.props("title")).toBe("Drill down");
-    });
-
-    it("should emit close when the full-page Back button is clicked", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ fullPage: true });
-      await flushPromises();
-
-      await wrapper.find('[data-test="traces-drill-down-back-btn"]').trigger("click");
-      expect(wrapper.emitted("close")).toHaveLength(1);
-    });
-
-    it("should keep the analysis-type title on the drawer (logs) rather than Drill down", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("title")).not.toBe("Drill down");
-    });
-
-    it("should pass a non-empty title to ODrawer for the 'duration' analysisType", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("title")).toBeTruthy();
-    });
-
-    it("should render header-left slot content (timeline header chips area)", () => {
-      const headerLeft = wrapper.find('[data-test-stub="o-drawer-header-left"]');
-      expect(headerLeft.exists()).toBe(true);
-    });
-
     it("should render RenderDashboardCharts when dashboardData is populated", async () => {
       await flushPromises();
       const charts = wrapper.find('[data-test="render-dashboard-charts"]');
@@ -353,11 +243,6 @@ describe("TracesAnalysisDashboard", () => {
       const btn = wrapper.find('[data-test="dimension-selector-collapse-btn"]');
       expect(btn.exists()).toBe(true);
     });
-
-    it("should NOT render the percentile refresh button by default (no uncommitted changes)", () => {
-      const refreshBtn = wrapper.find('[data-test="percentile-refresh-button"]');
-      expect(refreshBtn.exists()).toBe(false);
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -376,7 +261,6 @@ describe("TracesAnalysisDashboard", () => {
       wrapper.unmount();
       wrapper = mountComponent({
         analysisType: "volume",
-        availableAnalysisTypes: ["volume"],
       });
       await flushPromises();
       expect(wrapper.vm.activeAnalysisType).toBe("volume");
@@ -386,7 +270,6 @@ describe("TracesAnalysisDashboard", () => {
       wrapper.unmount();
       wrapper = mountComponent({
         analysisType: "error",
-        availableAnalysisTypes: ["error"],
       });
       await flushPromises();
       expect(wrapper.vm.activeAnalysisType).toBe("error");
@@ -409,21 +292,6 @@ describe("TracesAnalysisDashboard", () => {
       wrapper.vm.onClose();
       await flushPromises();
       expect(wrapper.emitted("close")!.length).toBe(2);
-    });
-
-    it("should emit 'close' when ODrawer emits update:open with false", async () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      drawer.vm.$emit("update:open", false);
-      await flushPromises();
-      expect(wrapper.emitted("close")).toBeTruthy();
-      expect(wrapper.emitted("close")!.length).toBe(1);
-    });
-
-    it("should NOT emit 'close' when ODrawer emits update:open with true", async () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      drawer.vm.$emit("update:open", true);
-      await flushPromises();
-      expect(wrapper.emitted("close")).toBeFalsy();
     });
   });
 
@@ -456,121 +324,6 @@ describe("TracesAnalysisDashboard", () => {
       const colors = wrapper.vm.chipColors;
       expect(colors.baseline).toBe(MOCK_COMPARISON_COLORS.dark.baseline);
       expect(colors.selected).toBe(MOCK_COMPARISON_COLORS.dark.selected);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Computed: showRefreshButton
-  // -------------------------------------------------------------------------
-  describe("computed showRefreshButton", () => {
-    it("should be false when activeAnalysisType is 'volume'", async () => {
-      wrapper.vm.activeAnalysisType = "volume";
-      await flushPromises();
-      expect(wrapper.vm.showRefreshButton).toBe(false);
-    });
-
-    it("should be false when activeAnalysisType is 'error'", async () => {
-      wrapper.vm.activeAnalysisType = "error";
-      await flushPromises();
-      expect(wrapper.vm.showRefreshButton).toBe(false);
-    });
-
-    it("should be false when activeAnalysisType is 'duration' and no variablesManager", () => {
-      // variablesManager is null by default
-      wrapper.vm.activeAnalysisType = "duration";
-      expect(wrapper.vm.showRefreshButton).toBe(false);
-    });
-
-    it("should be true when activeAnalysisType is 'duration' and variablesManager has uncommitted changes", async () => {
-      wrapper.vm.activeAnalysisType = "duration";
-      wrapper.vm.variablesManager = { hasUncommittedChanges: true };
-      await flushPromises();
-      expect(wrapper.vm.showRefreshButton).toBe(true);
-    });
-
-    it("should be true when variablesManager.hasUncommittedChanges is a ref with value true", async () => {
-      wrapper.vm.activeAnalysisType = "duration";
-      wrapper.vm.variablesManager = {
-        hasUncommittedChanges: { value: true },
-      };
-      await flushPromises();
-      expect(wrapper.vm.showRefreshButton).toBe(true);
-    });
-
-    it("should be false when variablesManager.hasUncommittedChanges is false", async () => {
-      wrapper.vm.activeAnalysisType = "duration";
-      wrapper.vm.variablesManager = { hasUncommittedChanges: false };
-      await flushPromises();
-      expect(wrapper.vm.showRefreshButton).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Computed: availableTabs
-  // -------------------------------------------------------------------------
-  describe("computed availableTabs", () => {
-    it("should return a tab object for each type in availableAnalysisTypes", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        availableAnalysisTypes: ["duration", "volume", "error"],
-      });
-      await flushPromises();
-      const tabs = wrapper.vm.availableTabs;
-      expect(tabs).toHaveLength(3);
-    });
-
-    it("should include 'volume' tab with correct icon", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ availableAnalysisTypes: ["volume"] });
-      await flushPromises();
-      const tab = wrapper.vm.availableTabs[0];
-      expect(tab.name).toBe("volume");
-      expect(tab.icon).toBe("trending-up");
-    });
-
-    it("should include 'duration' tab with correct icon", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ availableAnalysisTypes: ["duration"] });
-      await flushPromises();
-      const tab = wrapper.vm.availableTabs[0];
-      expect(tab.name).toBe("duration");
-      expect(tab.icon).toBe("schedule");
-    });
-
-    it("should include 'error' tab with correct icon", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ availableAnalysisTypes: ["error"] });
-      await flushPromises();
-      const tab = wrapper.vm.availableTabs[0];
-      expect(tab.name).toBe("error");
-      expect(tab.icon).toBe("error-outline");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Computed: showTabs
-  // -------------------------------------------------------------------------
-  describe("computed showTabs", () => {
-    it("should be false when only one analysis type is available", () => {
-      expect(wrapper.vm.showTabs).toBe(false);
-    });
-
-    it("should be true when more than one analysis type is available", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        availableAnalysisTypes: ["duration", "volume"],
-      });
-      await flushPromises();
-      expect(wrapper.vm.showTabs).toBe(true);
-    });
-
-    it("should be true for all three types", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        availableAnalysisTypes: ["duration", "volume", "error"],
-      });
-      await flushPromises();
-      expect(wrapper.vm.showTabs).toBe(true);
     });
   });
 
@@ -740,43 +493,6 @@ describe("TracesAnalysisDashboard", () => {
         endTime: 4_000_000,
       });
     });
-
-    it("should use durationFilter timeStart/timeEnd when rateFilter has no time range", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        durationFilter: { start: 100, end: 500, timeStart: 1_000_000, timeEnd: 2_000_000 },
-      });
-      await flushPromises();
-      expect(wrapper.vm.selectedTimeRangeDisplay).toEqual({
-        startTime: 1_000_000,
-        endTime: 2_000_000,
-      });
-    });
-
-    it("should use errorFilter timeStart/timeEnd when rateFilter and durationFilter have no time range", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        errorFilter: { start: 1, end: 10, timeStart: 7_000_000, timeEnd: 8_000_000 },
-      });
-      await flushPromises();
-      expect(wrapper.vm.selectedTimeRangeDisplay).toEqual({
-        startTime: 7_000_000,
-        endTime: 8_000_000,
-      });
-    });
-
-    it("should prioritise rateFilter over durationFilter when both have time ranges", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        rateFilter: { start: 1, end: 5, timeStart: 3_000_000, timeEnd: 4_000_000 },
-        durationFilter: { start: 100, end: 500, timeStart: 1_000_000, timeEnd: 2_000_000 },
-      });
-      await flushPromises();
-      expect(wrapper.vm.selectedTimeRangeDisplay).toEqual({
-        startTime: 3_000_000,
-        endTime: 4_000_000,
-      });
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -805,34 +521,10 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.vm.filterMetadata).toBeNull();
     });
 
-    it("should return a duration metadata string for 'duration' type with durationFilter (no timeStart)", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        analysisType: "duration",
-        durationFilter: { start: 200, end: 800 },
-      });
-      await flushPromises();
-      const meta = wrapper.vm.filterMetadata;
-      expect(meta).not.toBeNull();
-      expect(meta).toContain("200.00ms");
-      expect(meta).toContain("800.00ms");
-    });
-
-    it("should return null for 'duration' type when durationFilter has a timeStart (time-based brush)", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        analysisType: "duration",
-        durationFilter: { start: 200, end: 800, timeStart: 1_000_000, timeEnd: 2_000_000 },
-      });
-      await flushPromises();
-      expect(wrapper.vm.filterMetadata).toBeNull();
-    });
-
     it("should return a rate metadata string for 'volume' type with rateFilter (no timeStart)", async () => {
       wrapper.unmount();
       wrapper = mountComponent({
         analysisType: "volume",
-        availableAnalysisTypes: ["volume"],
         rateFilter: { start: 10, end: 50 },
       });
       await flushPromises();
@@ -840,19 +532,6 @@ describe("TracesAnalysisDashboard", () => {
       expect(meta).not.toBeNull();
       expect(meta).toContain("10");
       expect(meta).toContain("50");
-    });
-
-    it("should return an error metadata string for 'error' type with errorFilter (no timeStart)", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        analysisType: "error",
-        availableAnalysisTypes: ["error"],
-        errorFilter: { start: 5, end: 100 },
-      });
-      await flushPromises();
-      const meta = wrapper.vm.filterMetadata;
-      expect(meta).not.toBeNull();
-      expect(meta).toContain("5");
     });
   });
 
@@ -952,17 +631,6 @@ describe("TracesAnalysisDashboard", () => {
   // Method: getInitialDimensions
   // -------------------------------------------------------------------------
   describe("method getInitialDimensions", () => {
-    it("should call selectTraceDimensions for traces stream type", async () => {
-      const { selectTraceDimensions } = await import("@/composables/useDimensionSelector");
-      wrapper.unmount();
-      wrapper = mountComponent({
-        streamType: "traces",
-        streamFields: [{ name: "service_name" }],
-      });
-      await flushPromises();
-      expect(selectTraceDimensions).toHaveBeenCalled();
-    });
-
     it("should call selectDimensionsFromData for logs stream type with enough log samples", async () => {
       const { selectDimensionsFromData } = await import("@/composables/useDimensionSelector");
       const samples = Array.from({ length: 10 }, (_, i) => ({
@@ -1025,20 +693,6 @@ describe("TracesAnalysisDashboard", () => {
       expect(mockShowErrorNotification).toHaveBeenCalled();
     });
 
-    it("should use durationFilter config when activeAnalysisType is 'duration'", async () => {
-      const { useLatencyInsightsDashboard } =
-        await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
-      wrapper.vm.activeAnalysisType = "duration";
-      const durationFilter = { start: 100, end: 500 };
-      await wrapper.setProps({ durationFilter });
-      await wrapper.vm.loadAnalysis();
-      await flushPromises();
-      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
-      expect(callArg.durationFilter).toEqual(durationFilter);
-      expect(callArg.rateFilter).toBeUndefined();
-    });
-
     it("should use rateFilter config when activeAnalysisType is 'volume'", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
@@ -1050,21 +704,6 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
       const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
       expect(callArg.rateFilter).toEqual(rateFilter);
-      expect(callArg.durationFilter).toBeUndefined();
-    });
-
-    it("should use errorFilter config when activeAnalysisType is 'error'", async () => {
-      const { useLatencyInsightsDashboard } =
-        await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
-      wrapper.vm.activeAnalysisType = "error";
-      const errorFilter = { start: 1, end: 20 };
-      await wrapper.setProps({ errorFilter });
-      await wrapper.vm.loadAnalysis();
-      await flushPromises();
-      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
-      expect(callArg.errorFilter).toEqual(errorFilter);
-      expect(callArg.durationFilter).toBeUndefined();
     });
 
     it("should override selectedTimeRange with rateFilter time when rateFilter has timeStart", async () => {
@@ -1082,13 +721,6 @@ describe("TracesAnalysisDashboard", () => {
         startTime: 3_000_000,
         endTime: 4_000_000,
       });
-    });
-
-    it("should forward baselineFilter into the generateDashboard config", async () => {
-      await wrapper.setProps({ baselineFilter: "a = '1' or b = '2'" });
-      await wrapper.vm.loadAnalysis();
-      await flushPromises();
-      expect(mockGenerateDashboard.mock.calls.at(-1)[1].baselineFilter).toBe("a = '1' or b = '2'");
     });
 
     it("should pass selectedDimensions to generateDashboard config", async () => {
@@ -1115,76 +747,6 @@ describe("TracesAnalysisDashboard", () => {
       expect(mockAnalyses).toHaveLength(1);
       expect(mockAnalyses[0].dimensionName).toBe("service_name");
       expect(mockAnalyses[0].data).toEqual([]);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Method: onVariablesManagerReady
-  // -------------------------------------------------------------------------
-  describe("method onVariablesManagerReady", () => {
-    it("should set variablesManager to the provided manager object", () => {
-      const manager = { hasUncommittedChanges: false, committedVariablesData: {} };
-      wrapper.vm.onVariablesManagerReady(manager);
-      expect(wrapper.vm.variablesManager).toEqual(manager);
-    });
-
-    it("should call loadAnalysis when analysisType is 'duration' and dashboardData is null", async () => {
-      const { useLatencyInsightsDashboard } =
-        await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
-      wrapper.vm.activeAnalysisType = "duration";
-      wrapper.vm.dashboardData = null;
-      wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: false });
-      await flushPromises();
-      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
-        callsBefore,
-      );
-    });
-
-    it("should NOT call loadAnalysis when dashboardData is already populated", async () => {
-      const { useLatencyInsightsDashboard } =
-        await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
-      wrapper.vm.dashboardData = { tabs: [{ panels: [] }] };
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
-      wrapper.vm.activeAnalysisType = "duration";
-      wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: false });
-      await flushPromises();
-      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Method: getCurrentPercentile
-  // -------------------------------------------------------------------------
-  describe("method getCurrentPercentile", () => {
-    it("should return '0.95' (default P95) when variablesManager is null", () => {
-      wrapper.vm.variablesManager = null;
-      expect(wrapper.vm.getCurrentPercentile()).toBe("0.95");
-    });
-
-    it("should return the percentile value from committedVariablesData.global when present", () => {
-      wrapper.vm.variablesManager = {
-        committedVariablesData: {
-          global: [{ name: "percentile", value: "0.99" }],
-        },
-      };
-      expect(wrapper.vm.getCurrentPercentile()).toBe("0.99");
-    });
-
-    it("should return '0.95' when percentile variable is not in committedVariablesData.global", () => {
-      wrapper.vm.variablesManager = {
-        committedVariablesData: {
-          global: [{ name: "other_var", value: "foo" }],
-        },
-      };
-      expect(wrapper.vm.getCurrentPercentile()).toBe("0.95");
-    });
-
-    it("should return '0.95' when committedVariablesData is absent", () => {
-      wrapper.vm.variablesManager = {};
-      expect(wrapper.vm.getCurrentPercentile()).toBe("0.95");
     });
   });
 
@@ -1282,32 +844,6 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.vm.dashboardRenderKey).toBe(renderKeyBefore);
       expect(chartsEl()).toBe(chartsBefore);
       expect(mockGenerateDashboard).not.toHaveBeenCalled();
-    });
-
-    it("forwards baselineFilter to dimensions added after the dashboard opens", async () => {
-      await wrapper.setProps({ baselineFilter: "service_name = 'a'" });
-      await flushPromises();
-      mockGenerateDashboard.mockClear();
-      mockGenerateDashboard.mockReturnValueOnce({
-        tabs: [
-          {
-            panels: [
-              {
-                id: "panel-method",
-                title: "http_method",
-                layout: { x: 0, y: 0, w: 64, h: 16, i: "i-method" },
-              },
-            ],
-          },
-        ],
-      });
-
-      wrapper.vm.toggleDimension("http_method");
-      await flushPromises();
-
-      const config = mockGenerateDashboard.mock.calls.at(-1)[1];
-      expect(config.dimensions).toEqual(["http_method"]);
-      expect(config.baselineFilter).toBe("service_name = 'a'");
     });
 
     it("adds a panel for a newly ticked dimension without remounting the existing ones", async () => {
@@ -1429,9 +965,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should mount without errors when all optional filter props are undefined", async () => {
       wrapper.unmount();
       wrapper = mountComponent({
-        durationFilter: undefined,
         rateFilter: undefined,
-        errorFilter: undefined,
         baseFilter: undefined,
       });
       await flushPromises();
@@ -1491,7 +1025,6 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
       embedded: true,
       streamType: "logs",
       analysisType: "volume",
-      availableAnalysisTypes: ["volume"],
     });
     await flushPromises();
   });
@@ -1541,7 +1074,6 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
         streamType: "logs",
         streamName: "app_logs",
         analysisType: "volume",
-        availableAnalysisTypes: ["volume"],
         streamFields: fields,
         ...props,
       });
