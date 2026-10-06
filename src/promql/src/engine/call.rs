@@ -34,6 +34,9 @@ use crate::{
     scalar_param::ScalarParam,
 };
 
+/// The most quantiles `histogram_quantiles` takes, as upstream allows.
+const MAX_QUANTILES: usize = 10;
+
 impl Engine {
     pub(super) async fn call_expr(
         &mut self,
@@ -138,6 +141,35 @@ impl Engine {
 
                 functions::histogram_quantile(&phi, input, &self.eval_ctx)
             }
+            Func::HistogramFraction => {
+                let err = "Invalid args, expected histogram_fraction(lower scalar, upper scalar, b instant-vector)";
+                self.ensure_args_len(args, 3, err)?;
+                let lower = self.call_scalar_arg(args, 0, err).await?;
+                let upper = self.call_scalar_arg(args, 1, err).await?;
+                let input = self.call_expr_arg(args, 2).await?;
+
+                functions::histogram_fraction(&lower, &upper, input, &self.eval_ctx)
+            }
+            Func::HistogramQuantiles => {
+                let err = "Invalid args, expected histogram_quantiles(b instant-vector, label string, phi scalar, ...)";
+                let quantiles = args.len().saturating_sub(2);
+                if quantiles > MAX_QUANTILES {
+                    return Err(DataFusionError::Plan(format!(
+                        "histogram_quantiles accepts at most {MAX_QUANTILES} quantiles, got {quantiles}"
+                    )));
+                }
+                if quantiles == 0 {
+                    return Err(DataFusionError::NotImplemented(err.into()));
+                }
+                let input = self.call_expr_arg(args, 0).await?;
+                let label = self.call_string_arg(args, 1, err).await?;
+                let mut phis = Vec::with_capacity(quantiles);
+                for index in 2..args.len() {
+                    phis.push(self.call_scalar_arg(args, index, err).await?);
+                }
+
+                functions::histogram_quantiles(input, &label, &phis, &self.eval_ctx)
+            }
             Func::HoltWinters => {
                 let err =
                     "Invalid args, expected holt_winters(v range-vector, sf scalar, tf scalar)";
@@ -222,9 +254,13 @@ impl Engine {
 
                 functions::sort(input, func_name == Func::SortDesc, &self.eval_ctx)
             }
-            Func::HistogramCount | Func::HistogramFraction | Func::HistogramSum => Err(
-                DataFusionError::NotImplemented(format!("Unsupported Function: {func_name:?}")),
-            ),
+            Func::HistogramAvg
+            | Func::HistogramCount
+            | Func::HistogramStddev
+            | Func::HistogramStdvar
+            | Func::HistogramSum => Err(DataFusionError::NotImplemented(
+                functions::native_histogram_guidance(func_name.into()),
+            )),
             _ => self.call_single_arg_builtin(func_name, args).await,
         }
     }
@@ -1041,6 +1077,18 @@ mod tests {
             (format!("bottomk({{p}}, {series})"), 1.0, 1.0),
             (format!("quantile({{p}}, {series})"), 0.0, 0.5),
             (format!("histogram_quantile({{p}}, {buckets})"), 0.1, 0.4),
+            (format!("histogram_fraction(0, {{p}}, {buckets})"), 0.5, 0.5),
+            (format!("histogram_fraction({{p}}, 2, {buckets})"), 0.5, 0.5),
+            (
+                format!(r#"histogram_quantiles({buckets}, "q", {{p}})"#),
+                0.1,
+                0.4,
+            ),
+            (
+                format!(r#"histogram_quantiles({buckets}, "q", 0.5, {{p}})"#),
+                0.1,
+                0.3,
+            ),
             (
                 "quantile_over_time({p}, vector(time())[3m:1m])".to_string(),
                 0.0,
@@ -1168,5 +1216,214 @@ mod tests {
         let values = step_values(eval_at("vector(pi())", range_ctx()).await);
         assert_eq!(values.len(), 3);
         assert!(values.iter().all(|(_, v)| *v == std::f64::consts::PI));
+    }
+
+    async fn eval_err(query: &str, eval_ctx: EvalContext) -> String {
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            eval_ctx,
+        );
+        let expr = promql_parser::parser::parse(query).unwrap();
+        match engine.exec_expr(&expr).await {
+            Ok(value) => panic!("{query} evaluated to {value:?}"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    /// A classic histogram: one `le` series per `(bound, count)`, all labelled `g="<group>"`.
+    fn classic(group: &str, buckets: &[(&str, f64)]) -> String {
+        buckets
+            .iter()
+            .map(|(le, count)| {
+                format!(
+                    r#"label_replace(label_replace(label_replace(vector({count}), "le", "{le}", "", ""), "g", "{group}", "", ""), "__name__", "h_bucket", "", "")"#
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" or ")
+    }
+
+    fn instant() -> EvalContext {
+        EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into())
+    }
+
+    /// `g` label -> value, for one instant.
+    async fn by_group(query: &str) -> BTreeMap<String, f64> {
+        let Value::Matrix(matrix) = eval_at(query, instant()).await else {
+            panic!("expected a matrix for {query}");
+        };
+        matrix
+            .into_iter()
+            .map(|series| {
+                assert!(series.labels.get_value("__name__").is_empty(), "{query}");
+                (series.labels.get_value("g"), series.samples[0].value)
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_histogram_fraction_over_classic_buckets() {
+        let h = classic(
+            "a",
+            &[("0.1", 10.0), ("0.5", 30.0), ("1", 45.0), ("+Inf", 50.0)],
+        );
+        let fraction = |lo: &str, hi: &str| format!("histogram_fraction({lo}, {hi}, {h})");
+        assert_eq!(by_group(&fraction("0", "0.5")).await["a"], 30.0 / 50.0);
+        assert_eq!(by_group(&fraction("-Inf", "0.5")).await["a"], 30.0 / 50.0);
+        // (0.5, 1] holds 15, and 0.75 is halfway through it
+        assert_eq!(by_group(&fraction("0", "0.75")).await["a"], 37.5 / 50.0);
+        assert_eq!(by_group(&fraction("1", "+Inf")).await["a"], 5.0 / 50.0);
+        assert_eq!(by_group(&fraction("0.5", "0.5")).await["a"], 0.0);
+        assert_eq!(by_group(&fraction("0.6", "0.2")).await["a"], 0.0);
+        assert!(by_group(&fraction("NaN", "1")).await["a"].is_nan());
+
+        let no_inf = classic("b", &[("0.1", 10.0), ("0.5", 30.0)]);
+        assert!(by_group(&format!("histogram_fraction(0, 0.5, {no_inf})")).await["b"].is_nan());
+        let empty = classic("c", &[("0.1", 0.0), ("+Inf", 0.0)]);
+        assert!(by_group(&format!("histogram_fraction(0, 0.5, {empty})")).await["c"].is_nan());
+    }
+
+    /// Cases from upstream `histograms.test`.
+    #[tokio::test]
+    async fn test_histogram_fraction_matches_upstream() {
+        let h2 = classic(
+            "h2",
+            &[
+                ("0", 0.0),
+                ("2", 10.0),
+                ("4", 20.0),
+                ("6", 30.0),
+                ("+Inf", 30.0),
+            ],
+        );
+        let positive = classic(
+            "positive",
+            &[("1", 1.0), ("2", 3.0), ("3", 6.0), ("+Inf", 100.0)],
+        );
+        let negative = classic(
+            "negative",
+            &[("-3", 10.0), ("-2", 12.0), ("-1", 15.0), ("+Inf", 100.0)],
+        );
+        for (lo, hi, h, expected) in [
+            ("0", "4", &h2, 0.6666666666666666),
+            ("0", "6", &h2, 1.0),
+            ("0", "3.5", &h2, 0.5833333333333334),
+            ("0", "1.5", &positive, 0.02),
+            ("-4", "-2", &negative, 0.02),
+            ("-Inf", "-1.5", &negative, 0.135),
+            ("-Inf", "+Inf", &negative, 1.0),
+        ] {
+            let query = format!("histogram_fraction({lo}, {hi}, {h})");
+            let values = by_group(&query).await;
+            let actual = *values.values().next().unwrap();
+            assert!((actual - expected).abs() < 1e-12, "{lo}..{hi}: {actual}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_histogram_quantiles_labels_each_quantile() {
+        let h = format!(
+            "{} or {}",
+            classic("a", &[("1", 5.0), ("2", 10.0), ("+Inf", 10.0)]),
+            classic("b", &[("1", 2.0), ("2", 4.0), ("+Inf", 8.0)]),
+        );
+        let Value::Matrix(matrix) = eval_at(
+            &format!(r#"histogram_quantiles({h}, "q", 0.5, 0.9)"#),
+            instant(),
+        )
+        .await
+        else {
+            panic!("expected a matrix");
+        };
+        let mut actual: Vec<_> = matrix
+            .iter()
+            .map(|s| {
+                let labels: Vec<_> = s
+                    .labels
+                    .iter()
+                    .map(|l| format!("{}={}", l.name, l.value))
+                    .collect();
+                (labels.join(","), s.samples[0].value)
+            })
+            .collect();
+        actual.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut expected = Vec::new();
+        for phi in ["0.5", "0.9"] {
+            for (group, value) in by_group(&format!("histogram_quantile({phi}, {h})")).await {
+                expected.push((format!("g={group},q={phi}"), value));
+            }
+        }
+        expected.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(actual.len(), 4);
+        assert_eq!(actual, expected);
+
+        let Value::Matrix(matrix) = eval_at(
+            &format!(r#"histogram_quantiles({h}, "q", 0, 1)"#),
+            instant(),
+        )
+        .await
+        else {
+            panic!("expected a matrix");
+        };
+        let mut quantiles: Vec<_> = matrix.iter().map(|s| s.labels.get_value("q")).collect();
+        quantiles.sort();
+        assert_eq!(quantiles, ["0.0", "0.0", "1.0", "1.0"]);
+    }
+
+    #[tokio::test]
+    async fn test_histogram_quantiles_rejects_what_upstream_rejects() {
+        let h = classic("a", &[("1", 5.0), ("+Inf", 10.0)]);
+        let phis = vec!["0.5"; 11].join(", ");
+        for (query, message) in [
+            (
+                format!(r#"histogram_quantiles({h}, "q", {phis})"#),
+                "at most 10",
+            ),
+            (
+                format!(r#"histogram_quantiles({h}, "q", 0.5, 0.5)"#),
+                "0.5 is given twice",
+            ),
+            (
+                format!(r#"histogram_quantiles({h}, "g", 0.5)"#),
+                r#""g" already"#,
+            ),
+        ] {
+            let err = eval_err(&query, instant()).await;
+            assert!(err.contains("histogram_quantiles"), "{query}: {err}");
+            assert!(err.contains(message), "{query}: {err}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_native_histogram_functions_explain_themselves_without_reading_series() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        for (func, hint) in [
+            ("histogram_count", "_count"),
+            ("histogram_sum", "_sum"),
+            ("histogram_avg", "_sum"),
+            ("histogram_stddev", "no classic"),
+            ("histogram_stdvar", "no classic"),
+        ] {
+            let mut engine = Engine::new(
+                "test",
+                Arc::new(PromqlContext::new(
+                    create_test_query_ctx("test", "test_org", 30),
+                    CountingProvider(calls.clone()),
+                    vec![],
+                )),
+                instant(),
+            );
+            let expr = promql_parser::parser::parse(&format!("{func}(rate(x[10m]))")).unwrap();
+            let err = engine.exec_expr(&expr).await.unwrap_err().to_string();
+            assert!(err.contains(func), "{err}");
+            assert!(err.contains("native histograms"), "{err}");
+            assert!(err.contains(hint), "{err}");
+        }
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 }

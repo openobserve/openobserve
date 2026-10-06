@@ -25,7 +25,7 @@ use config::meta::promql::{
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 use rayon::prelude::*;
-use strum::EnumString;
+use strum::{EnumString, IntoStaticStr};
 
 use crate::micros;
 
@@ -65,7 +65,9 @@ mod vector;
 pub(crate) use absent::{absent, absent_labels};
 pub(crate) use absent_over_time::absent_over_time;
 pub(crate) use clamp::clamp;
-pub(crate) use histogram::histogram_quantile;
+pub(crate) use histogram::{
+    histogram_fraction, histogram_quantile, histogram_quantiles, native_histogram_guidance,
+};
 pub(crate) use holt_winters::holt_winters;
 pub(crate) use label_join::label_join;
 pub(crate) use label_replace::label_replace;
@@ -81,7 +83,7 @@ pub(crate) use vector::vector;
 const KEEP_METRIC_NAME_FUNCS: [&str; 2] = ["last_over_time", "first_over_time"];
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
-#[derive(Debug, Clone, Copy, PartialEq, EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, EnumString, IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum Func {
     Abs,
@@ -112,9 +114,13 @@ pub(crate) enum Func {
     Exp,
     FirstOverTime,
     Floor,
+    HistogramAvg,
     HistogramCount,
     HistogramFraction,
     HistogramQuantile,
+    HistogramQuantiles,
+    HistogramStddev,
+    HistogramStdvar,
     HistogramSum,
     HoltWinters,
     Hour,
