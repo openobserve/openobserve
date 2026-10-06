@@ -186,6 +186,13 @@ pub async fn pick_any_replica() -> Option<String> {
     Some(replicas.swap_remove(idx).1)
 }
 
+/// Every live o2-ai replica's address, sorted by name; empty if none is registered or readable.
+pub async fn live_replica_addrs() -> Vec<String> {
+    let mut replicas = live_replicas().await.unwrap_or_default();
+    replicas.sort_by(|a, b| a.0.cmp(&b.0));
+    replicas.into_iter().map(|(_, addr)| addr).collect()
+}
+
 /// Where a session should be routed.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SessionRoute {

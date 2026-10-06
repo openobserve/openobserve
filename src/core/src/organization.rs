@@ -1376,17 +1376,6 @@ pub async fn get_sre_agent_credentials(org_id: &str) -> Result<(String, String),
     }
 }
 
-/// Basic auth for the SysRcaAgent, provisioning it only when missing to skip FGA writes.
-#[cfg(feature = "enterprise")]
-pub async fn sre_agent_auth_header(org_id: &str) -> Result<String, anyhow::Error> {
-    let email = sre_agent_email(org_id);
-    let token = match db::org_users::get(org_id, &email).await {
-        Ok(record) => record.token,
-        Err(_) => get_sre_agent_credentials(org_id).await?.1,
-    };
-    Ok(crate::auth::build_basic_auth_header(&email, &token))
-}
-
 #[cfg(test)]
 mod tests {
     use infra::{db as infra_db, table as infra_table};

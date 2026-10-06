@@ -21,17 +21,22 @@ use std::{
     time::{Duration, Instant},
 };
 
+use axum::{
+    http::{HeaderValue, header},
+    response::Response,
+};
 use config::axum::middlewares::RealIp;
 
-/// The limiter key when no `RealIp` was resolved: one bucket still bounds the load.
-pub const SHARED_IP: &str = "shared";
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+/// How a client whose `RealIp` was not resolved shows up in logs.
+pub const UNKNOWN_IP: &str = "unknown";
 
 pub type Counters = RwLock<HashMap<String, (u32, Instant)>>;
 
-/// The limiter key: the ingress-resolved `RealIp`, or one shared bucket when that layer isn't
-/// installed.
+/// The client's address for logs: the ingress-resolved `RealIp`, or [`UNKNOWN_IP`].
 pub fn client_ip(ip: Option<RealIp>) -> String {
-    ip.map_or_else(|| SHARED_IP.to_owned(), |ip| ip.0.to_string())
+    ip.map_or_else(|| UNKNOWN_IP.to_owned(), |ip| ip.0.to_string())
 }
 
 /// Counts one hit for `key` and reports whether the window's budget is exceeded; fails open on a
@@ -53,6 +58,16 @@ pub fn over_budget(counters: &Counters, key: String, window: Duration, max: u32)
     e.0 > max
 }
 
+/// A JSON 429 telling the client when to come back.
+pub fn too_many_requests(retry_after: Duration) -> Response {
+    let mut resp = MetaHttpResponse::too_many_requests("Too many requests; please retry later");
+    resp.headers_mut().insert(
+        header::RETRY_AFTER,
+        HeaderValue::from(retry_after.as_secs().max(1)),
+    );
+    resp
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,5 +80,24 @@ mod tests {
         assert!(!over_budget(&counters, "ip".into(), window, 2));
         assert!(over_budget(&counters, "ip".into(), window, 2));
         assert!(!over_budget(&counters, "other".into(), window, 2));
+    }
+
+    #[tokio::test]
+    async fn too_many_requests_is_json_with_retry_after() {
+        let resp = too_many_requests(Duration::from_secs(60));
+        assert_eq!(resp.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(resp.headers()[header::RETRY_AFTER], "60");
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["code"], 429);
+        assert_eq!(
+            too_many_requests(Duration::ZERO).headers()[header::RETRY_AFTER],
+            "1"
+        );
+    }
+
+    #[test]
+    fn unresolved_clients_log_as_unknown() {
+        assert_eq!(client_ip(None), UNKNOWN_IP);
     }
 }

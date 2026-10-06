@@ -53,6 +53,10 @@ use crate::{
     models::ai::{PromptRequest, PromptResponse},
 };
 
+/// Context flag telling o2-ai that `history` is a forked share's transcript, not the caller's own.
+#[cfg(feature = "enterprise")]
+const FORK_SEED_CONTEXT_KEY: &str = "o2_fork_seed";
+
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
 const RCA_CONTEXT_KEYS: [&str; 10] = [
@@ -252,6 +256,35 @@ fn ai_upstream_error_response(error: anyhow::Error) -> Response {
         .into_response()
 }
 
+/// Refuses a stop or confirmation on someone else's or an unknown persisted chat.
+#[cfg(feature = "enterprise")]
+async fn check_chat_owner(
+    headers: &axum::http::HeaderMap,
+    org_id: &str,
+    session_id: &str,
+) -> Result<(), Response> {
+    // Without persistence there is no index row; the session id the caller must know scopes it.
+    if !o2_enterprise::enterprise::ai::chat::is_enabled() {
+        return Ok(());
+    }
+    let user_id = headers
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    let owner = super::chats::resolve_owner(user_id).await?;
+    match infra::table::ai_chat_sessions::get(org_id, session_id).await {
+        Ok(Some(row)) if row.user_id == owner => Ok(()),
+        // Someone else's or unknown: indistinguishable to the caller.
+        Ok(_) => Err(MetaHttpResponse::not_found("Unknown conversation")),
+        Err(e) => {
+            log::error!("[AI-CHAT] cannot read session {org_id}/{session_id}: {e}");
+            Err(MetaHttpResponse::internal_error(
+                "Could not read the conversation",
+            ))
+        }
+    }
+}
+
 /// Extract headers from the request that match the configured passthrough patterns.
 /// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
 fn extract_passthrough_headers(
@@ -447,6 +480,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 "org_id".to_string(),
                 serde_json::Value::String(org_id.clone()),
             );
+            obj.remove(FORK_SEED_CONTEXT_KEY);
         }
 
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
@@ -914,6 +948,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 "org_id".to_string(),
                 serde_json::Value::String(org_id_str.clone()),
             );
+            // Only a server-built fork seed may claim the fork framing.
+            obj.remove(FORK_SEED_CONTEXT_KEY);
         }
 
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
@@ -997,7 +1033,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 &org_id_str,
                 session_id.as_deref(),
                 &user_id,
-                &auth_str,
             )
             .await
             {
@@ -1060,6 +1095,9 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 && let Some(seed) = fork_seed
             {
                 query_req.history = Some(seed);
+                if let Some(context) = query_req.context.as_object_mut() {
+                    context.insert(FORK_SEED_CONTEXT_KEY.to_string(), true.into());
+                }
             }
 
             let settings = PersistSettings::from_config();
@@ -1388,7 +1426,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     )
 )]
 pub async fn confirm_action(
-    Path((_org_id, session_id)): Path<(String, String)>,
+    Path((org_id, session_id)): Path<(String, String)>,
     in_req: axum::extract::Request,
 ) -> Response {
     let (parts, body) = in_req.into_parts();
@@ -1419,6 +1457,9 @@ pub async fn confirm_action(
         // a caller-supplied path segment straight in.
         if !is_valid_session_id(&session_id) {
             return MetaHttpResponse::bad_request("Invalid session id");
+        }
+        if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
+            return resp;
         }
 
         // Extract user auth from headers to pass to the agent
@@ -1467,7 +1508,7 @@ pub async fn confirm_action(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(session_id);
+        drop((org_id, session_id));
         drop(parts);
         drop(body_bytes);
         MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
@@ -1524,30 +1565,8 @@ pub async fn cancel(
             None => return MetaHttpResponse::bad_request("Agent service not configured"),
         };
 
-        let user_id = parts
-            .headers
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default()
-            .to_string();
-
-        // Only the owner may stop a turn. Without persistence there is no
-        // index row to check ownership against, and cancellation is already
-        // scoped by the session id the caller must know.
-        if o2_enterprise::enterprise::ai::chat::is_enabled() {
-            let owner = match super::chats::resolve_owner(&user_id).await {
-                Ok(owner) => owner,
-                Err(resp) => return resp,
-            };
-            match infra::table::ai_chat_sessions::get(&org_id, &session_id).await {
-                Ok(Some(row)) if row.user_id == owner => {}
-                // Someone else's or unknown: indistinguishable to the caller.
-                Ok(_) => return MetaHttpResponse::not_found("Unknown conversation"),
-                Err(e) => {
-                    log::error!("[AI-CHAT] cannot read session {org_id}/{session_id}: {e}");
-                    return MetaHttpResponse::internal_error("Could not read the conversation");
-                }
-            }
+        if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
+            return resp;
         }
 
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
@@ -1562,7 +1581,7 @@ pub async fn cancel(
             }
             Err(e) => {
                 log::error!("[AI-CHAT] failed to forward cancel for {session_id}: {e}");
-                MetaHttpResponse::internal_error(format!("Failed to cancel: {e}"))
+                MetaHttpResponse::internal_error("Failed to cancel the response; please retry")
             }
         }
     }
