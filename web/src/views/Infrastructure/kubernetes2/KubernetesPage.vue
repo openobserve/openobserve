@@ -359,6 +359,7 @@ k8s.loadStreams();
           :nodes="scopedRows(k8s.inventory.value.nodes) as any"
           :namespace-options="k8s.namespaceOptions.value"
           :anchor-missing="mapAnchor"
+          :forbidden="k8s.forbidden.value"
           :loading="k8s.loading.value"
           :last-updated-at="k8s.lastUpdatedAt.value"
           @update="onUpdate"

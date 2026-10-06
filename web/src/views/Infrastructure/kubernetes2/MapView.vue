@@ -54,6 +54,7 @@ const props = defineProps<{
   nodes: NodeRow[];
   namespaceOptions: string[];
   anchorMissing: string | null;
+  forbidden: boolean;
   loading: boolean;
   lastUpdatedAt: number | null;
 }>();
@@ -279,6 +280,7 @@ function linkText(g: RowGroup): I18nText {
       :description="t('infra.k8s2.mapAnchorNeeds', { stream: anchorMissing })"
       data-test="k8s2-map-anchor-empty"
     />
+    <OEmptyState v-else-if="forbidden" preset="no-access" data-test="k8s2-map-forbidden" />
     <OEmptyState
       v-else-if="!loading && rows.length === 0"
       :filtered="filtered"
@@ -311,7 +313,7 @@ function linkText(g: RowGroup): I18nText {
       </div>
       <nav
         v-if="groupLinks.length"
-        class="flex flex-wrap items-center gap-1"
+        class="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap max-md:overflow-x-auto"
         :aria-label="t('infra.k8s2.mapGroups')"
         data-test="k8s2-map-groups"
       >

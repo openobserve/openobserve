@@ -203,8 +203,8 @@ function generatorResults(): QueryResults {
   pod("monitoring", "prometheus-0", { ss: "prometheus" });
   deployment("gateway", "api-gateway", "5d8f7c9b4f", ["x2k9p", "m3n7q"]);
   deployment("gateway", "auth-service", "8c7v6b5n4m", ["i1", "i2"]);
-  pod("default", "debug-shell", { cpuRequest: 0, cpu: 0 });
-  deployment("default", "nginx-test", "0p9o8i7u6y", ["j1", "j2"]);
+  pod("gateway", "debug-shell", { cpuRequest: 0, cpu: 0 });
+  deployment("gateway", "nginx-test", "0p9o8i7u6y", ["j1", "j2"]);
   for (const node of NODES) {
     add("N1", { node, condition: "Ready", status: "true" });
     add("N2", { node, resource: "cpu" }, 4);
@@ -229,7 +229,7 @@ let wrapper: VueWrapper<any>;
 const mountView = async (
   state = mapState(),
   inv = inventory(),
-  over: Partial<{ anchorMissing: string | null; loading: boolean }> = {},
+  over: Partial<{ anchorMissing: string | null; loading: boolean; forbidden: boolean }> = {},
 ) => {
   wrapper = mount(MapView, {
     props: {
@@ -238,6 +238,7 @@ const mountView = async (
       nodes: inv.nodes,
       namespaceOptions: ["chat", "commerce", "data", "default", "gateway", "media", "monitoring"],
       anchorMissing: null,
+      forbidden: false,
       loading: false,
       lastUpdatedAt: 1_700_000_000_000,
       ...over,
@@ -342,11 +343,11 @@ describe("MapView fill buckets (AC 43)", () => {
 
   it("draws pods with no request or no usage in the No data swatch", async () => {
     await mountView();
-    const noData = options().series[0].data[hexIndex("default/debug-shell")][2];
+    const noData = options().series[0].data[hexIndex("gateway/debug-shell")][2];
     expect(
       options().series[0].data[hexIndex("media/transcoding-service-nkgbp5xp5l-vwvn2")][2],
     ).toBe(noData);
-    expect(fillClass(byName(hexRows(), "default/debug-shell"), "cpuReq")).toBe("noData");
+    expect(fillClass(byName(hexRows(), "gateway/debug-shell"), "cpuReq")).toBe("noData");
     expect(options().series[0].data[hexIndex(INVENTORY)][2]).not.toBe(noData);
     expect(wrapper.find('[data-test="k8s2-map-legend-noData"]').text()).toBe("No data");
     expect(wrapper.find('[data-test="k8s2-map-legend-b5"]').text()).toBe("≥ 100%");
@@ -354,19 +355,18 @@ describe("MapView fill buckets (AC 43)", () => {
 });
 
 describe("MapView groups (AC 44, 45)", () => {
-  it("groups by namespace into 7 groups ordered by size then name, summing to 41", async () => {
+  it("groups by namespace into 6 groups ordered by size then name, summing to 41, with none for the empty default namespace", async () => {
     await mountView(mapState({ group: "namespace" }));
     const groups = hexMap().props("groups");
     expect(groups.map((g: any) => [g.name, g.rows.length])).toEqual([
       ["commerce", 10],
       ["data", 8],
+      ["gateway", 7],
       ["chat", 6],
       ["media", 5],
       ["monitoring", 5],
-      ["gateway", 4],
-      ["default", 3],
     ]);
-    expect(wrapper.findAll('[data-test="k8s2-map-group-link"]')).toHaveLength(7);
+    expect(wrapper.findAll('[data-test="k8s2-map-group-link"]')).toHaveLength(6);
   });
 
   it('puts each pod in its node\'s frame with the node status word, and node="" in Unscheduled', async () => {
@@ -536,7 +536,23 @@ describe("MapView URL updates (AC 48)", () => {
   });
 });
 
+describe("MapView on phones", () => {
+  it("keeps the group links to one horizontally scrolling row below md", async () => {
+    await mountView();
+    const links = wrapper.find('[data-test="k8s2-map-groups"]').classes();
+    expect(links).toEqual(
+      expect.arrayContaining(["flex-wrap", "max-md:flex-nowrap", "max-md:overflow-x-auto"]),
+    );
+  });
+});
+
 describe("MapView empty states (AC 49)", () => {
+  it("shows the no-access state, not a partial map, when the anchor query is forbidden", async () => {
+    await mountView(mapState(), inventory(), { forbidden: true });
+    expect(wrapper.find('[data-test="k8s2-map-forbidden"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "K8sHexMap" }).exists()).toBe(false);
+  });
+
   it("shows the anchor empty state naming the stream", async () => {
     await mountView(mapState(), inventory(), { anchorMissing: "kube_pod_status_phase" });
     const empty = wrapper.find('[data-test="k8s2-map-anchor-empty"]');
