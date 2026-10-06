@@ -945,7 +945,6 @@ mod tests {
         }
     }
 
-    /// The detail view's Smoothed trend forecast: a linear fit over a holt_winters-smoothed series.
     #[tokio::test]
     async fn test_detail_forecast_is_finite_and_follows_a_line() {
         let query = "predict_linear(holt_winters(vector(time())[10m:1m], 0.3, 0.1)[1h:1m], 60)";

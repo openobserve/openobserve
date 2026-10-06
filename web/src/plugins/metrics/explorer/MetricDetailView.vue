@@ -780,7 +780,6 @@ export default defineComponent({
     const onForecastHorizonChange = (value: unknown) =>
       emit("update:forecastHorizon", value === "auto" ? null : (value as ForecastHorizon));
 
-    /** Two instant fits per expression at the range end; the line between them is the forecast. */
     const loadForecast = async (exprs: string[], signal: AbortSignal) => {
       const ahead = activeForecast.value;
       if (!ahead) return null;
@@ -873,23 +872,21 @@ export default defineComponent({
           start: timeRange.start_time - compare.gapMs * 1000,
           end: timeRange.end_time - compare.gapMs * 1000,
         };
-        const [results, past, forecast] = await Promise.all([
+        // The forecast is extra and slower: a failure must not cost the chart, nor may the chart wait for it.
+        const pendingForecast = loadForecast(exprs, signal).catch(() => null);
+        const [results, past] = await Promise.all([
           Promise.all(exprs.map((expr) => props.runQuery(expr, signal))),
           window
             ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, undefined, { window })))
             : [],
-          // The forecast is extra: a timeout or rejection of its queries must not cost the chart.
-          loadForecast(exprs, signal).catch((error) => {
-            if (isCancelled(error)) throw error;
-            return null;
-          }),
         ]);
         if (mine !== generation) return;
-        active = null;
         overviewRefreshing.value = false;
         const shifted = compare
           ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
           : [];
+        // A kept chart keeps its forecast until the new one lands, rather than flickering it off.
+        const previous = keep && activeForecast.value ? overviewState.value.forecast : null;
         overviewState.value = {
           status: "done",
           results,
@@ -897,8 +894,12 @@ export default defineComponent({
           error: "",
           timeRange,
           stepSeconds,
-          forecast,
+          forecast: previous ?? null,
         };
+        const forecast = await pendingForecast;
+        if (mine !== generation) return;
+        active = null;
+        if (forecast || previous) overviewState.value = { ...overviewState.value, forecast };
       } catch (error: any) {
         if (mine !== generation) return;
         cancelActive();
@@ -926,8 +927,8 @@ export default defineComponent({
         () => `${activeForecast.value?.method}|${activeForecast.value?.horizon}`,
         () => props.timeRange,
       ],
-      // Every source but the trailing window unchanged: a refresh, which must not blank the chart.
-      (now, before) => loadOverview(!!before && now.slice(0, -1).every((v, i) => v === before[i])),
+      // Only the window or the forecast changed: the drawn chart stays up while the new one loads.
+      (now, before) => loadOverview(!!before && now.slice(0, -2).every((v, i) => v === before[i])),
       { immediate: true },
     );
 

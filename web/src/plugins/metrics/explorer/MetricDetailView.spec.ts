@@ -444,6 +444,29 @@ describe("MetricDetailView", () => {
       expect(chart.props("forecast")).toBeNull();
     });
 
+    it("draws the chart without waiting for the forecast, and adds it when it lands", async () => {
+      const fits: Array<() => void> = [];
+      runQuery.mockImplementation((expr: string, _s: any, _c: any, opts: any) =>
+        opts?.instantAt
+          ? new Promise((resolve) => fits.push(() => resolve(fit(expr))))
+          : Promise.resolve(SERIES),
+      );
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, stepSeconds: 30 });
+      await flushPromises();
+      const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart().props("forecast")).toBeNull();
+
+      await wrapper.setProps({ forecast: "smoothed" });
+      await flushPromises();
+      expect(chart().exists()).toBe(true);
+      expect(chart().props("results")).toEqual([SERIES, SERIES]);
+      expect(chart().props("forecast")).toBeNull();
+
+      fits.forEach((land) => land());
+      await flushPromises();
+      expect(chart().props("forecast").entries).toHaveLength(2);
+    });
+
     it("queries no forecast while it is off", async () => {
       wrapper = mountView({ overview: LINE, timeRange: WINDOW, stepSeconds: 30 });
       await flushPromises();
