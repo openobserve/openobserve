@@ -47,7 +47,6 @@ export interface HexLayout {
   bounds: HexBounds;
 }
 
-// Pointy-top hexes of unit radius.
 export const HEX_HALF_WIDTH = Math.sqrt(3) / 2;
 
 export const HEX_HALF_HEIGHT = 1;

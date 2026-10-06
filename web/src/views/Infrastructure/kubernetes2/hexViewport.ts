@@ -15,7 +15,6 @@
 
 import type { HexBounds } from "./hexLayout";
 
-// The layout point at the canvas centre, and pixels per layout unit.
 export interface ViewState {
   scale: number;
   cx: number;
@@ -25,7 +24,6 @@ export interface ViewState {
 export interface ViewSize {
   width: number;
   height: number;
-  // The fit scale, the zoom floor.
   fit: number;
 }
 

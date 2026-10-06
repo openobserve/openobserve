@@ -23,7 +23,6 @@ defineProps<{ containers: ContainerRow[] }>();
 
 const { t } = useI18nTyped();
 
-// Lens's containerStatusClassName bricks, in token utilities.
 const SQUARE_CLASS: Record<ContainerState, string> = {
   terminated: "border border-border-strong",
   restarted: "bg-status-positive ring-1 ring-offset-1 ring-status-warning-text",

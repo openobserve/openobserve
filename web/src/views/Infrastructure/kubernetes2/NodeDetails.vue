@@ -40,7 +40,6 @@ const emit = defineEmits<{ open: [ref: DetailsRef] }>();
 
 const { t } = useI18nTyped();
 
-// Conditions are filled badges here, where the list uses the soft ones.
 const FILLED: Partial<Record<BadgeVariant, BadgeVariant>> = {
   "success-soft": "success",
   "warning-soft": "warning",

@@ -71,7 +71,6 @@ const CLASS_TOKEN: Record<FillClass, `--${string}`> = {
 
 const NO_DATA = CLASSES.indexOf("noData");
 
-// Pointy-top, matching hexLayout; the gap keeps neighbours apart.
 const HEX_SCALE = 0.9;
 
 const { t } = useI18nTyped();

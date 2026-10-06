@@ -54,7 +54,6 @@ export interface EventScope {
 
 export const W_ROW_LIMIT = 20000;
 
-// A Kubernetes Event's identity: its uid, else namespace plus name.
 const EK =
   "COALESCE(json_get_str(body_object_metadata,'uid'), k8s_namespace_name || '/' || event_name)";
 

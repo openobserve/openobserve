@@ -74,7 +74,6 @@ const USAGE = [
   },
 ] as const;
 
-// A share of the node's allocatable; null off the node drawer or without data.
 const shareOf = (pod: PodRow, r: (typeof USAGE)[number]) => {
   const used = r.used(pod);
   const of = props.allocatable?.[r.id];
