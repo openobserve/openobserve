@@ -802,6 +802,12 @@ describe("GATE_PREDICATES", () => {
     expect(GATE_PREDICATES.downtimes(ctx({ isEnterprise: true }))).toBe(false);
   });
 
+  it("marks Downtimes as Beta in the Reliability flyout, and nothing else there", () => {
+    const reliability = NAV_GROUPS.find((g) => g.children.some((c) => c.name === "downtimes"))!;
+    const beta = reliability.children.filter((c) => c.beta).map((c) => c.name);
+    expect(beta).toEqual(["downtimes"]);
+  });
+
   it("puts Downtimes after Incidents when the rail carries a downtimes item", () => {
     const entries = groupNavLinks(
       [link("home"), link("alertList"), link("incidentList"), link("downtimes")],

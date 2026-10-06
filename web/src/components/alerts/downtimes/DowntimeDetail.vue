@@ -28,6 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     tabs-below
     title-data-test="downtime-detail-title"
   >
+    <template #title>
+      <span class="inline-flex max-w-full min-w-0 items-center gap-2">
+        <span class="truncate">{{ title }}</span>
+        <BetaBadge class="shrink-0" />
+      </span>
+    </template>
+
     <template v-if="downtime" #title-trail>
       <OTag type="downtimeStatus" :value="downtime.status" data-test="downtime-detail-status" />
     </template>
@@ -272,6 +279,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";

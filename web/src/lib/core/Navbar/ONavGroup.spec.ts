@@ -467,6 +467,18 @@ describe("ONavGroup", () => {
     expect(flyout().find('[data-test="nav-group-item-notARoute"]').exists()).toBe(false);
   });
 
+  it("tags a beta child with the shared Beta badge, and only that child", async () => {
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [children[0], { ...children[1], beta: true }],
+    });
+    await hoverOpen();
+
+    const item = (name: string) => flyout().find(`[data-test="nav-group-item-${name}"]`);
+    expect(item("pipelines").find('[data-test="beta-badge"]').exists()).toBe(true);
+    expect(item("logstreams").find('[data-test="beta-badge"]').exists()).toBe(false);
+  });
+
   it("heads a run of children sharing a categoryKey, and TRANSLATES the header", async () => {
     // The header was the one string in the rail rendered from a raw literal, so
     // it would have stayed English in all 15 locales. It takes an i18n key like

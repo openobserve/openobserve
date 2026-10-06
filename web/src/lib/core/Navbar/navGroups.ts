@@ -204,6 +204,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "downtimes",
         gate: "downtimes",
         activeOnRoutes: ["addDowntime", "editDowntime", "downtimeDetail"],
+        beta: true,
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
       // same workflow tile rather than as its own rail entry. Pages, Teams and
