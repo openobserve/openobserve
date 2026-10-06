@@ -62,6 +62,8 @@ export const contextToDimensions = (
     extractSemanticDimensions({ timestamp: 0, fields }, semanticGroups),
     identityConfig,
   );
+  // The shared helper keeps `service` when no identity fields are configured; the engine must not see it then.
+  if (identityConfig.service_optional) delete dimensions.service;
   const labelByGroupId: Record<string, string> = {};
   for (const group of semanticGroups) {
     if (!(group.id in dimensions)) continue;
@@ -101,10 +103,13 @@ export const droppedLabelNames = (
   labelByGroupId: Record<string, string>,
 ): string[] => droppedGroupIds.map((id) => labelByGroupId[id] ?? id);
 
+/** A stream opens only on filters that narrow it; an empty or wildcard value would open it unfiltered. */
+export const usableFilters = (filters: Record<string, string> = {}) =>
+  Object.entries(filters).filter(([, value]) => value && value !== SELECT_ALL_VALUE);
+
 const whereOf = (filters: Record<string, string>) =>
   b64EncodeUnicode(
-    Object.entries(filters)
-      .filter(([, value]) => value && value !== SELECT_ALL_VALUE)
+    usableFilters(filters)
       .map(([field, value]) => buildSqlCondition(field, value))
       .join(" AND "),
   );

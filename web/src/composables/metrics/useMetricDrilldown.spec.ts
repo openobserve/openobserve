@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ref, type Ref } from "vue";
 import { flushPromises } from "@vue/test-utils";
 import config from "@/aws-exports";
 import { useMetricDrilldown } from "./useMetricDrilldown";
@@ -69,13 +70,14 @@ const setup = (
     inapplicable?: any[];
     enabled?: boolean;
     metricLabels?: string[] | undefined;
+    org?: Ref<string>;
   } = {},
 ) => {
   const router = { push: vi.fn() };
   const store = { dispatch: vi.fn() };
   const onDropped = vi.fn();
   const drilldown = useMetricDrilldown({
-    org: () => "acme",
+    org: () => over.org?.value ?? "acme",
     metric: () => ({ name: "http_requests_total", labels: over.metricLabels }),
     labelsOf: () => labels,
     ensureSchemas: () => loadSchemas(),
@@ -133,6 +135,21 @@ describe("useMetricDrilldown", () => {
       await flushPromises();
       expect(api.getIdentityConfig).toHaveBeenCalledWith("acme", { silentForbidden: true });
       expect(api.getSemanticGroups).toHaveBeenCalledWith("acme", { silentForbidden: true });
+    });
+
+    it("reads again for the new org on an org switch, dropping the old org's menu", async () => {
+      const org = ref("acme");
+      const { drilldown } = setup({ org, filters: [{ label: "service_name", value: "checkout" }] });
+      await flushPromises();
+      await drilldown.open();
+      expect(drilldown.menu.value.kind).toBe("streams");
+
+      api.getSemanticGroups.mockReturnValueOnce(new Promise(() => {}));
+      org.value = "globex";
+      await flushPromises();
+      expect(api.getIdentityConfig).toHaveBeenLastCalledWith("globex", { silentForbidden: true });
+      expect(drilldown.availability.value).toBe("pending");
+      expect(drilldown.menu.value).toEqual({ kind: "idle" });
     });
 
     it("is forbidden when the identity config or the semantic groups are refused", async () => {
@@ -310,10 +327,14 @@ describe("useMetricDrilldown", () => {
       return ctx;
     };
 
-    it("lists each signal's streams; one without filters cannot be opened", async () => {
+    it("lists each signal's streams; one without usable filters cannot be opened", async () => {
       const { drilldown } = await opened(
         correlated(
-          [stream("checkout_logs", { service_name: "checkout" }), stream("all_logs")],
+          [
+            stream("checkout_logs", { service_name: "checkout" }),
+            stream("all_logs"),
+            stream("blank_logs", { service_name: "" }),
+          ],
           [stream("default", { service_name: "checkout" })],
         ),
       );
@@ -323,6 +344,7 @@ describe("useMetricDrilldown", () => {
         logs: [
           expect.objectContaining({ name: "checkout_logs", openable: true }),
           expect.objectContaining({ name: "all_logs", openable: false }),
+          expect.objectContaining({ name: "blank_logs", openable: false }),
         ],
         traces: [expect.objectContaining({ name: "default", openable: true })],
       });

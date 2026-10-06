@@ -86,6 +86,15 @@ describe("contextToDimensions", () => {
     );
     expect(out.dimensions).toEqual({ "k8s-namespace": "shop" });
   });
+
+  it("sends no service with service_optional set even when no identity fields are configured", () => {
+    const out = contextToDimensions([filter("service_name", "checkout")], [], GROUPS, {
+      sets: [],
+      tracked_alias_ids: [],
+      service_optional: true,
+    });
+    expect(out.dimensions).toEqual({});
+  });
 });
 
 describe("serviceLabelFor", () => {

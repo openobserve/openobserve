@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import config from "@/aws-exports";
 import serviceStreamsApi, {
   type FieldAlias,
@@ -28,6 +28,7 @@ import {
   contextToDimensions,
   droppedLabelNames,
   serviceLabelFor,
+  usableFilters,
   type ReadStatus,
 } from "@/utils/metrics/metricDrilldown";
 
@@ -106,9 +107,11 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
   let labelByGroupId: Record<string, string> = {};
   let generation = 0;
   let lastStep: () => Promise<void> = async () => {};
+  let readsToken = 0;
 
   // Each read keeps its status: the shared loaders turn a 403 into an empty answer.
   const loadReads = async () => {
+    const mine = ++readsToken;
     readError.value = null;
     const org = deps.org();
     const [identity, groups] = await Promise.allSettled([
@@ -116,6 +119,7 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
       serviceStreamsApi.getIdentityConfig(org, { silentForbidden: true }),
       serviceStreamsApi.getSemanticGroups(org, { silentForbidden: true }),
     ]);
+    if (mine !== readsToken) return;
     if (identity.status === "fulfilled") {
       identityConfig = identity.value.data ?? identityConfig;
       identityStatus.value = "ok";
@@ -132,10 +136,24 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
     }
   };
 
-  const readsReady =
-    config.isEnterprise === "true" && deps.serviceStreamsEnabled()
-      ? loadReads()
-      : Promise.resolve();
+  let readsReady: Promise<void> = Promise.resolve();
+  // The detail view stays mounted across an org switch, so the reads follow the org and the discovery flag.
+  watch(
+    () => [deps.org(), deps.serviceStreamsEnabled()],
+    () => {
+      ++generation;
+      menu.value = { kind: "idle" };
+      identityStatus.value = "pending";
+      groupsStatus.value = "pending";
+      identityConfig = { sets: [], tracked_alias_ids: [] };
+      semanticGroups = [];
+      readsReady =
+        config.isEnterprise === "true" && deps.serviceStreamsEnabled()
+          ? loadReads()
+          : Promise.resolve();
+    },
+    { immediate: true },
+  );
 
   const correlate = async (mine: number) => {
     const metric = deps.metric();
@@ -164,7 +182,7 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
       const listed = (streams: StreamInfo[] = []): DrilldownStream[] =>
         streams.map((info) => ({
           name: info.stream_name,
-          openable: !!info.filters && Object.keys(info.filters).length > 0,
+          openable: usableFilters(info.filters).length > 0,
           info,
         }));
       menu.value = {
@@ -203,7 +221,6 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
     }
   };
 
-  /** What the menu shows on opening: the context decides between a service pick, a notice and the streams. */
   const open = async () => {
     if (availability.value !== "available") return;
     const mine = ++generation;

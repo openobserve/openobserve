@@ -628,6 +628,12 @@ describe("MetricDetailView", () => {
         await flushPromises();
         expect((button().element as HTMLButtonElement).disabled).toBe(true);
         expect(isMenuTrigger()).toBe(false);
+        for (const target of [button().element, button().element.parentElement!]) {
+          target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        }
+        await flushPromises();
+        expect(document.querySelector('[data-test="metrics-detail-drilldown-menu"]')).toBeNull();
         expect(drilldownApi.getIdentityConfig).not.toHaveBeenCalled();
         expect(drilldownApi.correlate).not.toHaveBeenCalled();
       });
