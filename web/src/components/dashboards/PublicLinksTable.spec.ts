@@ -196,7 +196,7 @@ describe("PublicLinksTable", () => {
     expect(rows(w)).toHaveLength(5);
   });
 
-  it("searches by dashboard, folder and publisher", async () => {
+  it("searches by name, dashboard, folder and publisher", async () => {
     const w = build();
     await flushPromises();
     await selectTile(w, "all");
@@ -213,6 +213,24 @@ describe("PublicLinksTable", () => {
     await search.setValue("a@b");
     await flushPromises();
     expect(rows(w)).toHaveLength(5);
+  });
+
+  it("finds a link by its slug or a pasted public URL", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: { list: [link({ slug: "Xy7AbC" }), link({ id: "l2", slug: "Qq9zzz" })] },
+    } as never);
+    const w = build();
+    await flushPromises();
+    const search = find(w, "dashboards-public-links-search").find("input");
+    await search.setValue("https://o2.example.com/web/public/dashboards/Qq9zzz?tab=main");
+    await flushPromises();
+    expect(rows(w)).toHaveLength(1);
+    expect(find(w, "dashboards-public-links-l2-name").exists()).toBe(true);
+
+    await search.setValue("xy7abc");
+    await flushPromises();
+    expect(rows(w)).toHaveLength(1);
+    expect(find(w, "dashboards-public-links-l1-name").exists()).toBe(true);
   });
 
   it("copies the public URL and opens the public page", async () => {

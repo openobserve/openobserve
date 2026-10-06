@@ -6674,7 +6674,7 @@
       "expires": "Expires",
       "never": "Never",
       "publishedBy": "Published by",
-      "search": "Search public links",
+      "search": "Search by name, dashboard or link URL",
       "summaryAll": "All",
       "revokeTitle": "Revoke and delete \"{name}\"?",
       "revokeMessage": "Anyone using this link loses access immediately. This can't be undone. Publishing again creates a new link.",

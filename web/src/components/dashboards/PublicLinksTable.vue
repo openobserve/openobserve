@@ -422,14 +422,20 @@ const summaryStats = computed<StatItem[]>(() => {
   ];
 });
 
+// A pasted public URL is matched by its slug, the only part of it that identifies the link.
+const searchTerm = (input: string): string => {
+  const q = input.trim();
+  return (q.match(/\/public\/dashboards\/([^/?#\s]+)/)?.[1] ?? q).toLowerCase();
+};
+
 const visibleLinks = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase();
+  const q = searchTerm(searchQuery.value);
   const filter = statusFilter.value;
   return links.value.filter((link) => {
     if (filter !== "all" && !FILTER_STATUSES[filter].includes(link.status)) return false;
     if (!q) return true;
-    return [link.name, link.dashboard_title, link.folder_name, link.published_by].some((v) =>
-      (v ?? "").toLowerCase().includes(q),
+    return [link.name, link.slug, link.dashboard_title, link.folder_name, link.published_by].some(
+      (v) => (v ?? "").toLowerCase().includes(q),
     );
   });
 });
