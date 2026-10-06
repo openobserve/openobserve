@@ -25,7 +25,9 @@
 //!    read), under its turn lease, so a chat in use never loses history however long it lives;
 //! 2. purges rows whose oldest events are past R (plus a day of margin for compaction lag): chats
 //!    unused for long enough, and tombstones of deleted chats, which are only needed while the
-//!    deleted events still exist.
+//!    deleted events still exist;
+//! 3. re-sends the removal of chats deleted within the last day to every live o2-ai replica until
+//!    one pass reaches them all (a replica down at delete time keeps its copy otherwise).
 //!
 //! Idempotent: any scheduler may run it, and a missed pass only delays work.
 
@@ -36,7 +38,7 @@ use config::{
     spawn_pausable_job,
     utils::time::now_micros,
 };
-use infra::table::ai_chat_sessions;
+use infra::table::{ai_chat_sessions, ai_chat_turns};
 
 const SWEEP_INTERVAL_SECS: u64 = 60 * 60;
 /// Chats refreshed per org per pass; the rest wait for the next pass.
@@ -45,6 +47,8 @@ const REFRESH_PER_PASS: u64 = 50;
 /// dropped while compaction may still be deleting its events.
 const MARGIN_DAYS: i64 = 1;
 const MICROS_PER_DAY: i64 = 24 * 60 * 60 * 1_000_000;
+/// Deleted chats whose replica copies are re-purged per org per pass.
+const REPLICA_PURGE_PER_PASS: u64 = 100;
 
 pub fn run() {
     if !LOCAL_NODE.is_scheduler() {
@@ -61,6 +65,7 @@ pub fn run() {
 async fn sweep() -> Result<(), infra::errors::Error> {
     let now = now_micros();
     for org_id in ai_chat_sessions::orgs_with_chats().await? {
+        purge_deleted_replicas(&org_id, now).await;
         let settings =
             infra::schema::get_settings(&org_id, AI_CHAT_EVENTS_STREAM, StreamType::Logs)
                 .await
@@ -82,6 +87,13 @@ async fn sweep() -> Result<(), infra::errors::Error> {
             Ok(0) => {}
             Ok(n) => log::info!("[AI_CHAT_RETENTION] {org_id}: removed {n} orphaned share(s)"),
             Err(e) => log::error!("[AI_CHAT_RETENTION] {org_id}: share purge failed: {e}"),
+        }
+        match ai_chat_turns::purge_orphans(&org_id).await {
+            Ok(0) => {}
+            Ok(n) => {
+                log::info!("[AI_CHAT_RETENTION] {org_id}: removed {n} orphaned turn record(s)")
+            }
+            Err(e) => log::error!("[AI_CHAT_RETENTION] {org_id}: turn purge failed: {e}"),
         }
     }
     Ok(())
@@ -120,6 +132,58 @@ async fn refresh_in_use(org_id: &str, days: i64, now: i64) {
             ),
         }
         lease.release().await;
+    }
+}
+
+/// A chat deleted within the last day is done once one pass reaches every live replica.
+async fn purge_deleted_replicas(org_id: &str, now: i64) {
+    let due = match ai_chat_sessions::due_for_replica_purge(
+        org_id,
+        now - MICROS_PER_DAY,
+        REPLICA_PURGE_PER_PASS,
+    )
+    .await
+    {
+        Ok(rows) if rows.is_empty() => return,
+        Ok(rows) => rows,
+        Err(e) => {
+            log::error!("[AI_CHAT_RETENTION] {org_id}: cannot list deleted chats: {e}");
+            return;
+        }
+    };
+    let Some(client) = o2_enterprise::enterprise::ai::client::get_agent_client() else {
+        return;
+    };
+    let auth = match openobserve_core::organization::get_sre_agent_credentials(org_id).await {
+        Ok((email, token)) => openobserve_core::auth::build_basic_auth_header(&email, &token),
+        // o2-ai still accepts the internal secret the client attaches.
+        Err(_) => String::new(),
+    };
+    for row in due {
+        let result = client
+            .delete_session_everywhere(&row.session_id, org_id, &auth)
+            .await;
+        let label = if result.is_ok() { "ok" } else { "failed" };
+        config::metrics::AI_CHAT_REPLICA_PURGES_TOTAL
+            .with_label_values(&[label])
+            .inc();
+        match result {
+            Ok(()) => {
+                if let Err(e) =
+                    ai_chat_sessions::mark_replica_purged(org_id, &row.session_id, now_micros())
+                        .await
+                {
+                    log::warn!(
+                        "[AI_CHAT_RETENTION] {org_id}/{}: cannot record the purge: {e}",
+                        row.session_id
+                    );
+                }
+            }
+            Err(e) => log::warn!(
+                "[AI_CHAT_RETENTION] {org_id}/{}: replica purge failed: {e:#}",
+                row.session_id
+            ),
+        }
     }
 }
 

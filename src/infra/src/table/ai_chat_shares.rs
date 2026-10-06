@@ -45,14 +45,16 @@ pub struct NewShare<'a> {
     pub snapshot_seq: Option<i64>,
     pub visibility: &'a str,
     pub expires_at: Option<i64>,
+    pub redact_tools: bool,
 }
 
-/// The settings an owner may change on a share; all three are written as given.
+/// The settings an owner may change on a share; all are written as given.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShareSettings {
     pub mode: String,
     pub snapshot_seq: Option<i64>,
     pub expires_at: Option<i64>,
+    pub redact_tools: bool,
 }
 
 fn db_err(e: impl ToString) -> errors::Error {
@@ -119,6 +121,7 @@ pub async fn insert_with<C: ConnectionTrait>(
         last_accessed_at: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
+        redact_tools: Set(share.redact_tools),
     };
     Entity::insert(record).exec(conn).await.map_err(db_err)?;
     get_with(conn, share.org_id, &id)
@@ -208,6 +211,25 @@ pub async fn list_live_for_creator_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
+/// Every unrevoked, unexpired share in `org_id`, newest first.
+pub async fn list_live_for_org(org_id: &str, now: i64) -> Result<Vec<Model>, errors::Error> {
+    list_live_for_org_with(get_orm_client_ro().await, org_id, now).await
+}
+
+pub async fn list_live_for_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    now: i64,
+) -> Result<Vec<Model>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(not_revoked_or_expired(now))
+        .order_by_desc(Column::CreatedAt)
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
 /// Write `settings` to an unrevoked share. Returns `false` when there is none.
 pub async fn update(
     org_id: &str,
@@ -229,6 +251,7 @@ pub async fn update_with<C: ConnectionTrait>(
         .col_expr(Column::Mode, Expr::value(settings.mode.clone()))
         .col_expr(Column::SnapshotSeq, Expr::value(settings.snapshot_seq))
         .col_expr(Column::ExpiresAt, Expr::value(settings.expires_at))
+        .col_expr(Column::RedactTools, Expr::value(settings.redact_tools))
         .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
@@ -293,20 +316,55 @@ pub async fn revoke_for_sessions_with<C: ConnectionTrait>(
     Ok(revoked)
 }
 
-/// Count one read of a share.
-pub async fn record_access(id: &str, now: i64) -> Result<(), errors::Error> {
-    record_access_with(get_orm_client_rw().await, id, now).await
+/// Revoke every share of the chats `user_email` owns in `org_id` (they left it); returns how many.
+pub async fn revoke_for_owner(
+    org_id: &str,
+    user_email: &str,
+    now: i64,
+) -> Result<u64, errors::Error> {
+    revoke_for_owner_with(get_orm_client_rw().await, org_id, user_email, now).await
+}
+
+pub async fn revoke_for_owner_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+    now: i64,
+) -> Result<u64, errors::Error> {
+    // Only a chat's owner can share it, so the owner's chats are the creator's shares.
+    let owned = Query::select()
+        .column(ai_chat_sessions::Column::SessionId)
+        .from(ai_chat_sessions::Entity)
+        .and_where(ai_chat_sessions::Column::OrgId.eq(org_id))
+        .and_where(ai_chat_sessions::Column::UserEmail.eq(user_email))
+        .to_owned();
+    let result = Entity::update_many()
+        .col_expr(Column::RevokedAt, Expr::value(Some(now)))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.in_subquery(owned))
+        .filter(Column::RevokedAt.is_null())
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
+/// Count `reads` reads of a share, the last at `now`.
+pub async fn record_access(id: &str, reads: i64, now: i64) -> Result<(), errors::Error> {
+    record_access_with(get_orm_client_rw().await, id, reads, now).await
 }
 
 pub async fn record_access_with<C: ConnectionTrait>(
     conn: &C,
     id: &str,
+    reads: i64,
     now: i64,
 ) -> Result<(), errors::Error> {
     Entity::update_many()
         .col_expr(
             Column::AccessCount,
-            Expr::col(Column::AccessCount).add(1i64),
+            Expr::col(Column::AccessCount).add(reads),
         )
         .col_expr(Column::LastAccessedAt, Expr::value(Some(now)))
         .filter(Column::Id.eq(id))
@@ -371,6 +429,7 @@ mod tests {
             snapshot_seq: (mode == MODE_SNAPSHOT).then_some(4),
             visibility: VISIBILITY_ORG,
             expires_at,
+            redact_tools: false,
         }
     }
 
@@ -402,6 +461,7 @@ mod tests {
             last_accessed_at: None,
             created_at: 1,
             updated_at: 1,
+            redact_tools: false,
         }
     }
 
@@ -472,6 +532,7 @@ mod tests {
             mode: MODE_SNAPSHOT.into(),
             snapshot_seq: Some(7),
             expires_at: None,
+            redact_tools: true,
         };
         assert!(
             update_with(&db, ORG, &live.id, &settings, 20)
@@ -480,8 +541,8 @@ mod tests {
         );
         let row = get_with(&db, ORG, &live.id).await.unwrap().unwrap();
         assert_eq!(
-            (row.mode.as_str(), row.snapshot_seq),
-            (MODE_SNAPSHOT, Some(7))
+            (row.mode.as_str(), row.snapshot_seq, row.redact_tools),
+            (MODE_SNAPSHOT, Some(7), true)
         );
 
         assert!(revoke_with(&db, ORG, &live.id, 30).await.unwrap());
@@ -532,9 +593,53 @@ mod tests {
         let s = insert_with(&db, &new_share(MODE_LIVE, None), 10)
             .await
             .unwrap();
-        record_access_with(&db, &s.id, 20).await.unwrap();
-        record_access_with(&db, &s.id, 30).await.unwrap();
+        record_access_with(&db, &s.id, 1, 20).await.unwrap();
+        record_access_with(&db, &s.id, 3, 30).await.unwrap();
         let row = get_with(&db, ORG, &s.id).await.unwrap().unwrap();
-        assert_eq!((row.access_count, row.last_accessed_at), (2, Some(30)));
+        assert_eq!((row.access_count, row.last_accessed_at), (4, Some(30)));
+    }
+
+    #[tokio::test]
+    async fn org_listing_spans_creators_and_leaving_revokes_the_leavers_shares() {
+        let db = db().await;
+        const BOB_SID: &str = "11234567-89ab-7def-8123-456789abcdef";
+        crate::table::ai_chat_sessions::get_or_create_with(&db, ORG, SID, ALICE, "a@x", "o2", 1)
+            .await
+            .unwrap();
+        crate::table::ai_chat_sessions::get_or_create_with(
+            &db, ORG, BOB_SID, "bob", "b@x", "o2", 1,
+        )
+        .await
+        .unwrap();
+        let alice = insert_with(&db, &new_share(MODE_LIVE, None), 10)
+            .await
+            .unwrap();
+        let mut bob = new_share(MODE_LIVE, None);
+        bob.session_id = BOB_SID;
+        bob.created_by = "bob";
+        let bob = insert_with(&db, &bob, 11).await.unwrap();
+        let mut elsewhere = new_share(MODE_LIVE, None);
+        elsewhere.org_id = "other-org";
+        insert_with(&db, &elsewhere, 12).await.unwrap();
+
+        let ids = |rows: Vec<Model>| rows.into_iter().map(|r| r.id).collect::<Vec<_>>();
+        assert_eq!(
+            ids(list_live_for_org_with(&db, ORG, 100).await.unwrap()),
+            vec![bob.id.clone(), alice.id.clone()]
+        );
+
+        assert_eq!(revoke_for_owner_with(&db, ORG, "a@x", 20).await.unwrap(), 1);
+        assert_eq!(revoke_for_owner_with(&db, ORG, "a@x", 21).await.unwrap(), 0);
+        assert_eq!(
+            ids(list_live_for_org_with(&db, ORG, 100).await.unwrap()),
+            vec![bob.id]
+        );
+        assert_eq!(
+            list_live_for_org_with(&db, "other-org", 100)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

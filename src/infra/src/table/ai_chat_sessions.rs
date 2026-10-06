@@ -28,12 +28,12 @@
 
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    Set, SqlErr,
+    QueryTrait, Set, SqlErr,
     sea_query::{Expr, Func},
 };
 
 pub use super::entity::ai_chat_sessions::Model;
-use super::entity::ai_chat_sessions::*;
+use super::entity::{ai_chat_sessions::*, ai_chat_turns};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
@@ -172,6 +172,7 @@ pub async fn get_or_create_with<C: ConnectionTrait>(
         last_turn_id: Set(None),
         forked_from_share: Set(None),
         fork_seed_seq: Set(None),
+        replica_purged_at: Set(None),
     };
     if let Err(e) = Entity::insert(record).exec(conn).await {
         match e.sql_err() {
@@ -214,6 +215,7 @@ pub async fn insert_fork_with<C: ConnectionTrait>(
         last_turn_id: Set(None),
         forked_from_share: Set(Some(fork.share_id.to_string())),
         fork_seed_seq: Set(Some(fork.seed_seq)),
+        replica_purged_at: Set(None),
     };
     Entity::insert(record).exec(conn).await.map_err(db_err)?;
     get_with(conn, fork.org_id, fork.session_id)
@@ -526,13 +528,12 @@ pub async fn set_auto_title_with<C: ConnectionTrait>(
 }
 
 /// The user renamed the chat. Returns `false` when there is no active chat
-/// with that id owned by `user_id`.
+/// with that id owned by `user_id`. Leaves `updated_at`: a rename is not activity.
 pub async fn rename(
     org_id: &str,
     session_id: &str,
     user_id: &str,
     title: &str,
-    now: i64,
 ) -> Result<bool, errors::Error> {
     rename_with(
         get_orm_client_rw().await,
@@ -540,7 +541,6 @@ pub async fn rename(
         session_id,
         user_id,
         title,
-        now,
     )
     .await
 }
@@ -551,7 +551,6 @@ pub async fn rename_with<C: ConnectionTrait>(
     session_id: &str,
     user_id: &str,
     title: &str,
-    now: i64,
 ) -> Result<bool, errors::Error> {
     let result = Entity::update_many()
         .col_expr(Column::Title, Expr::value(title.to_string()))
@@ -559,7 +558,6 @@ pub async fn rename_with<C: ConnectionTrait>(
             Column::TitleSource,
             Expr::value(TITLE_FROM_USER.to_string()),
         )
-        .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::UserId.eq(user_id))
@@ -645,6 +643,84 @@ pub async fn mark_all_deleted_with<C: ConnectionTrait>(
         deleted.extend_from_slice(chunk);
     }
     Ok(deleted)
+}
+
+/// Session ids of every active chat `user_id` owns in `org_id`.
+pub async fn active_ids_for_user(
+    org_id: &str,
+    user_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    active_ids_for_user_with(get_orm_client_ro().await, org_id, user_id).await
+}
+
+pub async fn active_ids_for_user_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    Entity::find()
+        .select_only()
+        .column(Column::SessionId)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserId.eq(user_id))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// Chats deleted since `deleted_since` whose o2-ai copies are not yet confirmed gone, oldest first.
+pub async fn due_for_replica_purge(
+    org_id: &str,
+    deleted_since: i64,
+    limit: u64,
+) -> Result<Vec<Model>, errors::Error> {
+    due_for_replica_purge_with(get_orm_client_ro().await, org_id, deleted_since, limit).await
+}
+
+pub async fn due_for_replica_purge_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    deleted_since: i64,
+    limit: u64,
+) -> Result<Vec<Model>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::UpdatedAt.gte(deleted_since))
+        .filter(Column::ReplicaPurgedAt.is_null())
+        .order_by_asc(Column::UpdatedAt)
+        .limit(limit)
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// Every live o2-ai replica confirmed it no longer holds this deleted chat.
+pub async fn mark_replica_purged(
+    org_id: &str,
+    session_id: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    mark_replica_purged_with(get_orm_client_rw().await, org_id, session_id, now).await
+}
+
+pub async fn mark_replica_purged_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(Column::ReplicaPurgedAt, Expr::value(Some(now)))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
 }
 
 /// Orgs that have chat index rows (for the retention sweep).
@@ -773,13 +849,23 @@ pub async fn set_refreshed_range_with<C: ConnectionTrait>(
 
 /// One page of a user's active chats, most recently active first, keyset
 /// paginated on `(updated_at, session_id)` (see the `user_list` index).
+/// A chat with nothing stored is listed only while a turn is running in it (or it is a fork).
 pub async fn list_for_user(
     org_id: &str,
     user_id: &str,
     after: Option<&ListCursor>,
     limit: u64,
+    running_since: i64,
 ) -> Result<Vec<Model>, errors::Error> {
-    list_for_user_with(get_orm_client_ro().await, org_id, user_id, after, limit).await
+    list_for_user_with(
+        get_orm_client_ro().await,
+        org_id,
+        user_id,
+        after,
+        limit,
+        running_since,
+    )
+    .await
 }
 
 pub async fn list_for_user_with<C: ConnectionTrait>(
@@ -788,11 +874,25 @@ pub async fn list_for_user_with<C: ConnectionTrait>(
     user_id: &str,
     after: Option<&ListCursor>,
     limit: u64,
+    running_since: i64,
 ) -> Result<Vec<Model>, errors::Error> {
+    let running = ai_chat_turns::Entity::find()
+        .select_only()
+        .column(ai_chat_turns::Column::SessionId)
+        .filter(ai_chat_turns::Column::OrgId.eq(org_id))
+        .filter(ai_chat_turns::Column::Status.eq(super::ai_chat_turns::TURN_RUNNING))
+        .filter(ai_chat_turns::Column::StartedAt.gte(running_since))
+        .into_query();
     let mut query = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::UserId.eq(user_id))
-        .filter(Column::Status.eq(STATUS_ACTIVE));
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+        .filter(
+            Condition::any()
+                .add(Column::LastCommittedSeq.ne(NO_SEQ))
+                .add(Column::ForkedFromShare.is_not_null())
+                .add(Column::SessionId.in_subquery(running)),
+        );
     if let Some(cursor) = after {
         query = query.filter(
             Condition::any()
@@ -823,8 +923,12 @@ mod tests {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let backend = db.get_database_backend();
         let schema = Schema::new(backend);
-        let stmt = schema.create_table_from_entity(Entity);
-        db.execute(backend.build(&stmt)).await.unwrap();
+        for stmt in [
+            schema.create_table_from_entity(Entity),
+            schema.create_table_from_entity(ai_chat_turns::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
         db
     }
 
@@ -1066,9 +1170,9 @@ mod tests {
         assert_eq!(title_of(&db).await.0, "p99 latency spike");
 
         // Only the owner can rename, and a rename is never replaced.
-        assert!(!rename_with(&db, ORG, SID, BOB, "mine", 30).await.unwrap());
+        assert!(!rename_with(&db, ORG, SID, BOB, "mine").await.unwrap());
         assert!(
-            rename_with(&db, ORG, SID, ALICE, "p99 regression", 31)
+            rename_with(&db, ORG, SID, ALICE, "p99 regression")
                 .await
                 .unwrap()
         );
@@ -1174,19 +1278,31 @@ mod tests {
         );
     }
 
+    /// A chat with one committed batch, last active at `now`.
+    async fn used_chat(db: &sea_orm::DatabaseConnection, sid: &str, user: &str, now: i64) {
+        chat(db, sid, user, now).await;
+        assert!(
+            advance_watermark_with(db, ORG, sid, 1, NO_SEQ, 0, now, now, now)
+                .await
+                .unwrap()
+        );
+    }
+
     #[tokio::test]
     async fn listing_is_per_owner_newest_first_and_keyset_paginated() {
         let db = db().await;
         for (i, sid) in ["s1", "s2", "s3", "s4"].iter().enumerate() {
-            chat(&db, sid, ALICE, 100 + i as i64).await;
+            used_chat(&db, sid, ALICE, 100 + i as i64).await;
         }
-        chat(&db, "bob-chat", BOB, 500).await;
+        used_chat(&db, "bob-chat", BOB, 500).await;
         // Same updated_at: the session id breaks the tie deterministically.
-        chat(&db, "s0", ALICE, 103).await;
+        used_chat(&db, "s0", ALICE, 103).await;
         assert!(mark_deleted_with(&db, ORG, "s1", ALICE, 99).await.unwrap());
         // mark_deleted bumped s1's updated_at; it is still excluded.
 
-        let page1 = list_for_user_with(&db, ORG, ALICE, None, 2).await.unwrap();
+        let page1 = list_for_user_with(&db, ORG, ALICE, None, 2, 0)
+            .await
+            .unwrap();
         let ids: Vec<_> = page1.iter().map(|r| r.session_id.as_str()).collect();
         assert_eq!(ids, vec!["s4", "s0"]);
         let last = page1.last().unwrap();
@@ -1194,7 +1310,7 @@ mod tests {
             updated_at: last.updated_at,
             session_id: last.session_id.clone(),
         };
-        let page2 = list_for_user_with(&db, ORG, ALICE, Some(&cursor), 10)
+        let page2 = list_for_user_with(&db, ORG, ALICE, Some(&cursor), 10, 0)
             .await
             .unwrap();
         let ids: Vec<_> = page2.iter().map(|r| r.session_id.as_str()).collect();
@@ -1207,17 +1323,114 @@ mod tests {
         cleared.sort();
         assert_eq!(cleared, vec!["s0", "s2", "s3", "s4"]);
         assert!(
-            list_for_user_with(&db, ORG, ALICE, None, 10)
+            list_for_user_with(&db, ORG, ALICE, None, 10, 0)
                 .await
                 .unwrap()
                 .is_empty()
         );
         assert_eq!(
-            list_for_user_with(&db, ORG, BOB, None, 10)
+            list_for_user_with(&db, ORG, BOB, None, 10, 0)
                 .await
                 .unwrap()
                 .len(),
             1
+        );
+    }
+
+    async fn listed(db: &sea_orm::DatabaseConnection, running_since: i64) -> Vec<String> {
+        list_for_user_with(db, ORG, ALICE, None, 10, running_since)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.session_id)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_chat_with_nothing_stored_is_listed_only_while_its_turn_runs() {
+        use crate::table::ai_chat_turns::{self, TURN_FAILED};
+
+        let db = db().await;
+        used_chat(&db, "used", ALICE, 10).await;
+        chat(&db, "empty", ALICE, 20).await;
+        assert_eq!(listed(&db, 0).await, vec!["used"]);
+
+        ai_chat_turns::admit_with(&db, ORG, "empty", "t1", 0, 30)
+            .await
+            .unwrap();
+        assert_eq!(listed(&db, 0).await, vec!["empty", "used"]);
+        // A running turn older than the longest allowed turn died.
+        assert_eq!(listed(&db, 31).await, vec!["used"]);
+        ai_chat_turns::finish_with(&db, ORG, "empty", "t1", TURN_FAILED, None, None, None, 40)
+            .await
+            .unwrap();
+        assert_eq!(listed(&db, 0).await, vec!["used"]);
+
+        let fork = NewFork {
+            org_id: ORG,
+            session_id: "fork",
+            user_id: ALICE,
+            user_email: "a@x",
+            agent_type: "o2-ai",
+            title: "copy",
+            share_id: "share-1",
+            seed_seq: 3,
+        };
+        insert_fork_with(&db, &fork, 50).await.unwrap();
+        assert_eq!(listed(&db, 0).await, vec!["fork", "used"]);
+    }
+
+    #[tokio::test]
+    async fn a_rename_does_not_reorder_the_list() {
+        let db = db().await;
+        used_chat(&db, "older", ALICE, 10).await;
+        used_chat(&db, "newer", ALICE, 20).await;
+        assert!(
+            rename_with(&db, ORG, "older", ALICE, "renamed")
+                .await
+                .unwrap()
+        );
+        assert_eq!(listed(&db, 0).await, vec!["newer", "older"]);
+        let row = get_with(&db, ORG, "older").await.unwrap().unwrap();
+        assert_eq!((row.title.as_str(), row.updated_at), ("renamed", 10));
+    }
+
+    #[tokio::test]
+    async fn recently_deleted_chats_are_purged_from_replicas_until_confirmed() {
+        let db = db().await;
+        for sid in ["old", "recent", "confirmed", "active"] {
+            used_chat(&db, sid, ALICE, 10).await;
+        }
+        assert!(mark_deleted_with(&db, ORG, "old", ALICE, 50).await.unwrap());
+        assert!(
+            mark_deleted_with(&db, ORG, "recent", ALICE, 200)
+                .await
+                .unwrap()
+        );
+        assert!(
+            mark_deleted_with(&db, ORG, "confirmed", ALICE, 210)
+                .await
+                .unwrap()
+        );
+        mark_replica_purged_with(&db, ORG, "confirmed", 220)
+            .await
+            .unwrap();
+        // An active chat is never marked.
+        mark_replica_purged_with(&db, ORG, "active", 220)
+            .await
+            .unwrap();
+        let due = due_for_replica_purge_with(&db, ORG, 100, 10).await.unwrap();
+        assert_eq!(
+            due.iter()
+                .map(|r| r.session_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["recent"]
+        );
+        let active = get_with(&db, ORG, "active").await.unwrap().unwrap();
+        assert_eq!(active.replica_purged_at, None);
+        assert_eq!(
+            active_ids_for_user_with(&db, ORG, ALICE).await.unwrap(),
+            vec!["active".to_string()]
         );
     }
 }

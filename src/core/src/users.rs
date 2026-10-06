@@ -1216,6 +1216,7 @@ pub async fn remove_user_from_org(
                     {
                         log::error!("error deleting query history of {email_id} in {org_id}: {e}");
                     }
+                    revoke_ai_chat_shares(org_id, email_id).await;
                     Ok(MetaHttpResponse::ok("User removed from organization"))
                 } else {
                     Ok(MetaHttpResponse::not_found(
@@ -1437,6 +1438,17 @@ async fn update_cache(user_email: &str, roles: Vec<String>) {
             expires_at: Instant::now() + Duration::from_secs(60),
         },
     );
+}
+
+/// A member who left an org no longer vouches for the chats they shared there.
+async fn revoke_ai_chat_shares(org_id: &str, email_id: &str) {
+    let now = config::utils::time::now_micros();
+    match infra::table::ai_chat_shares::revoke_for_owner(org_id, email_id, now).await {
+        Ok(0) => {}
+        Ok(n) => log::info!("revoked {n} AI chat shares of {email_id}, who left {org_id}"),
+        // Reads re-check membership, so a missed revoke never serves a leaver's share.
+        Err(e) => log::error!("error revoking AI chat shares of {email_id} in {org_id}: {e}"),
+    }
 }
 
 /// Creates a service account user record if it doesn't already exist

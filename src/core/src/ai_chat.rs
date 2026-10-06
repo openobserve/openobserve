@@ -33,6 +33,8 @@
 //! error and never papered over. Index rows of chats whose events aged out are
 //! removed by the `ai_chat_retention` job.
 
+pub mod projection;
+
 use std::{
     collections::BTreeMap,
     sync::{Arc, LazyLock as Lazy},
@@ -50,7 +52,10 @@ use config::{
     utils::{json, schema::schema_eq, time::now_micros},
 };
 use dashmap::DashMap;
-use infra::table::ai_chat_sessions::{self, NO_SEQ};
+use infra::table::{
+    ai_chat_sessions::{self, NO_SEQ},
+    ai_chat_turns,
+};
 use o2_enterprise::enterprise::ai::chat::{
     AiChatEventRecord, Binding, ChatStore, batcher::DurableEvent,
 };
@@ -118,7 +123,8 @@ impl ChatStore for StreamChatStore {
         first_event_at: i64,
         last_event_at: i64,
     ) -> Result<bool> {
-        ai_chat_sessions::advance_watermark(
+        let now = now_micros();
+        let advanced = ai_chat_sessions::advance_watermark(
             org_id,
             session_id,
             epoch,
@@ -126,10 +132,16 @@ impl ChatStore for StreamChatStore {
             new_seq,
             first_event_at,
             last_event_at,
-            now_micros(),
+            now,
         )
         .await
-        .map_err(|e| anyhow::anyhow!("{e}"))
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        if advanced {
+            metrics::AI_CHAT_PERSIST_LAG_MILLISECONDS
+                .with_label_values(&[org_id])
+                .set((now - first_event_at).max(0) / 1000);
+        }
+        Ok(advanced)
     }
 
     async fn set_auto_title(&self, org_id: &str, session_id: &str, title: &str) -> Result<()> {
@@ -160,6 +172,38 @@ impl ChatStore for StreamChatStore {
             .map_err(|e| anyhow::anyhow!("{e}"))?
             .ok_or_else(|| anyhow::anyhow!("unknown chat session {session_id}"))?;
         Ok(read_committed_events(&row, after_seq).await?)
+    }
+
+    async fn finish_turn(
+        &self,
+        org_id: &str,
+        session_id: &str,
+        turn_id: &str,
+        status: &str,
+        error_code: Option<&str>,
+        start_seq: Option<i64>,
+        end_seq: Option<i64>,
+    ) -> Result<()> {
+        let finished = ai_chat_turns::finish(
+            org_id,
+            session_id,
+            turn_id,
+            status,
+            error_code,
+            start_seq,
+            end_seq,
+            now_micros(),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        if !finished {
+            // Superseded: a later turn found it still running and marked it interrupted.
+            log::warn!(
+                "[AI-CHAT] turn {turn_id} of {org_id}/{session_id} was no longer running \
+                 when it ended as {status}"
+            );
+        }
+        Ok(())
     }
 }
 

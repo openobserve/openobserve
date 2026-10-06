@@ -220,6 +220,8 @@ mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
 mod m20260923_000001_create_ai_chat_sessions;
 mod m20261006_000001_create_ai_chat_shares;
+mod m20261007_000001_create_ai_chat_turns;
+mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -568,6 +570,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261012_000001_create_alert_calibration_configs::Migration),
             Box::new(m20260923_000001_create_ai_chat_sessions::Migration),
             Box::new(m20261006_000001_create_ai_chat_shares::Migration),
+            Box::new(m20261007_000001_create_ai_chat_turns::Migration),
+            Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
         ]
     }
 }
@@ -632,6 +636,8 @@ mod tests {
         (103, "m20261012_000001_create_alert_calibration_configs"),
         (104, "m20260923_000001_create_ai_chat_sessions"),
         (105, "m20261006_000001_create_ai_chat_shares"),
+        (106, "m20261007_000001_create_ai_chat_turns"),
+        (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
     ];
 
     #[test]
@@ -737,6 +743,14 @@ mod tests {
                 "m20261009_000005_create_downtime_notifications",
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261006_000001_create_ai_chat_shares",
+            ),
+            (
+                "m20261006_000001_create_ai_chat_shares",
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261007_000001_create_ai_chat_turns",
             ),
         ] {
             assert!(
