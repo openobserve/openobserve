@@ -250,6 +250,8 @@ fn strip_secrets(v: &mut serde_json::Value) {
                 "promql_operations",
                 "customChartContent",
                 "custom_chart_content",
+                "drilldown",
+                "joins",
             ] {
                 map.remove(key);
             }
@@ -314,6 +316,28 @@ mod tests {
         assert!(s.contains("keep me"), "{s}");
         assert!(s.contains("\"id\":\"p1\""), "{s}");
         assert!(s.contains("x_axis"), "{s}");
+    }
+
+    #[test]
+    fn strip_secrets_removes_drilldowns_and_joins() {
+        let mut v = serde_json::json!({
+            "config": {
+                "show_legends": true,
+                "drilldown": [{
+                    "type": "logs",
+                    "data": { "logsQuery": "SELECT * FROM hidden WHERE tenant='acme'", "dashboard": "d-42" }
+                }]
+            },
+            "queries": [{ "joins": [{ "stream": "orders", "on": "customer_id" }] }]
+        });
+        strip_secrets(&mut v);
+        let s = serde_json::to_string(&v).unwrap();
+        assert!(
+            !s.contains("drilldown") && !s.contains("acme") && !s.contains("d-42"),
+            "{s}"
+        );
+        assert!(!s.contains("joins") && !s.contains("customer_id"), "{s}");
+        assert!(s.contains("show_legends"), "{s}");
     }
 
     #[test]

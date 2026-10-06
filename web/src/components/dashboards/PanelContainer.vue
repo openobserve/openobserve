@@ -415,6 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @contextmenu="$emit('contextmenu', $event)"
         ref="PanleSchemaRendererRef"
         :allowAnnotationsAdd="!props.injectedPanelData"
+        :allowDrilldown="!props.injectedPanelData"
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
