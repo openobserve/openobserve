@@ -63,8 +63,9 @@ impl Engine {
 
         let start = std::time::Instant::now();
         let result = if let Some(range_func) = func_name.range_func() {
+            let returns_sample_time = range_func.returns_sample_time();
             // a range function over a plain matrix selector streams its series one at a time
-            if let [arg] = args.args.as_slice()
+            let value = if let [arg] = args.args.as_slice()
                 && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
             {
                 let range_func: Arc<dyn RangeFunc> = Arc::from(range_func);
@@ -80,6 +81,12 @@ impl Engine {
             } else {
                 let input = self.call_expr_arg(args, 0).await?;
                 functions::eval_range(input, range_func, &self.eval_ctx)?
+            };
+            match args.args.first() {
+                Some(arg) if returns_sample_time => {
+                    functions::stored_sample_times(value, functions::sample_time_offset(arg))
+                }
+                _ => value,
             }
         } else {
             self.call_builtin(func_name, args).await?

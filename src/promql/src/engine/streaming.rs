@@ -1236,6 +1236,92 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_ts_of_over_time_is_the_stored_sample_time() {
+        let cases = [
+            ("ts_of_last_over_time(m[1m])", [1063.7, 1108.7, 1153.7], 2),
+            (
+                "ts_of_last_over_time(m[1m] offset 30s)",
+                [1033.7, 1078.7, 1123.7],
+                2,
+            ),
+            (
+                "ts_of_first_over_time(m[1m] offset 30s)",
+                [1003.7, 1033.7, 1078.7],
+                2,
+            ),
+            (
+                "ts_of_max_over_time(m[1m] offset -10s)",
+                [1078.7, 1123.7, 1168.7],
+                2,
+            ),
+            (
+                "ts_of_min_over_time((m[1m] offset 30s))",
+                [1003.7, 1033.7, 1078.7],
+                2,
+            ),
+            (
+                "max(ts_of_last_over_time(m[1m] offset 30s))",
+                [1033.7, 1078.7, 1123.7],
+                1,
+            ),
+            (
+                "ts_of_last_over_time(m[1m:15s] offset 30s)",
+                [1035.0, 1080.0, 1125.0],
+                2,
+            ),
+        ];
+        let (start, step) = (BASE + 70 * SECOND, 45 * SECOND);
+        for (query, values, count) in cases {
+            let steps = [70, 115, 160].map(|second| BASE + second * SECOND);
+            let expected: Vec<(i64, f64)> = steps.into_iter().zip(values).collect();
+            for streams in [true, false] {
+                let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
+                let expr = promql_parser::parser::parse(query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let series = canonical(value);
+                assert_eq!(series.len(), count, "{query}, streams {streams}");
+                for (_, samples) in series {
+                    assert_eq!(samples, expected, "{query}, streams {streams}");
+                }
+            }
+        }
+        // the window is open on the left: at 1180 s, `[11s300ms]` stops short of the sample at
+        // 1168.7 s
+        for (range, expected) in [("11s400ms", Some(1168.7)), ("11s300ms", None)] {
+            for streams in [true, false] {
+                let instant = BASE + 180 * SECOND;
+                let mut engine = engine_at(provider_off_the_second(streams), 30, instant, 0, None);
+                let query = format!("ts_of_first_over_time(m[{range}])");
+                let expr = promql_parser::parser::parse(&query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let first = match value {
+                    Value::None => None,
+                    value => canonical(value).first().map(|(_, samples)| samples[0].1),
+                };
+                assert_eq!(first, expected, "{query}, streams {streams}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ts_of_over_time_under_at_is_the_stored_sample_time() {
+        for (query, expected) in [
+            ("ts_of_last_over_time(m[1m] @ 1100)", 1100.0),
+            ("ts_of_first_over_time(m[1m] @ 1100)", 1060.0),
+            ("ts_of_last_over_time(m[1m] @ 1100 offset 20s)", 1080.0),
+            ("ts_of_max_over_time(m[1m] @ 1110 offset 20s)", 1080.0),
+        ] {
+            for streams in [true, false] {
+                assert_eq!(
+                    pinned_values(streams, query).await,
+                    on_every_step(expected),
+                    "{query}, streams {streams}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_time_minus_timestamp_is_the_age_of_the_sample() {
         let instant = BASE + 180 * SECOND;
         for streams in [true, false] {

@@ -77,6 +77,7 @@ pub(crate) use quantile_over_time::quantile_over_time;
 pub(crate) use scalar::{min_max_of, scalar};
 pub(crate) use sort::sort;
 pub(crate) use time_operations::*;
+pub(crate) use ts_of_over_time::{sample_time_offset, stored_sample_times};
 pub(crate) use vector::vector;
 
 /// Range functions that act like an offset, so they keep the metric name.
@@ -275,6 +276,10 @@ impl<T: RangeFunc + ?Sized> RangeFunc for Box<T> {
     fn reads_stale_markers(&self) -> bool {
         (**self).reads_stale_markers()
     }
+
+    fn returns_sample_time(&self) -> bool {
+        (**self).returns_sample_time()
+    }
 }
 
 impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
@@ -292,6 +297,10 @@ impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
 
     fn reads_stale_markers(&self) -> bool {
         (**self).reads_stale_markers()
+    }
+
+    fn returns_sample_time(&self) -> bool {
+        (**self).returns_sample_time()
     }
 }
 
@@ -367,6 +376,11 @@ pub trait RangeFunc: Send + Sync {
 
     /// Only a bare selector's lookback reads stale markers; every range function ignores them.
     fn reads_stale_markers(&self) -> bool {
+        false
+    }
+
+    /// Whether the value is a sample's time, which the engine has shifted by the selector's offset.
+    fn returns_sample_time(&self) -> bool {
         false
     }
 }

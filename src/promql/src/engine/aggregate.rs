@@ -182,6 +182,10 @@ fn fused_agg_shape(expr: &PromExpr) -> Option<FusedAggShape<'_>> {
             };
             let range_arg: &PromExpr = range_arg;
             let range_func = functions::fusable_range_func(func.name)?;
+            // the fold sees offset-shifted sample times, which only the call path moves back
+            if range_func.returns_sample_time() && functions::sample_time_offset(range_arg) != 0 {
+                return None;
+            }
             let selector = match range_arg {
                 PromExpr::MatrixSelector(MatrixSelector { vs, range }) => Some((vs, Some(*range))),
                 _ => None,

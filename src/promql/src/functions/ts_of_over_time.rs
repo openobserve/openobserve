@@ -15,9 +15,10 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::Sample;
+use config::meta::promql::value::{Sample, Value};
+use promql_parser::parser::Expr;
 
-use crate::functions::RangeFunc;
+use crate::{functions::RangeFunc, utils::offset_micros};
 
 /// `ts_of_*_over_time`: the time, in seconds, of the sample the variant picks from the window.
 pub enum TsOfOverTimeFunc {
@@ -48,6 +49,35 @@ impl RangeFunc for TsOfOverTimeFunc {
         }?;
         Some(sample.timestamp as f64 / 1_000_000.0)
     }
+
+    fn returns_sample_time(&self) -> bool {
+        true
+    }
+}
+
+/// The offset, in microseconds, the engine moved a range argument's samples by.
+pub(crate) fn sample_time_offset(range_arg: &Expr) -> i64 {
+    match range_arg {
+        Expr::Paren(paren) => sample_time_offset(&paren.expr),
+        Expr::MatrixSelector(selector) => offset_micros(&selector.vs.offset),
+        Expr::Subquery(subquery) => offset_micros(&subquery.offset),
+        _ => 0,
+    }
+}
+
+/// Moves sample times a range function returned back to where they are stored.
+pub(crate) fn stored_sample_times(value: Value, offset: i64) -> Value {
+    let Value::Matrix(mut matrix) = value else {
+        return value;
+    };
+    if offset != 0 {
+        for sample in matrix.iter_mut().flat_map(|series| &mut series.samples) {
+            // whole microseconds, so the subtraction is exact
+            let micros = (sample.value * 1_000_000.0).round() as i64 - offset;
+            sample.value = micros as f64 / 1_000_000.0;
+        }
+    }
+    Value::Matrix(matrix)
 }
 
 // a NaN loses to any number that follows it, as in upstream's `compareOverTime`
