@@ -6,6 +6,7 @@
         name="function"
         v-model:is-expanded="expandState.query"
         :label="t('common.query')"
+        min-header-height="2.125rem"
       >
         <template #left>
           <OIcon
@@ -23,15 +24,13 @@
           </OIcon>
         </template>
         <template #right>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!selectedStream.name || !inputQuery || loading.events"
-            @click="getResults"
-          >
-            <OIcon name="search" size="sm" class="me-1" />
-            {{ t("search.runQuery") }}
-          </OButton>
+          <O2AIContextAddBtn
+            v-if="!hideAiAssist"
+            @send-to-ai-chat="sendToAiChat(inputQuery)"
+            imageHeight="24"
+            imageWidth="24"
+            class="me-4 size-8! px-2"
+          />
         </template>
       </FullViewContainer>
       <div
@@ -85,6 +84,17 @@
             data-test="logs-search-bar-date-time-dropdown"
             @on:date-change="updateDateTime"
           />
+        </div>
+        <div class="self-end">
+          <OButton
+            data-test="test-function-run-query-btn"
+            variant="primary"
+            size="sm-action"
+            :disabled="!selectedStream.name || !inputQuery || loading.events"
+            @click="getResults"
+          >
+            {{ t("search.runQuery") }}
+          </OButton>
         </div>
 
         <div class="text-text-label mt-1 w-full text-xs">
@@ -162,13 +172,7 @@
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24"
             imageWidth="24"
-            :class="'me-4 px-2'"
-            style="
-              width: 2rem !important;
-              height: 2rem !important;
-              min-width: 2rem !important;
-              min-height: 2rem !important;
-            "
+            class="me-4 size-8! px-2"
           />
         </template>
       </FullViewContainer>
