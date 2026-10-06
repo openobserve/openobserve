@@ -4261,7 +4261,8 @@
   },
   "enterpriseFeature": {
     "lockedTitle": "Enterprise feature",
-    "locked": "{feature} is an Enterprise feature.",
+    "locked": "Unlock {feature} with OpenObserve Enterprise.",
+    "availableIn": "Available in OpenObserve Enterprise",
     "rbacDisabled": "RBAC is turned off for this organization. Ask your administrator to enable it.",
     "pitch": {
       "incidents": "Turn firing alerts into tracked incidents automatically.",

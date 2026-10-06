@@ -75,7 +75,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Sibling, NOT nested: child-mode OTooltip anchors to the element right
        before it, so nesting would shrink the hoverable region to whatever
        precedes it instead of the whole tile. -->
-  <LockedFeatureTooltip v-if="locked && lockedMessage" :message="lockedMessage" />
+  <LockedFeatureTooltip
+    v-if="locked && lockedMessage"
+    :message="lockedMessage"
+    :icon="icon || undefined"
+    :title="title"
+  />
 </template>
 
 <script lang="ts">

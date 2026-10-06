@@ -585,6 +585,9 @@ function onChildMouseenter(event: MouseEvent) {
                 child.title ? raw(child.title) : t(child.titleKey)
               }}</span>
               <BetaBadge v-if="child.beta" size="xs" />
+              <!-- Replaces an "Enterprise" text badge — a lock glyph reads at a
+                   glance without needing translation for every locale. -->
+              <OIcon v-if="child.locked" name="lock" size="xs" class="ms-auto shrink-0" />
             </component>
             <!-- Sibling, not nested — see MenuLink.vue for why. mouseenter/leave
                  reuse the flyout's own close-timer handlers so hovering the
@@ -592,6 +595,8 @@ function onChildMouseenter(event: MouseEvent) {
             <LockedFeatureTooltip
               v-if="child.locked && child.lockedMessage"
               :message="child.lockedMessage"
+              :icon="child.icon"
+              :title="child.title ? raw(child.title) : t(child.titleKey)"
               @mouseenter="clearTimers"
               @mouseleave="scheduleClose"
             />
@@ -625,10 +630,13 @@ function onChildMouseenter(event: MouseEvent) {
               block.child.title ? raw(block.child.title) : t(block.child.titleKey)
             }}</span>
             <BetaBadge v-if="block.child.beta" size="xs" />
+            <OIcon v-if="block.child.locked" name="lock" size="xs" class="ms-auto shrink-0" />
           </component>
           <LockedFeatureTooltip
             v-if="block.child.locked && block.child.lockedMessage"
             :message="block.child.lockedMessage"
+            :icon="block.child.icon"
+            :title="block.child.title ? raw(block.child.title) : t(block.child.titleKey)"
             @mouseenter="clearTimers"
             @mouseleave="scheduleClose"
           />
@@ -716,6 +724,9 @@ function onChildMouseenter(event: MouseEvent) {
                   child.title ? raw(child.title) : t(child.titleKey)
                 }}</span>
                 <BetaBadge v-if="child.beta" size="xs" />
+                <!-- Replaces an "Enterprise" text badge — a lock glyph reads at
+                     a glance without needing translation for every locale. -->
+                <OIcon v-if="child.locked" name="lock" size="xs" class="ms-auto shrink-0" />
               </component>
               <!-- Sibling, not nested — see the comment on the mobile block
                    above. mouseenter/leave keep the flyout's close timer paused
@@ -723,6 +734,8 @@ function onChildMouseenter(event: MouseEvent) {
               <LockedFeatureTooltip
                 v-if="child.locked && child.lockedMessage"
                 :message="child.lockedMessage"
+                :icon="child.icon"
+                :title="child.title ? raw(child.title) : t(child.titleKey)"
                 @mouseenter="clearTimers"
                 @mouseleave="scheduleClose"
               />
@@ -763,10 +776,13 @@ function onChildMouseenter(event: MouseEvent) {
                 block.child.title ? raw(block.child.title) : t(block.child.titleKey)
               }}</span>
               <BetaBadge v-if="block.child.beta" size="xs" />
+              <OIcon v-if="block.child.locked" name="lock" size="xs" class="ms-auto shrink-0" />
             </component>
             <LockedFeatureTooltip
               v-if="block.child.locked && block.child.lockedMessage"
               :message="block.child.lockedMessage"
+              :icon="block.child.icon"
+              :title="block.child.title ? raw(block.child.title) : t(block.child.titleKey)"
               @mouseenter="clearTimers"
               @mouseleave="scheduleClose"
             />
