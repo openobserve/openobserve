@@ -592,7 +592,10 @@ const rumSessionStreamName = "_rumdata";
 // cannot edit would show there as permanently ticked.
 // The health/type/device segments stay out — they filter the fetched rows
 // client-side (see tableRows), not the underlying query.
-const fieldListBaseFilter = "session_has_replay IS NOT NULL";
+// session_has_replay may not exist yet, and no replay data means no session can match it, so the fallback is always-false, not unfiltered.
+const fieldListBaseFilter = computed(() =>
+  schemaMapping.value["session_has_replay"] ? "session_has_replay IS NOT NULL" : "1 = 0",
+);
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -858,6 +861,7 @@ const getStreamFields = () => {
           "action_frustration_type",
           "action_target_name",
           "error_message",
+          "session_has_replay",
         ]);
 
         // Define priority fields that should appear at the top
@@ -998,7 +1002,9 @@ const getSessions = () => {
   }
 
   // Build WHERE clause with session replay filter
-  let whereClause = "session_has_replay IS NOT NULL";
+  let whereClause = schemaMapping.value["session_has_replay"]
+    ? "session_has_replay IS NOT NULL"
+    : "1 = 0";
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }

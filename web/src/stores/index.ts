@@ -71,6 +71,7 @@ const organizationObj = {
     free_trial_expiry: "",
     cross_links: [],
     usage_stream_enabled: false,
+    red_insights_enabled: false,
   },
   isDataIngested: false,
   regexPatterns: [],

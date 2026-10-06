@@ -262,7 +262,8 @@ export const buildPromqlSeriesNames = (
   }
 
   const auto = queries.filter((q) => !q.template);
-  const allMetrics = auto.flatMap((q) => q.metrics);
+  // Unique by object: a shifted result re-uses its primary's metric object.
+  const allMetrics = [...new Set(auto.flatMap((q) => q.metrics))];
   if (!allMetrics.length) return names;
 
   // Across every auto-named query, so a metric name constant WITHIN a query but

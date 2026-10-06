@@ -19,14 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-search-result" class="h-full overflow-hidden">
     <div class="bg-card-glass-bg flex h-full flex-col overflow-hidden">
-      <!-- Section header: title + count badge + insights + pagination -->
       <div
         v-if="
           searchObj.data.stream.selectedStream.value &&
           !searchObj.data.errorMsg?.trim()?.length &&
           searchObj.searchApplied
         "
-        ref="sectionHeaderRef"
         data-test="traces-section-header"
         class="border-border-default flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
@@ -100,7 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex-1" />
 
-        <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
         <div
           class="border-card-glass-border rounded-default me-1 inline-flex h-6 items-center overflow-hidden border px-1"
         >
@@ -123,18 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="wrap-text" size="sm" />
           <OTooltip :content="t('search.messageWrapContent')" />
-        </OButton>
-        <OButton
-          variant="outline"
-          :size="showActionLabels ? 'chip' : 'icon-chip'"
-          @click.stop="openUnifiedAnalysisDashboard"
-          data-test="insights-button"
-        >
-          <OIcon name="timeline" size="sm" />
-          <span v-if="showActionLabels" class="whitespace-nowrap">{{
-            t("volumeInsights.analyzeBtnLabel")
-          }}</span>
-          <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect
@@ -230,7 +215,6 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
-  onBeforeUnmount,
   onMounted,
   ref,
   watch,
@@ -338,28 +322,10 @@ export default defineComponent({
     // nested scrollbar — fixes the double-scrollbar on the traces page.
     const scrollContainerRef = ref<HTMLElement | null>(null);
 
-    const sectionHeaderRef = ref<HTMLElement | null>(null);
-    const containerWidth = ref(9999);
-    let headerResizeObserver: ResizeObserver | null = null;
-    const showActionLabels = computed(() => containerWidth.value >= 900);
-
     onMounted(() => {
       // Restore the wrap choice: a preference that resets on every reload is
       // not much of a preference.
       searchObj.meta.resultGrid.wrapCells = useLocalWrapTracesContent() === "true";
-
-      if (sectionHeaderRef.value) {
-        containerWidth.value = sectionHeaderRef.value.getBoundingClientRect().width;
-        headerResizeObserver = new ResizeObserver((entries) => {
-          containerWidth.value = entries[0]?.contentRect.width ?? 0;
-        });
-        headerResizeObserver.observe(sectionHeaderRef.value);
-      }
-    });
-
-    //Before unmount
-    onBeforeUnmount(() => {
-      headerResizeObserver?.disconnect();
     });
 
     watch(
@@ -483,8 +449,6 @@ export default defineComponent({
       updatedLocalLogFilterField,
       metricsDashboardRef,
       scrollContainerRef,
-      sectionHeaderRef,
-      showActionLabels,
       expandRowDetail,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,

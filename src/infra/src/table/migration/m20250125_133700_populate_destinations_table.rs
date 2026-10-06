@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::utils::json;
 use sea_orm::{
-    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
 use svix_ksuid::KsuidLike;
@@ -37,6 +38,16 @@ impl MigrationTrait for Migration {
             .into_iter()
             .map(|model| ((model.org, model.name), model.id))
             .collect();
+        // a re-run finds destinations that are already in the table
+        let copied: HashSet<(String, String)> = destinations::Entity::find()
+            .select_only()
+            .column(destinations::Column::Org)
+            .column(destinations::Column::Name)
+            .into_tuple()
+            .all(&txn)
+            .await?
+            .into_iter()
+            .collect();
 
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.
@@ -48,6 +59,8 @@ impl MigrationTrait for Migration {
         while let Some(metas) = meta_pages.fetch_and_next().await? {
             let new_temp_results: Result<Vec<_>, DbErr> = metas
                 .into_iter()
+                // destination change events are written to meta with an empty value
+                .filter(|meta| !meta.value.is_empty())
                 .map(|meta| {
                     let old_dest: meta_destinations::Destination =
                         json::from_str(&meta.value).map_err(|e| DbErr::Migration(e.to_string()))?;
@@ -99,7 +112,9 @@ impl MigrationTrait for Migration {
                         .or_else(|| templates.get(&("default".to_string(), old_dest.template))) // template could be default org
                         .cloned();
 
-                    if template_id.is_none() && module == "alert" {
+                    if (template_id.is_none() && module == "alert")
+                        || copied.contains(&(meta.key1.clone(), old_dest.name.clone()))
+                    {
                         Ok(None)
                     } else {
                         Ok(Some(destinations::ActiveModel {
@@ -113,12 +128,15 @@ impl MigrationTrait for Migration {
                     }
                 })
                 .filter_map(|result| match result {
-                    Ok(None) => None, // alert destination should have template. otherwise dropped
+                    Ok(None) => None, // no template for an alert destination, or already copied
                     Ok(Some(temp)) => Some(Ok(temp)),
                     Err(e) => Some(Err(e)),
                 })
                 .collect();
             let new_temps = new_temp_results?;
+            if new_temps.is_empty() {
+                continue;
+            }
             destinations::Entity::insert_many(new_temps)
                 .exec(&txn)
                 .await?;
@@ -341,7 +359,13 @@ fn ksuid_from_hash(
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection};
+
     use super::*;
+    use crate::table::migration::{
+        m20250125_102300_create_destinations_table as create_destinations,
+        m20250125_115400_create_templates_table as create_templates,
+    };
 
     fn make_dest(name: &str) -> meta_destinations::Destination {
         meta_destinations::Destination {
@@ -381,5 +405,74 @@ mod tests {
         let k1 = ksuid_from_hash(&d1, "org1");
         let k2 = ksuid_from_hash(&d2, "org1");
         assert_ne!(k1.to_string(), k2.to_string());
+    }
+
+    async fn db_with(statements: &[&str]) -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let manager = SchemaManager::new(&db);
+        create_templates::Migration.up(&manager).await.unwrap();
+        create_destinations::Migration.up(&manager).await.unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE meta (id INTEGER PRIMARY KEY AUTOINCREMENT, module TEXT NOT NULL, \
+             key1 TEXT NOT NULL, key2 TEXT NOT NULL, start_dt BIGINT NOT NULL, \
+             value TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+        db.execute_unprepared(
+            "INSERT INTO templates VALUES ('tid', 'default', 't1', 0, 'http', 'b', NULL)",
+        )
+        .await
+        .unwrap();
+        for sql in statements {
+            db.execute_unprepared(sql).await.unwrap();
+        }
+        db
+    }
+
+    #[tokio::test]
+    async fn test_up_skips_change_events_and_copied_destinations() {
+        let db = db_with(&[
+            r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES
+               ('destinations', 'default', 'webhook', 0, ''),
+               ('destinations', 'default', 'copied', 0,
+                '{"name":"copied","url":"http://a","template":"t1","type":"http"}'),
+               ('destinations', 'default', 'new', 0,
+                '{"name":"new","url":"http://b","template":"t1","type":"http"}')"#,
+            r#"INSERT INTO destinations VALUES ('earlier', 'default', 'copied', 'alert', 'tid',
+               '{"type":"http","url":"http://a"}')"#,
+        ])
+        .await;
+
+        Migration
+            .up(&SchemaManager::new(&db))
+            .await
+            .expect("empty change events and copied destinations must be skipped");
+        let rows: Vec<(String, String)> = destinations::Entity::find()
+            .select_only()
+            .column(destinations::Column::Name)
+            .column(destinations::Column::Id)
+            .order_by_asc(destinations::Column::Name)
+            .into_tuple()
+            .all(&db)
+            .await
+            .unwrap();
+        let names: Vec<&str> = rows.iter().map(|(name, _)| name.as_str()).collect();
+        assert_eq!(names, ["copied", "new"]);
+        assert_eq!(rows[0].1, "earlier");
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_with_only_change_events() {
+        let db = db_with(&[r#"INSERT INTO meta (module, key1, key2, start_dt, value)
+                              VALUES ('destinations', 'default', 'webhook', 0, '')"#])
+        .await;
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        Migration
+            .up(&manager)
+            .await
+            .expect("a page with nothing to copy must not fail");
+        assert_eq!(destinations::Entity::find().count(&db).await.unwrap(), 0);
     }
 }

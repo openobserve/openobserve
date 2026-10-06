@@ -380,7 +380,10 @@
       "metrics-promql-builder.spec.js",
       "metrics-share-deep-link.spec.js",
       "metrics-explorer-share-visualize.spec.js",
-      "metrics-explorer-stream-cache.spec.js"
+      "metrics-explorer-stream-cache.spec.js",
+      "metrics-promql-time-shift.spec.js",
+      "metrics-explorer-detail-view.spec.js",
+      "metrics-query-history.spec.js"
     ],
     "disabled": [],
     "paths": [
