@@ -193,8 +193,12 @@
     "actual_folder": "RegressionSet/RUM",
     "browser": "chrome",
     "run_files": [
-      "rum-11749-session-trace-correlation.spec.js"
+      "rum-11749-session-trace-correlation.spec.js",
+      "rum-product-analytics-schema-states.spec.js"
     ],
-    "disabled": []
+    "disabled": [],
+    "ingest_allowed_upto": "1440",
+    "workers": 1,
+    "_comment": "RUM bug-fix regressions. rum-product-analytics-schema-states creates its own orgs and seeds back-dated _rumdata (1-3 days), so the shard accepts 60 days of backdated ingestion; workers 1 for long analytics searches."
   }
 ]

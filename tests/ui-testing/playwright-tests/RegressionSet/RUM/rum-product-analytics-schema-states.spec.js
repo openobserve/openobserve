@@ -1,9 +1,9 @@
 // Each describe owns a fresh org whose _rumdata schema differs from a full one in exactly one optional field (ENT#2798-2801).
 
-const { test, expect } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { encodeDef } = require('../../pages/rumPages/rumProductAnalyticsPage.js');
+const { test, expect } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { encodeDef } = require('../../../pages/rumPages/rumProductAnalyticsPage.js');
 const {
   createRumStateOrg,
   rumSchemaFields,
@@ -15,7 +15,7 @@ const {
   runAppId,
   DAY_MS,
   HOUR_MS,
-} = require('../utils/rum-analytics-ingestion.js');
+} = require('../../utils/rum-analytics-ingestion.js');
 
 const TAGS = ['@rum', '@rumAnalytics', '@rum-product-analytics', '@regression', '@P0', '@all'];
 const SEARCH_URL = /\/api\/[^/]+\/_search(\?|$)/;
