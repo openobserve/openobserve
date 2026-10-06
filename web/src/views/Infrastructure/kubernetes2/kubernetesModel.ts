@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { utilizationTint } from "../useHostsList";
 import { ISSUE_KIND, type IssueKey, type K8sKind, type QueryId } from "./kubernetesQueries";
 import { encodeCompound } from "./kubernetesUrlState";
 
@@ -694,3 +697,19 @@ export function sortRows<T>(
     return String(av).localeCompare(String(bv)) * dir;
   });
 }
+
+export const formatPct = (value: number | null) => (value == null ? "—" : `${Math.round(value)}%`);
+
+export const formatBytes = (value: number | null) =>
+  value == null ? "—" : formatUnitValue(getUnitValue(value, "bytes", "", 1));
+
+// Kubernetes writes sub-core CPU in millicores.
+export const formatCores = (value: number | null) => {
+  if (value == null) return "—";
+  return value < 1 ? `${Math.round(value * 1000)}m` : value.toFixed(2);
+};
+
+export const usageBarVariant = (pctValue: number | null): ProgressBarVariant => {
+  const tint = utilizationTint(pctValue);
+  return tint === "critical" ? "danger" : tint === "warn" ? "warning" : "default";
+};

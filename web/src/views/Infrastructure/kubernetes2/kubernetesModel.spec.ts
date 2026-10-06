@@ -18,9 +18,13 @@ import type { QueryId } from "./kubernetesQueries";
 import {
   buildInventory,
   filterRows,
+  formatBytes,
+  formatCores,
+  formatPct,
   issueCounts,
   parseVector,
   sortRows,
+  usageBarVariant,
   type PodRow,
   type Series,
 } from "./kubernetesModel";
@@ -629,5 +633,26 @@ describe("issue counts, filtering and sorting", () => {
   it("keeps PodRow sortable on the CPU % of request", () => {
     const rows = [{ cpuPctOfRequest: 80 }, { cpuPctOfRequest: 5 }] as PodRow[];
     expect(sortRows(rows, (r) => r.cpuPctOfRequest, false)[0].cpuPctOfRequest).toBe(5);
+  });
+});
+
+describe("formatters", () => {
+  it("prints cores in millicores below one core", () => {
+    expect(formatCores(0.05)).toBe("50m");
+    expect(formatCores(1.5)).toBe("1.50");
+    expect(formatCores(null)).toBe("—");
+  });
+
+  it("rounds percentages and scales bytes", () => {
+    expect(formatPct(4.6)).toBe("5%");
+    expect(formatPct(null)).toBe("—");
+    expect(formatBytes(1024 ** 3)).toBe("1.0GB");
+  });
+
+  it("tints usage bars with the Hosts thresholds", () => {
+    expect(usageBarVariant(95)).toBe("danger");
+    expect(usageBarVariant(75)).toBe("warning");
+    expect(usageBarVariant(10)).toBe("default");
+    expect(usageBarVariant(null)).toBe("default");
   });
 });

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { LocationQueryRaw } from "vue-router";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 
@@ -36,7 +37,7 @@ export interface PodLogsStreams {
 }
 
 export interface PodLogsLink {
-  route: { path: "/logs"; query: Record<string, string | number> };
+  route: { path: "/logs"; query: LocationQueryRaw };
   warnNoClusterField: boolean;
 }
 

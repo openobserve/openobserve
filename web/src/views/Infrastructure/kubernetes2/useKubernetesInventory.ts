@@ -236,6 +236,10 @@ export function useKubernetesInventory(listState: () => K8sListState) {
 
   const kindRows = computed<AnyRow[]>(() => inventory.value[listState().kind]);
 
+  const scopedCount = computed(
+    () => kindRows.value.filter((row) => inScope(listState().kind, row, scope.value)).length,
+  );
+
   const clusterFacet = computed(() => countBy(kindRows.value, (row) => row.cluster));
 
   const namespaceFacet = computed(() => {
@@ -316,13 +320,20 @@ export function useKubernetesInventory(listState: () => K8sListState) {
 
   const podByKey = (key: string) => inventory.value.pods.find((pod) => pod.key === key) ?? null;
 
+  const podUsageStreams = computed(() => ({
+    cpu: has(QUERY_STREAM.K1),
+    memory: has(QUERY_STREAM.K2),
+  }));
+
   return {
     detection,
     loading,
     pageError,
     inventory,
     clusters,
+    effectiveCluster,
     scopeCluster,
+    scopedCount,
     counts,
     clusterFacet,
     namespaceFacet,
@@ -331,6 +342,7 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     pagedRows,
     banners,
     podByKey,
+    podUsageStreams,
     loadStreams,
     refresh,
   };
