@@ -208,7 +208,7 @@ function linkText(g: RowGroup): I18nText {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col gap-2" data-test="k8s2-map-view">
+  <div class="flex h-full min-h-0 flex-col gap-2 p-3" data-test="k8s2-map-view">
     <K8sListHeader
       :title="t('infra.k8s2.mapTitle')"
       :count="rows.length"
@@ -247,7 +247,7 @@ function linkText(g: RowGroup): I18nText {
         </OToggleGroupItem>
       </OToggleGroup>
       <OSelect
-        class="w-60"
+        width="md"
         size="sm"
         label-position="inside"
         :label="t('infra.k8s2.mapFillBy')"
@@ -258,7 +258,7 @@ function linkText(g: RowGroup): I18nText {
       />
       <OSelect
         v-if="isPods"
-        class="w-48"
+        width="sm"
         size="sm"
         label-position="inside"
         :label="t('infra.k8s2.mapGroupBy')"

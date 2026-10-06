@@ -75,7 +75,7 @@ const onNamespaces = (value: unknown) =>
 </script>
 
 <template>
-  <div ref="rowRef" class="flex min-w-0 flex-1 items-center gap-2" data-test="k8s2-list-header">
+  <div ref="rowRef" class="flex w-full min-w-0 items-center gap-2" data-test="k8s2-list-header">
     <OText
       tag="h2"
       class="min-w-0 shrink truncate text-lg font-semibold"

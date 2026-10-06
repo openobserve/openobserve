@@ -382,14 +382,10 @@ function resetZoom() {
       <!-- ChartRenderer, not PanelSchemaRenderer: hex clicks must be forwarded to open the drawer. -->
       <ChartRenderer :data="{ options }" @click="onChartClick" />
     </div>
-    <OButton
-      class="absolute end-2 top-2"
-      variant="outline"
-      size="xs"
-      data-test="k8s2-map-reset"
-      @click="resetZoom"
-    >
-      {{ t("infra.k8s2.mapResetZoom") }}
-    </OButton>
+    <div class="absolute end-2 top-2">
+      <OButton variant="outline" size="xs" data-test="k8s2-map-reset" @click="resetZoom">
+        {{ t("infra.k8s2.mapResetZoom") }}
+      </OButton>
+    </div>
   </div>
 </template>
