@@ -461,6 +461,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
+import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
 
@@ -518,7 +519,28 @@ const targetFolderName: FolderNameFn = (module: TargetModule, id: string) =>
 const downtimeFolderName = (id: string) => folderNameIn(downtimeFoldersList.data.value, id) ?? id;
 
 // ── Filters ─────────────────────────────────────────────────────────────────
-const activeFolderId = ref<string>((route.query.folder as string) || "default");
+// Without a folder in the URL the page lands on the first folder the user may use, then keeps
+// the choice in the URL; FolderList's own fallback to "default" is ignored until then.
+const folderDefault = useDefaultDowntimeFolder({ rememberLast: false });
+const landed = ref(!!route.query.folder);
+const activeFolderId = ref<string>((route.query.folder as string) || folderDefault.folderId.value);
+
+const showFolder = (folderId: string) => {
+  activeFolderId.value = folderId;
+  if (route.query.folder !== folderId) {
+    void router.replace({ query: { ...route.query, folder: folderId } });
+  }
+};
+
+watch(
+  folderDefault.ready,
+  (ready) => {
+    if (!ready || landed.value) return;
+    landed.value = true;
+    showFolder(folderDefault.folderId.value);
+  },
+  { immediate: true },
+);
 const search = ref("");
 const searchAcrossFolders = ref(route.query.scope === "all");
 const typeFilter = ref<TypeFilter>(
@@ -552,7 +574,8 @@ const onTypeChange = (value: unknown) => {
 };
 
 const onFolderChange = (folderId: string) => {
-  activeFolderId.value = folderId;
+  if (!landed.value) return;
+  showFolder(folderId);
   selectedIds.value = [];
 };
 
