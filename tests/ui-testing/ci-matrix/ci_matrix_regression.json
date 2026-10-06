@@ -95,7 +95,8 @@
       "traces-11615-flame-graph-span-selection.spec.js",
       "traces-6591-explorer-state.spec.js",
       "traces-6591-details-interactions.spec.js",
-      "traces-14317-error-filter-pagination.spec.js"
+      "traces-14317-error-filter-pagination.spec.js",
+      "traces-15130-time-window-error-state.spec.js"
     ],
     "disabled": []
   },
