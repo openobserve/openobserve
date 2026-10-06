@@ -59,7 +59,7 @@ describe("resolvePodLogs", () => {
           "k8s_pod_name='web-1' AND k8s_namespace_name='shop' AND k8s_cluster='prod'",
         ),
         org_identifier: "org1",
-        type: "trace_explorer",
+        quick_mode: "false",
       },
     });
     expect(link?.warnNoClusterField).toBe(false);

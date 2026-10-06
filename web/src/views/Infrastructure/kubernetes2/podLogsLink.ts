@@ -126,8 +126,8 @@ export async function resolvePodLogs(
         sql_mode: "false",
         query: b64EncodeUnicode(chosen.filter),
         org_identifier: ctx.orgId,
-        // The keep-alive Logs route restores URL params only on this branch.
-        type: "trace_explorer",
+        // Logs reads an absent quick_mode as on, which drops every field but the trace ids.
+        quick_mode: "false",
       },
     },
     warnNoClusterField: !chosen.hasClusterField && ctx.multiCluster,
