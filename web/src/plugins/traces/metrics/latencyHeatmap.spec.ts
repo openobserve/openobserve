@@ -28,6 +28,7 @@ import {
   composeFilter,
   isRangeSelectionCurrent,
   chartInterval,
+  selectionTerm,
   type LatencyHeatmapHit,
 } from "./latencyHeatmap";
 
@@ -455,5 +456,53 @@ describe("isRangeSelectionCurrent", () => {
 
   it("drops it for a different search mode", () => {
     expect(isRangeSelectionCurrent(entry, current({ searchMode: "spans" }))).toBe(false);
+  });
+
+  const errorsEntry = { ...entry, panelTitle: "Errors", start: null, end: null };
+  const rateEntry = { ...entry, panelTitle: "Rate", start: null, end: null };
+
+  it("keeps an Errors entry whose editor is its baseline and the error term", () => {
+    const text = composeFilter("service_name = 'a'", "span_status = 'ERROR'");
+    expect(isRangeSelectionCurrent(errorsEntry, current({ editorText: text }))).toBe(true);
+  });
+
+  it("keeps a Rate entry whose editor equals its baseline", () => {
+    expect(isRangeSelectionCurrent(rateEntry, current({ editorText: "service_name = 'a'" }))).toBe(
+      true,
+    );
+  });
+
+  it("drops an Errors or Rate entry after an unrelated edit", () => {
+    const errorsText = "(service_name = 'b') and span_status = 'ERROR'";
+    expect(isRangeSelectionCurrent(errorsEntry, current({ editorText: errorsText }))).toBe(false);
+    expect(isRangeSelectionCurrent(rateEntry, current({ editorText: "service_name = 'b'" }))).toBe(
+      false,
+    );
+  });
+});
+
+describe("selectionTerm", () => {
+  const base = {
+    start: null,
+    end: null,
+    appliedStart: 1,
+    appliedEnd: 2,
+    baselineFilter: "",
+    stream: "default",
+    searchMode: "spans" as const,
+  };
+
+  it("is the duration band for a heatmap box", () => {
+    expect(selectionTerm({ ...base, panelTitle: "Duration", start: 100_000, end: 500_000 })).toBe(
+      "duration >= '100ms' and duration < '500ms'",
+    );
+  });
+
+  it("is the error status for an Errors brush", () => {
+    expect(selectionTerm({ ...base, panelTitle: "Errors" })).toBe("span_status = 'ERROR'");
+  });
+
+  it("is empty for a Rate brush, which selects time only", () => {
+    expect(selectionTerm({ ...base, panelTitle: "Rate" })).toBe("");
   });
 });

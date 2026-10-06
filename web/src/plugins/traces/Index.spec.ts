@@ -1033,11 +1033,9 @@ describe("Index.vue (Main Traces Page)", () => {
       filters.clear();
     });
 
-    it("keeps a matching Duration entry across the search and deletes Rate and Errors", async () => {
+    it("keeps a matching Duration entry across the search", async () => {
       await mountPage();
       filters.set("heatmap", heatmapEntry());
-      filters.set("rate", { panelTitle: "Rate", start: -1, end: -1, timeStart: 1, timeEnd: 2 });
-      filters.set("errors", { panelTitle: "Errors", start: -1, end: -1, timeStart: 1, timeEnd: 2 });
 
       wrapper.vm.searchData();
       await flushPromises();
@@ -1045,6 +1043,36 @@ describe("Index.vue (Main Traces Page)", () => {
       expect([...filters.keys()]).toEqual(["heatmap"]);
       expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ["Errors", "(service_name = 'a') and span_status = 'ERROR'"],
+      ["Rate", "service_name = 'a'"],
+    ])("keeps a current %s entry across the search it triggers", async (panelTitle, editor) => {
+      await mountPage();
+      mockSearchObj.data.editorValue = editor;
+      filters.set("brush", heatmapEntry({ panelTitle, start: null, end: null }));
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["brush"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it.each(["Errors", "Rate"])(
+      "drops a stale %s entry and its original range",
+      async (panelTitle) => {
+        await mountPage();
+        mockSearchObj.data.editorValue = "service_name = 'b'";
+        filters.set("brush", heatmapEntry({ panelTitle, start: null, end: null }));
+
+        wrapper.vm.searchData();
+        await flushPromises();
+
+        expect(filters.size).toBe(0);
+        expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+      },
+    );
 
     it.each([
       ["applied range", { appliedEnd: APPLIED.endTime - 1_000_000 }],
@@ -1642,39 +1670,10 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(openUnifiedAnalysisDashboard).toHaveBeenCalledTimes(1);
     });
 
-    it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
+    it("has no filters-updated handler: brushes write the editor through editor-filter-set", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
-
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100", "service_name = 'test'"]);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(["duration >= 100", "service_name = 'test'"]); // applyFilters owns the single trigger; no skipSearch arg
-    });
-
-    it("should append error filter to applyFilters call when span_status = 'ERROR' is in the query", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100"]);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(["duration >= 100", "span_status = 'ERROR'"]); // applyFilters owns the single trigger; no skipSearch arg
-    });
-
-    it("should not duplicate error filter when it is already present in incoming filters", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      // Error panel brush already emitted span_status filter
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100", "span_status = 'ERROR'"]);
-      await flushPromises();
-
-      // span_status = 'ERROR' must appear exactly once
-      const calledWith = mockApplyFilters.mock.calls[0][0] as string[];
-      expect(calledWith.filter((f) => f === "span_status = 'ERROR'")).toHaveLength(1);
+      expect(wrapper.vm.onMetricsFiltersUpdated).toBeUndefined();
     });
 
     describe("onMetricsEditorFilterSet", () => {
@@ -1738,73 +1737,6 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
-    });
-
-    // Index no longer branches on liveMode / passes a skipSearch flag — it always
-    // calls applyFilters with just the filters; the live-mode search-gating now
-    // lives inside SearchBar.applyFilters (covered in SearchBar.spec).
-    it("should call applyFilters with only the filters when live mode is ON", async () => {
-      mockSearchObj.meta.liveMode = true;
-      store.state.zoConfig.auto_query_enabled = true;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ["duration > 100ms", 'service_name = "api"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should call applyFilters with only the filters when live mode is OFF", async () => {
-      mockSearchObj.meta.liveMode = false;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ['span_status = "ERROR"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should call applyFilters with only the filters when liveMode is undefined", async () => {
-      mockSearchObj.meta.liveMode = undefined;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ['http_method = "POST"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should handle searchBarRef not available", async () => {
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true, // No exposed methods
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-      await flushPromises();
-
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper.vm.onMetricsFiltersUpdated(["test"]);
-      await flushPromises();
-
-      expect(consoleSpy).toHaveBeenCalledWith("SearchBar not ready for filter application");
-      consoleSpy.mockRestore();
     });
   });
 

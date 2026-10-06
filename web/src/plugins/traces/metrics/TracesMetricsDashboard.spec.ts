@@ -614,35 +614,6 @@ describe("TracesMetricsDashboard", () => {
       expect(emitted![0][0]).toEqual({ start: 1_000, end: 2_000 });
     });
 
-    it("should not emit a duration term from emitFiltersToQueryEditor for a Duration entry", async () => {
-      mockMetricsRangeFilters.set("panel-dur", {
-        panelTitle: "Duration",
-        start: 200,
-        end: 800,
-        timeStart: null,
-        timeEnd: null,
-      });
-      wrapper.vm.emitFiltersToQueryEditor();
-      await flushPromises();
-      expect(wrapper.emitted("filters-updated")![0][0]).toEqual([]);
-    });
-
-    it("should emit filters-updated with an error filter entry when an Errors range is present", async () => {
-      mockMetricsRangeFilters.set("panel-err", {
-        panelTitle: "Errors",
-        start: -1,
-        end: -1,
-        timeStart: 1000,
-        timeEnd: 2000,
-      });
-      wrapper.vm.emitFiltersToQueryEditor();
-      await flushPromises();
-      const emitted = wrapper.emitted("filters-updated");
-      expect(emitted).toBeTruthy();
-      const filters: string[] = emitted![0][0] as string[];
-      expect(filters).toContain("span_status = 'ERROR'");
-    });
-
     it("should NOT emit time-range-selected when onDataZoom is called without start/end", async () => {
       wrapper.vm.onDataZoom({
         start: 0,
@@ -808,6 +779,8 @@ describe("TracesMetricsDashboard", () => {
       await wrapper.vm.onHeatmapSelect(selection());
       const edited = `${wrapper.emitted("editor-filter-set")![0][0]} and span_kind = 'Server'`;
       mockSearchObj.data.editorValue = edited;
+      // The edit was searched, which reloads the charts over the box's range.
+      await wrapper.vm.loadDashboard();
 
       await wrapper.vm.onHeatmapSelect(
         selection({ timeStartUs: T + 10 * S, timeEndUs: T + 20 * S, durationLoUs: 200_000 }),
@@ -823,18 +796,107 @@ describe("TracesMetricsDashboard", () => {
       );
     });
 
-    it("leaves Rate brushes on the old path: no applied fields, filters-updated still emitted", async () => {
-      await wrapper.vm.onDataZoom({
-        start: 1_000,
-        end: 2_000,
-        data: { id: "Panel_ID8254010", title: "Rate" },
+    const brush = (title: "Rate" | "Errors", start = 1_000, end = 2_000) =>
+      wrapper.vm.onDataZoom({ start, end, data: { id: `panel-${title}`, title } });
+    const entryOf = (title: string) =>
+      [...mockMetricsRangeFilters.values()].find((f: any) => f.panelTitle === title);
+
+    it("stores an Errors brush with what it applied and writes the error term over the baseline", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      mockSearchObj.meta.searchMode = "spans";
+      await brush("Errors");
+      expect(entryOf("Errors")).toEqual({
+        panelTitle: "Errors",
+        start: null,
+        end: null,
+        timeStart: T,
+        timeEnd: T + 40 * S,
+        appliedStart: T,
+        appliedEnd: T + 40 * S,
+        baselineFilter: "service_name = 'a'",
+        stream: "default",
+        searchMode: "spans",
       });
-      await flushPromises();
-      const entry: any = mockMetricsRangeFilters.get("Panel_ID8254010");
-      for (const key of ["appliedStart", "appliedEnd", "baselineFilter", "stream", "searchMode"]) {
-        expect(entry).not.toHaveProperty(key);
+      expect(wrapper.emitted("editor-filter-set")).toEqual([
+        ["(service_name = 'a') and span_status = 'ERROR'"],
+      ]);
+      expect(wrapper.emitted("filters-updated")).toBeUndefined();
+    });
+
+    it("leaves the editor text unchanged for a Rate brush, which selects time only", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await brush("Rate");
+      expect(wrapper.emitted("editor-filter-set")).toEqual([["service_name = 'a'"]]);
+      expect(entryOf("Rate")!.baselineFilter).toBe("service_name = 'a'");
+    });
+
+    it("hands the picker a brush's own values but converts a box's instants to the app zone", async () => {
+      const pinnedTz = process.env.TZ;
+      process.env.TZ = "UTC";
+      try {
+        mockStore.state.timezone = "Asia/Kolkata";
+        await brush("Rate", T / 1000, T / 1000 + 40_000);
+        expect(wrapper.emitted("time-range-selected")![0][0]).toEqual({
+          start: T / 1000,
+          end: T / 1000 + 40_000,
+        });
+        await wrapper.vm.onHeatmapSelect(selection());
+        const boxRange = wrapper.emitted("time-range-selected")![1][0] as any;
+        expect(boxRange.start).toBe(T / 1000 + 5.5 * 3600 * 1000);
+        expect(boxRange.end).toBe(T / 1000 + 40_000 + 5.5 * 3600 * 1000);
+      } finally {
+        process.env.TZ = pinnedTz;
       }
-      expect(wrapper.emitted("filters-updated")).toBeTruthy();
+    });
+
+    it("takes the current editor text, error term included, as a box's baseline after an Errors brush", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await brush("Errors");
+      const errorsText = wrapper.emitted("editor-filter-set")![0][0] as string;
+      mockSearchObj.data.editorValue = errorsText;
+      // Live mode: the brush's search reloads the charts over the brushed range.
+      await wrapper.vm.loadDashboard();
+
+      await wrapper.vm.onHeatmapSelect(selection());
+
+      expect(durationEntry()!.baselineFilter).toBe(errorsText);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: T,
+        endTime: T + 40 * S,
+      });
+      const boxText = wrapper.emitted("editor-filter-set")![1][0] as string;
+      expect(boxText).toContain("span_status = 'ERROR'");
+      expect(boxText).toContain(band);
+    });
+
+    it("snapshots the range the charts show, not the picker's, for a brush after an unsearched box", async () => {
+      // Manual mode: the box moves the picker, but the charts still show the range of the last search.
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      await wrapper.vm.onHeatmapSelect(selection());
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+      expect(mockSearchObj.data.datetime).toEqual({ startTime: T, endTime: T + 40 * S });
+
+      await brush("Rate");
+
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: 1_000_000,
+        endTime: 2_000_000,
+      });
+    });
+
+    it("keeps the band in the baseline of a brush drawn after a box", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await wrapper.vm.onHeatmapSelect(selection());
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+
+      await brush("Rate");
+
+      expect(entryOf("Rate")!.baselineFilter).toContain(band);
+      expect(entryOf("Duration")).toBeUndefined();
+      expect(wrapper.emitted("editor-filter-set")![1][0]).toContain(band);
     });
   });
 

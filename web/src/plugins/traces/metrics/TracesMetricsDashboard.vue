@@ -77,9 +77,9 @@ import {
   buildLatencyHeatmapSql,
   chartInterval,
   composeFilter,
-  durationBand,
   instantToPickerMs,
   isRangeSelectionCurrent,
+  selectionTerm,
   type LatencyHeatmapSelection,
 } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
@@ -105,7 +105,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "time-range-selected", range: { start: number; end: number }): void;
-  (e: "filters-updated", filters: string[]): void;
   (e: "editor-filter-set", text: string): void;
 }>();
 
@@ -180,6 +179,8 @@ const analysisRateFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 })
 const analysisErrorFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const analysisBaselineFilter = ref<string | undefined>(undefined);
 const defaultAnalysisTab = ref<"duration" | "volume" | "error">("volume");
+// The range the charts were last loaded for, which a selection's baseline describes.
+let chartsRange: TimeRange | null = null;
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
 
@@ -277,6 +278,7 @@ const loadDashboard = async () => {
       startTime: effectiveTimeRange.value.startTime,
       endTime: effectiveTimeRange.value.endTime,
     };
+    chartsRange = { ...effectiveTimeRange.value };
     convertedDashboard.tabs[0].panels.forEach(
       (
         panel: { title?: string; config: Record<string, unknown>; queries: { query: string }[] },
@@ -350,48 +352,6 @@ const refreshDashboard = () => {
   }
 };
 
-const createRangeFilter = (
-  data: { id?: string; title?: string } | undefined,
-  start: number | null = null,
-  end: number | null = null,
-  timeStart: number | null = null,
-  timeEnd: number | null = null,
-) => {
-  const panelId = data?.id;
-  const panelTitle = data?.title || "Chart";
-
-  // Support Duration, Rate, and Errors panels
-  if (panelId && (panelTitle === "Duration" || panelTitle === "Rate" || panelTitle === "Errors")) {
-    searchObj.meta.metricsRangeFilters.set(panelId, {
-      panelTitle,
-      start: start ? Math.floor(start) : null,
-      end: end ? Math.floor(end) : null,
-      timeStart: timeStart ? Math.floor(timeStart) : null,
-      timeEnd: timeEnd ? Math.floor(timeEnd) : null,
-    });
-    // Increment version to trigger reactivity
-    rangeFiltersVersion.value++;
-
-    // Emit filters to parent to update Query Editor
-    emitFiltersToQueryEditor();
-  }
-};
-
-// Build filter strings from current range filters and emit to parent
-const emitFiltersToQueryEditor = () => {
-  const filters: string[] = [];
-
-  searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
-    if (rangeFilter.panelTitle === "Errors") {
-      // Error filter: just add span_status check
-      filters.push("span_status = 'ERROR'");
-    }
-    // Note: Rate filter only affects time range, not query filter
-  });
-
-  emit("filters-updated", filters);
-};
-
 const onDataZoom = async ({
   start,
   end,
@@ -401,41 +361,43 @@ const onDataZoom = async ({
   end: number;
   data: any; // contains panel schema with data.id as panel id
 }) => {
-  if (start && end) {
-    const panelTitle = data?.title;
-
-    // Store the original time range BEFORE selection for volume analysis baseline
-    // This must be done before emit() which triggers the parent to update the datetime control
-    originalTimeRangeBeforeSelection.value = {
-      startTime: effectiveTimeRange.value.startTime,
-      endTime: effectiveTimeRange.value.endTime,
-    };
-
-    searchObj.meta.metricsRangeFilters.clear();
-
-    // All panels emit time-range-selected to update global datetime control
-    emit("time-range-selected", { start, end });
-
-    await nextTick();
-
-    // For Rate and Errors panels: use placeholder values to indicate time-based selection
-    // Volume/Error analysis will use the time range, not Y-axis values
-    if (panelTitle === "Rate" || panelTitle === "Errors") {
-      // Convert milliseconds to microseconds for OpenObserve timestamp format
-      const timeStartMicros = start * 1000;
-      const timeEndMicros = end * 1000;
-
-      // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
-      // Pass actual time range as timeStart/timeEnd for volume/error analysis
-      createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
-    }
-  }
+  if (!start || !end) return;
+  const panelTitle = data?.title;
+  if (panelTitle !== "Rate" && panelTitle !== "Errors") return;
+  // Line charts plot zoned wall-clock times, so a brush value is already what the picker expects.
+  await applySelection(panelTitle, data?.id ?? panelTitle, { start, end }, null, null, null, null);
 };
 
 const onHeatmapSelect = async (selection: LatencyHeatmapSelection) => {
   const { timeStartUs, timeEndUs, durationLoUs: lo, durationHiUs: hi } = selection;
-  // A refinement box keeps the pre-box baseline, but only while the view still shows what the first box applied.
-  const existing = [...rangeFilters.value.values()].find((f) => f.panelTitle === "Duration");
+  // The picker keeps whole seconds; rounding outwards keeps a mid-second clamped edge from emptying the range.
+  const pickerRange = {
+    start: instantToPickerMs(Math.floor(timeStartUs / 1_000_000) * 1000, store.state.timezone),
+    end: instantToPickerMs(Math.ceil(timeEndUs / 1_000_000) * 1000, store.state.timezone),
+  };
+  await applySelection(
+    "Duration",
+    LATENCY_HEATMAP_PANEL_ID,
+    pickerRange,
+    timeStartUs,
+    timeEndUs,
+    lo || null,
+    hi,
+  );
+};
+
+// One path for a heatmap box and a Rate or Errors brush; brushes pass null times and take what the picker applied.
+const applySelection = async (
+  panelTitle: "Duration" | "Errors" | "Rate",
+  key: string,
+  pickerRange: { start: number; end: number },
+  timeStartUs: number | null,
+  timeEndUs: number | null,
+  lo: number | null,
+  hi: number | null,
+) => {
+  // A same-kind selection refines the current one and keeps its baseline; any other starts from the editor as shown.
+  const existing = [...rangeFilters.value.values()].find((f) => f.panelTitle === panelTitle);
   const current =
     existing &&
     isRangeSelectionCurrent(existing, {
@@ -450,36 +412,30 @@ const onHeatmapSelect = async (selection: LatencyHeatmapSelection) => {
   const baselineFilter = current?.baselineFilter ?? searchObj.data.editorValue ?? "";
 
   if (!current || !originalTimeRangeBeforeSelection.value) {
-    originalTimeRangeBeforeSelection.value = {
-      startTime: effectiveTimeRange.value.startTime,
-      endTime: effectiveTimeRange.value.endTime,
-    };
+    // The charts show the last search's range; in manual mode the picker may already hold an unsearched box.
+    originalTimeRangeBeforeSelection.value = { ...(chartsRange ?? effectiveTimeRange.value) };
   }
   searchObj.meta.metricsRangeFilters.clear();
 
-  // The picker keeps whole seconds; rounding outwards keeps a mid-second clamped edge from emptying the range.
-  emit("time-range-selected", {
-    start: instantToPickerMs(Math.floor(timeStartUs / 1_000_000) * 1000, store.state.timezone),
-    end: instantToPickerMs(Math.ceil(timeEndUs / 1_000_000) * 1000, store.state.timezone),
-  });
+  emit("time-range-selected", pickerRange);
 
   await nextTick();
 
-  // Set directly, not via createRangeFilter: its filters-updated would add a second live-mode search.
-  searchObj.meta.metricsRangeFilters.set(LATENCY_HEATMAP_PANEL_ID, {
-    panelTitle: "Duration",
-    start: lo || null,
+  const entry: MetricsRangeFilter = {
+    panelTitle,
+    start: lo,
     end: hi,
-    timeStart: timeStartUs,
-    timeEnd: timeEndUs,
+    timeStart: timeStartUs ?? searchObj.data.datetime.startTime,
+    timeEnd: timeEndUs ?? searchObj.data.datetime.endTime,
     appliedStart: searchObj.data.datetime.startTime,
     appliedEnd: searchObj.data.datetime.endTime,
     baselineFilter,
     stream: searchObj.data.stream.selectedStream.value,
     searchMode: searchObj.meta.searchMode,
-  });
+  };
+  searchObj.meta.metricsRangeFilters.set(key, entry);
   rangeFiltersVersion.value++;
-  emit("editor-filter-set", composeFilter(baselineFilter, durationBand(lo, hi)));
+  emit("editor-filter-set", composeFilter(baselineFilter, selectionTerm(entry)));
 };
 
 // Unified function to open analysis dashboard with all filters populated

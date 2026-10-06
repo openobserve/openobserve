@@ -377,7 +377,6 @@ describe("SearchResult", () => {
         "remove:searchTerm",
         "search:timeboxed",
         "get:traceDetails",
-        "metrics:filters-updated",
         "metrics:editor-filter-set",
         "run-query",
         "remove-filter",

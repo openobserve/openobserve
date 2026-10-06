@@ -196,6 +196,13 @@ export function durationBand(lo: number | null, hi: number | null): string {
   return parts.join(" and ");
 }
 
+// The term a selection writes into the editor on top of its baseline text.
+export function selectionTerm(entry: Pick<MetricsRangeFilter, "panelTitle" | "start" | "end">) {
+  if (entry.panelTitle === "Duration") return durationBand(entry.start, entry.end);
+  if (entry.panelTitle === "Errors") return "span_status = 'ERROR'";
+  return "";
+}
+
 export function composeFilter(baselineFilter: string, band: string): string {
   if (band === "") return baselineFilter;
   if (baselineFilter.trim() === "") return band;
@@ -210,12 +217,12 @@ export interface RangeSelectionContext {
   editorText: string;
 }
 
-// The selection holds only while the search still shows exactly what the box applied.
+// The selection holds only while the search still shows exactly what it applied.
 export function isRangeSelectionCurrent(
   entry: MetricsRangeFilter,
   current: RangeSelectionContext,
 ): boolean {
-  const expected = composeFilter(entry.baselineFilter ?? "", durationBand(entry.start, entry.end));
+  const expected = composeFilter(entry.baselineFilter ?? "", selectionTerm(entry));
   return (
     entry.appliedStart === current.startTime &&
     entry.appliedEnd === current.endTime &&

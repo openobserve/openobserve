@@ -205,7 +205,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
-                        @metrics:filters-updated="onMetricsFiltersUpdated"
                         @metrics:editor-filter-set="onMetricsEditorFilterSet"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
@@ -786,12 +785,11 @@ function buildEditorFilter() {
   return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
 }
 
-// Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the heatmap entry is checked there.
-const dropStaleHeatmapSelection = () => {
+// Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
+const dropStaleSelection = () => {
   const filters = searchObj.meta.metricsRangeFilters;
   let dropped = false;
   for (const [id, entry] of filters) {
-    if (entry.panelTitle !== "Duration") continue;
     const current = isRangeSelectionCurrent(entry, {
       startTime: searchObj.data.datetime.startTime,
       endTime: searchObj.data.datetime.endTime,
@@ -857,7 +855,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
     if (!isPagination) {
       submittedFilter = buildEditorFilter();
-      dropStaleHeatmapSelection();
+      dropStaleSelection();
     }
     const combinedFilter = submittedFilter;
 
@@ -1476,28 +1474,7 @@ const setHistogramDate = async (date: any) => {
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
 };
 
-// Handler for metrics dashboard brush selection filters
-// Simply replace the query editor content with metrics filters
-// User can manually add their own filters before clicking "Run Query"
-const onMetricsFiltersUpdated = (filters: string[]) => {
-  const allFilters = [...filters];
-  // Add error filter only if span_status='ERROR' is currently active and not already present
-  if (showErrorOnly.value && !allFilters.includes("span_status = 'ERROR'")) {
-    allFilters.push("span_status = 'ERROR'");
-  }
-  // Apply each filter term independently so replace-or-append works per field.
-  // applyFilters owns the single trigger: it emits `searchdata` (one search) only
-  // in live mode. The brush also sets a time range programmatically, which the
-  // DateTime picker stamps userChangedValue=false, so it never adds a competing
-  // search — this filter apply is the sole trigger.
-  if (searchBarRef.value?.applyFilters) {
-    searchBarRef.value.applyFilters(allFilters);
-  } else {
-    console.warn("SearchBar not ready for filter application");
-  }
-};
-
-// The heatmap box replaces the whole editor text; the programmatic date change never searches, so this is the one search.
+// A selection replaces the whole editor text; the programmatic date change never searches, so this is the one search.
 const onMetricsEditorFilterSet = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
@@ -1871,11 +1848,6 @@ const searchData = () => {
   }
 
   if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
-
-  // Rate/Errors brushes are now part of the query; the heatmap entry is kept while the search still reflects it.
-  for (const [id, entry] of searchObj.meta.metricsRangeFilters) {
-    if (entry.panelTitle !== "Duration") searchObj.meta.metricsRangeFilters.delete(id);
-  }
 
   runQueryFn();
 

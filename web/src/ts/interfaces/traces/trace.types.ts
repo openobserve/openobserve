@@ -22,17 +22,17 @@ export const DEFAULT_TRACE_SEARCH_MODE: TraceSearchMode = "spans";
 /** A RED-chart selection, keyed by panel id in `searchObj.meta.metricsRangeFilters`. */
 export type MetricsRangeFilter = {
   panelTitle: string;
-  // Duration µs; Rate/Errors store -1 because their selection is time only.
+  // Duration µs; null for Rate and Errors, whose selection is time only.
   start: number | null;
   end: number | null;
   timeStart?: number | null;
   timeEnd?: number | null;
-  // Heatmap ("Duration") entries only: what the box applied, to tell when a later search no longer reflects it.
-  appliedStart?: number;
-  appliedEnd?: number;
-  baselineFilter?: string;
-  stream?: string;
-  searchMode?: TraceSearchMode;
+  // Every selection: what it applied, to tell when a later search no longer reflects it.
+  appliedStart: number;
+  appliedEnd: number;
+  baselineFilter: string;
+  stream: string;
+  searchMode: TraceSearchMode;
 };
 
 export const isTraceSearchMode = (value: unknown): value is TraceSearchMode =>
