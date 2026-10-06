@@ -751,6 +751,27 @@ describe("TracesMetricsDashboard", () => {
       );
     });
 
+    it("re-snapshots the baseline and range when the editor was edited after the first box", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await wrapper.vm.onHeatmapSelect(selection());
+      const edited = `${wrapper.emitted("editor-filter-set")![0][0]} and span_kind = 'Server'`;
+      mockSearchObj.data.editorValue = edited;
+
+      await wrapper.vm.onHeatmapSelect(
+        selection({ timeStartUs: T + 10 * S, timeEndUs: T + 20 * S, durationLoUs: 200_000 }),
+      );
+
+      expect(durationEntry()!.baselineFilter).toBe(edited);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: T,
+        endTime: T + 40 * S,
+      });
+      expect(wrapper.emitted("editor-filter-set")![1][0]).toBe(
+        `(${edited}) and duration >= '200ms' and duration < '500ms'`,
+      );
+    });
+
     it("leaves Rate brushes on the old path: no applied fields, filters-updated still emitted", async () => {
       await wrapper.vm.onDataZoom({
         start: 1_000,

@@ -86,6 +86,7 @@ import {
   composeFilter,
   durationBand,
   instantToPickerMs,
+  isRangeSelectionCurrent,
   type LatencyHeatmapSelection,
 } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
@@ -425,8 +426,19 @@ const onDataZoom = async ({
 
 const onHeatmapSelect = async (selection: LatencyHeatmapSelection) => {
   const { timeStartUs, timeEndUs, durationLoUs: lo, durationHiUs: hi } = selection;
-  // A refinement box keeps the pre-box baseline; re-snapshotting would bake the first band into it.
-  const current = [...rangeFilters.value.values()].find((f) => f.panelTitle === "Duration");
+  // A refinement box keeps the pre-box baseline, but only while the view still shows what the first box applied.
+  const existing = [...rangeFilters.value.values()].find((f) => f.panelTitle === "Duration");
+  const current =
+    existing &&
+    isRangeSelectionCurrent(existing, {
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      stream: searchObj.data.stream.selectedStream.value,
+      searchMode: searchObj.meta.searchMode,
+      editorText: searchObj.data.editorValue ?? "",
+    })
+      ? existing
+      : undefined;
   const baselineFilter = current?.baselineFilter ?? searchObj.data.editorValue ?? "";
 
   if (!current || !originalTimeRangeBeforeSelection.value) {
