@@ -227,6 +227,13 @@
   --color-chart-series-11: #e879f9;
   --color-chart-series-12: #facc15;
 
+  /* Map heat ramp, calm low (1) to hot high (5): every step keeps 3:1 against surface-base. */
+  --color-map-seq-1: #05a92e;
+  --color-map-seq-2: #819307;
+  --color-map-seq-3: #a57c04;
+  --color-map-seq-4: #bd6100;
+  --color-map-seq-5: #d72601;
+
   --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
 
   /* --- Dashboard table row-highlight palette — light values (dark overrides in
