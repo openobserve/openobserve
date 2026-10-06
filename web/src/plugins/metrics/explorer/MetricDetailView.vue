@@ -453,7 +453,7 @@ import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 
 const RELATED_LIMIT = 12;
-/** A compared period is a dashed line or bar beside the current one; a heatmap has no room for it. */
+/** A compared period draws as a twin series, which a heatmap's cells cannot show. */
 const COMPARE_CHART_TYPES = ["line", "area", "bar"];
 const COMPARE_OFFSETS = Object.keys(COMPARE_OFFSET_MS) as CompareOffset[];
 
@@ -704,7 +704,12 @@ export default defineComponent({
         },
       });
     };
-    const overviewHasSamples = computed(() => overviewState.value.results.some(hasSamples));
+    // The earlier period alone is still worth charting: it says what this window is missing.
+    const overviewHasSamples = computed(
+      () =>
+        overviewState.value.results.some(hasSamples) ||
+        !!overviewState.value.shifted?.some((entry) => hasSamples(entry.result)),
+    );
     const overviewUnit = computed(() => toO2Unit(props.overview.unit));
     const overviewBucketUnit = computed(() =>
       props.overview.bucketUnit

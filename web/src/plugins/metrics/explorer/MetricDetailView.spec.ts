@@ -313,6 +313,16 @@ describe("MetricDetailView", () => {
       expect(chart().props("stepSeconds")).toBe(60);
     });
 
+    it("charts the earlier period when only it has samples", async () => {
+      const EMPTY = { resultType: "matrix", result: [] };
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, _card: any, opts: any) =>
+        Promise.resolve(opts?.window ? SERIES : EMPTY),
+      );
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, compare: "1d" });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).exists()).toBe(true);
+    });
+
     it("runs each expression once without a comparison", async () => {
       wrapper = mountView({ overview: LINE, timeRange: WINDOW });
       await flushPromises();

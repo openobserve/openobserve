@@ -178,7 +178,12 @@ const { t } = useI18nTyped();
 const root = ref<HTMLElement | null>(null);
 const state = ref<TileState>(IDLE);
 watch(state, ({ status, results }) => emit("results", { status, results }), { immediate: true });
-const hasData = computed(() => state.value.results.some(hasSamples));
+// The earlier period alone is still worth charting: it says what this window is missing.
+const hasData = computed(
+  () =>
+    state.value.results.some(hasSamples) ||
+    !!state.value.shifted?.some((entry) => hasSamples(entry.result)),
+);
 const o2Unit = computed(() => toO2Unit(props.unit ?? ""));
 const bucketO2Unit = computed(() =>
   props.bucketUnit ? toO2Unit(props.bucketUnit) : { unit: null, unitCustom: null },

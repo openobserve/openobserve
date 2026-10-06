@@ -125,6 +125,15 @@ describe("MetricChartTile", () => {
     expect(chart().props("stepSeconds")).toBe(60);
   });
 
+  it("charts the earlier period when only it has samples", async () => {
+    runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+      Promise.resolve(opts?.window ? SERIES : EMPTY),
+    );
+    wrapper = mountTile({ compare: { gapMs: 3_600_000, periodAsStr: "1 hour ago" } });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "MetricCardChart" }).exists()).toBe(true);
+  });
+
   it("reloads when the comparison changes", async () => {
     wrapper = mountTile();
     await flushPromises();
