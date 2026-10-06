@@ -48,7 +48,7 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
 
-/** One expression's result over an earlier period; `gapMs` is the offset, as dashboards store it. */
+/** `gapMs` is in ms although dashboards store it as `timeRangeGap.seconds`. */
 export interface ShiftedResult {
   result: any;
   gapMs: number;
@@ -96,7 +96,6 @@ export default defineComponent({
      */
     allowAlertCreation: { type: Boolean, default: false },
     legend: { type: Boolean, default: false },
-    /** Earlier periods drawn over the primaries; the converter dashes them in their parent's colour. */
     shifted: { type: Array as PropType<ShiftedResult[]>, default: () => [] },
     /** The queries' step, so shifted samples snap onto the primaries' grid. */
     stepSeconds: { type: Number, default: 0 },

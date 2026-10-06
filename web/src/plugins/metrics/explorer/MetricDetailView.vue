@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :searchable="false"
             size="sm"
             width="sm"
-            class="shrink-0"
+            class="min-w-0"
             data-test="metrics-detail-compare"
             @update:model-value="onCompareChange"
           />
@@ -547,7 +547,6 @@ export default defineComponent({
       required: true,
     },
     rateWindow: { type: String, required: true },
-    /** The "Compare to" offset from the URL; the overview and Breakdown's focused chart draw it. */
     compare: { type: String as PropType<CompareOffset | null>, default: null },
     /** The detail queries' step, so a compared period snaps onto the current one. */
     stepSeconds: { type: Number, default: 0 },

@@ -120,7 +120,6 @@ export interface TileQuery {
   stream?: string;
 }
 
-/** An earlier period to chart beside the current one. */
 export interface TileCompare {
   gapMs: number;
   periodAsStr: string;
@@ -151,7 +150,6 @@ const props = withDefaults(
     legend?: boolean;
     /** Offer the chart's right-click "Create alert" menu. */
     allowAlertCreation?: boolean;
-    /** Chart each query again over the period this far back. */
     compare?: TileCompare | null;
     stepSeconds?: number;
     /** A signal, not a cancel by expr, so two tiles on one query never cancel each other. */

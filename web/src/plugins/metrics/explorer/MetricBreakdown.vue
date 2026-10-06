@@ -548,7 +548,6 @@ export default defineComponent({
       >,
       required: true,
     },
-    /** The detail view's "Compare to" period, charted on the focused label only. */
     compare: { type: Object as PropType<TileCompare | null>, default: null },
     stepSeconds: { type: Number, default: 0 },
   },
