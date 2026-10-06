@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
           class="ms-1!"
-          size="sm-toolbar"
+          size="icon-toolbar"
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
-          <OIcon name="arrow-drop-down" size="sm" />
+          <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
           <OTooltip :content="raw(selectedFunctionTooltip)" :side-offset="2" />
         </OButton>
       </template>
