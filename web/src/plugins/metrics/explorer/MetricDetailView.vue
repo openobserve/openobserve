@@ -579,7 +579,11 @@ export default defineComponent({
         if (!request.signal.aborted) usageStatus.value = "error";
       }
     };
-    watch(() => props.card?.name, loadUsage, { immediate: true });
+    watch(
+      () => [store.state.selectedOrganization?.identifier, props.card?.name] as const,
+      ([, metric]) => loadUsage(metric),
+      { immediate: true },
+    );
     onBeforeUnmount(() => usageRequest?.abort());
 
     // The tab label is counted from the same lookup the tab lists.

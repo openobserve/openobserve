@@ -637,8 +637,10 @@ fn dashboard_query_outcome(metric: &str, query: &Value, promql: bool) -> Outcome
         Outcome::NoMatch
     } else if promql {
         promql_outcome(metric, Some(text))
-    } else {
+    } else if query["fields"]["stream_type"].as_str() == Some("metrics") {
         sql_outcome(metric, text)
+    } else {
+        Outcome::NoMatch
     }
 }
 
@@ -736,6 +738,7 @@ mod tests {
         let mut query = base()["tabs"][0]["panels"][0]["queries"][0].clone();
         query["query"] = json!(text);
         query["customQuery"] = json!(true);
+        query["fields"]["stream_type"] = json!("metrics");
         query
     }
 
@@ -921,6 +924,9 @@ mod tests {
             )],
         );
         assert_eq!(hits_of(&literal), (None, 0));
+        let mut logs = custom(r#"SELECT * FROM "http_requests_total""#);
+        logs["fields"]["stream_type"] = json!("logs");
+        assert_eq!(hits_of(&dashboard("sql", vec![logs])), (None, 0));
     }
 
     #[test]

@@ -319,6 +319,18 @@ describe("MetricDetailView", () => {
       expect(usedInLabel(wrapper)).toBe("Used in");
     });
 
+    it("asks again in another organization", async () => {
+      wrapper = mountView();
+      await flushPromises();
+      const org = store.state.selectedOrganization;
+      store.state.selectedOrganization = { ...org, identifier: "other-org" };
+      await flushPromises();
+      expect(getMetricUsage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ org_identifier: "other-org", metric: SELECTED.name }),
+      );
+      store.state.selectedOrganization = org;
+    });
+
     it("asks again for a different metric", async () => {
       wrapper = mountView();
       await flushPromises();
