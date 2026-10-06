@@ -185,7 +185,6 @@ export function parseEvents(hits: any[]): EventRow[] {
   });
 }
 
-// The Cluster overview list: node conditions, then the latest Warning per involved object.
 export function warningListRows(
   inventory: Inventory,
   events: WarningEvent[],

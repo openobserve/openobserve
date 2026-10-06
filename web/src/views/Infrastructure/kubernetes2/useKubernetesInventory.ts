@@ -136,7 +136,11 @@ export function useKubernetesInventory(
   const lastUpdatedAt = ref<number | null>(null);
   const refreshNonce = ref(0);
   // What the last load was for, so derived values read the time and cluster their data belongs to.
-  const loadedFor = shallowRef<{ cluster: string | null; end: number } | null>(null);
+  const loadedFor = shallowRef<{
+    cluster: string | null;
+    end: number;
+    detailKind: DetailKind | null;
+  } | null>(null);
 
   // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
   let generation = 0;
@@ -437,7 +441,7 @@ export function useKubernetesInventory(
       detailLoading.value = false;
       return;
     }
-    commit(main, cluster, t);
+    commit(main, cluster, t, s.details?.kind ?? null);
     const detail = s.details;
     if (detail) {
       const row = findRow(
@@ -466,12 +470,17 @@ export function useKubernetesInventory(
     detailLoading.value = false;
   };
 
-  const commit = (main: Settled, cluster: string | null, t: K8sTime) => {
+  const commit = (
+    main: Settled,
+    cluster: string | null,
+    t: K8sTime,
+    detailKind: DetailKind | null,
+  ) => {
     pageError.value = null;
     results.value = main.results;
     sql.value = main.sql;
     failed.value = main.failed;
-    loadedFor.value = { cluster, end: t.end };
+    loadedFor.value = { cluster, end: t.end, detailKind };
     lastUpdatedAt.value = main.updatedAt;
     loading.value = false;
     loaded.value = true;
@@ -507,9 +516,9 @@ export function useKubernetesInventory(
       if (name.startsWith("O:"))
         joinObjects(inv, name.slice(2) as DetailKind, cluster, parseObjects(hits));
     }
-    const detail = state().details;
+    const detailKind = loadedFor.value?.detailKind;
     const one = sql.value.get("O1obj");
-    if (detail && one) joinObjects(inv, detail.kind, cluster, parseObjects(one));
+    if (detailKind && one) joinObjects(inv, detailKind, cluster, parseObjects(one));
     attachWarningEvents(inv, warnings.value.rows);
     return inv;
   });

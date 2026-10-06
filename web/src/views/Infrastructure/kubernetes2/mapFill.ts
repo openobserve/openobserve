@@ -36,11 +36,9 @@ export type NumericFill = Exclude<MapFill, "status">;
 
 export interface RowGroup {
   id: string;
-  // Node, namespace or "<Kind> <name>"; empty for the special and ungrouped blocks.
   name: string;
   special: "unscheduled" | "noOwner" | null;
   owner: Owner | null;
-  // The workload's namespace; empty for other groupings.
   namespace: string;
   rows: MapRow[];
 }

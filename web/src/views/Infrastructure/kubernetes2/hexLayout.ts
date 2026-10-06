@@ -18,7 +18,6 @@ import type { MapEntity, MapGroup } from "./kubernetesQueries";
 export interface LayoutParams {
   entity: MapEntity;
   group: MapGroup;
-  // Row keys per group, in draw order.
   groups: string[][];
   width: number;
   height: number;
@@ -42,10 +41,8 @@ export interface HexFrame {
 }
 
 export interface HexLayout {
-  // Hex centres, group by group in the order of `LayoutParams.groups`.
   x: Float64Array;
   y: Float64Array;
-  // One per group when the map is grouped, else empty.
   frames: HexFrame[];
   bounds: HexBounds;
 }

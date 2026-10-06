@@ -39,7 +39,6 @@ const props = defineProps<{
   group: MapGroup;
   fill: MapFill;
   groups: RowGroup[];
-  // One per group, drawn above its frame.
   frameLabels: string[];
   label: I18nText;
 }>();
