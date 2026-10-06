@@ -897,7 +897,9 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     expect(sql).toContain(
       `AND ((type = 'action' AND action_target_name <> '') OR (type = 'view' AND (strpos(view_url, '${def.anchor.key}') > 0) AND ${pageKeyExpr("view_url", s.schema)} = '${def.anchor.key}')) GROUP BY`,
     );
-    expect(sql).toContain("MIN(CASE WHEN key = 'p:/web/logs' THEN n END) OVER (PARTITION BY sid) AS n0");
+    expect(sql).toContain(
+      "MIN(CASE WHEN key = 'p:/web/logs' THEN n END) OVER (PARTITION BY sid) AS n0",
+    );
     expect(() => assertJoinFree(sql)).not.toThrow();
   });
 
