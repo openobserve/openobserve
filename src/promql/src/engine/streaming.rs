@@ -840,6 +840,11 @@ mod tests {
             "topk by(instance) (1, m)",
             "bottomk by(nope) (1, m)",
             "topk(5, m)",
+            "limitk(1, rate(m[1m]))",
+            "limitk by(instance) (1, m)",
+            "limitk(1, m offset 30s)",
+            "limit_ratio(0.5, rate(m[1m]))",
+            "limit_ratio(-0.5, m)",
         ] {
             let expected = generic_topk(provider(false, false), query).await;
             let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
@@ -938,6 +943,8 @@ mod tests {
             "increase(m[1m] offset 30s)",
             "last_over_time(m[40s])",
             "count_over_time(m{instance=\"a\"}[1m])",
+            "first_over_time(m[1m] offset 30s)",
+            "mad_over_time(m[1m])",
         ] {
             let expected = generic_range_func(provider(false, false), query).await;
             let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
@@ -1285,8 +1292,7 @@ mod tests {
                 }
             }
         }
-        // the window is open on the left: at 1180 s, `[11s300ms]` stops short of the sample at
-        // 1168.7 s
+        // left-open window: `[11s300ms]` at 1180 s just misses the sample at 1168.7 s
         for (range, expected) in [("11s400ms", Some(1168.7)), ("11s300ms", None)] {
             for streams in [true, false] {
                 let instant = BASE + 180 * SECOND;
@@ -1299,6 +1305,34 @@ mod tests {
                     value => canonical(value).first().map(|(_, samples)| samples[0].1),
                 };
                 assert_eq!(first, expected, "{query}, streams {streams}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_first_and_mad_over_time_values_and_names() {
+        let cases = [
+            ("first_over_time(m[1m])", [3.0, 12.0, 21.0], 2, true),
+            ("max(first_over_time(m[1m]))", [3.0, 12.0, 21.0], 1, false),
+            // 3, 6, 9 and 12 in every window: median 7.5, deviations 4.5, 1.5, 1.5, 4.5
+            ("mad_over_time(m[1m])", [3.0, 3.0, 3.0], 2, false),
+            ("max(mad_over_time(m[1m]))", [3.0, 3.0, 3.0], 1, false),
+        ];
+        let (start, step) = (BASE + 70 * SECOND, 45 * SECOND);
+        for (query, values, count, named) in cases {
+            let steps = [70, 115, 160].map(|second| BASE + second * SECOND);
+            let expected: Vec<(i64, f64)> = steps.into_iter().zip(values).collect();
+            for streams in [true, false] {
+                let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
+                let expr = promql_parser::parser::parse(query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let series = canonical(value);
+                assert_eq!(series.len(), count, "{query}, streams {streams}");
+                for (labels, samples) in series {
+                    let has_name = labels.iter().any(|(name, _)| name == NAME_LABEL);
+                    assert_eq!(has_name, named, "{query}, streams {streams}: {labels:?}");
+                    assert_eq!(samples, expected, "{query}, streams {streams}");
+                }
             }
         }
     }
