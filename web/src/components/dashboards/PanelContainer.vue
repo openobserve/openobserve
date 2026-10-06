@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              unaffected — the spacer just absorbs 1.25rem less. -->
         <div
           :title="props.data.title"
-          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap max-md:line-clamp-2 max-md:whitespace-normal"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
