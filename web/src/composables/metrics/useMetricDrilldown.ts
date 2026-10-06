@@ -112,8 +112,9 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
     readError.value = null;
     const org = deps.org();
     const [identity, groups] = await Promise.allSettled([
-      serviceStreamsApi.getIdentityConfig(org),
-      serviceStreamsApi.getSemanticGroups(org),
+      // A restricted user's 403 is shown as the disabled button, not as a global toast.
+      serviceStreamsApi.getIdentityConfig(org, { silentForbidden: true }),
+      serviceStreamsApi.getSemanticGroups(org, { silentForbidden: true }),
     ]);
     if (identity.status === "fulfilled") {
       identityConfig = identity.value.data ?? identityConfig;

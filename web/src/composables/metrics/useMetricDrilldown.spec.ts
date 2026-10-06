@@ -128,6 +128,13 @@ describe("useMetricDrilldown", () => {
       expect(api.getIdentityConfig).not.toHaveBeenCalled();
     });
 
+    it("asks for both reads without the global Unauthorized toast", async () => {
+      setup();
+      await flushPromises();
+      expect(api.getIdentityConfig).toHaveBeenCalledWith("acme", { silentForbidden: true });
+      expect(api.getSemanticGroups).toHaveBeenCalledWith("acme", { silentForbidden: true });
+    });
+
     it("is forbidden when the identity config or the semantic groups are refused", async () => {
       api.getIdentityConfig.mockRejectedValueOnce(httpError(403));
       const first = setup();
