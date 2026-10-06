@@ -55,16 +55,13 @@ export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
   const data: any[] = series?.data ?? [];
   const start = series?._fitStartIndex ?? data.findIndex((point) => point?.[1] != null);
   if (start < 0) return undefined;
-  // A point closing the seam lies before the range end, where no forecast target can be.
-  const onSeam = dataIndex !== undefined && dataIndex < start;
   const end = data.findLastIndex((point) => point?.[1] != null);
   return {
     rangeEndValue: series?._rangeEndValue,
     startTime: times[start],
     startValue: Number(data[start][1]),
     endValue: Number(data[end][1]),
-    clickedTime: onSeam ? times[start] : (times[dataIndex ?? -1] ?? times[times.length - 1]),
-    onSeam,
+    clickedTime: times[dataIndex ?? -1] ?? times[times.length - 1],
   };
 };
 

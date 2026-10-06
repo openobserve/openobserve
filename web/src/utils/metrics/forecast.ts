@@ -96,7 +96,7 @@ export const forecastSeries = (
   return { resultType: "matrix", result };
 };
 
-/** Both fits of every expression at the range end `T` (µs); null when any fit fails. */
+/** `T` in µs; null when any fit fails, since a partial result would forecast some series and not others. */
 export const fitForecasts = async (
   exprs: string[],
   request: { method: ForecastMethod; horizon: number },

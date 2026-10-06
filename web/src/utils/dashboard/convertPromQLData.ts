@@ -86,7 +86,7 @@ export type SeriesRole = "primary" | "shifted" | "forecast";
 const labelSetKey = (metric: Record<string, string> = {}) =>
   JSON.stringify(Object.entries(metric).sort(([a], [b]) => a.localeCompare(b)));
 
-/** Extends a forecast's fitted line back to index `from`, so no gap opens after the data. */
+/** The fit starts at the range end, usually after the last sample: without this a gap opens between them. */
 const closeForecastSeam = (twin: any, from: number) => {
   const first: number = twin._fitStartIndex;
   const next = twin.data.findIndex((point: any, i: number) => i > first && point[1] != null);
