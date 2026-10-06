@@ -885,6 +885,15 @@ describe("formulas and hidden queries", () => {
     expect(state.metadata.queries.map((m: any) => !!m.notSent)).toEqual([true, false, true]);
   });
 
+  it("keeps a formula on its input after a preceding query is deleted", async () => {
+    const { payloads } = await run([
+      { query: "b", config: { ref: "B", hide: true } },
+      { query: "", config: { formula: "B * 2" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["(b) * 2"]);
+  });
+
   it("does not time-shift a hidden query", async () => {
     const { payloads } = await run([
       { query: "x", config: { ref: "A", hide: true, time_shift: [{ offSet: "1d" }] } },

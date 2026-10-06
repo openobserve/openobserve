@@ -629,7 +629,6 @@ export default defineComponent({
       );
     });
 
-    // Gives letterless PromQL queries a letter and mirrors config.hide into layout.hiddenQueries.
     watch(
       () => [
         promqlMode.value,

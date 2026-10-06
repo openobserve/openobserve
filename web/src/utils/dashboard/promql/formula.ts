@@ -81,7 +81,6 @@ const nextToken = (text: string, i: number, letters: number[]): number => {
   return i + 1;
 };
 
-/** Positions of the letters in `formula` that stand for queries. */
 const letterPositions = (formula: string): number[] => {
   const letters: number[] = [];
   let i = 0;
