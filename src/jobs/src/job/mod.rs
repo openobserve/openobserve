@@ -241,6 +241,30 @@ async fn reload_downtimes_cache() {
     }
 }
 
+/// Rows created before the RBAC fix have no folder ownership tuple, so only admins can open them.
+#[cfg(feature = "enterprise")]
+async fn backfill_downtime_ownership() {
+    use bytes::Bytes;
+
+    const MIGRATION_ORG: &str = "_migration";
+    const FLAG_KEY: &str = "downtimes_ownership_backfill_v1";
+
+    if openobserve_core::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
+        return;
+    }
+    let rows = db::downtimes::backfill_ownership().await;
+    if let Err(e) =
+        openobserve_core::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+    {
+        log::error!("[DOWNTIMES] could not set the ownership backfill flag: {e}");
+    } else {
+        log::info!("[DOWNTIMES] ownership tuples written for {rows} rows");
+    }
+}
+
 #[cfg(feature = "cloud")]
 async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
     if !LOCAL_NODE.is_scheduler() {
@@ -714,6 +738,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("downtimes cache failed");
         tokio::task::spawn(reload_downtimes_cache());
+        if get_openfga_config().enabled {
+            tokio::task::spawn(backfill_downtime_ownership());
+        }
         openobserve_synthetics::alerting::register_mute_check(
             openobserve_core::synthetics::downtime_mute_check,
         );

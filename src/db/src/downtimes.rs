@@ -101,6 +101,16 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn watch() -> Result<(), anyhow::Error> {
     coordinator::watch_events(on_put, on_delete).await
 }
+/// Writes the folder ownership tuple of every cached row; rows created before the RBAC fix lack
+/// it, and OpenFGA ignores a tuple that already exists, so a rerun writes nothing new.
+pub async fn backfill_ownership() -> usize {
+    let tuples = ownership_backfill(&all_cached());
+    for (org, authz) in &tuples {
+        crate::authz::set_ownership(org, "downtimes", authz.clone()).await;
+    }
+    tuples.len()
+}
+
 
 /// The cached rows of an org; cheap to clone, never partial.
 pub fn list_cached(org: &str) -> Arc<Vec<Downtime>> {
@@ -136,6 +146,23 @@ async fn on_delete(org: String, id: String) -> Result<(), anyhow::Error> {
     remove_cached(&org, &id);
     Ok(())
 }
+fn all_cached() -> Vec<Arc<Vec<Downtime>>> {
+    DOWNTIMES
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .values()
+        .cloned()
+        .collect()
+}
+
+/// `(org, tuple)` for every row, each parented by the folder it is filed in.
+fn ownership_backfill(orgs: &[Arc<Vec<Downtime>>]) -> Vec<(String, Authz)> {
+    orgs.iter()
+        .flat_map(|rows| rows.iter())
+        .map(|row| (row.org.clone(), ownership(row)))
+        .collect()
+}
+
 
 fn replace_org(org: &str, rows: Vec<Downtime>) {
     let mut cache = DOWNTIMES.write().unwrap_or_else(|e| e.into_inner());
@@ -281,5 +308,31 @@ mod tests {
         assert_eq!(owner.obj_id, "dt-1");
         assert_eq!(owner.parent_type, "downtime_folders");
         assert_eq!(owner.parent, "payments");
+
+    #[test]
+    fn the_ownership_backfill_covers_every_row_of_every_org_under_its_folder() {
+        let mut moved = downtime("acme", "dt-2");
+        moved.folder_id = "payments".to_string();
+        let orgs = vec![
+            Arc::new(vec![downtime("acme", "dt-1"), moved]),
+            Arc::new(vec![downtime("beta", "dt-3")]),
+        ];
+        let tuples: Vec<(String, String, String)> = ownership_backfill(&orgs)
+            .into_iter()
+            .map(|(org, a)| (org, a.obj_id, a.parent))
+            .collect();
+        let expected = |org: &str, id: &str, folder: &str| {
+            (org.to_string(), id.to_string(), folder.to_string())
+        };
+        assert_eq!(
+            tuples,
+            vec![
+                expected("acme", "dt-1", "default"),
+                expected("acme", "dt-2", "payments"),
+                expected("beta", "dt-3", "default"),
+            ]
+        );
+        assert!(ownership_backfill(&[]).is_empty());
+    }
     }
 }
