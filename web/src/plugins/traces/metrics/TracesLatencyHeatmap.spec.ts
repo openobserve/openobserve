@@ -276,7 +276,7 @@ describe("TracesLatencyHeatmap", () => {
       wrapper = await mountHeatmap();
       expect(chartColor).toHaveBeenCalledWith("--color-latency-p95");
       expect(options(wrapper).visualMap.inRange.color).toEqual(["#0a4ce8"]);
-      expect(options(wrapper).visualMap.inRange.colorAlpha).toEqual([0.08, 1]);
+      expect(options(wrapper).visualMap.inRange.colorAlpha).toEqual([0.2, 1]);
     });
 
     it("rebuilds the option when the theme flips", async () => {

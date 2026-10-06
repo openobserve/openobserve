@@ -149,30 +149,49 @@ describe("buildHeatmapGrid", () => {
     expect(buildHeatmapGrid([hit(-600, 4, 3), hit(900, 6, 3)], 10, T0, T0 + 30 * S)).toBeNull();
   });
 
-  it("puts the colour rank at index 2 and the raw count at index 3", () => {
-    const grid = buildHeatmapGrid([hit(10, 4, 99)], 10, T0, T0 + 30 * S)!;
-    expect(grid.cells[0]).toEqual([1, 0, 1, 99]);
+  it("colours each cell by the square root of its share of its column's busiest cell", () => {
+    const counts = [4787, 2970, 1516, 1];
+    const grid = buildHeatmapGrid(
+      counts.map((count, row) => hit(10, 5 + row, count)),
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    const colour = grid.cells.map((c) => c[2]);
+    expect(colour[0]).toBe(1);
+    expect(colour[1]).toBeCloseTo(0.788, 3);
+    expect(colour[2]).toBeCloseTo(0.563, 3);
+    expect(colour[3]).toBeCloseTo(0.0145, 4);
   });
 
-  it("colours each cell by its percentile rank among all counts, ties sharing the average rank", () => {
-    // Sorted counts 1, 3, 5, 5, 9 take ranks 0, 1, 2.5, 2.5, 4 out of 4.
-    const counts = [5, 1, 5, 9, 3];
-    const hits = counts.map((count, i) => hit(i * 10, 5, count));
-    const grid = buildHeatmapGrid(hits, 10, T0, T0 + 50 * S)!;
-    expect(grid.cells.map((c) => [c[3], c[2]])).toEqual([
-      [5, 0.625],
-      [1, 0],
-      [5, 0.625],
-      [9, 1],
-      [3, 0.25],
-    ]);
+  it("normalises each column independently", () => {
+    const grid = buildHeatmapGrid(
+      [hit(0, 5, 100), hit(0, 6, 25), hit(10, 5, 25), hit(10, 6, 1)],
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    const at = (col: number, row: number) => grid.cells.find((c) => c[0] === col && c[1] === row)!;
+    expect(at(0, 1)[2]).toBeCloseTo(0.5, 10);
+    expect(at(1, 0)[2]).toBe(1);
   });
 
-  it("puts every cell at 1 for a single cell or equal counts", () => {
-    for (const hits of [[hit(0, 5, 7)], [hit(0, 5, 7), hit(10, 6, 7), hit(20, 7, 7)]]) {
-      const grid = buildHeatmapGrid(hits, 10, T0, T0 + 30 * S)!;
-      expect(grid.cells.map((c) => c[2])).toEqual(hits.map(() => 1));
+  it("puts the busiest cell of every column at exactly 1, including a column of one cell", () => {
+    const grid = buildHeatmapGrid(
+      [hit(0, 5, 7), hit(0, 6, 3), hit(10, 7, 1), hit(20, 5, 2), hit(20, 6, 9)],
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    for (const col of [0, 1, 2]) {
+      const inCol = grid.cells.filter((c) => c[0] === col).map((c) => c[2]);
+      expect(Math.max(...inCol)).toBe(1);
     }
+  });
+
+  it("keeps the raw count at index 3", () => {
+    const grid = buildHeatmapGrid([hit(10, 4, 99), hit(10, 5, 9)], 10, T0, T0 + 30 * S)!;
+    expect(grid.cells.map((c) => c[3])).toEqual([99, 9]);
   });
 });
 

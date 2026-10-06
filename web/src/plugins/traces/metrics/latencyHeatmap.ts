@@ -112,30 +112,17 @@ export function buildHeatmapGrid(
   const rows: number[] = [];
   for (let k = minBucket; k <= maxBucket; k++) rows.push(k);
 
-  const ranks = rankFractions(kept.map((k) => k.count));
-  const cells = kept.map(({ col, bucket, count }, i): [number, number, number, number] => [
+  const colMax = new Array<number>(colStartUs.length).fill(0);
+  for (const k of kept) colMax[k.col] = Math.max(colMax[k.col], k.count);
+  // Per-column square root: each column shows its own latency shape, and the faint tail keeps a gradient.
+  const cells = kept.map(({ col, bucket, count }): [number, number, number, number] => [
     col,
     bucket - minBucket,
-    ranks[i],
+    Math.sqrt(count / colMax[col]),
     count,
   ]);
 
   return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells };
-}
-
-// Rank-based colour (histogram equalisation): any value scale crowds the dense rows into one band, so colour by rank.
-function rankFractions(counts: number[]): number[] {
-  const order = counts.map((count, i) => ({ count, i })).sort((a, b) => a.count - b.count);
-  const ranks = new Array<number>(counts.length);
-  for (let start = 0; start < order.length;) {
-    let end = start;
-    while (end + 1 < order.length && order[end + 1].count === order[start].count) end++;
-    const averageRank = (start + end) / 2;
-    for (let k = start; k <= end; k++) ranks[order[k].i] = averageRank;
-    start = end + 1;
-  }
-  const top = Math.max(...ranks);
-  return ranks.map((r) => (top === 0 ? 1 : r / top));
 }
 
 const clampIndex = (i: number, length: number) => Math.min(Math.max(i, 0), length - 1);

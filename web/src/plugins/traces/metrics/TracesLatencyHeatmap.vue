@@ -235,7 +235,7 @@ const options = computed(() => {
       dimension: 2,
       min: 0,
       max: 1,
-      inRange: { color: [chartColor("--color-latency-p95")], colorAlpha: [0.08, 1] },
+      inRange: { color: [chartColor("--color-latency-p95")], colorAlpha: [0.2, 1] },
     },
     toolbox: {
       show: true,
