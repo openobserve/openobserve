@@ -73,7 +73,13 @@ impl PhysicalOptimizerRule for AggregateTopkRule {
         }
 
         if let Some(expr) = final_agg_plan.aggr_expr().first() {
-            if !["count", "avg", "min", "max", "sum"].contains(&expr.fun().name()) {
+            let eligible = match expr.fun().name() {
+                "min" | "max" => true,
+                // A DISTINCT count/sum partial state is a value list, not the final value.
+                "count" | "sum" => !expr.is_distinct(),
+                _ => false,
+            };
+            if !eligible {
                 return Ok(plan);
             }
             let expr_name = expr.name();
@@ -133,8 +139,11 @@ impl TreeNodeRewriter for AggregateTopkRewriter {
             }
 
             let input_plan = Arc::clone(agg_node);
-            let agg_plan =
-                AggregateTopkExec::new(input_plan, &self.field, self.descending, self.limit);
+            let Ok(agg_plan) =
+                AggregateTopkExec::try_new(input_plan, &self.field, self.descending, self.limit)
+            else {
+                return Ok(Transformed::no(node));
+            };
 
             let node = node.replace_children(
                 vec![Arc::new(agg_plan) as Arc<dyn ExecutionPlan>],
@@ -230,8 +239,16 @@ impl<'n> TreeNodeVisitor<'n> for SortLimitVisitor {
 
 #[cfg(test)]
 mod tests {
+    use arrow::{
+        array::{Array, Int64Array, RecordBatch, StringArray},
+        compute::cast,
+    };
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion::{physical_plan::displayable, prelude::SessionConfig};
+    use datafusion::{
+        datasource::MemTable,
+        physical_plan::{collect, displayable},
+        prelude::SessionConfig,
+    };
 
     use super::*;
     use crate::datafusion::table_provider::empty_table::NewEmptyTable;
@@ -248,6 +265,10 @@ mod tests {
     /// Whether the rule inserts `AggregateTopkExec` for `agg(v)` grouped by `name`, sorted
     /// on the aggregate and limited.
     async fn inserts_topk(agg: &str) -> bool {
+        inserts_topk_for(&format!("{agg}(v)")).await
+    }
+
+    async fn inserts_topk_for(select_expr: &str) -> bool {
         enable_topk();
         let schema = Arc::new(Schema::new(vec![
             Field::new("name", DataType::Utf8, false),
@@ -258,8 +279,9 @@ mod tests {
         );
         ctx.register_table("t", Arc::new(NewEmptyTable::new("t", schema)))
             .unwrap();
-        let sql =
-            format!("SELECT name, {agg}(v) AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 10");
+        let sql = format!(
+            "SELECT name, {select_expr} AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 10"
+        );
         let plan = ctx
             .sql(&sql)
             .await
@@ -278,9 +300,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_topk_keeps_the_supported_aggregates() {
-        for agg in ["count", "avg", "min", "max", "sum"] {
+        for agg in ["count", "min", "max", "sum"] {
             assert!(inserts_topk(agg).await, "{agg} must stay eligible");
         }
+    }
+
+    #[tokio::test]
+    async fn test_topk_matches_an_aggregate_name_with_brackets() {
+        let filtered = "COUNT(*) FILTER (WHERE CAST(v AS VARCHAR) IN ('2','5'))";
+        assert!(inserts_topk_for(filtered).await, "{filtered}");
     }
 
     #[tokio::test]
@@ -289,5 +317,142 @@ mod tests {
             !inserts_topk("approx_distinct").await,
             "approx_distinct must stay on the regular aggregation path"
         );
+    }
+
+    #[tokio::test]
+    async fn test_topk_skips_avg() {
+        assert!(
+            !inserts_topk("avg").await,
+            "avg must stay on the regular aggregation path"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topk_skips_distinct_with_filter() {
+        for expr in [
+            "COUNT(DISTINCT v) FILTER (WHERE v > 0)",
+            "SUM(DISTINCT v) FILTER (WHERE v > 0)",
+        ] {
+            assert!(
+                !inserts_topk_for(expr).await,
+                "{expr} must stay on the regular aggregation path"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_topk_keeps_min_max_distinct_with_filter() {
+        for expr in [
+            "MIN(DISTINCT v) FILTER (WHERE v > 0)",
+            "MAX(DISTINCT v) FILTER (WHERE v > 0)",
+        ] {
+            assert!(inserts_topk_for(expr).await, "{expr} must stay eligible");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_avg_top_group_with_few_rows_is_not_dropped() {
+        enable_topk();
+        // More groups than the heap keeps (1000), each outranking `top` by row count.
+        let mut names = vec!["top".to_string()];
+        let mut values = vec![100_i64];
+        for i in 0..1000 {
+            names.extend([format!("g{i}"), format!("g{i}")]);
+            values.extend([1, 1]);
+        }
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(names)),
+                Arc::new(Int64Array::from(values)),
+            ],
+        )
+        .unwrap();
+        let ctx = datafusion::prelude::SessionContext::new_with_config(
+            SessionConfig::new().with_target_partitions(2),
+        );
+        ctx.register_table(
+            "t",
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+        let plan = ctx
+            .sql("SELECT name, avg(v) AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 1")
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        let plan = AggregateTopkRule::new(1)
+            .optimize(plan, &ConfigOptions::default())
+            .unwrap();
+        let batches = collect(plan, ctx.task_ctx()).await.unwrap();
+        let names: Vec<String> = batches
+            .iter()
+            .flat_map(|b| {
+                let col = cast(b.column(0), &DataType::Utf8).unwrap();
+                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                col.iter().flatten().map(String::from).collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(names, vec!["top".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_count_distinct_filter_top_group_is_not_dropped() {
+        enable_topk();
+        // Partial state is a value list: `[5]` outranks `[1, 2, 3]` despite a lower count.
+        let mut names = vec!["top".to_string(); 3];
+        let mut values = vec![1_i64, 2, 3];
+        for i in 0..1000 {
+            names.extend([format!("g{i}"), format!("g{i}")]);
+            values.extend([5, 5]);
+        }
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(names)),
+                Arc::new(Int64Array::from(values)),
+            ],
+        )
+        .unwrap();
+        let ctx = datafusion::prelude::SessionContext::new_with_config(
+            SessionConfig::new().with_target_partitions(2),
+        );
+        ctx.register_table(
+            "t",
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+        let sql = "SELECT name, COUNT(DISTINCT v) FILTER (WHERE v > 0) AS x FROM t \
+                   GROUP BY name ORDER BY x DESC LIMIT 1";
+        let plan = ctx
+            .sql(sql)
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        let plan = AggregateTopkRule::new(1)
+            .optimize(plan, &ConfigOptions::default())
+            .unwrap();
+        let batches = collect(plan, ctx.task_ctx()).await.unwrap();
+        let names: Vec<String> = batches
+            .iter()
+            .flat_map(|b| {
+                let col = cast(b.column(0), &DataType::Utf8).unwrap();
+                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                col.iter().flatten().map(String::from).collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(names, vec!["top".to_string()]);
     }
 }

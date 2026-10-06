@@ -1102,3 +1102,102 @@ describe("SpanBlock marker drill-down", () => {
     expect(wrapper.emitted("selectSpan")).toEqual([[mockSpan.spanId]]);
   });
 });
+
+describe("SpanBlock critical path", () => {
+  const spanLengthUs = mockSpan.endTimeUs - mockSpan.startTimeUs;
+  const criticalSpan = {
+    ...mockSpan,
+    criticalSections: [
+      {
+        spanId: mockSpan.spanId,
+        sectionStartUs: mockSpan.startTimeUs - 0.4,
+        sectionEndUs: mockSpan.startTimeUs + spanLengthUs / 4,
+      },
+      {
+        spanId: mockSpan.spanId,
+        sectionStartUs: mockSpan.startTimeUs + spanLengthUs / 2,
+        sectionEndUs: mockSpan.endTimeUs + 0.6,
+      },
+    ],
+  };
+  const nonCriticalSpan = { ...mockSpan, criticalSections: [] };
+  let wrapper: any;
+
+  const mountBlock = async (span: any, showCriticalPath: boolean, selectedSpanId: any = null) => {
+    wrapper = mount(SpanBlock, {
+      props: {
+        span,
+        showCriticalPath,
+        baseTracePosition: mockBaseTracePosition,
+        spanDimensions: mockSpanDimensions,
+        spanData: mockSpanData,
+      },
+      global: { plugins: [i18n, router], provide: { store: mockStore } },
+    });
+    wrapper.vm.searchObj.data.traceDetails.selectedSpanId = selectedSpanId;
+    await flushPromises();
+  };
+
+  const isDimmed = () =>
+    wrapper.find('[data-test="span-block-select-trigger"]').classes().includes("opacity-30");
+
+  afterEach(() => {
+    wrapper.vm.searchObj.data.traceDetails.selectedSpanId = null;
+    wrapper.unmount();
+  });
+
+  it("draws one overlay per section, positioned on the bar's own time basis and clamped", async () => {
+    await mountBlock(criticalSpan, true);
+
+    const segments = wrapper.findAll('[data-test="span-critical-section"]');
+    expect(segments).toHaveLength(2);
+    expect(segments[0].attributes("style")).toContain("left: 0%");
+    expect(segments[0].attributes("style")).toContain("width: 25%");
+    expect(segments[1].attributes("style")).toContain("left: 50%");
+    expect(segments[1].attributes("style")).toContain("width: 50%");
+  });
+
+  it("colours the overlay with the accent token, not the error one", async () => {
+    await mountBlock(criticalSpan, true);
+
+    const classes = wrapper.find('[data-test="span-critical-section"]').classes();
+    expect(classes).toContain("bg-accent");
+    expect(classes).not.toContain("bg-status-error-text");
+  });
+
+  it("draws no overlay when the critical path toggle is off", async () => {
+    await mountBlock(criticalSpan, false);
+
+    expect(wrapper.findAll('[data-test="span-critical-section"]')).toHaveLength(0);
+  });
+
+  it("dims a span with no critical section while the toggle is on", async () => {
+    await mountBlock(nonCriticalSpan, true);
+
+    expect(isDimmed()).toBe(true);
+  });
+
+  it("does not dim a critical span while the toggle is on", async () => {
+    await mountBlock(criticalSpan, true);
+
+    expect(isDimmed()).toBe(false);
+  });
+
+  it("does not dim a non-critical span while the toggle is off", async () => {
+    await mountBlock(nonCriticalSpan, false);
+
+    expect(isDimmed()).toBe(false);
+  });
+
+  it("never dims the selected span, even when it is off the critical path", async () => {
+    await mountBlock(nonCriticalSpan, true, mockSpan.spanId);
+
+    expect(isDimmed()).toBe(false);
+  });
+
+  it("still dims a critical span when another span is selected", async () => {
+    await mountBlock(criticalSpan, true, "some-other-span");
+
+    expect(isDimmed()).toBe(true);
+  });
+});
