@@ -320,7 +320,9 @@
       "logsVisualizePersistence.spec.js",
       "streamNotFound.spec.js",
       "logsRefreshCacheDropdown.spec.js",
-      "logs-highlighting.spec.js"
+      "logs-highlighting.spec.js",
+      "logs-drilldown.spec.js",
+      "logs-search-around-multistream.spec.js"
     ],
     "disabled": [
       {
