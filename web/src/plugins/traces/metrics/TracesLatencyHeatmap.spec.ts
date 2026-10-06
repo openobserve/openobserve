@@ -147,10 +147,24 @@ describe("TracesLatencyHeatmap", () => {
       expect(error.text()).toBe(i18n.global.t("traces.latencyHeatmap.loadFailed"));
     });
 
-    it("does not treat an aborted search as an error", async () => {
-      search.mockRejectedValue(Object.assign(new Error("canceled"), { name: "CanceledError" }));
+    it("stays ready on the newer grid when the superseded search later rejects as canceled", async () => {
+      let rejectFirst!: (e: unknown) => void;
+      let resolveSecond!: (v: any) => void;
+      search
+        .mockReturnValueOnce(new Promise((_, reject) => (rejectFirst = reject)) as any)
+        .mockReturnValueOnce(new Promise((r) => (resolveSecond = r)) as any);
       wrapper = await mountHeatmap();
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      resolveSecond({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+      rejectFirst(Object.assign(new Error("canceled"), { name: "CanceledError" }));
+      await settle();
+
       expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(options(wrapper).yAxis.data).toEqual(["100ms", "200ms", "500ms"]);
     });
 
     it("renders the unavailable state and no chart without a histogram interval", async () => {
