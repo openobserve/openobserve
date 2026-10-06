@@ -81,6 +81,17 @@ describe("StepPicker", () => {
     expect(values(w)).toContain("p:/a");
   });
 
+  it("a failed load shows the error inside the dropdown instead of 'No options found' (o2-enterprise#2800)", async () => {
+    mockPa.loadPicker.mockResolvedValue({ status: "error", options: [] });
+    const w = mountPicker();
+    await w.find("button").trigger("click");
+    await flushPromises();
+    const empty = document.body.querySelector('[data-test="pa-step-picker-empty-error"]');
+    expect(empty).not.toBeNull();
+    expect(empty!.textContent).toBeTruthy();
+    expect(document.body.textContent).not.toContain("No options found");
+  });
+
   it("drops server search results when the scope changes (W16)", async () => {
     mockPa.loadPicker.mockResolvedValue(full(200));
     mockPa.searchPicker.mockResolvedValue({ status: "ok", options: [page("/deep")] });
@@ -104,5 +115,19 @@ describe("StepPicker", () => {
     select(w).vm.$emit("search", "deep");
     await flushPromises();
     expect(select(w).props("errorMessage")).toBeTruthy();
+  });
+
+  it("clears a stale search failure once the term is cleared instead of keeping 'load failed' stuck on an empty result", async () => {
+    mockPa.loadPicker.mockResolvedValue(full(200));
+    mockPa.searchPicker.mockResolvedValue({ status: "error", options: [] });
+    const w = mountPicker();
+    select(w).vm.$emit("open");
+    await flushPromises();
+    select(w).vm.$emit("search", "deep");
+    await flushPromises();
+    expect(select(w).props("errorMessage")).toBeTruthy();
+    select(w).vm.$emit("search", "");
+    await flushPromises();
+    expect(select(w).props("errorMessage")).toBeFalsy();
   });
 });
