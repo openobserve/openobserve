@@ -668,6 +668,22 @@ describe("TracesMetricsDashboard", () => {
       });
     });
 
+    it("never hands the picker an empty range for a final column clamped mid-second", async () => {
+      // Final column 10:02:00–10:02:10 with the search ending at 10:02:00.437.
+      await wrapper.vm.onHeatmapSelect(selection({ timeEndUs: T + 437_000 }));
+      const { start, end } = wrapper.emitted("time-range-selected")![0][0] as any;
+      // The picker keeps whole seconds only.
+      const appliedStart = Math.floor(start / 1000);
+      const appliedEnd = Math.floor(end / 1000);
+      expect(appliedEnd).toBeGreaterThan(appliedStart);
+      expect(end).toBe(T / 1000 + 1000);
+    });
+
+    it("rounds a mid-second clamped start down to the whole second", async () => {
+      await wrapper.vm.onHeatmapSelect(selection({ timeStartUs: T + 437_000 }));
+      expect((wrapper.emitted("time-range-selected")![0][0] as any).start).toBe(T / 1000);
+    });
+
     it("stores the Duration entry with the range the picker applied", async () => {
       mountApplying({ startTime: T, endTime: T + 40 * S });
       mockSearchObj.data.editorValue = "service_name = 'a'";

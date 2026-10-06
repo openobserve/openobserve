@@ -449,9 +449,10 @@ const onHeatmapSelect = async (selection: LatencyHeatmapSelection) => {
   }
   searchObj.meta.metricsRangeFilters.clear();
 
+  // The picker keeps whole seconds; rounding outwards keeps a mid-second clamped edge from emptying the range.
   emit("time-range-selected", {
-    start: instantToPickerMs(timeStartUs / 1000, store.state.timezone),
-    end: instantToPickerMs(timeEndUs / 1000, store.state.timezone),
+    start: instantToPickerMs(Math.floor(timeStartUs / 1_000_000) * 1000, store.state.timezone),
+    end: instantToPickerMs(Math.ceil(timeEndUs / 1_000_000) * 1000, store.state.timezone),
   });
 
   await nextTick();
