@@ -33,6 +33,21 @@ vi.mock("@/services/search", () => ({
 }));
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams }) }));
 
+const viewport = { mdUp: true, lgUp: true };
+
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !viewport.mdUp),
+      isTablet: computed(() => viewport.mdUp && !viewport.lgUp),
+      isDesktop: computed(() => viewport.lgUp),
+      mdUp: computed(() => viewport.mdUp),
+      lgUp: computed(() => viewport.lgUp),
+    }),
+  };
+});
+
 const metricsQuery = vi.mocked(searchService.metrics_query);
 
 const ALL_STREAMS = Object.values(QUERY_STREAM);
@@ -258,7 +273,13 @@ const passthrough = (name: string) =>
   defineComponent({
     name,
     setup(_p: any, { slots }: any) {
-      return () => h("div", {}, [slots.actions?.(), slots.default?.()]);
+      return () =>
+        h("div", {}, [
+          slots.actions?.(),
+          h("div", { "data-test": "layout-overflow" }, slots["actions-overflow"]?.()),
+          h("div", { "data-test": "layout-sidebar" }, slots.sidebar?.()),
+          slots.default?.(),
+        ]);
     },
   });
 
@@ -313,6 +334,7 @@ describe("KubernetesExplorerPage", () => {
   const mountPage = async (
     query: Record<string, any> = {},
     streams: string[] | null = ALL_STREAMS,
+    { realLayout = false } = {},
   ) => {
     if (streams) getStreams.mockResolvedValue({ list: streams.map((name) => ({ name })) });
     store = createStore({
@@ -340,7 +362,7 @@ describe("KubernetesExplorerPage", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          OPageLayout: passthrough("OPageLayout"),
+          ...(realLayout ? {} : { OPageLayout: passthrough("OPageLayout") }),
           OTable: OTableStub,
           ORadioGroup: radioGroupStub,
           ORadio: radioStub,
@@ -396,7 +418,9 @@ describe("KubernetesExplorerPage", () => {
       await mountPage({}, null);
       expect(wrapper.find('[data-test="k8s2-streams-error"]').exists()).toBe(true);
       getStreams.mockResolvedValue({ list: ALL_STREAMS.map((name) => ({ name })) });
-      await wrapper.find('[data-test="k8s2-streams-retry"]').trigger("click");
+      const face = wrapper.findComponent({ name: "OEmptyState" });
+      expect(face.attributes("data-test")).toBe("k8s2-streams-error");
+      face.vm.$emit("action", "retry");
       await flushPromises();
       expect(getStreams).toHaveBeenLastCalledWith("metrics", false, false, true);
       expect(wrapper.find('[data-test="k8s2-tiles"]').exists()).toBe(true);
@@ -421,7 +445,9 @@ describe("KubernetesExplorerPage", () => {
       await mountPage();
       expect(wrapper.find('[data-test="k8s2-page-error"]').text()).toContain("engine down");
       serve();
-      await wrapper.find('[data-test="k8s2-retry"]').trigger("click");
+      const face = wrapper.findComponent({ name: "OEmptyState" });
+      expect(face.attributes("data-test")).toBe("k8s2-page-error");
+      face.vm.$emit("action", "retry");
       await flushPromises();
       expect(wrapper.find('[data-test="k8s2-page-error"]').exists()).toBe(false);
     });
@@ -826,6 +852,104 @@ describe("KubernetesExplorerPage", () => {
     expect(calls.length).toBeGreaterThan(0);
     expect(calls.every((c) => c.org_identifier === "org2")).toBe(true);
     expect(calls.map((c) => idOf(c.query))).toEqual(["P1"]);
+  });
+
+  describe("live-check and review fixes", () => {
+    afterEach(() => {
+      viewport.mdUp = true;
+      viewport.lgUp = true;
+    });
+
+    it("Refresh reloads the stream list first, so an undetected page comes alive", async () => {
+      await mountPage({}, ["system_cpu_time"]);
+      expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(true);
+      getStreams.mockClear();
+      getStreams.mockResolvedValue({ list: ALL_STREAMS.map((name) => ({ name })) });
+      await wrapper.find('[data-test="k8s2-refresh"]').trigger("click");
+      await flushPromises();
+      expect(getStreams).toHaveBeenCalledTimes(1);
+      expect(getStreams).toHaveBeenCalledWith("metrics", false, false, true);
+      const ids = metricsQuery.mock.calls.map(([args]: any[]) => idOf(args.query));
+      expect(ids.length).toBeGreaterThan(0);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("Refresh picks up a family that arrived after the page loaded", async () => {
+      await mountPage({ kind: "nodes" }, ["kube_pod_status_phase"]);
+      metricsQuery.mockClear();
+      getStreams.mockResolvedValue({ list: ALL_STREAMS.map((name) => ({ name })) });
+      await wrapper.find('[data-test="k8s2-refresh"]').trigger("click");
+      await flushPromises();
+      expect(metricsQuery.mock.calls.map(([args]: any[]) => idOf(args.query))).toContain("N1");
+    });
+
+    it("keeps the facets in the page rail and Refresh among the secondary actions", async () => {
+      await mountPage();
+      expect(
+        wrapper.find('[data-test="layout-sidebar"] [data-test="k8s2-name-filter"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="layout-overflow"] [data-test="k8s2-refresh"]').exists(),
+      ).toBe(true);
+    });
+
+    it("puts the facets behind the side-panel drawer on a phone", async () => {
+      viewport.mdUp = false;
+      viewport.lgUp = false;
+      await mountPage({}, ALL_STREAMS, { realLayout: true });
+      expect(wrapper.find('[data-test="o-page-layout-mobile-sidebar-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-name-filter"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="k8s2-pods-table"]').exists()).toBe(true);
+    });
+
+    it("selects the defaulted single cluster in the facet, matching the chip", async () => {
+      await mountPage();
+      expect(radio("k8s2-cluster-facet").props("modelValue")).toBe(GEN);
+      expect(wrapper.find('[data-test="k8s2-scope-cluster"]').text()).toBe(`Cluster: ${GEN}`);
+    });
+
+    it("explains an ambiguous pod in its status cell", async () => {
+      fixture = {
+        P1: [
+          {
+            metric: { k8s_cluster: GEN, namespace: "data", pod: "db-0", uid: "A", phase: "Failed" },
+            value: 1,
+          },
+          {
+            metric: {
+              k8s_cluster: GEN,
+              namespace: "data",
+              pod: "db-0",
+              uid: "B",
+              phase: "Running",
+            },
+            value: 1,
+          },
+        ],
+      };
+      serve();
+      await mountPage(
+        {},
+        ALL_STREAMS.filter((name) => name !== "kube_pod_created"),
+      );
+      const cell = wrapper.find('[data-test="k8s2-pod-ambiguous"]');
+      expect(cell.text()).toBe("—");
+      expect(cell.attributes("aria-label")).toBe(
+        "Several pod instances share this name and their creation time is unavailable",
+      );
+    });
+
+    it("gives pod names the widest column and their full name on hover", async () => {
+      await mountPage();
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const size = (id: string) => columns.find((c) => c.id === id).size;
+      expect(size("name")).toBeGreaterThan(size("owner"));
+      expect(size("name")).toBeGreaterThan(size("node"));
+      const name = "recommendation-service-9x58zgdb6z-jwhzq";
+      expect(
+        wrapper.find(`[data-test="k8s2-pod-open-${GEN}/data/${name}"]`).attributes("title"),
+      ).toBe(name);
+    });
   });
 
   describe("navigation and state hygiene", () => {

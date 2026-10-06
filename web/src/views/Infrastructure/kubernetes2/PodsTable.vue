@@ -52,7 +52,14 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const columns = computed<OTableColumnDef<PodRow>[]>(() => [
-  { id: "name", header: t("infra.k8s2.columnName"), accessorKey: "name", sortable: true },
+  {
+    id: "name",
+    header: t("infra.k8s2.columnName"),
+    accessorKey: "name",
+    size: 320,
+    minSize: 200,
+    sortable: true,
+  },
   {
     id: "namespace",
     header: t("infra.k8s2.columnNamespace"),
@@ -138,6 +145,7 @@ const cpuDetail = (row: PodRow) => {
         variant="ghost-primary"
         size="xs"
         :data-test="`k8s2-pod-open-${row.key}`"
+        :title="raw(row.name)"
         @click="emit('open', row)"
       >
         {{ raw(row.name) }}
@@ -149,7 +157,9 @@ const cpuDetail = (row: PodRow) => {
     <template #cell-status="{ row }">
       <div class="flex min-w-0 flex-col items-start" :data-test="`k8s2-pod-status-${row.key}`">
         <OTooltip v-if="row.ambiguous" :content="t('infra.k8s2.ambiguous')">
-          <span data-test="k8s2-pod-ambiguous">{{ raw("—") }}</span>
+          <span data-test="k8s2-pod-ambiguous" :aria-label="t('infra.k8s2.ambiguous')">{{
+            raw("—")
+          }}</span>
         </OTooltip>
         <OTag v-else-if="row.status" :variant="row.status.variant" size="xs">{{
           raw(row.status.text)

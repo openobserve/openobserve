@@ -25,6 +25,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -121,7 +122,17 @@ const refreshList = () =>
 let reAnchoring = false;
 let reAnchorFetched = false;
 
-const onRefreshClick = () => {
+// Set while Refresh reloads the stream list, so the detection watcher leaves the fetch to Refresh.
+let reloadingStreams = false;
+
+const onRefreshClick = async () => {
+  reloadingStreams = true;
+  try {
+    await k8s.loadStreams({ force: true });
+  } finally {
+    reloadingStreams = false;
+  }
+  if (detection.value !== "detected") return;
   const picker = dateTimePickerRef.value;
   reAnchoring = true;
   reAnchorFetched = false;
@@ -147,9 +158,14 @@ watch(
   },
 );
 
-watch(detection, (next, prev) => {
-  if (next === "detected" && prev !== "detected") refreshList();
-});
+watch(
+  detection,
+  (next, prev) => {
+    if (next === "detected" && prev !== "detected" && !reloadingStreams) refreshList();
+  },
+  // Synchronous, so it runs while reloadingStreams is still set.
+  { flush: "sync" },
+);
 
 watch(
   () => store.state.selectedOrganization?.identifier,
@@ -214,9 +230,9 @@ const onName = (name: string) => {
   if (name !== state.value.name) writeState(withFilter(state.value, { name }));
 };
 
-const clusterChoice = computed(() =>
-  state.value.cluster === "*" ? "*" : (k8s.effectiveCluster.value ?? "*"),
-);
+const clusterChoice = computed(() => k8s.scopeCluster.value ?? "*");
+
+const showRail = computed(() => detection.value === "detected" && !pageError.value);
 const onCluster = (value: string | number | boolean) =>
   writeState(withFilter(state.value, { cluster: String(value) }));
 
@@ -301,17 +317,112 @@ const tableProps = computed(() => ({
           data-test-name="k8s2-date-time"
           @on:date-change="onDateChange"
         />
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="refresh"
-          class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
-          data-test="k8s2-refresh"
-          :loading="loading"
-          @click="onRefreshClick"
-        >
-          <span class="max-md:sr-only">{{ t("infra.k8s2.refresh") }}</span>
-        </OButton>
+      </div>
+    </template>
+    <template #actions-overflow>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        icon-left="refresh"
+        data-test="k8s2-refresh"
+        :loading="loading"
+        @click="onRefreshClick"
+      >
+        {{ t("infra.k8s2.refresh") }}
+      </OButton>
+    </template>
+
+    <template v-if="showRail" #sidebar>
+      <div class="bg-surface-panel flex h-full flex-col gap-3 overflow-y-auto px-1.5 py-2">
+        <OSearchInput
+          :model-value="state.name"
+          :debounce="300"
+          :placeholder="t('infra.k8s2.filterPlaceholder')"
+          data-test="k8s2-name-filter"
+          @update:model-value="onName"
+        />
+        <section v-if="k8s.clusterFacet.value.length" class="flex flex-col gap-1">
+          <OText variant="label" class="px-1 font-semibold">{{
+            t("infra.k8s2.clusterFacet")
+          }}</OText>
+          <ORadioGroup
+            :model-value="clusterChoice"
+            data-test="k8s2-cluster-facet"
+            @update:model-value="onCluster"
+          >
+            <ORadio value="*" size="sm">
+              <template #label>
+                <span class="flex min-w-0 items-center justify-between gap-2">
+                  <span class="truncate text-xs">{{ t("infra.k8s2.facetAll") }}</span>
+                  <OTag
+                    type="countChip"
+                    value="neutral"
+                    size="xs"
+                    shape="rounded"
+                    data-test="k8s2-cluster-facet-all-count"
+                    >{{ k8s.clusterTotal.value }}</OTag
+                  >
+                </span>
+              </template>
+            </ORadio>
+            <ORadio
+              v-for="facet in k8s.clusterFacet.value"
+              :key="facet.value"
+              :value="facet.value"
+              size="sm"
+            >
+              <template #label>
+                <span class="flex min-w-0 items-center justify-between gap-2">
+                  <span class="truncate text-xs">{{ raw(facet.value) }}</span>
+                  <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
+                    facet.count
+                  }}</OTag>
+                </span>
+              </template>
+            </ORadio>
+          </ORadioGroup>
+        </section>
+        <section v-if="state.kind !== 'nodes'" class="flex flex-col gap-1">
+          <OText variant="label" class="px-1 font-semibold">{{
+            t("infra.k8s2.namespaceFacet")
+          }}</OText>
+          <ORadioGroup
+            :model-value="state.namespace ?? ''"
+            data-test="k8s2-namespace-facet"
+            @update:model-value="onNamespace"
+          >
+            <ORadio value="" size="sm">
+              <template #label>
+                <span class="flex min-w-0 items-center justify-between gap-2">
+                  <span class="truncate text-xs">{{ t("infra.k8s2.facetAll") }}</span>
+                  <OTag
+                    type="countChip"
+                    value="neutral"
+                    size="xs"
+                    shape="rounded"
+                    data-test="k8s2-namespace-facet-all-count"
+                    >{{ k8s.namespaceTotal.value }}</OTag
+                  >
+                </span>
+              </template>
+            </ORadio>
+            <ORadio
+              v-for="facet in k8s.namespaceFacet.value"
+              :key="facet.value"
+              :value="facet.value"
+              size="sm"
+            >
+              <template #label>
+                <span class="flex min-w-0 items-center justify-between gap-2">
+                  <span class="truncate text-xs">{{ raw(facet.value) }}</span>
+                  <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
+                    facet.count
+                  }}</OTag>
+                </span>
+              </template>
+            </ORadio>
+          </ORadioGroup>
+        </section>
       </div>
     </template>
 
@@ -323,21 +434,13 @@ const tableProps = computed(() => ({
       <OSpinner size="lg" />
     </div>
 
-    <div
+    <OEmptyState
       v-else-if="detection === 'error'"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      preset="load-error"
+      :title="t('infra.k8s2.streamsError')"
       data-test="k8s2-streams-error"
-    >
-      <OText class="text-lg font-semibold">{{ t("infra.k8s2.streamsError") }}</OText>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="k8s2-streams-retry"
-        @click="retryStreams"
-      >
-        {{ t("infra.k8s2.retry") }}
-      </OButton>
-    </div>
+      @action="retryStreams"
+    />
 
     <div v-else-if="detection === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
       <div
@@ -349,17 +452,14 @@ const tableProps = computed(() => ({
       </div>
     </div>
 
-    <div
+    <OEmptyState
       v-else-if="pageError"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      preset="load-error"
+      :title="t('infra.k8s2.pageError')"
+      :description="raw(pageError)"
       data-test="k8s2-page-error"
-    >
-      <OText class="text-lg font-semibold">{{ t("infra.k8s2.pageError") }}</OText>
-      <OText variant="meta">{{ raw(pageError) }}</OText>
-      <OButton variant="outline" size="sm-action" data-test="k8s2-retry" @click="refreshList">
-        {{ t("infra.k8s2.retry") }}
-      </OButton>
-    </div>
+      @action="refreshList"
+    />
 
     <div v-else class="flex h-full min-h-0 flex-col gap-2">
       <OBanner
@@ -395,159 +495,63 @@ const tableProps = computed(() => ({
         />
       </OTabs>
 
-      <div class="flex min-h-0 flex-1">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
         <div
-          class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-3 overflow-y-auto border-e px-1.5 py-2"
+          v-if="state.kind === 'pods' && (state.onNode || state.workload)"
+          class="flex flex-wrap items-center gap-2 px-2 pt-2"
         >
-          <OSearchInput
-            :model-value="state.name"
-            :debounce="300"
-            :placeholder="t('infra.k8s2.filterPlaceholder')"
-            data-test="k8s2-name-filter"
-            @update:model-value="onName"
-          />
-          <section v-if="k8s.clusterFacet.value.length" class="flex flex-col gap-1">
-            <OText variant="label" class="px-1 font-semibold">{{
-              t("infra.k8s2.clusterFacet")
-            }}</OText>
-            <ORadioGroup
-              :model-value="clusterChoice"
-              data-test="k8s2-cluster-facet"
-              @update:model-value="onCluster"
-            >
-              <ORadio value="*" size="sm">
-                <template #label>
-                  <span class="flex min-w-0 items-center justify-between gap-2">
-                    <span class="truncate text-xs">{{ t("infra.k8s2.facetAll") }}</span>
-                    <OTag
-                      type="countChip"
-                      value="neutral"
-                      size="xs"
-                      shape="rounded"
-                      data-test="k8s2-cluster-facet-all-count"
-                      >{{ k8s.clusterTotal.value }}</OTag
-                    >
-                  </span>
-                </template>
-              </ORadio>
-              <ORadio
-                v-for="facet in k8s.clusterFacet.value"
-                :key="facet.value"
-                :value="facet.value"
-                size="sm"
-              >
-                <template #label>
-                  <span class="flex min-w-0 items-center justify-between gap-2">
-                    <span class="truncate text-xs">{{ raw(facet.value) }}</span>
-                    <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
-                      facet.count
-                    }}</OTag>
-                  </span>
-                </template>
-              </ORadio>
-            </ORadioGroup>
-          </section>
-          <section v-if="state.kind !== 'nodes'" class="flex flex-col gap-1">
-            <OText variant="label" class="px-1 font-semibold">{{
-              t("infra.k8s2.namespaceFacet")
-            }}</OText>
-            <ORadioGroup
-              :model-value="state.namespace ?? ''"
-              data-test="k8s2-namespace-facet"
-              @update:model-value="onNamespace"
-            >
-              <ORadio value="" size="sm">
-                <template #label>
-                  <span class="flex min-w-0 items-center justify-between gap-2">
-                    <span class="truncate text-xs">{{ t("infra.k8s2.facetAll") }}</span>
-                    <OTag
-                      type="countChip"
-                      value="neutral"
-                      size="xs"
-                      shape="rounded"
-                      data-test="k8s2-namespace-facet-all-count"
-                      >{{ k8s.namespaceTotal.value }}</OTag
-                    >
-                  </span>
-                </template>
-              </ORadio>
-              <ORadio
-                v-for="facet in k8s.namespaceFacet.value"
-                :key="facet.value"
-                :value="facet.value"
-                size="sm"
-              >
-                <template #label>
-                  <span class="flex min-w-0 items-center justify-between gap-2">
-                    <span class="truncate text-xs">{{ raw(facet.value) }}</span>
-                    <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
-                      facet.count
-                    }}</OTag>
-                  </span>
-                </template>
-              </ORadio>
-            </ORadioGroup>
-          </section>
-        </div>
-
-        <div class="flex min-h-0 flex-1 flex-col gap-2">
-          <div
-            v-if="state.kind === 'pods' && (state.onNode || state.workload)"
-            class="flex flex-wrap items-center gap-2 px-2 pt-2"
+          <OButton
+            v-if="state.onNode"
+            variant="outline"
+            size="xs"
+            icon-right="close"
+            :title="t('infra.k8s2.clearFilter')"
+            data-test="k8s2-filter-node"
+            @click="writeState(withFilter(state, { onNode: null }))"
+            >{{ t("infra.k8s2.filterNode", { name: raw(state.onNode[1]) }) }}</OButton
           >
-            <OButton
-              v-if="state.onNode"
-              variant="outline"
-              size="xs"
-              icon-right="close"
-              :title="t('infra.k8s2.clearFilter')"
-              data-test="k8s2-filter-node"
-              @click="writeState(withFilter(state, { onNode: null }))"
-              >{{ t("infra.k8s2.filterNode", { name: raw(state.onNode[1]) }) }}</OButton
-            >
-            <OButton
-              v-if="state.workload"
-              variant="outline"
-              size="xs"
-              icon-right="close"
-              :title="t('infra.k8s2.clearFilter')"
-              data-test="k8s2-filter-workload"
-              @click="writeState(withFilter(state, { workload: null }))"
-              >{{
-                t("infra.k8s2.filterWorkload", {
-                  name: raw(`${state.workload[2]}/${state.workload[3]}`),
-                })
-              }}</OButton
-            >
-          </div>
-          <div class="min-h-0 flex-1">
-            <PodsTable
-              v-if="state.kind === 'pods'"
-              :rows="k8s.pagedRows.value as PodRow[]"
-              v-bind="tableProps"
-              @sort="onSort"
-              @page="onPage"
-              @open="openPod"
-              @filter-node="onPodNode"
-              @filter-owner="onPodOwner"
-            />
-            <NodesTable
-              v-else-if="state.kind === 'nodes'"
-              :rows="k8s.pagedRows.value as NodeRow[]"
-              v-bind="tableProps"
-              @sort="onSort"
-              @page="onPage"
-              @open="onNodeRow"
-            />
-            <DeploymentsTable
-              v-else
-              :rows="k8s.pagedRows.value as DeploymentRow[]"
-              v-bind="tableProps"
-              @sort="onSort"
-              @page="onPage"
-              @open="onDeploymentRow"
-            />
-          </div>
+          <OButton
+            v-if="state.workload"
+            variant="outline"
+            size="xs"
+            icon-right="close"
+            :title="t('infra.k8s2.clearFilter')"
+            data-test="k8s2-filter-workload"
+            @click="writeState(withFilter(state, { workload: null }))"
+            >{{
+              t("infra.k8s2.filterWorkload", {
+                name: raw(`${state.workload[2]}/${state.workload[3]}`),
+              })
+            }}</OButton
+          >
+        </div>
+        <div class="min-h-0 min-w-0 flex-1">
+          <PodsTable
+            v-if="state.kind === 'pods'"
+            :rows="k8s.pagedRows.value as PodRow[]"
+            v-bind="tableProps"
+            @sort="onSort"
+            @page="onPage"
+            @open="openPod"
+            @filter-node="onPodNode"
+            @filter-owner="onPodOwner"
+          />
+          <NodesTable
+            v-else-if="state.kind === 'nodes'"
+            :rows="k8s.pagedRows.value as NodeRow[]"
+            v-bind="tableProps"
+            @sort="onSort"
+            @page="onPage"
+            @open="onNodeRow"
+          />
+          <DeploymentsTable
+            v-else
+            :rows="k8s.pagedRows.value as DeploymentRow[]"
+            v-bind="tableProps"
+            @sort="onSort"
+            @page="onPage"
+            @open="onDeploymentRow"
+          />
         </div>
       </div>
     </div>
