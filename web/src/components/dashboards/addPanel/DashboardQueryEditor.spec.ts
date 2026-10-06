@@ -747,7 +747,7 @@ describe("formula letters and the saved hide flag", () => {
     mock.dashboardPanelData.data.queryType = "promql";
     mock.dashboardPanelData.data.queries.splice(0, 1, ...queries);
     mock.dashboardPanelData.layout.currentQueryIndex = currentQueryIndex;
-    // Through the reactive proxy, as the real addQuery does.
+    // The default mock pushes onto the raw array, which never fires the editor's watcher.
     mock.addQuery = () => mock.dashboardPanelData.data.queries.push(q({}, ""));
     (useDashboardPanelData as any).mockImplementation(() => mock);
     wrapper = mount(DashboardQueryEditor, {
