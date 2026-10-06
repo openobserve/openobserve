@@ -319,7 +319,8 @@
       "ftsDefaultColumn.spec.js",
       "logsVisualizePersistence.spec.js",
       "streamNotFound.spec.js",
-      "logsRefreshCacheDropdown.spec.js"
+      "logsRefreshCacheDropdown.spec.js",
+      "logs-highlighting.spec.js"
     ],
     "disabled": [
       {
