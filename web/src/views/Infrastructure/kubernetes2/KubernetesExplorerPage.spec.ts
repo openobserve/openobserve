@@ -710,16 +710,6 @@ describe("KubernetesExplorerPage", () => {
       ]);
     });
 
-    it("the Deployment pods count opens the same filtered list", async () => {
-      await mountPage({ kind: "deployments" });
-      await wrapper
-        .find(`[data-test="k8s2-deployment-pods-${GEN}/data/recommendation-service"]`)
-        .trigger("click");
-      await flushPromises();
-      expect(query()).toEqual({ workload: `${GEN}/data/Deployment/recommendation-service` });
-      expect(listed("pod")).toHaveLength(2);
-    });
-
     it("a Node row opens its pods in that cluster only", async () => {
       twoClusters();
       await mountPage({ kind: "nodes", cluster: "*" });
@@ -811,9 +801,124 @@ describe("KubernetesExplorerPage", () => {
   it("an org switch clears every Kubernetes 2 param and refreshes detection", async () => {
     await mountPage({ cluster: "*", kind: "nodes", name: "x", pod: `${GEN}/a/b` });
     getStreams.mockClear();
+    metricsQuery.mockClear();
+    let releaseStreams: (v: any) => void = () => {};
+    getStreams.mockReturnValue(new Promise((resolve) => (releaseStreams = resolve)));
     store.state.selectedOrganization = { identifier: "org2" };
     await flushPromises();
     expect(query()).toEqual({});
     expect(getStreams).toHaveBeenCalledWith("metrics", false, false, true);
+    expect(wrapper.find('[data-test="k8s2-spinner"]').exists()).toBe(true);
+    // A date change mid-switch must not query org2 with org1's stream set.
+    wrapper
+      .findComponent({ name: "DateTime" })
+      .vm.$emit("on:date-change", { startTime: 1, endTime: 2, userChangedValue: true });
+    await flushPromises();
+    expect(metricsQuery).not.toHaveBeenCalled();
+    releaseStreams({ list: [{ name: "kube_pod_status_phase" }] });
+    await flushPromises();
+    const calls = metricsQuery.mock.calls.map(([args]: any[]) => args);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((c) => c.org_identifier === "org2")).toBe(true);
+    expect(calls.map((c) => idOf(c.query))).toEqual(["P1"]);
+  });
+
+  describe("navigation and state hygiene", () => {
+    it("drops a node filter when leaving Pods, so a Deployment row shows only its pods", async () => {
+      await mountPage({ kind: "nodes" });
+      await wrapper
+        .find(`[data-test="k8s2-node-open-${GEN}/ip-10-0-1-10.ec2.internal"]`)
+        .trigger("click");
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "deployments");
+      await flushPromises();
+      expect(query()).toEqual({ kind: "deployments" });
+      await wrapper
+        .find(`[data-test="k8s2-deployment-open-${GEN}/data/analytics-service"]`)
+        .trigger("click");
+      await flushPromises();
+      expect(query()).toEqual({ workload: `${GEN}/data/Deployment/analytics-service` });
+      expect(listed("pod")).toEqual(["analytics-service-x6xv7pjxhb-zqcl4"]);
+    });
+
+    it("a drawer link replaces an active issue filter", async () => {
+      await mountPage({
+        issue: "podsOomKilled",
+        pod: `${GEN}/data/analytics-service-x6xv7pjxhb-zqcl4`,
+      });
+      const drawer = wrapper.findComponent({ name: "PodDetailDrawer" });
+      drawer.vm.$emit("filter-node", drawer.props("pod"));
+      await flushPromises();
+      expect(query()).toEqual({ onNode: `${GEN}/ip-10-0-13-37.ec2.internal` });
+    });
+
+    it("rewrites a repeated param on any route change, not only on mount", async () => {
+      fixture = merge(generatorFixture(), generatorFixture("alpha"));
+      serve();
+      await mountPage();
+      await router.push({ query: { cluster: ["alpha", GEN] } });
+      await flushPromises();
+      expect(query()).toEqual({ cluster: "alpha" });
+    });
+
+    it("gives the All facet rows a count", async () => {
+      fixture = merge(generatorFixture(), generatorFixture("alpha"));
+      serve();
+      await mountPage();
+      expect(wrapper.find('[data-test="k8s2-cluster-facet-all-count"]').text()).toBe("18");
+      expect(wrapper.find('[data-test="k8s2-namespace-facet-all-count"]').text()).toBe("9");
+    });
+
+    it("shows a skeleton, never All clusters, until the clusters are known", async () => {
+      metricsQuery.mockReturnValue(new Promise(() => {}) as any);
+      await mountPage();
+      expect(wrapper.find('[data-test="k8s2-scope-cluster"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="k8s2-scope-skeleton"]').exists()).toBe(true);
+    });
+
+    it("names the All tile after the tab", async () => {
+      await mountPage();
+      const label = () =>
+        (wrapper.findComponent({ name: "OStatStrip" }).props("items") as any[])[0].label;
+      expect(label()).toBe("All pods");
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "nodes");
+      await flushPromises();
+      expect(label()).toBe("All nodes");
+    });
+
+    it("a sort change returns to page 1", async () => {
+      await mountPage({ page: "2" });
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("sort-change", { column: "cpu", order: "desc" });
+      await flushPromises();
+      expect(query()).toEqual({ sort: "cpu", desc: "true" });
+    });
+
+    it("pushes history for tabs, links and the drawer, and replaces it for filters", async () => {
+      await mountPage();
+      const push = vi.spyOn(router, "push");
+      const replace = vi.spyOn(router, "replace");
+      radio("k8s2-namespace-facet").vm.$emit("update:modelValue", "data");
+      await flushPromises();
+      wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "rec");
+      await flushPromises();
+      expect(push).not.toHaveBeenCalled();
+      expect(replace).toHaveBeenCalledTimes(2);
+      await wrapper
+        .find(`[data-test="k8s2-pod-open-${GEN}/data/recommendation-service-9x58zgdb6z-jwhzq"]`)
+        .trigger("click");
+      await flushPromises();
+      expect(push).toHaveBeenCalledTimes(1);
+      router.back();
+      await flushPromises();
+      expect(query()).toEqual({ namespace: "data", name: "rec" });
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "nodes");
+      await flushPromises();
+      expect(push).toHaveBeenCalledTimes(2);
+      router.back();
+      await flushPromises();
+      expect(query()).toEqual({ namespace: "data", name: "rec" });
+    });
   });
 });

@@ -135,16 +135,7 @@ const availableText = (row: DeploymentRow) =>
       <span v-else :data-test="`k8s2-deployment-status-${row.key}`">{{ raw("—") }}</span>
     </template>
     <template #cell-pods="{ row }">
-      <OButton
-        v-if="row.pods != null"
-        variant="ghost"
-        size="xs"
-        class="tabular-nums"
-        :data-test="`k8s2-deployment-pods-${row.key}`"
-        @click="emit('open', row)"
-        >{{ raw(String(row.pods)) }}</OButton
-      >
-      <span v-else>{{ raw("—") }}</span>
+      <span class="tabular-nums">{{ raw(row.pods == null ? "—" : String(row.pods)) }}</span>
     </template>
   </OTable>
 </template>

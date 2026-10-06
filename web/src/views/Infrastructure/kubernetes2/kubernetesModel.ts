@@ -82,7 +82,6 @@ export interface PodRow {
   memoryLimit: Amount;
   memoryPctOfRequest: number | null;
   memoryPctOfLimit: number | null;
-  // Where the trend queries point; null when the pod has no usage row.
   usage: { clusterLabel: "k8s_cluster" | "k8s_cluster_name" | null; uid: string | null } | null;
   issues: IssueKey[];
 }
@@ -124,7 +123,6 @@ export interface Inventory {
 }
 
 export interface Scope {
-  // null = every cluster.
   cluster: string | null;
   namespace: string | null;
 }

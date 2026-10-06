@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
@@ -24,6 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -49,7 +50,9 @@ import {
   toQuery,
   withFilter,
   withKind,
+  withNodeLink,
   withTile,
+  withWorkloadLink,
   type K8sListState,
 } from "./kubernetesUrlState";
 
@@ -65,6 +68,12 @@ const ISSUE_TONE: Record<IssueKey, StatTone> = {
   nodesNotReady: "error",
   nodesPressure: "warning",
   deploymentsUnavailable: "error",
+};
+
+const ALL_TILE_LABEL: Record<K8sKind, I18nKey> = {
+  pods: "infra.k8s2.tileAllPods",
+  nodes: "infra.k8s2.tileAllNodes",
+  deployments: "infra.k8s2.tileAllDeployments",
 };
 
 const ISSUE_LABEL: Record<IssueKey, I18nKey> = {
@@ -95,6 +104,10 @@ const dateTimePickerRef = ref<{ refresh?: () => void } | null>(null);
 // A flat route remounts, so every piece of list state lives in the URL.
 const writeState = (next: K8sListState) =>
   router.replace({ query: toQuery(next, route.query) as Record<string, any> });
+
+// Tabs, cross-links and the drawer are steps down the hierarchy, so browser Back must undo them.
+const navigate = (next: K8sListState) =>
+  router.push({ query: toQuery(next, route.query) as Record<string, any> });
 
 const refreshList = () =>
   k8s.refresh({
@@ -142,17 +155,21 @@ watch(
   () => store.state.selectedOrganization?.identifier,
   async (next, prev) => {
     if (!next || next === prev) return;
+    k8s.reset();
     await router.replace({ query: stripListParams(route.query) as Record<string, any> });
-    const wasDetected = detection.value === "detected";
     await k8s.loadStreams({ force: true });
-    if (wasDetected && detection.value === "detected") refreshList();
   },
 );
 
-onMounted(() => {
-  if (!isCanonical(route.query)) writeState(state.value);
-  k8s.loadStreams();
-});
+watch(
+  () => route.query,
+  (query) => {
+    if (!isCanonical(query)) writeState(parseListState(query));
+  },
+  { immediate: true },
+);
+
+k8s.loadStreams();
 
 const retryStreams = () => k8s.loadStreams({ force: true });
 
@@ -170,7 +187,7 @@ const tiles = computed<StatItem[]>(() => {
   const items: StatItem[] = [
     {
       key: "all",
-      label: t("infra.k8s2.tileAll"),
+      label: t(ALL_TILE_LABEL[state.value.kind]),
       value: k8s.scopedCount.value,
       dataTest: "k8s2-tile-all",
     },
@@ -191,7 +208,7 @@ const tiles = computed<StatItem[]>(() => {
 
 const onTile = (key: string) => writeState(withTile(state.value, key as IssueKey | "all"));
 
-const onKind = (kind: string | number) => writeState(withKind(state.value, kind as K8sKind));
+const onKind = (kind: string | number) => navigate(withKind(state.value, kind as K8sKind));
 
 const onName = (name: string) => {
   if (name !== state.value.name) writeState(withFilter(state.value, { name }));
@@ -206,22 +223,17 @@ const onCluster = (value: string | number | boolean) =>
 const onNamespace = (value: string | number | boolean) =>
   writeState(withFilter(state.value, { namespace: value ? String(value) : null }));
 
-const onSort = (sort: string, desc: boolean) => writeState({ ...state.value, sort, desc });
+const onSort = (sort: string, desc: boolean) => writeState(withFilter(state.value, { sort, desc }));
 const onPage = (page: number) => writeState({ ...state.value, page });
 
 const podsOnNode = (cluster: string, node: string) =>
-  writeState(withFilter(withKind(state.value, "pods"), { onNode: [cluster, node], pod: null }));
+  navigate(withNodeLink(state.value, [cluster, node]));
 
 const podsOfOwner = (cluster: string, namespace: string, kind: string, name: string) =>
-  writeState(
-    withFilter(withKind(state.value, "pods"), {
-      workload: [cluster, namespace, kind, name],
-      pod: null,
-    }),
-  );
+  navigate(withWorkloadLink(state.value, [cluster, namespace, kind, name]));
 
 const openPod = (row: PodRow) =>
-  writeState({ ...state.value, pod: [row.cluster, row.namespace, row.name] });
+  navigate({ ...state.value, pod: [row.cluster, row.namespace, row.name] });
 const closePod = () => writeState({ ...state.value, pod: null });
 
 const onPodNode = (row: PodRow) => row.node && podsOnNode(row.cluster, row.node);
@@ -230,6 +242,8 @@ const onPodOwner = (row: PodRow) =>
 const onNodeRow = (row: NodeRow) => podsOnNode(row.cluster, row.name);
 const onDeploymentRow = (row: DeploymentRow) =>
   podsOfOwner(row.cluster, row.namespace, "Deployment", row.name);
+
+const drawerPending = computed(() => !k8s.loaded.value || loading.value);
 
 const drawerPod = computed(() =>
   state.value.pod ? k8s.podByKey(encodeCompound(state.value.pod)) : null,
@@ -252,8 +266,14 @@ const tableProps = computed(() => ({
   <OPageLayout :title="t('menu.kubernetes2')" icon="hub" bleed>
     <template #actions>
       <div class="flex items-center gap-2">
+        <OSkeleton
+          v-if="detection !== 'error' && detection !== 'undetected' && !k8s.loaded.value"
+          type="text"
+          class="w-28"
+          data-test="k8s2-scope-skeleton"
+        />
         <OTag
-          v-if="detection === 'detected'"
+          v-else-if="detection === 'detected'"
           variant="default-soft"
           size="sm"
           data-test="k8s2-scope-cluster"
@@ -389,7 +409,21 @@ const tableProps = computed(() => ({
               data-test="k8s2-cluster-facet"
               @update:model-value="onCluster"
             >
-              <ORadio value="*" size="sm" :label="t('infra.k8s2.facetAll')" />
+              <ORadio value="*" size="sm">
+                <template #label>
+                  <span class="flex min-w-0 items-center justify-between gap-2">
+                    <span class="truncate text-xs">{{ t("infra.k8s2.facetAll") }}</span>
+                    <OTag
+                      type="countChip"
+                      value="neutral"
+                      size="xs"
+                      shape="rounded"
+                      data-test="k8s2-cluster-facet-all-count"
+                      >{{ k8s.clusterTotal.value }}</OTag
+                    >
+                  </span>
+                </template>
+              </ORadio>
               <ORadio
                 v-for="facet in k8s.clusterFacet.value"
                 :key="facet.value"
@@ -416,7 +450,21 @@ const tableProps = computed(() => ({
               data-test="k8s2-namespace-facet"
               @update:model-value="onNamespace"
             >
-              <ORadio value="" size="sm" :label="t('infra.k8s2.facetAll')" />
+              <ORadio value="" size="sm">
+                <template #label>
+                  <span class="flex min-w-0 items-center justify-between gap-2">
+                    <span class="truncate text-xs">{{ t("infra.k8s2.facetAll") }}</span>
+                    <OTag
+                      type="countChip"
+                      value="neutral"
+                      size="xs"
+                      shape="rounded"
+                      data-test="k8s2-namespace-facet-all-count"
+                      >{{ k8s.namespaceTotal.value }}</OTag
+                    >
+                  </span>
+                </template>
+              </ORadio>
               <ORadio
                 v-for="facet in k8s.namespaceFacet.value"
                 :key="facet.value"
@@ -506,6 +554,7 @@ const tableProps = computed(() => ({
       :org-id="orgId"
       :multi-cluster="multiCluster"
       :usage-streams="k8s.podUsageStreams.value"
+      :pending="drawerPending"
       @close="closePod"
       @filter-node="onPodNode"
       @filter-owner="onPodOwner"

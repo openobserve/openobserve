@@ -28,6 +28,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
@@ -67,6 +68,8 @@ const props = defineProps<{
   orgId: string;
   multiCluster: boolean;
   usageStreams: { cpu: boolean; memory: boolean };
+  // A deep link opens before the inventory loads; "not found" must wait for it.
+  pending: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -234,8 +237,12 @@ watch(
   { immediate: true },
 );
 
+const logsBusy = ref(false);
+
 const viewLogs = async () => {
+  if (logsBusy.value) return;
   const [cluster, namespace, pod] = props.target;
+  logsBusy.value = true;
   const link = await resolvePodLogs(
     { cluster, namespace, pod },
     {
@@ -245,7 +252,7 @@ const viewLogs = async () => {
       multiCluster: props.multiCluster,
     },
     streamsApi,
-  );
+  ).finally(() => (logsBusy.value = false));
   if (!link) {
     toast({ variant: "warning", message: t("infra.k8s2.logsNoStream") });
     return;
@@ -269,7 +276,13 @@ const viewLogs = async () => {
     data-test="k8s2-pod-drawer"
     @update:open="(open: boolean) => !open && emit('close')"
   >
-    <div class="flex flex-col gap-4">
+    <div v-if="!pod" class="flex justify-center py-6">
+      <OSpinner v-if="pending" size="md" data-test="k8s2-drawer-pending" />
+      <OText v-else variant="meta" data-test="k8s2-drawer-not-found">{{
+        t("infra.k8s2.podNotFound")
+      }}</OText>
+    </div>
+    <div v-else class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-2">
         <OTag v-if="pod?.status" :variant="pod.status.variant" size="sm">{{
           raw(pod.status.text)
@@ -371,6 +384,8 @@ const viewLogs = async () => {
           size="sm-action"
           icon-left="article"
           data-test="k8s2-drawer-view-logs"
+          :loading="logsBusy"
+          :disabled="logsBusy"
           @click="viewLogs"
           >{{ t("infra.k8s2.viewLogs") }}</OButton
         >

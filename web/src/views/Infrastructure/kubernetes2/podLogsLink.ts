@@ -27,7 +27,6 @@ export interface PodLogsContext {
   orgId: string;
   start: number;
   end: number;
-  // The page scope spans several clusters (cluster=*).
   multiCluster: boolean;
 }
 

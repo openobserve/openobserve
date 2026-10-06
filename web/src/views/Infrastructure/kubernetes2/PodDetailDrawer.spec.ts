@@ -119,6 +119,7 @@ describe("PodDetailDrawer", () => {
         orgId: "org1",
         multiCluster: false,
         usageStreams: { cpu: true, memory: true },
+        pending: false,
         ...props,
       },
       global: { plugins: [store, router, i18n], stubs: { ODrawer: drawerStub } },
@@ -217,6 +218,19 @@ describe("PodDetailDrawer", () => {
     expect(rangeQuery).not.toHaveBeenCalled();
   });
 
+  it("shows a loading state for a deep link until the inventory arrives", async () => {
+    await mountDrawer({ pod: null, pending: true });
+    expect(wrapper.find('[data-test="k8s2-drawer-pending"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="k8s2-drawer-not-found"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="k8s2-drawer-view-logs"]').exists()).toBe(false);
+  });
+
+  it("says Pod not found when the loaded inventory has no such pod", async () => {
+    await mountDrawer({ pod: null, pending: false });
+    expect(wrapper.find('[data-test="k8s2-drawer-not-found"]').text()).toBe("Pod not found");
+    expect(wrapper.find('[data-test="k8s2-drawer-containers"]').exists()).toBe(false);
+  });
+
   it("hides a trend whose stream is missing", async () => {
     await mountDrawer({ usageStreams: { cpu: true, memory: false } });
     expect(rangeQuery).toHaveBeenCalledTimes(1);
@@ -264,6 +278,22 @@ describe("PodDetailDrawer", () => {
       await flushPromises();
       expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(router.push).toHaveBeenCalledWith(route);
+    });
+
+    it("is busy while resolving, so a second click never pushes twice", async () => {
+      let release: (v: any) => void = () => {};
+      resolveMock.mockReturnValue(new Promise((resolve) => (release = resolve)));
+      await mountDrawer();
+      const button = () => wrapper.findComponent('[data-test="k8s2-drawer-view-logs"]' as any);
+      await wrapper.find('[data-test="k8s2-drawer-view-logs"]').trigger("click");
+      await flushPromises();
+      expect(button().props("loading")).toBe(true);
+      await wrapper.find('[data-test="k8s2-drawer-view-logs"]').trigger("click");
+      expect(resolveMock).toHaveBeenCalledTimes(1);
+      release({ route, warnNoClusterField: false });
+      await flushPromises();
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(button().props("loading")).toBe(false);
     });
 
     it("warns and stays put when no stream qualifies", async () => {
