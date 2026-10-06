@@ -383,7 +383,9 @@ pub async fn handle_otlp_request(
                 .await;
 
                 // update schema metadata
-                if !schema_exists.has_metrics_metadata {
+                if !schema_exists.has_metrics_metadata
+                    || stored_as_counter(metric, metric_schema_map.get(&metric_name))
+                {
                     if !prom_meta.contains_key(METADATA_LABEL) {
                         prom_meta.insert(
                             METADATA_LABEL.to_string(),
@@ -737,6 +739,20 @@ fn prepare_sum(
     );
     process_aggregation_temporality(rec, sum.aggregation_temporality);
     rec["is_monotonic"] = sum.is_monotonic.to_string().into();
+}
+
+/// Whether a sum that can go down is still stored as a counter and needs its type corrected.
+fn stored_as_counter(
+    metric: &opentelemetry_proto::tonic::metrics::v1::Metric,
+    schema: Option<&SchemaCache>,
+) -> bool {
+    let Some(Data::Sum(sum)) = &metric.data else {
+        return false;
+    };
+    !sum.is_monotonic
+        && schema
+            .and_then(|schema| get_metadata_from_schema(schema.schema()))
+            .is_some_and(|meta| meta.metric_type == MetricType::Counter)
 }
 
 /// One hashed record per gauge or sum data point that has a value.
@@ -2361,6 +2377,37 @@ mod tests {
                     assert_eq!(metadata.metric_type, MetricType::Gauge, "{temporality:?}");
                 }
             }
+        }
+
+        fn schema_with_type(metric_type: MetricType) -> SchemaCache {
+            let meta = Metadata {
+                metric_family_name: "m".to_string(),
+                metric_type,
+                help: String::new(),
+                unit: "By".to_string(),
+            };
+            let metadata = HashMap::from([(
+                METADATA_LABEL.to_string(),
+                serde_json::to_string(&meta).unwrap(),
+            )]);
+            SchemaCache::new(Schema::empty().with_metadata(metadata))
+        }
+
+        #[test]
+        fn test_stored_as_counter() {
+            let up_down = create_test_sum_metric("m", 1.0, false);
+            let monotonic = create_test_sum_metric("m", 1.0, true);
+            let gauge = create_test_gauge_metric("m", 1.0);
+            let counter = schema_with_type(MetricType::Counter);
+            let stored_gauge = schema_with_type(MetricType::Gauge);
+            let no_metadata = SchemaCache::new(Schema::empty());
+
+            assert!(stored_as_counter(&up_down, Some(&counter)));
+            assert!(!stored_as_counter(&up_down, Some(&stored_gauge)));
+            assert!(!stored_as_counter(&up_down, Some(&no_metadata)));
+            assert!(!stored_as_counter(&up_down, None));
+            assert!(!stored_as_counter(&monotonic, Some(&counter)));
+            assert!(!stored_as_counter(&gauge, Some(&counter)));
         }
 
         #[test]
