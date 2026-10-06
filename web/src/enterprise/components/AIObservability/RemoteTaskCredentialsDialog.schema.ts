@@ -4,11 +4,11 @@ import { z } from "zod";
 import type { TranslateFn } from "@/types/i18n";
 import type { RemoteTaskAuthType, RemoteTaskSecretMaterial } from "@/services/remote-tasks.service";
 
-export interface RemoteTaskCredentialsValues {
+export type RemoteTaskCredentialsValues = {
   token: string;
   username: string;
   password: string;
-}
+};
 
 const filled = (message: string) =>
   z.string().refine((value) => value.trim().length > 0, { message });
