@@ -250,11 +250,7 @@ impl DbAdapter for PostgresAdapter {
         // Get column info for proper null type binding
         let column_infos = self.get_columns(table).await?;
 
-        // ON CONFLICT must name a key the target has. The source's key is not always
-        // one: SQLite keys file_list, file_list_history and file_list_dump_stats on
-        // `id`, but Postgres creates them partitioned with no primary key, and
-        // `ON CONFLICT ("id")` then fails with "no unique or exclusion constraint
-        // matching the ON CONFLICT specification".
+        // Conflict on the target's key: partitioned file_list tables have none, unlike SQLite's `id`
         let target_keys = self.get_primary_keys(table).await?;
         let sql = build_upsert_sql(table, columns, &target_keys);
 
@@ -385,9 +381,7 @@ impl DbAdapter for PostgresAdapter {
     }
 }
 
-/// Build the per-row INSERT for `upsert_batch`. `OVERRIDING SYSTEM VALUE` keeps the
-/// source's IDENTITY values. With no primary key on the target, rows that hit any
-/// unique constraint are skipped rather than updated.
+/// Per-row INSERT keeping source IDENTITY values; with no target key, conflicting rows are skipped.
 fn build_upsert_sql(table: &str, columns: &[String], primary_keys: &[String]) -> String {
     let cols = columns
         .iter()
