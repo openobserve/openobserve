@@ -171,7 +171,6 @@ describe("routes", () => {
       query: undefined,
       quick_mode: "false",
       show_histogram: "true",
-      refresh: "0",
       defined_schemas: "user_defined_schema",
       org_identifier: "acme",
     });

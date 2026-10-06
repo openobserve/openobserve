@@ -358,18 +358,21 @@ describe("useMetricDrilldown", () => {
     });
 
     it("says no service matched on a null answer", async () => {
-      const { drilldown } = await opened({ data: null });
+      const { drilldown, router } = await opened({ data: null });
       expect(drilldown.menu.value).toEqual({ kind: "notice", notice: "noService" });
+      expect(router.push).not.toHaveBeenCalled();
     });
 
     it("says the user may not view services on a 403", async () => {
-      const { drilldown } = await opened(httpError(403));
+      const { drilldown, router } = await opened(httpError(403));
       expect(drilldown.menu.value).toEqual({ kind: "notice", notice: "noPermission" });
+      expect(router.push).not.toHaveBeenCalled();
     });
 
     it("shows a network error with Retry", async () => {
-      const { drilldown } = await opened(new Error("Network Error"));
+      const { drilldown, router } = await opened(new Error("Network Error"));
       expect(drilldown.menu.value).toEqual({ kind: "error", message: "Network Error" });
+      expect(router.push).not.toHaveBeenCalled();
       await drilldown.retry();
       expect(drilldown.menu.value.kind).toBe("streams");
     });
@@ -398,6 +401,7 @@ describe("useMetricDrilldown", () => {
         from: "1000000",
         to: "2000000",
       });
+      expect(b64DecodeUnicode(route.query.query)).toBe(`"service_name" = 'checkout'`);
       expect(onDropped).toHaveBeenCalledWith(["namespace"]);
     });
 

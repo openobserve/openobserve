@@ -28,7 +28,6 @@ const SERVICE_GROUP = "service";
 
 export type DrilldownAvailability = "oss" | "discoveryOff" | "pending" | "forbidden" | "available";
 
-/** A read's outcome: pending, ok, or the HTTP status it failed with (0 when there was none). */
 export type ReadStatus = "pending" | "ok" | number;
 
 interface LabelFilterLike {
@@ -73,7 +72,6 @@ export const contextToDimensions = (
   return { dimensions, labelByGroupId };
 };
 
-/** The label "Pick a service" offers the values of: the service group's first one the metric has. */
 export const serviceLabelFor = (
   metricLabels: string[],
   semanticGroups: FieldAlias[],
@@ -121,7 +119,7 @@ interface RouteArgs {
   org: string;
 }
 
-/** `defined_schemas` must be present, or restoring the URL pushes a second entry and Back lands on logs again. */
+/** Restoring the URL pushes a second entry, so one Back lands on logs again, unless `defined_schemas` is present and `refresh` absent. */
 export const buildLogsRoute = ({ stream, filters, timeRange, org }: RouteArgs) => ({
   path: "/logs",
   query: {
@@ -133,7 +131,6 @@ export const buildLogsRoute = ({ stream, filters, timeRange, org }: RouteArgs) =
     query: whereOf(filters),
     quick_mode: "false",
     show_histogram: "true",
-    refresh: "0",
     defined_schemas: "user_defined_schema",
     org_identifier: org,
   },

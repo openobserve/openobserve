@@ -718,9 +718,8 @@ export default defineComponent({
     isFavorite: { type: Boolean, default: false },
     allCards: { type: Array as PropType<MetricCardModel[]>, required: true },
     labelsByStream: { type: Object as PropType<Record<string, string[]>>, required: true },
-    /** Loads every metric's labels, which the drilldown needs to find a service label. */
     ensureSchemas: {
-      type: Function as PropType<() => Promise<void>>,
+      type: Function as PropType<() => Promise<boolean | void>>,
       default: () => Promise.resolve(),
     },
     prefixOf: { type: Function as PropType<(name: string) => string>, required: true },
