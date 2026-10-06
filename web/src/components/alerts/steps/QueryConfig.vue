@@ -2613,6 +2613,9 @@ export default defineComponent({
       "query_condition.promql_warning_value",
       "trigger_condition.threshold",
       "trigger_condition.operator",
+      "trigger_condition.period",
+      "trigger_condition.frequency",
+      "_ui.checkEvery",
       "row_template",
     ];
     let thresholdSnapshot: Record<string, unknown> | null = null;

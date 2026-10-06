@@ -917,6 +917,19 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();
     });
 
+    it("enables the action when only a later query has a stream", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [
+            { query: "SELECT 1", fields: {} },
+            { query: "SELECT * FROM test", fields: { stream: "test-stream" } },
+          ],
+        },
+      });
+      expect(wrapper.vm.alertDisabledReason).toBeNull();
+    });
+
     it("enables the action for a panel with a query and a stream", async () => {
       const panelWithStream = {
         ...mockPanelData,

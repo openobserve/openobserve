@@ -1079,6 +1079,9 @@ describe("QueryConfig.vue", () => {
       });
       expect(v.query_condition.promql_warning_value).toBe(5);
       expect(v.row_template).toBe("{device} is at {value}");
+      expect(v.trigger_condition.period).toBe(10);
+      expect(v.trigger_condition.frequency).toBe(10);
+      expect(v._ui.checkEvery).toBe(10);
       expect(host.find('[data-test="alert-forecast-fields"]').exists()).toBe(false);
     });
   });

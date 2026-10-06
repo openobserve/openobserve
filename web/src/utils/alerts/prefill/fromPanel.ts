@@ -219,6 +219,10 @@ export const buildPrefillFromPanel = (
 
   const isPromql = input.queryType === "promql";
   const sourceQuery = input.executedQuery || query?.query || "";
+  // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
+  if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
+    warnings.push(warn("unresolvedQuery", "blocking"));
+  }
 
   const { minutes, warnings: rangeWarnings } = periodMinutesFromRange(
     toPrefillRange(input.timeRange, input.now ?? Date.now()),

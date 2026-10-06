@@ -1117,7 +1117,10 @@ export default defineComponent({
     // than a control that explains itself.
     const alertDisabledReason = computed(() => {
       if (!props.data?.queries?.length) return t("panel.noQueriesToCreateAlert");
-      if (!props.data.queries[0]?.fields?.stream) return t("panel.panelQueryMustHaveStream");
+      // Any query with a stream can be alerted on; the confirm dialog picks between them.
+      if (!props.data.queries.some((query: any) => query?.fields?.stream)) {
+        return t("panel.panelQueryMustHaveStream");
+      }
       return null;
     });
 

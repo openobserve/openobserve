@@ -362,6 +362,34 @@ describe("buildPrefillFromPanel — the query the user points at", () => {
   });
 });
 
+describe("buildPrefillFromPanel — unresolved dashboard variables", () => {
+  it("blocks raw text that still holds a variable when the query has no executed text", () => {
+    const raw = 'up{host="$host"}';
+    const p = buildPrefillFromPanel(
+      promqlPanel({ queries: [{ query: raw, fields: { stream: "up" } }] }),
+      makeId,
+    );
+    expect(isPrefillBlocked(normalizePrefill(p))).toBe(true);
+
+    const resolved = buildPrefillFromPanel(
+      promqlPanel({
+        queries: [{ query: raw, fields: { stream: "up" } }],
+        executedQuery: 'up{host="a"}',
+      }),
+      makeId,
+    );
+    expect(isPrefillBlocked(normalizePrefill(resolved))).toBe(false);
+  });
+
+  it("lets a regex end anchor through", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({ queries: [{ query: 'up{job=~"api$"}', fields: { stream: "up" } }] }),
+      makeId,
+    );
+    expect(isPrefillBlocked(normalizePrefill(p))).toBe(false);
+  });
+});
+
 describe("buildPrefillFromPanel — the Date pair a rendered panel holds", () => {
   const TWO_HOURS_US = 2 * 3_600_000_000;
   const START_US = 1_700_000_000_000_000;
