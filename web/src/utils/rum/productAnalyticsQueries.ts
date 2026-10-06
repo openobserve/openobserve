@@ -328,7 +328,9 @@ export function summarySql(scope: AnalyticsScope, currentStartUs: number): strin
     : "0 AS synthetic_sessions";
   // The caption says synthetics are excluded, so the sessions KPI (and its prior-period base) must
   // actually drop them here too, not just report their count via `synthetic_sessions`.
-  const notSynthetic = hasSessionType ? " AND (session_type IS NULL OR session_type <> 'synthetics')" : "";
+  const notSynthetic = hasSessionType
+    ? " AND (session_type IS NULL OR session_type <> 'synthetics')"
+    : "";
   const cols = [
     `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} THEN session_id END) AS sessions`,
     `COUNT(DISTINCT CASE WHEN _timestamp < ${cs}${notSynthetic} THEN session_id END) AS prev_sessions`,

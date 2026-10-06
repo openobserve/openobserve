@@ -376,12 +376,16 @@ describe("scope-load builders (G2)", () => {
     // `sessions`/`prev_sessions` must drop synthetics so the KPI matches the "N synthetic sessions
     // excluded" caption, while `synthetic_sessions` still counts them via its own, unfiltered CASE.
     expect(sql).toContain(
-      "CASE WHEN _timestamp >= {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS sessions"
-        .replace("{cs}", String(CS)),
+      "CASE WHEN _timestamp >= {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS sessions".replace(
+        "{cs}",
+        String(CS),
+      ),
     );
     expect(sql).toContain(
-      "CASE WHEN _timestamp < {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS prev_sessions"
-        .replace("{cs}", String(CS)),
+      "CASE WHEN _timestamp < {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS prev_sessions".replace(
+        "{cs}",
+        String(CS),
+      ),
     );
     expect(sql).toContain(
       `CASE WHEN _timestamp >= ${CS} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`,
