@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} и ещё {count} источник перестали передавать данные | {first} и ещё {count} источников перестали передавать данные",
       "staleNoDataBannerShort": "{capability}: данных пока нет",
       "stoppedAgo": "остановлено {duration} назад",
-      "showDetails": "Показать подробности",
-      "hideDetails": "Скрыть подробности",
       "aboutNumbers": "Об этих числах",
       "staleNoDataBanner": "У {capability} пока нет данных — поток существует, но никогда не передавал данные. Панели ниже останутся пустыми, пока данные не появятся.",
       "dormantHeadline": "{workload}: передача данных остановлена",

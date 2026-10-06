@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} et {count} autre source n'envoient plus de données | {first} et {count} autres sources n'envoient plus de données",
       "staleNoDataBannerShort": "{capability} n'a encore envoyé aucune donnée",
       "stoppedAgo": "arrêté depuis {duration}",
-      "showDetails": "Afficher les détails",
-      "hideDetails": "Masquer les détails",
       "aboutNumbers": "À propos de ces chiffres",
       "staleNoDataBanner": "Aucune donnée pour {capability} pour l'instant - le flux existe mais n'a jamais remonté de données. Les panneaux ci-dessous restent vides tant que ce n'est pas le cas.",
       "dormantHeadline": "{workload} a cessé de remonter des données",

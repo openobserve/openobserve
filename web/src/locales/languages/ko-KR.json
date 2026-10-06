@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} 외 {count}개 소스가 보고를 중단했습니다 | {first} 외 {count}개 소스가 보고를 중단했습니다",
       "staleNoDataBannerShort": "{capability}이(가) 아직 데이터를 보내지 않았습니다",
       "stoppedAgo": "{duration} 전에 중단됨",
-      "showDetails": "세부 정보 보기",
-      "hideDetails": "세부 정보 숨기기",
       "aboutNumbers": "이 수치에 대하여",
       "staleNoDataBanner": "{capability}에 아직 데이터가 없습니다 - 스트림은 존재하지만 한 번도 보고한 적이 없습니다. 보고가 시작될 때까지 아래 패널은 비어 있습니다.",
       "dormantHeadline": "{workload}의 보고가 중단되었습니다",

@@ -18179,8 +18179,6 @@
       "staleBannerMany": "{first} 及另外 {count} 個資料來源已停止回報 | {first} 及另外 {count} 個資料來源已停止回報",
       "staleNoDataBannerShort": "{capability} 尚未回報任何資料",
       "stoppedAgo": "{duration} 前停止",
-      "showDetails": "顯示詳細資料",
-      "hideDetails": "隱藏詳細資料",
       "aboutNumbers": "關於這些數字",
       "staleNoDataBanner": "{capability} 尚無資料 - 串流存在但從未回報過。在它開始回報之前，下方的面板會保持空白。",
       "dormantHeadline": "{workload} 已停止回報",

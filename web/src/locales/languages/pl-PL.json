@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} i {count} inne źródło przestały raportować | {first} i {count} innych źródeł przestało raportować",
       "staleNoDataBannerShort": "{capability} nie wysłało jeszcze żadnych danych",
       "stoppedAgo": "zatrzymane {duration} temu",
-      "showDetails": "Pokaż szczegóły",
-      "hideDetails": "Ukryj szczegóły",
       "aboutNumbers": "O tych liczbach",
       "staleNoDataBanner": "{capability} nie ma jeszcze danych - strumień istnieje, ale nigdy nie raportował. Poniższe panele pozostaną puste, dopóki nie zacznie raportować.",
       "dormantHeadline": "{workload} przestało raportować",

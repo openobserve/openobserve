@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} và {count} nguồn khác đã ngừng gửi dữ liệu | {first} và {count} nguồn khác đã ngừng gửi dữ liệu",
       "staleNoDataBannerShort": "{capability} chưa gửi dữ liệu nào",
       "stoppedAgo": "đã dừng {duration} trước",
-      "showDetails": "Hiển thị chi tiết",
-      "hideDetails": "Ẩn chi tiết",
       "aboutNumbers": "Về các con số này",
       "staleNoDataBanner": "{capability} chưa có dữ liệu - stream tồn tại nhưng chưa từng báo cáo. Các panel bên dưới vẫn trống cho đến khi có dữ liệu.",
       "dormantHeadline": "{workload} đã ngừng báo cáo",

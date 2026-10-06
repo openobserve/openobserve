@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} و{count} مصدر آخر توقفت عن الإرسال | {first} و{count} مصادر أخرى توقفت عن الإرسال",
       "staleNoDataBannerShort": "لم يرسل {capability} أي بيانات بعد",
       "stoppedAgo": "توقف منذ {duration}",
-      "showDetails": "عرض التفاصيل",
-      "hideDetails": "إخفاء التفاصيل",
       "aboutNumbers": "حول هذه الأرقام",
       "staleNoDataBanner": "لا توجد بيانات لـ {capability} بعد - الجدول موجود لكنه لم يبلّغ قط. تبقى اللوحات أدناه فارغة حتى يفعل ذلك.",
       "dormantHeadline": "توقف {workload} عن الإبلاغ",

@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} ほか {count} 件のソースが送信を停止しました | {first} ほか {count} 件のソースが送信を停止しました",
       "staleNoDataBannerShort": "{capability} はまだデータを送信していません",
       "stoppedAgo": "{duration} 前に停止",
-      "showDetails": "詳細を表示",
-      "hideDetails": "詳細を非表示",
       "aboutNumbers": "これらの数値について",
       "staleNoDataBanner": "{capability} にはまだデータがありません - ストリームは存在しますが、一度も報告されていません。以下のパネルは報告があるまで空のままです。",
       "dormantHeadline": "{workload} は報告を停止しました",

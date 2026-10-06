@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} und {count} weitere Quelle melden keine Daten mehr | {first} und {count} weitere Quellen melden keine Daten mehr",
       "staleNoDataBannerShort": "{capability} hat noch keine Daten gesendet",
       "stoppedAgo": "seit {duration} keine Daten",
-      "showDetails": "Details anzeigen",
-      "hideDetails": "Details ausblenden",
       "aboutNumbers": "Zu diesen Zahlen",
       "staleNoDataBanner": "{capability} hat noch keine Daten – der Stream existiert, hat aber noch nie gemeldet. Die Panels unten bleiben leer, bis das der Fall ist.",
       "dormantHeadline": "{workload} meldet keine Daten mehr",

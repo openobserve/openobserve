@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} e mais {count} fonte deixaram de enviar dados | {first} e mais {count} fontes deixaram de enviar dados",
       "staleNoDataBannerShort": "{capability} ainda não enviou dados",
       "stoppedAgo": "parou há {duration}",
-      "showDetails": "Mostrar detalhes",
-      "hideDetails": "Ocultar detalhes",
       "aboutNumbers": "Sobre estes números",
       "staleNoDataBanner": "{capability} ainda não tem dados - o stream existe, mas nunca reportou. Os painéis abaixo permanecem vazios até que isso aconteça.",
       "dormantHeadline": "{workload} parou de reportar",

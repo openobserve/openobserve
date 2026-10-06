@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} 及另外 {count} 个数据源已停止上报 | {first} 及另外 {count} 个数据源已停止上报",
       "staleNoDataBannerShort": "{capability} 尚未上报任何数据",
       "stoppedAgo": "{duration} 前停止",
-      "showDetails": "显示详情",
-      "hideDetails": "隐藏详情",
       "aboutNumbers": "关于这些数字",
       "staleNoDataBanner": "{capability} 还没有数据——数据流存在但从未上报过。在它开始上报之前，下方的面板会一直为空。",
       "dormantHeadline": "{workload} 已停止上报",

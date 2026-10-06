@@ -18184,8 +18184,6 @@
       "staleBannerMany": "{first} ve {count} kaynak daha veri göndermeyi durdurdu | {first} ve {count} kaynak daha veri göndermeyi durdurdu",
       "staleNoDataBannerShort": "{capability} henüz veri göndermedi",
       "stoppedAgo": "{duration} önce durdu",
-      "showDetails": "Ayrıntıları göster",
-      "hideDetails": "Ayrıntıları gizle",
       "aboutNumbers": "Bu sayılar hakkında",
       "staleNoDataBanner": "{capability} henüz veriye sahip değil - akış mevcut ancak hiç bildirim göndermedi. Aşağıdaki paneller bildirim gelene kadar boş kalır.",
       "dormantHeadline": "{workload} bildirim göndermeyi durdurdu",
