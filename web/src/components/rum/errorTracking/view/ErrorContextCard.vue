@@ -52,7 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-2">
         <img :src="browserIcon" :alt="t('rum.browserImageAlt')" class="h-auto w-6 shrink-0" />
         <div class="min-w-0">
-          <div class="truncate" data-test="rum-error-context-browser">{{ browserName }}</div>
+          <OTruncatedText as="div" data-test="rum-error-context-browser">{{
+            browserName
+          }}</OTruncatedText>
           <small class="block">{{ browserVersion }}</small>
         </div>
       </div>
@@ -60,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-2">
         <img :src="osIcon" :alt="t('rum.osImageAlt')" class="h-auto w-6 shrink-0" />
         <div class="min-w-0">
-          <div class="truncate" data-test="rum-error-context-os">{{ osName }}</div>
+          <OTruncatedText as="div" data-test="rum-error-context-os">{{ osName }}</OTruncatedText>
           <small class="block">{{ osVersion }}</small>
         </div>
       </div>
@@ -90,6 +92,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import KeyValueRow from "@/components/rum/common/KeyValueRow.vue";
 import ErrorTag from "@/components/rum/errorTracking/view/ErrorTag.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import chrome from "@/assets/images/rum/chrome.png";
 import firefox from "@/assets/images/rum/firefox.png";
 import safari from "@/assets/images/rum/safari.png";

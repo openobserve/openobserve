@@ -144,11 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Show the message CONTENT; the role envelope is kept in the stored
              value but only adds noise in a two-line cell. -->
             <template #cell-input="{ row }">
-              <span class="text-text-body line-clamp-2">{{ row.inputPreview }}</span>
+              <OTruncatedText :lines="2" class="text-text-body wrap-anywhere whitespace-normal">{{
+                row.inputPreview
+              }}</OTruncatedText>
             </template>
 
             <template #cell-expectedOutput="{ row }">
-              <span class="text-text-body line-clamp-2">{{ row.expectedOutput ?? "—" }}</span>
+              <OTruncatedText :lines="2" class="text-text-body wrap-anywhere whitespace-normal">{{
+                row.expectedOutput ?? "—"
+              }}</OTruncatedText>
             </template>
 
             <template #cell-source="{ row }">
@@ -422,6 +426,7 @@ import {
 } from "@/services/llm-datasets.service.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIDatasetDetailPage" });
 

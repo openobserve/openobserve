@@ -151,12 +151,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="shrink-0"
                   :class="chip.colorClass ? chip.colorClass : ''"
                 />
-                <span
-                  class="truncate text-sm leading-none"
+                <OTruncatedText
+                  class="text-sm leading-none"
                   :class="chip.colorClass || 'text-text-body'"
                 >
                   {{ chip.value }}
-                </span>
+                </OTruncatedText>
               </div>
             </div>
 
@@ -453,9 +453,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 {{ t("synthetics.runDetail.detailUrl") }}
                               </dt>
-                              <dd class="text-text-secondary truncate">
+                              <OTruncatedText as="dd" class="text-text-secondary">
                                 {{ row.url || currentRun.url }}
-                              </dd>
+                              </OTruncatedText>
                               <dt
                                 class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
                               >
@@ -621,6 +621,7 @@ import StepEvidence from "@/components/synthetics/StepEvidence.vue";
 import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";

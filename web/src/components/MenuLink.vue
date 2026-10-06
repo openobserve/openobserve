@@ -38,8 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
-      <div
-        class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250 max-md:text-left max-md:text-sm"
+      <OTruncatedText
+        as="div"
+        :lines="2"
+        :tooltip="asTrigger || submenu ? false : undefined"
+        class="nav-menu-item-label w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250 max-md:text-left max-md:text-sm"
         :class="
           isActive
             ? activeLabelClass
@@ -47,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         {{ title }}
-      </div>
+      </OTruncatedText>
     </div>
 
     <!-- Submenu affordance: hidden at rest so a group/link-with-subnav tile is
@@ -76,11 +79,12 @@ import { useRouter, RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
-  components: { OIcon },
+  components: { OIcon, OTruncatedText },
   props: {
     title: {
       type: String as unknown as PropType<I18nText>,

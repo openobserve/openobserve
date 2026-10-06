@@ -54,12 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Keep classes in sync with ODialog's built-in subTitle. -->
-        <span
-          class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
+        <OTruncatedText
+          class="text-dialog-content-text mt-0.5 block text-sm opacity-70"
           data-test="metrics-fn-subtitle"
         >
           {{ t("metrics.explorer.fn.subtitle") }}
-        </span>
+        </OTruncatedText>
       </div>
     </template>
 
@@ -238,6 +238,7 @@ import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { parseSearchError } from "@/utils/query/searchError";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { hasSamples, type FnOverride } from "@/composables/metrics/useMetricsExplorerGrid";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 type TileStatus = "idle" | "loading" | "done" | "error" | "unavailable";
 
@@ -262,6 +263,7 @@ const sameNumbers = (a: number[] | null, b: number[] | null) => {
 export default defineComponent({
   name: "FunctionConfigDialog",
   components: {
+    OTruncatedText,
     MetricCardChart,
     ODialog,
     OButton,

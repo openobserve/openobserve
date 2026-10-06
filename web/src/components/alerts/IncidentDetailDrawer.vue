@@ -459,9 +459,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.id || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -484,9 +484,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.title || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -701,9 +701,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :key="liaison.id"
                             class="flex items-center justify-between gap-2"
                           >
-                            <span class="text-text-body truncate text-xs">
+                            <OTruncatedText class="text-text-body text-xs">
                               {{ raw(oncallTeamNameFor(liaison.team_id)) }}
-                            </span>
+                            </OTruncatedText>
                             <OTag type="oncallResponseState" :value="liaison.state" size="sm" />
                           </span>
                         </div>
@@ -897,17 +897,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ index + 1 }}.
                               </span>
                               <div class="min-w-0 flex-1">
-                                <OTooltip
-                                  v-if="alert.name.length > 30"
-                                  :content="raw(alert.name)"
-                                />
-                                <span class="block truncate font-medium">
-                                  {{
-                                    alert.name.length > 30
-                                      ? alert.name.substring(0, 30) + "..."
-                                      : alert.name
-                                  }}
-                                </span>
+                                <OTruncatedText class="block font-medium">
+                                  {{ alert.name }}
+                                </OTruncatedText>
                               </div>
                               <div class="w-30 flex-shrink-0">
                                 <span :class="'text-text-secondary'">
@@ -1060,9 +1052,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
-                              <span :class="'text-text-body'" class="truncate text-sm font-medium">
+                              <OTruncatedText :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.stream_name || raw("N/A") }}
-                              </span>
+                              </OTruncatedText>
                             </div>
                           </div>
 
@@ -1527,6 +1519,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
@@ -1557,6 +1550,7 @@ export default defineComponent({
     OUserCell,
     OIcon,
     OTag,
+    OTruncatedText,
     OInlineEdit,
   },
   emits: ["close", "status-updated", "sendToAiChat"],

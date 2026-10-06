@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="mobileDrawerOpen = true"
       >
         <template #icon-left><OIcon name="folder-outline" size="sm" /></template>
-        <span class="max-w-52 truncate">{{ activeFolderName || t("dashboard.folders") }}</span>
+        <OTruncatedText class="max-w-52">{{
+          activeFolderName || t("dashboard.folders")
+        }}</OTruncatedText>
       </OButton>
       <OButton
         variant="ghost"

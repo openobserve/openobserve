@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex min-w-0 flex-col py-0.5"
             :data-test="`edit-role-module-pane-scope-row-${row.key}`"
           >
-            <span class="text-text-heading truncate font-medium">{{ row.label }}</span>
-            <span class="text-text-secondary truncate text-xs">{{ row.hint }}</span>
+            <OTruncatedText class="text-text-heading font-medium">{{ row.label }}</OTruncatedText>
+            <OTruncatedText class="text-text-secondary text-xs">{{ row.hint }}</OTruncatedText>
           </div>
           <div
             v-else-if="row.node.has_entities && row.node.childName"
@@ -115,11 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-primary"
               size="sm"
               icon-right="chevron-right"
-              :title="t('iam.editRole.openFolder')"
+              class="min-w-0"
               :data-test="`edit-role-module-pane-open-${row.node.name}`"
               @click="emit('open', row.node)"
             >
-              {{ row.node.display_name }}
+              <OTruncatedText class="block">{{ row.node.display_name }}</OTruncatedText>
             </OButton>
             <OTooltip
               v-if="insideOf(row.node).count"
@@ -205,6 +205,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 

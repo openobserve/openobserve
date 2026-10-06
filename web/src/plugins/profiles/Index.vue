@@ -127,7 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="max-w-62.5"
         :data-test="`profiles-filter-chip-${filter.key}`"
       >
-        <span class="truncate font-mono text-xs">{{ filter.key }} = {{ filter.value }}</span>
+        <OTruncatedText class="font-mono text-xs"
+          >{{ filter.key }} = {{ filter.value }}</OTruncatedText
+        >
         <template #trailing>
           <button
             type="button"
@@ -403,6 +405,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import CommonFlameGraph from "@/components/common/FlameGraphView.vue";

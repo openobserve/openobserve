@@ -137,8 +137,8 @@
       </template>
 
       <template #cell-name="{ row }">
-        <div class="flex items-center gap-2">
-          <span class="font-medium">{{ row.name }}</span>
+        <div class="flex min-w-0 items-center gap-2">
+          <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
           <OTag
             v-if="isGrouped(row)"
             variant="purple-soft"
@@ -493,6 +493,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

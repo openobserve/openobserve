@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          OTab pills' text lands on), not the pill edge — so 'IAM'/'Settings' sits
          directly above 'Users'. Matches FolderList's heading. -->
     <div v-else-if="title" class="ps-page-edge flex shrink-0 items-center gap-1.5 pe-1.5 pt-3 pb-1">
-      <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-semibold">{{
+      <OTruncatedText class="text-text-heading flex-1 text-sm font-semibold">{{
         title
-      }}</span>
+      }}</OTruncatedText>
       <!-- Same control the logs field panel uses, so the two rails collapse by
            the same affordance rather than each inventing one. -->
       <OButton
@@ -123,6 +123,7 @@ import { useRouter, type RouteLocationRaw } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

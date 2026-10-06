@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
         data-test="rum-error-issue-cell-route-tag"
       />
-      <small v-if="issue.service" class="truncate" data-test="rum-error-issue-cell-service">{{
+      <OTruncatedText v-if="issue.service" as="small" data-test="rum-error-issue-cell-service">{{
         issue.service
-      }}</small>
+      }}</OTruncatedText>
     </div>
   </div>
 </template>
@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { parseTopFrame, routeFromUrl } from "@/utils/rum/errorIssueUtils";
 
 const props = defineProps<{

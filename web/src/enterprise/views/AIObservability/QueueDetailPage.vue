@@ -173,13 +173,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-refId="{ row }">
           <div class="flex min-w-0 flex-col">
-            <span class="truncate font-mono text-xs">{{ raw(row.refId) }}</span>
-            <span
+            <OTruncatedText class="font-mono text-xs">{{ raw(row.refId) }}</OTruncatedText>
+            <OTruncatedText
               v-if="row.refTraceId && row.refType !== 'trace'"
-              class="text-text-secondary text-2xs truncate font-mono"
+              class="text-text-secondary text-2xs font-mono"
             >
               {{ t("aiObservability.queues.detail.inTrace", { traceId: raw(row.refTraceId) }) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
@@ -238,6 +238,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import llmQueuesService, {
   type LlmQueue,
   type LlmQueueBinding,

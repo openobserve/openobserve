@@ -724,7 +724,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center gap-3 px-4 py-2.5"
           :class="'bg-surface-subtle'"
         >
-          <div class="min-w-0 flex-1 truncate text-xs" :class="'text-text-secondary'">
+          <div class="min-w-0 flex-1 text-xs" :class="'text-text-secondary'">
             <span class="font-bold" :class="'text-text-body'">{{
               t("settings.serviceIdentitySetup.recommended")
             }}</span>

@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dependency-impact-row-${row.name}`"
               >
                 <OIcon :name="depKindIcon(s.kind)" size="sm" class="text-text-secondary shrink-0" />
-                <span class="text-compact min-w-0 flex-1 truncate">{{ row.name }}</span>
+                <OTruncatedText class="text-compact flex-1">{{ row.name }}</OTruncatedText>
               </div>
             </div>
           </div>
@@ -319,6 +319,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

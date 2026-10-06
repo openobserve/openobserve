@@ -38,6 +38,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput } from "@/utils/keyboardShortcuts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -2007,10 +2008,10 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <OIcon name="error" size="sm" class="text-badge-error-ol-text mt-0.5" aria-hidden="true" />
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="text-badge-error-ol-text text-sm font-semibold">{{ failedTitle }}</span>
-        <span
+        <OTruncatedText
           v-if="failedStepResult?.stepName"
-          class="text-badge-error-ol-text truncate pt-1 text-xs"
-          >{{ failedStepResult.stepName }}</span
+          class="text-badge-error-ol-text pt-1 text-xs"
+          >{{ failedStepResult.stepName }}</OTruncatedText
         >
         <template v-if="typedSecretReport">
           <span v-if="failedSecretNote" class="text-badge-error-ol-text pt-1 text-xs">{{
@@ -2137,8 +2138,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               : t("synthetics.journey.recording")
           }}</span>
         </span>
-        <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
-          <span class="truncate">{{ currentUrl }}</span>
+        <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 text-xs">
+          <OTruncatedText>{{ currentUrl }}</OTruncatedText>
         </span>
         <span class="text-text-muted text-xs">{{
           t("synthetics.table.stepsCount", { count: capturedSteps.length })

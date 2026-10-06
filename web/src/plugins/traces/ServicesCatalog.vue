@@ -241,9 +241,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`services-catalog-type-${cat}`"
             >
               <div class="flex w-full flex-nowrap items-center justify-between gap-2">
-                <span class="min-w-0 flex-1 truncate text-left">{{
+                <OTruncatedText class="flex-1 text-left">{{
                   t(`traces.servicesCatalog.types.${cat}`)
-                }}</span>
+                }}</OTruncatedText>
                 <span class="flex shrink-0 items-center gap-1">
                   <span class="text-text-tertiary tabular-nums">{{ categoryCounts[cat] }}</span>
                   <!-- Unhealthy count in a filled circle, colored by the tab's
@@ -451,6 +451,7 @@ import {
 } from "@/utils/zincutils";
 import { getEffectiveTimeRange } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

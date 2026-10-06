@@ -33,6 +33,7 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
 
 const props = defineProps<{
@@ -873,9 +874,9 @@ function openInLogs() {
               <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums">{{
                 fmtTs(ev._timestamp)
               }}</span>
-              <span class="min-w-0 flex-1 truncate font-mono text-xs">
+              <OTruncatedText class="flex-1 font-mono text-xs" :tooltip="false">
                 <LogsHighLighting :data="ev" :show-braces="true" />
-              </span>
+              </OTruncatedText>
               <span
                 class="text-text-secondary hover:text-accent flex w-8 shrink-0 cursor-pointer items-center justify-center"
                 data-test="log-explorer-row-open"
@@ -948,7 +949,7 @@ function openInLogs() {
             <span class="text-text-heading text-xs font-medium tabular-nums">{{
               fmtTs(selectedEvent["_timestamp"])
             }}</span>
-            <span class="text-text-secondary truncate text-xs">{{ stream }}</span>
+            <OTruncatedText class="text-text-secondary text-xs">{{ stream }}</OTruncatedText>
           </div>
           <div class="flex shrink-0 items-center gap-1">
             <OButton
@@ -1262,9 +1263,12 @@ function openInLogs() {
                           class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums"
                           >{{ fmtTsShort(ev._timestamp) }}</span
                         >
-                        <span class="dld-ctx-body min-w-0 flex-1 truncate font-mono text-xs">
+                        <OTruncatedText
+                          class="dld-ctx-body flex-1 font-mono text-xs"
+                          :tooltip="false"
+                        >
                           <LogsHighLighting :data="ev" :show-braces="true" />
-                        </span>
+                        </OTruncatedText>
                         <button
                           class="dld-expand-btn shrink-0"
                           :aria-label="

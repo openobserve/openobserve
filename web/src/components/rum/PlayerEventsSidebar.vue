@@ -25,22 +25,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="mail" size="sm" class="pe-1" />
             {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
-          <div class="mb-2 w-full truncate pe-1 text-xs">
+          <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
             <OIcon name="schedule" size="sm" class="pe-1" />
             {{ sessionDetails.date }}
-          </div>
-          <div class="mb-2 w-full truncate pe-1 text-xs">
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
             <OIcon name="settings" size="sm" class="pe-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
-          </div>
-          <div class="mb-2 w-full truncate text-xs">
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full text-xs">
             <OIcon name="language" size="sm" class="pe-1" />
             {{ sessionDetails.ip }}
-          </div>
-          <div class="mb-2 w-full truncate text-xs">
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full text-xs">
             <OIcon name="location-on" size="sm" class="pe-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
-          </div>
+          </OTruncatedText>
         </div>
       </div>
     </template>
@@ -132,6 +132,7 @@ import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
 
 const { t } = useI18nTyped();

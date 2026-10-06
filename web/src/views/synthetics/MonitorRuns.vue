@@ -755,10 +755,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-environment="{ row }">
                     <span
                       v-if="(row as VisibleRun).environment"
-                      class="text-text-body inline-flex items-center gap-1 font-mono text-sm"
+                      class="text-text-body inline-flex max-w-full items-center gap-1 font-mono text-sm"
                     >
                       <OIcon name="layers" size="sm" class="text-text-secondary" />
-                      {{ (row as VisibleRun).environment }}
+                      <OTruncatedText>{{ (row as VisibleRun).environment }}</OTruncatedText>
                     </span>
                     <span v-else class="text-text-muted text-sm">—</span>
                   </template>
@@ -784,21 +784,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                   <template #cell-location="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="locationIcon((row as VisibleRun).location)" size="sm" />
-                      {{ locationLabel((row as VisibleRun).location) }}
+                      <OTruncatedText>{{
+                        locationLabel((row as VisibleRun).location)
+                      }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-browser="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="browserIcon((row as VisibleRun).browser)" size="sm" />
-                      {{ (row as VisibleRun).browser }}
+                      <OTruncatedText>{{ (row as VisibleRun).browser }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-device="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
-                      {{ deviceDisplay((row as VisibleRun).device) }}
+                      <OTruncatedText>{{
+                        deviceDisplay((row as VisibleRun).device)
+                      }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-trigger_type="{ row }">
@@ -932,9 +936,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="stepsError">
                 <div class="flex items-center gap-2 px-2" data-test="monitor-runs-steps-error">
                   <OIcon name="error_outline" size="xs" class="text-status-error-text shrink-0" />
-                  <span class="text-status-error-text min-w-0 flex-1 truncate text-xs">{{
+                  <OTruncatedText :lines="2" class="text-status-error-text flex-1 text-xs">{{
                     stepsError
-                  }}</span>
+                  }}</OTruncatedText>
                   <OButton
                     variant="ghost"
                     size="xs"
@@ -968,9 +972,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- cell-name: Step name -->
                     <template #cell-name="{ row }">
                       <div class="min-w-0">
-                        <div class="text-text-heading truncate text-xs font-semibold">
+                        <OTruncatedText as="div" class="text-text-heading text-xs font-semibold">
                           {{ row.name }}
-                        </div>
+                        </OTruncatedText>
                       </div>
                     </template>
 
@@ -1127,6 +1131,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";

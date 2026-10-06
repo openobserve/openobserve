@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-description="{ row }">
-          <span class="text-text-secondary line-clamp-1">{{ row.description || "—" }}</span>
+          <span class="text-text-secondary">{{ row.description || "—" }}</span>
         </template>
 
         <template #cell-tags="{ row }">

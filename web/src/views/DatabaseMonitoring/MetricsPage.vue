@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="shrink-0"
                   data-test="dbm-metrics-load-breakdown"
                 />
-                <span class="text-text-secondary min-w-0 truncate text-xs">{{
+                <span class="text-text-secondary min-w-0 text-xs">{{
                   t("dbm.metrics.load.hint")
                 }}</span>
               </template>

@@ -230,9 +230,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <div class="flex min-w-0 flex-1 flex-col">
-                            <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                            <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
                               stream.stream_name
-                            }}</span>
+                            }}</OTruncatedText>
                           </div>
                         </div>
                       </template>
@@ -687,9 +687,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                         <div class="flex min-w-0 flex-1 flex-col">
-                          <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                          <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
                             stream.stream_name
-                          }}</span>
+                          }}</OTruncatedText>
                         </div>
                       </div>
                     </template>
@@ -1109,6 +1109,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),

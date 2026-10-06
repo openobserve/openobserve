@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-description="{ row }">
-          <span class="text-text-secondary line-clamp-1">{{ row.description || "—" }}</span>
+          <span class="text-text-secondary">{{ row.description || "—" }}</span>
         </template>
 
         <template #cell-scoreConfigs="{ row }">
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-targetDataset="{ row }">
           <span v-if="row.targetDatasetName" class="flex items-center gap-1.5">
             <OIcon name="table-chart" size="sm" class="text-text-secondary shrink-0" />
-            <span class="truncate">{{ row.targetDatasetName }}</span>
+            <OTruncatedText>{{ row.targetDatasetName }}</OTruncatedText>
           </span>
           <span v-else class="text-text-secondary">—</span>
         </template>
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`ai-queues-create-config-${cfg.scoreConfigId}`"
               >
                 <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
-                <strong class="min-w-0 flex-1 truncate font-mono">{{ cfg.name }}</strong>
+                <OTruncatedText as="strong" class="flex-1 font-mono">{{ cfg.name }}</OTruncatedText>
                 <OTag type="evalDataType" :value="cfg.dataType" class="shrink-0" />
                 <OIcon name="keep-outline" size="sm" class="text-text-secondary shrink-0">
                   <OTooltip :content="t('aiObservability.queues.create.pin')" />
@@ -374,6 +374,7 @@ import llmQueuesService, {
 } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import { makeQueueFormSchema, type QueueForm, type QueueBoundConfig } from "./QueueForm.schema";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIQueuesPage" });
 

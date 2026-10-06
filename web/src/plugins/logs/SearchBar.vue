@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
                       />
                     </template>
-                    <span class="max-w-56 truncate">{{ view.view_name }}</span>
+                    <OTruncatedText class="max-w-56">{{ view.view_name }}</OTruncatedText>
                     <template #icon-right>
                       <OButton
                         variant="ghost"
@@ -2045,6 +2045,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -2144,6 +2145,7 @@ export default defineComponent({
     OFormToggleGroup,
     OSpinner,
     OTooltip,
+    OTruncatedText,
     OInput,
     OSearchInput,
     OSelect,

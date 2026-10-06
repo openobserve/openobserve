@@ -36,11 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip v-if="titleAttr" :content="raw(titleAttr)" />
       {{ text || raw("—") }}
     </span>
-    <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
+    <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
       <OTag v-if="dbSystem" type="dbSystem" :value="dbSystem" size="xs" />
-      <template v-for="item in shownItems" :key="item.key">
+      <template v-if="shownItems.length">
         <span class="opacity-45">·</span>
-        <span :class="item.class">{{ item.label }}</span>
+        <OTruncatedText :tooltip="shownItemsText">
+          <template v-for="(item, index) in shownItems" :key="item.key">
+            <span v-if="index > 0" class="px-1 opacity-45">·</span>
+            <span :class="item.class">{{ item.label }}</span>
+          </template>
+        </OTruncatedText>
       </template>
       <slot />
     </div>
@@ -51,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, type I18nText } from "@/types/i18n";
 
@@ -83,4 +89,6 @@ const props = withDefaults(
 
 /** A blank fact prints as a bare middot, which reads as missing data rather than absent. */
 const shownItems = computed(() => props.metaItems.filter((item) => item.label));
+// The on-screen gaps are padding, so the element's own text would run the items together.
+const shownItemsText = computed(() => raw(shownItems.value.map((item) => item.label).join(" · ")));
 </script>

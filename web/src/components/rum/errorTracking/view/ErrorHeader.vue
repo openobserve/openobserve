@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #title>
         <span class="flex min-w-0 items-center gap-2">
-          <span class="truncate" data-test="error-header-error-type">{{ errorType }}</span>
+          <OTruncatedText data-test="error-header-error-type">{{ errorType }}</OTruncatedText>
           <OTag
             v-if="error.error_handling"
             :label="raw(error.error_handling)"
@@ -126,6 +126,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 

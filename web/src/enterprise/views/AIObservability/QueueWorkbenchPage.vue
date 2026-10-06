@@ -129,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`ai-queue-workbench-nav-preview-${i}`"
                   >{{ item.inputPreview }}</span
                 >
-                <span class="text-text-secondary text-2xs truncate font-mono">{{
+                <OTruncatedText class="text-text-secondary text-2xs font-mono">{{
                   item.refId
-                }}</span>
+                }}</OTruncatedText>
               </span>
-              <span v-else class="min-w-0 flex-1 truncate text-left font-mono">{{
+              <OTruncatedText v-else class="flex-1 text-left font-mono">{{
                 item.refId
-              }}</span>
+              }}</OTruncatedText>
             </div>
           </OTab>
         </OTabs>
@@ -202,9 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag variant="blue-soft" shape="rounded" class="shrink-0">{{
                     currentItem.refType
                   }}</OTag>
-                  <h2 class="text-text-heading min-w-0 flex-1 truncate text-lg font-semibold">
+                  <OTruncatedText
+                    as="h2"
+                    class="text-text-heading flex-1 text-lg font-semibold"
+                    :tooltip="false"
+                  >
                     {{ itemTitle }}
-                  </h2>
+                  </OTruncatedText>
                   <OButton
                     variant="outline"
                     size="sm"
@@ -220,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-text-secondary flex flex-wrap items-center gap-x-2 font-mono text-xs"
                 >
-                  <span class="truncate">{{ currentItem.refId }}</span>
+                  <OTruncatedText>{{ currentItem.refId }}</OTruncatedText>
                   <span>·</span><span>{{ currentCase.workflow }}</span> <span>·</span
                   ><span>{{ currentCase.model }}</span>
                 </div>
@@ -714,6 +718,7 @@ import {
 } from "@/services/llm-queues.service.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
 

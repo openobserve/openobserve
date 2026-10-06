@@ -370,11 +370,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-b-border-default text-compact hover:bg-table-row-hover-bg flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2 transition-[background] duration-150 last:border-b-0"
         >
           <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
-          <span
-            class="text-text-heading max-w-[12.5em] min-w-[7.5em] overflow-hidden font-medium text-ellipsis whitespace-nowrap"
-            >{{ ev.service }}</span
-          >
-          <span class="text-text-secondary flex-1 truncate">{{ ev.description }}</span>
+          <OTruncatedText class="text-text-heading max-w-[12.5em] min-w-[7.5em] font-medium">{{
+            ev.service
+          }}</OTruncatedText>
+          <OTruncatedText class="text-text-secondary flex-1">{{ ev.description }}</OTruncatedText>
           <OTag
             v-if="ev.failCount > 1"
             type="countChip"
@@ -416,9 +415,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="notifications" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionAlerts")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionAlertsDesc")
             }}</span>
@@ -443,9 +442,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="search" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionLogs")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionLogsDesc")
             }}</span>
@@ -470,9 +469,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionTraces")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionTracesDesc")
             }}</span>
@@ -517,6 +516,7 @@ import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

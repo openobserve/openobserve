@@ -81,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <p v-if="entry.description" class="text-text-secondary line-clamp-3 text-xs">
+    <OTruncatedText v-if="entry.description" as="p" :lines="3" class="text-text-secondary text-xs">
       {{ entry.description }}
-    </p>
+    </OTruncatedText>
 
     <div class="mt-auto flex flex-col gap-1 pt-1">
       <div class="flex items-center gap-1.5">
@@ -142,6 +142,7 @@ import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { useI18nTyped } from "@/types/i18n";

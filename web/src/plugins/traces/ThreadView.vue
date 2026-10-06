@@ -158,12 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="settings" size="xs" class="me-1" />
             {{ t("traces.threadView.system") }}
           </span>
-          <span
+          <OTruncatedText
             v-if="!showSystemFull"
-            class="thread-system__preview text-compact text-text-secondary min-w-0 flex-1 truncate"
+            :tooltip="false"
+            class="thread-system__preview text-compact text-text-secondary flex-1"
           >
             {{ truncate(head.systemPrompt, 160) }}
-          </span>
+          </OTruncatedText>
           <span v-else class="flex-1" />
           <span
             class="thread-system__toggle text-theme-accent inline-flex shrink-0 items-center gap-[0.15rem] text-xs font-medium"
@@ -321,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface Props {
   spans: any[];

@@ -43,6 +43,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -461,7 +462,7 @@ const startRowColspan = computed(
               </slot>
             </div>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span class="text-text-body truncate text-sm">{{ startRow!.name }}</span>
+              <OTruncatedText class="text-text-body text-sm">{{ startRow!.name }}</OTruncatedText>
               <span
                 v-if="startRow!.error"
                 class="text-status-error-text truncate font-mono text-xs"
@@ -544,14 +545,11 @@ const startRowColspan = computed(
         </div>
 
         <!-- Step display name -->
-        <span
-          :class="[
-            isSkippedPreview(row) ? 'text-text-muted' : 'text-text-body',
-            'min-w-0 flex-1 truncate text-sm',
-          ]"
+        <OTruncatedText
+          :class="[isSkippedPreview(row) ? 'text-text-muted' : 'text-text-body', 'flex-1 text-sm']"
         >
           {{ stepName(row) }}
-        </span>
+        </OTruncatedText>
 
         <!-- The only progress on a reference row while it runs: nothing auto-expands during `running`. -->
         <span
@@ -574,12 +572,12 @@ const startRowColspan = computed(
           >{{ stepBadge(row)!.label }}</OBadge
         >
 
-        <span
+        <OTruncatedText
           v-if="mode !== 'results' && (stepDetail(row) || isSkippedPreview(row))"
-          class="text-text-secondary max-w-[25%] shrink-0 truncate font-mono text-xs"
+          class="text-text-secondary max-w-[25%] shrink-0 font-mono text-xs"
         >
           {{ isSkippedPreview(row) ? t("synthetics.journey.subtest.notRun") : stepDetail(row) }}
-        </span>
+        </OTruncatedText>
 
         <!-- Insertion marker: recorded steps land ABOVE this row. Absolutely
              positioned against the cell, so previewing it on hover repaints

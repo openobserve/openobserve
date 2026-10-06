@@ -103,9 +103,9 @@
           :key="entry.experiment.id"
           class="border-b-border-default flex items-center gap-2 border-b py-2 text-xs"
         >
-          <span class="text-text-heading min-w-0 flex-1 truncate font-medium">{{
+          <OTruncatedText class="text-text-heading flex-1 font-medium">{{
             entry.experiment.name
-          }}</span>
+          }}</OTruncatedText>
           <OTag v-if="entry.kind === 'content_match'" variant="default-soft">
             {{ t("aiObservability.promptManagement.contentMatch") }}
           </OTag>
@@ -130,6 +130,7 @@ import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
