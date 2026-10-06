@@ -34,6 +34,8 @@ interface QueryMetadata {
   query?: string;
   startTime?: number | string;
   endTime?: number | string;
+  /** Set by the executor on a hidden query's slot, which it never sends. */
+  notSent?: boolean;
 }
 
 interface PanelExemplarsArgs {

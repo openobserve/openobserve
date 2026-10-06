@@ -57,11 +57,23 @@ const hasMetric = (node: PromqlTree | undefined): boolean => {
   );
 };
 
+const isTree = (value: unknown): value is PromqlTree =>
+  !!value && typeof value === "object" && "type" in value && typeof value.type === "string";
+
+const stripValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(stripValue);
+  if (isTree(value)) return stripParens(value);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, stripValue(inner)]));
+};
+
 export const stripParens = (tree: PromqlTree): PromqlTree => {
-  if (Array.isArray(tree)) return tree.map(stripParens) as any;
-  if (!tree || typeof tree !== "object") return tree;
   if (tree.type === "paren") return stripParens(tree.expr);
-  return Object.fromEntries(Object.entries(tree).map(([key, value]) => [key, stripParens(value)]));
+  const out: PromqlTree = { type: tree.type };
+  for (const [key, value] of Object.entries(tree)) {
+    if (key !== "type") out[key] = stripValue(value);
+  }
+  return out;
 };
 
 /** A range function reads the matrix directly, so it is always the innermost step. */
