@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <transition name="slide-fade">
       <div
         v-if="show"
-        class="charts-wrapper dashboard-strip h-40 min-h-[8.5rem] overflow-hidden py-0! will-change-[transform,opacity]"
+        class="charts-wrapper dashboard-strip flex h-auto min-h-[8.5rem] flex-col overflow-hidden py-0! will-change-[transform,opacity] md:h-40 md:flex-row"
       >
-        <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-sm">
+        <div
+          class="h-40 min-w-0 md:h-auto md:flex-2 dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-sm"
+        >
           <RenderDashboardCharts
             v-if="show"
             ref="dashboardChartsRef"
@@ -33,22 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :allowAlertCreation="false"
             searchType="dashboards"
             @updated:dataZoom="onDataZoom"
-            @chart:contextmenu="handleChartContextMenu"
           />
+        </div>
+        <div class="h-40 min-w-0 px-1 py-0.5 md:h-auto md:flex-1">
+          <TracesLatencyHeatmap :request="heatmapRequest" />
         </div>
       </div>
     </transition>
-
-    <TracesMetricsContextMenu
-      v-if="show"
-      :visible="contextMenuVisible"
-      :x="contextMenuPosition.x"
-      :y="contextMenuPosition.y"
-      :value="contextMenuValue"
-      :fieldName="contextMenuFieldName"
-      @select="handleContextMenuSelect"
-      @close="hideContextMenu"
-    />
 
     <Teleport v-if="showAnalysisDashboard" defer to="#traces-drill-down-page">
       <TracesAnalysisDashboard
@@ -85,16 +78,15 @@ import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics.json";
 import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
+import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
+import TracesLatencyHeatmap, { type LatencyHeatmapRequest } from "./TracesLatencyHeatmap.vue";
+import { buildLatencyHeatmapSql } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
-);
-
-const TracesMetricsContextMenu = defineAsyncComponent(
-  () => import("./TracesMetricsContextMenu.vue"),
 );
 
 const TracesAnalysisDashboard = defineAsyncComponent(() => import("./TracesAnalysisDashboard.vue"));
@@ -162,6 +154,7 @@ const currentTimeObj = ref({
 });
 
 const dashboardData = ref(null);
+const heatmapRequest = ref<LatencyHeatmapRequest | null>(null);
 
 // Unified Analysis Dashboard state
 interface AnalysisFilter {
@@ -205,16 +198,8 @@ const streamFields = computed(() => {
   return searchObj.data.stream.selectedStreamFields || [];
 });
 
-// Runtime entries carry timeStart/timeEnd (set below); the useTraces Map generic omits them.
-type MetricsRangeFilter = {
-  panelTitle: string;
-  start: number | null;
-  end: number | null;
-  timeStart?: number | null;
-  timeEnd?: number | null;
-};
-const rangeFilters = computed(
-  () => searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>,
+const rangeFilters = computed<Map<string, MetricsRangeFilter>>(
+  () => searchObj.meta.metricsRangeFilters,
 );
 
 // Check if ANY RED panel has a time-based brush selection
@@ -242,13 +227,6 @@ const hasAnyBrushSelection = computed(() => {
 
   return hasSelection;
 });
-
-// Context menu state
-const contextMenuVisible = ref(false);
-const contextMenuPosition = ref({ x: 0, y: 0 });
-const contextMenuValue = ref(0);
-const contextMenuFieldName = ref("");
-const contextMenuData = ref<any>(null);
 
 const getBaseFilters = () => {
   let baseFilters = [];
@@ -286,6 +264,13 @@ const loadDashboard = async () => {
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
+    const streamName = searchObj.data.stream.selectedStream.value;
+
+    heatmapRequest.value = {
+      sql: buildLatencyHeatmapSql(streamName, baseFilters),
+      startTime: effectiveTimeRange.value.startTime,
+      endTime: effectiveTimeRange.value.endTime,
+    };
     convertedDashboard.tabs[0].panels.forEach(
       (panel: { title?: string; queries: { query: string }[] }, index: number) => {
         // Build WHERE clause based on filters
@@ -302,18 +287,9 @@ const loadDashboard = async () => {
           }
 
           whereClause = errorFilters.length ? "WHERE " + errorFilters.join(" AND ") : "";
-        } else if (panel.title === "Duration" && !isSpansMode) {
-          // Traces mode: restrict Duration percentiles to root spans only so that
-          // each trace contributes exactly one duration value. Root spans are
-          // identified by an absent reference_parent_span_id (NULL or empty string).
-          const durationFilters = [...baseFilters];
-          if (durationFilters.length) whereClause = "WHERE " + durationFilters.join(" AND ");
         } else {
-          // Spans mode Duration, and Rate panel for both modes: apply combined filters
           whereClause = baseFilters.length ? "WHERE " + baseFilters.join(" AND ") : "";
         }
-
-        const streamName = searchObj.data.stream.selectedStream.value;
 
         // Build the final query: substitute placeholders then apply mode transforms
         let query = panel["queries"][0].query
@@ -368,7 +344,7 @@ const createRangeFilter = (
 
   // Support Duration, Rate, and Errors panels
   if (panelId && (panelTitle === "Duration" || panelTitle === "Rate" || panelTitle === "Errors")) {
-    (searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>).set(panelId, {
+    searchObj.meta.metricsRangeFilters.set(panelId, {
       panelTitle,
       start: start ? Math.floor(start) : null,
       end: end ? Math.floor(end) : null,
@@ -413,14 +389,10 @@ const emitFiltersToQueryEditor = () => {
 const onDataZoom = async ({
   start,
   end,
-  start1,
-  end1,
   data,
 }: {
   start: number;
   end: number;
-  start1: number;
-  end1: number;
   data: any; // contains panel schema with data.id as panel id
 }) => {
   if (start && end) {
@@ -450,36 +422,8 @@ const onDataZoom = async ({
       // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
       // Pass actual time range as timeStart/timeEnd for volume/error analysis
       createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
-    } else {
-      // For Duration/other panels: use actual Y-axis values (start1, end1)
-      // ALSO pass time range so all tabs can use it for comparison
-      const timeStartMicros = start * 1000;
-      const timeEndMicros = end * 1000;
-
-      createRangeFilter(data, start1, end1, timeStartMicros, timeEndMicros);
     }
   }
-};
-
-const handleChartContextMenu = (event: any) => {
-  // Extract field name from series name
-  // For traces metrics, the panel titles are "Rate", "Errors", "Duration"
-  const panelTitle = event.panelTitle || "";
-  const seriesName = event.seriesName || "";
-
-  if (panelTitle === "Duration") {
-    // Use panel title as field name (Rate, Errors, Duration)
-    contextMenuFieldName.value = panelTitle || seriesName || "Value";
-
-    contextMenuVisible.value = true;
-    contextMenuPosition.value = { x: event.x, y: event.y };
-    contextMenuValue.value = event.value;
-    contextMenuData.value = event;
-  }
-};
-
-const hideContextMenu = () => {
-  contextMenuVisible.value = false;
 };
 
 // Unified function to open analysis dashboard with all filters populated
@@ -562,23 +506,6 @@ const openUnifiedAnalysisDashboard = () => {
   }
 
   showAnalysisDashboard.value = true;
-};
-
-const handleContextMenuSelect = (selection: {
-  condition: string;
-  value: number;
-  fieldName: string;
-}) => {
-  createRangeFilter(
-    {
-      id: contextMenuData.value.panelId,
-      title: contextMenuData.value.panelTitle,
-    },
-    selection.condition === "gte" ? selection.value : null,
-    selection.condition === "lte" ? selection.value : null,
-  );
-
-  hideContextMenu();
 };
 
 const stopAutoRefresh = () => {

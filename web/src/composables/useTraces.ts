@@ -25,7 +25,10 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
+import {
+  DEFAULT_TRACE_SEARCH_MODE,
+  type MetricsRangeFilter,
+} from "@/ts/interfaces/traces/trace.types";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import { gt } from "@/types/i18n";
@@ -126,7 +129,7 @@ const defaultObject = {
     redirectedFromLogs: false,
     searchApplied: false,
     lastRunAt: undefined as number | undefined,
-    metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
+    metricsRangeFilters: new Map<string, MetricsRangeFilter>(),
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
     searchMode: DEFAULT_TRACE_SEARCH_MODE,

@@ -27,8 +27,13 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: { template: '<div data-test="render-dashboard-charts"></div>' },
 }));
 
-vi.mock("./TracesMetricsContextMenu.vue", () => ({
-  default: { template: '<div data-test="traces-metrics-context-menu"></div>' },
+vi.mock("./TracesLatencyHeatmap.vue", () => ({
+  default: {
+    name: "TracesLatencyHeatmap",
+    template: '<div data-test="traces-latency-heatmap"></div>',
+    props: ["request"],
+    emits: ["select"],
+  },
 }));
 
 vi.mock("./TracesAnalysisDashboard.vue", () => ({
@@ -143,9 +148,6 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
         RenderDashboardCharts: {
           template: '<div data-test="render-dashboard-charts"></div>',
         },
-        TracesMetricsContextMenu: {
-          template: '<div data-test="traces-metrics-context-menu"></div>',
-        },
         TracesAnalysisDashboard: {
           template: '<div data-test="traces-analysis-dashboard"></div>',
           props: {
@@ -170,6 +172,10 @@ function getPanelQuery(wrapper: VueWrapper<any>, title: string): string {
   const panels: any[] = data?.tabs?.[0]?.panels ?? [];
   const panel = panels.find((p: any) => p.title === title);
   return panel?.queries?.[0]?.query ?? "";
+}
+
+function getHeatmapSql(wrapper: VueWrapper<any>): string {
+  return wrapper.vm.heatmapRequest?.sql ?? "";
 }
 
 // ---------------------------------------------------------------------------
@@ -307,11 +313,10 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("count(*) FILTER (WHERE span_status = 'ERROR')");
     });
 
-    it("should NOT add the root-span filter to the Duration panel in spans mode", async () => {
+    it("should NOT add the root-span filter to the heatmap query in spans mode", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).not.toContain("reference_parent_span_id");
+      expect(getHeatmapSql(wrapper)).not.toContain("reference_parent_span_id");
     });
   });
 
@@ -330,15 +335,25 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("service_name = 'api'");
     });
 
-    it("should include the filter prop in the Duration panel WHERE clause", async () => {
+    it("should include the filter prop in the heatmap WHERE clause", async () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "service_name = 'api'";
       wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain("service_name = 'api'");
+      expect(getHeatmapSql(wrapper)).toContain("WHERE service_name = 'api' GROUP BY");
+    });
+
+    it("should decode span_kind labels in the heatmap WHERE clause", async () => {
+      wrapper.unmount();
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+      wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      expect(getHeatmapSql(wrapper)).toContain("span_kind='2'");
+      expect(getHeatmapSql(wrapper)).not.toContain("span_kind='Server'");
     });
 
     it("should include the filter prop in the Errors panel WHERE clause", async () => {
@@ -412,15 +427,14 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("service_name = 'api'");
     });
 
-    it("should leave non-span_kind filter unchanged in the Duration panel WHERE clause", async () => {
+    it("should leave non-span_kind filter unchanged in the heatmap WHERE clause", async () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "service_name = 'api'";
       wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain("service_name = 'api'");
+      expect(getHeatmapSql(wrapper)).toContain("service_name = 'api'");
     });
 
     it("should convert span_kind label case-insensitively in the Errors panel", async () => {
@@ -456,6 +470,42 @@ describe("TracesMetricsDashboard", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Latency heatmap
+  // -------------------------------------------------------------------------
+  describe("latency heatmap", () => {
+    it("drops the Duration panel and gives Rate and Errors half the strip each", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const panels: any[] = wrapper.vm.dashboardData.tabs[0].panels;
+      expect(panels.map((p) => p.title)).toEqual(["Rate", "Errors"]);
+      expect(panels.map((p) => [p.layout.x, p.layout.w])).toEqual([
+        [0, 24],
+        [24, 24],
+      ]);
+    });
+
+    it("passes the heatmap a request over the search range", async () => {
+      mockSearchObj.data.datetime = { startTime: 3_000_000, endTime: 4_000_000 };
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const heatmap = wrapper.findComponent({ name: "TracesLatencyHeatmap" });
+      expect(heatmap.props("request")).toEqual({
+        sql: getHeatmapSql(wrapper),
+        startTime: 3_000_000,
+        endTime: 4_000_000,
+      });
+    });
+
+    it("builds a fresh request object on every loadDashboard", async () => {
+      await wrapper.vm.loadDashboard();
+      const first = wrapper.vm.heatmapRequest;
+      await wrapper.vm.loadDashboard();
+      expect(wrapper.vm.heatmapRequest).not.toBe(first);
+      expect(wrapper.vm.heatmapRequest).toEqual(first);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // loadDashboard — stream name substitution
   // -------------------------------------------------------------------------
   describe("loadDashboard — stream name substitution", () => {
@@ -468,13 +518,11 @@ describe("TracesMetricsDashboard", () => {
       expect(query).not.toContain("[STREAM_NAME]");
     });
 
-    it("should replace [STREAM_NAME] placeholder in Duration panel", async () => {
+    it("should query the selected stream in the heatmap", async () => {
       mockSearchObj.data.stream.selectedStream.value = "prod_traces";
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain('"prod_traces"');
-      expect(query).not.toContain("[STREAM_NAME]");
+      expect(getHeatmapSql(wrapper)).toContain('FROM "prod_traces"');
     });
 
     it("should replace [STREAM_NAME] placeholder in Errors panel", async () => {
@@ -945,12 +993,12 @@ describe("TracesMetricsDashboard", () => {
       expect(wrapper.emitted("time-range-selected")).toBeFalsy();
     });
 
-    it("should produce a Duration query with no WHERE clause in spans mode when no filters exist", async () => {
+    it("should produce a heatmap query with no WHERE clause in spans mode when no filters exist", async () => {
       mockSearchObj.meta.searchMode = "spans";
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).not.toMatch(/WHERE\b/);
+      expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp)");
+      expect(getHeatmapSql(wrapper)).not.toMatch(/WHERE\b/);
     });
   });
 });
