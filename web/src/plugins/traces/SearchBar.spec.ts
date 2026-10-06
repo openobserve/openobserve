@@ -131,6 +131,19 @@ vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: mockConfirm }),
 }));
 
+// Read at setup time, so set it before mounting.
+const breakpointState = vi.hoisted(() => ({ lgUp: true }));
+
+vi.mock("@/composables/useBreakpoint", () => ({
+  default: () => ({
+    isMobile: { value: false },
+    isTablet: { value: !breakpointState.lgUp },
+    isDesktop: { value: breakpointState.lgUp },
+    mdUp: { value: true },
+    lgUp: { value: breakpointState.lgUp },
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Shared mutable searchObj — reset to a fresh copy in every beforeEach so
 // that mutations in one test cannot affect the next.
@@ -280,6 +293,7 @@ vi.mock("@/composables/useTraces", () => ({
 // Import the component AFTER all vi.mock declarations.
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
+import { useToolbarPins } from "@/composables/useToolbarPins";
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
@@ -370,7 +384,9 @@ const sharedStubs = {
       '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
     emits: ["select"],
   },
-  ODropdownGroup: { template: "<div><slot /></div>" },
+  ODropdownGroup: {
+    template: '<div v-bind="$attrs"><slot name="label-action" /><slot /></div>',
+  },
   ODropdownSeparator: { template: "<hr />" },
 };
 
@@ -389,6 +405,15 @@ function mountSearchBar(props: Record<string, unknown> = {}): VueWrapper {
       plugins: [store, router],
       stubs: sharedStubs,
     },
+  });
+}
+
+// jsdom reports zero widths, so the pinned saved-views group would always fall back into More.
+function mockToolbarWidth(width: number) {
+  return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    return { width: this.classList.contains("justify-between") ? width : 0 } as DOMRect;
   });
 }
 
@@ -1515,6 +1540,9 @@ describe("SearchBar", () => {
     const tracesView = { view_id: "t1", view_name: "checkout errors", view_type: "traces" };
     const logsView = { view_id: "l1", view_name: "logs view" };
 
+    const { isPinned, togglePin } = useToolbarPins("traces");
+    let widthSpy: ReturnType<typeof mockToolbarWidth>;
+
     const expectedData = () => ({
       version: 1,
       stream: { label: "default", value: "default" },
@@ -1546,6 +1574,14 @@ describe("SearchBar", () => {
       searchObjInstance.meta.resultGrid.sortBy = "duration";
       searchObjInstance.meta.resultGrid.sortOrder = "asc";
       searchObjInstance.data.stream.selectedFields = ["service_name", "duration"];
+
+      breakpointState.lgUp = true;
+      if (!isPinned("savedViews")) togglePin("savedViews");
+      widthSpy = mockToolbarWidth(1600);
+    });
+
+    afterEach(() => {
+      widthSpy.mockRestore();
     });
 
     it("lists only traces views", async () => {
@@ -1680,6 +1716,155 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(mockSavedViewsDelete).not.toHaveBeenCalled();
+    });
+
+    describe("in the More menu", () => {
+      const moreGroup = () =>
+        wrapper.find('[data-test="traces-search-bar-menu-saved-views-group"]');
+      const toolbarGroup = () => wrapper.find('[data-test="traces-search-bar-saved-views"]');
+
+      it("shows the saved-views group with the list, create and pin button", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(moreGroup().exists()).toBe(true);
+        expect(
+          moreGroup().find('[data-test="traces-search-bar-menu-saved-view-apply-t1"]').exists(),
+        ).toBe(true);
+        expect(
+          moreGroup().find('[data-test="traces-search-bar-menu-saved-view-apply-l1"]').exists(),
+        ).toBe(false);
+        expect(
+          moreGroup().find('[data-test="traces-search-bar-menu-create-saved-view-btn"]').exists(),
+        ).toBe(true);
+        expect(
+          moreGroup().find('[data-test="traces-search-bar-menu-pin-saved-views-btn"]').exists(),
+        ).toBe(true);
+      });
+
+      it("pin click toggles the toolbar group without closing the menu", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(toolbarGroup().exists()).toBe(true);
+
+        const bubbled = vi.fn();
+        moreGroup().element.addEventListener("click", bubbled);
+        await moreGroup()
+          .find('[data-test="traces-search-bar-menu-pin-saved-views-btn"]')
+          .trigger("click");
+
+        expect(isPinned("savedViews")).toBe(false);
+        expect(toolbarGroup().exists()).toBe(false);
+        expect(bubbled).not.toHaveBeenCalled();
+
+        await moreGroup()
+          .find('[data-test="traces-search-bar-menu-pin-saved-views-btn"]')
+          .trigger("click");
+        expect(toolbarGroup().exists()).toBe(true);
+      });
+
+      it("applies the view selected from the More copy", async () => {
+        mockGetViewDetail.mockResolvedValue({ data: { ...tracesView, data: expectedData() } });
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        await wrapper
+          .find('[data-test="traces-search-bar-menu-saved-view-apply-t1"]')
+          .trigger("click");
+        await flushPromises();
+
+        expect(mockGetViewDetail).toHaveBeenCalledWith(expect.any(String), "t1");
+        expect(wrapper.emitted("apply-saved-view")?.[0]).toEqual([expectedData()]);
+      });
+
+      it("offers update but no delete in the More copy", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(
+          wrapper.find('[data-test="traces-search-bar-menu-saved-view-update-t1"]').exists(),
+        ).toBe(true);
+        expect(
+          wrapper.find('[data-test="traces-search-bar-menu-saved-view-delete-t1"]').exists(),
+        ).toBe(false);
+      });
+
+      it("opens the save dialog from Create saved view", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        await wrapper
+          .find('[data-test="traces-search-bar-menu-create-saved-view-btn"]')
+          .trigger("click");
+        expect((wrapper.vm as any).saveViewDialogOpen).toBe(true);
+      });
+
+      it("shows the empty state when there are no traces views", async () => {
+        mockSavedViewsGet.mockResolvedValue({ data: { views: [] } });
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(moreGroup().text()).toContain("search.savedViewsNotFound");
+      });
+
+      it.each(["service-graph", "services-catalog"])(
+        "hides the group but keeps More on the %s tab",
+        async (mode) => {
+          searchObjInstance.meta.searchMode = mode as any;
+          wrapper = mountSearchBar();
+          await flushPromises();
+
+          expect(wrapper.find('[data-test="traces-search-bar-more-menu-btn"]').exists()).toBe(true);
+          expect(moreGroup().exists()).toBe(false);
+        },
+      );
+
+      it("keeps the toolbar group off when unpinned", async () => {
+        togglePin("savedViews");
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(toolbarGroup().exists()).toBe(false);
+        expect(moreGroup().exists()).toBe(true);
+      });
+
+      it("shows the pinned group below lg without a width budget", async () => {
+        widthSpy.mockRestore();
+        widthSpy = mockToolbarWidth(0);
+        breakpointState.lgUp = false;
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(toolbarGroup().exists()).toBe(true);
+      });
+
+      it("shrinks the toggle labels before the pinned group falls back", async () => {
+        widthSpy.mockRestore();
+        widthSpy = mockToolbarWidth(800);
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(toolbarGroup().exists()).toBe(true);
+        expect(wrapper.find('[data-test="traces-search-mode-spans-btn"]').text()).not.toContain(
+          "traces.spansTab",
+        );
+
+        togglePin("savedViews");
+        await flushPromises();
+        expect(wrapper.find('[data-test="traces-search-mode-spans-btn"]').text()).toContain(
+          "traces.spansTab",
+        );
+      });
+
+      it("falls back to More at desktop width when the toolbar has no room", async () => {
+        widthSpy.mockRestore();
+        widthSpy = mockToolbarWidth(360);
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(toolbarGroup().exists()).toBe(false);
+        expect(moreGroup().exists()).toBe(true);
+      });
     });
   });
 });
