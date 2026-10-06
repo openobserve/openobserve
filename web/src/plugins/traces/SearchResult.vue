@@ -169,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
             @time-range-selected="onMetricsTimeRangeSelected"
             @filters-updated="onMetricsFiltersUpdated"
+            @editor-filter-set="onMetricsEditorFilterSet"
           />
         </transition>
 
@@ -279,6 +280,7 @@ export default defineComponent({
     "search:timeboxed",
     "get:traceDetails",
     "metrics:filters-updated",
+    "metrics:editor-filter-set",
     "run-query",
     "remove-filter",
     "jump-to-stream-data",
@@ -378,6 +380,10 @@ export default defineComponent({
       emit("metrics:filters-updated", filters);
     };
 
+    const onMetricsEditorFilterSet = (text: string) => {
+      emit("metrics:editor-filter-set", text);
+    };
+
     const getDashboardData = () => {
       metricsDashboardRef?.value?.loadDashboard();
     };
@@ -452,6 +458,7 @@ export default defineComponent({
       expandRowDetail,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,
+      onMetricsEditorFilterSet,
       getDashboardData,
       hits,
       searchPerformed,

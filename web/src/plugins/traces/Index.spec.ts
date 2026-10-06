@@ -1387,6 +1387,7 @@ describe("Index.vue (Main Traces Page)", () => {
     // Spies for SearchBar ref methods exposed via stub
     const mockApplyFilters = vi.fn();
     const mockRemoveFilterByField = vi.fn();
+    const mockSetEditorValue = vi.fn();
 
     function mountWithSearchBarStub() {
       return mount(Index, {
@@ -1401,6 +1402,7 @@ describe("Index.vue (Main Traces Page)", () => {
                 return {
                   applyFilters: mockApplyFilters,
                   removeFilterByField: mockRemoveFilterByField,
+                  setEditorValue: mockSetEditorValue,
                 };
               },
             },
@@ -1417,6 +1419,7 @@ describe("Index.vue (Main Traces Page)", () => {
     beforeEach(() => {
       mockApplyFilters.mockReset();
       mockRemoveFilterByField.mockReset();
+      mockSetEditorValue.mockReset();
       mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
@@ -1476,6 +1479,49 @@ describe("Index.vue (Main Traces Page)", () => {
       // span_status = 'ERROR' must appear exactly once
       const calledWith = mockApplyFilters.mock.calls[0][0] as string[];
       expect(calledWith.filter((f) => f === "span_status = 'ERROR'")).toHaveLength(1);
+    });
+
+    describe("onMetricsEditorFilterSet", () => {
+      const searchDataRuns = () =>
+        vi
+          .mocked(analytics.track)
+          .mock.calls.filter(
+            ([event, props]: any[]) => event === "Button Click" && props?.button === "Search Data",
+          ).length;
+
+      beforeEach(() => {
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      });
+
+      it("sets the editor text and runs exactly one search in live mode", async () => {
+        mockSearchObj.meta.liveMode = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
+        vi.mocked(analytics.track).mockClear();
+
+        wrapper.vm.onMetricsEditorFilterSet("(a = '1') and duration < '1ms'");
+
+        expect(mockSearchObj.data.editorValue).toBe("(a = '1') and duration < '1ms'");
+        expect(mockSetEditorValue).toHaveBeenCalledWith("(a = '1') and duration < '1ms'");
+        expect(searchDataRuns()).toBe(1);
+      });
+
+      it("sets the editor text and runs no search with live mode off", async () => {
+        store.state.zoConfig.auto_query_enabled = true;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
+        // Mount derives liveMode from auto_query_enabled, so switch it off afterwards.
+        mockSearchObj.meta.liveMode = false;
+        vi.mocked(analytics.track).mockClear();
+
+        wrapper.vm.onMetricsEditorFilterSet("duration < '1ms'");
+
+        expect(mockSearchObj.data.editorValue).toBe("duration < '1ms'");
+        expect(mockSetEditorValue).toHaveBeenCalledWith("duration < '1ms'");
+        expect(searchDataRuns()).toBe(0);
+      });
     });
 
     it("should call applyFilters with error condition when error only toggle is turned on", async () => {

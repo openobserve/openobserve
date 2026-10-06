@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="h-40 min-w-0 px-1 py-0.5 md:h-auto md:flex-1">
-          <TracesLatencyHeatmap :request="heatmapRequest" />
+          <TracesLatencyHeatmap :request="heatmapRequest" @select="onHeatmapSelect" />
         </div>
       </div>
     </transition>
@@ -77,10 +77,16 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics.json";
-import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
+import { deepCopy } from "@/utils/zincutils";
 import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
 import TracesLatencyHeatmap, { type LatencyHeatmapRequest } from "./TracesLatencyHeatmap.vue";
-import { buildLatencyHeatmapSql } from "./latencyHeatmap";
+import {
+  buildLatencyHeatmapSql,
+  composeFilter,
+  durationBand,
+  instantToPickerMs,
+  type LatencyHeatmapSelection,
+} from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
@@ -105,10 +111,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "time-range-selected", range: { start: number; end: number }): void;
   (e: "filters-updated", filters: string[]): void;
+  (e: "editor-filter-set", text: string): void;
 }>();
 
+const LATENCY_HEATMAP_PANEL_ID = "traces_latency_heatmap";
+
 const { showErrorNotification } = useNotifications();
-useStore();
+const store = useStore();
 const { searchObj, tracesParser } = useTraces();
 const { t } = useI18nTyped();
 
@@ -361,19 +370,7 @@ const emitFiltersToQueryEditor = () => {
   const filters: string[] = [];
 
   searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
-    if (rangeFilter.panelTitle === "Duration") {
-      // Duration filter: format µs values as human-readable strings so they
-      // render nicely in the query editor and are decoded by parseDurationWhereClause.
-      if (rangeFilter.start !== null && rangeFilter.end !== null) {
-        filters.push(
-          `duration >= '${formatTimeWithSuffix(rangeFilter.start)}' and duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`,
-        );
-      } else if (rangeFilter.start !== null) {
-        filters.push(`duration >= '${formatTimeWithSuffix(rangeFilter.start)}'`);
-      } else if (rangeFilter.end !== null) {
-        filters.push(`duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`);
-      }
-    } else if (rangeFilter.panelTitle === "Errors") {
+    if (rangeFilter.panelTitle === "Errors") {
       // Error filter: just add span_status check
       filters.push("span_status = 'ERROR'");
     }
@@ -421,6 +418,44 @@ const onDataZoom = async ({
       createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
     }
   }
+};
+
+const onHeatmapSelect = async (selection: LatencyHeatmapSelection) => {
+  const { timeStartUs, timeEndUs, durationLoUs: lo, durationHiUs: hi } = selection;
+  // A refinement box keeps the pre-box baseline; re-snapshotting would bake the first band into it.
+  const current = [...rangeFilters.value.values()].find((f) => f.panelTitle === "Duration");
+  const baselineFilter = current?.baselineFilter ?? searchObj.data.editorValue ?? "";
+
+  if (!current || !originalTimeRangeBeforeSelection.value) {
+    originalTimeRangeBeforeSelection.value = {
+      startTime: effectiveTimeRange.value.startTime,
+      endTime: effectiveTimeRange.value.endTime,
+    };
+  }
+  searchObj.meta.metricsRangeFilters.clear();
+
+  emit("time-range-selected", {
+    start: instantToPickerMs(timeStartUs / 1000, store.state.timezone),
+    end: instantToPickerMs(timeEndUs / 1000, store.state.timezone),
+  });
+
+  await nextTick();
+
+  // Set directly, not via createRangeFilter: its filters-updated would add a second live-mode search.
+  searchObj.meta.metricsRangeFilters.set(LATENCY_HEATMAP_PANEL_ID, {
+    panelTitle: "Duration",
+    start: lo || null,
+    end: hi,
+    timeStart: timeStartUs,
+    timeEnd: timeEndUs,
+    appliedStart: searchObj.data.datetime.startTime,
+    appliedEnd: searchObj.data.datetime.endTime,
+    baselineFilter,
+    stream: searchObj.data.stream.selectedStream.value,
+    searchMode: searchObj.meta.searchMode,
+  });
+  rangeFiltersVersion.value++;
+  emit("editor-filter-set", composeFilter(baselineFilter, durationBand(lo, hi)));
 };
 
 // Unified function to open analysis dashboard with all filters populated

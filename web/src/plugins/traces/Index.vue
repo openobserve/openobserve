@@ -206,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:sort="runQueryOnSort"
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:filters-updated="onMetricsFiltersUpdated"
+                        @metrics:editor-filter-set="onMetricsEditorFilterSet"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
@@ -1468,6 +1469,13 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
   } else {
     console.warn("SearchBar not ready for filter application");
   }
+};
+
+// The heatmap box replaces the whole editor text; the programmatic date change never searches, so this is the one search.
+const onMetricsEditorFilterSet = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,

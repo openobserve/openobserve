@@ -233,6 +233,15 @@ describe("SearchResult", () => {
       expect(wrapper.emitted("update:datetime")).toBeTruthy();
       expect(wrapper.emitted("update:datetime")[0]).toEqual([{ start, end }]);
     });
+
+    it("should relay the heatmap's editor-filter-set as metrics:editor-filter-set", async () => {
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("editor-filter-set", "(a = '1') and duration < '1ms'");
+
+      expect(wrapper.emitted("metrics:editor-filter-set")).toEqual([
+        ["(a = '1') and duration < '1ms'"],
+      ]);
+    });
   });
 
   describe("loadMore / infinite scroll", () => {
@@ -369,6 +378,7 @@ describe("SearchResult", () => {
         "search:timeboxed",
         "get:traceDetails",
         "metrics:filters-updated",
+        "metrics:editor-filter-set",
         "run-query",
         "remove-filter",
         "jump-to-stream-data",
