@@ -30,7 +30,7 @@ describe("buildForecastAlertPromql", () => {
   it("writes the rises-to expression on one line", () => {
     expect(buildForecastAlertPromql({ U: DISK, T: 0.9, direction: "rises", W: "2d" })).toBe(
       `((${DISK}) >= 0.9) * 0` +
-        ` or clamp_min(ceil((0.9 - (${DISK})) / (deriv((${DISK})[2d:15m]) > 0) / 8640) / 10, 0)` +
+        ` or clamp_min(ceil((0.9 - (${DISK})) / (deriv((${DISK})[2d:15m]) > 0) / 8640 - 1e-6) / 10, 0)` +
         ` or ((${DISK}) * 0 + 36500)`,
     );
   });
@@ -38,7 +38,7 @@ describe("buildForecastAlertPromql", () => {
   it("flips the crossed check and the slope filter for falls-to", () => {
     expect(buildForecastAlertPromql({ U: "free_bytes", T: 100, direction: "falls", W: "1d" })).toBe(
       "((free_bytes) <= 100) * 0" +
-        " or clamp_min(ceil((100 - (free_bytes)) / (deriv((free_bytes)[1d:8m]) < 0) / 8640) / 10, 0)" +
+        " or clamp_min(ceil((100 - (free_bytes)) / (deriv((free_bytes)[1d:8m]) < 0) / 8640 - 1e-6) / 10, 0)" +
         " or ((free_bytes) * 0 + 36500)",
     );
   });

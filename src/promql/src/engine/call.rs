@@ -949,12 +949,11 @@ mod tests {
     fn forecast_days(u: &str, threshold: f64, rises: bool) -> String {
         let (crossed, towards) = if rises { (">=", ">") } else { ("<=", "<") };
         format!(
-            "(({u}) {crossed} {threshold}) * 0 or clamp_min(ceil(({threshold} - ({u})) / (deriv(({u})[2d:15m]) {towards} 0) / 8640) / 10, 0) or (({u}) * 0 + 36500)"
+            "(({u}) {crossed} {threshold}) * 0 or clamp_min(ceil(({threshold} - ({u})) / (deriv(({u})[2d:15m]) {towards} 0) / 8640 - 1e-6) / 10, 0) or (({u}) * 0 + 36500)"
         )
     }
 
     #[tokio::test]
-    #[ignore = "spec §1 defect: ceil of a float quotient reads 5 days as 5.1; awaiting a decision"]
     async fn test_forecast_alert_query_gives_days_until_the_threshold() {
         let gauge = |at_t: f64, per_day: f64| {
             format!("vector({at_t} + {per_day} * (time() - {BASE}) / 86400)")

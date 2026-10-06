@@ -61,10 +61,10 @@ export const buildForecastAlertPromql = ({ U, T, direction, W }: ForecastAlertQu
   const stepMinutes = Math.round(WINDOW_SECONDS[W] / WINDOW_STEPS / 60);
   const crossed = direction === "rises" ? ">=" : "<=";
   const towards = direction === "rises" ? ">" : "<";
-  // ceil(seconds / 8640) / 10 is days rounded UP to one decimal, so `<= H` never fires early.
+  // Days rounded UP to one decimal, so `<= H` never fires early; 1e-6 absorbs float noise in the fit.
   return (
     `((${U}) ${crossed} ${T}) * 0` +
-    ` or clamp_min(ceil((${T} - (${U})) / (deriv((${U})[${W}:${stepMinutes}m]) ${towards} 0) / 8640) / 10, 0)` +
+    ` or clamp_min(ceil((${T} - (${U})) / (deriv((${U})[${W}:${stepMinutes}m]) ${towards} 0) / 8640 - 1e-6) / 10, 0)` +
     ` or ((${U}) * 0 + ${NEVER_DAYS})`
   );
 };
