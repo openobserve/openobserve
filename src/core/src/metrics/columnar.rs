@@ -137,7 +137,7 @@ impl ColumnarStream {
                 .column(*col, ColumnKind::Utf8)
                 .append_str(label.value());
         }
-        // a column the row gives no value reads NULL
+        // the builder pads a skipped cell with NULL
         if let Some(value) = value {
             bucket
                 .column(self.value_col, ColumnKind::Float64)
@@ -167,8 +167,7 @@ impl ColumnarStream {
     }
 }
 
-/// Remote write's streams nothing downstream needs as JSON: no pipeline, UDS, alert, partition key
-/// or odd type.
+/// Remote write's streams nothing downstream needs as JSON (pipeline, UDS, alert, partition key).
 pub(super) fn plan_columnar_streams(
     org_id: &str,
     unique_metrics: &HashSet<String>,

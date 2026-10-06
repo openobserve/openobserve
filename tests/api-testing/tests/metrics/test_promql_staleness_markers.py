@@ -130,8 +130,13 @@ def test_stale_marker_ends_the_series(create_session, base_url, org_id, stale_me
 
 def test_count_drops_at_the_marker(create_session, base_url, org_id, stale_metric):
     metric, at = stale_metric
-    result = _range(create_session, base_url, org_id, f"count({metric})", at[4], at[8])
-    counts = {int(float(t)): float(v) for t, v in result[0]["values"]}
+
+    def counts_after_marker():
+        result = _range(create_session, base_url, org_id, f"count({metric})", at[4], at[8])
+        counts = {int(float(t)): float(v) for t, v in result[0]["values"]} if result else {}
+        return counts if counts.get(at[6]) == 1 else None
+
+    counts = wait_until(counts_after_marker, timeout=120, interval=2, msg="count never dropped at the marker")
     assert counts[at[5]] == 2
     assert counts[at[6]] == 1
     assert counts[at[8]] == 1

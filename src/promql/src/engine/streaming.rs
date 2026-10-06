@@ -1661,8 +1661,7 @@ mod tests {
         }
     }
 
-    /// Ported from Prometheus `promql/promqltest/testdata/staleness.test`, with its 3.x
-    /// left-open windows.
+    /// Ported from Prometheus `promqltest/testdata/staleness.test`, with 3.x left-open windows.
     #[tokio::test]
     async fn test_upstream_staleness_cases() {
         let stale = f64::from_bits(STALE_NAN_BITS);

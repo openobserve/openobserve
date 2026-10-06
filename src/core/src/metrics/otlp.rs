@@ -71,8 +71,7 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
-/// The `flag` of every stored gauge or sum row; a stale marker's too, so its series keeps its
-/// labels.
+/// Every stored gauge or sum row's `flag`, a marker's too, so a marker keeps its series' labels.
 const STORED_NUMBER_POINT_FLAG: &str = "DATA_POINT_FLAGS_DO_NOT_USE";
 
 /// A number point's labels, rebuilt per point on top of its metric's base labels.

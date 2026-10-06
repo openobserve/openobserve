@@ -1091,8 +1091,7 @@ fn finish_identity_columns(json_data: &mut [PendingRecord]) {
     }
 }
 
-/// A sample's `value` cell under the policy OTLP shares, `None` for no row; `Some(None)` is a
-/// stale marker, kept only once the stream has a `value` column, which real samples create.
+/// A sample's `value` cell, `None` for no row; a marker needs the `value` column samples create.
 fn sample_cell(value: f64, schema: Option<&SchemaCache>) -> Option<Option<f64>> {
     let cell = super::sanitize_metric_value(value).row_value()?;
     (cell.is_some() || ingest::has_value_column(schema)).then_some(cell)
