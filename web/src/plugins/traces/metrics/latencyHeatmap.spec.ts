@@ -324,9 +324,14 @@ describe("isRangeSelectionCurrent", () => {
     expect(isRangeSelectionCurrent(entry, current())).toBe(true);
   });
 
-  it("keeps it when the composed text differs only in whitespace", () => {
-    const spaced = "(service_name  =  'a')\n and duration >= '100ms'   and duration < '500ms' ";
-    expect(isRangeSelectionCurrent(entry, current({ editorText: spaced }))).toBe(true);
+  it("keeps it when the editor adds only leading or trailing whitespace, as the editor trims", () => {
+    expect(isRangeSelectionCurrent(entry, current({ editorText: `  ${composed}\n` }))).toBe(true);
+  });
+
+  it("drops it when whitespace inside a quoted literal changes", () => {
+    const quoted = { ...entry, baselineFilter: "message = 'a b'" };
+    const typed = "(message = 'a  b') and duration >= '100ms' and duration < '500ms'";
+    expect(isRangeSelectionCurrent(quoted, current({ editorText: typed }))).toBe(false);
   });
 
   it("drops it for a different applied range", () => {

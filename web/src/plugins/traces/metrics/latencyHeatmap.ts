@@ -170,8 +170,6 @@ export interface RangeSelectionContext {
   editorText: string;
 }
 
-const normaliseWhitespace = (text: string) => text.replace(/\s+/g, " ").trim();
-
 // The selection holds only while the search still shows exactly what the box applied.
 export function isRangeSelectionCurrent(
   entry: MetricsRangeFilter,
@@ -183,6 +181,7 @@ export function isRangeSelectionCurrent(
     entry.appliedEnd === current.endTime &&
     entry.stream === current.stream &&
     entry.searchMode === current.searchMode &&
-    normaliseWhitespace(current.editorText ?? "") === normaliseWhitespace(expected)
+    // The editor writes the composed text verbatim and only trims it, so anything else is a real edit.
+    (current.editorText ?? "").trim() === expected.trim()
   );
 }
