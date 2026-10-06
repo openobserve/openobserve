@@ -60,6 +60,7 @@ describe("resolvePodLogs", () => {
         ),
         org_identifier: "org1",
         quick_mode: "false",
+        type: "trace_explorer",
       },
     });
     expect(link?.warnNoClusterField).toBe(false);

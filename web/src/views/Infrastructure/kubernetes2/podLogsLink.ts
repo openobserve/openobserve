@@ -128,6 +128,8 @@ export async function resolvePodLogs(
         org_identifier: ctx.orgId,
         // Logs reads an absent quick_mode as on, which drops every field but the trace ids.
         quick_mode: "false",
+        // The kept-alive Logs page re-reads the URL on activation only for this type.
+        type: "trace_explorer",
       },
     },
     warnNoClusterField: !chosen.hasClusterField && ctx.multiCluster,
