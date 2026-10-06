@@ -882,6 +882,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/cache/results", delete(stream::delete_stream_cache))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
+        .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -893,10 +894,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
         .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
         // OTLP Profiles is still development; otlp_http exporter defaults to this path.
-        .route(
-            "/{org_id}/v1development/profiles",
-            post(profiles::ingest::otlp_profiles_write),
-        )
+        .route("/{org_id}/v1development/profiles", post(profiles::ingest::otlp_profiles_write))
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
@@ -963,7 +961,19 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 
-        .merge(metrics_routes())
+        // Metrics
+        .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
+
+        // PromQL
+        .route("/{org_id}/prometheus/api/v1/write", post(promql::remote_write))
+        .route("/{org_id}/prometheus/api/v1/query", get(promql::query_get).post(promql::query_post))
+        .route("/{org_id}/prometheus/api/v1/query_range", get(promql::query_range_get).post(promql::query_range_post))
+        .route("/{org_id}/prometheus/api/v1/query_exemplars", get(promql::query_exemplars_get).post(promql::query_exemplars_post))
+        .route("/{org_id}/prometheus/api/v1/metadata", get(promql::metadata))
+        .route("/{org_id}/prometheus/api/v1/series", get(promql::series_get).post(promql::series_post))
+        .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
+        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
+        .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
 
         // Search
         .route("/{org_id}/_search", post(search::search))
@@ -2005,25 +2015,6 @@ pub fn service_routes() -> Router {
                 response
             }
         }))
-}
-
-// Split out of service_routes(), which sits at the clippy too_many_lines cap.
-fn metrics_routes() -> Router {
-    Router::new()
-        // Metrics
-        .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
-        .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
-
-        // PromQL
-        .route("/{org_id}/prometheus/api/v1/write", post(promql::remote_write))
-        .route("/{org_id}/prometheus/api/v1/query", get(promql::query_get).post(promql::query_post))
-        .route("/{org_id}/prometheus/api/v1/query_range", get(promql::query_range_get).post(promql::query_range_post))
-        .route("/{org_id}/prometheus/api/v1/query_exemplars", get(promql::query_exemplars_get).post(promql::query_exemplars_post))
-        .route("/{org_id}/prometheus/api/v1/metadata", get(promql::metadata))
-        .route("/{org_id}/prometheus/api/v1/series", get(promql::series_get).post(promql::series_post))
-        .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
-        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
-        .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -3311,14 +3302,11 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    /// `service_routes()` and the helpers below it, minus comments, whitespace and wrap commas.
+    /// `service_routes()` minus comments, whitespace and wrap commas.
     fn service_routes_registrations() -> String {
         let source = include_str!("mod.rs");
         let start = source.find("pub fn service_routes() -> Router {").unwrap();
-        let end = start
-            + source[start..]
-                .find("pub fn other_service_routes()")
-                .unwrap();
+        let end = start + source[start..].find("\npub fn ").unwrap();
         let mut body = String::new();
         let mut rest = &source[start..end];
         while let Some(at) = rest.find("/*") {
@@ -3342,7 +3330,7 @@ mod tests {
             service_routes_registrations().contains(
                 r#".route("/{org_id}/metrics/{metric_name}/usage",get(metrics_usage::get_metric_usage))"#
             ),
-            "GET /{{org_id}}/metrics/{{metric_name}}/usage must be registered under service_routes()"
+            "GET /{{org_id}}/metrics/{{metric_name}}/usage must be registered in service_routes()"
         );
     }
 
