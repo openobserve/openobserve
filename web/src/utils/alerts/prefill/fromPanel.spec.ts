@@ -593,6 +593,13 @@ describe("buildPrefillFromPanel — a formula query", () => {
     ]);
   });
 
+  it("keeps a '#' inside a backtick string from hiding the rest of an input", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].query = "sum(foo{path=`a#b`}) + sum(bar)";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual(["foo", "bar", "http_requests_total"]);
+  });
+
   it("takes a builder-mode input's metric from its builder stream", () => {
     const panel = formulaPanel("A / B");
     panel.queries![0].customQuery = false;

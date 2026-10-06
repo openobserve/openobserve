@@ -184,7 +184,10 @@ const conditionsFromFilters = (fields: any, makeId: () => string) => {
 
 // Quoted strings are matched first so a `#` inside a label value survives.
 const withoutComments = (text = ""): string =>
-  text.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|#[^\n]*/g, (_, quoted) => quoted ?? "");
+  text.replace(
+    /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`)|#[^\n]*/g,
+    (_, quoted) => quoted ?? "",
+  );
 
 /** The metrics a formula's inputs read, once each; an alert needs one of them as its stream. */
 const formulaInputStreams = (

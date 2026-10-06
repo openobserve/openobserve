@@ -33,7 +33,6 @@ async function typeIntoCurrentTab(page, text) {
   await editorText(page, text);
 }
 
-/** The `query` of every PromQL range request the page sends from now on. */
 function sentQueries(page) {
   const sent = [];
   page.on('request', (req) => {
