@@ -261,7 +261,7 @@ describe("CuratedPageView", () => {
         { face: ref("unknown"), dashboard: ref(null), loadError: ref(true) },
       );
       expect(wrapper.find('[data-test="curated-spinner"]').exists()).toBe(false);
-      const retry = wrapper.find('[data-test="curated-retry"]');
+      const retry = wrapper.find('[data-test="curated-error"] button');
       expect(retry.exists()).toBe(true);
       refreshSpy.mockClear();
       await retry.trigger("click");
@@ -1871,9 +1871,9 @@ describe("CuratedPageView", () => {
 
     it("the pack-unavailable escape hatch still routes to the dashboards LIST, creating nothing", async () => {
       // Locked decision 1 guard: it routes, and creates/copies/imports/forks nothing.
-      wrapper = await mountView({}, { manifest: null, packUnavailable: true });
-      const build = wrapper.find('[data-test="curated-pack-unavailable-build"]');
-      if (!build.exists()) return;
+      wrapper = await mountView({ workload: "packless" });
+      const build = wrapper.find('[data-test="curated-pack-unavailable"] button');
+      expect(build.exists()).toBe(true);
       await build.trigger("click");
       await flushPromises();
       expect(router.push).toHaveBeenCalledTimes(1);

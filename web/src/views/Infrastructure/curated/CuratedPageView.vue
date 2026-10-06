@@ -28,6 +28,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
@@ -79,7 +80,7 @@ const timezone = computed(() => store.state.timezone ?? "UTC");
 
 const DEFAULT_WINDOW_US = 3 * 60 * 60 * 1_000_000;
 
-/** The SELECTION, not its bounds: a relative window means "as of now", so it is materialized per refresh. */
+// The SELECTION, not its bounds: a relative window means "as of now", so it is materialized per refresh.
 type CuratedWindow =
   | { kind: "relative"; period: string; widthUs: number }
   | { kind: "absolute"; from: number; to: number };
@@ -98,9 +99,7 @@ const checkedAtMs = computed(() =>
   checkedAtUs.value === null ? null : Math.floor(checkedAtUs.value / 1000),
 );
 
-// MICROSECOND epoch, undivided: usePanelDataLoader reads these back with
-// `new Date(start_time.toISOString()).getTime()` and hands the result to
-// executePromQL as µs, so a ms-epoch Date lands the x-axis in 1970.
+// MICROSECOND epoch, undivided: usePanelDataLoader hands these to executePromQL as µs, so ms lands the x-axis in 1970.
 const currentTimeObj = computed(() => ({
   __global: {
     start_time: new Date(range.value.from),
@@ -180,14 +179,7 @@ watch(
   { immediate: true },
 );
 
-/**
- * The tab is shareable only if it is IN the URL, so the resolved selection is
- * written back — including the seeded default, which is what makes a plain
- * landing URL copyable without the reader first clicking something.
- *
- * `replace`, never `push` (ViewDashboard :1487): a tab is a view of one page,
- * so Back should leave the page rather than walk every tab the reader opened.
- */
+// Written back with `replace` (seeded default included) so the URL is shareable and Back leaves the page, not each tab.
 watch(
   selectedTabId,
   (tabId) => {
@@ -200,16 +192,14 @@ watch(
       .replace({ query: { ...route.query, tab: tabId } })
       .finally(() => (isInternalUrlUpdate.value = false));
   },
-  // The seeding watcher above resolves the default during setup, BEFORE this one exists; without
-  // immediate it would never see that first value and a landing URL would stay unshareable.
+  // The seeding watcher resolves the default before this one exists, so without immediate it never sees it.
   { immediate: true },
 );
 
 // ── Explainer strip ─────────────────────────────────────────────────────────
 
 const stripExpanded = ref(false);
-// SEEDS the expansion once (design pass-4 finding 8b: "first presentation only").
-// Re-syncing on every change discarded a collapse the user had just performed.
+// Seeds the expansion once: re-syncing on every change discarded a collapse the user had just performed.
 let stripSeeded = false;
 watch(
   stripAutoExpand,
@@ -228,12 +218,18 @@ const hasStrip = computed(
 
 const collapsedCapabilities = computed<I18nText>(() => {
   const sentences = hiddenGroups.value.map((hidden) => t(hidden.group.capabilityKey));
-  if (sentences.length === 0) return raw("");
+  // With nothing hidden the strip only carries stale or partial groups, which have no capability sentence to show.
+  const labels = [...staleGroups.value, ...partialGroups.value].map((entry) =>
+    t(entry.group.labelKey),
+  );
+  const items = sentences.length > 0 ? sentences : [...new Set(labels)];
+  const separator = sentences.length > 0 ? " " : ", ";
+  if (items.length === 0) return raw("");
   // Already-translated sentences: joining them widens to plain string, it does not untranslate them.
-  if (sentences.length <= 2) return raw(sentences.join(" "));
+  if (items.length <= 2) return raw(items.join(separator));
   return t("infra.curated.hiddenSummaryMore", {
-    first: sentences[0],
-    count: sentences.length - 1,
+    first: items[0],
+    count: items.length - 1,
   });
 });
 
@@ -282,7 +278,8 @@ const staleDurations = computed(() =>
     return {
       id: stale.group.id,
       key: noDataYet ? "infra.curated.staleNoDataBanner" : "infra.curated.staleBanner",
-      capability: t(stale.group.capabilityKey),
+      // The label, not the capability sentence: "... are unavailable stopped 3 hours ago" does not parse.
+      capability: t(stale.group.labelKey),
       duration: noDataYet ? "" : humanDuration(stale.lastSeenUs),
       date: noDataYet ? "" : formatUs(stale.lastSeenUs),
     };
@@ -322,26 +319,12 @@ const defaultFieldNamesWarning = computed(() =>
 
 const variableList = computed(() => ((dashboard.value as any)?.variables?.list ?? []) as any[]);
 
-/**
- * Panels query COMMITTED variable state (RenderDashboardCharts
- * getCommittedVariablesForPanel), and a selection only reaches it through
- * commitAll — which every other embedder triggers from its own Refresh
- * (ViewDashboard :1254, AppPerformance :326, TracesAnalysisDashboard :782).
- * A curated page has no such button for pickers: PanelContainer's per-panel
- * "refresh to apply variables" control is `v-if="!viewOnly"` (:204) and this
- * page is viewOnly, so an uncommitted selection would be unappliable. Commit
- * on the selection itself instead — the picker IS the apply gesture here.
- */
+// Panels read COMMITTED variables and this viewOnly page has no apply button, so the picker selection itself commits.
 type VariablesManager = ReturnType<typeof useVariablesManager>;
 const variablesManager = ref<VariablesManager | null>(null);
 let stopCommitWatch: (() => void) | undefined;
 
-/**
- * A cleared picker has to leave the URL too, or a refresh restores the scope the
- * user just dropped. getUrlParams omits an empty value (useVariablesManager
- * :994-1002), so rebuilding every `var-` key from it deletes exactly the cleared
- * ones — including the `.t.`/`.p.` suffixed shapes a prefix match would miss.
- */
+// Rebuilding every `var-` key from getUrlParams (which omits empties) drops cleared pickers, suffixed shapes included.
 const syncPickerUrl = (manager: VariablesManager) => {
   const params = manager.getUrlParams({ useLive: false });
   const query: Record<string, any> = { ...route.query };
@@ -361,8 +344,7 @@ const syncPickerUrl = (manager: VariablesManager) => {
 const onVariablesManagerReady = (manager: VariablesManager) => {
   variablesManager.value = manager;
   stopCommitWatch?.();
-  // Values ONLY: options and loading flags churn on every fetch, and committing
-  // on those would re-run panels for a picker the user never touched.
+  // Values ONLY: options and loading flags churn per fetch and would re-run panels for an untouched picker.
   stopCommitWatch = watch(
     () => manager.variablesData.global.map((variable) => variable.value),
     () => {
@@ -377,11 +359,7 @@ onBeforeUnmount(() => stopCommitWatch?.());
 
 // ── Fleet-quadrant drilldown ────────────────────────────────────────────────
 
-/**
- * The sandboxed chart JS cannot see the router, so it announces the pick as a
- * DOM event and the routing happens here — `location.assign` in the sandbox
- * reloaded the whole SPA, losing every panel's data and in-memory state.
- */
+// The sandboxed chart JS cannot reach the router, so it emits a DOM event; `location.assign` reloaded the whole SPA.
 const onClusterDrilldown = (event: Event) => {
   const cluster = (event as CustomEvent<{ cluster?: string }>).detail?.cluster;
   if (!cluster) return;
@@ -398,19 +376,11 @@ const onClusterDrilldown = (event: Event) => {
 onMounted(() => document.addEventListener(FLEET_DRILLDOWN_EVENT, onClusterDrilldown));
 onBeforeUnmount(() => document.removeEventListener(FLEET_DRILLDOWN_EVENT, onClusterDrilldown));
 
-/**
- * The reload used to re-seed the tab and the pickers off the URL; a mounted view
- * is re-entered instead, so the drilldown's own two params are applied here.
- * Covers Back and Forward too, which restore a query and nothing else.
- *
- * Keyed on those two ALONE: reacting to the whole query would snap the tab back
- * on unrelated param churn.
- */
+// Re-applies the drilldown's two params on re-entry and Back/Forward; keyed on them alone so other params don't snap the tab.
 watch(
   () => [route.query.tab, route.query["var-cluster"]] as const,
   () => {
-    // Our own ?tab= write echoes back here, and it never carries var-cluster — re-entering
-    // would hit the reset below and drop a hand-picked cluster on every tab click.
+    // Our own ?tab= echo carries no var-cluster; re-entering would reset a hand-picked cluster on every tab click.
     if (isInternalUrlUpdate.value) return;
     const query = route.query;
     const tabs = visibleTabs.value;
@@ -561,41 +531,28 @@ watch(
       </div>
     </template>
 
-    <div
+    <OEmptyState
       v-if="!hasPack"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      size="hero"
+      illustration="board"
+      class="min-h-0 flex-1"
       data-test="curated-pack-unavailable"
-    >
-      <OText tag="h2" class="text-base font-semibold">{{
-        t("infra.curated.packUnavailable")
-      }}</OText>
-      <OText variant="meta">{{ t("infra.curated.packUnavailableHint") }}</OText>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="curated-pack-unavailable-build"
-        @click="openDashboardsList"
-      >
-        {{ t("infra.curated.buildOwnDashboard") }}
-      </OButton>
-    </div>
+      :title="t('infra.curated.packUnavailable')"
+      :description="t('infra.curated.packUnavailableHint')"
+      :action-label="t('infra.curated.buildOwnDashboard')"
+      @action="openDashboardsList"
+    />
 
     <!-- `unknown` + loadError is the lists-failed state, never an endless spinner. -->
-    <div
+    <OEmptyState
       v-else-if="face === 'unknown' && loadError"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      preset="load-error"
+      size="hero"
+      class="min-h-0 flex-1"
       data-test="curated-error"
-    >
-      <OText variant="meta">{{ t("infra.curated.pageError") }}</OText>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="curated-retry"
-        @click="runRefresh(true)"
-      >
-        {{ t("infra.curated.retry") }}
-      </OButton>
-    </div>
+      :description="t('infra.curated.pageError')"
+      @action="runRefresh(true)"
+    />
 
     <div
       v-else-if="face === 'unknown'"
@@ -638,32 +595,35 @@ watch(
       </div>
     </div>
 
-    <!-- The streams exist and merely stopped reporting. Rendering the SETUP face
-         here would tell an org to install a collector it already has, so this
-         face names the outage instead and offers no setup CTA. -->
-    <div v-else-if="face === 'dormant'" class="min-h-0 flex-1 overflow-y-auto">
-      <div
-        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
-        data-test="curated-dormant-state"
+    <!-- Streams exist but stopped reporting, so this names the outage and offers no setup CTA. -->
+    <div
+      v-else-if="face === 'dormant'"
+      class="flex min-h-0 flex-1 flex-col justify-center-safe overflow-y-auto"
+      data-test="curated-dormant-state"
+    >
+      <OEmptyState
+        illustration="hourglass"
+        :title="t('infra.curated.dormantHeadline', { workload: t(manifest.titleKey) })"
+        :description="t('infra.curated.dormantBody')"
       >
-        <OText tag="h2" class="text-xl font-semibold">{{
-          t("infra.curated.dormantHeadline", { workload: t(manifest.titleKey) })
-        }}</OText>
-        <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
-        <OBanner
-          v-for="hidden in dormantGroups"
-          :key="hidden.group.id"
-          variant="warning"
-          dense
-          data-test="curated-dormant-stream"
-          :content="
-            t('infra.curated.streamsStale', {
-              list: hidden.streams,
-              date: hidden.date,
-            })
-          "
-        />
-      </div>
+        <template #extra>
+          <div class="flex w-full max-w-xl flex-col gap-2 text-start">
+            <OBanner
+              v-for="hidden in dormantGroups"
+              :key="hidden.group.id"
+              variant="warning"
+              dense
+              data-test="curated-dormant-stream"
+              :content="
+                t('infra.curated.streamsStale', {
+                  list: hidden.streams,
+                  date: hidden.date,
+                })
+              "
+            />
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <div v-else-if="dashboard" class="flex min-h-0 flex-1 flex-col">
@@ -739,9 +699,7 @@ watch(
                 >
                   <div class="flex items-center justify-between gap-2">
                     <OText>{{ t(hidden.group.capabilityKey) }}</OText>
-                    <!-- A group that is PRESENT (its siblings render) has its
-                         collector installed already; only the field is missing,
-                         so "Set up" would send the user to re-install what works. -->
+                    <!-- A PRESENT group's collector already works; only a field is missing, so no "Set up". -->
                     <OButton
                       v-if="!presentGroupIds.includes(hidden.group.id)"
                       variant="outline"
@@ -851,8 +809,7 @@ watch(
               </div>
             </OCollapsible>
 
-            <!-- Last in the region, so it sits directly above the grid it
-                 qualifies rather than being pushed off by banners. -->
+            <!-- Last, so the note sits directly above the grid it qualifies. -->
             <OText v-if="sectionNoteKey" variant="meta" data-test="curated-section-note">{{
               t(sectionNoteKey)
             }}</OText>
