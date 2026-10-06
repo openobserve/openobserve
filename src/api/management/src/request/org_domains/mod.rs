@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Authenticated admin CRUD for status pages. Routes live in `service_routes()`
-//! under `auth_middleware`, so per-route RBAC is enforced declaratively by the
-//! OpenFGA route-permission middleware (mirrors synthetics). The one check that
-//! CANNOT be declarative is the per-mapped-check folder-authz (R-1) — a status
-//! page must never publish the status of a synthetics check the caller cannot
-//! read — so `set_components` verifies each check in-handler before writing.
-
 use axum::{Json, extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::status_pages::CreateDomainRequest;
@@ -50,21 +43,22 @@ pub async fn link_domain(
             return MetaHttpResponse::internal_error(format!("error getting org settings : {e}"));
         }
     };
+    let domain = body.domain.trim().to_lowercase();
 
     if org_settings
         .domain_org_mappings
         .iter()
-        .find(|v| v.domain == body.domain)
+        .find(|v| v.domain.to_lowercase() == domain)
         .is_some()
     {
         return MetaHttpResponse::bad_request("this domain is already mapped to this org");
     }
 
-    match org_domain_ownership::get_org_for_domain(&body.domain).await {
+    match org_domain_ownership::get_org_for_domain(&domain).await {
         Ok(Some(_)) => {
-            return MetaHttpResponse::bad_request(format!(
-                "This domain is already claimed by some other org"
-            ));
+            return MetaHttpResponse::bad_request(
+                "This domain is already claimed by some other org",
+            );
         }
         Err(e) => {
             return MetaHttpResponse::internal_error(format!(
@@ -74,20 +68,16 @@ pub async fn link_domain(
         _ => {}
     }
 
-    match org_domain_ownership::save_org_domain_mapping(&org_id, &body.domain).await {
+    match org_domain_ownership::save_org_domain_mapping(&org_id, &domain).await {
         Ok(_) => {
             log::info!(
-                "successfully created org domain ownership entry for {org_id} domain {} by user {}",
-                body.domain,
+                "successfully created org domain ownership entry for {org_id} domain {domain} by user {}",
                 user.user_id
             );
             MetaHttpResponse::ok("successfully created mapping request")
         }
         Err(e) => {
-            log::error!(
-                "error saving domain {} link to org {org_id} : {e}",
-                body.domain
-            );
+            log::error!("error saving domain {domain} link to org {org_id} : {e}",);
             MetaHttpResponse::internal_error(format!("error saving org domain linking : {e}"))
         }
     }
@@ -97,17 +87,37 @@ pub async fn delete_linked_domain(
     Path((org_id, did)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
-    match org_domain_ownership::delete_linked_domain(&org_id, &did).await {
+    let domain = did.trim().to_lowercase();
+    let record = match org_domain_ownership::get_org_for_domain(&domain).await {
+        Ok(v) => v,
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!(
+                "error getting org domain linking : {e}"
+            ));
+        }
+    };
+
+    match record {
+        None => {
+            return MetaHttpResponse::bad_request("org domain link not found");
+        }
+        Some(org) if org != org_id => {
+            return MetaHttpResponse::bad_request("domain not linked to this org");
+        }
+        _ => {}
+    }
+
+    match org_domain_ownership::delete_linked_domain(&org_id, &domain).await {
         Ok(_) => {
             log::info!(
-                "removed domain link of {did} from org {org_id} by user {}",
+                "removed domain link of {domain} from org {org_id} by user {}",
                 user.user_id
             );
             MetaHttpResponse::ok("successfully deleted mapping")
         }
         Err(e) => {
             log::error!(
-                "error removing domain link of {did} from org {org_id} by user {} : {e}",
+                "error removing domain link of {domain} from org {org_id} by user {} : {e}",
                 user.user_id
             );
             MetaHttpResponse::internal_error(format!("error deleting org domain linking : {e}"))
@@ -119,11 +129,12 @@ pub async fn verify_domain(
     Path((org_id, did)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
-    match org_domain_ownership::verify_domain_now(&org_id, &did).await {
-        Ok(_) => MetaHttpResponse::ok("successfully deleted mapping"),
+    let domain = did.trim().to_lowercase();
+    match org_domain_ownership::verify_domain_now(&org_id, &domain).await {
+        Ok(_) => MetaHttpResponse::ok("successfully verified mapping"),
         Err(e) => {
             log::error!(
-                "error verifying domain {did} for org {org_id} by user {}: {e}",
+                "error verifying domain {domain} for org {org_id} by user {}: {e}",
                 user.user_id
             );
             MetaHttpResponse::bad_request(e)

@@ -122,12 +122,11 @@ pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<(), anyhow:
             "no mapping for domain {domain} foung for org {org_id}"
         ));
     };
-    emit_sync_event(org_id, domain).await;
-
     if verify(record).await? == OwnershipState::Verfied as i32 {
         let mut lock = CACHE.write().await;
         lock.insert(domain.to_owned(), org_id.to_owned());
     }
+    emit_sync_event(org_id, domain).await;
     Ok(())
 }
 
@@ -179,57 +178,54 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
 
-        match ev {
-            Event::Put(ev) => {
-                let Some(key) = ev.key.strip_prefix(ODO_PREFIX) else {
-                    log::error!("unexpected key for org domain prefix watch : {}", ev.key);
-                    continue;
-                };
-                let Some((org, domain)) = key.split_once("/") else {
+        if let Event::Put(ev) = ev {
+            let Some(key) = ev.key.strip_prefix(ODO_PREFIX) else {
+                log::error!("unexpected key for org domain prefix watch : {}", ev.key);
+                continue;
+            };
+            let Some((org, domain)) = key.split_once("/") else {
+                log::error!(
+                    "invalid key received for org domain ownership sync : {}",
+                    ev.key
+                );
+                continue;
+            };
+            log::info!("received sync event for org domain ownership for org {org}");
+            let record = match infra::table::org_domain_ownership::get_domain_org_record(
+                org, domain,
+            )
+            .await
+            {
+                Ok(v) => v,
+                Err(e) => {
                     log::error!(
-                        "invalid key received for org domain ownership sync : {}",
-                        ev.key
+                        "error in retrieving org domain ownership record from db for {org} domain {domain} : {e}"
                     );
                     continue;
-                };
-                log::info!("received sync event for org domain ownership for org {org}");
-                let record = match infra::table::org_domain_ownership::get_domain_org_record(
-                    org, domain,
-                )
-                .await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "error in retrieving org domain ownership record from db for {org} domain {domain} : {e}"
-                        );
-                        continue;
-                    }
-                };
-                let mut lock = CACHE.write().await;
-                match record {
-                    None => {
+                }
+            };
+            let mut lock = CACHE.write().await;
+            match record {
+                None => {
+                    log::info!(
+                        "removing org {org} domain {domain} from memory cache as record not found in db"
+                    );
+                    lock.remove(domain);
+                }
+                Some(v) => {
+                    if v.verification_state == OwnershipState::Verfied as i32 {
                         log::info!(
-                            "removing org {org} domain {domain} from memory cache as record not found in db"
+                            "added org {org} domain {domain} from memory cache as verified in db"
+                        );
+                        lock.insert(domain.to_owned(), org.to_owned());
+                    } else {
+                        log::info!(
+                            "removed org {org} domain {domain} from memory cache as not verified in db"
                         );
                         lock.remove(domain);
                     }
-                    Some(v) => {
-                        if v.verification_state == OwnershipState::Verfied as i32 {
-                            log::info!(
-                                "added org {org} domain {domain} from memory cache as verified in db"
-                            );
-                            lock.insert(domain.to_owned(), org.to_owned());
-                        } else {
-                            log::info!(
-                                "removed org {org} domain {domain} from memory cache as not verified in db"
-                            );
-                            lock.remove(domain);
-                        }
-                    }
                 }
             }
-            _ => {}
         }
     }
 }

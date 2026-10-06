@@ -3,7 +3,7 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde::Serialize, serde::Deserialize)]
-#[sea_orm(table_name = "status_page_custom_domains")]
+#[sea_orm(table_name = "org_domain_ownership")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,

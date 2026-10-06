@@ -19,8 +19,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(feature = "cloud")]
-use config::META_ORG_ID;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
@@ -153,14 +151,28 @@ pub async fn create(
         data.cross_links = cross_links;
     }
 
-    // ignore this for all non _meta orgs
     #[cfg(feature = "cloud")]
-    if org_id == META_ORG_ID
-        && let Some(mut mappings) = settings.domain_org_mappings
-    {
+    if let Some(mut mappings) = settings.domain_org_mappings {
+        use hashbrown::HashSet;
+
         field_found = true;
+        let child_orgs =
+            o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(&org_id)
+                .await
+                .unwrap_or_default();
+
+        let mut allowed_orgs: HashSet<_> =
+            child_orgs.into_iter().map(|v| v.member_org_id).collect();
+        allowed_orgs.insert(org_id.clone());
         for mapping in &mut mappings {
             use o2_openfga::authorizer::roles::get_all_roles;
+
+            if !allowed_orgs.contains(&mapping.org_id) {
+                return MetaHttpResponse::bad_request(format!(
+                    "Not allowed to setup a mapping for org {}",
+                    mapping.org_id
+                ));
+            }
 
             if openobserve_core::organization::get_org(&mapping.org_id)
                 .await
@@ -196,7 +208,7 @@ pub async fn create(
                     }
                 };
                 if !matches!(role.as_str(), "admin" | "editor" | "viewer" | "user")
-                    && !all_roles.contains(&format_role_name(&org_id, role))
+                    && !all_roles.contains(&format_role_name(&mapping.org_id, role))
                 {
                     return MetaHttpResponse::bad_request(format!(
                         "custom role {role} not found in org {}",

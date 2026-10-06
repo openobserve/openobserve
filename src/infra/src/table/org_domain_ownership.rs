@@ -41,7 +41,7 @@ pub async fn list_active_domain_org_map() -> Result<HashMap<String, String>, any
         .select_only()
         .column(Column::OrgId)
         .column(Column::Domain)
-        .filter(Column::VerificationState.eq(OwnershipState::Verfied as u8))
+        .filter(Column::VerificationState.eq(OwnershipState::Verfied as i32))
         .into_tuple::<(String, String)>()
         .all(client)
         .await?;

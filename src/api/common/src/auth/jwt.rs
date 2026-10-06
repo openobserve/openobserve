@@ -50,7 +50,7 @@ use {
     },
     std::collections::HashSet,
 };
-#[cfg(all(feature = "enterprise"))]
+#[cfg(feature = "enterprise")]
 use {
     config::meta::user::{UserOrg, UserRole},
     o2_dex::config::get_config as get_dex_config,
@@ -759,7 +759,7 @@ async fn map_group_to_custom_role(
     }
 }
 
-#[cfg(all(feature = "enterprise"))]
+#[cfg(feature = "enterprise")]
 pub fn format_role_name(org_id: &str, role: &str) -> String {
     let role = format_role_name_only(role);
     format!("{org_id}/{role}")
@@ -928,7 +928,7 @@ pub async fn process_domain_org_mapping(
         return Ok(true);
     }
 
-    let Some(mapped) = mappings.get(0) else {
+    let Some(mapped) = mappings.iter().find(|v| v.domain.to_lowercase() == domain) else {
         log::warn!(
             "mapping for domain {domain} cached, but not found in settings, skipping for user {user_email}"
         );
@@ -988,7 +988,7 @@ pub async fn process_domain_org_mapping(
     // mapped base role
     let mut remove_tuples = Vec::new();
 
-    for (org, _) in &parsed_orgs {
+    for org in parsed_orgs.keys() {
         if !existing_orgs.contains(org) && allowed_orgs.contains(org) {
             add_orgs.insert(org);
         }
@@ -1075,7 +1075,7 @@ pub async fn process_domain_org_mapping(
         mapped.org_id
     );
     log::info!("domain org mapping for user {user_email} successfully processed");
-    return Ok(true);
+    Ok(true)
 }
 
 #[cfg(feature = "cloud")]
@@ -1299,7 +1299,7 @@ pub async fn check_and_add_to_org(
 ///
 /// Returns Some((source_orgs, custom_roles)) if custom parsing succeeded
 /// Returns None if custom parsing is disabled or not available
-#[cfg(all(feature = "enterprise"))]
+#[cfg(feature = "enterprise")]
 async fn process_custom_claim_parsing(
     claims: &HashMap<String, Value>,
     org_id: &str,

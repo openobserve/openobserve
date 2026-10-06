@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::user::UserRole, stats::MemorySize};
+#[cfg(feature = "cloud")]
 use o2_enterprise::enterprise::domain_management::meta::DomainManagementConfig;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -1484,8 +1485,11 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
+            #[cfg(feature = "cloud")]
             domain_org_mappings: None,
+            #[cfg(feature = "cloud")]
             role_name_claim: None,
+            #[cfg(feature = "cloud")]
             create_missing_role: None,
             #[cfg(feature = "cloud")]
             domain_management_config: None,
