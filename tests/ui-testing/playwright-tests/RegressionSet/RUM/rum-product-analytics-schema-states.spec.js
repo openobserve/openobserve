@@ -1,11 +1,11 @@
-// Each describe owns a fresh org whose _rumdata schema differs from a full one in exactly one optional field (ENT#2798-2801).
+// Each describe owns a stable org whose _rumdata schema differs from a full one in exactly one optional field (ENT#2798-2801).
 
 const { test, expect } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { encodeDef } = require('../../../pages/rumPages/rumProductAnalyticsPage.js');
+const { encodeDef, funnelParam, sqlOf } = require('../../../pages/rumPages/rumProductAnalyticsPage.js');
 const {
-  createRumStateOrg,
+  ensureRumStateOrg,
   rumSchemaFields,
   seedBuilt,
   ensureSessionReplayStream,
@@ -17,24 +17,14 @@ const {
   HOUR_MS,
 } = require('../../utils/rum-analytics-ingestion.js');
 
-const TAGS = ['@rum', '@rumAnalytics', '@rum-product-analytics', '@regression', '@P0', '@all'];
-const SEARCH_URL = /\/api\/[^/]+\/_search(\?|$)/;
+const tags = (priority) => ['@rum', '@rumAnalytics', priority, '@all', '@regression'];
+const TAGS = tags('@P0');
+// _search and the Trends panel's _search_stream only; _search_partition, _search_history and the rest are not analytics queries.
+const SEARCH_URL = /\/api\/[^/]+\/_search(_stream)?(\?|$)/;
 // The app probe of an org that never ingested RUM answers 400 "stream not found" (code 20002) by design; the shell handles it.
 const STREAM_NOT_FOUND = /"code":\s*20002|Search stream not found/;
 
-const funnelParam = (steps, extra = {}) => encodeDef({ s: steps, u: 'sessions', w: 'session', ...extra });
-
-const sqlOf = (request) => {
-  try {
-    const body = JSON.parse(request.postData() || '{}');
-    const sql = body.query?.sql || '';
-    return body.encoding === 'base64' ? Buffer.from(sql, 'base64').toString('utf8') : sql;
-  } catch {
-    return '';
-  }
-};
-
-/** Records every `_search` answered with HTTP 400 (SQL + message) and the SQL of every 200; attach before the first goto. */
+/** Records every `_search` / `_search_stream` answered with HTTP 400 (SQL + message) and the SQL of every 200; start it before the first goto. */
 function watchSearch400(page) {
   const bad = [];
   const ok = [];
@@ -50,7 +40,7 @@ function watchSearch400(page) {
     if (!SEARCH_URL.test(r.url())) return;
     if (r.status() === 200) ok.push(sqlOf(r.request()));
     if (r.status() !== 400) return;
-    const entry = { sql: sqlOf(r.request()).slice(0, 600), message: '' };
+    const entry = { status: r.status(), sql: sqlOf(r.request()).slice(0, 600), message: '' };
     bad.push(entry);
     reads.push(r.text().then((t) => { entry.message = t.slice(0, 300); }).catch(() => {}));
   };
@@ -62,6 +52,11 @@ function watchSearch400(page) {
     bad,
     ok,
     // A search still in flight could answer 400 after the check, so wait for every one to finish first.
+    // Runs from `finally`, so a 400 behind an earlier failed UI assertion still reaches the report.
+    attach: async (testInfo) => {
+      await Promise.all(reads);
+      if (bad.length) await testInfo.attach('search-400s.json', { body: JSON.stringify(bad, null, 2), contentType: 'application/json' });
+    },
     settled: async () => {
       await expect.poll(() => pending, { timeout: 60000, message: '_search requests still in flight' }).toBe(0);
       await Promise.all(reads);
@@ -82,11 +77,11 @@ async function expectNo400(w) {
   expect(w.bad, describe400(w.bad)).toEqual([]);
 }
 
-/** Creates the org, ingests each seed into it and checks the schema is in the state the describe needs. */
+/** Finds or creates the org, ingests each seed into it and checks the schema is in the state the describe needs. */
 async function prepareStateOrg(browser, prefix, seeds, { has = [], lacks = [], extra = null } = {}) {
   const page = await browser.newPage();
   try {
-    const { identifier } = await createRumStateOrg(page, prefix);
+    const { identifier } = await ensureRumStateOrg(page, prefix);
     const nowMs = Date.now();
     const facts = [];
     for (const build of seeds) facts.push(await seedBuilt(page, build(nowMs), { nowMs, orgId: identifier }));
@@ -129,7 +124,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
 
     test('a web app in an org with view_name loads Pages, Entry/Exit, the funnel and the quick starts (ENT#2798)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -158,13 +153,14 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.waitForNetworkQuiet();
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
 
     test('a mobile app ranks screens by view_name and funnels and paths over them (ENT#2798)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const { home, product, cart } = mob.screens;
       const w = watchSearch400(page);
@@ -194,6 +190,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.waitForNetworkQuiet();
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
@@ -212,7 +209,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
 
     test('suggestions and all three drop-off sections load without session_has_replay (ENT#2799)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -240,13 +237,14 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.waitForNetworkQuiet();
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
 
     test('Paths and the branch drawer load without session_has_replay (ENT#2799)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -269,6 +267,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.waitForNetworkQuiet();
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
@@ -288,7 +287,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
 
     test('the Sessions list renders its empty list instead of failing on session_has_replay (ENT#2799)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -303,6 +302,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         expect(w.ok.some((sql) => /FROM "_rumdata"[\s\S]*GROUP BY session_id/.test(sql)), 'the Sessions list query ran and answered 200').toBe(true);
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
@@ -321,7 +321,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
 
     test('Overview says clicks are not captured while Pages still rank (ENT#2800)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -333,13 +333,14 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.waitForNetworkQuiet();
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
 
     test('Paths all and pages render, clicks-only is an empty state, and From lists pages (ENT#2800)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -363,6 +364,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.waitForNetworkQuiet();
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
@@ -381,7 +383,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
 
     test('a country breakdown link computes the plain funnel without geo_info_country (ENT#2801)', {
       tag: TAGS,
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -395,6 +397,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.waitForNetworkQuiet();
         await expectNo400(w);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });
@@ -408,8 +411,8 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
     });
 
     test('shows the RUM onboarding state, not empty panels', {
-      tag: ['@rum', '@rumAnalytics', '@rum-product-analytics', '@P1', '@all'],
-    }, async ({ page }) => {
+      tag: tags('@P1'),
+    }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const w = watchSearch400(page);
       try {
@@ -424,6 +427,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         const unexpected = w.bad.filter((b) => !STREAM_NOT_FOUND.test(b.message));
         expect(unexpected, describe400(unexpected)).toEqual([]);
       } finally {
+        await w.attach(testInfo);
         w.stop();
       }
     });

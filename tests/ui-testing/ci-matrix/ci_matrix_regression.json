@@ -199,6 +199,6 @@
     "disabled": [],
     "ingest_allowed_upto": "1440",
     "workers": 1,
-    "_comment": "RUM bug-fix regressions. rum-product-analytics-schema-states creates its own orgs and seeds back-dated _rumdata (1-3 days), so the shard accepts 60 days of backdated ingestion; workers 1 for long analytics searches."
+    "_comment": "RUM bug-fix regressions. rum-product-analytics-schema-states seeds _rumdata up to ~5 hours old, right on the workflow default ZO_INGEST_ALLOWED_UPTO of 5 hours, so the shard raises it to 1440 like RUM-Analytics; workers 1 for long analytics searches."
   }
 ]

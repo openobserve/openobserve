@@ -314,15 +314,15 @@ function buildSyntheticMixSeed(appId, nowMs = Date.now()) {
 
 const ORG_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
-/** Basic-auth API context for the run's org, or for a state org this run created, which only root (its creator) belongs to. */
-function apiContext(orgId = null) {
+/** Basic-auth API context for `orgId` (default: the run's org); `asRoot` signs in as root instead of the run's user. */
+function apiContext({ orgId = null, asRoot = false } = {}) {
   const ctx = rumTestContext();
+  if (orgId && !ORG_ID_PATTERN.test(orgId)) throw new Error(`org id "${orgId}" is not safe for an API path`);
   let { email, password } = ctx;
-  if (orgId) {
-    if (!ORG_ID_PATTERN.test(orgId)) throw new Error(`org id "${orgId}" is not safe for an API path`);
+  if (asRoot) {
     email = process.env.ZO_ROOT_USER_EMAIL;
     password = process.env.ZO_ROOT_USER_PASSWORD;
-    if (!email || !password) throw new Error('State orgs need ZO_ROOT_USER_EMAIL / ZO_ROOT_USER_PASSWORD');
+    if (!email || !password) throw new Error('Root API calls need ZO_ROOT_USER_EMAIL / ZO_ROOT_USER_PASSWORD');
   }
   return {
     orgId: orgId || ctx.orgId,
@@ -334,11 +334,24 @@ function apiContext(orgId = null) {
   };
 }
 
-/** Creates a fresh org as root (OSS lets no one else) and returns its server-generated identifier. */
-async function createRumStateOrg(page, prefix) {
-  const name = `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  // Any valid org id selects root credentials; the create route itself is org-less.
-  const { baseUrl, headers } = apiContext(rumTestContext().orgId);
+// A state org only root (its creator) belongs to, so calls into one act as root.
+const orgApiContext = (orgId) => apiContext({ orgId, asRoot: Boolean(orgId) });
+
+/** Returns the org named exactly `name`, creating it as root (OSS lets no one else) only when it does not exist yet. */
+async function ensureRumStateOrg(page, name) {
+  if (!ORG_ID_PATTERN.test(name)) throw new Error(`org name "${name}" is not a plain identifier`);
+  // Stable names: there is no org delete route, so one org per state forever beats one per run.
+  const { baseUrl, headers } = apiContext({ asRoot: true });
+  const list = await page.request.get(`${baseUrl}/api/organizations?page_size=10000`, { headers });
+  const listText = await list.text();
+  if (!list.ok()) throw new Error(`org list failed: ${list.status()} ${listText}`);
+  const existing = (JSON.parse(listText).data || [])
+    .filter((o) => o.name === name)
+    .sort((a, b) => a.id - b.id)[0];
+  if (existing) {
+    testLogger.info('Reusing RUM state org', { name, identifier: existing.identifier });
+    return { name, identifier: existing.identifier };
+  }
   const res = await page.request.post(`${baseUrl}/api/organizations`, { headers, data: { name } });
   const text = await res.text();
   if (!res.ok()) throw new Error(`org create failed: ${res.status()} ${text}`);
@@ -351,7 +364,7 @@ async function createRumStateOrg(page, prefix) {
 
 /** The org's _rumdata field names, or null when the stream does not exist. */
 async function rumSchemaFields(page, orgId) {
-  const { baseUrl, headers } = apiContext(orgId);
+  const { baseUrl, headers } = orgApiContext(orgId);
   const res = await page.request.get(`${baseUrl}/api/${orgId}/streams/_rumdata/schema?type=logs`, { headers });
   if (res.status() === 404) return null;
   if (!res.ok()) throw new Error(`schema read failed for ${orgId}: ${res.status()} ${await res.text()}`);
@@ -359,7 +372,7 @@ async function rumSchemaFields(page, orgId) {
 }
 
 async function ingestJson(page, stream, rows, { orgId = null } = {}) {
-  const { orgId: org, baseUrl, headers } = apiContext(orgId);
+  const { orgId: org, baseUrl, headers } = orgApiContext(orgId);
   const res = await page.request.post(`${baseUrl}/api/${org}/${stream}/_json`, { headers, data: rows });
   const body = await res.text();
   if (!res.ok()) throw new Error(`${stream} ingest failed: ${res.status()} ${body}`);
@@ -374,7 +387,7 @@ async function ingestJson(page, stream, rows, { orgId = null } = {}) {
 const postRows = (page, rows, opts = {}) => ingestJson(page, '_rumdata', rows, opts);
 
 async function waitForStream(page, stream, { orgId = null } = {}) {
-  const { orgId: org, baseUrl, headers } = apiContext(orgId);
+  const { orgId: org, baseUrl, headers } = orgApiContext(orgId);
   const deadline = Date.now() + 90000;
   while (Date.now() < deadline) {
     const res = await page.request.get(`${baseUrl}/api/${org}/streams/${stream}/schema?type=logs`, { headers });
@@ -448,7 +461,7 @@ async function seedLongPageApp(page, { appId, nowMs = Date.now() }) {
 }
 
 async function waitForRows(page, appId, expected, nowMs, { orgId = null } = {}) {
-  const { orgId: org, baseUrl, headers } = apiContext(orgId);
+  const { orgId: org, baseUrl, headers } = orgApiContext(orgId);
   const deadline = Date.now() + 90000;
   const sql = `SELECT COUNT(*) AS n FROM "_rumdata" WHERE application_id = '${appId}'`;
   while (Date.now() < deadline) {
@@ -467,7 +480,7 @@ async function waitForRows(page, appId, expected, nowMs, { orgId = null } = {}) 
 
 module.exports = {
   apiContext,
-  createRumStateOrg,
+  ensureRumStateOrg,
   rumSchemaFields,
   seedBuilt,
   waitForStream,

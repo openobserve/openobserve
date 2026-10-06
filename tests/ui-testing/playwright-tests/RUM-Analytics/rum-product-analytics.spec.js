@@ -4,7 +4,7 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const { rumTestContext } = require('../utils/rum-env.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { encodeDef } = require('../../pages/rumPages/rumProductAnalyticsPage.js');
+const { encodeDef, funnelParam, sqlOf } = require('../../pages/rumPages/rumProductAnalyticsPage.js');
 const {
   apiContext,
   ensureSessionReplayStream,
@@ -13,7 +13,7 @@ const {
   seedPlaceholderIdentityApp,
   seedLongPageApp,
   seedBuilt,
-  createRumStateOrg,
+  ensureRumStateOrg,
   buildUsersModeSeed,
   buildSyntheticMixSeed,
   runAppId,
@@ -27,18 +27,7 @@ let placeholderApp = null;
 let longPageApp = null;
 let usersApp = null;
 
-const funnelParam = (steps, extra = {}) =>
-  encodeDef({ s: steps, u: 'sessions', w: 'session', ...extra });
-
-const sqlOf = (request) => {
-  try {
-    const body = JSON.parse(request.postData() || '{}');
-    const sql = body.query?.sql || '';
-    return body.encoding === 'base64' ? Buffer.from(sql, 'base64').toString('utf8') : sql;
-  } catch {
-    return '';
-  }
-};
+const PA_TAGS = (priority) => ['@rum', '@rumAnalytics', priority, '@all'];
 
 async function rumSchemaHas(page, field) {
   const { orgId, baseUrl, headers } = apiContext();
@@ -156,7 +145,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Product Analytics sits under Experience after RUM and Synthetics, and RUM keeps only its own tabs (AC-39, AC-40)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.gotoRum('');
@@ -198,7 +187,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('opens on Overview with the busiest app and last 7 days, lists ready (AC-1)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const { orgId, baseUrl, headers } = apiContext();
     const sql = `SELECT application_id AS app, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE application_id IS NOT NULL AND application_id <> '' AND session_id IS NOT NULL GROUP BY application_id ORDER BY sessions DESC LIMIT 100`;
@@ -221,7 +210,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('app, env and range live in the URL and carry across sub-tabs and reload (AC-6)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('overview', { app: facts.appId, period: '2d' });
@@ -245,7 +234,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('empty range offers Last 30 days; an app without click names explains it (AC-8)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const from = (NOW - 60 * DAY_MS) * 1000;
@@ -263,7 +252,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Pages list switches to Entry and Exit pages in one click (AC-42)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('overview', { app: facts.appId, period: '7d' });
@@ -277,7 +266,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Trends chart shows sessions and one series per trended key (AC-48)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('overview', { app: facts.appId, period: '7d' });
@@ -298,7 +287,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Build funnel from an Overview row, then two suggestions, gives a 3-step funnel (AC-10, AC-12)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('overview', { app: facts.appId, period: '7d' });
@@ -320,7 +309,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('steps are picked, removed and reordered; the funnel recomputes each time (AC-13)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const funnel = funnelParam([['p', '/web/a'], ['c', 'b-btn']]);
@@ -344,7 +333,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Breakdown by browser splits every step and sums to the funnel (AC-47)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const funnel = funnelParam([['p', '/web/a'], ['c', 'b-btn']]);
@@ -369,7 +358,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('drop-off drawer, Session Viewer at the drop-off moment, and Back to the same funnel (AC-16, AC-17, AC-18, AC-19)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const funnel = funnelParam([['p', '/web/a'], ['c', 'b-btn'], ['p', '/web/c']]);
@@ -410,7 +399,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('See paths of dropped sessions opens Paths filtered to them (AC-25)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const funnel = funnelParam([['p', '/web/a'], ['c', 'b-btn']]);
@@ -429,7 +418,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Paths from an Overview row, then a branch drawer into Session Viewer (AC-23, AC-25, AC-26)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('overview', { app: facts.appId, period: '7d' });
@@ -458,7 +447,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Retention without a user id shows the unlock state, never a grid (AC-30)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('retention', { app: viewsOnlyApp, period: '7d' });
@@ -470,7 +459,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('a constant usr_email shows the placeholder reason and a disabled Users unit (scope addition 6)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('retention', { app: placeholderApp.appId, period: '7d' });
@@ -497,7 +486,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Retention renders with zero clicks; a cell drawer lists users and opens Sessions (AC-31, AC-35)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.pinRumDataStart(facts.retentionFromMs * 1000);
@@ -520,7 +509,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Sessions with an absolute range: Back from a session issues no new list search (AC-39)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await ensureSessionReplayStream(page, facts.appId, NOW);
@@ -545,7 +534,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('named events: create, use in Features and as a funnel step, then delete (AC-44, AC-45)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const name = `Reached A ${facts.appId.slice(-4)}`;
@@ -602,7 +591,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('named events: two can be created from the list in one visit, then both are deleted', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const suffix = facts.appId.slice(-4);
@@ -629,7 +618,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('saved funnels: save, open by link in a fresh page, Edited, Save, Rename, Save as, Duplicate, delete and fall back (AC-67, AC-70)', {
-    tag: ['@rum', '@rumAnalytics', '@P0'],
+    tag: PA_TAGS('@P0'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const suffix = facts.appId.slice(-4);
@@ -711,7 +700,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('saved funnels: a save over a funnel changed in another page opens Reload or Overwrite naming who (AC-70)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const name = `Conflict ${facts.appId.slice(-4)}`;
     const row = await createViaApi(page, 'funnels', facts.appId, {
@@ -751,7 +740,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('saved funnels: a failed list keeps an sf link for Retry, and renaming another funnel deleted elsewhere leaves the open one alone (F48, F50)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const suffix = facts.appId.slice(-4);
     const def = { s: [['p', facts.funnel.a], ['c', facts.funnel.b]], u: 'sessions', w: 'session' };
@@ -817,7 +806,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('deleting a named event a saved funnel uses asks once, naming the funnel, which then shows Deleted event (AC-69)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const suffix = facts.appId.slice(-4);
     const ev = await createViaApi(page, 'events', facts.appId, {
@@ -853,7 +842,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('an On page longer than 1,024 characters is an inline field error and saves nothing (F46)', {
-    tag: ['@rum', '@rumAnalytics', '@P2'],
+    tag: PA_TAGS('@P2'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     const writes = [];
@@ -891,7 +880,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Add to dashboard: funnel panel lands on a dashboard; Trends opens the dialog (AC-53)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const { orgId, baseUrl, headers } = apiContext();
     const title = `pa-e2e-${facts.appId}`;
@@ -935,7 +924,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test('Funnels with no steps list entry pages and Recent funnels (AC-58)', {
-    tag: ['@rum', '@rumAnalytics', '@P1'],
+    tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('funnels/build', { app: facts.appId, period: '7d' });
@@ -958,7 +947,7 @@ test.describe('RUM Product Analytics', () => {
 
   for (const theme of ['light', 'dark']) {
     test(`funnel, retention and paths are readable in the ${theme} theme (AC-41)`, {
-      tag: ['@rum', '@rumAnalytics', '@P2'],
+      tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       await page.addInitScript((mode) => window.localStorage.setItem('theme', mode), theme);
       const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -989,8 +978,6 @@ test.describe('RUM Product Analytics', () => {
       await expect.poll(colours, { timeout: 15000 }).toBeGreaterThanOrEqual(3);
     });
   }
-
-  const PA_TAGS = (priority) => ['@rum', '@rumAnalytics', '@rum-product-analytics', priority, '@all'];
 
   /** Records the status of every named-event or saved-funnel write until `stop()`. */
   function recordWrites(page) {
@@ -1322,6 +1309,7 @@ test.describe('RUM Product Analytics', () => {
   });
 
   test.describe('open defects (do not assert current behaviour)', () => {
+    // These fixmes track o2-enterprise#2809; un-fixme each one when its item closes.
     test.fixme('o2-enterprise#2809 (M1): the date picker label follows the URL range after a reload', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
@@ -1359,7 +1347,7 @@ test.describe('RUM Product Analytics', () => {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
-      const { identifier: org } = await createRumStateOrg(page, 'pa_noreplay');
+      const { identifier: org } = await ensureRumStateOrg(page, 'pa_noreplay');
       const now = Date.now();
       const seed = await seedBuilt(page, buildUsersModeSeed(runAppId('pa-noreplay'), now), { nowMs: now, orgId: org });
       await pa.goto('retention', { app: seed.appId, period: '7d' }, { org });

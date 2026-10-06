@@ -17,6 +17,22 @@ export function decodeDef(param) {
     return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
 }
 
+/** A funnel URL parameter over `steps`, counting sessions within one session unless `extra` overrides it. */
+export function funnelParam(steps, extra = {}) {
+    return encodeDef({ s: steps, u: 'sessions', w: 'session', ...extra });
+}
+
+/** The SQL a search request carries, decoded when the app sent it base64-encoded. */
+export function sqlOf(request) {
+    try {
+        const body = JSON.parse(request.postData() || '{}');
+        const sql = body.query?.sql || '';
+        return body.encoding === 'base64' ? Buffer.from(sql, 'base64').toString('utf8') : sql;
+    } catch {
+        return '';
+    }
+}
+
 export class RumProductAnalyticsPage {
     constructor(page) {
         this.page = page;
@@ -532,13 +548,13 @@ export class RumProductAnalyticsPage {
     /** The labels the Paths "From" picker offers. */
     async pathsAnchorOptionLabels() {
         // The picker lists the selected anchor at once and only appends the scope's keys once its first search answers.
-        const loaded = this.page.waitForResponse(
-            (r) => /\/_search(\?|$)/.test(r.url()) && /SELECT kind, k, COUNT\(DISTINCT sid\) AS sessions FROM e\b/.test(r.request().postData() || ''),
-            { timeout: 30000 },
-        );
-        await this.pathsAnchorTrigger.click();
+        const isAnchorSearch = (r) => /\/_search(\?|$)/.test(r.url())
+            && /SELECT kind, k, COUNT\(DISTINCT sid\) AS sessions FROM e\b/.test(sqlOf(r.request()));
+        await Promise.all([
+            this.page.waitForResponse(isAnchorSearch, { timeout: 30000 }),
+            this.pathsAnchorTrigger.click(),
+        ]);
         await expect(this.pathsAnchorOptions.first()).toBeVisible({ timeout: 30000 });
-        await loaded;
         await expect(this.pathsAnchorTrigger.getByRole('status')).toHaveCount(0, { timeout: 30000 });
         const labels = await this.pathsAnchorOptions.evaluateAll((els) => els.map((e) => e.getAttribute('data-test-label')));
         await this.closePopovers();
@@ -638,6 +654,9 @@ export class RumProductAnalyticsPage {
     /** Flags, from the first paint on, any moment the KPI strip shows `text`; read it back with kpiTextSeen(). */
     async watchKpiText(text) {
         await this.page.addInitScript((needle) => {
+            // Init scripts run on every navigation, so the flag keeps one observer per document.
+            if (window.__kpiWatchInstalled) return;
+            window.__kpiWatchInstalled = true;
             window.__kpiTextSeen = false;
             new MutationObserver(() => {
                 const strip = document.querySelector('[data-test="rum-analytics-kpi-strip"]');
