@@ -140,6 +140,49 @@ describe("forecast entries", () => {
     expect(named(result)[0]._timestamps).toBeUndefined();
   });
 
+  it("start at their primary's last drawn sample, on the fitted line rather than at that sample", async () => {
+    const at = (values: Array<[number, string]>) => ({ values });
+    const now = matrix(
+      {
+        metric: { pod: "api-1" },
+        ...at([
+          [START_S, "0"],
+          [START_S + STEP_S, "2"],
+        ]),
+      },
+      { metric: { pod: "api-2" }, ...at([[NOW_S - STEP_S, "5"]]) },
+    );
+    // The fit rises one per step from 10 at the range end, so it was 8 two steps before.
+    const fit = matrix({
+      metric: { pod: "api-1" },
+      values: grid(NOW_S, 3).map((t, k) => [t, String(10 + k)]),
+    });
+    const result = await convert([now, fit]);
+    const twin = named(result).find((s: any) => s.name === "api-1 (forecast)");
+    const valueAt = (t: number) => twin.data[twin._timestamps.indexOf(t)][1];
+
+    expect(valueAt(START_S)).toBeNull();
+    expect(Number(valueAt(START_S + STEP_S))).toBeCloseTo(8);
+    expect(Number(valueAt(NOW_S - STEP_S))).toBeCloseTo(9);
+    expect(valueAt(NOW_S)).toBe("10");
+    expect(twin._fitStartIndex).toBe(twin._timestamps.indexOf(NOW_S));
+    expect(twin._rangeEndValue).toBe(2);
+  });
+
+  it("label their points fitted in the tooltip", async () => {
+    const result = await convert([current(), ahead("api-1")]);
+    const all = result.options.series;
+    const row = (name: string) => {
+      const seriesIndex = all.findIndex((s: any) => s.name === name);
+      const point = { data: ["2023-11-14T22:16:00", 1], value: ["2023-11-14T22:16:00", 1] };
+      return result.options.tooltip.formatter([
+        { ...point, seriesIndex, seriesName: name, marker: "" },
+      ]);
+    };
+    expect(row("api-1 (forecast)")).toContain("fitted");
+    expect(row("api-1")).not.toContain("fitted");
+  });
+
   it("never take a primary's place at the series cap", async () => {
     const tight = { state: { ...store.state, zoConfig: { max_dashboard_series: 2 } } };
     const result = await convert([current(), ahead("api-1", "api-2")], tight);

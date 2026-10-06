@@ -35,6 +35,7 @@ const MetricCardChartStub = {
     "allowAlertCreation",
     "shifted",
     "stepSeconds",
+    "forecast",
   ],
   template: `<div data-test="tile-chart-stub" />`,
 };
@@ -277,6 +278,120 @@ describe("MetricChartTile", () => {
     await flushPromises();
     wrapper.unmount();
     expect(cancelled()).toEqual(["sum(rate(x[4m]))"]);
+  });
+
+  describe("forecast", () => {
+    const WINDOW = { start_time: 1_000_000_000, end_time: 4_600_000_000 };
+    const T_S = WINDOW.end_time / 1e6;
+    const LINEAR = { method: "linear", horizon: 900, label: "forecast" };
+    const fit = (expr: string) => ({
+      resultType: "vector",
+      result: [{ metric: {}, value: [T_S, expr.endsWith(", 0)") ? "1" : "2"] }],
+    });
+    const isFit = (opts: any) => opts?.instantAt !== undefined;
+    const fitCalls = () => runQuery.mock.calls.filter(([, , opts]) => isFit(opts));
+    const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+    const mountForecast = (props: Record<string, any> = {}) =>
+      mountTile({ timeRange: WINDOW, stepSeconds: 60, forecast: LINEAR, ...props });
+
+    beforeEach(() => {
+      runQuery.mockImplementation((expr: string, _signal: AbortSignal, opts: any) =>
+        Promise.resolve(isFit(opts) ? fit(expr) : SERIES),
+      );
+    });
+
+    it("fits each query at the range end, after its primaries, and draws the line between", async () => {
+      wrapper = mountForecast();
+      await flushPromises();
+
+      expect(runQuery.mock.calls.map(([expr, , opts]) => [expr, opts?.instantAt])).toEqual([
+        ["sum(rate(x[4m]))", undefined],
+        ["predict_linear((sum(rate(x[4m])))[3600s:60s], 0)", WINDOW.end_time],
+        ["predict_linear((sum(rate(x[4m])))[3600s:60s], 900)", WINDOW.end_time],
+      ]);
+      const forecast = chart().props("forecast");
+      expect(forecast.until).toBe(WINDOW.end_time + 900e6);
+      expect(forecast.label).toBe("forecast");
+      expect(forecast.entries.map((entry: any) => entry.parentIndex)).toEqual([0]);
+      const values = forecast.entries[0].result.result[0].values;
+      expect(values[0]).toEqual([T_S, "1"]);
+      expect(values.at(-1)).toEqual([T_S + 900, "2"]);
+    });
+
+    it("runs no fits without a forecast", async () => {
+      wrapper = mountTile({ timeRange: WINDOW, stepSeconds: 60 });
+      await flushPromises();
+      expect(fitCalls()).toEqual([]);
+      expect(chart().props("forecast")).toBeNull();
+    });
+
+    it("draws the chart without a forecast when a fit fails", async () => {
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+        isFit(opts) ? Promise.reject(new Error("timeout")) : Promise.resolve(SERIES),
+      );
+      wrapper = mountForecast();
+      await flushPromises();
+      expect(chart().props("results")).toEqual([SERIES]);
+      expect(chart().props("forecast")).toBeNull();
+      expect(wrapper.find('[data-test="tile-error"]').exists()).toBe(false);
+    });
+
+    it("draws the chart without waiting for the fits, and adds the forecast when they land", async () => {
+      const fits: Array<() => void> = [];
+      runQuery.mockImplementation((expr: string, _signal: AbortSignal, opts: any) =>
+        isFit(opts)
+          ? new Promise((resolve) => fits.push(() => resolve(fit(expr))))
+          : Promise.resolve(SERIES),
+      );
+      wrapper = mountForecast();
+      await flushPromises();
+      expect(chart().props("results")).toEqual([SERIES]);
+      expect(chart().props("forecast")).toBeNull();
+
+      fits.forEach((answer) => answer());
+      await flushPromises();
+      expect(chart().props("forecast").entries).toHaveLength(1);
+    });
+
+    it("never pairs the previous forecast with a new window", async () => {
+      wrapper = mountForecast();
+      await flushPromises();
+      expect(chart().props("forecast")).not.toBeNull();
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+        isFit(opts) ? new Promise(() => {}) : Promise.resolve(SERIES),
+      );
+
+      await wrapper.setProps({
+        timeRange: { start_time: WINDOW.start_time, end_time: WINDOW.end_time + 60e6 },
+      });
+      await flushPromises();
+      expect(chart().props("timeRange").end_time).toBe(WINDOW.end_time + 60e6);
+      expect(chart().props("forecast")).toBeNull();
+    });
+
+    it("keeps the drawn chart and fits again when the method changes", async () => {
+      wrapper = mountForecast();
+      await flushPromises();
+      runQuery.mockClear();
+      runQuery.mockImplementation(() => new Promise(() => {}));
+
+      await wrapper.setProps({ forecast: { ...LINEAR, method: "smoothed" } });
+      await flushPromises();
+      expect(chart().exists()).toBe(true);
+      expect(fitCalls().map(([expr]) => expr)[1]).toBe(
+        "predict_linear(holt_winters((sum(rate(x[4m])))[600s:60s], 0.3, 0.1)[3600s:60s], 900)",
+      );
+    });
+
+    it("cancels its fits when it unmounts", async () => {
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+        isFit(opts) ? new Promise(() => {}) : Promise.resolve(SERIES),
+      );
+      wrapper = mountForecast();
+      await flushPromises();
+      wrapper.unmount();
+      expect(fitCalls().map(([, signal]) => signal.aborted)).toEqual([true, true]);
+    });
   });
 
   describe("lazy loading", () => {

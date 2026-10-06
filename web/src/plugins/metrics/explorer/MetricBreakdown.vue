@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         legend
         allow-alert-creation
         :compare="compare"
+        :forecast="forecast"
         :step-seconds="stepSeconds"
         data-test="metrics-breakdown-chart"
         @results="focused = $event"
@@ -375,7 +376,11 @@ import {
 import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import MetricChartTile, { type TileCompare, type TileQuery } from "./MetricChartTile.vue";
+import MetricChartTile, {
+  type TileCompare,
+  type TileForecast,
+  type TileQuery,
+} from "./MetricChartTile.vue";
 import MetricCardChart from "./MetricCardChart.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
@@ -549,6 +554,7 @@ export default defineComponent({
       required: true,
     },
     compare: { type: Object as PropType<TileCompare | null>, default: null },
+    forecast: { type: Object as PropType<TileForecast | null>, default: null },
     stepSeconds: { type: Number, default: 0 },
   },
   emits: ["update:selectedLabel", "add-filter"],

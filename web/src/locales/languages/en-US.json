@@ -6428,6 +6428,7 @@
       "selectRequiredFields": "Please select required fields to render the chart",
       "noDataFound": "No data found",
       "seriesLimitWarning": "Limiting the displayed series to ensure optimal performance",
+      "fitted": "fitted",
       "mapLayerName": "Layer 1",
       "mapLayerNameIndexed": "Layer {index}",
       "secondsAgo": "{count} Second ago | {count} Seconds ago",

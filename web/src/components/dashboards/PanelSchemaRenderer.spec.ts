@@ -2105,6 +2105,39 @@ describe("PanelSchemaRenderer", () => {
       });
     });
 
+    it("measures a forecast line from the range end, past the points that close the seam", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              _fitStartIndex: 1,
+              _rangeEndValue: 0.45,
+              data: [
+                ["x0", 0.4],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.7, seriesIndex: 1, dataIndex: 3 });
+
+      expect(wrapper.vm.contextMenuData.forecastPoint).toMatchObject({
+        startTime: 160,
+        startValue: 0.5,
+        endValue: 0.7,
+      });
+    });
+
     it("should hide context menu", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
 

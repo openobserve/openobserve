@@ -95,6 +95,7 @@ const MetricCardChartStub = {
     allowAlertCreation: Boolean,
     shifted: Array,
     stepSeconds: Number,
+    forecast: Object,
   },
   template: `<div data-test="breakdown-chart-stub"><div data-test="chart-renderer" /></div>`,
 };
@@ -645,6 +646,26 @@ describe("MetricBreakdown", () => {
       const chart = wrapper.findComponent({ name: "MetricCardChart" });
       expect(chart.props("shifted")).toHaveLength(1);
       expect(chart.props("stepSeconds")).toBe(60);
+    });
+
+    it("forecasts the focused chart per label value, and only it", async () => {
+      const forecast = { method: "linear", horizon: 900, label: "forecast" };
+      const timeRange = { start_time: 1_000_000_000, end_time: 4_600_000_000 };
+      wrapper = mountBreakdown({ forecast, stepSeconds: 60, timeRange });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalled();
+      expect(runQuery.mock.calls.some(([, , opts]) => opts?.instantAt)).toBe(false);
+      runQuery.mockClear();
+
+      await wrapper.setProps({ selectedLabel: "method" });
+      await flushPromises();
+      const fits = runQuery.mock.calls.filter(([, , opts]) => opts?.instantAt);
+      expect(fits.map(([, , opts]) => opts.instantAt)).toEqual([4_600_000_000, 4_600_000_000]);
+      expect(fits[0][0]).toMatch(/^predict_linear\(\(.*by \(method\).*\)\[3600s:60s\], 0\)$/);
+      expect(fits[1][0]).toMatch(/, 900\)$/);
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("forecast").until).toBe(4_600_000_000 + 900e6);
+      expect(chart.props("forecast").entries).toHaveLength(1);
     });
 
     it("keeps the right-click alert off the small label tiles", async () => {

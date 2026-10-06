@@ -141,7 +141,7 @@ const mountView = (
         ...stubs,
         MetricBreakdown: {
           name: "MetricBreakdown",
-          props: ["variant", "panelQueries", "runQuery", "compare", "stepSeconds"],
+          props: ["variant", "panelQueries", "runQuery", "compare", "stepSeconds", "forecast"],
           template: "<div data-test='breakdown-stub' />",
         },
         MetricCardChart: {
@@ -418,6 +418,26 @@ describe("MetricDetailView", () => {
       expect(values.at(-1)).toEqual([T_S + 900, "2"]);
     });
 
+    it("hands Breakdown the same method and horizon, and none while it is off", async () => {
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "smoothed",
+        forecastHorizon: "1h",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+      const breakdown = () => wrapper.findComponent({ name: "MetricBreakdown" });
+      expect(breakdown().props("forecast")).toEqual({
+        method: "smoothed",
+        horizon: 3600,
+        label: "forecast",
+      });
+
+      await wrapper.setProps({ forecast: null });
+      expect(breakdown().props("forecast")).toBeNull();
+    });
+
     it("uses the chosen horizon preset", async () => {
       wrapper = mountView({
         overview: LINE,
@@ -547,6 +567,7 @@ describe("MetricDetailView", () => {
       await flushPromises();
       expect(selectNamed(wrapper, "metrics-detail-forecast")).toBeUndefined();
       expect(runQuery.mock.calls.some(([, , , opts]) => opts?.instantAt)).toBe(false);
+      expect(wrapper.findComponent({ name: "MetricBreakdown" }).props("forecast")).toBeNull();
       wrapper.unmount();
 
       wrapper = mountView(

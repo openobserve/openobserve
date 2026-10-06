@@ -49,11 +49,11 @@ export const wrapCsvValue = (val: any): string => {
   return needsQuotes ? `"${str}"` : str;
 };
 
-/** Times in seconds; the line's first point is its fit at the range end. */
+/** Times in seconds; the line starts at its fit at the range end, past the points closing its seam. */
 export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
   const times: number[] = series?._timestamps ?? [];
   const data: any[] = series?.data ?? [];
-  const start = data.findIndex((point) => point?.[1] != null);
+  const start = series?._fitStartIndex ?? data.findIndex((point) => point?.[1] != null);
   if (start < 0) return undefined;
   const end = data.findLastIndex((point) => point?.[1] != null);
   return {

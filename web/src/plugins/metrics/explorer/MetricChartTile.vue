@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :allow-alert-creation="allowAlertCreation"
           :shifted="state.shifted ?? []"
           :step-seconds="state.stepSeconds ?? 0"
+          :forecast="state.forecast ?? null"
           @error="onRenderError"
         />
       </slot>
@@ -111,7 +112,8 @@ import { parseSearchError } from "@/utils/query/searchError";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { hasSamples, type QueryWindow } from "@/composables/metrics/useMetricsExplorerGrid";
-import type { ShiftedResult } from "./MetricCardChart.vue";
+import type { ChartForecast, ShiftedResult } from "./MetricCardChart.vue";
+import { fitForecasts, type ForecastMethod } from "@/utils/metrics/forecast";
 
 export interface TileQuery {
   expr: string;
@@ -125,10 +127,18 @@ export interface TileCompare {
   periodAsStr: string;
 }
 
+/** `horizon` in seconds; the fits are trained on the tile's own window. */
+export interface TileForecast {
+  method: ForecastMethod;
+  horizon: number;
+  label: string;
+}
+
 interface TileState {
   status: "idle" | "loading" | "done" | "error";
   results: any[];
   shifted?: ShiftedResult[];
+  forecast?: ChartForecast | null;
   /** The step `results` were queried at, kept with them like `timeRange`. */
   stepSeconds?: number;
   error: string;
@@ -151,9 +161,14 @@ const props = withDefaults(
     /** Offer the chart's right-click "Create alert" menu. */
     allowAlertCreation?: boolean;
     compare?: TileCompare | null;
+    forecast?: TileForecast | null;
     stepSeconds?: number;
     /** A signal, not a cancel by expr, so two tiles on one query never cancel each other. */
-    runQuery: (expr: string, signal: AbortSignal, opts?: { window?: QueryWindow }) => Promise<any>;
+    runQuery: (
+      expr: string,
+      signal: AbortSignal,
+      opts?: { window?: QueryWindow; instantAt?: number },
+    ) => Promise<any>;
     dataTest: string;
   }>(),
   {
@@ -163,6 +178,7 @@ const props = withDefaults(
     legend: false,
     allowAlertCreation: false,
     compare: null,
+    forecast: null,
     stepSeconds: 0,
   },
 );
@@ -198,12 +214,14 @@ let stale = true;
 let generation = 0;
 let active: AbortController | null = null;
 /** What the last load asked for, so a watcher catching up on it does not ask again. */
-let loadedFor: { key: string; timeRange: object } | null = null;
+let loadedFor: { key: string; forecastKey: string; timeRange: object } | null = null;
 
 const queryKey = () => {
   const exprs = props.queries?.map((query) => query.expr).join("\n");
   return exprs === undefined ? null : `${exprs}\n${props.compare?.gapMs ?? 0}`;
 };
+const forecastKey = () =>
+  props.forecast ? `${props.forecast.method}|${props.forecast.horizon}` : "";
 
 const cancelActive = () => {
   active?.abort();
@@ -221,8 +239,9 @@ const load = async () => {
   stale = false;
   const timeRange = props.timeRange;
   const compare = props.compare;
+  const forecast = props.forecast;
   const stepSeconds = props.stepSeconds;
-  loadedFor = { key: queryKey() ?? "", timeRange };
+  loadedFor = { key: queryKey() ?? "", forecastKey: forecastKey(), timeRange };
   active = new AbortController();
   const { signal } = active;
   // Only a chart of this same query is still kept here: a new query resets to IDLE first.
@@ -233,17 +252,39 @@ const load = async () => {
       start: timeRange.start_time - compare.gapMs * 1000,
       end: timeRange.end_time - compare.gapMs * 1000,
     };
-    const [results, past] = await Promise.all([
+    const current = Promise.all([
       Promise.all(exprs.map((expr) => props.runQuery(expr, signal))),
       window ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, { window }))) : [],
     ]);
+    const T = timeRange.end_time;
+    const fitWindow = { T, rangeSeconds: (T - timeRange.start_time) / 1e6, stepSeconds };
+    // Queued after the chart's own queries, and never waited on by it: the fits are slower and optional.
+    const pendingForecast =
+      forecast && stepSeconds > 0
+        ? fitForecasts(exprs, forecast, fitWindow, (query) =>
+            props.runQuery(query, signal, { instantAt: T }),
+          ).catch(() => null)
+        : Promise.resolve(null);
+    const [results, past] = await current;
     if (mine !== generation) return;
-    active = null;
     refreshing.value = false;
     const shifted = compare
       ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
       : [];
-    state.value = { status: "done", results, shifted, error: "", timeRange, stepSeconds };
+    state.value = {
+      status: "done",
+      results,
+      shifted,
+      error: "",
+      timeRange,
+      stepSeconds,
+      forecast: null,
+    };
+    const fits = await pendingForecast;
+    if (mine !== generation) return;
+    active = null;
+    if (fits && forecast)
+      state.value = { ...state.value, forecast: { ...fits, label: forecast.label } };
   } catch (error: any) {
     if (mine !== generation) return;
     // The other queries of a failed load are not worth finishing.
@@ -262,8 +303,14 @@ const load = async () => {
 
 /** Drops whatever is shown or running; only an on-screen tile queries again now. */
 const invalidate = () => {
-  if (!stale && loadedFor?.key === queryKey() && loadedFor?.timeRange === props.timeRange) return;
-  // A new window alone (a refresh tick) keeps the drawn chart until the new result lands.
+  if (
+    !stale &&
+    loadedFor?.key === queryKey() &&
+    loadedFor?.forecastKey === forecastKey() &&
+    loadedFor?.timeRange === props.timeRange
+  )
+    return;
+  // A new window or forecast alone keeps the drawn chart until the new result lands.
   const windowOnly = loadedFor?.key === queryKey();
   generation += 1;
   cancelActive();
@@ -274,7 +321,7 @@ const invalidate = () => {
 };
 
 // Sources compared one by one: a getter returning a fresh array re-fires on every rebuild.
-watch([queryKey, () => props.timeRange], invalidate);
+watch([queryKey, forecastKey, () => props.timeRange], invalidate);
 
 watch(visible, (isVisible) => {
   if (isVisible) {

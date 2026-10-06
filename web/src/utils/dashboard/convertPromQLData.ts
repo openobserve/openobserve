@@ -86,6 +86,19 @@ export type SeriesRole = "primary" | "shifted" | "forecast";
 const labelSetKey = (metric: Record<string, string> = {}) =>
   JSON.stringify(Object.entries(metric).sort(([a], [b]) => a.localeCompare(b)));
 
+/** Extends a forecast's fitted line back to index `from`, so no gap opens after the data. */
+const closeForecastSeam = (twin: any, from: number) => {
+  const first: number = twin._fitStartIndex;
+  const next = twin.data.findIndex((point: any, i: number) => i > first && point[1] != null);
+  if (from < 0 || first <= from || next < 0) return;
+  const times: number[] = twin._timestamps;
+  const start = Number(twin.data[first][1]);
+  const slope = (Number(twin.data[next][1]) - start) / (times[next] - times[first]);
+  for (let i = from; i < first; i++) {
+    twin.data[i] = [twin.data[i][0], start + slope * (times[i] - times[first])];
+  }
+};
+
 /** Snaps shifted results onto the step grid and their primaries' series; read config via `parentQueryIndex`. */
 export const alignShiftedPromQLResults = (
   data: any[],
@@ -547,6 +560,11 @@ export const convertPromQLData = async (
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
             // if have than bold it
+            // A forecast point is the fit, which can differ from the sample drawn at the same time.
+            const fitted =
+              options.series?.[it.seriesIndex]?._seriesRole === "forecast"
+                ? ` (${gt("dashboard.utils.fitted")})`
+                : "";
             const row = `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
               formatUnitValue(
                 getUnitValue(
@@ -556,7 +574,7 @@ export const convertPromQLData = async (
                   panelSchema.config?.decimals,
                 ),
               ),
-            )}`;
+            )}${escapeHtml(fitted)}`;
             hoverText.push(
               it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
                 ? `<strong>${row} </strong>`
@@ -1277,11 +1295,12 @@ export const convertPromQLData = async (
   );
   for (const [twin, metric] of shiftedTwins) {
     if (twin._seriesRole === "forecast") {
-      const drawn = (primaryByMetric.get(metric)?.data ?? []).filter(
-        (point: any) => point[1] != null,
-      );
+      const drawn: any[] = primaryByMetric.get(metric)?.data ?? [];
+      const last = drawn.findLastIndex((point: any) => point[1] != null);
       // The series' own value at the range end; a forecast alert's direction is judged against it.
-      twin._rangeEndValue = drawn.length ? Number(drawn[drawn.length - 1][1]) : undefined;
+      twin._rangeEndValue = last >= 0 ? Number(drawn[last][1]) : undefined;
+      twin._fitStartIndex = twin.data.findIndex((point: any) => point[1] != null);
+      closeForecastSeam(twin, last);
     }
     // A mapping on the twin's own name is the user's choice and outranks the primary's colour.
     if (!mappedNames.has(twin.name)) {

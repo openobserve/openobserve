@@ -496,6 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :color="color"
             :run-query="runBreakdownQuery"
             :compare="compareShift"
+            :forecast="breakdownForecast"
             :step-seconds="stepSeconds"
             :variant="overview"
             :panel-queries="panelQueries"
@@ -579,7 +580,11 @@ import { computed, defineComponent, onBeforeUnmount, ref, watch, type PropType }
 import { raw, useI18nTyped } from "@/types/i18n";
 import MetricCardChart, { type ChartForecast, type ShiftedResult } from "./MetricCardChart.vue";
 import MetricBreakdown from "./MetricBreakdown.vue";
-import MetricChartTile, { type TileCompare, type TileQuery } from "./MetricChartTile.vue";
+import MetricChartTile, {
+  type TileCompare,
+  type TileForecast,
+  type TileQuery,
+} from "./MetricChartTile.vue";
 import MetricUsageList from "./MetricUsageList.vue";
 import metricsService, { type MetricUsage } from "@/services/metrics";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -608,10 +613,9 @@ import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
 import { parseSearchError } from "@/utils/query/searchError";
 import { CARD_KIND, supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
 import {
-  buildForecastQueries,
+  fitForecasts,
   forecastHorizonOptions as forecastHorizonPresets,
   forecastHorizonSeconds,
-  forecastSeries,
   type ForecastHorizon,
   type ForecastMethod,
 } from "@/utils/metrics/forecast";
@@ -958,30 +962,20 @@ export default defineComponent({
     const onForecastHorizonChange = (value: unknown) =>
       emit("update:forecastHorizon", value === "auto" ? null : (value as ForecastHorizon));
 
+    const breakdownForecast = computed<TileForecast | null>(() =>
+      activeForecast.value
+        ? { ...activeForecast.value, label: t("metrics.explorer.detail.forecast.suffix") }
+        : null,
+    );
     const loadForecast = async (exprs: string[], signal: AbortSignal) => {
       const ahead = activeForecast.value;
       if (!ahead) return null;
       const { end_time: T } = props.timeRange;
-      const step = props.stepSeconds;
-      // Settled, not raced: a rejected fit must not leave its siblings running past the view's cancel.
-      const settled = await Promise.allSettled(
-        exprs.flatMap((expr) =>
-          buildForecastQueries(expr, ahead.method, rangeSeconds.value, step, ahead.horizon).map(
-            (query) => props.runQuery(query, signal, undefined, { instantAt: T }),
-          ),
-        ),
+      const window = { T, rangeSeconds: rangeSeconds.value, stepSeconds: props.stepSeconds };
+      const fits = await fitForecasts(exprs, ahead, window, (query) =>
+        props.runQuery(query, signal, undefined, { instantAt: T }),
       );
-      if (settled.some((outcome) => outcome.status === "rejected")) return null;
-      const values = settled.map((outcome) => (outcome as PromiseFulfilledResult<any>).value);
-      const fits = exprs.map((_, i) => [values[2 * i], values[2 * i + 1]]);
-      return {
-        until: T + ahead.horizon * 1e6,
-        label: t("metrics.explorer.detail.forecast.suffix"),
-        entries: fits.map(([atT, atTH], parentIndex) => ({
-          result: forecastSeries(atT, atTH, T / 1e6, ahead.horizon, step),
-          parentIndex,
-        })),
-      };
+      return fits && { ...fits, label: t("metrics.explorer.detail.forecast.suffix") };
     };
     const overviewQueries = computed(() =>
       props.card ? withSourceStreams(props.overview.queries, props.card.name) : [],
@@ -1179,6 +1173,7 @@ export default defineComponent({
       compareEligible,
       compareOptions,
       compareShift,
+      breakdownForecast,
       onCompareChange,
       forecastEligible,
       forecastOptions,

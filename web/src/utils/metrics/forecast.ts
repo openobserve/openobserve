@@ -95,3 +95,36 @@ export const forecastSeries = (
   });
   return { resultType: "matrix", result };
 };
+
+/** Both fits of every expression at the range end `T` (µs); null when any fit fails. */
+export const fitForecasts = async (
+  exprs: string[],
+  request: { method: ForecastMethod; horizon: number },
+  window: { T: number; rangeSeconds: number; stepSeconds: number },
+  runInstant: (query: string) => Promise<any>,
+): Promise<{ until: number; entries: Array<{ result: any; parentIndex: number }> } | null> => {
+  const { T, rangeSeconds, stepSeconds } = window;
+  // Settled, not raced: a rejected fit must not leave its siblings running past the caller's cancel.
+  const settled = await Promise.allSettled(
+    exprs.flatMap((expr) =>
+      buildForecastQueries(expr, request.method, rangeSeconds, stepSeconds, request.horizon).map(
+        runInstant,
+      ),
+    ),
+  );
+  if (settled.some((outcome) => outcome.status === "rejected")) return null;
+  const values = settled.map((outcome) => (outcome as PromiseFulfilledResult<any>).value);
+  return {
+    until: T + request.horizon * 1e6,
+    entries: exprs.map((_, parentIndex) => ({
+      result: forecastSeries(
+        values[2 * parentIndex],
+        values[2 * parentIndex + 1],
+        T / 1e6,
+        request.horizon,
+        stepSeconds,
+      ),
+      parentIndex,
+    })),
+  };
+};
