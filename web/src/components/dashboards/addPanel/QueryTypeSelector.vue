@@ -47,7 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onUpdateBuilderMode($event as string)"
       >
         <OToggleGroupItem
-          v-if="dashboardPanelData.data.type != 'custom_chart'"
+          v-if="
+            dashboardPanelData.data.type != 'custom_chart' &&
+            !isFormulaQuery(
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex],
+            )
+          "
           value="builder"
           size="sm"
           data-test="dashboard-builder-query-type"
@@ -82,6 +87,7 @@ import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -441,6 +447,7 @@ export default defineComponent({
       selectedButtonType,
       store,
       selectedButtonQueryType,
+      isFormulaQuery,
     };
   },
   components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, OIcon },

@@ -2535,6 +2535,70 @@ describe("PanelSchemaRenderer", () => {
       expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([1, 1]);
     });
   });
+
+  describe("the saved hide flag", () => {
+    const entry = (name: string) => ({ resultType: "matrix", result: [{ metric: { q: name } }] });
+    const metaEntry = (panelQueryIndex: number, gapMs = 0) => ({
+      panelQueryIndex,
+      timeRangeGap: { seconds: gapMs, periodAsStr: gapMs ? "1 day ago" : "" },
+    });
+
+    it("hides a query saved with config.hide on a dashboard, outside the editor", async () => {
+      const loaded = ref<any[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: loaded,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [metaEntry(0), metaEntry(1), metaEntry(0, 86_400_000)] }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 2 }], [{ step: 3 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-saved-hide",
+            type: "line",
+            queryType: "promql",
+            queries: [
+              { query: "a", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+              { query: "b", fields: {}, config: { hide: true } },
+            ],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      loaded.value = [entry("A"), entry("B"), entry("A1d")];
+      await flushPromises();
+
+      const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
+      expect(call[1].map((d: any) => d.result[0].metric.q)).toEqual(["A", "A1d"]);
+      expect(call[6].queries.map((m: any) => m.panelQueryIndex)).toEqual([0, 0]);
+    });
+  });
   // A chunk conversion landing after the final one must not overwrite it.
   describe("conversions finishing out of order", () => {
     const PAGE_KEY = "conversion-race";

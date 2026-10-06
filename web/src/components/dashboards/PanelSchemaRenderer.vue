@@ -603,10 +603,13 @@ export default defineComponent({
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
-    // Returns array of hidden query indices (e.g., [0, 2] means queries 0 and 2 are hidden)
-    // Returns [] if no page key or no hiddenQueries - which means no filtering
-    const hiddenQueries = computed(() => {
-      return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
+    // Saved hide flags apply everywhere; the editor's unapplied toggles add to them.
+    const hiddenQueries = computed((): number[] => {
+      const saved = (panelSchema.value?.queries ?? []).flatMap((query: any, i: number) =>
+        query?.config?.hide ? [i] : [],
+      );
+      const editor: number[] = dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
+      return [...new Set([...saved, ...editor])];
     });
 
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config

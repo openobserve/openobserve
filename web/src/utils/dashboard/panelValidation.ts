@@ -2,6 +2,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 
 // will find first valid mapped value based on given fieldToCheck
 export const findFirstValidMappedValue = (value: any, mappings: any[], fieldToCheck: string) => {
@@ -681,7 +682,7 @@ const validateQueriesNotEmpty = (
   customMessage?: string,
 ) => {
   queries.forEach((q: any, index: number) => {
-    if (q && q?.query === "") {
+    if (q && (isFormulaQuery(q) ? q.config.formula : q?.query) === "") {
       errors.push(customMessage || t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
     }
   });

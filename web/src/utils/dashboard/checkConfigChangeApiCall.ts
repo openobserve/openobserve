@@ -3,7 +3,7 @@ const API_REQUIRING_CHANGES = new Set(["queries", "variables"]);
 
 // Keys under "queries" that are runtime metadata — changes to these
 // should NOT trigger the "chart not up to date" banner or require an API call.
-const IGNORED_QUERY_KEYS = new Set(["vrlFunctionFieldList", "tabName"]);
+const IGNORED_QUERY_KEYS = new Set(["vrlFunctionFieldList", "tabName", "ref"]);
 
 /**
  * Flattens an object's keys with dot notation

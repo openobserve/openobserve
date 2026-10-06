@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
                 class="cursor-pointer px-0.5 text-sm whitespace-nowrap select-none"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
-                >{{ tab.tabName || t("common.queryNumber", { index: Number(index) + 1 }) }}</span
+                >{{ tabLabel(tab, Number(index)) }}</span
               >
               <!-- xs matches the tick it swaps with, so the tab keeps its width. -->
               <span v-if="editingQueryIndex !== index" class="relative inline-flex items-center">
@@ -102,26 +102,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="relative inline-flex items-center"
               >
                 <OIcon
-                  :name="
-                    (dashboardPanelData.layout.hiddenQueries || []).includes(index)
-                      ? 'visibility-off'
-                      : 'visibility'
-                  "
+                  :name="tab.config?.hide ? 'visibility-off' : 'visibility'"
                   class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-[0.7] transition-all duration-150 hover:rounded-full hover:opacity-100"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
                   size="sm"
                   :data-test="`dashboard-panel-query-tab-visibility-${index}`"
-                  :data-test-hidden="
-                    (dashboardPanelData.layout.hiddenQueries || []).includes(index)
-                      ? 'true'
-                      : 'false'
-                  "
+                  :data-test-hidden="tab.config?.hide ? 'true' : 'false'"
                 />
                 <OTooltip
                   :content="
-                    (dashboardPanelData.layout.hiddenQueries || []).includes(index)
+                    tab.config?.hide
                       ? t('dashboard.showQueryResults')
                       : t('dashboard.hideQueryResults')
                   "
@@ -149,6 +141,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-query-tab-add"
           icon-left="add"
         >
+        </OButton>
+        <OButton
+          v-if="promqlMode"
+          variant="ghost"
+          size="sm"
+          @click.stop="addFormulaTab"
+          data-test="dashboard-panel-query-tab-add-formula"
+          icon-left="functions"
+        >
+          {{ t("dashboard.addFormula") }}
         </OButton>
         <!-- Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
@@ -201,10 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="queryEditorRef"
                   :languages="['sql', 'promql']"
                   :default-language="dashboardPanelData.data.queryType"
-                  :query="
-                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                      .query
-                  "
+                  :query="currentQueryText"
                   :read-only="
                     !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .customQuery
@@ -303,6 +302,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-status-error-text z-100000 col-auto mx-2">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
+      <div
+        v-if="formulaError"
+        class="text-status-error-text mx-2 text-sm"
+        data-test="dashboard-panel-formula-error"
+      >
+        {{ formulaError }}
+      </div>
+      <div
+        v-else-if="isFormulaInput"
+        class="text-text-secondary mx-2 text-sm"
+        data-test="dashboard-panel-formula-input-note"
+      >
+        {{ t("dashboard.formulaInputNote") }}
+      </div>
     </div>
   </div>
 </template>
@@ -346,6 +359,13 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import {
+  formulaInputs,
+  formulaRefs,
+  isFormulaQuery,
+  queryRefs,
+  substituteFormula,
+} from "@/utils/dashboard/promql/formula";
 
 // Minimal surface of UnifiedQueryEditor's exposed methods used here.
 interface QueryEditorInstance {
@@ -558,6 +578,81 @@ export default defineComponent({
       dashboardPanelData.layout.currentQueryIndex = dashboardPanelData.data.queries.length - 1;
     };
 
+    const addFormulaTab = () => {
+      addQuery();
+      const formula = dashboardPanelData.data.queries[dashboardPanelData.data.queries.length - 1];
+      formula.query = "";
+      formula.customQuery = true;
+      formula.config = { ...(formula.config ?? {}), formula: "" };
+      dashboardPanelData.layout.currentQueryIndex = dashboardPanelData.data.queries.length - 1;
+    };
+
+    const currentQuery = computed(
+      () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex],
+    );
+
+    const queryTextOf = (query: any) =>
+      isFormulaQuery(query) ? query.config.formula : query?.query;
+
+    const setQueryText = (query: any, text: string) => {
+      if (isFormulaQuery(query)) query.config.formula = text;
+      else query.query = text;
+    };
+
+    const currentQueryText = computed(() => queryTextOf(currentQuery.value));
+
+    const tabLabel = (tab: any, index: number) => {
+      if (isFormulaQuery(tab))
+        return tab.tabName || t("dashboard.formulaNumber", { index: index + 1 });
+      const name = tab.tabName || t("common.queryNumber", { index: index + 1 });
+      return promqlMode.value && tab.config?.ref ? `${tab.config.ref} · ${name}` : name;
+    };
+
+    const formulaError = computed(() => {
+      if (!isFormulaQuery(currentQuery.value)) return "";
+      const queries = dashboardPanelData.data.queries;
+      const out = substituteFormula(
+        currentQuery.value.config.formula,
+        formulaInputs(
+          queries,
+          queries.map(() => ""),
+        ),
+      );
+      return "error" in out ? out.error : "";
+    });
+
+    const isFormulaInput = computed(() => {
+      const letter = currentQuery.value?.config?.ref;
+      if (!letter || isFormulaQuery(currentQuery.value)) return false;
+      return dashboardPanelData.data.queries.some(
+        (query: any) => isFormulaQuery(query) && formulaRefs(query.config.formula).includes(letter),
+      );
+    });
+
+    // Letters and hide flags are stored per query; legacy panels get both on load.
+    watch(
+      () => [
+        promqlMode.value,
+        dashboardPanelData.data.queries.map((query: any) => [
+          query?.config?.ref,
+          !!query?.config?.hide,
+        ]),
+      ],
+      () => {
+        const queries = dashboardPanelData.data.queries;
+        if (promqlMode.value) {
+          queryRefs(queries).forEach((letter, i) => {
+            if (letter && !queries[i].config?.ref)
+              queries[i].config = { ...queries[i].config, ref: letter };
+          });
+        }
+        dashboardPanelData.layout.hiddenQueries = queries.flatMap((query: any, i: number) =>
+          query?.config?.hide ? [i] : [],
+        );
+      },
+      { immediate: true, deep: true },
+    );
+
     const updatePromQLQuery = async (value: string, _event?: unknown) => {
       promqlAutoCompleteData.value.query = value;
       // promqlAutoCompleteData.value.text = event.changes[0].text;
@@ -717,21 +812,8 @@ export default defineComponent({
     };
 
     const toggleQueryVisibility = (rawIndex: string | number) => {
-      const index = Number(rawIndex);
-      // Lazy-init for older saved dashboard layouts that lack this array.
-      if (!Array.isArray(dashboardPanelData.layout.hiddenQueries)) {
-        dashboardPanelData.layout.hiddenQueries = [];
-      }
-      const hiddenQueries = dashboardPanelData.layout.hiddenQueries;
-      const queryIndex = hiddenQueries.indexOf(index);
-
-      if (queryIndex > -1) {
-        // Query is currently hidden, show it
-        hiddenQueries.splice(queryIndex, 1);
-      } else {
-        // Query is currently visible, hide it
-        hiddenQueries.push(index);
-      }
+      const query = dashboardPanelData.data.queries[Number(rawIndex)];
+      query.config = { ...query.config, hide: !query.config?.hide };
     };
 
     // toggle show query view
@@ -826,7 +908,7 @@ export default defineComponent({
     // Unified Query Editor: Handle query update
     const handleQueryUpdate = (newQuery: string) => {
       _sqlOnQueryChange();
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = newQuery;
+      setQueryText(currentQuery.value, newQuery);
 
       // Also call the existing updateQuery logic for autocomplete
       updateQuery(newQuery, {});
@@ -853,7 +935,7 @@ export default defineComponent({
         if (typeof editorValue !== "string") return;
 
         const trimmed = editorValue.trim();
-        if (trimmed && outgoing.query !== trimmed) outgoing.query = trimmed;
+        if (trimmed && queryTextOf(outgoing) !== trimmed) setQueryText(outgoing, trimmed);
       },
       { flush: "sync" },
     );
@@ -867,9 +949,7 @@ export default defineComponent({
       // Explicitly sync the editor with the correct query after language change
       setTimeout(() => {
         if (queryEditorRef.value && queryEditorRef.value.setValue) {
-          const currentQuery =
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query;
-          queryEditorRef.value.setValue(currentQuery);
+          queryEditorRef.value.setValue(currentQueryText.value);
         }
       }, 50);
     };
@@ -964,6 +1044,11 @@ export default defineComponent({
       confirmQueryModeChangeDialog,
       onUpdateToggle,
       addTab,
+      addFormulaTab,
+      currentQueryText,
+      tabLabel,
+      formulaError,
+      isFormulaInput,
       removeTab,
       toggleQueryVisibility,
       promqlAutoCompleteKeywords,

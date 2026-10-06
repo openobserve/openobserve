@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -69,6 +69,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
 
 import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQueryEditor.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -732,5 +733,122 @@ describe("DashboardQueryEditor", () => {
     wrapper.findComponent({ name: "CodeQueryEditor" }).vm.$emit("run-query");
 
     expect(runQuery).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("formula letters and the saved hide flag", () => {
+  let wrapper: any;
+
+  afterEach(() => wrapper?.unmount());
+
+  const mountWith = (queries: any[], currentQueryIndex = 0) => {
+    const mock: any = createMockDashboardPanelData();
+    mock.promqlMode = ref(true);
+    mock.dashboardPanelData.data.queryType = "promql";
+    mock.dashboardPanelData.data.queries.splice(0, 1, ...queries);
+    mock.dashboardPanelData.layout.currentQueryIndex = currentQueryIndex;
+    // Through the reactive proxy, as the real addQuery does.
+    mock.addQuery = () => mock.dashboardPanelData.data.queries.push(q({}, ""));
+    (useDashboardPanelData as any).mockImplementation(() => mock);
+    wrapper = mount(DashboardQueryEditor, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { dashboardPanelDataPageKey: "dashboard" },
+        stubs: { QueryTypeSelector: true, QueryEditor: true },
+      },
+    });
+    return mock.dashboardPanelData;
+  };
+  const q = (config: any = {}, query = "up") => ({
+    query,
+    customQuery: true,
+    vrlFunctionQuery: "",
+    config,
+  });
+  const refs = (data: any) => data.data.queries.map((it: any) => it.config?.ref);
+
+  it("gives legacy queries their letters by position on load", async () => {
+    const data = mountWith([q(), q()]);
+    await wrapper.vm.$nextTick();
+
+    expect(refs(data)).toEqual(["A", "B"]);
+  });
+
+  it("gives a new query the first unused letter", async () => {
+    const data = mountWith([q({ ref: "B" })]);
+    wrapper.vm.addTab();
+    await wrapper.vm.$nextTick();
+
+    expect(refs(data)).toEqual(["B", "A"]);
+  });
+
+  it("keeps every letter when a preceding query is deleted", async () => {
+    const data = mountWith([q({ ref: "A" }), q({ ref: "B" }), q({ formula: "B * 2" }, "")], 2);
+    await wrapper.vm.removeTab(0);
+    await wrapper.vm.$nextTick();
+
+    expect(refs(data)).toEqual(["B", undefined]);
+    expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').exists()).toBe(false);
+  });
+
+  it("labels each non-formula tab with its letter", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A" }, "")]);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-0"]').text()).toBe(
+      "A · Query 1",
+    );
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-1"]').text()).toBe("Formula 2");
+  });
+
+  it("backs the visibility toggle with config.hide", async () => {
+    const data = mountWith([q({ ref: "A", hide: true }), q({ ref: "B" })]);
+    await wrapper.vm.$nextTick();
+    expect(data.layout.hiddenQueries).toEqual([0]);
+
+    wrapper.vm.toggleQueryVisibility(1);
+    await wrapper.vm.$nextTick();
+
+    expect(data.data.queries[1].config.hide).toBe(true);
+    expect(data.layout.hiddenQueries).toEqual([0, 1]);
+  });
+
+  it("adds a formula as a lettered-free code query", async () => {
+    const data = mountWith([q({ ref: "A" })]);
+    await wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]').trigger("click");
+    await wrapper.vm.$nextTick();
+
+    const formula = data.data.queries[1];
+    expect(formula.config.formula).toBe("");
+    expect(formula.customQuery).toBe(true);
+    expect(formula.config.ref).toBeUndefined();
+    expect(data.layout.currentQueryIndex).toBe(1);
+  });
+
+  it("writes the editor text of a formula tab into config.formula", async () => {
+    const data = mountWith([q({ ref: "A" }), q({ formula: "" }, "")], 1);
+    wrapper.vm.handleQueryUpdate("A * 2");
+
+    expect(data.data.queries[1].config.formula).toBe("A * 2");
+    expect(data.data.queries[1].query).toBe("");
+  });
+
+  it("shows an unknown letter under the formula", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A / B" }, "")], 1);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').text()).toBe(
+      "B is not a query in this panel",
+    );
+  });
+
+  it("tells a referenced input that its own settings do not apply in the formula", async () => {
+    mountWith([q({ ref: "A" }), q({ ref: "B" }), q({ formula: "A * 2" }, "")]);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-formula-input-note"]').exists()).toBe(true);
+
+    wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 1;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-formula-input-note"]').exists()).toBe(false);
   });
 });

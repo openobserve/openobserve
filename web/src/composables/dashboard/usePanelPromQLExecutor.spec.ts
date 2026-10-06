@@ -740,3 +740,125 @@ describe("time shift keeps the shifted series of every shown primary under the s
     expect(shiftedHosts).toEqual(expect.arrayContaining(shown.map((m) => m.host)));
   });
 });
+
+describe("formulas and hidden queries", () => {
+  const ERR = 'sum by (job)(rate(http_requests_total{code=~"5.."}[5m]))';
+  const ALL = "sum by (job)(rate(http_requests_total[5m]))";
+
+  const run = async (queries: any[]) => {
+    const panelSchema = makePanelSchema(queries);
+    const made = makeCtx({ panelSchema });
+    const handlers: any[] = [];
+    (made.fetchQueryDataWithHttpStream as any).mockImplementation((_p: any, h: any) =>
+      handlers.push(h),
+    );
+    await usePanelPromQLExecutor(made.ctx as any).executePromQL(0, 300_000_000, null);
+    const payloads = (made.fetchQueryDataWithHttpStream as any).mock.calls.map((c: any) => c[0]);
+    return { ...made, handlers, payloads };
+  };
+
+  it("sends only the formula when its inputs are hidden", async () => {
+    const { payloads, state } = await run([
+      { query: ERR, config: { ref: "A", hide: true } },
+      { query: ALL, config: { ref: "B", hide: true } },
+      { query: "", config: { formula: "A / B * 100" } },
+    ]);
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].queryReq.query).toBe(`(${ERR}) / (${ALL}) * 100`);
+    expect(state.metadata.queries[2].panelQueryIndex).toBe(2);
+    expect(state.metadata.queries[2].query).toBe(`(${ERR}) / (${ALL}) * 100`);
+  });
+
+  it("keeps data and metadata slots aligned with panel queries for hidden ones", async () => {
+    const { state, handlers } = await run([
+      { query: "a", config: { ref: "A", hide: true } },
+      { query: "b", config: { ref: "B" } },
+    ]);
+
+    expect(handlers).toHaveLength(1);
+    expect(state.data[0]).toEqual({ resultType: "matrix", result: [] });
+    expect(state.metadata.queries[0].panelQueryIndex).toBe(0);
+    handlers[0].data({}, { type: "promql_response", content: { results: { result: [1] } } });
+    expect(state.data[0]).toEqual({ resultType: "matrix", result: [] });
+    expect(state.metadata.queries[1].panelQueryIndex).toBe(1);
+  });
+
+  it("finishes loading when every query is hidden", async () => {
+    const { state, payloads } = await run([{ query: "a", config: { ref: "A", hide: true } }]);
+
+    expect(payloads).toHaveLength(0);
+    expect(state.loading).toBe(false);
+  });
+
+  it("substitutes each input's text after variable substitution", async () => {
+    const panelSchema = makePanelSchema([
+      { query: 'up{job="$job"}', config: { ref: "A" } },
+      { query: "", config: { formula: "A * 2" } },
+    ]);
+    const made = makeCtx({ panelSchema });
+    made.ctx.applyDynamicVariables = vi.fn(async (q: string) => ({
+      query: q.replace("$job", "api"),
+      metadata: [],
+    }));
+    await usePanelPromQLExecutor(made.ctx as any).executePromQL(0, 300_000_000, null);
+
+    const sent = (made.fetchQueryDataWithHttpStream as any).mock.calls.map(
+      (c: any) => c[0].queryReq.query,
+    );
+    expect(sent).toEqual(['up{job="api"}', '(up{job="api"}) * 2']);
+  });
+
+  it("uses the formula's own query type, not its input's", async () => {
+    const { payloads } = await run([
+      { query: "up", config: { ref: "A", hide: true, query_type: "instant" } },
+      { query: "", config: { formula: "A * 2", query_type: "range" } },
+    ]);
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].queryReq.query_type).toBe("range");
+  });
+
+  it("gives letters to legacy inputs by position", async () => {
+    const { payloads } = await run([
+      { query: "x", config: { hide: true } },
+      { query: "y", config: { hide: true } },
+      { query: "", config: { formula: "B - A" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["(y) - (x)"]);
+  });
+
+  it("shows an unknown-letter error and sends nothing for that formula", async () => {
+    const { payloads, state, handlers } = await run([
+      { query: "x", config: { ref: "A" } },
+      { query: "", config: { formula: "A / B" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["x"]);
+    expect(state.errorDetail.message).toBe("B is not a query in this panel");
+    expect(state.data[1]).toEqual({ resultType: "matrix", result: [] });
+    handlers[0].data({}, { type: "promql_response", content: { results: { result: [] } } });
+    expect(state.errorDetail.message).toBe("B is not a query in this panel");
+  });
+
+  it("time-shifts a formula like any other query", async () => {
+    const { payloads, state } = await run([
+      { query: "x", config: { ref: "A", hide: true } },
+      { query: "", config: { formula: "A * 2", time_shift: [{ offSet: "1d" }] } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["(x) * 2", "(x) * 2"]);
+    expect(payloads[1].queryReq.end_time).toBe(300_000_000 - 86_400_000_000);
+    expect(state.metadata.queries[2].panelQueryIndex).toBe(1);
+  });
+
+  it("does not time-shift a hidden query", async () => {
+    const { payloads } = await run([
+      { query: "x", config: { ref: "A", hide: true, time_shift: [{ offSet: "1d" }] } },
+      { query: "y", config: { ref: "B" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["y"]);
+  });
+});

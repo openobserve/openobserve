@@ -168,6 +168,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
         query_label: "",
         layer_type: "scatter",
         weight_fixed: 1,
+        hide: false,
       },
     };
     // Seed the new query's default builder fields synchronously (mirrors the
