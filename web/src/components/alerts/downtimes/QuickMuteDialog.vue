@@ -67,6 +67,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ endsIn }}
       </p>
 
+      <div class="flex flex-wrap items-center gap-1 text-sm" data-test="quick-mute-folder">
+        <span class="text-text-secondary">{{ t("alerts.downtimes.mute.fileIn") }}</span>
+        <InlineSelectFolderDropdown
+          variant="inline"
+          type="downtimes"
+          :model-value="values.folder_id"
+          data-test="quick-mute-folder-select"
+          @update:model-value="(v: string) => form.setFieldValue('folder_id', v)"
+        />
+      </div>
+
       <OFormTextarea
         name="reason"
         :label="t('alerts.downtimes.form.reason')"
@@ -104,6 +115,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
 
 const FORM_ID = "quick-mute-form";
 
@@ -125,17 +137,17 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const { mute, timezone } = useQuickMute();
+const { mute, timezone, defaultFolderId } = useQuickMute();
 
 const nowMicros = () => Date.now() * 1000;
 
 const form = useOForm<QuickMuteForm>({
-  defaultValues: quickMuteDefaults(Date.now(), timezone),
+  defaultValues: quickMuteDefaults(Date.now(), timezone, defaultFolderId.value),
   schema: makeQuickMuteSchema(t, timezone, nowMicros),
   onSubmit: async (values) => {
     const endsAt = quickMuteEndsAt(values, nowMicros(), timezone);
     if (endsAt === null) return;
-    const id = await mute(props.selection, endsAt, values.reason);
+    const id = await mute(props.selection, endsAt, values.reason, values.folder_id);
     if (!id) return;
     emit("muted", id);
     emit("update:open", false);
@@ -179,7 +191,12 @@ watch(preset, (value) => {
 watch(
   () => props.open,
   (isOpen) => {
-    if (isOpen) form.reset(quickMuteDefaults(Date.now(), timezone));
+    if (isOpen) form.reset(quickMuteDefaults(Date.now(), timezone, defaultFolderId.value));
   },
 );
+
+// The folder list can answer after the dialog opened; follow it until the user picks one.
+watch(defaultFolderId, (next, prev) => {
+  if (values.value.folder_id === prev) form.setFieldValue("folder_id", next);
+});
 </script>

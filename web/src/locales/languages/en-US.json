@@ -9026,6 +9026,7 @@
         },
         "subtitle": "They keep running and keep their history. Notifications, pages and workflows stop until the window ends.",
         "muteFor": "Mute for",
+        "fileIn": "File in",
         "presets": {
           "30m": "30 min",
           "1h": "1 h",

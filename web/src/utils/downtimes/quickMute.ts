@@ -15,6 +15,7 @@
 
 import type { I18nKey } from "@/types/i18n";
 import type { DowntimeRequest, DowntimeTarget, TargetModule } from "@/services/downtimes";
+import { DEFAULT_DOWNTIME_FOLDER } from "./folderDefault";
 
 export type QuickMutePreset = "30m" | "1h" | "2h" | "4h";
 
@@ -34,16 +35,17 @@ export interface QuickMuteSelection {
   ids: string[];
 }
 
-/** One target per module, all folders, the named ids, from now, filed in default, no banner. */
+/** One target per module, all folders, the named ids, from now, filed in `folderId`, no banner. */
 export function buildQuickMuteRequest(
   selection: QuickMuteSelection[],
   startsAtMicros: number,
   endsAtMicros: number,
   timezone: string,
   reason?: string,
+  folderId: string = DEFAULT_DOWNTIME_FOLDER,
 ): DowntimeRequest {
   const body: DowntimeRequest = {
-    folder_id: "default",
+    folder_id: folderId,
     targets: selection
       .filter((s) => s.ids.length > 0)
       .map((s): DowntimeTarget => ({

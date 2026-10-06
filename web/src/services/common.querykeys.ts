@@ -25,6 +25,7 @@ import { orgKey } from "@/composables/query/keys";
 export const folderKeys = {
   all: (org: string) => orgKey(org, "folders"),
   list: (org: string, type: string) => orgKey(org, "folders", type),
+  permitted: (org: string, type: string) => orgKey(org, "folders", type, "permitted"),
 };
 
 export const nodeKeys = {

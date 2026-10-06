@@ -28,6 +28,7 @@ export interface QuickMuteForm extends Record<string, unknown> {
   end_date: string;
   end_time: string;
   reason: string;
+  folder_id: string;
 }
 
 /** The end of the mute in microseconds UTC, or null while a custom end is incomplete. */
@@ -43,6 +44,7 @@ export const makeQuickMuteSchema = (t: TranslateFn, tz: string, now: () => numbe
       end_date: z.string(),
       end_time: z.string(),
       reason: z.string(),
+      folder_id: z.string().min(1),
     })
     .superRefine((raw, ctx) => {
       const v = raw as QuickMuteForm;
@@ -61,7 +63,7 @@ export const makeQuickMuteSchema = (t: TranslateFn, tz: string, now: () => numbe
       if (message) ctx.addIssue({ code: "custom", path: ["end_date"], message });
     });
 
-export const quickMuteDefaults = (nowMs: number, tz: string): QuickMuteForm => {
+export const quickMuteDefaults = (nowMs: number, tz: string, folderId: string): QuickMuteForm => {
   const end = utcMicrosToLocal((nowMs + 2 * 3_600_000) * 1000, tz);
-  return { preset: "2h", end_date: end.date, end_time: end.time, reason: "" };
+  return { preset: "2h", end_date: end.date, end_time: end.time, reason: "", folder_id: folderId };
 };

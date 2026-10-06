@@ -39,6 +39,15 @@ export const foldersQuery = (org: string, type: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** The folders as the server lists them for this user, without the injected "default". */
+export const permittedFoldersQuery = (org: string, type: string) =>
+  queryOptions({
+    queryKey: folderKeys.permitted(org, type),
+    queryFn: async (): Promise<Folder[]> =>
+      ((await common.list_Folders(org, type)).data.list ?? []) as Folder[],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export const nodesQuery = (org: string) =>
   queryOptions({
     queryKey: nodeKeys.list(org),

@@ -18,6 +18,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { formatInTimeZone } from "date-fns-tz";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
+import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
 import { quickMuteMutation } from "@/services/downtimes.queries";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -33,17 +34,27 @@ export function useQuickMute() {
   const router = useRouter();
   const mutation = useMutation(() => quickMuteMutation(orgId.value));
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const defaultFolder = useDefaultDowntimeFolder();
 
   const mute = async (
     selection: QuickMuteSelection[],
     endsAtMicros: number,
     reason?: string,
+    folderId: string = defaultFolder.folderId.value,
   ): Promise<string | null> => {
     const count = selectionCount(selection);
     const startsAt = Date.now() * 1000;
-    const body = buildQuickMuteRequest(selection, startsAt, endsAtMicros, timezone, reason);
+    const body = buildQuickMuteRequest(
+      selection,
+      startsAt,
+      endsAtMicros,
+      timezone,
+      reason,
+      folderId,
+    );
     try {
       const created = await mutation.mutateAsync(body);
+      defaultFolder.remember(folderId);
       const until = formatInTimeZone(new Date(endsAtMicros / 1000), timezone, "HH:mm");
       toast({
         variant: "success",
@@ -76,5 +87,11 @@ export function useQuickMute() {
   const muteFor = (selection: QuickMuteSelection[], seconds: number) =>
     mute(selection, Date.now() * 1000 + seconds * 1_000_000);
 
-  return { mute, muteFor, isPending: mutation.isPending, timezone };
+  return {
+    mute,
+    muteFor,
+    isPending: mutation.isPending,
+    timezone,
+    defaultFolderId: defaultFolder.folderId,
+  };
 }

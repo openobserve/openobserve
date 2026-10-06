@@ -50,6 +50,18 @@ describe("quick mute request body", () => {
     ]);
     expect(body).not.toHaveProperty("reason");
   });
+
+  it("files the mute in the folder the user picked", () => {
+    const body = buildQuickMuteRequest(
+      [{ module: "alerts", ids: ["a1"] }],
+      NOW,
+      NOW + 1,
+      "UTC",
+      undefined,
+      "payments-maintenance",
+    );
+    expect(body.folder_id).toBe("payments-maintenance");
+  });
 });
 
 describe("quick mute form", () => {
@@ -59,6 +71,7 @@ describe("quick mute form", () => {
     end_date: "2026-09-17",
     end_time: "18:00",
     reason: "",
+    folder_id: "payments",
     ...over,
   });
 
