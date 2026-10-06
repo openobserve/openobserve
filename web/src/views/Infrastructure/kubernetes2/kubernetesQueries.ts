@@ -140,9 +140,7 @@ export const SPARSE_STREAMS: ReadonlySet<string> = new Set([
 ]);
 
 // The openobserve-collector chart drops this stream, so its absence says nothing about OOMs.
-export const OPTIONAL_STREAMS: ReadonlySet<string> = new Set([
-  "kube_pod_container_status_last_terminated_reason",
-]);
+export const OPTIONAL_STREAM = "kube_pod_container_status_last_terminated_reason";
 
 export const ALWAYS_QUERIES: readonly QueryId[] = [
   "P1",

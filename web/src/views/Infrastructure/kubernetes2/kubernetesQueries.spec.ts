@@ -18,7 +18,7 @@ import {
   ALWAYS_QUERIES,
   DETECTION_STREAMS,
   KSM_ANCHOR,
-  OPTIONAL_STREAMS,
+  OPTIONAL_STREAM,
   QUERY_FAMILY,
   QUERY_STREAM,
   SPARSE_STREAMS,
@@ -162,7 +162,7 @@ describe("kubernetesQueries", () => {
       "kube_pod_container_status_waiting_reason",
       "kube_pod_container_resource_limits",
     ]);
-    expect([...OPTIONAL_STREAMS]).toEqual(["kube_pod_container_status_last_terminated_reason"]);
+    expect(OPTIONAL_STREAM).toBe("kube_pod_container_status_last_terminated_reason");
   });
 
   it("detects on any of the seven anchor or usage streams", () => {

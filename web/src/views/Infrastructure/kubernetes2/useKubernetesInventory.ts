@@ -22,7 +22,7 @@ import {
   DETECTION_STREAMS,
   ISSUE_INPUTS,
   KSM_ANCHOR,
-  OPTIONAL_STREAMS,
+  OPTIONAL_STREAM,
   QUERY_FAMILY,
   QUERY_STREAM,
   SPARSE_STREAMS,
@@ -295,13 +295,12 @@ export function useKubernetesInventory(listState: () => K8sListState) {
         });
       }
     }
-    const [optional] = [...OPTIONAL_STREAMS];
-    if (has(KSM_ANCHOR.pods) && !has(optional)) {
+    if (has(KSM_ANCHOR.pods) && !has(OPTIONAL_STREAM)) {
       out.push({
         id: "oom-stream",
         kind: "pods",
         key: "infra.k8s2.oomNeedsStream",
-        params: { stream: optional },
+        params: { stream: OPTIONAL_STREAM },
       });
     }
     for (const family of inventory.value.unlabelledFamilies) {
