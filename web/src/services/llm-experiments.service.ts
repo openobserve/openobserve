@@ -126,7 +126,6 @@ export interface ExperimentPreview {
 
 /** An order-of-magnitude estimate of what the platform pays to run the experiment. */
 export interface ExperimentCostEstimate {
-  currency: string;
   /** null when nothing could be priced. */
   estimatedCost: number | null;
   /** false for Remote/SDK tasks: the total is scoring cost only. */
@@ -541,7 +540,6 @@ function normalizeCostEstimate(input: any): ExperimentCostEstimate | null {
   if (!input) return null;
   const cost = value<number | null>(input, "estimatedCost", "estimated_cost", null);
   return {
-    currency: input.currency ?? "USD",
     estimatedCost: cost === null ? null : Number(cost),
     taskCostEstimated: Boolean(value(input, "taskCostEstimated", "task_cost_estimated", false)),
     incomplete: Boolean(input.incomplete),

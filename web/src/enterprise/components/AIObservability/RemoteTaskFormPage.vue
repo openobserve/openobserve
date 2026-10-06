@@ -770,7 +770,8 @@ async function runStoredVersionTest() {
         latencyMs: row.latencyMs,
       }
     : null;
-  testState.value = row?.status === "ok" ? "passed" : "failed";
+  // An explicit skip is a well-formed answer, which verification also counts as a pass.
+  testState.value = row && row.status !== "error" ? "passed" : "failed";
   if (testState.value === "failed") {
     testError.value = raw(row?.error) || t("aiObservability.remoteTasks.form.testFailed");
   }

@@ -496,6 +496,28 @@ describe("RemoteTaskFormPage — test connection", () => {
       );
     });
 
+    it("counts an explicit skip from the endpoint as a pass", async () => {
+      testRun.mockResolvedValue([
+        {
+          rowId: "sample-0",
+          status: "skipped",
+          rawRequest: "{}",
+          rawResponse: "{}",
+          httpStatus: 200,
+          latencyMs: 5,
+          attempts: 1,
+          error: "no context",
+        },
+      ]);
+      const wrapper = mountForm();
+      await flushPromises();
+
+      await runTest(wrapper);
+
+      expect((wrapper.vm as any).testState).toBe("passed");
+      expect((wrapper.vm as any).testError).toBeNull();
+    });
+
     it("surfaces the stored version's failure", async () => {
       testRun.mockResolvedValue([
         {

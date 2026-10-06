@@ -379,7 +379,6 @@ describe("ExperimentForm", () => {
 
   describe("cost confirmation", () => {
     const costEstimate = {
-      currency: "USD",
       estimatedCost: 42.5,
       taskCostEstimated: true,
       incomplete: false,
