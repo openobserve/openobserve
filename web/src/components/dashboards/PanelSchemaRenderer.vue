@@ -1148,6 +1148,7 @@ export default defineComponent({
       router,
       emit,
       visibleQueryIndexes,
+      hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
     });
     // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
     const onChartDomContextMenu = (event: any) => {

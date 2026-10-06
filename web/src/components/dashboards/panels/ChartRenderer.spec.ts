@@ -594,21 +594,32 @@ describe("ChartRenderer", () => {
       });
     });
 
-    it("hides the chart tooltip when the alert menu opens, so the tooltip cannot cover it", async () => {
+    it("leaves the tooltip alone on both right-click paths; only an opened alert menu hides it", async () => {
       const echarts = await import("echarts/core");
       const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
       vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line" }] });
       vi.mocked(mockChart.convertFromPixel).mockReturnValue([1609459200000, 5]);
       vi.mocked(mockChart.dispatchAction).mockClear();
+      const seriesHandler = vi
+        .mocked(mockChart.on)
+        .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
 
+      seriesHandler!({
+        seriesIndex: 0,
+        dataIndex: 1,
+        value: [1609459200000, 7],
+        event: {
+          event: { clientX: 1, clientY: 2, preventDefault: vi.fn(), stopPropagation: vi.fn() },
+        },
+      });
       await wrapper.find('[data-test="chart-renderer"]').trigger("contextmenu", {
         clientX: 10,
         clientY: 20,
       });
       await flushPromises();
 
-      expect(wrapper.emitted("domcontextmenu")).toBeTruthy();
-      expect(mockChart.dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+      expect(wrapper.emitted("domcontextmenu")).toHaveLength(2);
+      expect(mockChart.dispatchAction).not.toHaveBeenCalledWith({ type: "hideTip" });
     });
 
     it("should not emit domcontextmenu for non-bar/line chart types", async () => {

@@ -2021,6 +2021,30 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuValue).toBe(75);
     });
 
+    it("hides the chart tooltip when the alert menu opens, from a series or from empty chart area", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      const dispatchAction = vi.fn();
+      wrapper.vm.chartRendererRef = { chart: { dispatchAction } };
+      wrapper.vm.panelData = { options: { series: [{ name: "a", _panelQueryIndex: 0 }] } };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0, dataIndex: 1 });
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+
+      expect(dispatchAction).toHaveBeenCalledTimes(2);
+      expect(dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+    });
+
+    it("keeps the chart tooltip on a right-click when alert creation is off", () => {
+      wrapper = createWrapper({ allowAlertCreation: false });
+      const dispatchAction = vi.fn();
+      wrapper.vm.chartRendererRef = { chart: { dispatchAction } };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+
+      expect(dispatchAction).not.toHaveBeenCalled();
+    });
+
     it("resolves the clicked series to its panel query and role", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
       wrapper.vm.panelData = {
