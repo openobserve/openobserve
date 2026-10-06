@@ -82,6 +82,12 @@ export const labelFilterKey = (filter: LabelFilter): string =>
   // plain-text source.
   `${filter.label}\u0000${filter.operator ?? "="}\u0000${filter.value}`;
 
+/** A query window other than the grid's own, in µs. */
+export interface QueryWindow {
+  start: number;
+  end: number;
+}
+
 export type PreviewStatus =
   | "idle"
   | "loading"
@@ -1133,8 +1139,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /* ------------------------------------------------------------- previews */
 
-  const previewCacheKey = (query: string, step: number) =>
-    `${org.value}|${query}|${timeRange.value.start_time}|${timeRange.value.end_time}|${step}`;
+  const previewCacheKey = (query: string, step: number, window?: QueryWindow) =>
+    `${org.value}|${query}|${window?.start ?? timeRange.value.start_time}|${window?.end ?? timeRange.value.end_time}|${step}`;
 
   /**
    * Drops a card's rendered preview and abandons whatever it still has running.
@@ -1166,7 +1172,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * the queue's AbortSignal is what the grid already fires on scroll-away,
    * filter change and refresh, so it is bridged to `cancelStreamQueryBasedOnRequestId`.
    */
-  const streamQuery = (query: string, step: number, signal: AbortSignal, seriesLimit?: number) =>
+  const streamQuery = (
+    query: string,
+    step: number,
+    signal: AbortSignal,
+    seriesLimit?: number,
+    window?: QueryWindow,
+  ) =>
     new Promise<any>((resolve, reject) => {
       const { traceId } = generateTraceContext();
       const maxSeries = seriesLimit ?? store.state?.zoConfig?.max_dashboard_series ?? 100;
@@ -1204,8 +1216,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         {
           queryReq: {
             query,
-            start_time: timeRange.value.start_time,
-            end_time: timeRange.value.end_time,
+            start_time: window?.start ?? timeRange.value.start_time,
+            end_time: window?.end ?? timeRange.value.end_time,
             step: `${step}s`,
             query_type: "range",
           },
@@ -1917,16 +1929,22 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     expr: string,
     card: MetricCard,
     signal: AbortSignal,
-    opts?: { maxSeries?: number },
+    opts?: { maxSeries?: number; window?: QueryWindow },
   ) => {
     const step = dialogStepFor(card);
-    const key = previewCacheKey(expr, step);
+    // The window is in the key, so a shifted request gets its own job instead of joining the current one.
+    const key = previewCacheKey(expr, step, opts?.window);
     if (signal.aborted) return Promise.reject(new PreviewCancelledError(key));
     const owner = `${DETAIL_OWNER}:${++detailRequests}`;
     const onAbort = () => queue.cancel(key, owner);
     signal.addEventListener("abort", onAbort, { once: true });
     return queue
-      .run(key, PRIORITY.DIALOG, (abort) => streamQuery(expr, step, abort, opts?.maxSeries), owner)
+      .run(
+        key,
+        PRIORITY.DIALOG,
+        (abort) => streamQuery(expr, step, abort, opts?.maxSeries, opts?.window),
+        owner,
+      )
       .finally(() => signal.removeEventListener("abort", onAbort));
   };
 
@@ -2430,6 +2448,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     runDialogQuery,
     cancelDialogQueries,
     runDetailQuery,
+    detailStepFor: dialogStepFor,
     rateWindowFor,
 
     labelsByStream,

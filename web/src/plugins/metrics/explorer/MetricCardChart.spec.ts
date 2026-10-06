@@ -22,6 +22,7 @@ config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 import MetricCardChart from "./MetricCardChart.vue";
 import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
+import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 
 const RESULTS = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }];
 
@@ -238,6 +239,86 @@ describe("MetricCardChart feeds the queue's results in as injected data", () => 
       startTime: 1_000_000,
       endTime: 2_000_000,
     });
+  });
+
+  it("appends shifted results after the primaries, with their offset window and parent query", () => {
+    const DAY_MS = 86_400_000;
+    const past = { resultType: "matrix", result: [{ metric: {}, values: [[1, "3"]] }] };
+    const wrapper = mountChart({
+      results: [RESULTS[0], RESULTS[0]],
+      queries: [{ expr: "a" }, { expr: "b" }],
+      stepSeconds: 30,
+      shifted: [{ result: past, gapMs: DAY_MS, periodAsStr: "1 day ago", parentIndex: 1 }],
+    });
+    const injected = panelProp(wrapper, "injectedPromqlData");
+
+    expect(injected.data).toEqual([RESULTS[0], RESULTS[0], past]);
+    expect(injected.metadata.queries).toEqual([
+      { startTime: 1_000_000, endTime: 2_000_000 },
+      { startTime: 1_000_000, endTime: 2_000_000 },
+      {
+        startTime: 1_000_000 - DAY_MS * 1000,
+        endTime: 2_000_000 - DAY_MS * 1000,
+        timeRangeGap: { seconds: DAY_MS, periodAsStr: "1 day ago" },
+        panelQueryIndex: 1,
+      },
+    ]);
+    expect(injected.resultMetaData).toEqual([
+      [{ step: 30_000_000 }],
+      [{ step: 30_000_000 }],
+      [{ step: 30_000_000 }],
+    ]);
+    expect(panelProp(wrapper, "panelSchema").queries).toHaveLength(2);
+  });
+
+  it("draws a dashed twin per series, on the current x values, when the step does not divide the offset", async () => {
+    const DAY_S = 86_400;
+    const STEP = 35;
+    const START_S = 1_700_000_005;
+    const grid = (start: number) => Array.from({ length: 10 }, (_, i) => start + i * STEP);
+    const series = (ts: number[]) => ({
+      resultType: "matrix",
+      result: [{ metric: { pod: "a" }, values: ts.map((t) => [t, "1"]) }],
+    });
+    const wrapper = mountChart({
+      results: [series(grid(START_S))],
+      queries: [{ expr: "x" }],
+      timeRange: { start_time: START_S * 1e6, end_time: (START_S + 9 * STEP) * 1e6 },
+      stepSeconds: STEP,
+      shifted: [
+        {
+          result: series(grid(START_S - DAY_S + 17)),
+          gapMs: DAY_S * 1000,
+          periodAsStr: "1 day ago",
+          parentIndex: 0,
+        },
+      ],
+    });
+    const injected = panelProp(wrapper, "injectedPromqlData");
+    const { options } = await convertPromQLData(
+      panelProp(wrapper, "panelSchema"),
+      injected.data,
+      { state: { zoConfig: { max_dashboard_series: 100 }, timezone: "UTC", theme: "light" } },
+      { value: { offsetWidth: 500, offsetHeight: 300 } },
+      null,
+      [],
+      injected.metadata,
+      injected.resultMetaData,
+      true,
+    );
+
+    const named = options.series.filter((s: any) => s.name);
+    expect(named.map((s: any) => s.name)).toEqual(["a", "a (1 day ago)"]);
+    expect(named[1].lineStyle.type).toBe("dashed");
+    const xs = new Set(named.flatMap((s: any) => s.data.map((point: any) => String(point[0]))));
+    expect(xs.size).toBe(10);
+  });
+
+  it("passes no shifted entries or step metadata without a comparison", () => {
+    const injected = panelProp(mountChart(), "injectedPromqlData");
+    expect(injected.data).toEqual(RESULTS);
+    expect(injected.metadata.queries).toHaveLength(1);
+    expect(injected.resultMetaData).toBeUndefined();
   });
 
   it("converts the µs window into the Date pair the panel expects", () => {

@@ -48,9 +48,19 @@ export interface ExplorerFilterState {
   tab?: DetailTab | null;
   /** The label the Breakdown tab charts. Meaningful only alongside `metric`. */
   breakdownLabel?: string | null;
+  /** The period the detail charts compare against. Meaningful only alongside `metric`. */
+  compare?: CompareOffset | null;
 }
 
 export type DetailTab = "breakdown" | "related" | "used_in";
+
+/** The detail view's "Compare to" offsets, in ms. */
+export const COMPARE_OFFSET_MS = {
+  "1h": 3_600_000,
+  "1d": 86_400_000,
+  "1w": 604_800_000,
+} as const;
+export type CompareOffset = keyof typeof COMPARE_OFFSET_MS;
 
 const DETAIL_TABS = new Set<string>(["breakdown", "related", "used_in"]);
 
@@ -69,6 +79,7 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "metric",
   "tab",
   "breakdown_label",
+  "compare",
 ] as const;
 
 const TYPE_IDS = new Set(["counter", "gauge", "histogram", "summary", "other"]);
@@ -111,6 +122,7 @@ export function explorerFiltersToQuery(
     query.metric = state.metric;
     if (state.tab) query.tab = state.tab;
     if (state.breakdownLabel) query.breakdown_label = state.breakdownLabel;
+    if (state.compare) query.compare = state.compare;
   }
   return query;
 }
@@ -155,6 +167,9 @@ export function queryToExplorerFilters(
     // A label name is embedded into PromQL, so only a well-formed one is kept.
     if (typeof query.breakdown_label === "string" && LABEL_NAME.test(query.breakdown_label)) {
       out.breakdownLabel = query.breakdown_label;
+    }
+    if (typeof query.compare === "string" && Object.hasOwn(COMPARE_OFFSET_MS, query.compare)) {
+      out.compare = query.compare as CompareOffset;
     }
   }
 

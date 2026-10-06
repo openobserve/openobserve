@@ -201,6 +201,23 @@ describe("explorerUrlState", () => {
       expect(queryToExplorerFilters({ tab: "related", breakdown_label: "route" })).toEqual({});
     });
 
+    it("round-trips compare, and owns its key", () => {
+      expect(EXPLORER_FILTER_PARAM_KEYS).toContain("compare");
+      for (const compare of ["1h", "1d", "1w"] as const) {
+        const query = explorerFiltersToQuery({ ...defaults(), metric: "up", compare });
+        expect(query).toEqual({ metric: "up", compare });
+        expect(queryToExplorerFilters(query)).toEqual({ metric: "up", compare });
+      }
+    });
+
+    it("rejects any compare value outside the three presets, and compare without a metric", () => {
+      for (const compare of ["2h", "1mo", "1D", "", "1d,1w"]) {
+        expect(queryToExplorerFilters({ metric: "up", compare })).toEqual({ metric: "up" });
+      }
+      expect(queryToExplorerFilters({ compare: "1d" })).toEqual({});
+      expect(explorerFiltersToQuery({ ...defaults(), compare: "1d" })).toEqual({});
+    });
+
     it("drops an unknown tab and a malformed label name", () => {
       expect(
         queryToExplorerFilters({ metric: "up", tab: "bogus", breakdown_label: "1bad" }),

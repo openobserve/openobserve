@@ -48,6 +48,14 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
 
+/** One expression's result over an earlier period; `gapMs` is the offset, as dashboards store it. */
+export interface ShiftedResult {
+  result: any;
+  gapMs: number;
+  periodAsStr: string;
+  parentIndex: number;
+}
+
 export default defineComponent({
   name: "MetricCardChart",
   components: { PanelSchemaRenderer },
@@ -88,6 +96,10 @@ export default defineComponent({
      */
     allowAlertCreation: { type: Boolean, default: false },
     legend: { type: Boolean, default: false },
+    /** Earlier periods drawn over the primaries; the converter dashes them in their parent's colour. */
+    shifted: { type: Array as PropType<ShiftedResult[]>, default: () => [] },
+    /** The queries' step, so shifted samples snap onto the primaries' grid. */
+    stepSeconds: { type: Number, default: 0 },
     /** The card's exemplar state; the explorer grid owns the fetch. */
     injectedExemplars: {
       type: Object as PropType<InjectedExemplars | undefined>,
@@ -192,16 +204,20 @@ export default defineComponent({
     const injectedPromqlData = computed(() => {
       if (!props.results?.length) return undefined;
       const range = props.timeRange;
+      const primary = { startTime: range?.start_time, endTime: range?.end_time };
+      const shifted = props.shifted.map((entry) => ({
+        startTime: range?.start_time - entry.gapMs * 1000,
+        endTime: range?.end_time - entry.gapMs * 1000,
+        timeRangeGap: { seconds: entry.gapMs, periodAsStr: entry.periodAsStr },
+        panelQueryIndex: entry.parentIndex,
+      }));
+      const queries = [...props.results.map(() => ({ ...primary })), ...shifted];
       return {
-        data: props.results,
-        metadata: {
-          queries: [
-            {
-              startTime: range?.start_time,
-              endTime: range?.end_time,
-            },
-          ],
-        },
+        data: [...props.results, ...props.shifted.map((entry) => entry.result)],
+        metadata: { queries },
+        ...(props.stepSeconds > 0
+          ? { resultMetaData: queries.map(() => [{ step: props.stepSeconds * 1e6 }]) }
+          : {}),
       };
     });
 

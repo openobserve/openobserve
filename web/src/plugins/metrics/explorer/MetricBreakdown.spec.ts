@@ -93,6 +93,8 @@ const MetricCardChartStub = {
     timeRange: Object,
     legend: Boolean,
     allowAlertCreation: Boolean,
+    shifted: Array,
+    stepSeconds: Number,
   },
   template: `<div data-test="breakdown-chart-stub"><div data-test="chart-renderer" /></div>`,
 };
@@ -625,6 +627,24 @@ describe("MetricBreakdown", () => {
       const chart = wrapper.findComponent({ name: "MetricCardChart" });
       expect(chart.props("allowAlertCreation")).toBe(true);
       expect(chart.props("queries")[0].stream).toBe(CARD.name);
+    });
+
+    it("compares the focused chart, and only it, with the chosen period", async () => {
+      const compare = { gapMs: 86_400_000, periodAsStr: "1 day ago" };
+      wrapper = mountBreakdown({ compare, stepSeconds: 60 });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalled();
+      expect(runQuery.mock.calls.some(([, , opts]) => opts?.window)).toBe(false);
+      runQuery.mockClear();
+
+      await wrapper.setProps({ selectedLabel: "method" });
+      await flushPromises();
+      const shiftedCalls = runQuery.mock.calls.filter(([, , opts]) => opts?.window);
+      expect(shiftedCalls).toHaveLength(1);
+      expect(shiftedCalls[0][0]).toContain("by (method)");
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("shifted")).toHaveLength(1);
+      expect(chart.props("stepSeconds")).toBe(60);
     });
 
     it("keeps the right-click alert off the small label tiles", async () => {

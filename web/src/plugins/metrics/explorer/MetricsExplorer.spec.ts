@@ -89,6 +89,7 @@ const grid = vi.hoisted(() => {
     runDialogQuery: vi.fn(),
     cancelDialogQueries: vi.fn(),
     runDetailQuery: vi.fn(),
+    detailStepFor: vi.fn(() => 30),
     rateWindowFor: vi.fn(() => "4m"),
     labelsByStream: { value: {} },
     prefixAssignment: { value: { groupOf: new Map() } },
@@ -1547,6 +1548,32 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.effectiveVariant).toHaveBeenLastCalledWith(OTHER, undefined, expect.any(Object));
       expect(chart.queries).toEqual([{ expr: "sum(rate(http_responses_total[4m]))" }]);
       expect(chart.chartType).toBe("line");
+    });
+
+    it("restores compare from a deep link and writes a change to the URL without re-querying the grid", async () => {
+      routerState.query = { metric: CARD.name, compare: "1d" };
+      const wrapper = mountExplorer();
+      expect(detailView(wrapper).props("compare")).toBe("1d");
+      expect(detailView(wrapper).props("stepSeconds")).toBe(30);
+      routerState.push.mockClear();
+      routerState.replace.mockClear();
+      grid.requestPreview.mockClear();
+
+      detailView(wrapper).vm.$emit("update:compare", "1w");
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("compare")).toBe("1w");
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        compare: "1w",
+      });
+      expect(routerState.push).not.toHaveBeenCalled();
+
+      routerState.query = { metric: CARD.name, compare: "1h" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("compare")).toBe("1h");
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
     });
 
     it("Back to the label grid clears the breakdown label, replacing the entry", async () => {

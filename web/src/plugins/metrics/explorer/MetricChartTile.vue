@@ -85,6 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :time-range="state.timeRange"
           :legend="legend"
           :allow-alert-creation="allowAlertCreation"
+          :shifted="state.shifted ?? []"
+          :step-seconds="stepSeconds"
           @error="onRenderError"
         />
       </slot>
@@ -108,7 +110,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { parseSearchError } from "@/utils/query/searchError";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
-import { hasSamples } from "@/composables/metrics/useMetricsExplorerGrid";
+import { hasSamples, type QueryWindow } from "@/composables/metrics/useMetricsExplorerGrid";
+import type { ShiftedResult } from "./MetricCardChart.vue";
 
 export interface TileQuery {
   expr: string;
@@ -117,9 +120,16 @@ export interface TileQuery {
   stream?: string;
 }
 
+/** An earlier period to chart beside the current one. */
+export interface TileCompare {
+  gapMs: number;
+  periodAsStr: string;
+}
+
 interface TileState {
   status: "idle" | "loading" | "done" | "error";
   results: any[];
+  shifted?: ShiftedResult[];
   error: string;
   /** The window `results` were queried for: a chart kept through a refresh stays on its axis. */
   timeRange?: { start_time: number; end_time: number };
@@ -139,11 +149,22 @@ const props = withDefaults(
     legend?: boolean;
     /** Offer the chart's right-click "Create alert" menu. */
     allowAlertCreation?: boolean;
+    /** Chart each query again over the period this far back. */
+    compare?: TileCompare | null;
+    stepSeconds?: number;
     /** A signal, not a cancel by expr, so two tiles on one query never cancel each other. */
-    runQuery: (expr: string, signal: AbortSignal) => Promise<any>;
+    runQuery: (expr: string, signal: AbortSignal, opts?: { window?: QueryWindow }) => Promise<any>;
     dataTest: string;
   }>(),
-  { chartType: "line", unit: null, bucketUnit: null, legend: false, allowAlertCreation: false },
+  {
+    chartType: "line",
+    unit: null,
+    bucketUnit: null,
+    legend: false,
+    allowAlertCreation: false,
+    compare: null,
+    stepSeconds: 0,
+  },
 );
 
 const emit = defineEmits<{
@@ -174,7 +195,10 @@ let active: AbortController | null = null;
 /** What the last load asked for, so a watcher catching up on it does not ask again. */
 let loadedFor: { key: string; timeRange: object } | null = null;
 
-const queryKey = () => props.queries?.map((query) => query.expr).join("\n") ?? null;
+const queryKey = () => {
+  const exprs = props.queries?.map((query) => query.expr).join("\n");
+  return exprs === undefined ? null : `${exprs}\n${props.compare?.gapMs ?? 0}`;
+};
 
 const cancelActive = () => {
   active?.abort();
@@ -191,18 +215,29 @@ const load = async () => {
   }
   stale = false;
   const timeRange = props.timeRange;
-  loadedFor = { key: exprs.join("\n"), timeRange };
+  const compare = props.compare;
+  loadedFor = { key: queryKey() ?? "", timeRange };
   active = new AbortController();
   const { signal } = active;
   // Only a chart of this same query is still kept here: a new query resets to IDLE first.
   if (state.value.status === "done") refreshing.value = true;
   else state.value = { status: "loading", results: [], error: "" };
   try {
-    const results = await Promise.all(exprs.map((expr) => props.runQuery(expr, signal)));
+    const window = compare && {
+      start: timeRange.start_time - compare.gapMs * 1000,
+      end: timeRange.end_time - compare.gapMs * 1000,
+    };
+    const [results, past] = await Promise.all([
+      Promise.all(exprs.map((expr) => props.runQuery(expr, signal))),
+      window ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, { window }))) : [],
+    ]);
     if (mine !== generation) return;
     active = null;
     refreshing.value = false;
-    state.value = { status: "done", results, error: "", timeRange };
+    const shifted = compare
+      ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
+      : [];
+    state.value = { status: "done", results, shifted, error: "", timeRange };
   } catch (error: any) {
     if (mine !== generation) return;
     // The other queries of a failed load are not worth finishing.

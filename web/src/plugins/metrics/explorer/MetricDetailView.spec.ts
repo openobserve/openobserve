@@ -133,7 +133,7 @@ const mountView = (
         ...stubs,
         MetricBreakdown: {
           name: "MetricBreakdown",
-          props: ["variant", "panelQueries", "runQuery"],
+          props: ["variant", "panelQueries", "runQuery", "compare", "stepSeconds"],
           template: "<div data-test='breakdown-stub' />",
         },
         MetricCardChart: {
@@ -147,6 +147,8 @@ const mountView = (
             "timeRange",
             "injectedExemplars",
             "allowAlertCreation",
+            "shifted",
+            "stepSeconds",
           ],
           template: "<div />",
         },
@@ -244,6 +246,79 @@ describe("MetricDetailView", () => {
       await flushPromises();
       expect(chart().props("results")).toEqual([NEXT]);
       expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 3 });
+    });
+  });
+
+  describe("compare to", () => {
+    const HOUR_US = 3_600_000_000;
+    const DAY_US = 24 * HOUR_US;
+    const WINDOW = { start_time: 10 * DAY_US, end_time: 10 * DAY_US + HOUR_US };
+    const LINE = {
+      queries: [{ expr: "sum(rate(x[4m]))" }, { expr: "max(rate(x[4m]))" }],
+      chartType: "line",
+      unit: "count-per-sec",
+      bucketUnit: null,
+    };
+    const selectStub = {
+      OSelect: {
+        name: "OSelect",
+        props: ["modelValue", "options"],
+        emits: ["update:modelValue"],
+        template: "<div v-bind='$attrs' />",
+      },
+    };
+    const compareSelect = (wrapper: VueWrapper<any>) =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c) => c.attributes("data-test") === "metrics-detail-compare");
+
+    it("runs each expression once more over the shifted window and hands the twins to the chart", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, compare: "1d", stepSeconds: 30 });
+      await flushPromises();
+
+      const shiftedWindow = { start: WINDOW.start_time - DAY_US, end: WINDOW.end_time - DAY_US };
+      expect(runQuery.mock.calls.map(([expr, , , opts]) => [expr, opts?.window])).toEqual([
+        ["sum(rate(x[4m]))", undefined],
+        ["max(rate(x[4m]))", undefined],
+        ["sum(rate(x[4m]))", shiftedWindow],
+        ["max(rate(x[4m]))", shiftedWindow],
+      ]);
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("results")).toEqual([SERIES, SERIES]);
+      expect(chart.props("stepSeconds")).toBe(30);
+      expect(chart.props("shifted")).toEqual([
+        { result: SERIES, gapMs: DAY_US / 1000, periodAsStr: "1 day ago", parentIndex: 0 },
+        { result: SERIES, gapMs: DAY_US / 1000, periodAsStr: "1 day ago", parentIndex: 1 },
+      ]);
+      expect(wrapper.findComponent({ name: "MetricBreakdown" }).props("compare")).toEqual({
+        gapMs: DAY_US / 1000,
+        periodAsStr: "1 day ago",
+      });
+    });
+
+    it("runs each expression once without a comparison", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalledTimes(2);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("shifted")).toEqual([]);
+      expect(wrapper.findComponent({ name: "MetricBreakdown" }).props("compare")).toBeNull();
+    });
+
+    it("offers Off and three offsets, and asks for the chosen one", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW }, { stubs: selectStub });
+      const select = compareSelect(wrapper)!;
+      expect(select.props("options").map((o: any) => o.value)).toEqual(["off", "1h", "1d", "1w"]);
+      expect(select.props("modelValue")).toBe("off");
+      await select.vm.$emit("update:modelValue", "1w");
+      await select.vm.$emit("update:modelValue", "off");
+      expect(wrapper.emitted("update:compare")).toEqual([["1w"], [null]]);
+    });
+
+    it("hides the control on a heatmap and charts no comparison there", async () => {
+      wrapper = mountView({ compare: "1d", timeRange: WINDOW }, { stubs: selectStub });
+      await flushPromises();
+      expect(compareSelect(wrapper)).toBeUndefined();
+      expect(runQuery).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -107,6 +107,8 @@ const STREAMS = [
 /** Every in-flight streaming query, so a test can land or strand each one. */
 const inFlight: Array<{
   query: string;
+  start: number;
+  end: number;
   complete: (result: any) => void;
 }> = [];
 
@@ -143,6 +145,8 @@ vi.mock("@/composables/useStreamingSearch", () => ({
     fetchQueryDataWithHttpStream: (payload: any, handlers: any) => {
       inFlight.push({
         query: payload.queryReq.query,
+        start: payload.queryReq.start_time,
+        end: payload.queryReq.end_time,
         complete: (result: any) => {
           handlers.data({}, { type: "promql_response", content: { results: result } });
           handlers.complete();
@@ -1898,6 +1902,27 @@ describe("useMetricsExplorerGrid", () => {
       expect(cancel).toHaveBeenCalledWith(key, owner);
       await expect(pending).rejects.toSatisfy(isCancelled);
       inFlight.length = 0;
+    });
+
+    it("runs a shifted window as its own request, never joining the current window's", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const { start_time, end_time } = grid.timeRange.value;
+      const DAY_US = 86_400_000_000;
+      const shifted = { start: start_time - DAY_US, end: end_time - DAY_US };
+
+      grid.runDetailQuery("sum(up)", card, new AbortController().signal).catch(() => {});
+      grid
+        .runDetailQuery("sum(up)", card, new AbortController().signal, { window: shifted })
+        .catch(() => {});
+      await flush();
+
+      const requests = inFlight.filter((q) => q.query === "sum(up)");
+      expect(requests.map((q) => [q.start, q.end])).toEqual([
+        [start_time, end_time],
+        [shifted.start, shifted.end],
+      ]);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
     });
 
     it("never starts a query whose signal already aborted", async () => {

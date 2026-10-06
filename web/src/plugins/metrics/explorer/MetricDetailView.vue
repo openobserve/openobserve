@@ -67,6 +67,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-detail-unit"
             >{{ unitLabel }}</span
           >
+          <OSelect
+            v-if="compareEligible"
+            :model-value="compare ?? 'off'"
+            :options="compareOptions"
+            :label="t('metrics.explorer.detail.compare.label')"
+            label-position="inside"
+            :searchable="false"
+            size="sm"
+            width="sm"
+            class="shrink-0"
+            data-test="metrics-detail-compare"
+            @update:model-value="onCompareChange"
+          />
           <!-- The subtitle truncates and hides on a phone; this always holds the whole sentence. -->
           <OButton
             v-if="card.help"
@@ -269,6 +282,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <MetricCardChart
               v-else-if="overviewState.status === 'done'"
               :results="overviewState.results"
+              :shifted="overviewState.shifted ?? []"
+              :step-seconds="stepSeconds"
               :queries="overviewQueries"
               :chart-type="overview.chartType"
               :unit="overviewUnit.unit"
@@ -313,6 +328,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :nan-guard="nanGuard"
             :color="color"
             :run-query="runBreakdownQuery"
+            :compare="compareShift"
+            :step-seconds="stepSeconds"
             :variant="overview"
             :panel-queries="panelQueries"
             @update:selected-label="$emit('update:breakdownLabel', $event)"
@@ -393,9 +410,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent, onBeforeUnmount, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import MetricCardChart from "./MetricCardChart.vue";
+import MetricCardChart, { type ShiftedResult } from "./MetricCardChart.vue";
 import MetricBreakdown from "./MetricBreakdown.vue";
-import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
+import MetricChartTile, { type TileCompare, type TileQuery } from "./MetricChartTile.vue";
 import MetricUsageList from "./MetricUsageList.vue";
 import { useStore } from "vuex";
 import metricsService, { type MetricUsage } from "@/services/metrics";
@@ -412,6 +429,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
@@ -419,14 +437,25 @@ import { parseSearchError } from "@/utils/query/searchError";
 import { supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
 import { UNIT_LABELS } from "@/utils/metrics/metricPalette";
 import { rankRelatedMetrics, relatedCandidates } from "@/utils/metrics/relatedMetrics";
-import type { DetailTab } from "@/utils/metrics/explorerUrlState";
+import {
+  COMPARE_OFFSET_MS,
+  type CompareOffset,
+  type DetailTab,
+} from "@/utils/metrics/explorerUrlState";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
-import { hasSamples, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import {
+  hasSamples,
+  type LabelFilter,
+  type QueryWindow,
+} from "@/composables/metrics/useMetricsExplorerGrid";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 
 const RELATED_LIMIT = 12;
+/** A compared period is a dashed line or bar beside the current one; a heatmap has no room for it. */
+const COMPARE_CHART_TYPES = ["line", "area", "bar"];
+const COMPARE_OFFSETS = Object.keys(COMPARE_OFFSET_MS) as CompareOffset[];
 
 /** A metric's chart as its explorer card draws it. */
 export interface DetailChart {
@@ -453,6 +482,7 @@ interface OverviewState {
   error: string;
   /** The window `results` were queried for: a chart kept through a refresh stays on its axis. */
   timeRange?: { start_time: number; end_time: number };
+  shifted?: ShiftedResult[];
 }
 
 const IDLE: OverviewState = { status: "idle", results: [], error: "" };
@@ -477,6 +507,7 @@ export default defineComponent({
     OTooltip,
     OBanner,
     ODropdown,
+    OSelect,
     CreateAlertAction,
   },
   props: {
@@ -514,6 +545,10 @@ export default defineComponent({
       required: true,
     },
     rateWindow: { type: String, required: true },
+    /** The "Compare to" offset from the URL; the overview and Breakdown's focused chart draw it. */
+    compare: { type: String as PropType<CompareOffset | null>, default: null },
+    /** The detail queries' step, so a compared period snaps onto the current one. */
+    stepSeconds: { type: Number, default: 0 },
     /** The rate window a dashboard panel built from this metric rates over. */
     panelRateWindow: { type: String, required: true },
     nanGuard: { type: Boolean, default: false },
@@ -535,7 +570,7 @@ export default defineComponent({
           expr: string,
           signal: AbortSignal,
           card?: MetricCardModel,
-          opts?: { maxSeries?: number },
+          opts?: { maxSeries?: number; window?: QueryWindow },
         ) => Promise<any>
       >,
       required: true,
@@ -552,8 +587,9 @@ export default defineComponent({
     "update:breakdownLabel",
     "open-related",
     "add-filter",
+    "update:compare",
   ],
-  setup(props) {
+  setup(props, { emit }) {
     const { t } = useI18nTyped();
 
     const unitLabel = computed(() => raw(UNIT_LABELS[props.card?.unit ?? ""] ?? ""));
@@ -624,6 +660,25 @@ export default defineComponent({
     });
 
     const overviewState = ref<OverviewState>(IDLE);
+
+    const compareEligible = computed(() => COMPARE_CHART_TYPES.includes(props.overview.chartType));
+    const comparePeriodLabel = (offset: CompareOffset) =>
+      t(`metrics.explorer.detail.compare.ago${offset}` as const);
+    const compareOptions = computed(() => [
+      { label: t("metrics.explorer.detail.compare.off"), value: "off" },
+      ...COMPARE_OFFSETS.map((offset) => ({ label: comparePeriodLabel(offset), value: offset })),
+    ]);
+    /** The comparison the charts draw: none on a heatmap, whatever the URL says. */
+    const compareShift = computed<TileCompare | null>(() =>
+      compareEligible.value && props.compare
+        ? {
+            gapMs: COMPARE_OFFSET_MS[props.compare],
+            periodAsStr: comparePeriodLabel(props.compare),
+          }
+        : null,
+    );
+    const onCompareChange = (value: unknown) =>
+      emit("update:compare", value === "off" ? null : (value as CompareOffset));
     const overviewQueries = computed(() =>
       props.card ? withSourceStreams(props.overview.queries, props.card.name) : [],
     );
@@ -677,16 +732,29 @@ export default defineComponent({
         return;
       }
       const timeRange = props.timeRange;
+      const compare = compareShift.value;
       active = new AbortController();
       const { signal } = active;
       if (keep && overviewState.value.status === "done") overviewRefreshing.value = true;
       else overviewState.value = { status: "loading", results: [], error: "" };
       try {
-        const results = await Promise.all(exprs.map((expr) => props.runQuery(expr, signal)));
+        const window = compare && {
+          start: timeRange.start_time - compare.gapMs * 1000,
+          end: timeRange.end_time - compare.gapMs * 1000,
+        };
+        const [results, past] = await Promise.all([
+          Promise.all(exprs.map((expr) => props.runQuery(expr, signal))),
+          window
+            ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, undefined, { window })))
+            : [],
+        ]);
         if (mine !== generation) return;
         active = null;
         overviewRefreshing.value = false;
-        overviewState.value = { status: "done", results, error: "", timeRange };
+        const shifted = compare
+          ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
+          : [];
+        overviewState.value = { status: "done", results, shifted, error: "", timeRange };
       } catch (error: any) {
         if (mine !== generation) return;
         cancelActive();
@@ -710,6 +778,7 @@ export default defineComponent({
         () => props.loading,
         () => props.card?.name,
         () => props.overview.queries.map((query: any) => query.expr).join("\n"),
+        () => compareShift.value?.gapMs,
         () => props.timeRange,
       ],
       // Every source but the trailing window unchanged: a refresh, which must not blank the chart.
@@ -757,8 +826,11 @@ export default defineComponent({
     });
 
     /** The breakdown's queries run for this view's own metric. */
-    const runBreakdownQuery = (expr: string, signal: AbortSignal, opts?: { maxSeries?: number }) =>
-      props.runQuery(expr, signal, undefined, opts);
+    const runBreakdownQuery = (
+      expr: string,
+      signal: AbortSignal,
+      opts?: { maxSeries?: number; window?: QueryWindow },
+    ) => props.runQuery(expr, signal, undefined, opts);
 
     return {
       runBreakdownQuery,
@@ -772,6 +844,10 @@ export default defineComponent({
       overviewState,
       overviewQueries,
       buildOverviewAlertPrefill,
+      compareEligible,
+      compareOptions,
+      compareShift,
+      onCompareChange,
       overviewHasSamples,
       overviewUnit,
       overviewBucketUnit,

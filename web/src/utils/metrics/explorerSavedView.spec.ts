@@ -83,7 +83,14 @@ describe("explorer saved views", () => {
   it("applies only allow-listed keys, even from a hand-edited payload", () => {
     const query = explorerViewToQuery({
       version: 1,
-      state: { sort: "z-a", metric: "up", tab: "related", breakdown_label: "job", stream: "x" },
+      state: {
+        sort: "z-a",
+        metric: "up",
+        tab: "related",
+        breakdown_label: "job",
+        compare: "1d",
+        stream: "x",
+      },
     });
     expect(query).toEqual({ sort: "z-a" });
   });

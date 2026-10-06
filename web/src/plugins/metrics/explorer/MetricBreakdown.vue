@@ -48,6 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :run-query="heatmap ? runHeatmapQuery : runQuery"
         legend
         allow-alert-creation
+        :compare="heatmap ? null : compare"
+        :step-seconds="stepSeconds"
         data-test="metrics-breakdown-chart"
         @results="focused = $event"
       >
@@ -373,7 +375,7 @@ import {
 import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
+import MetricChartTile, { type TileCompare, type TileQuery } from "./MetricChartTile.vue";
 import MetricCardChart from "./MetricCardChart.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
@@ -415,7 +417,7 @@ import {
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
-import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import type { LabelFilter, QueryWindow } from "@/composables/metrics/useMetricsExplorerGrid";
 
 interface BreakdownVariant {
   /** `builder` names the stream a query reads when it is not the card's own. */
@@ -538,10 +540,17 @@ export default defineComponent({
     /** Runs one PromQL query on the detail view's scheduler slot. */
     runQuery: {
       type: Function as PropType<
-        (expr: string, signal: AbortSignal, opts?: { maxSeries?: number }) => Promise<any>
+        (
+          expr: string,
+          signal: AbortSignal,
+          opts?: { maxSeries?: number; window?: QueryWindow },
+        ) => Promise<any>
       >,
       required: true,
     },
+    /** The detail view's "Compare to" period, charted on the focused label only. */
+    compare: { type: Object as PropType<TileCompare | null>, default: null },
+    stepSeconds: { type: Number, default: 0 },
   },
   emits: ["update:selectedLabel", "add-filter"],
   setup(props, { emit }) {

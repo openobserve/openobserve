@@ -571,6 +571,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="detailLoading"
       :tab="detailTab"
       :breakdown-label="breakdownLabel"
+      :compare="compareOffset"
+      :step-seconds="detailCard ? grid.detailStepFor(detailCard) : 0"
       :overview="detailOverview"
       :panel-queries="detailPanelQueries"
       :chart-of="chartOf"
@@ -601,6 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry-exemplars="detailCard && grid.retryExemplars(detailCard)"
       @update:tab="onDetailTab"
       @update:breakdown-label="onBreakdownLabel"
+      @update:compare="compareOffset = $event"
       @open-related="onOpenRelated"
       @add-filter="onBreakdownAddFilter"
     />
@@ -699,6 +702,7 @@ import {
   EXPLORER_FILTER_PARAM_KEYS,
   explorerFiltersToQuery,
   queryToExplorerFilters,
+  type CompareOffset,
   type DetailTab,
 } from "@/utils/metrics/explorerUrlState";
 import {
@@ -885,6 +889,7 @@ export default defineComponent({
     const detailMetric = ref<string | null>(null);
     const detailTab = ref<DetailTab | null>(null);
     const breakdownLabel = ref<string | null>(null);
+    const compareOffset = ref<CompareOffset | null>(null);
     const detailOpen = computed(() => isGridMode.value && !!detailMetric.value);
 
     const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
@@ -1475,6 +1480,7 @@ export default defineComponent({
       detailMetric.value = null;
       detailTab.value = null;
       breakdownLabel.value = null;
+      compareOffset.value = null;
     };
 
     const onDetailTab = (tab: string | number) => {
@@ -1529,6 +1535,7 @@ export default defineComponent({
         detailMetric.value = f.metric;
         detailTab.value = f.tab ?? null;
         breakdownLabel.value = f.breakdownLabel ?? null;
+        compareOffset.value = f.compare ?? null;
       }
 
       // Rehydrate the built chart on refresh / a shared Visualize link: decode
@@ -1575,6 +1582,7 @@ export default defineComponent({
         metric: mode.value === "visualize" ? null : detailMetric.value,
         tab: detailTab.value,
         breakdownLabel: breakdownLabel.value,
+        compare: compareOffset.value,
       });
       const time: any = selectedDateToQueryParams(selectedDate.value);
       // The default window is recoverable from its absence, like the filters.
@@ -1698,6 +1706,7 @@ export default defineComponent({
         detailMetric.value,
         detailTab.value,
         breakdownLabel.value,
+        compareOffset.value,
         selectedDate.value,
         refreshInterval.value,
       ],
@@ -1729,6 +1738,7 @@ export default defineComponent({
       detailMetric.value = detail.metric ?? null;
       detailTab.value = detail.tab ?? null;
       breakdownLabel.value = detail.breakdownLabel ?? null;
+      compareOffset.value = detail.compare ?? null;
     };
 
     // URL -> state, for the navigations the mount-time apply cannot see:
@@ -1756,7 +1766,7 @@ export default defineComponent({
 
       // Mode/detail-only changes skip the filters: new Set/array identities re-query every card.
       const withoutPageKeys = (o: Record<string, string>) => {
-        const { mode: _m, metric: _x, tab: _t, breakdown_label: _b, ...rest } = o;
+        const { mode: _m, metric: _x, tab: _t, breakdown_label: _b, compare: _c, ...rest } = o;
         return rest;
       };
       const q = route.query as Record<string, any>;
@@ -2202,6 +2212,7 @@ export default defineComponent({
       detailMetric,
       detailTab,
       breakdownLabel,
+      compareOffset,
       detailOpen,
       detailCard,
       detailLoading,

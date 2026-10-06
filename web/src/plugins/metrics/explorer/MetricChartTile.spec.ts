@@ -33,6 +33,8 @@ const MetricCardChartStub = {
     "timeRange",
     "legend",
     "allowAlertCreation",
+    "shifted",
+    "stepSeconds",
   ],
   template: `<div data-test="tile-chart-stub" />`,
 };
@@ -81,6 +83,39 @@ describe("MetricChartTile", () => {
     expect(wrapper.find('[data-test="tile-header"]').exists()).toBe(true);
     expect(runQuery).toHaveBeenCalledWith("sum(rate(x[4m]))", expect.any(AbortSignal));
     expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
+  });
+
+  it("charts a comparison: each query again over the shifted window, as dashed twins", async () => {
+    const DAY_MS = 86_400_000;
+    wrapper = mountTile({
+      timeRange: { start_time: 5_000_000_000, end_time: 6_000_000_000 },
+      compare: { gapMs: DAY_MS, periodAsStr: "1 day ago" },
+      stepSeconds: 15,
+    });
+    await flushPromises();
+
+    expect(runQuery.mock.calls.map(([expr, , opts]) => [expr, opts?.window])).toEqual([
+      ["sum(rate(x[4m]))", undefined],
+      [
+        "sum(rate(x[4m]))",
+        { start: 5_000_000_000 - DAY_MS * 1000, end: 6_000_000_000 - DAY_MS * 1000 },
+      ],
+    ]);
+    const chart = wrapper.findComponent({ name: "MetricCardChart" });
+    expect(chart.props("results")).toEqual([SERIES]);
+    expect(chart.props("stepSeconds")).toBe(15);
+    expect(chart.props("shifted")).toEqual([
+      { result: SERIES, gapMs: DAY_MS, periodAsStr: "1 day ago", parentIndex: 0 },
+    ]);
+  });
+
+  it("reloads when the comparison changes", async () => {
+    wrapper = mountTile();
+    await flushPromises();
+    expect(runQuery).toHaveBeenCalledTimes(1);
+    await wrapper.setProps({ compare: { gapMs: 3_600_000, periodAsStr: "1 hour ago" } });
+    await flushPromises();
+    expect(runQuery).toHaveBeenCalledTimes(3);
   });
 
   it("offers the chart's right-click alert only when asked to", async () => {

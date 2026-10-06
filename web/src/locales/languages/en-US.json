@@ -9356,6 +9356,13 @@
         "openInVisualize": "Open in Visualize",
         "moreActions": "More actions",
         "noAlertQuery": "This metric has no query to alert on",
+        "compare": {
+          "label": "Compare to",
+          "off": "Off",
+          "ago1h": "1 hour ago",
+          "ago1d": "1 day ago",
+          "ago1w": "1 week ago"
+        },
         "noPreview": "No preview — open it in Visualize",
         "exemplars": "Exemplars",
         "filtersNotApplied": "Filter {filters} does not apply to this metric; showing all its series | Filters {filters} do not apply to this metric; showing all its series",
