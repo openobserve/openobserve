@@ -6662,7 +6662,6 @@
       "rangeTooLong": "A time range can be at most 365 days",
       "rangeStartAfterEnd": "The start must be before the end",
       "rangeEndsInFuture": "An absolute time range must end in the past",
-      "longRangeRefresh": "Time ranges longer than 30 days need a refresh of at least 1 hour",
       "fixRanges": "Fix the time ranges marked above",
       "addRange": "Add time range",
       "removeRange": "Remove {range}",

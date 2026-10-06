@@ -51,9 +51,6 @@ const REBUILD_STATE_ERROR: i32 = 2;
 const MAX_RANGES: usize = 10;
 const MIN_RANGE_SECS: i64 = 60;
 const MAX_RANGE_SECS: i64 = 365 * 86_400;
-/// A relative range longer than this re-queries a lot of data, so it needs a slow refresh.
-const LONG_RANGE_SECS: i64 = 30 * 86_400;
-const LONG_RANGE_MIN_REFRESH_SECS: i32 = 3600;
 /// How often a link of only absolute ranges is checked for expiry and a departed publisher.
 const ABSOLUTE_CHECK_SECS: i64 = 86_400;
 const MAX_FROZEN_VARIABLES_BYTES: usize = 64 * 1024;
@@ -1007,7 +1004,7 @@ fn validate_limits(cfg: &PublicDashboardConfig, now: i64) -> Result<(), String> 
     if name.chars().count() > 256 {
         return Err("name must be at most 256 characters".to_string());
     }
-    check_ranges(&cfg.time_range, cfg.rebuild_secs, now)?;
+    check_ranges(&cfg.time_range, now)?;
     let vars_len = serde_json::to_string(&cfg.frozen_variables).map_or(0, |s| s.len());
     if vars_len > MAX_FROZEN_VARIABLES_BYTES {
         return Err("frozen variables must be at most 64 KB".to_string());
@@ -1015,7 +1012,7 @@ fn validate_limits(cfg: &PublicDashboardConfig, now: i64) -> Result<(), String> 
     Ok(())
 }
 
-fn check_ranges(tr: &TimeRangePolicy, rebuild_secs: i32, now: i64) -> Result<(), String> {
+fn check_ranges(tr: &TimeRangePolicy, now: i64) -> Result<(), String> {
     if tr.ranges.is_empty() {
         return Err("at least one time range is required".to_string());
     }
@@ -1030,22 +1027,15 @@ fn check_ranges(tr: &TimeRangePolicy, rebuild_secs: i32, now: i64) -> Result<(),
         return Err("the default time range must be one of the time ranges".to_string());
     }
     for range in &tr.ranges {
-        check_range(range, rebuild_secs, now)?;
+        check_range(range, now)?;
     }
     Ok(())
 }
 
-fn check_range(range: &TimeRange, rebuild_secs: i32, now: i64) -> Result<(), String> {
+fn check_range(range: &TimeRange, now: i64) -> Result<(), String> {
     match range {
         TimeRange::Relative { secs } if *secs < MIN_RANGE_SECS => {
             return Err("a relative time range must be at least 1 minute".to_string());
-        }
-        TimeRange::Relative { secs }
-            if *secs > LONG_RANGE_SECS && rebuild_secs < LONG_RANGE_MIN_REFRESH_SECS =>
-        {
-            return Err(
-                "time ranges longer than 30 days need a refresh of at least 1 hour".to_string(),
-            );
         }
         TimeRange::Absolute { start, end } if start >= end => {
             return Err("an absolute time range must start before it ends".to_string());
@@ -1278,13 +1268,13 @@ mod tests {
     #[test]
     fn ranges_are_capped_in_count_and_unique_with_a_listed_default() {
         let tr = |ranges: Vec<TimeRange>, default: TimeRange| TimeRangePolicy { ranges, default };
-        assert!(check_ranges(&tr(vec![rel(60), rel(3600)], rel(3600)), 60, 0).is_ok());
-        assert!(check_ranges(&tr(vec![], rel(3600)), 60, 0).is_err());
+        assert!(check_ranges(&tr(vec![rel(60), rel(3600)], rel(3600)), 0).is_ok());
+        assert!(check_ranges(&tr(vec![], rel(3600)), 0).is_err());
         let eleven = (1..=11).map(|i| rel(i * 60)).collect();
-        assert!(check_ranges(&tr(eleven, rel(60)), 60, 0).is_err());
-        assert!(check_ranges(&tr(vec![rel(60), rel(60)], rel(60)), 60, 0).is_err());
+        assert!(check_ranges(&tr(eleven, rel(60)), 0).is_err());
+        assert!(check_ranges(&tr(vec![rel(60), rel(60)], rel(60)), 0).is_err());
         assert_eq!(
-            check_ranges(&tr(vec![rel(60)], rel(3600)), 60, 0).unwrap_err(),
+            check_ranges(&tr(vec![rel(60)], rel(3600)), 0).unwrap_err(),
             "the default time range must be one of the time ranges"
         );
     }
@@ -1294,18 +1284,15 @@ mod tests {
         let now = 1_000 * 86_400 * 1_000_000;
         let abs = |start: i64, end: i64| TimeRange::Absolute { start, end };
         let day = 86_400 * 1_000_000;
-        assert!(check_range(&rel(30), 60, now).is_err());
-        assert!(check_range(&rel(365 * 86_400), 3600, now).is_ok());
-        assert!(check_range(&rel(366 * 86_400), 3600, now).is_err());
+        assert!(check_range(&rel(30), now).is_err());
+        assert!(check_range(&rel(365 * 86_400), now).is_ok());
+        assert!(check_range(&rel(366 * 86_400), now).is_err());
+        assert!(check_range(&rel(90 * 86_400), now).is_ok());
+        assert!(check_range(&abs(now - 365 * day, now), now).is_ok());
+        assert!(check_range(&abs(now - 366 * day, now), now).is_err());
+        assert!(check_range(&abs(now, now - day), now).is_err());
         assert_eq!(
-            check_range(&rel(31 * 86_400), 60, now).unwrap_err(),
-            "time ranges longer than 30 days need a refresh of at least 1 hour"
-        );
-        assert!(check_range(&abs(now - 365 * day, now), 60, now).is_ok());
-        assert!(check_range(&abs(now - 366 * day, now), 60, now).is_err());
-        assert!(check_range(&abs(now, now - day), 60, now).is_err());
-        assert_eq!(
-            check_range(&abs(now - day, now + 1), 60, now).unwrap_err(),
+            check_range(&abs(now - day, now + 1), now).unwrap_err(),
             "an absolute time range must end in the past"
         );
     }

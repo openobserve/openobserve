@@ -69,10 +69,9 @@ describe("PublicLinkForm schema", () => {
     expect(r.error?.issues[0].path).toEqual(["ranges"]);
   });
 
-  it("needs an hourly refresh for a relative range over 30 days", () => {
-    const long = { ...named(), ranges: [rel(31 * 86400)], defaultKey: "r2678400" };
-    expect(schema.safeParse(long).error?.issues[0].path).toEqual(["rebuildSecs"]);
-    expect(schema.safeParse({ ...long, rebuildSecs: 3600 }).success).toBe(true);
+  it("allows any refresh for a long relative range", () => {
+    const long = { ...named(), ranges: [rel(90 * 86400)], defaultKey: "r7776000" };
+    expect(schema.safeParse({ ...long, rebuildSecs: 60 }).success).toBe(true);
   });
 });
 

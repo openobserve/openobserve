@@ -30,9 +30,6 @@ export const REFRESH_SECONDS = [
 export const MAX_RANGES = 10;
 const MIN_RANGE_SECS = 60;
 const MAX_RANGE_SECS = 365 * 86_400;
-// A relative range longer than this re-queries a lot of data at every refresh.
-const LONG_RANGE_SECS = 30 * 86_400;
-const LONG_RANGE_MIN_REFRESH_SECS = 3600;
 
 /** What the dashboard date-time picker reports on a change. */
 export interface PickedTime {
@@ -166,14 +163,6 @@ export const makePublicLinkSchema = (t: TranslateFn, today: string) =>
           code: "custom",
           path: ["defaultKey"],
           message: t("dashboard.publicLinks.defaultNotAvailable"),
-        });
-      }
-      const long = v.ranges.some((r) => r.type === "relative" && r.secs > LONG_RANGE_SECS);
-      if (long && v.rebuildSecs < LONG_RANGE_MIN_REFRESH_SECS) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["rebuildSecs"],
-          message: t("dashboard.publicLinks.longRangeRefresh"),
         });
       }
     });
