@@ -498,29 +498,30 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * returning early — callers like `loadLabelValues` read `labelsByStream`
    * immediately after awaiting, so an early return would hand them an empty map.
    */
-  let schemaInFlight: Promise<void> | null = null;
+  let schemaInFlight: Promise<boolean> | null = null;
 
-  const ensureSchemas = (): Promise<void> => {
-    if (schemaLoaded.value) return Promise.resolve();
+  /** Resolves `false` when the load failed; it is then not marked loaded, so the next call tries again. */
+  const ensureSchemas = (): Promise<boolean> => {
+    if (schemaLoaded.value) return Promise.resolve(true);
     if (schemaInFlight) return schemaInFlight;
     // Self-comparing clear: an org switch nulls the slot and a new load may
     // claim it before THIS one settles — its finally must not evict the
     // successor.
-    const self: Promise<void> = doEnsureSchemas().finally(() => {
+    const self: Promise<boolean> = doEnsureSchemas().finally(() => {
       if (schemaInFlight === self) schemaInFlight = null;
     });
     schemaInFlight = self;
     return self;
   };
 
-  const doEnsureSchemas = async () => {
+  const doEnsureSchemas = async (): Promise<boolean> => {
     const generation = orgGeneration;
     schemaLoading.value = true;
     try {
       // Called directly: useStreams cannot request schemas on a bulk fetch.
       const response = await StreamService.nameList(org.value, "metrics", true);
       // The org may have changed while this was in flight; its cards are not ours.
-      if (generation !== orgGeneration) return;
+      if (generation !== orgGeneration) return false;
       const list = (response?.data?.list ?? []) as MetricStream[];
 
       // An empty list is not an answer, it is a failure that did not throw — and
@@ -529,10 +530,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // cannot help here because nothing was thrown. Keep the cards we have; the
       // filter then fails open (see `isLabelEligible`), which is the same
       // outcome as a rejected request.
-      if (!list.length) {
-        schemaLoaded.value = true;
-        return;
-      }
+      if (!list.length) return false;
 
       cards.value = buildMetricCards(list);
       const map: Record<string, string[]> = {};
@@ -541,10 +539,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       labelsByStream.value = map;
       schemaLoaded.value = true;
+      return true;
     } catch {
       // Fail open: without membership data every card stays eligible. The chips
       // still work; we just cannot narrow the grid.
-      if (generation === orgGeneration) schemaLoaded.value = true;
+      return false;
     } finally {
       if (generation === orgGeneration) schemaLoading.value = false;
     }

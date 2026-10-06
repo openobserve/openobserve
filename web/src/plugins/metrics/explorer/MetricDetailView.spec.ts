@@ -567,6 +567,13 @@ describe("MetricDetailView", () => {
 
   describe("logs & traces drilldown", () => {
     const button = () => wrapper.find('[data-test="metrics-detail-drilldown"]');
+    // A menu trigger marks itself, or an ancestor it wraps, with aria-haspopup.
+    const isMenuTrigger = () => {
+      for (let el: Element | null = button().element; el; el = el.parentElement) {
+        if (el.hasAttribute("aria-haspopup")) return true;
+      }
+      return false;
+    };
     const tooltipText = async () => {
       vi.useFakeTimers();
       await button().element.parentElement!.dispatchEvent(
@@ -616,12 +623,11 @@ describe("MetricDetailView", () => {
         );
       });
 
-      it("opens nothing on click or Enter, and asks the server nothing", async () => {
+      it("cannot be activated: natively disabled, no menu trigger, and asks the server nothing", async () => {
         wrapper = mountView();
-        await button().trigger("click");
-        await button().trigger("keydown", { key: "Enter" });
         await flushPromises();
-        expect(wrapper.find('[data-test="metrics-detail-drilldown-menu"]').exists()).toBe(false);
+        expect((button().element as HTMLButtonElement).disabled).toBe(true);
+        expect(isMenuTrigger()).toBe(false);
         expect(drilldownApi.getIdentityConfig).not.toHaveBeenCalled();
         expect(drilldownApi.correlate).not.toHaveBeenCalled();
       });
@@ -636,12 +642,29 @@ describe("MetricDetailView", () => {
         wrapper = mountView();
         await flushPromises();
         expect(button().attributes("disabled")).toBeUndefined();
+        expect(isMenuTrigger()).toBe(true);
         expect(button().find('[data-test="metrics-detail-drilldown-lock"]').exists()).toBe(false);
         expect(
           wrapper
             .findAllComponents({ name: "ODropdown" })
             .some((d) => d.find('[data-test="metrics-detail-drilldown"]').exists()),
         ).toBe(true);
+      });
+
+      it("stays disabled, saying it is checking access, until both reads answer", async () => {
+        let answer!: (value: any) => void;
+        drilldownApi.getSemanticGroups.mockReturnValueOnce(new Promise((r) => (answer = r)));
+        wrapper = mountView({}, { realHeader: false });
+        await flushPromises();
+        expect((button().element as HTMLButtonElement).disabled).toBe(true);
+        expect(isMenuTrigger()).toBe(false);
+        expect(button().find('[data-test="metrics-detail-drilldown-lock"]').exists()).toBe(false);
+        expect(await tooltipText()).toContain("Checking access...");
+
+        answer({ data: [] });
+        await flushPromises();
+        expect(button().attributes("disabled")).toBeUndefined();
+        expect(isMenuTrigger()).toBe(true);
       });
 
       it("is disabled, with the discovery tooltip, when service discovery is off", async () => {

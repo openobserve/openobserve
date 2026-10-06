@@ -1,4 +1,3 @@
-// The detail view's Logs & traces drilldown on an OSS build: shown, locked, and explained.
 const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');

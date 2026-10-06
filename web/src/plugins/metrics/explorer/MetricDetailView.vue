@@ -883,6 +883,7 @@ export default defineComponent({
       const state = drilldown.availability.value;
       if (state === "oss") return t("metrics.explorer.detail.drilldown.enterprise");
       if (state === "discoveryOff") return t("metrics.explorer.detail.drilldown.discoveryOff");
+      if (state === "pending") return t("metrics.explorer.detail.drilldown.checking");
       return t("metrics.explorer.detail.drilldown.forbidden");
     });
     const onDrilldownOpen = (open: boolean) => {

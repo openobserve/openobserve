@@ -9363,6 +9363,7 @@
           "enterprise": "Logs and traces drilldown is an Enterprise feature.",
           "discoveryOff": "Service discovery is turned off for this organization.",
           "forbidden": "You do not have permission to use service correlation.",
+          "checking": "Checking access...",
           "loading": "Loading...",
           "schemaError": "Could not load this metric's labels.",
           "retry": "Retry",

@@ -510,11 +510,32 @@ describe("useMetricsExplorerGrid", () => {
 
       await grid.addLabelFilter({ label: "code", value: "500", operator: "=" });
 
-      expect(grid.schemaLoaded.value).toBe(true); // we did stop trying...
+      expect(grid.schemaLoaded.value).toBe(false); // a failure is not a load: the next call retries...
       // ...but we do not claim a card is ineligible when we cannot know.
       // (Against the CARD count, not the stream count: the histogram base is a
       // metadata-only phantom and is suppressed, so it never becomes a card.)
       expect(grid.sortedCards.value).toHaveLength(grid.cards.value.length);
+    });
+
+    it("reports a failed load, and fetches again on the next call", async () => {
+      const grid = await setup();
+      const calls = (StreamService.nameList as any).mock.calls.length;
+      (StreamService.nameList as any).mockRejectedValueOnce(new Error("500"));
+      expect(await grid.ensureSchemas()).toBe(false);
+
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: { list: STREAMS.map((x) => ({ ...x, schema: [{ name: "pod", type: "Utf8" }] })) },
+      });
+      expect(await grid.ensureSchemas()).toBe(true);
+      expect((StreamService.nameList as any).mock.calls.length).toBe(calls + 2);
+      expect(grid.schemaLoaded.value).toBe(true);
+    });
+
+    it("treats an empty stream list as a failed load too", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({ data: { list: [] } });
+      expect(await grid.ensureSchemas()).toBe(false);
+      expect(grid.schemaLoaded.value).toBe(false);
     });
 
     it("narrows the grid once membership IS known", async () => {

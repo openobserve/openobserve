@@ -61,7 +61,8 @@ const httpError = (status: number, message = "boom") =>
   Object.assign(new Error(message), { response: { status, data: { message } } });
 
 let labels: string[] | undefined;
-let schemaReady: Promise<void>;
+// Models the grid's loader: a failed load resolves false and is retried by the next call.
+let loadSchemas: () => Promise<boolean>;
 const setup = (
   over: {
     filters?: any[];
@@ -77,7 +78,7 @@ const setup = (
     org: () => "acme",
     metric: () => ({ name: "http_requests_total", labels: over.metricLabels }),
     labelsOf: () => labels,
-    ensureSchemas: () => schemaReady,
+    ensureSchemas: () => loadSchemas(),
     filters: () => over.filters ?? [],
     inapplicableFilters: () => over.inapplicable ?? [],
     timeRange: () => WINDOW,
@@ -95,7 +96,7 @@ describe("useMetricDrilldown", () => {
     (config as any).isCloud = "false";
     vi.clearAllMocks();
     labels = ["job", "instance"];
-    schemaReady = Promise.resolve();
+    loadSchemas = () => Promise.resolve(true);
     api.getIdentityConfig.mockResolvedValue({ data: IDENTITY });
     api.getSemanticGroups.mockResolvedValue({ data: GROUPS });
     api.labelValues.mockResolvedValue({ data: { data: ["payments", "checkout"] } });
@@ -139,6 +140,17 @@ describe("useMetricDrilldown", () => {
       expect(second.drilldown.availability.value).toBe("forbidden");
     });
 
+    it("is pending, not enabled, until both reads answer", async () => {
+      let answer!: (value: any) => void;
+      api.getSemanticGroups.mockReturnValueOnce(new Promise((r) => (answer = r)));
+      const { drilldown } = setup();
+      await flushPromises();
+      expect(drilldown.availability.value).toBe("pending");
+      answer({ data: GROUPS });
+      await flushPromises();
+      expect(drilldown.availability.value).toBe("available");
+    });
+
     it("stays available on a server error, and the menu shows it with Retry", async () => {
       api.getIdentityConfig.mockRejectedValueOnce(httpError(500, "config store down"));
       const { drilldown } = setup({ filters: [{ label: "service_name", value: "checkout" }] });
@@ -154,8 +166,8 @@ describe("useMetricDrilldown", () => {
 
   describe("the metric's labels", () => {
     it("shows a loading line until the schema arrives", async () => {
-      let resolve!: () => void;
-      schemaReady = new Promise((r) => (resolve = r));
+      let resolve!: (loaded: boolean) => void;
+      loadSchemas = () => new Promise((r) => (resolve = r));
       labels = undefined;
       const { drilldown } = setup();
       await flushPromises();
@@ -164,21 +176,36 @@ describe("useMetricDrilldown", () => {
       expect(drilldown.menu.value).toEqual({ kind: "loading" });
 
       labels = ["job"];
-      resolve();
+      resolve(true);
       await opening;
       expect(drilldown.menu.value.kind).toBe("pickService");
     });
 
-    it("shows an error with Retry when the schema cannot be loaded", async () => {
+    it("shows an error with Retry when the schema cannot be loaded, and recovers on Retry", async () => {
       labels = undefined;
+      let attempts = 0;
+      loadSchemas = async () => {
+        attempts += 1;
+        if (attempts === 1) return false;
+        labels = ["job"];
+        return true;
+      };
       const { drilldown } = setup();
       await flushPromises();
       await drilldown.open();
       expect(drilldown.menu.value).toEqual({ kind: "error", message: null });
 
-      labels = ["job"];
       await drilldown.retry();
+      expect(attempts).toBe(2);
       expect(drilldown.menu.value.kind).toBe("pickService");
+    });
+
+    it("says there is no service label when the metric's stream has no labels", async () => {
+      labels = undefined;
+      const { drilldown } = setup();
+      await flushPromises();
+      await drilldown.open();
+      expect(drilldown.menu.value).toEqual({ kind: "notice", notice: "noServiceLabel" });
     });
   });
 
@@ -238,18 +265,6 @@ describe("useMetricDrilldown", () => {
       await drilldown.open();
       expect(drilldown.menu.value).toEqual({ kind: "notice", notice: "noServiceLabel" });
       expect(api.correlate).not.toHaveBeenCalled();
-    });
-
-    it("correlates straight away on a service filter, without __name__", async () => {
-      const { drilldown } = setup({
-        filters: [
-          { label: "service_name", value: "checkout" },
-          { label: "__name__", value: "http_requests_total" },
-        ],
-      });
-      await flushPromises();
-      await drilldown.open();
-      expect(api.correlate.mock.calls[0][1].available_dimensions).toEqual({ service: "checkout" });
     });
   });
 

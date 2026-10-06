@@ -26,7 +26,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 const NEVER_SENT = new Set(["__name__", "le", "quantile"]);
 const SERVICE_GROUP = "service";
 
-export type DrilldownAvailability = "oss" | "discoveryOff" | "forbidden" | "available";
+export type DrilldownAvailability = "oss" | "discoveryOff" | "pending" | "forbidden" | "available";
 
 /** A read's outcome: pending, ok, or the HTTP status it failed with (0 when there was none). */
 export type ReadStatus = "pending" | "ok" | number;
@@ -91,6 +91,8 @@ export const availability = (state: {
   if (state.isEnterprise !== "true") return "oss";
   if (!state.serviceStreamsEnabled) return "discoveryOff";
   if (state.identityStatus === 403 || state.groupsStatus === 403) return "forbidden";
+  // Until both reads answer, a refusal is still possible: the button must not show enabled and then flip.
+  if (state.identityStatus === "pending" || state.groupsStatus === "pending") return "pending";
   return "available";
 };
 
@@ -139,7 +141,8 @@ export const buildTracesRoute = ({ stream, filters, timeRange, org }: RouteArgs)
     from: String(timeRange.start_time),
     to: String(timeRange.end_time),
     query: whereOf(filters),
-    tab: "traces",
+    // Same key order as the traces page's own URL: vue-router compares query strings by order.
     org_identifier: org,
+    tab: "traces",
   },
 });

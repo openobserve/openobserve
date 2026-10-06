@@ -69,7 +69,8 @@ export interface UseMetricDrilldownDeps {
   metric: () => { name: string; labels?: string[] } | null;
   /** Labels from the grid's schema load, for a card that came without them. */
   labelsOf: (name: string) => string[] | undefined;
-  ensureSchemas: () => Promise<void>;
+  /** Resolves `false` when the labels could not be loaded; a later call tries again. */
+  ensureSchemas: () => Promise<boolean | void>;
   filters: () => LabelFilterLike[];
   inapplicableFilters: () => LabelFilterLike[];
   timeRange: () => { start_time: number; end_time: number };
@@ -217,17 +218,14 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
 
     const metric = deps.metric();
     if (!metric) return;
-    try {
-      await deps.ensureSchemas();
-    } catch {
-      // The labels check below reports it.
-    }
+    const loaded = await deps.ensureSchemas();
     if (mine !== generation) return;
-    const labels = metric.labels ?? deps.labelsOf(metric.name);
-    if (!labels) {
+    if (loaded === false) {
       menu.value = { kind: "error", message: null };
       return;
     }
+    // A loaded schema without this metric's labels means its stream has none.
+    const labels = metric.labels ?? deps.labelsOf(metric.name) ?? [];
 
     const { dimensions } = contextToDimensions(
       deps.filters(),

@@ -23,6 +23,7 @@ import {
   serviceLabelFor,
 } from "./metricDrilldown";
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import { stringifyQuery } from "vue-router";
 
 const GROUPS: any[] = [
   { id: "service", display: "Service", fields: ["service_name", "service", "job", "__name__"] },
@@ -43,9 +44,9 @@ describe("contextToDimensions", () => {
         filter("service_name", "checkout"),
         filter("namespace", "shop", "="),
         filter("pod", "web-1"),
-        filter("region", "eu"),
+        filter("k8s_namespace_name", "staging"),
       ],
-      [filter("region", "eu")],
+      [filter("k8s_namespace_name", "staging")],
       GROUPS,
       IDENTITY,
     );
@@ -118,9 +119,16 @@ describe("availability", () => {
     expect(availability({ ...base, groupsStatus: 403 })).toBe("forbidden");
   });
 
-  it("is available otherwise, including while the reads are pending or failed for other reasons", () => {
+  it("is pending until both reads have answered", () => {
+    expect(availability({ ...base, identityStatus: "pending" })).toBe("pending");
+    expect(availability({ ...base, groupsStatus: "pending" })).toBe("pending");
+    expect(availability({ ...base, identityStatus: "pending", groupsStatus: 403 })).toBe(
+      "forbidden",
+    );
+  });
+
+  it("is available otherwise, including when a read failed for another reason", () => {
     expect(availability(base)).toBe("available");
-    expect(availability({ ...base, identityStatus: "pending" })).toBe("available");
     expect(availability({ ...base, groupsStatus: 500 })).toBe("available");
   });
 });
@@ -173,6 +181,21 @@ describe("routes", () => {
       org_identifier: "acme",
     });
     expect(b64DecodeUnicode(route.query.query)).toBe(where);
+  });
+
+  it("orders traces query keys as the traces page does, so Back finds the same location", () => {
+    const route = buildTracesRoute({ ...args, stream: "default" });
+    // Insertion order of useTraces getUrlQueryParams() for an absolute range; trace_id is undefined there.
+    const pushedByTraces = {
+      stream: "default",
+      from: 1000000,
+      to: 2000000,
+      query: route.query.query,
+      org_identifier: "acme",
+      trace_id: undefined,
+      tab: "traces",
+    };
+    expect(stringifyQuery(route.query)).toBe(stringifyQuery(pushedByTraces as any));
   });
 
   it("skips a wildcard filter", () => {
