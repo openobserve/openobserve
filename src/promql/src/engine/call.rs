@@ -34,9 +34,6 @@ use crate::{
     scalar_param::ScalarParam,
 };
 
-/// The most quantiles `histogram_quantiles` takes, as upstream allows.
-const MAX_QUANTILES: usize = 10;
-
 impl Engine {
     pub(super) async fn call_expr(
         &mut self,
@@ -160,11 +157,6 @@ impl Engine {
             Func::HistogramQuantiles => {
                 let err = "Invalid args, expected histogram_quantiles(b instant-vector, label string, phi scalar, ...)";
                 let quantiles = args.len().saturating_sub(2);
-                if quantiles > MAX_QUANTILES {
-                    return Err(DataFusionError::Plan(format!(
-                        "histogram_quantiles accepts at most {MAX_QUANTILES} quantiles, got {quantiles}"
-                    )));
-                }
                 if quantiles == 0 {
                     return Err(DataFusionError::NotImplemented(err.into()));
                 }
@@ -1439,12 +1431,11 @@ mod tests {
     #[tokio::test]
     async fn test_histogram_quantiles_rejects_what_upstream_rejects() {
         let h = classic("a", &[("1", 5.0), ("+Inf", 10.0)]);
+        // the parser stops at ten quantiles, as upstream
         let phis = ["0.5"; 11].join(", ");
+        let eleven = format!(r#"histogram_quantiles({h}, "q", {phis})"#);
+        assert!(promql_parser::parser::parse(&eleven).is_err());
         for (query, message) in [
-            (
-                format!(r#"histogram_quantiles({h}, "q", {phis})"#),
-                "at most 10",
-            ),
             (
                 format!(r#"histogram_quantiles({h}, "q", 0.5, 0.5)"#),
                 "0.5 is given twice",
