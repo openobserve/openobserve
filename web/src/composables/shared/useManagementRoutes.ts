@@ -289,6 +289,17 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "org_domain_mapping",
+          name: "orgDomainMapping",
+          component: () => import("@/components/settings/OrgDomainMapping.vue"),
+          meta: {
+            titleKey: "routeTitles.orgDomainMapping",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     );
   }

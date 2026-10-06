@@ -94,6 +94,7 @@ export default defineComponent({
       queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
+      orgDomainMapping: "org_domain_mapping",
       passwordPolicy: "password_policy",
       pipelineDestinations: "pipeline_destinations",
       alertTemplates: "templates",
@@ -124,6 +125,7 @@ export default defineComponent({
       "organization",
       "license",
       "domain_management",
+      "org_domain_mapping",
       "password_policy",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
@@ -158,6 +160,10 @@ export default defineComponent({
         (store.state.zoConfig.meta_org && !isMetaOrg.value) ||
         store.state.zoConfig?.synthetics_enabled === false;
       if (name === "syntheticsLocations" && syntheticsBlocked) {
+        toGeneral();
+        return;
+      }
+      if (name === "orgDomainMapping" && config.isCloud !== "true") {
         toGeneral();
       }
     };
@@ -240,6 +246,16 @@ export default defineComponent({
           to: { name: "domainManagement", query: { org_identifier: org } },
           visible: isEnt && meta,
           dataTest: "domain-management-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "org_domain_mapping",
+          label: t("settings.orgDomainMapping.tabLabel"),
+          description: t("settings.orgDomainMapping.tabDesc"),
+          icon: "domain",
+          to: { name: "orgDomainMapping", query: { org_identifier: org } },
+          visible: isCloud,
+          dataTest: "org-domain-mapping-tab",
           group: "Access & Security",
         },
         {

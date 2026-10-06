@@ -166,6 +166,9 @@ pub async fn create(
         allowed_orgs.insert(org_id.clone());
         for mapping in &mut mappings {
             use o2_openfga::authorizer::roles::get_all_roles;
+            use openobserve_core::org_domain_ownership;
+
+            let domain = mapping.domain.trim().to_lowercase();
 
             if !allowed_orgs.contains(&mapping.org_id) {
                 return MetaHttpResponse::bad_request(format!(
@@ -218,15 +221,15 @@ pub async fn create(
             }
 
             match org_domain_ownership::get_org_for_domain(&domain).await {
-                Ok(Some(org_id)) => {
-                    if org_id != mapping.org_id {
+                Ok(Some(org)) => {
+                    if org != org_id {
                         return MetaHttpResponse::bad_request(
                             "This domain is already claimed by some other org",
                         );
                     }
                 }
                 Ok(None) => {
-                    return MetaHttpResponse::internal_error("This domain is not linked yet");
+                    return MetaHttpResponse::bad_request("This domain is not linked yet");
                 }
                 Err(e) => {
                     return MetaHttpResponse::internal_error(format!(
@@ -235,9 +238,25 @@ pub async fn create(
                 }
             }
 
-            mapping.domain = mapping.domain.to_lowercase();
+            mapping.domain = domain;
         }
         data.domain_org_mappings = mappings;
+    }
+
+    #[cfg(feature = "cloud")]
+    if let Some(name) = settings.role_name_claim {
+        if name.is_empty() {
+            data.role_name_claim = None;
+        } else {
+            data.role_name_claim = Some(name);
+        }
+        field_found = true;
+    }
+
+    #[cfg(feature = "cloud")]
+    if let Some(create) = settings.create_missing_role {
+        data.create_missing_role = create;
+        field_found = true;
     }
 
     #[cfg(feature = "cloud")]
