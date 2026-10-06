@@ -285,6 +285,28 @@ function reduceComplete(state: StreamState, data: any, ctx: ReducerCtx): StreamE
   return [{ kind: "throttledSave", force: true }];
 }
 
+// A stored turn the user stopped; the live panel marks its own Stop, as the aborted stream never sees this frame.
+function reduceCancelled(state: StreamState, ctx: ReducerCtx): StreamEffect[] {
+  if (state.activeToolCall) {
+    pushCompletedToolCall(state, completedBlockFrom(state.activeToolCall));
+    if (ctx.isActive) state.activeToolCall = null;
+  }
+  const note = `_[${ctx.t("aiAssistant.responseStoppedByUser")}]_`;
+  const lastMessage = lastMessageOf(state);
+  if (lastMessage?.role === "assistant") {
+    lastMessage.content = raw(lastMessage.content ? `${lastMessage.content}\n\n${note}` : note);
+    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+    lastMessage.contentBlocks.push({ type: "text", text: note });
+  } else {
+    state.messages.push({
+      role: "assistant",
+      content: raw(note),
+      contentBlocks: [{ type: "text", text: note }],
+    });
+  }
+  return [];
+}
+
 function dashboardEffect(data: any): StreamEffect | null {
   const resolvedToolName = data.tool && data.tool !== "tools_call" ? data.tool : "";
   const callArgs = data.call_args || {};
@@ -485,6 +507,7 @@ export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEf
   if (data && data.type === "tool_call") return reduceToolCall(state, data, ctx);
   if (data && data.type === "error") return reduceError(state, data, ctx);
   if (data && data.type === "complete") return reduceComplete(state, data, ctx);
+  if (data && data.type === "cancelled") return reduceCancelled(state, ctx);
   if (data && data.type === "tool_result") return reduceToolResult(state, data, ctx);
   // ponytail: phase gate reproduces the tail-flush handler gap on purpose. Delete with the follow-up fix.
   if (data && data.type === "navigation_action" && ctx.phase === "stream") {

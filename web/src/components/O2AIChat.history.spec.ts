@@ -112,4 +112,34 @@ describe("messagesFromTurns", () => {
     const blocks = messages.flatMap((m) => m.contentBlocks ?? []);
     expect(blocks.some((b) => b.pendingConfirmation)).toBe(false);
   });
+
+  it("marks a stopped turn after its partial answer", () => {
+    const stopped: StoredTurn = {
+      user_message_id: "msg_stop",
+      user: { text: "explain" },
+      frames: [{ type: "message_delta", content: "Partial" }, { type: "cancelled" }],
+    };
+    const [, assistant] = messagesFromTurns([stopped], t);
+    const note = "_[aiAssistant.responseStoppedByUser]_";
+    expect(assistant.content).toBe(`Partial\n\n${note}`);
+    expect(assistant.contentBlocks).toEqual([
+      { type: "text", text: "Partial" },
+      { type: "text", text: note },
+    ]);
+  });
+
+  it("marks a turn stopped before any answer, closing its running tool call", () => {
+    const stopped: StoredTurn = {
+      user_message_id: "msg_stop",
+      user: { text: "list" },
+      frames: [
+        { type: "tool_call", tool: "StreamList", message: "Listing", call_id: "c1", context: {} },
+        { type: "cancelled" },
+      ],
+    };
+    const messages = messagesFromTurns([stopped], t);
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(messages[1].contentBlocks?.map((b) => b.type)).toEqual(["tool_call", "text"]);
+    expect(messages[1].content).toBe("_[aiAssistant.responseStoppedByUser]_");
+  });
 });

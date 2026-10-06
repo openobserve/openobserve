@@ -183,6 +183,9 @@ export function useChatStream(options: UseChatStreamOptions) {
   // Set by processStream when the owning replica is gone; the stream already returned 200, so sendMessage reads it after it ends.
   const streamOwnerUnavailable = ref(false);
 
+  // The Stop's final save; the aborted turn's post-turn reload must read it, not an earlier throttled save.
+  let stopSave: Promise<void> | null = null;
+
   const cancelCurrentRequest = async () => {
     if (currentAbortController.value) {
       trackAnswerOutcome(currentAbortController.value, "ai_assistant_answer_aborted");
@@ -209,6 +212,8 @@ export function useChatStream(options: UseChatStreamOptions) {
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
       }
+      // A trailing render flush would overwrite the stopped note appended below.
+      disposeRenderFlush();
 
       if (chatMessages.value.length > 0) {
         const lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -223,15 +228,15 @@ export function useChatStream(options: UseChatStreamOptions) {
               chatMessages.value.pop();
             }
           } else if (currentStreamingMessage.value) {
+            const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
             if (lastMessage.contentBlocks) {
               const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
               if (lastBlock && lastBlock.type === "text") {
                 lastBlock.text = currentTextSegment.value;
               }
+              lastMessage.contentBlocks.push({ type: "text", text: stoppedNote });
             }
-            lastMessage.content = raw(
-              lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
-            );
+            lastMessage.content = raw(lastMessage.content + "\n\n" + stoppedNote);
           }
         }
       }
@@ -240,7 +245,8 @@ export function useChatStream(options: UseChatStreamOptions) {
       currentTextSegment.value = "";
       displayedStreamingContent.value = "";
 
-      await saveToHistory();
+      stopSave = saveToHistory();
+      await stopSave;
 
       await scrollToBottom();
     }
@@ -792,6 +798,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
     // Before isLoading: the registry watcher clears a spinner whose session has no live turn.
     sessionStreamingState[streamSessionId] = true;
+    stopSave = null;
 
     isLoading.value = true;
     currentStreamingMessage.value = "";
@@ -986,6 +993,8 @@ export function useChatStream(options: UseChatStreamOptions) {
       }
       streamOwnerUnavailable.value = false;
 
+      if (turnController.signal.aborted && stopSave) await stopSave;
+      stopSave = null;
       // Only update UI/store if stream was NOT detached (session is still the same)
       const wasDetached = chatMessages.value !== streamMsgs;
       if (!wasDetached) {

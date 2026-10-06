@@ -7440,6 +7440,7 @@
     "forkIntoMyChats": "Fork into my chats",
     "forkFailed": "Could not fork the chat",
     "forked": "Copied into your chats",
+    "forkedFromShareBanner": "Forked from a shared chat",
     "untitled": "Untitled chat",
     "emptyChat": "This chat has no messages yet.",
     "readOnly": "Read-only"

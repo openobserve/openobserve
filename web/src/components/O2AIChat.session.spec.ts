@@ -1154,4 +1154,57 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       expect(insertedChips[0].charCount).toBe(200);
     });
   });
+
+  describe("forks and sharing", () => {
+    const shareStubs = {
+      ...baseStubs,
+      AiChatShareDialog: {
+        name: "AiChatShareDialog",
+        template: '<div data-test="share-dialog-stub" />',
+        props: ["open", "sessionId", "chatTitle"],
+      },
+    };
+
+    it("shows the fork banner on a chat forked from a share, and drops it for a new chat", async () => {
+      mockLoadChat.mockResolvedValueOnce({
+        id: 7,
+        title: "Forked",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "hello" },
+        ],
+        sessionId: "s-7",
+        forkedFromShare: "share-1",
+      });
+      await vm.loadChat(7);
+      await flushPromises();
+      const banner = '[data-test="o2-ai-chat-forked-banner"]';
+      expect(wrapper!.find(banner).exists()).toBe(true);
+
+      vm.addNewChat();
+      await flushPromises();
+      expect(wrapper!.find(banner).exists()).toBe(false);
+    });
+
+    it("opens the share dialog for the chat picked in the history menu", async () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat({}, shareStubs);
+      vm = wrapper.vm as any;
+      vm.chatHistory = [
+        {
+          id: 9,
+          title: "Old chat",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          messages: [],
+          sessionId: "s-9",
+          serverBacked: true,
+        },
+      ];
+      vm.shareHistoryChat(9);
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+      expect(dialog.props()).toMatchObject({ open: true, sessionId: "s-9", chatTitle: "Old chat" });
+    });
+  });
 });

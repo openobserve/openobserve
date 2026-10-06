@@ -1132,6 +1132,89 @@ describe("useChatHistory", () => {
       expect(historyOrg1[0].title).toBe("Org1 Chat");
     });
   });
+  describe("loadChat against the server", () => {
+    const SESSION = "0190a1b2-c3d4-7000-8000-0000000000aa";
+    const storedTurn = (text: string) => ({
+      user_message_id: `msg_${text}`,
+      user: { text },
+      frames: [{ type: "message_delta", content: `re ${text}` }, { type: "complete" }],
+    });
+    const makeServer = (turns: unknown[], extra: Record<string, unknown> = {}) => ({
+      enabled: () => true,
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({
+        session_id: SESSION,
+        title: "Server",
+        created_at: 1,
+        updated_at: 2_000_000,
+        last_committed_seq: 7,
+        not_modified: false,
+        turns,
+        ...extra,
+      }),
+      rename: vi.fn(),
+      remove: vi.fn(),
+      removeAll: vi.fn(),
+    });
+
+    it("keeps a live save the server has not committed yet", async () => {
+      const server = makeServer([storedTurn("first")], { forked_from_share: "share-1" });
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const local = makeMessages(4);
+      const chatId = await saveToHistory(local, SESSION, "Local");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(local.map((m) => m.content));
+      expect(entry!.cachedLastSeq).toBeUndefined();
+      expect(entry!.forkedFromShare).toBe("share-1");
+    });
+
+    it("takes the server copy once it has caught up", async () => {
+      const server = makeServer([storedTurn("first"), storedTurn("second")]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(4), SESSION, "Local");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages[2].content).toBe("second");
+      expect(entry!.cachedLastSeq).toBe(7);
+      expect(entry!.forkedFromShare).toBeUndefined();
+    });
+
+    it("carries forked_from_share from the server listing", async () => {
+      const server = makeServer([]);
+      server.list.mockResolvedValue({
+        chats: [
+          {
+            session_id: SESSION,
+            title: "Fork",
+            created_at: 1,
+            updated_at: 2_000_000,
+            last_committed_seq: 3,
+            forked_from_share: "share-9",
+          },
+        ],
+      });
+      const { loadHistory } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const [chat] = await loadHistory();
+      expect(chat.forkedFromShare).toBe("share-9");
+    });
+  });
+
   describe("adoptServerChat", () => {
     const SESSION = "0190a1b2-c3d4-7000-8000-000000000001";
     const makeServer = () => ({

@@ -88,6 +88,8 @@ export interface ServerChatSummary {
   created_at: number; // microseconds
   updated_at: number; // microseconds
   last_committed_seq: number;
+  /** Set on a chat forked from a share: the share's id. */
+  forked_from_share?: string;
 }
 
 /** A stored chat (`GET /api/{org}/ai/chats/{session_id}`). */
@@ -485,6 +487,7 @@ export function useChatHistory(
         userOrgKey,
         serverBacked: true,
         cachedLastSeq: cached?.cachedLastSeq,
+        forkedFromShare: chat.forked_from_share,
       });
     }
     const oldestListed = Math.min(...page.chats.map((c) => c.updated_at / 1000));
@@ -525,6 +528,14 @@ export function useChatHistory(
     if (detail.not_modified && record) return record;
 
     const messages = messagesFromTurns(detail.turns ?? [], t);
+    // A live save ahead of the server (a stopped turn commits after its cancel returns) must not be replaced by the older copy.
+    const liveSaveAhead =
+      record?.serverBacked &&
+      record.cachedLastSeq === undefined &&
+      messages.length < record.messages.length;
+    if (record && liveSaveAhead) {
+      return { ...record, forkedFromShare: detail.forked_from_share ?? record.forkedFromShare };
+    }
     // Feedback votes live only in this browser; keep them when the shape matches.
     if (record && record.messages.length === messages.length) {
       messages.forEach((msg, i) => {
@@ -540,6 +551,7 @@ export function useChatHistory(
       userOrgKey: await getUserOrgKey(),
       serverBacked: true,
       cachedLastSeq: detail.last_committed_seq,
+      forkedFromShare: detail.forked_from_share,
     };
     try {
       await putRecord(entry);
