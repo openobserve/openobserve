@@ -8772,8 +8772,7 @@
         "startTimeRequired": "Enter a start time as HH:MM.",
         "durationInvalid": "Enter a duration such as 90m or 1h 30m.",
         "weekdaysRequired": "Choose at least one day.",
-        "untilAfterStart": "Repeat until must be on or after the first day.",
-        "confirmRequired": "Tick the box to confirm that this downtime silences whole modules."
+        "untilAfterStart": "Repeat until must be on or after the first day."
       },
       "title": "Downtimes",
       "subtitle": "Scheduled windows that keep alerts, anomaly detections and synthetics checks running but stop their notifications",
@@ -8955,6 +8954,20 @@
         "showAll": "Show the full list",
         "showLess": "Show less"
       },
+      "muteAllDialog": {
+        "title": "Mute whole modules?",
+        "intro": "No folder, item, tag or condition narrows these modules, so this downtime mutes:",
+        "every": {
+          "alerts": "Every alert in this organization",
+          "anomaly_detections": "Every anomaly detection in this organization",
+          "synthetics": "Every synthetics check in this organization",
+          "slos": "Every SLO in this organization"
+        },
+        "matchedNow": "{matched} today",
+        "outro": "Notifications, on-call pages and workflows stop for all of them inside the window.",
+        "cancel": "Cancel",
+        "confirm": "Mute all"
+      },
       "summaryPane": {
         "title": "Summary",
         "filedIn": "Filed in",
@@ -8962,8 +8975,6 @@
         "nextWindow": "Next window",
         "inUtc": "In UTC",
         "largeMatch": "{modules}: the downtime matches more than half of the items. Most of this org will not notify inside the window.",
-        "confirm": "I understand that this downtime silences whole modules",
-        "confirmCaption": "Required when a module has All folders and no other narrowing, whatever the match size.",
         "whatHappens": "What happens",
         "keepRunning": "Evaluations and checks keep running and keep their history.",
         "noNotifications": "Notifications, on-call pages and workflows stop.",

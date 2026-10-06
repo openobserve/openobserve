@@ -128,7 +128,7 @@ describe("buildDowntimeRequest", () => {
   });
 });
 
-describe("prefill and the confirmation rule", () => {
+describe("prefill and the mute-all rule", () => {
   it("pre-fills one module with all folders and the row's id", () => {
     const values = applyPrefill(defaultDowntimeValues(NOW, "UTC"), {
       module: "slos",
@@ -142,7 +142,7 @@ describe("prefill and the confirmation rule", () => {
     });
   });
 
-  it("asks for the tick while a module narrows nothing", () => {
+  it("flags a module that narrows nothing, so Save asks before muting it whole", () => {
     const values: DowntimeFormValues = defaultDowntimeValues(NOW, "UTC");
     expect(unnarrowedModules(values)).toEqual(["alerts"]);
     values.condition_open = true;

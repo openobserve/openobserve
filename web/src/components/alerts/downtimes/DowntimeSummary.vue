@@ -51,18 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :content="t('alerts.downtimes.summaryPane.largeMatch', { modules: largeModuleNames })"
     />
 
-    <div v-if="needsConfirm" class="flex flex-col gap-1">
-      <OFormCheckbox
-        name="confirm_all"
-        :label="t('alerts.downtimes.summaryPane.confirm')"
-        required
-        data-test="downtime-summary-confirm"
-      />
-      <span class="text-text-secondary text-xs">
-        {{ t("alerts.downtimes.summaryPane.confirmCaption") }}
-      </span>
-    </div>
-
     <div class="flex flex-col gap-1" data-test="downtime-summary-what-happens">
       <span class="text-text-heading text-xs font-semibold">
         {{ t("alerts.downtimes.summaryPane.whatHappens") }}
@@ -84,7 +72,6 @@ import { currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
 import { summarySentence } from "@/utils/downtimes/summary";
 import { MODULE_LABEL_KEYS, type FolderNameFn } from "@/utils/downtimes/targetSummary";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -93,10 +80,8 @@ const props = withDefaults(
     folderName?: FolderNameFn;
     /** Modules whose match is more than half of their items. */
     largeModules?: TargetModule[];
-    /** A chosen module narrows nothing, so the confirmation tick is required. */
-    needsConfirm?: boolean;
   }>(),
-  { folderName: undefined, largeModules: () => [], needsConfirm: false },
+  { folderName: undefined, largeModules: () => [] },
 );
 
 const { t } = useI18nTyped();

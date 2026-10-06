@@ -80,15 +80,6 @@ const save = async (wrapper: ReturnType<typeof mount>) => {
   await flushPromises();
 };
 
-const tick = async (wrapper: ReturnType<typeof mount>, dataTest: string) => {
-  const root = wrapper.get(`[data-test="${dataTest}"]`);
-  const control = ["BUTTON", "INPUT"].includes(root.element.tagName)
-    ? root
-    : root.get("button, input");
-  await control.trigger("click");
-  await flushPromises();
-};
-
 describe("AddDowntime", () => {
   beforeEach(() => {
     vi.mocked(downtimes.preview).mockResolvedValue({ data: EMPTY_PREVIEW } as any);
@@ -100,25 +91,45 @@ describe("AddDowntime", () => {
     };
   });
 
-  it("refuses a whole-module downtime until the confirmation is ticked", async () => {
+  const dialog = () =>
+    document.body.querySelector<HTMLElement>('[data-test="add-downtime-mute-all-dialog"]');
+  const dialogButton = async (which: "primary" | "secondary") => {
+    dialog()!.querySelector<HTMLButtonElement>(`[data-test="o-dialog-${which}-btn"]`)!.click();
+    await flushPromises();
+  };
+
+  it("asks before muting a whole module and names the impact", async () => {
+    vi.mocked(downtimes.preview).mockResolvedValue({
+      data: { ...EMPTY_PREVIEW, alerts_total: 12 },
+    } as any);
     const { wrapper } = await mountPage();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await flushPromises();
     await save(wrapper);
     expect(downtimes.create).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain(
-      "Tick the box to confirm that this downtime silences whole modules.",
-    );
+    expect(dialog()?.textContent).toContain("Every alert in this organization");
+    expect(dialog()?.textContent).toContain("12 alerts today");
+    expect(dialog()?.textContent).toContain("Mute all");
     wrapper.unmount();
   });
 
-  it("creates the downtime once the confirmation is ticked", async () => {
+  it("saves nothing when the dialog is cancelled", async () => {
     const { wrapper } = await mountPage();
-    await tick(wrapper, "downtime-summary-confirm");
     await save(wrapper);
+    await dialogButton("secondary");
+    expect(downtimes.create).not.toHaveBeenCalled();
+    expect(dialog()).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("creates the downtime once Mute all is confirmed", async () => {
+    const { wrapper } = await mountPage();
+    await save(wrapper);
+    await dialogButton("primary");
     expect(downtimes.create).toHaveBeenCalledTimes(1);
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
     expect(body.targets).toEqual([{ module: "alerts", folders: { kind: "all" } }]);
     expect(body.schedule.repeat).toBe("none");
-    expect(body).not.toHaveProperty("confirm_all");
     wrapper.unmount();
   });
 

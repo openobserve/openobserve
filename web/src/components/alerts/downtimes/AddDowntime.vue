@@ -262,13 +262,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :folder-label="folderLabel"
                 :folder-name="targetFolderName"
                 :large-modules="largeModules"
-                :needs-confirm="needsConfirm"
               />
             </div>
           </div>
         </div>
       </div>
     </OPageLayout>
+
+    <ODialog
+      v-model:open="muteAllOpen"
+      size="sm"
+      :title="t('alerts.downtimes.muteAllDialog.title')"
+      :primary-button-label="t('alerts.downtimes.muteAllDialog.confirm')"
+      primary-button-variant="destructive"
+      :primary-button-loading="saveMutation.isPending.value"
+      :secondary-button-label="t('alerts.downtimes.muteAllDialog.cancel')"
+      data-test="add-downtime-mute-all-dialog"
+      @click:primary="confirmMuteAll"
+      @click:secondary="muteAllOpen = false"
+    >
+      <div class="flex flex-col gap-3 text-sm">
+        <p class="text-text-body">{{ t("alerts.downtimes.muteAllDialog.intro") }}</p>
+        <ul class="text-text-body flex list-disc flex-col gap-1 ps-5">
+          <li v-for="m in muteAllModules" :key="m" :data-test="`add-downtime-mute-all-module-${m}`">
+            <span class="font-medium">{{ t(MUTE_ALL_EVERY_KEYS[m]) }}</span>
+            <span v-if="matchedText(m)" class="text-text-secondary">
+              · {{ t("alerts.downtimes.muteAllDialog.matchedNow", { matched: matchedText(m) }) }}
+            </span>
+          </li>
+        </ul>
+        <p class="text-text-secondary text-xs">{{ t("alerts.downtimes.muteAllDialog.outro") }}</p>
+      </div>
+    </ODialog>
   </OForm>
 </template>
 
@@ -276,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { useAutoName } from "@/composables/useAutoName";
 import { useDowntimeItems } from "@/composables/downtimes/useDowntimeItems";
@@ -324,6 +349,7 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
 import DowntimeConditionSection from "./DowntimeConditionSection.vue";
 import DowntimeTargetCard from "./DowntimeTargetCard.vue";
@@ -407,7 +433,21 @@ const itemName = (module: TargetModule, id: string) =>
 
 const schema = makeAddDowntimeSchema(t, { itemFolder });
 
-const onSubmit = async (submitted: DowntimeFormValues) => {
+const MUTE_ALL_EVERY_KEYS = {
+  alerts: "alerts.downtimes.muteAllDialog.every.alerts",
+  anomaly_detections: "alerts.downtimes.muteAllDialog.every.anomaly_detections",
+  synthetics: "alerts.downtimes.muteAllDialog.every.synthetics",
+  slos: "alerts.downtimes.muteAllDialog.every.slos",
+} as const satisfies Record<TargetModule, I18nKey>;
+
+const MATCHED_KEYS = {
+  alerts: "alerts.downtimes.matched.alerts",
+  anomaly_detections: "alerts.downtimes.matched.anomalies",
+  synthetics: "alerts.downtimes.matched.synthetics",
+  slos: "alerts.downtimes.matched.slos",
+} as const satisfies Record<TargetModule, I18nKey>;
+
+const save = async (submitted: DowntimeFormValues) => {
   const body = buildDowntimeRequest(submitted);
   try {
     await saveMutation.mutateAsync({ id: editId.value || undefined, body });
@@ -428,6 +468,33 @@ const onSubmit = async (submitted: DowntimeFormValues) => {
     });
   }
 };
+
+// A module with nothing narrowing it mutes the whole module, so Save asks first.
+const muteAllOpen = ref(false);
+const pendingSave = ref<DowntimeFormValues | null>(null);
+const muteAllModules = computed(() =>
+  pendingSave.value ? unnarrowedModules(pendingSave.value) : [],
+);
+
+const onSubmit = async (submitted: DowntimeFormValues) => {
+  if (unnarrowedModules(submitted).length > 0) {
+    pendingSave.value = submitted;
+    muteAllOpen.value = true;
+    return;
+  }
+  await save(submitted);
+};
+
+const confirmMuteAll = async () => {
+  const submitted = pendingSave.value;
+  if (!submitted) return;
+  await save(submitted);
+  muteAllOpen.value = false;
+};
+
+watch(muteAllOpen, (open) => {
+  if (!open) pendingSave.value = null;
+});
 
 const form = useOForm<DowntimeFormValues>({
   defaultValues: initial,
@@ -560,7 +627,10 @@ const largeModules = computed(() =>
   }),
 );
 
-const needsConfirm = computed(() => unnarrowedModules(values.value).length > 0);
+const matchedText = (m: TargetModule): I18nText | null => {
+  const count = matchCounts.value[m];
+  return count === null ? null : t(MATCHED_KEYS[m], { count }, count);
+};
 
 const bannerCounts = computed(() =>
   chosenModules.value

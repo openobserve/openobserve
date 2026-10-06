@@ -73,7 +73,6 @@ export interface DowntimeFormValues extends Record<string, unknown> {
   schedule: ScheduleFormValues;
   reason: string;
   show_banner: boolean;
-  confirm_all: boolean;
 }
 
 /** What a row action already knows, read from the create page's query string. */
@@ -125,7 +124,6 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
     },
     reason: "",
     show_banner: true,
-    confirm_all: false,
   };
 }
 
@@ -282,7 +280,6 @@ export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
     schedule: scheduleValues(d.schedule),
     reason: d.reason ?? "",
     show_banner: d.show_banner,
-    confirm_all: false,
   };
 }
 

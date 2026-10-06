@@ -64,10 +64,8 @@ describe("AddDowntime schema", () => {
     expect(errorsOf(v)).toEqual({});
   });
 
-  it("asks for the confirmation tick when a module has All folders and nothing else", () => {
-    const v = { ...valid(), condition_open: false };
-    expect(errorsOf(v).confirm_all).toMatch(/^Tick the box/);
-    expect(errorsOf({ ...v, confirm_all: true })).toEqual({});
+  it("accepts a module with All folders and nothing else; Save asks for it in a dialog", () => {
+    expect(errorsOf({ ...valid(), condition_open: false })).toEqual({});
   });
 
   it("refuses an id outside the chosen folders", () => {
@@ -107,6 +105,6 @@ describe("AddDowntime schema", () => {
     expect(tabForPath(["schedule", "duration"])).toBe("schedule");
     expect(tabForPath(["reason"])).toBe("advanced");
     expect(tabForPath(["targets", "alerts", "folders"])).toBe("targets");
-    expect(tabForPath(["confirm_all"])).toBe("targets");
+    expect(tabForPath(["modules"])).toBe("targets");
   });
 });

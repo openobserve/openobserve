@@ -21,7 +21,6 @@ import { conditionError } from "@/utils/downtimes/conditionRules";
 import {
   ALL_FOLDERS,
   hasIdentity,
-  unnarrowedModules,
   type DowntimeFormValues,
   type ScheduleFormValues,
 } from "@/utils/downtimes/downtimeForm";
@@ -192,7 +191,7 @@ const scheduleIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
   return s.repeat === "none" ? onceIssues(s, t) : recurringIssues(s, t);
 };
 
-/** Every rule of the create page; errors route to fields by path, and the tick is never sent. */
+/** Every rule of the create page; errors route to fields by path. */
 export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaContext = {}) =>
   z
     .object({
@@ -210,7 +209,6 @@ export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaCont
       schedule: scheduleSchema,
       reason: z.string(),
       show_banner: z.boolean(),
-      confirm_all: z.boolean(),
     })
     .superRefine((raw, zctx) => {
       const v = raw as DowntimeFormValues;
@@ -219,12 +217,6 @@ export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaCont
         ...conditionIssues(v, t),
         ...scheduleIssues(v.schedule, t),
       ];
-      if (!v.confirm_all && unnarrowedModules(v).length > 0) {
-        issues.push({
-          path: ["confirm_all"],
-          message: t("alerts.downtimes.validation.confirmRequired"),
-        });
-      }
       for (const issue of issues) zctx.addIssue({ code: "custom", ...issue });
     });
 
