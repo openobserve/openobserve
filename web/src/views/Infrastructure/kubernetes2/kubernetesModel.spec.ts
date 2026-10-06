@@ -791,6 +791,20 @@ describe("pods — Lens redesign", () => {
       expect(row.warnings[0].lastSeen).toBe(END - 60_000_000);
     });
 
+    it("never gives a uid-bearing event to an ambiguous pod by name", () => {
+      const row = buildInventory(
+        results({
+          P1: [
+            ksm({ ...p, uid: "a", phase: "Running" }),
+            ksm({ ...p, uid: "b", phase: "Running" }),
+          ],
+        }),
+        [event({ uid: "c" })],
+      ).pods[0];
+      expect(row.uid).toBeNull();
+      expect(row.warnings).toEqual([]);
+    });
+
     it("leaves an event for another cluster unattached", () => {
       expect(withEvents([event({ uid: "", cluster: "dev" })]).warnings).toEqual([]);
     });

@@ -113,7 +113,6 @@ const HPA_VARIANT: Record<string, BadgeVariant> = {
   ScalingLimited: "error-soft",
 };
 
-// Hidden by default per §4.0; every other hideable column starts visible.
 export const HIDDEN_BY_DEFAULT: Partial<Record<View, string[]>> = {
   pods: ["ip", "cpuReq", "cpuLim", "memReq", "memLim"],
 };
@@ -378,7 +377,7 @@ function podColumns(ctx: ColumnContext): K8sColumn[] {
         tone: (r: PodRow) => (r.status ? toneOf(r.status.variant) : null),
         tip: (r: PodRow) => (r.ambiguous ? t("infra.k8s2.ambiguous") : null),
       },
-      { accessorFn: (r: PodRow) => r.status?.text ?? r.status?.key ?? undefined, size: 150 },
+      { accessorFn: (r: PodRow) => (r.status ? chipLabel(r.status, t) : undefined), size: 150 },
     ),
     col(
       "ip",

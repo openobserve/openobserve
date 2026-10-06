@@ -1498,6 +1498,8 @@ function matchEvent(
     const exact = byUid.get(`${event.kind}|${event.uid}`);
     if (exact) return exact;
   }
+  // A uid-bearing pod event belongs only to the pod with that uid; an ambiguous pod has none to match.
+  if (event.uid && event.kind === "Pod") return null;
   const row = byName.get(`${event.kind}|${event.cluster}|${event.namespace}|${event.name}`);
   // A row whose uid is known and differs is a different generation of that name.
   return row && !(event.uid && row.uid) ? row : null;

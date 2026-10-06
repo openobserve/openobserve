@@ -72,7 +72,7 @@ const inventory: Inventory = buildInventory(
       ksm({ replicaset: "other-1", owner_kind: "Deployment", owner_name: "other" }),
     ],
     RS2: [
-      ksm({ replicaset: "web-old" }, 0),
+      ksm({ replicaset: "web-old" }, 5),
       ksm({ replicaset: "web-abc" }, 3),
       ksm({ replicaset: "other-1" }, 1),
     ],
@@ -155,7 +155,7 @@ describe("WorkloadDetails: Deployment", () => {
     );
   });
 
-  it("lists exactly its owned ReplicaSets, by pods descending", () => {
+  it("lists exactly its owned ReplicaSets, by ready pods descending", () => {
     const revisions = mountRow(row).find('[data-test="k8s2-wl-revisions"]');
     expect(revisions.findAll('[data-test="row"]').map((r) => r.attributes("data-name"))).toEqual([
       "web-abc",

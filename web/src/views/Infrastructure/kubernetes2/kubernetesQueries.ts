@@ -67,11 +67,8 @@ export interface TrendTarget {
 
 export interface KindInfo {
   view: View;
-  // The Kubernetes kind as events and owner references spell it.
   kind: string;
-  // KSM's label for the object name.
   label: string;
-  // k8s_events' plural resource name for object records.
   resource: string;
   namespaced: boolean;
   title: I18nKey;
@@ -330,7 +327,6 @@ const POD_SET: QueryId[] = [
 
 const MAP_POD_SET: QueryId[] = POD_SET.filter((id) => !["P13", "P14"].includes(id));
 
-// §7.2: the PromQL each view sends; the CL queries and NS1 are added for every view.
 export const VIEW_QUERIES: Record<Exclude<View, "map">, readonly QueryId[]> = {
   cluster: ["O1", "O2", "O3", "O4", "O5", "N1", "P1", "P2", "P11", "P12"],
   nodes: ["N1", "N2", "N3", "N4", "N5", "K3", "K4", "K5", "K6"],
@@ -365,7 +361,6 @@ export const VIEW_QUERIES: Record<Exclude<View, "map">, readonly QueryId[]> = {
   events: [],
 };
 
-// Drawer additions on top of the kind's own list set (§7.2).
 export const DETAIL_EXTRA_QUERIES: Record<DetailKind, readonly QueryId[]> = {
   pod: [],
   node: [],
@@ -374,13 +369,12 @@ export const DETAIL_EXTRA_QUERIES: Record<DetailKind, readonly QueryId[]> = {
   statefulset: [],
   replicaset: [],
   job: ["J7"],
-  cronjob: ["J1", "J2", "J3", "J7"],
+  cronjob: ["J1", "J2", "J3", "J5", "J7"],
   pvc: [],
   hpa: ["H8"],
   namespace: [],
 };
 
-// Kinds whose drawer lists related pods, so it also loads the Pods set.
 export const DETAIL_WITH_PODS: ReadonlySet<DetailKind> = new Set([
   "node",
   "deployment",

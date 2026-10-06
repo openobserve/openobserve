@@ -135,6 +135,16 @@ describe("kubernetesColumns", () => {
     expect(value(colOf("pods", "warnings"), pod)).toBe(1);
   });
 
+  it("sorts pod Status by the label it shows, not an i18n key", () => {
+    const p = { namespace: "a", pod: "p", uid: "u" };
+    const pod = buildInventory(
+      results({ P1: [ksm({ ...p, phase: "Running" })], P11: [ksm({ ...p, condition: "false" })] }),
+    ).pods[0];
+    const translated = ((key: string) => `Shown ${key}`) as any;
+    const status = columnsFor("pods", { ...ctx, t: translated }).find((c) => c.id === "status")!;
+    expect(value(status, pod)).toBe("Shown infra.k8s2.podRunningNotReady");
+  });
+
   it("sorts Containers by container count", () => {
     const p = { namespace: "a", pod: "p", uid: "u" };
     const pod = buildInventory(

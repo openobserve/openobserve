@@ -170,7 +170,7 @@ describe("kubernetesQueries", () => {
         expect.arrayContaining(["D1", "D4", "D6", "P5", "RS2", "RS4", "P13", "K1"]),
       );
       expect(detailQueries("cronjob").sort()).toEqual(
-        ["CJ1", "CJ2", "CJ3", "CJ4", "J6", "J7", "J1", "J2", "J3"].sort(),
+        ["CJ1", "CJ2", "CJ3", "CJ4", "J6", "J7", "J1", "J2", "J3", "J5"].sort(),
       );
       expect(detailQueries("hpa").sort()).toEqual(["H1", "H2", "H3", "H4", "H5", "H8"].sort());
       expect(detailQueries("pvc")).not.toContain("P1");

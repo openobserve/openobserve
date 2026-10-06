@@ -193,7 +193,7 @@ const revisions = computed(() => {
       rs.owner?.kind === "Deployment" &&
       rs.owner.name === r.name,
   );
-  return sortRows(owned, (rs) => rs.desired, true);
+  return sortRows(owned, (rs) => rs.ready, true);
 });
 
 const jobs = computed<JobEntry[]>(() => {
