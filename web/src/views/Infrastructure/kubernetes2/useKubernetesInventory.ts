@@ -211,7 +211,8 @@ export function useKubernetesInventory(
       const logNames = new Set(((logs?.list ?? []) as Array<{ name: string }>).map((s) => s.name));
       let scoped = false;
       if (logNames.has(EVENTS_STREAM)) {
-        const schema: any = await getStream(EVENTS_STREAM, "logs", true).catch(() => null);
+        // A failed lookup must not read as "no k8s_cluster field", which would run events unscoped.
+        const schema: any = await getStream(EVENTS_STREAM, "logs", true);
         scoped = ((schema?.schema ?? []) as Array<{ name: string }>).some(
           (f) => f.name === "k8s_cluster",
         );
@@ -410,6 +411,11 @@ export function useKubernetesInventory(
       [],
     );
     if (gen !== generation) return;
+    // Without the cluster list nothing can be scoped, so no rows are shown rather than every cluster's.
+    if (cl.failed.size > 0 && cl.results.size === 0) {
+      fail(cl.firstError);
+      return;
+    }
     clusterResults.value = cl.results;
     const listed = metricClusters.value;
     if (!listed.length && hasEvents.value && eventsScoped.value) {
@@ -433,12 +439,7 @@ export function useKubernetesInventory(
     const sent = [...main.results.keys(), ...main.sql.keys(), ...main.failed.keys()];
     const allRejected = main.failed.size > 0 && main.failed.size === sent.length;
     if (allRejected) {
-      pageError.value = main.firstError;
-      results.value = new Map();
-      sql.value = new Map();
-      failed.value = new Map();
-      loading.value = false;
-      detailLoading.value = false;
+      fail(main.firstError);
       return;
     }
     commit(main, cluster, t, s.details);
@@ -467,6 +468,15 @@ export function useKubernetesInventory(
       if (gen !== generation) return;
       mergeSql(events);
     }
+    detailLoading.value = false;
+  };
+
+  const fail = (error: string | null) => {
+    pageError.value = error;
+    results.value = new Map();
+    sql.value = new Map();
+    failed.value = new Map();
+    loading.value = false;
     detailLoading.value = false;
   };
 

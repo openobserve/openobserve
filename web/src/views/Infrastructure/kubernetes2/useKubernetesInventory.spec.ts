@@ -304,6 +304,35 @@ describe("useKubernetesInventory", () => {
     });
   });
 
+  describe("scope failures", () => {
+    it("shows a page error and withholds every row when cluster discovery fails", async () => {
+      fixture = { P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })] };
+      reject = [...CLUSTER_QUERIES];
+      const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.pageError.value).toContain("boom");
+      expect(inv.inventory.value.pods).toEqual([]);
+      expect(sentIds().filter((id) => !id.startsWith("CL"))).toEqual([]);
+    });
+
+    it("treats a failed k8s_events schema lookup as a stream error, never as unlabelled", async () => {
+      getStreams.mockImplementation(async (type: string) => ({
+        list: (type === "metrics" ? ALL_STREAMS : ["k8s_events"]).map((name) => ({ name })),
+      }));
+      getStream.mockRejectedValue(new Error("schema down"));
+      const inv = useKubernetesInventory(
+        () => parseUrlState({ view: "events" }),
+        () => ({ start: START, end: END, relative: true }),
+        () => "org1",
+      );
+      await inv.loadStreams();
+      expect(inv.detection.value).toBe("error");
+      expect(inv.eventsScoped.value).toBe(false);
+      await inv.load();
+      expect(search).not.toHaveBeenCalled();
+    });
+  });
+
   describe("unscoped events (no k8s_cluster field)", () => {
     it("runs E with no cluster term and sends no W, DE, O* or fallback", async () => {
       fixture = {};
