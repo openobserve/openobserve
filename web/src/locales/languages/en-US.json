@@ -13030,6 +13030,7 @@
       },
       "testPanel": {
         "title": "Test Connection",
+        "storedCredentialsHint": "Tests the published version with its stored credentials. Your unsaved edits are tested when you publish.",
         "sourceLabel": "Sample Input",
         "sourceDataset": "From a Dataset",
         "sourceManual": "Manual",
@@ -13154,6 +13155,14 @@
         },
         "attemptsValue": "{count} of {max}",
         "resultsTitle": "Results"
+      },
+      "credentialsDialog": {
+        "open": "Replace credentials",
+        "title": "Replace credentials",
+        "body": "The new value replaces the stored one in place. The task keeps its version, and the stored value is never shown.",
+        "submit": "Replace",
+        "success": "Credentials replaced",
+        "error": "Could not replace the credentials"
       },
       "signingPanel": {
         "title": "Signing Keys",

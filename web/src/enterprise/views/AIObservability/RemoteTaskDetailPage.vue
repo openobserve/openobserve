@@ -163,6 +163,24 @@
                 </span>
               </dd>
             </dl>
+            <OButton
+              v-if="canReplaceCredentials"
+              variant="outline"
+              size="sm"
+              icon-left="key"
+              class="mt-3"
+              data-test="ai-remote-task-detail-replace-credentials"
+              @click="credentialsDialogOpen = true"
+            >
+              {{ t("aiObservability.remoteTasks.credentialsDialog.open") }}
+            </OButton>
+            <RemoteTaskCredentialsDialog
+              v-if="canReplaceCredentials"
+              v-model:open="credentialsDialogOpen"
+              :org-id="orgId"
+              :entity-id="entityId"
+              :auth="task.auth"
+            />
           </RemoteTaskDetailSection>
 
           <RemoteTaskDetailSection
@@ -401,6 +419,7 @@ import { useMutation } from "@tanstack/vue-query";
 import RemoteTaskSigningPanel from "@/enterprise/components/AIObservability/RemoteTaskSigningPanel.vue";
 import RemoteTaskTestRunPanel from "@/enterprise/components/AIObservability/RemoteTaskTestRunPanel.vue";
 import RemoteTaskDetailSection from "@/enterprise/components/AIObservability/RemoteTaskDetailSection.vue";
+import RemoteTaskCredentialsDialog from "@/enterprise/components/AIObservability/RemoteTaskCredentialsDialog.vue";
 import { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentDetailRoute } from "./experimentRoutes";
 import {
@@ -442,6 +461,11 @@ const title = computed<I18nText>(() =>
 );
 const state = computed(() => (task.value ? remoteTaskState(task.value) : "draft"));
 const canEdit = computed(() => Boolean(task.value && canEditRemoteTask(task.value)));
+/** Only a stored auth secret can be replaced; a draft has none until it is registered. */
+const canReplaceCredentials = computed(
+  () => canEdit.value && task.value?.auth.type !== "none" && Boolean(task.value?.auth.usesSecret),
+);
+const credentialsDialogOpen = ref(false);
 const hasDraft = computed(() => versions.value.some((version) => version.isDraft));
 const timeoutLabel = computed<I18nText>(() =>
   task.value ? raw(`${Math.round(task.value.timeoutMs / 1000)} s`) : DASH,
