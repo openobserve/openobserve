@@ -94,17 +94,22 @@
             <!-- Pipe divider between the two options -->
             <OSeparator v-if="transformTypeOptions[1]" vertical class="my-1.5" />
 
-            <!-- JavaScript option only shown in _meta organization -->
+            <!-- JavaScript — shown locked (not hidden) in builds that don't
+                 unlock it; see isJsAllowed in AddFunction.vue. -->
             <OToggleGroupItem
               v-if="transformTypeOptions[1]"
               value="1"
               data-test="function-transform-type-js-option"
+              :disabled="transformTypeOptions[1]?.disabled"
             >
               <template #icon-left>
                 <OBadge size="xs" shape="rounded" variant="amber-soft">{{ raw("JS") }}</OBadge>
               </template>
               {{ transformTypeOptions[1]?.label }}
-              <template #icon-right>
+              <template v-if="transformTypeOptions[1]?.disabled" #icon-right>
+                <OIcon name="lock" size="sm" class="opacity-70" />
+              </template>
+              <template v-else #icon-right>
                 <OIcon
                   name="info-outline"
                   size="sm"
@@ -124,6 +129,12 @@
                 </OIcon>
               </template>
             </OToggleGroupItem>
+            <LockedFeatureTooltip
+              v-if="transformTypeOptions[1]?.disabled"
+              :message="t('enterpriseFeature.locked', { feature: raw('JavaScript') })"
+              icon="function"
+              :title="raw('JavaScript')"
+            />
           </OFormToggleGroup>
 
           <!-- Forced-language hosts get no toggle, so the tip for the locked
@@ -241,6 +252,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 const { t } = useI18nTyped();
@@ -256,7 +268,7 @@ defineProps({
     default: false,
   },
   transformTypeOptions: {
-    type: Array as PropType<{ label: string; value: string | number }[]>,
+    type: Array as PropType<{ label: string; value: string | number; disabled?: boolean }[]>,
     default: () => [],
   },
   // Hides the VRL/JS language toggle entirely (used when a host forces a single

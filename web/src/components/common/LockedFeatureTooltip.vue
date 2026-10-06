@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   it right after the locked trigger, not wrapped around it.
 -->
 <template>
-  <OTooltip hoverable side="right" :align="align" max-width="17rem" content-class="p-3!">
+  <OTooltip hoverable :side="side" :align="align" max-width="17rem" content-class="p-3!">
     <template #content>
       <div class="flex w-full flex-col items-start gap-2.5">
         <div v-if="icon || title" class="flex items-center gap-2">
@@ -83,9 +83,11 @@ withDefaults(
     icon?: string;
     title?: I18nText;
     align?: "start" | "center" | "end";
+    /** Which side of the trigger the bubble opens on — "right" suits a nav rail; a top-of-page icon button wants "bottom". */
+    side?: "top" | "right" | "bottom" | "left";
     showUpgradeCta?: boolean;
   }>(),
-  { showUpgradeCta: true },
+  { showUpgradeCta: true, side: "right" },
 );
 
 const { t } = useI18nTyped();

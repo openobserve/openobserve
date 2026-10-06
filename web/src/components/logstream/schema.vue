@@ -432,13 +432,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #cell-patterns="{ row }">
                           <template
                             v-if="
-                              config.isEnterprise == 'true' &&
                               !(row.name == store.state.zoConfig.timestamp_column) &&
                               (row.type == 'Utf8' || row.type == 'utf8')
                             "
                           >
                             <span
-                              class="text-brand-indigo cursor-pointer"
+                              class="cursor-pointer"
+                              :class="
+                                sdrAccess.allowed
+                                  ? 'text-brand-indigo'
+                                  : 'text-text-disabled cursor-not-allowed'
+                              "
                               :data-test="`schema-field-${row.name}-pattern-action`"
                               @click="openPatternAssociationDialog(row.name)"
                             >
@@ -449,8 +453,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     })
                                   : t("logStream.addPattern")
                               }}
-                              <OIcon name="arrow-forward" size="xs" />
+                              <OIcon :name="sdrAccess.allowed ? 'arrow-forward' : 'lock'" size="xs" />
                             </span>
+                            <LockedFeatureTooltip
+                              v-if="!sdrAccess.allowed"
+                              :message="sdrAccess.message"
+                              icon="shield"
+                              :title="raw('SDR')"
+                            />
                           </template>
                         </template>
                       </OTable>
@@ -826,6 +836,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -879,6 +891,7 @@ export default defineComponent({
     StreamFieldsInputs,
     OToggleGroup,
     OToggleGroupItem,
+    LockedFeatureTooltip,
     OTable,
     OTag,
     DateTime,
@@ -930,6 +943,12 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    // The "SDR" (Sensitive Data Redaction) column is the same capability as
+    // Settings → Regex Patterns, surfaced per-field here — shown locked (not
+    // hidden) in builds that don't unlock it.
+    const sdrAccess = computed(() =>
+      checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
+    );
     // Timezone used for the stream-stats time range: the user's selected
     // timezone, falling back to the browser's zone (never a hardcoded "UTC").
     const displayTimezone = computed(
@@ -1888,19 +1907,19 @@ export default defineComponent({
         size: 220,
         meta: { align: "left" },
       },
-      // Only show patterns column for enterprise builds
-      ...(config.isEnterprise == "true"
-        ? [
-            {
-              id: "patterns",
-              header: raw("SDR"),
-              accessorKey: "patterns",
-              sortable: false,
-              size: COL.template,
-              meta: { align: "left" },
-            },
-          ]
-        : []),
+      // SDR column — shown locked (not hidden) in builds that don't unlock
+      // the regex-pattern association feature; see sdrAccess.
+      {
+        id: "patterns",
+        header: raw("SDR"),
+        accessorKey: "patterns",
+        sortable: false,
+        size: COL.template,
+        meta: {
+          align: "left",
+          headerTooltip: sdrAccess.value.allowed ? undefined : sdrAccess.value.message,
+        },
+      },
     ];
 
     const redBtnColumns: OTableColumnDef<any>[] = [
@@ -2303,6 +2322,10 @@ export default defineComponent({
     };
 
     const openPatternAssociationDialog = (field: string) => {
+      // Defense in depth — the trigger's own disabled styling already blocks
+      // this, but that's CSS-only (not a real `disabled` attribute), so
+      // re-check the gate here too.
+      if (!sdrAccess.value.allowed) return;
       patternAssociationDialog.value.show = true;
       patternAssociationDialog.value.data = patternAssociations.value[field] || [];
       patternAssociationDialog.value.fieldName = field;
@@ -2554,6 +2577,7 @@ export default defineComponent({
       IsdeleteBtnVisible,
       showStoreOriginalDataToggle,
       patternAssociations,
+      sdrAccess,
       patternAssociationDialog,
       assocPatternsRef,
       openPatternAssociationDialog,

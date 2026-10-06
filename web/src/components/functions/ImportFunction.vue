@@ -321,11 +321,12 @@ export default defineComponent({
         store.state.selectedOrganization?.identifier === "_meta",
     );
 
-    const transTypeOptions = computed(() => {
-      const options = [{ label: t("function.vrl"), value: "0" }];
-      if (isJsAllowed.value) options.push({ label: raw("JavaScript"), value: "1" });
-      return options;
-    });
+    // JavaScript always appears in the dropdown — shown disabled (not
+    // hidden) in builds that don't unlock it, same as the Add form's toggle.
+    const transTypeOptions = computed(() => [
+      { label: t("function.vrl"), value: "0" },
+      { label: raw("JavaScript"), value: "1", disabled: !isJsAllowed.value },
+    ]);
 
     // Set at each call site, so one declared mutation covers both create and override.
     const isOverride = ref(false);
@@ -447,6 +448,9 @@ export default defineComponent({
     };
 
     const updateTransType = (transType: string, index: number) => {
+      // Defense in depth — the JS option's own `disabled` already blocks
+      // selecting it, but that attribute can be stripped via devtools.
+      if (transType === "1" && !isJsAllowed.value) return;
       userSelectedTransType.value[index] = transType;
       writeField(index, "transType", transType);
     };

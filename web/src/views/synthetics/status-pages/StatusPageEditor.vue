@@ -136,7 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             aria-hidden="true"
                             data-test="status-page-logo-lock"
                           />
-                          <OTooltip side="right" :content="t('statusPages.fields.logoLocked')" />
+                          <LockedFeatureTooltip
+                            :message="t('statusPages.fields.logoLocked')"
+                            icon="image"
+                            :title="t('statusPages.fields.logo')"
+                          />
                         </template>
                       </div>
 
@@ -390,6 +394,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
 import StatusPagePreview from "./StatusPagePreview.vue";
@@ -541,6 +546,9 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 async function onLogoFileSelected(value: FileValue) {
+  // Defense in depth — the file input's own `disabled` already blocks this,
+  // but that attribute can be stripped via devtools.
+  if (!logoUploadEnabled.value) return;
   const file = Array.isArray(value) ? value[0] : value;
   if (!file) return;
   try {

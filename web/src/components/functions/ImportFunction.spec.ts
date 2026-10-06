@@ -556,22 +556,27 @@ describe("ImportFunction", () => {
       expect(wrapper.vm.bodyLanguage(0)).toBe("vrl");
     });
 
-    // OSS builds cannot run JavaScript, so offering it would only trade this
-    // validation error for a server-side one.
-    it("offers VRL only on OSS", async () => {
+    // OSS builds cannot run JavaScript, so the option is shown locked (not
+    // hidden) — selecting it would only trade this validation error for a
+    // server-side one.
+    it("offers a locked JavaScript option on OSS", async () => {
       (config as any).isEnterprise = "false";
       const wrapper = mountScreen();
       await flushPromises();
 
-      expect(wrapper.vm.transTypeOptions.map((o: any) => o.value)).toEqual(["0"]);
+      const options = wrapper.vm.transTypeOptions;
+      expect(options.map((o: any) => o.value)).toEqual(["0", "1"]);
+      expect(options.find((o: any) => o.value === "1").disabled).toBe(true);
     });
 
-    it("offers JavaScript where the build can run it", async () => {
+    it("offers an unlocked JavaScript option where the build can run it", async () => {
       (config as any).isEnterprise = "true";
       const wrapper = mountScreen();
       await flushPromises();
 
-      expect(wrapper.vm.transTypeOptions.map((o: any) => o.value)).toEqual(["0", "1"]);
+      const options = wrapper.vm.transTypeOptions;
+      expect(options.map((o: any) => o.value)).toEqual(["0", "1"]);
+      expect(options.find((o: any) => o.value === "1").disabled).toBe(false);
     });
 
     it("takes unusable params from the params box", async () => {
