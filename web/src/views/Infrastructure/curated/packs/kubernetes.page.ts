@@ -967,6 +967,8 @@ export const kubernetesPage: CuratedPageManifest = {
             unit: "numbers",
             groupId: "kube-state",
             layout: { w: 96, h: 16 },
+            // `> 0` filters every healthy pod out, so an empty table is good news.
+            emptyMeansHealthy: true,
             variants: [
               {
                 requiresStreams: ["kube_pod_status_phase"],
