@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
+import { convertToUtcTimestamp } from "@/utils/timezone";
 
 // ---------------------------------------------------------------------------
 // Heavy async component stubs — must be declared before the component import
@@ -658,14 +659,26 @@ describe("TracesMetricsDashboard", () => {
       });
     };
 
-    it("emits the box instants converted for the app timezone", async () => {
-      mockStore.state.timezone = "Asia/Kolkata";
-      await wrapper.vm.onHeatmapSelect(selection());
-      const shift = 5.5 * 3600 * 1000;
-      expect(wrapper.emitted("time-range-selected")![0][0]).toEqual({
-        start: T / 1000 + shift,
-        end: (T + 40 * S) / 1000 + shift,
-      });
+    it("emits instants the picker lands exactly on, whatever the browser zone", async () => {
+      const pinnedTz = process.env.TZ;
+      process.env.TZ = "America/New_York";
+      try {
+        mockStore.state.timezone = "Asia/Kolkata";
+        await wrapper.vm.onHeatmapSelect(selection());
+        const { start, end } = wrapper.emitted("time-range-selected")![0][0] as any;
+        // The picker formats with browser-local getters and parses that wall clock in the app zone.
+        const picked = (ms: number) => {
+          const d = new Date(ms);
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const text = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+          return convertToUtcTimestamp(text, "Asia/Kolkata");
+        };
+        expect(new Date(T / 1000).getTimezoneOffset()).not.toBe(0);
+        expect(picked(start)).toBe(T);
+        expect(picked(end)).toBe(T + 40 * S);
+      } finally {
+        process.env.TZ = pinnedTz;
+      }
     });
 
     it("never hands the picker an empty range for a final column clamped mid-second", async () => {

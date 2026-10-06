@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { convertToUtcTimestamp } from "@/utils/timezone";
 import {
@@ -276,24 +276,30 @@ describe("durationBand / composeFilter", () => {
 
 describe("instantToPickerMs", () => {
   const instantMs = Date.UTC(2026, 9, 6, 10, 2, 0);
+  const pinnedTz = process.env.TZ;
 
-  it("shifts by the app-zone offset so browser-local getters read the app-zone wall clock", () => {
-    const ms = instantToPickerMs(instantMs, "Asia/Kolkata");
-    expect(ms).toBe(instantMs + 5.5 * 3600 * 1000);
-    const local = new Date(ms);
-    expect(local.getHours()).toBe(15);
-    expect(local.getMinutes()).toBe(32);
+  afterEach(() => {
+    process.env.TZ = pinnedTz;
   });
 
-  it("round-trips through the picker's local format and app-zone parse", () => {
-    const d = new Date(instantToPickerMs(instantMs, "Asia/Kolkata"));
+  // What the picker does: format with browser-local getters, then parse that wall clock in the app zone.
+  const pickerRoundTrip = (pickerMs: number, appZone: string) => {
+    const d = new Date(pickerMs);
     const pad = (n: number) => String(n).padStart(2, "0");
     const text = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    expect(convertToUtcTimestamp(text, "Asia/Kolkata") / 1000).toBe(instantMs);
-  });
+    return convertToUtcTimestamp(text, appZone) / 1000;
+  };
 
-  it("is the identity when the app zone equals the browser zone", () => {
-    expect(instantToPickerMs(instantMs, "UTC")).toBe(instantMs);
+  it.each([
+    ["America/New_York", "Asia/Kolkata"],
+    ["Asia/Tokyo", "America/Los_Angeles"],
+    ["America/New_York", "UTC"],
+    ["Asia/Tokyo", "Asia/Tokyo"],
+  ])("lands the picker on the instant with browser zone %s and app zone %s", (host, app) => {
+    process.env.TZ = host;
+    // Guards against a runtime that ignores the TZ change, which would make the round trip vacuous.
+    expect(new Date(instantMs).getTimezoneOffset()).not.toBe(0);
+    expect(pickerRoundTrip(instantToPickerMs(instantMs, app), app)).toBe(instantMs);
   });
 });
 
