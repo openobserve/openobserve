@@ -1813,7 +1813,9 @@ describe("PanelContainer", () => {
       // attribute nothing in web/src consumed, so the caveat reached no user.
       const tooltip = wrapper.findComponent({ name: "OTag" }).findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.props("content")).toBe("As of the last stream-list refresh.");
+      expect(tooltip.props("content")).toContain("As of the last stream-list refresh.");
+      // The label rides the tooltip too, since a narrow panel bar shows only the icon.
+      expect(tooltip.props("content")).toContain("3 days");
     });
 
     it("dims the panel BODY wrapper when badged — a full-contrast number reads as current", () => {

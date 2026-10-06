@@ -54,15 +54,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </div>
+        <!-- Icon-only on a narrow bar: the full label otherwise squeezes the panel title to nothing. -->
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
           size="sm"
+          class="shrink-0"
           data-test="dashboard-panel-curated-badge"
-          :title="t('infra.curated.staleBadgeTooltip')"
+          :aria-label="curatedBadgeText"
         >
-          {{ t(curatedBadge.key, curatedBadgeParams) }}
-          <OTooltip :content="t('infra.curated.staleBadgeTooltip')" side="bottom" />
+          <!-- One wrapper, because a child-mode tooltip binds to its previous sibling element. -->
+          <span class="inline-flex items-center" data-test="dashboard-panel-curated-badge-label">
+            <span class="hidden @min-[32rem]/panelbar:inline">{{ curatedBadgeText }}</span>
+            <OIcon name="schedule" size="xs" class="@min-[32rem]/panelbar:hidden" />
+          </span>
+          <OTooltip :content="curatedBadgeTooltip" side="bottom" />
         </OTag>
         <OTag
           v-if="
@@ -503,7 +509,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
@@ -615,6 +621,13 @@ export default defineComponent({
         : "";
       return { duration, date: badge.date };
     });
+    const curatedBadgeText = computed(() =>
+      curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
+    );
+    // Both halves are already translated; joining them widens to string without untranslating either.
+    const curatedBadgeTooltip = computed(() =>
+      raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
+    );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
 
@@ -1126,6 +1139,8 @@ export default defineComponent({
       exemplarErrorMessage,
       curatedBadge,
       curatedBadgeParams,
+      curatedBadgeText,
+      curatedBadgeTooltip,
       curatedNoData,
       curatedAllClear,
       curatedTableOwnsEmpty,
