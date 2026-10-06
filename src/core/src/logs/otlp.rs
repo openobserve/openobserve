@@ -22,7 +22,7 @@ use config::{
     meta::{
         db_monitoring::is_dbm_server_stream,
         otlp::OtlpRequestType,
-        self_reporting::usage::{UsageType, is_internal_rollup_stream},
+        self_reporting::{ai_chat::is_protected_ai_chat_stream, usage::UsageType},
         stream::{StreamParams, StreamType},
     },
     metrics,
@@ -154,10 +154,10 @@ pub async fn handle_request(
     let stream_name = in_stream_name
         .map(|name| format_stream_name(name.to_string()))
         .unwrap_or_else(|| "default".to_string());
-    // Same refusal as `logs::ingest::ingest`: OTLP callers are always users.
-    if is_internal_rollup_stream(&stream_name) {
+    // _o2_dbm_server is written by OTLP collectors, so only the chat-events stream is refused here.
+    if is_protected_ai_chat_stream(&stream_name) {
         return Err(Error::IngestionError(format!(
-            "stream '{stream_name}' is an internal rollup stream and cannot be ingested into"
+            "stream '{stream_name}' is reserved and cannot be ingested into"
         )));
     }
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
@@ -1106,7 +1106,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_logs_refuses_internal_streams() {
-        for stream in ["_o2_ai_chat_events", "_o2_service_graph"] {
+        for stream in ["_o2_ai_chat_events"] {
             let result = handle_request(
                 0,
                 "test_org_id",
