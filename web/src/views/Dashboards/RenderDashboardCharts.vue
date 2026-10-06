@@ -1188,6 +1188,16 @@ export default defineComponent({
       },
     );
 
+    watch(
+      () => panels.value.map((panel: any) => panel.id).join(","),
+      async (ids, previousIds) => {
+        // A panel that joins an already-built grid is otherwise never observed, so it stays a placeholder.
+        if (!previousIds || ids === previousIds) return;
+        await nextTick();
+        await setupPanelObservers();
+      },
+    );
+
     // Initialize GridStack when component is mounted
     onMounted(async () => {
       await nextTick(); // Wait for DOM to be ready

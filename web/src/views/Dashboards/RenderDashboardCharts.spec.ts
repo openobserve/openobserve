@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import i18n from "@/locales";
@@ -331,6 +332,30 @@ describe("RenderDashboardCharts", () => {
       };
       wrapper = createWrapper({ dashboardData: dashboardWithNoPanels });
       expect(wrapper.exists()).toBe(true);
+    });
+
+    it("mounts a panel that joins an already-built tab once it scrolls into view", async () => {
+      const io = installFakeIntersectionObserver({ autoVisible: true });
+      try {
+        const panel = (id: string) => ({
+          id,
+          title: id,
+          type: "line",
+          layout: { x: 0, y: 0, w: 6, h: 4, i: id },
+          queries: [],
+        });
+        const dashboard = (ids: string[]) => ({
+          ...defaultProps.dashboardData,
+          tabs: [{ tabId: "default", name: "Default Tab", panels: ids.map(panel) }],
+        });
+        wrapper = createWrapper({ dashboardData: dashboard(["panel-a"]) });
+        await flushPromises();
+        await wrapper.setProps({ dashboardData: dashboard(["panel-a", "panel-b"]) });
+        await flushPromises();
+        expect(wrapper.vm.shouldMountPanel("panel-b")).toBe(true);
+      } finally {
+        io.restore();
+      }
     });
 
     it("should pass correct props to PanelContainer components", () => {
