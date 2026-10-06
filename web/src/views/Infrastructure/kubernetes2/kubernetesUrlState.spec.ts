@@ -23,7 +23,9 @@ import {
   toQuery,
   withFilter,
   withKind,
+  withNodeLink,
   withTile,
+  withWorkloadLink,
 } from "./kubernetesUrlState";
 
 describe("kubernetesUrlState", () => {
@@ -136,6 +138,57 @@ describe("kubernetesUrlState", () => {
         sort: null,
         desc: false,
         page: 1,
+      });
+    });
+
+    it("drops the pods-only link filters when leaving the Pods tab", () => {
+      const linked = {
+        ...base,
+        onNode: ["prod", "n1"] as [string, string],
+        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
+      };
+      expect(withKind(linked, "deployments")).toMatchObject({ onNode: null, workload: null });
+      expect(withKind(linked, "pods")).toMatchObject({
+        onNode: ["prod", "n1"],
+        workload: ["prod", "shop", "Deployment", "web"],
+      });
+    });
+
+    it("a node link replaces the other list filters but keeps the name and scope", () => {
+      const from = {
+        ...base,
+        kind: "nodes" as const,
+        issue: "nodesPressure" as const,
+        workload: ["prod", "shop", "Deployment", "web"] as [string, string, string, string],
+        pod: ["prod", "shop", "p"] as [string, string, string],
+      };
+      expect(withNodeLink(from, ["prod", "n1"])).toMatchObject({
+        kind: "pods",
+        onNode: ["prod", "n1"],
+        workload: null,
+        issue: null,
+        pod: null,
+        name: "web",
+        cluster: "prod",
+        namespace: "shop",
+        sort: null,
+        page: 1,
+      });
+    });
+
+    it("a workload link is the mirror of a node link", () => {
+      const from = {
+        ...base,
+        onNode: ["prod", "n1"] as [string, string],
+        pod: ["prod", "shop", "p"] as [string, string, string],
+      };
+      expect(withWorkloadLink(from, ["prod", "shop", "Deployment", "web"])).toMatchObject({
+        kind: "pods",
+        workload: ["prod", "shop", "Deployment", "web"],
+        onNode: null,
+        issue: null,
+        pod: null,
+        name: "web",
       });
     });
 

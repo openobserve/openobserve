@@ -19,7 +19,6 @@ import { ISSUE_KIND, type IssueKey, type K8sKind } from "./kubernetesQueries";
 export interface K8sListState {
   kind: K8sKind;
   name: string;
-  // null = the default (first cluster when there are several); "*" = all clusters.
   cluster: string | null;
   namespace: string | null;
   issue: IssueKey | null;
@@ -142,9 +141,31 @@ export const withKind = (state: K8sListState, kind: K8sKind): K8sListState => ({
   ...state,
   kind,
   issue: state.issue && ISSUE_KIND[state.issue] === kind ? state.issue : null,
+  onNode: kind === "pods" ? state.onNode : null,
+  workload: kind === "pods" ? state.workload : null,
   sort: null,
   desc: false,
   page: 1,
+});
+
+// A cross-link is a new question about one node or workload, so it replaces the list filters it would otherwise stack on.
+export const withNodeLink = (state: K8sListState, onNode: [string, string]): K8sListState => ({
+  ...withKind(state, "pods"),
+  issue: null,
+  onNode,
+  workload: null,
+  pod: null,
+});
+
+export const withWorkloadLink = (
+  state: K8sListState,
+  workload: [string, string, string, string],
+): K8sListState => ({
+  ...withKind(state, "pods"),
+  issue: null,
+  onNode: null,
+  workload,
+  pod: null,
 });
 
 // The list then shows exactly what the tile counted, which uses only the scope facets.
