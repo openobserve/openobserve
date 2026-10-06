@@ -251,7 +251,6 @@ export const observed = (labels: Record<string, string>) => ({
   status: {},
 });
 
-// The AC 42 inventory with labels observed on 39 of 41 pods and on all 4 nodes.
 export function labelledInventory(results = generatorResults()): Inventory {
   const inv = inventory(results);
   for (const pod of inv.pods) {

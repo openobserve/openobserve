@@ -18,7 +18,6 @@ import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { labelsOf } from "./kubernetesObjects";
 import type { MapRow } from "./mapFill";
 
-// Whether the map's object query can say anything about labels yet.
 export interface MapObjects {
   state: "loading" | "skipped" | "failed" | "ok";
   reason?: "noStream" | "unscoped" | "anchor";
@@ -37,7 +36,7 @@ export interface LabelIndex {
 }
 
 // Controller bookkeeping: hashes change on every rollout and job names duplicate the workload.
-export const NOISE_LABEL_KEYS: readonly string[] = [
+const NOISE_LABEL_KEYS: readonly string[] = [
   "pod-template-hash",
   "controller-revision-hash",
   "pod-template-generation",

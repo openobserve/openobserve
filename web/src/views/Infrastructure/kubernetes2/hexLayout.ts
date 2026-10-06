@@ -22,7 +22,6 @@ export interface LayoutParams {
   groups: string[][];
   width: number;
   height: number;
-  // Pixels at the canvas bottom that the legend and zoom overlays cover.
   bottomInset: number;
 }
 
@@ -40,8 +39,6 @@ export interface HexFrame {
   top: number;
   bottom: number;
   headerBottom: number;
-  labelX: number;
-  labelY: number;
 }
 
 export interface HexLayout {
@@ -64,7 +61,7 @@ export const HEX_HALF_WIDTH = Math.sqrt(3) / 2;
 
 export const HEX_HALF_HEIGHT = 1;
 
-export const LABEL_BAND = 2;
+const LABEL_BAND = 2;
 
 const HEX_WIDTH = 2 * HEX_HALF_WIDTH;
 
@@ -92,7 +89,6 @@ export function hexLayout(params: LayoutParams): HexLayout {
   return layout;
 }
 
-// The extent of the packing at one shelf width, without placing any hex.
 export function packedSpan(params: LayoutParams, shelfWidth: number) {
   return pack(blocksOf(params), shelfWidth);
 }
@@ -198,7 +194,6 @@ function pack(blocks: Block[], shelfWidth: number) {
   return { spanX, spanY: cursorY + shelfHeight };
 }
 
-// The shelf width whose packing fit() will draw largest.
 function bestShelf(blocks: Block[], params: LayoutParams) {
   let best = { width: 0, scale: -Infinity };
   for (const width of shelfCandidates(blocks.map((b) => b.width))) {
@@ -235,8 +230,6 @@ function computeLayout(params: LayoutParams): HexLayout {
       top: -block.top,
       bottom: -(block.top + block.height),
       headerBottom: -(block.top + pad + band),
-      labelX: block.left + pad,
-      labelY: -(block.top + pad + band / 2),
     };
     if (framed) frames.push(frame);
     bounds.maxX = Math.max(bounds.maxX, frame.right);

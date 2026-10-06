@@ -42,14 +42,12 @@ export interface RowGroup {
   owner: Owner | null;
   namespace: string;
   rows: MapRow[];
-  // How many label-value groups an "other" group stands for.
   merged?: number;
 }
 
-// What a group card's header shows; built by the view, drawn by the canvas.
 export interface GroupHeader {
   title: string;
-  // Leading title chars truncation must keep, e.g. a workload's kind.
+  // A workload's kind must survive truncation, so the title is pinned up to here.
   pin: number;
   count: string;
   summary: { cls: StatusClass; count: number }[];

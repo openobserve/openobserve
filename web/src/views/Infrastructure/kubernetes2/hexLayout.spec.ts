@@ -77,7 +77,7 @@ describe("hexLayout (AC 52)", () => {
         expect(layout.x[index] - HEX_HALF_WIDTH).toBeGreaterThanOrEqual(f.left);
         expect(layout.x[index] + HEX_HALF_WIDTH).toBeLessThanOrEqual(f.right);
         expect(layout.y[index] + HEX_HALF_HEIGHT).toBeLessThanOrEqual(f.top);
-        expect(f.labelY).toBeGreaterThan(layout.y[index] + HEX_HALF_HEIGHT);
+        expect(f.headerBottom).toBeGreaterThanOrEqual(layout.y[index] + HEX_HALF_HEIGHT);
         expect(layout.y[index] - HEX_HALF_HEIGHT).toBeGreaterThanOrEqual(f.bottom);
       }
     });

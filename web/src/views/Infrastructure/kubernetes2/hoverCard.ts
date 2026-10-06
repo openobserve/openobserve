@@ -18,14 +18,7 @@ import { chartColor } from "@/utils/chartTheme";
 import { labelsOf } from "./kubernetesObjects";
 import { chipLabel, formatPct, warningLabel, type NodeRow, type PodRow } from "./kubernetesModel";
 import type { MapFill } from "./kubernetesUrlState";
-import {
-  FILL_LABEL,
-  fillClass,
-  fillValue,
-  statusClass,
-  type FillClass,
-  type StatusClass,
-} from "./mapFill";
+import { FILL_LABEL, fillClass, fillValue, statusClass, type StatusClass } from "./mapFill";
 
 // Literal class strings, so Tailwind emits them for this markup.
 const DOT: Record<StatusClass | "noData", string> = {
@@ -42,13 +35,6 @@ const card = (lines: string[]) =>
   `<div class="flex flex-col gap-0.5 text-xs whitespace-normal">${lines.join("")}</div>`;
 
 const title = (text: string) => line(text, "text-sm font-semibold text-text-heading break-all");
-
-export function escapeHtml(text: string) {
-  return text.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
-  );
-}
 
 export function tooltipStyle() {
   return {
@@ -119,8 +105,8 @@ export function groupCard(
   return card(lines);
 }
 
-function statusLine(cls: FillClass, text: string) {
-  const dot = `<span class="size-2 shrink-0 rounded-full ${DOT[cls as StatusClass | "noData"]}"></span>`;
+function statusLine(cls: StatusClass | "noData", text: string) {
+  const dot = `<span class="size-2 shrink-0 rounded-full ${DOT[cls]}"></span>`;
   return `<div class="flex items-center gap-1">${dot}<span>${escapeHtml(text)}</span></div>`;
 }
 
@@ -128,4 +114,11 @@ function fillText(row: PodRow, fill: Exclude<MapFill, "status">, t: TranslateFn)
   if (fillClass(row, fill) === "noData") return t("infra.k8s2.mapNoData");
   const value = fillValue(row, fill);
   return fill === "restarts" ? String(value) : formatPct(value);
+}
+
+function escapeHtml(text: string) {
+  return text.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+  );
 }

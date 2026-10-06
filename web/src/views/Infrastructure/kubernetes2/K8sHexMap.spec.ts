@@ -121,7 +121,6 @@ const mountMap = async (
   return wrapper;
 };
 
-// A fake ECharts api at `scale` px per layout unit, y flipped as on screen.
 const fakeApi = (data: number[], scale: number) => ({
   value: (dim: number) => data[dim],
   coord: ([x, y]: number[]) => [x * scale, -y * scale],
