@@ -510,6 +510,23 @@ test.describe("Traces Charts testcases", () => {
     return sql && sql.includes("'Selected' AS series") ? sql : null;
   };
 
+  // Hits from a plain JSON search body or from a streamed (SSE) one.
+  const comparisonHitsOf = (text) => {
+    try {
+      return JSON.parse(text).hits ?? [];
+    } catch {
+      const hits = [];
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const event = JSON.parse(line.slice(5));
+          hits.push(...(event?.results?.hits ?? event?.hits ?? []));
+        } catch {}
+      }
+      return hits;
+    }
+  };
+
   // The band's bounds in µs; a missing side is 0 below and unbounded above.
   const bandBoundsUs = (band) => {
     const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
@@ -589,9 +606,15 @@ test.describe("Traces Charts testcases", () => {
       }
       if (hi !== null) expect(baseline).not.toMatch(new RegExp(`duration < ${hi}\\b`));
 
-      const responseText = await (await comparisonResponse).text();
-      expect(responseText, 'Comparison hits must carry Selected rows').toContain('"series":"Selected"');
-      expect(responseText, 'Comparison hits must carry Baseline rows').toContain('"series":"Baseline"');
+      const response = await comparisonResponse;
+      const hits = comparisonHitsOf(await response.text());
+      testLogger.info('Drill-down comparison hits', { url: response.url(), hits });
+      const selectedValues = hits.filter((h) => h.series === 'Selected').map((h) => h.value);
+      const baselineValues = new Set(hits.filter((h) => h.series === 'Baseline').map((h) => h.value));
+      expect(selectedValues.length, 'Comparison must return Selected rows').toBeGreaterThan(0);
+      for (const value of selectedValues) {
+        expect(baselineValues.has(value), `Selected value ${value} must have a Baseline row`).toBeTruthy();
+      }
 
       await pm.tracesPage.closeAnalysisDashboard();
       if (live) await pm.tracesPage.setLiveMode(false);
