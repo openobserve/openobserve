@@ -49,7 +49,6 @@ const mountPanel = (props: Record<string, unknown>) =>
       series: [],
       events: [],
       range: { startUs: 0, endUs: 7 * DAY_US },
-      timezone: "Asia/Kolkata",
       eventsStatus: "ready",
       ...props,
     },
@@ -69,11 +68,11 @@ const mountPanel = (props: Record<string, unknown>) =>
 const renderer = (w: ReturnType<typeof mountPanel>) => w.findComponent(RendererStub);
 
 describe("TrendsPanel (AC-48)", () => {
-  it("charts sessions per day in the user's timezone over the analytics range through RUM search", () => {
+  it("charts sessions per UTC day over the analytics range through RUM search", () => {
     const w = mountPanel({});
     const r = renderer(w);
     const schema = r.props("panelSchema") as Schema;
-    expect(schema.queries[0].query).toContain("histogram(_timestamp, '1 day', 'Asia/Kolkata')");
+    expect(schema.queries[0].query).toContain("histogram(_timestamp, '1 day') AS x_axis_1");
     expect(schema.queries[0].fields.y[0].alias).toBe("y_axis_1");
     expect(r.props("searchType")).toBe("RUM");
     expect(r.props("allowAnnotationsAPI")).toBe(false);
@@ -83,6 +82,46 @@ describe("TrendsPanel (AC-48)", () => {
     expect(time.end_time.getTime()).toBe(7 * DAY_US);
     expect(r.props("forceLoad")).toBe(true);
     expect(w.find('[data-test="rum-analytics-trends"]').text()).toContain("per day");
+  });
+
+  it("starts a daily chart at the UTC midnight before a mid-day start, so the first day is plotted (o2-enterprise#2808)", () => {
+    const startUs = Date.UTC(2026, 8, 29, 13, 18) * 1000;
+    const endUs = startUs + 7 * DAY_US;
+    const time = renderer(mountPanel({ range: { startUs, endUs } })).props("selectedTimeObj") as {
+      start_time: Date;
+      end_time: Date;
+    };
+    expect(time.start_time.getTime()).toBe(Date.UTC(2026, 8, 29) * 1000);
+    expect(time.end_time.getTime()).toBe(endUs);
+  });
+
+  it("starts a weekly chart at the server's Monday bucket edge, keeping weekly even when the floor shortens the range (o2-enterprise#2808)", () => {
+    const startUs = Date.UTC(2026, 9, 1, 9, 30) * 1000;
+    const endUs = startUs + 31 * DAY_US + 1;
+    const r = renderer(mountPanel({ range: { startUs, endUs } }));
+    expect((r.props("panelSchema") as Schema).queries[0].query).toContain("'1 week'");
+    const time = r.props("selectedTimeObj") as { start_time: Date; end_time: Date };
+    expect(time.start_time.getTime()).toBe(Date.UTC(2026, 8, 28) * 1000);
+    expect(new Date(time.start_time.getTime() / 1000).getUTCDay()).toBe(1);
+    expect(time.end_time.getTime()).toBe(endUs);
+  });
+
+  it.each([
+    [{}, 7, "Sessions per day · UTC"],
+    [{}, 40, "Sessions per week · UTC"],
+    [{ series: [{ kind: "p", key: "/web" }] }, 7, "Sessions per day · UTC"],
+  ])("marks the buckets as UTC in the subtitle (%o, %i days)", (extra, days, text) => {
+    const w = mountPanel({ ...extra, range: { startUs: 0, endUs: days * DAY_US } });
+    expect(w.find('[data-test="rum-analytics-trends-subtitle"]').text()).toBe(text);
+  });
+
+  it("marks the users subtitle as UTC too", async () => {
+    const w = mountPanel({ range: { startUs: 0, endUs: 40 * DAY_US } });
+    await w.find('[data-test="rum-analytics-trends-metric-users"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="rum-analytics-trends-subtitle"]').text()).toBe(
+      "Users per week · UTC",
+    );
   });
 
   it("switches to weekly buckets beyond 31 days", () => {
@@ -227,7 +266,6 @@ describe("TrendsPanel (AC-48)", () => {
                     series: [],
                     events: [],
                     range: { startUs: 0, endUs: 7 * DAY_US },
-                    timezone: "UTC",
                     eventsStatus: "ready",
                   }),
                 ]

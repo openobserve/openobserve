@@ -1769,6 +1769,7 @@
         "sessionsPerWeek": "Sessions per week",
         "usersPerDay": "{unit} per day",
         "usersPerWeek": "{unit} per week",
+        "utcBuckets": "{label} · UTC",
         "clear": "Clear",
         "panelTitle": "Trends: {app}",
         "added": "{name} added to the Trends chart"

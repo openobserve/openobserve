@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :events="events"
         :events-status="pa.eventsStatus.value"
         :range="range"
-        :timezone="timezone"
         @update:series="(s) => (pa.trendSeries.value = s)"
         @retry-events="pa.retryEvents()"
       />
@@ -368,7 +367,6 @@ let lastClickPageKeys = "";
 let active = true;
 let activatedOnce = false;
 
-const timezone = computed(() => store.state.timezone || "UTC");
 const range = computed(() => pa.range.value ?? { startUs: 0, endUs: 0 });
 const prevHasData = computed(() => (summary.value?.prevSessions ?? 0) > 0);
 const totals = computed(() => ({

@@ -504,8 +504,8 @@ describe("overview builders (G3)", () => {
   });
 
   it("Q21 app trend equals the proven shape with users", () => {
-    expect(norm(trendSql(s, id, "1 day", "Asia/Kolkata", [], []), s)).toBe(PROVEN.Q21_TREND_APP);
-    expect(trendSql(s, null, "1 week", "UTC", [], [])).not.toContain("y_axis_2");
+    expect(norm(trendSql(s, id, "1 day", [], []), s)).toBe(PROVEN.Q21_TREND_APP);
+    expect(trendSql(s, null, "1 week", [], [])).not.toContain("y_axis_2");
   });
 
   it("Q21 selected trend equals the proven shape (AC-48)", () => {
@@ -515,28 +515,33 @@ describe("overview builders (G3)", () => {
       { kind: "p" as const, key: "/web/logs" },
     ];
     const withClicks = scope({ schema: { action_target_name: true } });
-    expect(norm(trendSql(withClicks, null, "1 day", "UTC", series, []), withClicks)).toBe(
+    expect(norm(trendSql(withClicks, null, "1 day", series, []), withClicks)).toBe(
       PROVEN.Q21_TREND_KEYS,
     );
   });
 
   it("Q21 a click series matches nothing, instead of referencing action_target_name, when the org has no click events (o2-enterprise#2800)", () => {
     const series = [{ kind: "c" as const, key: "menu-link-/logs-item" }];
-    const sql = trendSql(scope(), null, "1 day", "UTC", series, []);
+    const sql = trendSql(scope(), null, "1 day", series, []);
     expect(sql).not.toContain("action_target_name");
     expect(sql).toContain("COUNT(DISTINCT CASE WHEN (1 = 0) THEN session_id END) AS y_axis_1");
   });
 
   it("Q21 is time-relative: no range literal", () => {
-    expect(trendSql(s, id, "1 day", "UTC", [], [])).not.toMatch(/_timestamp >= \d/);
+    expect(trendSql(s, id, "1 day", [], [])).not.toMatch(/_timestamp >= \d/);
   });
 
   it("Q22 activeUsers counts identified users in the last 1, 7 and 30 days (AC-49)", () => {
     expect(norm(activeUsersSql(s, id, 1790576393933254), s)).toBe(PROVEN.Q22_ACTIVE_USERS);
   });
 
-  it("the timezone and interval are literals from fixed inputs", () => {
-    expect(trendSql(s, null, "1 day", "Asia/O'Kol", [], [])).toContain("'Asia/O''Kol'");
+  it("Q21 asks for UTC buckets with no timezone argument, daily and weekly (o2-enterprise#2808)", () => {
+    expect(trendSql(s, id, "1 day", [], [])).toContain(
+      "histogram(_timestamp, '1 day') AS x_axis_1",
+    );
+    expect(trendSql(s, id, "1 week", [], [])).toContain(
+      "histogram(_timestamp, '1 week') AS x_axis_1",
+    );
   });
 });
 
@@ -1330,7 +1335,7 @@ describe("assertJoinFree over every builder (AC-55)", () => {
     pagesSql: () => [QUERIES.pagesSql(s, CS, id), QUERIES.pagesSql(s, CS, null)],
     clicksSql: () => [QUERIES.clicksSql(s, CS, id), QUERIES.clicksSql(s, CS, null)],
     clickPagesSql: () => [QUERIES.clickPagesSql(s, CS, ["save", "o'k"])],
-    trendSql: () => [QUERIES.trendSql(s, id, "1 day", "UTC", pick, [ev])],
+    trendSql: () => [QUERIES.trendSql(s, id, "1 day", pick, [ev])],
     activeUsersSql: () => [QUERIES.activeUsersSql(s, id, CS)],
     funnelSql: () =>
       defs.flatMap((d) => [

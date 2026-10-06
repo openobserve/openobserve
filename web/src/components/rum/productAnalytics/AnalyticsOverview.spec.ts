@@ -215,7 +215,7 @@ const store = createStore({
 const reveal = vi.fn();
 const TrendsStub = {
   name: "TrendsPanel",
-  props: ["scope", "identity", "series", "events", "eventsStatus", "range", "timezone"],
+  props: ["scope", "identity", "series", "events", "eventsStatus", "range"],
   emits: ["update:series", "retry-events"],
   methods: { reveal },
   template: "<div data-test='trends-stub' />",

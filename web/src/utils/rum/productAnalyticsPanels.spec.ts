@@ -40,28 +40,19 @@ type Panel = {
 
 describe("buildTrendsPanel (AC-48)", () => {
   it("is a line panel over the Q21 SQL with Sessions on y_axis_1", () => {
-    const p = buildTrendsPanel(
-      scope,
-      id,
-      "sessions",
-      [],
-      [],
-      "1 day",
-      "UTC",
-      t,
-    ) as unknown as Panel;
+    const p = buildTrendsPanel(scope, id, "sessions", [], [], "1 day", t) as unknown as Panel;
     expect(p.type).toBe("line");
     expect(p.queryType).toBe("sql");
     expect(p.queries[0].customQuery).toBe(true);
     expect(p.queries[0].fields.stream).toBe("_rumdata");
-    expect(p.queries[0].query).toBe(trendSql(scope, id, "1 day", "UTC", [], []));
+    expect(p.queries[0].query).toBe(trendSql(scope, id, "1 day", [], []));
     expect(p.queries[0].fields.x.map((x) => x.alias)).toEqual(["x_axis_1"]);
     expect(p.queries[0].fields.y.map((y) => y.alias)).toEqual(["y_axis_1"]);
     assertJoinFree(p.queries[0].query);
   });
 
   it("plots Users from y_axis_2 when the metric is users", () => {
-    const p = buildTrendsPanel(scope, id, "users", [], [], "1 week", "UTC", t) as unknown as Panel;
+    const p = buildTrendsPanel(scope, id, "users", [], [], "1 week", t) as unknown as Panel;
     expect(p.queries[0].fields.y.map((y) => y.alias)).toEqual(["y_axis_2"]);
     expect(p.queries[0].query).toContain("'1 week'");
   });
@@ -71,16 +62,7 @@ describe("buildTrendsPanel (AC-48)", () => {
       { kind: "p" as const, key: "/web" },
       { kind: "c" as const, key: "save" },
     ];
-    const p = buildTrendsPanel(
-      scope,
-      null,
-      "sessions",
-      series,
-      [],
-      "1 day",
-      "UTC",
-      t,
-    ) as unknown as Panel;
+    const p = buildTrendsPanel(scope, null, "sessions", series, [], "1 day", t) as unknown as Panel;
     expect(p.queries[0].fields.y.map((y) => [y.alias, y.label])).toEqual([
       ["y_axis_1", "/web"],
       ["y_axis_2", "save"],

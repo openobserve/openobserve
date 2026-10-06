@@ -157,7 +157,10 @@ import type { AnalyticsScope, IdentitySql, StepRef } from "@/utils/rum/productAn
 
 const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
 
-const DAILY_LIMIT_US = 31 * 86400000000;
+const DAY_US = 86400000000;
+const DAILY_LIMIT_US = 31 * DAY_US;
+// The server's histogram() is date_bin anchored here, a Monday at UTC midnight.
+const DATE_BIN_ORIGIN_US = Date.UTC(2001, 0, 1) * 1000;
 const FRESH_MS = 2000;
 
 const props = defineProps<{
@@ -168,7 +171,6 @@ const props = defineProps<{
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
   range: { startUs: number; endUs: number };
-  timezone: string;
 }>();
 const emit = defineEmits<{ "update:series": [StepRef[]]; "retry-events": [] }>();
 const { t } = useI18nTyped();
@@ -193,7 +195,7 @@ const interval = computed<"1 day" | "1 week">(() =>
   props.range.endUs - props.range.startUs > DAILY_LIMIT_US ? "1 week" : "1 day",
 );
 
-const subtitle = computed(() => {
+const bucketLabel = computed(() => {
   const weekly = interval.value === "1 week";
   if (metric.value !== "users" || !props.identity || props.series.length) {
     return weekly
@@ -205,6 +207,8 @@ const subtitle = computed(() => {
     ? t("rum.analytics.trends.usersPerWeek", { unit })
     : t("rum.analytics.trends.usersPerDay", { unit });
 });
+
+const subtitle = computed(() => t("rum.analytics.trends.utcBuckets", { label: bucketLabel.value }));
 
 // Until the events are ready an event series would compile as a zero-match, so it is not charted.
 const eventsGate = computed<NamedEventsStatus>(() =>
@@ -227,7 +231,6 @@ const panelSchema = computed(() =>
     chartSeries.value,
     props.events,
     interval.value,
-    props.timezone,
     t,
   ),
 );
@@ -235,9 +238,16 @@ const panelSchema = computed(() =>
 // The dialog stamps an id and title onto what it adds, so it gets a copy.
 const dashboardPanel = computed(() => JSON.parse(JSON.stringify(panelSchema.value)));
 
+// The chart pins its x-axis to start_time, so a mid-bucket start would cut off the first bucket.
+const bucketStartUs = computed(() => {
+  const step = interval.value === "1 week" ? 7 * DAY_US : DAY_US;
+  const offset = props.range.startUs - DATE_BIN_ORIGIN_US;
+  return DATE_BIN_ORIGIN_US + Math.floor(offset / step) * step;
+});
+
 // usePanelDataLoader reads getTime() off these Dates as microseconds.
 const selectedTimeObj = computed(() => ({
-  start_time: new Date(props.range.startUs),
+  start_time: new Date(bucketStartUs.value),
   end_time: new Date(props.range.endUs),
 }));
 

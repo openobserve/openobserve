@@ -514,11 +514,11 @@ export function trendSql(
   scope: AnalyticsScope,
   id: IdentitySql | null,
   interval: "1 day" | "1 week",
-  tz: string,
   series: StepRef[],
   events: NamedEvent[],
 ): string {
-  const bucket = `histogram(_timestamp, ${lit(interval === "1 week" ? "1 week" : "1 day")}, ${lit(tz)}) AS x_axis_1`;
+  // UTC buckets: the chart reads zone-less labels as UTC, and the result cache drops a timezone argument.
+  const bucket = `histogram(_timestamp, ${lit(interval === "1 week" ? "1 week" : "1 day")}) AS x_axis_1`;
   const tail = "GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 1000";
   if (!series.length) {
     const users = id
