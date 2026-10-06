@@ -120,6 +120,10 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
           resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
+        } else if (resource === "downtime") {
+          resourceDetails = resourceMapper.value["downtime_folder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
         } else if (resource === "workflows") {
           resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
@@ -178,6 +182,10 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
         } else if (resource === "synthetics") {
           // Plain-id entity — locate the folder whose loaded monitors contain it.
           resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
+        } else if (resource === "downtime") {
+          resourceDetails = resourceMapper.value["downtime_folder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
         } else if (resource === "workflows") {
