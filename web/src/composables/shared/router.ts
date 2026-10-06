@@ -544,6 +544,13 @@ const useRoutes = () => {
       beforeEnter: routeGuard,
     },
     {
+      path: "infra/kubernetes-2",
+      name: "infraKubernetes2",
+      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesExplorerPage.vue"),
+      meta: { titleKey: "menu.kubernetes2" },
+      beforeEnter: routeGuard,
+    },
+    {
       path: "traces/trace-details",
       name: "traceDetails",
       component: TraceDetails,
