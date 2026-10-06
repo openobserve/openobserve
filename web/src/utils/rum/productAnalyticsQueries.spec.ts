@@ -504,10 +504,8 @@ describe("overview builders (G3)", () => {
   });
 
   it("Q21 app trend equals the proven shape with users", () => {
-    expect(norm(trendSql(s, id, "1 day", "Asia/Kolkata", CS, [], []), s)).toBe(
-      PROVEN.Q21_TREND_APP,
-    );
-    expect(trendSql(s, null, "1 week", "UTC", CS, [], [])).not.toContain("y_axis_2");
+    expect(norm(trendSql(s, id, "1 day", [], []), s)).toBe(PROVEN.Q21_TREND_APP);
+    expect(trendSql(s, null, "1 week", [], [])).not.toContain("y_axis_2");
   });
 
   it("Q21 selected trend equals the proven shape (AC-48)", () => {
@@ -517,46 +515,34 @@ describe("overview builders (G3)", () => {
       { kind: "p" as const, key: "/web/logs" },
     ];
     const withClicks = scope({ schema: { action_target_name: true } });
-    expect(norm(trendSql(withClicks, null, "1 day", "UTC", CS, series, []), withClicks)).toBe(
+    expect(norm(trendSql(withClicks, null, "1 day", series, []), withClicks)).toBe(
       PROVEN.Q21_TREND_KEYS,
     );
   });
 
   it("Q21 a click series matches nothing, instead of referencing action_target_name, when the org has no click events (o2-enterprise#2800)", () => {
     const series = [{ kind: "c" as const, key: "menu-link-/logs-item" }];
-    const sql = trendSql(scope(), null, "1 day", "UTC", CS, series, []);
+    const sql = trendSql(scope(), null, "1 day", series, []);
     expect(sql).not.toContain("action_target_name");
     expect(sql).toContain("COUNT(DISTINCT CASE WHEN (1 = 0) THEN session_id END) AS y_axis_1");
   });
 
   it("Q21 is time-relative: no range literal", () => {
-    expect(trendSql(s, id, "1 day", "UTC", CS, [], [])).not.toMatch(/_timestamp >= \d/);
+    expect(trendSql(s, id, "1 day", [], [])).not.toMatch(/_timestamp >= \d/);
   });
 
   it("Q22 activeUsers counts identified users in the last 1, 7 and 30 days (AC-49)", () => {
     expect(norm(activeUsersSql(s, id, 1790576393933254), s)).toBe(PROVEN.Q22_ACTIVE_USERS);
   });
 
-  it("Q21 bakes the viewer's offset into a UTC instant, not a doubly-shifted local one (o2-enterprise#2808)", () => {
-    // Asia/Kolkata is UTC+5:30 with no DST, so the correction is a fixed
-    // 19800-second subtraction — this is what undoes histogram()'s own
-    // "local wall-clock, mislabeled as UTC" bucket edges (see
-    // histogramLocalBucketExpr) so the shared chart renderer's single
-    // display-time shift lands on the correct instant instead of doubling it.
-    const sql = trendSql(s, id, "1 day", "Asia/Kolkata", CS, [], []);
-    expect(sql).toContain(
-      "(histogram(_timestamp, '1 day', 'Asia/Kolkata') - INTERVAL '19800 SECOND') AS x_axis_1",
-    );
-  });
-
-  it("Q21 skips the correction for UTC, where histogram() already returns true UTC instants", () => {
-    expect(trendSql(s, id, "1 day", "UTC", CS, [], [])).toContain(
-      "histogram(_timestamp, '1 day', 'UTC') AS x_axis_1",
-    );
-  });
-
-  it("the timezone and interval are literals from fixed inputs", () => {
-    expect(trendSql(s, null, "1 day", "Asia/O'Kol", CS, [], [])).toContain("'Asia/O''Kol'");
+  // No timezone is baked into histogram() here (o2-enterprise#2808): a tz-aware
+  // histogram() bucket comes back as local wall-clock time stamped as if it
+  // were UTC, and the shared chart renderer always shifts a histogram()
+  // x-axis once more for display — so baking one in applies the viewer's
+  // offset twice. Bucket boundaries land on UTC calendar days instead, same
+  // as every other dashboard panel's histogram() usage in this codebase.
+  it("Q21 never bakes a timezone into histogram()", () => {
+    expect(trendSql(s, id, "1 day", [], [])).toContain("histogram(_timestamp, '1 day') AS x_axis_1");
   });
 });
 
@@ -1350,7 +1336,7 @@ describe("assertJoinFree over every builder (AC-55)", () => {
     pagesSql: () => [QUERIES.pagesSql(s, CS, id), QUERIES.pagesSql(s, CS, null)],
     clicksSql: () => [QUERIES.clicksSql(s, CS, id), QUERIES.clicksSql(s, CS, null)],
     clickPagesSql: () => [QUERIES.clickPagesSql(s, CS, ["save", "o'k"])],
-    trendSql: () => [QUERIES.trendSql(s, id, "1 day", "UTC", CS, pick, [ev])],
+    trendSql: () => [QUERIES.trendSql(s, id, "1 day", pick, [ev])],
     activeUsersSql: () => [QUERIES.activeUsersSql(s, id, CS)],
     funnelSql: () =>
       defs.flatMap((d) => [

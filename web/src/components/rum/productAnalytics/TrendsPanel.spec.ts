@@ -49,7 +49,6 @@ const mountPanel = (props: Record<string, unknown>) =>
       series: [],
       events: [],
       range: { startUs: 0, endUs: 7 * DAY_US },
-      timezone: "Asia/Kolkata",
       eventsStatus: "ready",
       ...props,
     },
@@ -69,16 +68,16 @@ const mountPanel = (props: Record<string, unknown>) =>
 const renderer = (w: ReturnType<typeof mountPanel>) => w.findComponent(RendererStub);
 
 describe("TrendsPanel (AC-48)", () => {
-  it("charts sessions per day in the user's timezone over the analytics range through RUM search", () => {
+  it("charts sessions per day over the analytics range through RUM search", () => {
     const w = mountPanel({});
     const r = renderer(w);
     const schema = r.props("panelSchema") as Schema;
-    expect(schema.queries[0].query).toContain("histogram(_timestamp, '1 day', 'Asia/Kolkata')");
-    // The viewer's offset must be undone once in SQL so the shared chart
-    // renderer's own display-time shift isn't doubled (o2-enterprise#2808).
-    expect(schema.queries[0].query).toContain(
-      "(histogram(_timestamp, '1 day', 'Asia/Kolkata') - INTERVAL '19800 SECOND') AS x_axis_1",
-    );
+    // No timezone is baked into histogram() (o2-enterprise#2808): a tz-aware
+    // histogram() bucket comes back as local wall-clock time stamped as if
+    // it were UTC, and the shared chart renderer always shifts a
+    // histogram() x-axis once more for display — baking one in here would
+    // apply the viewer's offset twice.
+    expect(schema.queries[0].query).toContain("histogram(_timestamp, '1 day') AS x_axis_1");
     expect(schema.queries[0].fields.y[0].alias).toBe("y_axis_1");
     expect(r.props("searchType")).toBe("RUM");
     expect(r.props("allowAnnotationsAPI")).toBe(false);
@@ -232,7 +231,6 @@ describe("TrendsPanel (AC-48)", () => {
                     series: [],
                     events: [],
                     range: { startUs: 0, endUs: 7 * DAY_US },
-                    timezone: "UTC",
                     eventsStatus: "ready",
                   }),
                 ]

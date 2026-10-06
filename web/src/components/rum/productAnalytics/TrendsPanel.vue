@@ -168,7 +168,6 @@ const props = defineProps<{
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
   range: { startUs: number; endUs: number };
-  timezone: string;
 }>();
 const emit = defineEmits<{ "update:series": [StepRef[]]; "retry-events": [] }>();
 const { t } = useI18nTyped();
@@ -227,8 +226,6 @@ const panelSchema = computed(() =>
     chartSeries.value,
     props.events,
     interval.value,
-    props.timezone,
-    props.range.endUs,
     t,
   ),
 );

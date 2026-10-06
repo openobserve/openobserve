@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { getTimezoneOffset } from "date-fns-tz";
 import { sqlIn, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import type {
   NamedActionRule,
@@ -154,33 +153,17 @@ const lit = (value: unknown): string => sqlLiteral(value);
 const lits = (values: readonly unknown[]): string => values.map(lit).join(", ");
 
 // histogram()'s optional 3rd (timezone) argument buckets by *local* calendar
-// day/week — but per its own contract, each bucket edge comes back as local
-// wall-clock time stamped as if it were UTC, not as a true UTC instant
-// (o2-enterprise#2808). The shared chart renderer (sqlTimeSeriesConverter)
-// always treats a histogram() x-axis as true UTC and shifts it once more for
-// display, so left as-is the viewer's offset gets applied twice: every point
-// lands later than it should, and the earliest bucket can shift past the
-// query's start and disappear. Undo the backend's wall-clock shift by
-// subtracting the same offset back out, so what reaches the renderer is a
-// genuine UTC instant — like every other dashboard panel's x-axis — while the
-// bucket boundaries themselves stay aligned to the viewer's local day.
-const histogramLocalBucketExpr = (
-  interval: "1 day" | "1 week",
-  tz: string,
-  referenceUs: number,
-): string => {
-  const raw = `histogram(_timestamp, ${lit(interval === "1 week" ? "1 week" : "1 day")}, ${lit(tz)})`;
-  let offsetMs = 0;
-  try {
-    offsetMs = getTimezoneOffset(tz, referenceUs / 1000);
-  } catch {
-    offsetMs = 0;
-  }
-  const offsetSeconds = Math.round(offsetMs / 1000);
-  if (!offsetSeconds) return raw;
-  const op = offsetSeconds > 0 ? "-" : "+";
-  return `(${raw} ${op} INTERVAL '${Math.abs(offsetSeconds)} SECOND')`;
-};
+// day/week, but returns each bucket edge as local wall-clock time stamped as
+// if it were UTC — not as a true UTC instant. The shared chart renderer
+// (sqlTimeSeriesConverter) always treats a histogram() x-axis as true UTC and
+// shifts it once more for display, so passing a timezone here applies the
+// viewer's offset twice: every point lands later than it should, and the
+// earliest bucket can shift past the query's start and disappear. No other
+// panel in the app bakes a timezone into histogram() for exactly this reason
+// — the bucket boundaries land on UTC calendar days, and the renderer's own
+// single shift is what moves them into the viewer's local time for display.
+const histogramBucketExpr = (interval: "1 day" | "1 week"): string =>
+  `histogram(_timestamp, ${lit(interval === "1 week" ? "1 week" : "1 day")})`;
 
 const has = (scope: AnalyticsScope, field: string): boolean => scope.schema[field] === true;
 
@@ -544,12 +527,10 @@ export function trendSql(
   scope: AnalyticsScope,
   id: IdentitySql | null,
   interval: "1 day" | "1 week",
-  tz: string,
-  referenceUs: number,
   series: StepRef[],
   events: NamedEvent[],
 ): string {
-  const bucket = `${histogramLocalBucketExpr(interval, tz, referenceUs)} AS x_axis_1`;
+  const bucket = `${histogramBucketExpr(interval)} AS x_axis_1`;
   const tail = "GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 1000";
   if (!series.length) {
     const users = id
