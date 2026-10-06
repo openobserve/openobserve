@@ -147,6 +147,16 @@ export class TracesPage {
     this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-error"]';
     this.analysisDashboardRetryBtn = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-retry-btn"]';
 
+    // ===== DRILL DOWN COMPARISON (web/src/plugins/traces/metrics/TracesComparison.vue) =====
+    this.comparisonPage = '[data-test="traces-comparison"]';
+    this.comparisonNoSelection = '[data-test="traces-comparison-no-selection"]';
+    this.comparisonError = '[data-test="traces-comparison-error"]';
+    this.comparisonSummary = '[data-test="traces-comparison-summary"]';
+    this.comparisonSampleNote = '[data-test="traces-comparison-sample-note"]';
+    this.comparisonBaselineBefore = '[data-test="traces-comparison-baseline-toggle-before"]';
+    this.comparisonFieldCards = '[data-test^="traces-comparison-field-"]';
+    this.drillDownBackButton = '[data-test="traces-drill-down-back-btn"]';
+
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
     this.fieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
@@ -2012,6 +2022,35 @@ export class TracesPage {
   /**
    * Click the Drill down button to open the Analysis Dashboard
    */
+  /**
+   * Open Drill down and wait for the comparison page to settle on a terminal state.
+   * @returns {Promise<string>} the data-test of the state it settled on
+   */
+  async openComparison() {
+    await this.page.locator(this.insightsButton).click();
+    const states = [this.comparisonPage, this.comparisonNoSelection, this.comparisonError];
+    await this.page.locator(states.join(', ')).first().waitFor({ state: 'visible', timeout: 120000 });
+    for (const state of states) {
+      if (await this.page.locator(state).isVisible().catch(() => false)) return state;
+    }
+    return '';
+  }
+
+  /** @returns {Promise<{ name: string, score: number }[]>} the comparison cards in render order */
+  async getComparisonCards() {
+    return await this.page.locator(this.comparisonFieldCards).evaluateAll((cards) =>
+      cards.map((c) => ({
+        name: (c.getAttribute('data-test') || '').replace('traces-comparison-field-', ''),
+        score: Number(c.getAttribute('data-score')),
+      })),
+    );
+  }
+
+  /** Click "Filter to this value" on the first value of a comparison card. */
+  async includeFirstComparisonValue(field) {
+    await this.page.locator(`[data-test="traces-comparison-include-${field}-0"]`).click();
+  }
+
   async clickInsightsButton() {
     await this.page.locator(this.insightsButton).click();
     await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});

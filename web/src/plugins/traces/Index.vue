@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
-              @drill-down="searchResultRef?.openUnifiedAnalysisDashboard()"
+              @drill-down="searchResultRef?.openComparison()"
             />
           </div>
         </template>
@@ -206,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:sort="runQueryOnSort"
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:editor-filter-set="onMetricsEditorFilterSet"
+                        @metrics:editor-filter-run="onMetricsEditorFilterRun"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
@@ -1479,6 +1480,13 @@ const onMetricsEditorFilterSet = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
+};
+
+// A comparison filter is an explicit apply from a page the search closes, so it searches in manual mode too.
+const onMetricsEditorFilterRun = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,

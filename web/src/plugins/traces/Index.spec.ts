@@ -1125,6 +1125,24 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockClearOriginalTimeRange).toHaveBeenCalled();
     });
 
+    it("runs exactly one search for a comparison filter, with live mode off", async () => {
+      await mountPage();
+      mockSearchObj.meta.liveMode = false;
+      mockSearchObj.meta.searchMode = "spans";
+      mockFetchQueryDataWithHttpStream.mockClear();
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper.vm.onMetricsEditorFilterRun("(service_name = 'a') and http_method = 'GET'");
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("(service_name = 'a') and http_method = 'GET'");
+      const runs = vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([, props]: any[]) => props?.button === "Search Data");
+      expect(runs).toHaveLength(1);
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    });
+
     it("drops an entry made stale by an unsearched filter edit on a sort", async () => {
       await mountPage();
       filters.set("heatmap", heatmapEntry());
@@ -1661,13 +1679,13 @@ describe("Index.vue (Main Traces Page)", () => {
     it("should open the analysis dashboard on SearchResult when SearchBar emits drill-down", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
-      const openUnifiedAnalysisDashboard = vi.fn();
-      wrapper.vm.searchResultRef = { openUnifiedAnalysisDashboard };
+      const openComparison = vi.fn();
+      wrapper.vm.searchResultRef = { openComparison };
 
       wrapper.findComponent('[data-test="logs-search-bar"]').vm.$emit("drill-down");
       await flushPromises();
 
-      expect(openUnifiedAnalysisDashboard).toHaveBeenCalledTimes(1);
+      expect(openComparison).toHaveBeenCalledTimes(1);
     });
 
     it("has no filters-updated handler: brushes write the editor through editor-filter-set", async () => {

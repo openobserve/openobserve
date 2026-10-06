@@ -244,6 +244,21 @@ describe("SearchResult", () => {
     });
   });
 
+  describe("comparison relays", () => {
+    it("should relay the comparison's editor-filter-run as metrics:editor-filter-run", async () => {
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("editor-filter-run", "(a = '1') and b = '2'");
+      expect(wrapper.emitted("metrics:editor-filter-run")).toEqual([["(a = '1') and b = '2'"]]);
+    });
+
+    it("should open the comparison through the metrics dashboard", () => {
+      const openComparison = vi.fn();
+      wrapper.vm.metricsDashboardRef = { openComparison };
+      wrapper.vm.openComparison();
+      expect(openComparison).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("loadMore / infinite scroll", () => {
     beforeEach(() => {
       // Reset page and total to known state before each test
@@ -378,6 +393,7 @@ describe("SearchResult", () => {
         "search:timeboxed",
         "get:traceDetails",
         "metrics:editor-filter-set",
+        "metrics:editor-filter-run",
         "run-query",
         "remove-filter",
         "jump-to-stream-data",

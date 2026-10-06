@@ -43,28 +43,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </transition>
 
-    <Teleport v-if="showAnalysisDashboard" defer to="#traces-drill-down-page">
-      <TracesAnalysisDashboard
-        full-page
+    <Teleport v-if="showComparison" defer to="#traces-drill-down-page">
+      <TracesComparison
+        :selection="comparisonSelection"
         :streamName="streamName"
-        streamType="traces"
-        :timeRange="originalTimeRangeBeforeSelection || effectiveTimeRange"
-        :rateFilter="analysisRateFilter"
-        :durationFilter="analysisDurationFilter"
-        :errorFilter="analysisErrorFilter"
-        :baseFilter="parsedEffectiveFilter"
-        :baselineFilter="analysisBaselineFilter"
-        :streamFields="streamFields"
-        :analysisType="defaultAnalysisTab"
-        :availableAnalysisTypes="['volume', 'error', 'duration']"
-        @close="showAnalysisDashboard = false"
+        @close="showComparison = false"
+        @apply-filter="onComparisonApply"
       />
     </Teleport>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import { ref, shallowRef, onMounted, computed, defineAsyncComponent, nextTick, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -73,6 +64,7 @@ import metrics from "./metrics.json";
 import { deepCopy } from "@/utils/zincutils";
 import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
 import TracesLatencyHeatmap, { type LatencyHeatmapRequest } from "./TracesLatencyHeatmap.vue";
+import type { ComparisonSelection } from "./traceComparison";
 import {
   buildLatencyHeatmapSql,
   chartInterval,
@@ -90,14 +82,14 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-const TracesAnalysisDashboard = defineAsyncComponent(() => import("./TracesAnalysisDashboard.vue"));
+const TracesComparison = defineAsyncComponent(() => import("./TracesComparison.vue"));
 
 export interface TimeRange {
   startTime: number;
   endTime: number;
 }
 
-const props = defineProps<{
+defineProps<{
   streamName: string;
   show?: boolean;
   streamFields?: any[];
@@ -106,6 +98,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "time-range-selected", range: { start: number; end: number }): void;
   (e: "editor-filter-set", text: string): void;
+  (e: "editor-filter-run", text: string): void;
 }>();
 
 const LATENCY_HEATMAP_PANEL_ID = "traces_latency_heatmap";
@@ -140,7 +133,6 @@ const decodeFilter = (text: string | undefined): string => {
   );
 };
 const parseEffectiveFilter = (): string => decodeFilter(effectiveFilter.value);
-const parsedEffectiveFilter = computed(() => parseEffectiveFilter());
 
 const effectiveTimeRange = computed<TimeRange>(() => ({
   startTime: searchObj.data.datetime.startTime,
@@ -159,26 +151,16 @@ const currentTimeObj = ref({
 const dashboardData = ref(null);
 const heatmapRequest = ref<LatencyHeatmapRequest | null>(null);
 
-// Unified Analysis Dashboard state
-interface AnalysisFilter {
-  start: number;
-  end: number;
-  timeStart?: number;
-  timeEnd?: number;
-}
-const showAnalysisDashboard = ref(false);
-// The analysis is a snapshot of the search that opened it, so a new search closes it.
+const showComparison = ref(false);
+// The comparison is a snapshot of the search that opened it, so a new search closes it.
 watch(
   () => searchObj.loading,
   (loading, wasLoading) => {
-    if (loading && !wasLoading) showAnalysisDashboard.value = false;
+    if (loading && !wasLoading) showComparison.value = false;
   },
 );
-const analysisDurationFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
-const analysisRateFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
-const analysisErrorFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
-const analysisBaselineFilter = ref<string | undefined>(undefined);
-const defaultAnalysisTab = ref<"duration" | "volume" | "error">("volume");
+const comparisonSelection = shallowRef<ComparisonSelection | null>(null);
+let comparisonEntry: MetricsRangeFilter | null = null;
 // The range the charts were last loaded for, which a selection's baseline describes.
 let chartsRange: TimeRange | null = null;
 // Store the original time range before selection for baseline comparison
@@ -187,52 +169,9 @@ const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
 // Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
 const rangeFiltersVersion = ref(0);
 
-// Stream fields for dimension selector
-// Priority: props > userDefinedSchema > selectedStreamFields
-const streamFields = computed(() => {
-  if (props.streamFields) {
-    return props.streamFields;
-  }
-
-  // Prefer user-defined schema if available.
-  // Set dynamically on shared stream state; not part of useTraces defaults.
-  const userDefinedSchema = searchObj.data.stream.userDefinedSchema;
-  if (userDefinedSchema?.length > 0) {
-    return userDefinedSchema;
-  }
-
-  return searchObj.data.stream.selectedStreamFields || [];
-});
-
 const rangeFilters = computed<Map<string, MetricsRangeFilter>>(
   () => searchObj.meta.metricsRangeFilters,
 );
-
-// Check if ANY RED panel has a time-based brush selection
-// This controls the visibility of the "Analyze Dimensions" button
-// - Button shows ONLY when user has made a brush selection on Rate, Duration, or Errors panel
-// - Button hides when no selection exists (baseline = selected, no point in analysis)
-// - When button is clicked, analysis dashboard opens with comparison mode
-const hasAnyBrushSelection = computed(() => {
-  // Force reactivity by accessing rangeFiltersVersion
-  rangeFiltersVersion.value;
-
-  let hasSelection = false;
-  rangeFilters.value.forEach((filter) => {
-    // Check if any RED panel has a time range selection
-    if (
-      (filter.panelTitle === "Duration" ||
-        filter.panelTitle === "Rate" ||
-        filter.panelTitle === "Errors") &&
-      filter.timeStart !== null &&
-      filter.timeEnd !== null
-    ) {
-      hasSelection = true;
-    }
-  });
-
-  return hasSelection;
-});
 
 const getBaseFilters = () => {
   let baseFilters = [];
@@ -438,93 +377,56 @@ const applySelection = async (
   emit("editor-filter-set", composeFilter(baselineFilter, selectionTerm(entry)));
 };
 
-// Unified function to open analysis dashboard with all filters populated
-const openUnifiedAnalysisDashboard = () => {
-  // Check if there are any brush selections
-  const hasBrushSelection = hasAnyBrushSelection.value;
+const COMPARISON_KINDS: Record<string, ComparisonSelection["kind"]> = {
+  Duration: "duration",
+  Errors: "errors",
+  Rate: "rate",
+};
 
-  if (!hasBrushSelection) {
-    // Baseline-only analysis (no brush selection)
-    // Set all filters to undefined to perform analysis only on baseline time range
-    analysisDurationFilter.value = undefined;
-    analysisRateFilter.value = undefined;
-    analysisErrorFilter.value = undefined;
-    analysisBaselineFilter.value = undefined;
-
-    // Default to volume tab when no brush selection
-    defaultAnalysisTab.value = "volume";
-  } else {
-    // Brush selection exists - compare baseline vs selected time range
-    // Populate all filter types from range filters
-    let durationStart = null,
-      durationEnd = null,
-      durationTimeStart = null,
-      durationTimeEnd = null;
-    let rateStart = null,
-      rateEnd = null,
-      rateTimeStart = null,
-      rateTimeEnd = null;
-    let errorStart = null,
-      errorEnd = null,
-      errorTimeStart = null,
-      errorTimeEnd = null;
-    let latestFilterType = null;
-    let baselineFilter: string | undefined;
-
-    rangeFilters.value.forEach((filter) => {
-      if (filter.panelTitle === "Duration") {
-        durationStart = filter.start;
-        durationEnd = filter.end;
-        // The picker applies the box to the second, so Selected must use what it applied.
-        durationTimeStart = filter.appliedStart ?? filter.timeStart;
-        durationTimeEnd = filter.appliedEnd ?? filter.timeEnd;
-        baselineFilter = filter.baselineFilter;
-        latestFilterType = "duration";
-      } else if (filter.panelTitle === "Rate") {
-        rateStart = filter.start;
-        rateEnd = filter.end;
-        rateTimeStart = filter.timeStart;
-        rateTimeEnd = filter.timeEnd;
-        latestFilterType = "volume";
-      } else if (filter.panelTitle === "Errors") {
-        errorStart = filter.start;
-        errorEnd = filter.end;
-        errorTimeStart = filter.timeStart;
-        errorTimeEnd = filter.timeEnd;
-        latestFilterType = "error";
-      }
+// Opens on the selection the table shows; a stale or missing one opens the no-selection state.
+const openComparison = () => {
+  const entry = [...rangeFilters.value.values()][0];
+  const range = originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;
+  const current =
+    entry &&
+    isRangeSelectionCurrent(entry, {
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      stream: searchObj.data.stream.selectedStream.value,
+      searchMode: searchObj.meta.searchMode,
+      editorText: searchObj.data.editorValue ?? "",
     });
+  comparisonEntry = current ? entry : null;
+  comparisonSelection.value =
+    current && COMPARISON_KINDS[entry.panelTitle]
+      ? {
+          kind: COMPARISON_KINDS[entry.panelTitle],
+          windowStartUs: entry.appliedStart,
+          windowEndUs: entry.appliedEnd,
+          rangeStartUs: range.startTime,
+          rangeEndUs: range.endTime,
+          durationLoUs: entry.start,
+          durationHiUs: entry.end,
+          filter: decodeFilter(entry.baselineFilter),
+        }
+      : null;
+  showComparison.value = true;
+};
 
-    analysisBaselineFilter.value =
-      baselineFilter === undefined ? undefined : decodeFilter(baselineFilter);
-
-    // Set all filters
-    analysisDurationFilter.value = {
-      start: durationStart || 0,
-      end: durationEnd || Number.MAX_SAFE_INTEGER,
-      timeStart: durationTimeStart || undefined,
-      timeEnd: durationTimeEnd || undefined,
-    };
-
-    analysisRateFilter.value = {
-      start: rateStart || 0,
-      end: rateEnd || Number.MAX_SAFE_INTEGER,
-      timeStart: rateTimeStart || undefined,
-      timeEnd: rateTimeEnd || undefined,
-    };
-
-    analysisErrorFilter.value = {
-      start: errorStart || 0,
-      end: errorEnd || Number.MAX_SAFE_INTEGER,
-      timeStart: errorTimeStart || undefined,
-      timeEnd: errorTimeEnd || undefined,
-    };
-
-    // Set default tab based on most recent selection, or volume if no selection
-    defaultAnalysisTab.value = latestFilterType || "volume";
-  }
-
-  showAnalysisDashboard.value = true;
+const onComparisonApply = async (term: string) => {
+  const entry = comparisonEntry;
+  const range = originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;
+  // R holds instants, not chart wall-clock values, so it converts like a heatmap box.
+  emit("time-range-selected", {
+    start: instantToPickerMs(Math.floor(range.startTime / 1_000_000) * 1000, store.state.timezone),
+    end: instantToPickerMs(Math.ceil(range.endTime / 1_000_000) * 1000, store.state.timezone),
+  });
+  searchObj.meta.metricsRangeFilters.clear();
+  clearOriginalTimeRange();
+  rangeFiltersVersion.value++;
+  // The picker updates the search range in a watcher; searching before the tick would use the selection's window.
+  await nextTick();
+  emit("editor-filter-run", composeFilter(entry?.baselineFilter ?? "", term));
 };
 
 const clearOriginalTimeRange = () => {
@@ -543,7 +445,7 @@ defineExpose({
   loadDashboard,
   getBaseFilters,
   rangeFiltersVersion,
-  openUnifiedAnalysisDashboard,
+  openComparison,
   clearOriginalTimeRange,
 });
 </script>

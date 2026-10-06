@@ -169,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
             @time-range-selected="onMetricsTimeRangeSelected"
             @editor-filter-set="onMetricsEditorFilterSet"
+            @editor-filter-run="onMetricsEditorFilterRun"
           />
         </transition>
 
@@ -279,6 +280,7 @@ export default defineComponent({
     "search:timeboxed",
     "get:traceDetails",
     "metrics:editor-filter-set",
+    "metrics:editor-filter-run",
     "run-query",
     "remove-filter",
     "jump-to-stream-data",
@@ -378,6 +380,10 @@ export default defineComponent({
       emit("metrics:editor-filter-set", text);
     };
 
+    const onMetricsEditorFilterRun = (text: string) => {
+      emit("metrics:editor-filter-run", text);
+    };
+
     const getDashboardData = () => {
       metricsDashboardRef?.value?.loadDashboard();
     };
@@ -431,10 +437,8 @@ export default defineComponent({
       useLocalWrapTracesContent(searchObj.meta.resultGrid.wrapCells ? "true" : "false");
     }
 
-    function openUnifiedAnalysisDashboard() {
-      if (metricsDashboardRef.value) {
-        metricsDashboardRef.value.openUnifiedAnalysisDashboard();
-      }
+    function openComparison() {
+      metricsDashboardRef.value?.openComparison();
     }
 
     const toggleFieldList = () => {
@@ -452,6 +456,7 @@ export default defineComponent({
       expandRowDetail,
       onMetricsTimeRangeSelected,
       onMetricsEditorFilterSet,
+      onMetricsEditorFilterRun,
       getDashboardData,
       hits,
       searchPerformed,
@@ -460,7 +465,7 @@ export default defineComponent({
       changeSortBy,
       rowsPerPageOptions,
       totalPages,
-      openUnifiedAnalysisDashboard,
+      openComparison,
       toggleWrapCells,
       toggleFieldList,
       formatLargeNumber,
