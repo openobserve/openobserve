@@ -48,6 +48,10 @@ impl Engine {
             self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
             return Ok(functions::time(&self.eval_ctx));
         }
+        if func_name == Func::Pi {
+            self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
+            return Ok(Value::Float(std::f64::consts::PI));
+        }
         if let Some(vs) = timestamp_selector(func, args) {
             return self
                 .exec_vector_selector(vs, SelectorOutput::SampleTimestamp)
@@ -1069,5 +1073,100 @@ mod tests {
             assert!(!expected.is_empty(), "{per_step}");
             assert_eq!(actual, expected, "{per_step}");
         }
+    }
+
+    /// `trig{l="x"} 10`, `trig{l="y"} 20` and `trig{l="NaN"} NaN`, as upstream's trig tests load.
+    fn trig_input(shift: f64) -> String {
+        [("x", "10"), ("y", "20"), ("NaN", "NaN")]
+            .iter()
+            .map(|(l, v)| {
+                format!(
+                    r#"label_replace(label_replace(vector({v} - {shift}), "l", "{l}", "", ""), "__name__", "trig", "", "")"#
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" or ")
+    }
+
+    /// `l` label -> (labels without `l`, value), for one instant.
+    fn by_l(value: Value) -> BTreeMap<String, (Vec<String>, f64)> {
+        let Value::Matrix(matrix) = value else {
+            panic!("expected a matrix, got {value:?}");
+        };
+        matrix
+            .into_iter()
+            .map(|series| {
+                let other = series
+                    .labels
+                    .iter()
+                    .filter(|label| label.name != "l")
+                    .map(|label| label.name.clone())
+                    .collect();
+                (
+                    series.labels.get_value("l"),
+                    (other, series.samples[0].value),
+                )
+            })
+            .collect()
+    }
+
+    /// Cases from upstream `promql/promqltest/testdata/trig_functions.test`.
+    #[tokio::test]
+    async fn test_trig_functions_match_upstream_and_drop_the_name() {
+        let nan = f64::NAN;
+        let cases = [
+            ("sin", 0.0, [-0.5440211108893699, 0.9129452507276277]),
+            ("cos", 0.0, [-0.8390715290764524, 0.40808206181339196]),
+            ("tan", 0.0, [0.6483608274590867, 2.2371609442247427]),
+            ("asin", 10.1, [-0.10016742116155944, nan]),
+            ("acos", 10.1, [1.670963747956456, nan]),
+            ("atan", 0.0, [1.4711276743037345, 1.5208379310729538]),
+            ("sinh", 0.0, [11013.232920103324, 2.4258259770489514e+08]),
+            ("cosh", 0.0, [11013.232920103324, 2.4258259770489514e+08]),
+            ("tanh", 0.0, [0.9999999958776927, 1.0]),
+            ("asinh", 0.0, [2.99822295029797, 3.6895038689889055]),
+            ("acosh", 0.0, [2.993222846126381, 3.6882538673612966]),
+            ("atanh", 10.1, [-0.10033534773107522, nan]),
+            ("rad", 0.0, [0.17453292519943295, 0.3490658503988659]),
+            ("rad", 10.0, [0.0, 0.17453292519943295]),
+            ("rad", 20.0, [-0.17453292519943295, 0.0]),
+            ("deg", 0.0, [572.9577951308232, 1145.9155902616465]),
+            ("deg", 10.0, [0.0, 572.9577951308232]),
+            ("deg", 20.0, [-572.9577951308232, 0.0]),
+        ];
+        let instant = EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into());
+        for (func, shift, [x, y]) in cases {
+            let query = format!("{func}({})", trig_input(shift));
+            let actual = by_l(eval_at(&query, instant.clone()).await);
+            assert_eq!(actual.len(), 3, "{query}");
+            for (l, expected) in [("x", x), ("y", y), ("NaN", nan)] {
+                let (labels, value) = &actual[l];
+                assert!(labels.is_empty(), "{func} kept {labels:?}");
+                if expected.is_nan() {
+                    assert!(value.is_nan(), "{func}({l} - {shift}): {value}");
+                } else if func == "deg" || func == "rad" {
+                    assert_eq!(value.to_bits(), expected.to_bits(), "{func}({l} - {shift})");
+                } else {
+                    // promqltest's own tolerance; Go's sinh and cosh differ from libm past it
+                    let tolerance = expected.abs() * 1e-6;
+                    assert!(
+                        (value - expected).abs() <= tolerance,
+                        "{func}({l}): {value}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pi_is_a_scalar() {
+        let instant = EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into());
+        assert!(matches!(
+            eval_at("pi()", instant).await,
+            Value::Float(pi) if pi == 3.141592653589793
+        ));
+        let values = step_values(eval_at("vector(pi())", range_ctx()).await);
+        assert_eq!(values.len(), 3);
+        assert!(values.iter().all(|(_, v)| *v == std::f64::consts::PI));
     }
 }

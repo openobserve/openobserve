@@ -37,7 +37,7 @@ const LABEL_DROPPING_AGGS: [u8; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 44] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 58] = [
     "rate",
     "irate",
     "increase",
@@ -82,6 +82,20 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 44] = [
     "minute",
     "month",
     "year",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "asinh",
+    "acosh",
+    "atanh",
+    "deg",
+    "rad",
 ];
 
 /// Returns true when the query's root aggregation discards all labels and the
@@ -183,6 +197,7 @@ mod tests {
             ("count(metric)", true),
             ("(sum(rate(metric[5m])))", true),
             ("sum(clamp(rate(metric[5m]), 0, 100))", true),
+            ("sum(deg(atan(metric)))", true),
             // grouping keeps labels
             ("sum by (region) (rate(metric[5m]))", false),
             ("sum without (le) (rate(metric[5m]))", false),
