@@ -217,11 +217,30 @@ pub async fn create(
                 }
             }
 
+            match org_domain_ownership::get_org_for_domain(&domain).await {
+                Ok(Some(org_id)) => {
+                    if org_id != mapping.org_id {
+                        return MetaHttpResponse::bad_request(
+                            "This domain is already claimed by some other org",
+                        );
+                    }
+                }
+                Ok(None) => {
+                    return MetaHttpResponse::internal_error("This domain is not linked yet");
+                }
+                Err(e) => {
+                    return MetaHttpResponse::internal_error(format!(
+                        "error getting domain mappings : {e}"
+                    ));
+                }
+            }
+
             mapping.domain = mapping.domain.to_lowercase();
         }
         data.domain_org_mappings = mappings;
     }
 
+    #[cfg(feature = "cloud")]
     if let Some(config) = settings.domain_management_config {
         data.domain_management_config = config;
         field_found = true;
