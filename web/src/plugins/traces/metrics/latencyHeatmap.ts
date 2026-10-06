@@ -1,0 +1,158 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { DateTime } from "luxon";
+
+// Integer bounds keep every bucket exactly expressible as `duration >= lo AND duration < hi`.
+export const DURATION_BOUNDS_US: readonly number[] = [
+  1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000, 200_000,
+  500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000, 20_000_000, 50_000_000, 100_000_000,
+  200_000_000, 500_000_000, 1_000_000_000,
+];
+
+export const TOP_BUCKET = DURATION_BOUNDS_US.length;
+
+export const HEATMAP_ROW_LIMIT = 20000;
+
+export interface LatencyHeatmapHit {
+  x_axis: string;
+  duration_bucket: number;
+  span_count: number;
+}
+
+export interface LatencyHeatmapGrid {
+  colStartUs: number[];
+  intervalUs: number;
+  rangeStartUs: number;
+  rangeEndUs: number;
+  rows: number[];
+  cells: [number, number, number, number][];
+  maxValue: number;
+}
+
+export interface LatencyHeatmapSelection {
+  timeStartUs: number;
+  timeEndUs: number;
+  durationLoUs: number;
+  durationHiUs: number | null;
+}
+
+export interface HeatmapBox {
+  start: number;
+  end: number;
+  start1: number;
+  end1: number;
+}
+
+export function bucketBounds(k: number): { lo: number; hi: number | null } {
+  return {
+    lo: k === 0 ? 0 : DURATION_BOUNDS_US[k - 1],
+    hi: k === TOP_BUCKET ? null : DURATION_BOUNDS_US[k],
+  };
+}
+
+export function formatDurationBound(us: number): string {
+  if (us > 0 && us % 1_000_000 === 0) return `${us / 1_000_000}s`;
+  if (us > 0 && us % 1_000 === 0) return `${us / 1_000}ms`;
+  return `${us}us`;
+}
+
+export function buildLatencyHeatmapSql(streamName: string, filters: string[]): string {
+  const whens = DURATION_BOUNDS_US.map((bound, k) => `WHEN duration < ${bound} THEN ${k}`).join(
+    " ",
+  );
+  const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
+  return (
+    `SELECT histogram(_timestamp) AS x_axis, CASE ${whens} ELSE ${TOP_BUCKET} END AS duration_bucket, ` +
+    `count(*) AS span_count FROM "${streamName}"${where} ` +
+    `GROUP BY x_axis, duration_bucket LIMIT ${HEATMAP_ROW_LIMIT}`
+  );
+}
+
+// The histogram x_axis is a zone-less UTC timestamp string.
+const parseBucketUs = (xAxis: string): number => new Date(`${xAxis}Z`).getTime() * 1000;
+
+export function buildHeatmapGrid(
+  hits: LatencyHeatmapHit[],
+  intervalSec: number,
+  rangeStartUs: number,
+  rangeEndUs: number,
+): LatencyHeatmapGrid | null {
+  if (!hits.length) return null;
+
+  const intervalUs = intervalSec * 1_000_000;
+  const anchorUs = parseBucketUs(hits[0].x_axis);
+  const firstUs = anchorUs + Math.floor((rangeStartUs - anchorUs) / intervalUs) * intervalUs;
+  const colStartUs: number[] = [];
+  for (let t = firstUs; t < rangeEndUs; t += intervalUs) colStartUs.push(t);
+
+  const buckets = hits.map((h) => Number(h.duration_bucket));
+  const minBucket = Math.min(...buckets);
+  const maxBucket = Math.max(...buckets);
+  const rows: number[] = [];
+  for (let k = minBucket; k <= maxBucket; k++) rows.push(k);
+
+  const cells: [number, number, number, number][] = [];
+  let maxValue = 0;
+  for (const h of hits) {
+    const col = Math.round((parseBucketUs(h.x_axis) - firstUs) / intervalUs);
+    if (col < 0 || col >= colStartUs.length) continue;
+    const count = Number(h.span_count);
+    const value = Math.log1p(count);
+    maxValue = Math.max(maxValue, value);
+    cells.push([col, Number(h.duration_bucket) - minBucket, value, count]);
+  }
+
+  return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells, maxValue };
+}
+
+const clampIndex = (i: number, length: number) => Math.min(Math.max(i, 0), length - 1);
+
+export function selectionFromBox(
+  grid: LatencyHeatmapGrid,
+  box: HeatmapBox,
+): LatencyHeatmapSelection {
+  const cols = grid.colStartUs.length;
+  const i0 = clampIndex(Math.round(Math.min(box.start, box.end)), cols);
+  const i1 = clampIndex(Math.round(Math.max(box.start, box.end)), cols);
+  const j0 = clampIndex(Math.round(Math.min(box.start1, box.end1)), grid.rows.length);
+  const j1 = clampIndex(Math.round(Math.max(box.start1, box.end1)), grid.rows.length);
+  return {
+    timeStartUs: Math.max(grid.rangeStartUs, grid.colStartUs[i0]),
+    timeEndUs: Math.min(grid.rangeEndUs, grid.colStartUs[i1] + grid.intervalUs),
+    durationLoUs: bucketBounds(grid.rows[j0]).lo,
+    durationHiUs: bucketBounds(grid.rows[j1]).hi,
+  };
+}
+
+// The picker formats with browser-local getters and re-parses in the app zone, so pass it the app-zone wall clock.
+export function instantToPickerMs(ms: number, timezone: string): number {
+  return DateTime.fromMillis(ms, { zone: timezone })
+    .setZone("system", { keepLocalTime: true })
+    .toMillis();
+}
+
+export function durationBand(lo: number | null, hi: number | null): string {
+  const parts: string[] = [];
+  if (lo) parts.push(`duration >= '${formatDurationBound(lo)}'`);
+  if (hi !== null) parts.push(`duration < '${formatDurationBound(hi)}'`);
+  return parts.join(" and ");
+}
+
+export function composeFilter(baselineFilter: string, band: string): string {
+  if (band === "") return baselineFilter;
+  if (baselineFilter.trim() === "") return band;
+  return `(${baselineFilter}) and ${band}`;
+}
