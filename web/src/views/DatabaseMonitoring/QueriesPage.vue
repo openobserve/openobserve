@@ -738,9 +738,7 @@ const {
             ? countClaim(rows.value.length, false, "client")
             : countClaim(serverRows.value.length, serverTruncated.value, "server"),
     },
-    // 0 here means "no client traffic", not "no databases" — the shared
-    // snapshot's fleet fallback is the better number then.
-    { key: "databaseCount", value: () => databaseCount.value || undefined },
+    // Only this tab's own badge: distinct instances in the top queries is not the Overview's database count.
   ],
 });
 // The list→detail hop: the seed hand-off plus the push, in one place. See
@@ -944,24 +942,8 @@ const { traceCount, probeTracePresence } = useDbmTracePresence(getStreams);
  * rather than on a page state that merely looks quiet.
  */
 const completionBias = ref<{ dropPercent: number } | null>(null);
-/**
- * The distinct instances in THIS page's result, which is not the shared
- * fan-out's database count and must not be replaced by it: this page's rows are
- * narrowed by up to five filters, so the number beside the Overview tab has
- * always described what the reader is looking at here. `null` until the first
- * load answers, so the badge stays bare rather than claiming zero.
- */
-const databaseCount = ref<number | null>(null);
 
-/**
- * Every badge, from the shell's shared snapshot.
- *
- * The TWO this page counts better than the fan-out can are in there too —
- * `ownCounts` above publishes them. `queryCount` is `rows.length` (what the
- * table is showing after this page's filters) and `databaseCount` the distinct
- * instances within it; both differ from the unfiltered shared read by design,
- * and both must read the same from every tab rather than only from this one.
- */
+// Every badge comes from the shell's shared snapshot; this page publishes only its own queryCount into it.
 const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 /**
@@ -1504,7 +1486,6 @@ const loadQueries = async (token: number) => {
   freshness.value = data.freshness;
   topNSubset.value = data.top_n_subset;
   neverAggregated.value = data.freshness?.data_through === 0;
-  databaseCount.value = new Set(hits.map((r) => r.db_instance)).size;
 
   // Shares are measured against the WHOLE scope (shown + remainder), not just
   // what is on screen — otherwise every row's share inflates as the ranking
