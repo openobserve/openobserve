@@ -473,9 +473,6 @@ describe("TracesMetricsDashboard", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Latency heatmap
-  // -------------------------------------------------------------------------
   describe("latency heatmap", () => {
     it("drops the Duration panel and gives Rate and Errors half the strip each", async () => {
       await wrapper.vm.loadDashboard();
@@ -631,9 +628,6 @@ describe("TracesMetricsDashboard", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Heatmap selection
-  // -------------------------------------------------------------------------
   describe("heatmap selection", () => {
     const S = 1_000_000;
     const T = Date.UTC(2026, 9, 6, 10, 2, 0) * 1000;
@@ -816,9 +810,6 @@ describe("TracesMetricsDashboard", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Drill-down baseline filter (pre-box editor text)
-  // -------------------------------------------------------------------------
   describe("Drill-down baseline filter", () => {
     const raw = "(service_name = 'a' or duration >= '1ms') and span_kind = 'Server'";
     const analysis = () => wrapper.find('[data-test="traces-analysis-dashboard"]');

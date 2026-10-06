@@ -2546,11 +2546,7 @@ export class TracesPage {
 
   // --- Auto Run (live mode) ---
 
-  /**
-   * Switch Auto Run on or off through the Run Query dropdown.
-   * @param {boolean} on - Desired state
-   * @returns {Promise<boolean>} false when the env has auto_query_enabled off, so live mode cannot be turned on
-   */
+  /** Switch Auto Run on or off; resolves false when auto_query_enabled is off, so live mode cannot be turned on. */
   async setLiveMode(on) {
     const enabled = await this.page.evaluate(async () => {
       try {

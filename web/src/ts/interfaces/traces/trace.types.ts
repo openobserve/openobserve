@@ -19,9 +19,7 @@ export const TRACE_SEARCH_MODES: readonly TraceSearchMode[] = [
 
 export const DEFAULT_TRACE_SEARCH_MODE: TraceSearchMode = "spans";
 
-/**
- * A RED-chart selection, keyed by panel id in `searchObj.meta.metricsRangeFilters`
- */
+/** A RED-chart selection, keyed by panel id in `searchObj.meta.metricsRangeFilters`. */
 export type MetricsRangeFilter = {
   panelTitle: string;
   // Duration µs; Rate/Errors store -1 because their selection is time only.
