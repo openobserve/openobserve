@@ -98,6 +98,7 @@ usage_reporting.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
 zip.workspace = true
+strum.workspace = true
 
 [dev-dependencies]
 cron.workspace = true

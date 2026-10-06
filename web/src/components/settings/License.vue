@@ -113,6 +113,30 @@
                     <td
                       class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
+                      {{ t("about.licensed_features") }}
+                    </td>
+                    <td class="px-3 py-2 leading-[1.2]" data-test="settings-license-features">
+                      <!-- absent list is a pre-entitlement license, which unlocks every feature -->
+                      <OBadge v-if="!licenseData.license.features">
+                        {{ t("about.all_features") }}
+                      </OBadge>
+                      <span
+                        v-else-if="licenseData.license.features.length === 0"
+                        class="text-text-muted"
+                      >
+                        {{ t("about.no_features") }}
+                      </span>
+                      <div v-else class="flex flex-wrap gap-1">
+                        <OBadge v-for="feature in licenseData.license.features" :key="feature">
+                          {{ feature }}
+                        </OBadge>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="border-table-row-divider border-b border-solid">
+                    <td
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                    >
                       {{ t("about.create_at_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">

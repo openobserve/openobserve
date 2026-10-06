@@ -440,6 +440,9 @@ async fn run() -> Result<(), anyhow::Error> {
 /// Initializes enterprise features.
 #[cfg(feature = "enterprise")]
 async fn init_enterprise() -> Result<(), anyhow::Error> {
+    let node = &config::cluster::LOCAL_NODE;
+    o2_enterprise::enterprise::license::load_license(node.is_router() || node.is_single_role())
+        .await;
     o2_enterprise::enterprise::search::init().await?;
 
     if o2_enterprise::enterprise::common::config::get_config()
