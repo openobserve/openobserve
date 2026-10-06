@@ -703,6 +703,12 @@ fn resolve_module_configs(
             poll_interval_secs: pick_interval(cfg.limit.scheduler_query_reco_interval),
             lease_timeout_secs: None,
         },
+        ModuleSchedulerConfig {
+            module: TriggerModule::PublicDashboard,
+            concurrency: pick_concurrency(cfg.limit.scheduler_public_dashboard_concurrency),
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_public_dashboard_interval),
+            lease_timeout_secs: None,
+        },
     ]
 }
 
@@ -944,20 +950,7 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        // Ten, and the list below is the authority: the count trailed the
-        // modules when `CompositeAlert` and `OncallEscalation` arrived from
-        // different branches, so it is asserted against the same number the
-        // loop walks rather than a literal somebody has to remember to bump.
-        let expected = 10;
-        assert_eq!(configs.len(), expected);
-        let modules: std::collections::HashSet<_> =
-            configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(
-            modules.len(),
-            expected,
-            "duplicate module in resolved configs"
-        );
-        for m in [
+        let all = [
             TriggerModule::Alert,
             TriggerModule::CompositeAlert,
             TriggerModule::Report,
@@ -968,7 +961,33 @@ mod tests {
             TriggerModule::Slo,
             TriggerModule::SloBackfill,
             TriggerModule::OncallEscalation,
-        ] {
+            TriggerModule::PublicDashboard,
+        ];
+        // No wildcard arm: a new variant fails to compile here until it is added to `all`.
+        for m in &all {
+            match m {
+                TriggerModule::Alert
+                | TriggerModule::CompositeAlert
+                | TriggerModule::Report
+                | TriggerModule::DerivedStream
+                | TriggerModule::Backfill
+                | TriggerModule::AnomalyDetection
+                | TriggerModule::QueryRecommendations
+                | TriggerModule::Slo
+                | TriggerModule::SloBackfill
+                | TriggerModule::OncallEscalation
+                | TriggerModule::PublicDashboard => {}
+            }
+        }
+        assert_eq!(configs.len(), all.len());
+        let modules: std::collections::HashSet<_> =
+            configs.iter().map(|c| c.module.clone()).collect();
+        assert_eq!(
+            modules.len(),
+            all.len(),
+            "duplicate module in resolved configs"
+        );
+        for m in all {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
     }
@@ -992,6 +1011,7 @@ mod tests {
             TriggerModule::AnomalyDetection,
             TriggerModule::QueryRecommendations,
             TriggerModule::Slo,
+            TriggerModule::PublicDashboard,
         ] {
             let c = find_module(&configs, m.clone());
             assert_eq!(c.concurrency, 3, "{m:?} should inherit base concurrency");
