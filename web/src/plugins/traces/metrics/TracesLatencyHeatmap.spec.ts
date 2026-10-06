@@ -19,9 +19,20 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import searchService from "@/services/search";
 
-const { tokenColors } = vi.hoisted(() => ({
+const { tokenColors, labelOverride } = vi.hoisted(() => ({
   tokenColors: { "--color-latency-p95": "#0a4ce8" } as Record<string, string>,
+  labelOverride: { value: null as string | null },
 }));
+
+// Lets a test feed markup through the column label, the one tooltip line derived from formatting.
+vi.mock("@/utils/timezone", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    timestampToTimezoneDate: (...args: any[]) =>
+      labelOverride.value ?? actual.timestampToTimezoneDate(...args),
+  };
+});
 
 vi.mock("@/services/search", () => ({
   default: { search: vi.fn() },
@@ -102,6 +113,7 @@ beforeEach(() => {
   search.mockReset();
   respond({ hits: HITS, histogram_interval: 10 });
   tokenColors["--color-latency-p95"] = "#0a4ce8";
+  labelOverride.value = null;
 });
 
 afterEach(() => {
@@ -184,6 +196,29 @@ describe("TracesLatencyHeatmap", () => {
       expect(search).toHaveBeenCalledTimes(2);
       expect(first.aborted).toBe(true);
     });
+
+    it("keeps the newer request's grid when the superseded one resolves last", async () => {
+      let resolveFirst!: (v: any) => void;
+      let resolveSecond!: (v: any) => void;
+      search
+        .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)) as any)
+        .mockReturnValueOnce(new Promise((r) => (resolveSecond = r)) as any);
+      wrapper = await mountHeatmap();
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      resolveSecond({
+        data: {
+          hits: [{ x_axis: "2026-10-06T10:00:10", duration_bucket: 20, span_count: 5 }],
+          histogram_interval: 10,
+        },
+      });
+      await settle();
+      resolveFirst({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+
+      expect(options(wrapper).yAxis.data).toEqual(["2s"]);
+    });
   });
 
   describe("chart option", () => {
@@ -233,7 +268,15 @@ describe("TracesLatencyHeatmap", () => {
       expect(options(wrapper).visualMap.inRange.color).toEqual(["#5586f7"]);
     });
 
-    it("formats the tooltip with the escaped range and the span count", async () => {
+    it("escapes the tooltip text", async () => {
+      labelOverride.value = "<b>10:00</b>";
+      wrapper = await mountHeatmap();
+      const html: string = options(wrapper).tooltip.formatter({ data: [1, 0, Math.log1p(40), 40] });
+      expect(html).toContain("&lt;b&gt;10:00&lt;/b&gt;");
+      expect(html).not.toContain("<b>");
+    });
+
+    it("formats the tooltip with the time, range and span count", async () => {
       wrapper = await mountHeatmap();
       const html: string = options(wrapper).tooltip.formatter({ data: [1, 0, Math.log1p(40), 40] });
       expect(html).toContain("10:00:10");
