@@ -754,6 +754,7 @@ describe("KubernetesExplorerPage", () => {
       };
       serve();
       await mountPage({ kind: "nodes" });
+      expect(wrapper.find('[data-test="k8s2-node-cluster-/node-1"]').text()).toBe("—");
       await wrapper.find('[data-test="k8s2-node-open-/node-1"]').trigger("click");
       await flushPromises();
       expect(query()).toEqual({ onNode: "/node-1" });

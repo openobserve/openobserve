@@ -108,6 +108,9 @@ const onSort = (params: OTableSortParams) => emit("sort", params.column, params.
         {{ raw(row.name) }}
       </OButton>
     </template>
+    <template #cell-cluster="{ row }">
+      <span :data-test="`k8s2-node-cluster-${row.key}`">{{ raw(row.cluster || "—") }}</span>
+    </template>
     <template #cell-status="{ row }">
       <div class="flex flex-wrap items-center gap-1" :data-test="`k8s2-node-status-${row.key}`">
         <OTag v-if="row.status" :variant="row.status.variant" size="xs">{{

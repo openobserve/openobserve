@@ -121,6 +121,9 @@ const availableText = (row: DeploymentRow) =>
     <template #cell-available="{ row }">
       <span class="tabular-nums">{{ availableText(row) }}</span>
     </template>
+    <template #cell-cluster="{ row }">
+      <span :data-test="`k8s2-deployment-cluster-${row.key}`">{{ raw(row.cluster || "—") }}</span>
+    </template>
     <template #cell-status="{ row }">
       <OTag
         v-if="row.status"

@@ -143,6 +143,9 @@ const cpuDetail = (row: PodRow) => {
         {{ raw(row.name) }}
       </OButton>
     </template>
+    <template #cell-cluster="{ row }">
+      <span :data-test="`k8s2-pod-cluster-${row.key}`">{{ raw(row.cluster || "—") }}</span>
+    </template>
     <template #cell-status="{ row }">
       <div class="flex min-w-0 flex-col items-start" :data-test="`k8s2-pod-status-${row.key}`">
         <OTooltip v-if="row.ambiguous" :content="t('infra.k8s2.ambiguous')">
