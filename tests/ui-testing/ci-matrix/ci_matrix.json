@@ -508,6 +508,7 @@
       "traceQueryEditor.spec.js",
       "traceErrorFilter.spec.js",
       "traceDetails.spec.js",
+      "traceDetailsPaging.spec.js",
       "traceAdvancedFiltering.spec.js",
       "tracesTriageLoop.spec.js",
       "traces-autocomplete-suggestions.spec.js",

@@ -39,7 +39,7 @@ export function useTraceProcessing(
     const traceStartTimeUs =
       treeNodes.length > 0 && treeNodes[0].lowestStartTime ? treeNodes[0].lowestStartTime : 0;
 
-    const traverse = (node: any, depth: number) => {
+    const convert = (node: any, depth: number) => {
       // Calculate startOffsetMs as offset from trace start
       const startOffsetMs = traceStartTimeUs
         ? (node.startTimeUs - traceStartTimeUs) / 1000
@@ -80,14 +80,17 @@ export function useTraceProcessing(
       };
 
       result.push(enrichedSpan);
-
-      // Process children (old format uses 'spans' property)
-      if (node.spans && Array.isArray(node.spans)) {
-        node.spans.forEach((child: any) => traverse(child, depth + 1));
-      }
     };
 
-    treeNodes.forEach((node) => traverse(node, currentDepth));
+    // Pre-order over the old format's 'spans' children; an explicit stack, so trace depth never bounds the call stack.
+    const stack: [any, number][] = [];
+    for (let i = treeNodes.length - 1; i >= 0; i--) stack.push([treeNodes[i], currentDepth]);
+    while (stack.length) {
+      const [node, depth] = stack.pop()!;
+      convert(node, depth);
+      const children = node.spans && Array.isArray(node.spans) ? node.spans : [];
+      for (let i = children.length - 1; i >= 0; i--) stack.push([children[i], depth + 1]);
+    }
     return result;
   };
 
@@ -148,21 +151,14 @@ export function useTraceProcessing(
       }
     });
 
-    // Calculate depths
-    const calculateDepth = (span: EnrichedSpan, depth: number) => {
+    // Depths and start-time child order in one walk; an explicit stack, so trace depth never bounds the call stack.
+    const stack: [EnrichedSpan, number][] = rootSpans.map((span) => [span, 0]);
+    while (stack.length) {
+      const [span, depth] = stack.pop()!;
       span.depth = depth;
-      span.children.forEach((child) => calculateDepth(child, depth + 1));
-    };
-
-    rootSpans.forEach((span) => calculateDepth(span, 0));
-
-    // Sort children by start time
-    const sortChildren = (span: EnrichedSpan) => {
       span.children.sort((a, b) => a.start_time - b.start_time);
-      span.children.forEach(sortChildren);
-    };
-
-    rootSpans.forEach(sortChildren);
+      for (const child of span.children) stack.push([child, depth + 1]);
+    }
 
     return rootSpans;
   };
@@ -173,14 +169,15 @@ export function useTraceProcessing(
   const flattenSpanTree = (roots: EnrichedSpan[]): EnrichedSpan[] => {
     const result: EnrichedSpan[] = [];
 
-    const traverse = (span: EnrichedSpan) => {
+    // Pre-order; an explicit stack, so trace depth never bounds the call stack.
+    const stack = [...roots].reverse();
+    while (stack.length) {
+      const span = stack.pop()!;
       result.push(span);
-      if (span.isExpanded && span.children.length > 0) {
-        span.children.forEach(traverse);
+      if (span.isExpanded) {
+        for (let i = span.children.length - 1; i >= 0; i--) stack.push(span.children[i]);
       }
-    };
-
-    roots.forEach(traverse);
+    }
     return result;
   };
 

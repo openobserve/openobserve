@@ -374,8 +374,7 @@ export class TracesPage {
   }
 
   /** `fromUs` / `toUs` are microsecond epoch bounds (traceDetails.utils.ts resolveUrlTimeRange). */
-  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default' }) {
-    const org = process.env['ORGNAME'] || 'default';
+  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default', org = process.env['ORGNAME'] || 'default' }) {
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
     const url = `${baseUrl}/web/traces/trace-details?trace_id=${traceId}&stream=${stream}&from=${fromUs}&to=${toUs}&org_identifier=${org}`;
     await this.page.goto(url);

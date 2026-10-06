@@ -11123,7 +11123,11 @@
       "unknownOperation": "Unknown Operation",
       "unknownService": "Unknown Service",
       "traceIdCopied": "Trace ID copied to clipboard",
-      "sessionIdCopied": "Session ID copied to clipboard"
+      "sessionIdCopied": "Session ID copied to clipboard",
+      "partial": "Some spans of this trace could not be read. The waterfall may be incomplete.",
+      "truncated": "Showing the first span of this trace, in start-time order. Later spans are not loaded yet. | Showing the first {count} spans of this trace, in start-time order. Later spans are not loaded yet.",
+      "loadMore": "Load the next span | Load next {size} spans",
+      "loadMoreFailed": "Could not load more spans of this trace"
     },
     "traceTree": {
       "clickToExpand": "Click to expand",
