@@ -558,14 +558,6 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       group: PromqlStepGroup.Trigonometry,
       documentation: gt("promql.operations.radDoc"),
     },
-    {
-      id: PromqlStepId.Pi,
-      name: raw("Pi"),
-      params: [],
-      defaultParams: [],
-      group: PromqlStepGroup.Trigonometry,
-      documentation: gt("promql.operations.piDoc"),
-    },
 
     // ============ Time Functions ============
     {

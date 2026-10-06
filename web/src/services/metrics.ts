@@ -119,8 +119,13 @@ const getMetricUsage = ({
 }): Promise<{ data: MetricUsage }> =>
   http().get(`/api/${org_identifier}/metrics/${encodeURIComponent(metric)}/usage`, { signal });
 
+/** The backend's JSON tree of a PromQL query; a 400 carries the parser's message. */
+const parsePromqlQuery = ({ org_identifier, query }: { org_identifier: string; query: string }) =>
+  http().post(`/api/${org_identifier}/prometheus/api/v1/parse_tree`, { query });
+
 export default {
   getMetricUsage,
+  parsePromqlQuery,
   formatPromqlQuery,
   get_promql_series,
   labels,

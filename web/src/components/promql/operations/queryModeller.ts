@@ -25,6 +25,16 @@ import {
 } from "../types";
 import { buildPromqlStepCatalog } from "./index";
 
+/** PromQL binding strength of each scalar-math step's operator. */
+const SCALAR_PRECEDENCE: Partial<Record<string, number>> = {
+  [PromqlStepId.Addition]: 1,
+  [PromqlStepId.Subtraction]: 1,
+  [PromqlStepId.MultiplyBy]: 2,
+  [PromqlStepId.DivideBy]: 2,
+  [PromqlStepId.Modulo]: 2,
+  [PromqlStepId.Exponent]: 3,
+};
+
 class PromqlRendererImpl implements PromqlRenderer {
   private operations: Map<string, PromqlStepSpec>;
 
@@ -172,6 +182,8 @@ class PromqlRendererImpl implements PromqlRenderer {
     ) {
       if (id === PromqlStepId.Clamp) {
         return `${id}(${innerExpr}, ${params[0]}, ${params[1]})`;
+      } else if (id === PromqlStepId.ClampMax || id === PromqlStepId.ClampMin) {
+        return `${id}(${innerExpr}, ${params[0]})`;
       } else if (id === PromqlStepId.Round && params[0] && params[0] !== 1) {
         return `${id}(${innerExpr}, ${params[0]})`;
       }
@@ -201,6 +213,12 @@ class PromqlRendererImpl implements PromqlRenderer {
     // Example: [max, rate, sum] renders as: sum(rate(max(...)))
     let currentExpr = queryStr;
     for (let i = 0; i < query.operations.length; i++) {
+      const inner = SCALAR_PRECEDENCE[normalizeStepId(query.operations[i - 1]?.id ?? "")];
+      const outer = SCALAR_PRECEDENCE[normalizeStepId(query.operations[i].id)];
+      // A binary input binds looser than (or as loose as) the operator now wrapping it.
+      if (inner !== undefined && outer !== undefined && inner <= outer) {
+        currentExpr = `(${currentExpr})`;
+      }
       currentExpr = this.renderOperation(query.operations[i], currentExpr);
     }
 

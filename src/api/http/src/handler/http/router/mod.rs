@@ -974,6 +974,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
         .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
+        .route("/{org_id}/prometheus/api/v1/parse_tree", post(promql::parse_tree))
 
         // Search
         .route("/{org_id}/_search", post(search::search))
@@ -3345,6 +3346,30 @@ mod tests {
         assert_eq!(
             path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
             Some("GetMetricUsage")
+        );
+    }
+
+    #[test]
+    fn parse_tree_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/prometheus/api/v1/parse_tree")
+            .expect("parse_tree is missing from the OpenAPI surface");
+        assert_eq!(
+            path.post.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("PrometheusParseTree")
+        );
+    }
+
+    #[test]
+    fn parse_tree_route_is_registered_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/prometheus/api/v1/parse_tree",post(promql::parse_tree))"#
+            ),
+            "POST /{{org_id}}/prometheus/api/v1/parse_tree must be registered in service_routes()"
         );
     }
 

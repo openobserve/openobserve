@@ -1234,6 +1234,9 @@ export default defineComponent({
       operations: [],
     });
 
+    // The builder state as entering builder mode loaded it; the query text is the user's until it changes.
+    let enteredState: string | null = null;
+
     /**
      * Reads a panel's saved operations, upgrading any step ids it was stored
      * under, and writes the upgrade back into the panel.
@@ -1352,6 +1355,7 @@ export default defineComponent({
           // panel was saved under.
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          enteredState = JSON.stringify(promqlBuilderQuery);
         }
       },
       { immediate: true },
@@ -1422,6 +1426,8 @@ export default defineComponent({
       () => {
         // Only rebuild if in promql-builder mode (queryType = "promql" && customQuery = false)
         if (!promqlBuilderMode.value) return;
+        if (enteredState !== null && JSON.stringify(promqlBuilderQuery) === enteredState) return;
+        enteredState = null;
 
         const currentQuery =
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];

@@ -190,7 +190,6 @@ export enum PromqlStepId {
   Atanh = "atanh",
   Deg = "deg",
   Rad = "rad",
-  Pi = "pi",
 
   // Scalar math
   Addition = "scalar_add",

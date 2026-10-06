@@ -174,14 +174,27 @@
                 :key="op.id"
                 :data-test="`promql-operation-option-${op.id}`"
                 :data-test-value="op.name"
-                class="promql-operation-option hover:bg-primary-background cursor-pointer px-4 py-2 text-sm"
+                :aria-disabled="isBlocked(op) ? 'true' : 'false'"
+                class="promql-operation-option px-4 py-2 text-sm"
+                :class="
+                  isBlocked(op)
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'hover:bg-primary-background cursor-pointer'
+                "
                 @click="
-                  addOperation(op);
-                  showOperationSelector = false;
+                  if (!isBlocked(op)) {
+                    addOperation(op);
+                    showOperationSelector = false;
+                  }
                 "
               >
                 <div class="font-medium">{{ op.name }}</div>
                 <div class="text-text-secondary mt-0.5 text-xs">{{ op.documentation }}</div>
+                <OTooltip
+                  v-if="isBlocked(op)"
+                  :content="t('metrics.operationsList.rangeOnlyFirst')"
+                  side="top"
+                />
               </div>
             </div>
           </OCollapsible>
@@ -206,7 +219,12 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
-import { PromqlStep, PromqlStepArgSpec, PromqlStepSpec } from "@/components/promql/types";
+import {
+  PromqlStep,
+  PromqlStepArgSpec,
+  PromqlStepGroup,
+  PromqlStepSpec,
+} from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 
 const props = defineProps<{
@@ -282,7 +300,13 @@ const getFilteredOperationsForCategory = (category: string): PromqlStepSpec[] =>
   );
 };
 
+// A range function needs a range vector, which in a chain only the bare selector gives.
+const isRangeStep = (id: string) => getStepSpec(id)?.group === PromqlStepGroup.RateAndRange;
+
+const isBlocked = (op: PromqlStepSpec) => isRangeStep(op.id) && props.operations.length > 0;
+
 const handleDragUpdate = (newVal: PromqlStep[]) => {
+  if (newVal.some((step, index) => index > 0 && isRangeStep(step.id))) return;
   // Create new array instead of mutating props
   const newOperations = [...newVal];
   emit("update:operations", newOperations);

@@ -6279,8 +6279,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Change Query Mode",
-      "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
-      "switchToBuilderConfirm": "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped off."
+      "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Also replace query with example query",
@@ -9603,6 +9602,12 @@
       "regexPattern": "Regex pattern (e.g., prod.*)",
       "regexNotMatching": "Regex not matching (e.g., test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "The builder cannot show {construct}",
+      "twoMetrics": "The builder cannot show a binary operation between two metrics — use a formula",
+      "noMetric": "The builder needs a query over one named metric",
+      "mismatch": "The builder cannot show this query exactly"
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Time range for rate calculation",
@@ -9622,6 +9627,7 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Nearest multiple"
       },
+      "rangeOnlyFirst": "A range function can only be the first step",
       "dragToReorder": "Drag to reorder",
       "noMatchingLabels": "No matching labels",
       "selectMetricFirst": "Select a metric first to load labels",
@@ -17772,7 +17778,6 @@
       "clampMinDoc": "Clamp values to minimum",
       "degDoc": "Convert radians to degrees",
       "radDoc": "Convert degrees to radians",
-      "piDoc": "Returns the mathematical constant π (pi)",
       "hourDoc": "Hour of the day (0-23)",
       "minuteDoc": "Minute of the hour (0-59)",
       "monthDoc": "Month of the year (1-12)",

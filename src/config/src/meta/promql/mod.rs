@@ -355,6 +355,11 @@ pub struct RequestFormatQuery {
     pub query: String,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct RequestParseTree {
+    pub query: String,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Function {
     Avg,

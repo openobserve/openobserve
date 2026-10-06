@@ -97,6 +97,7 @@ use crate::{
         openobserve_api_search::promql::labels_get,
         openobserve_api_search::promql::label_values,
         openobserve_api_search::promql::format_query_get,
+        openobserve_api_search::promql::parse_tree,
         enrichment_table::save_enrichment_table,
         enrichment_table::save_enrichment_table_from_url,
         rum::ingest::log,
