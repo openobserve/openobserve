@@ -367,13 +367,25 @@ describe("scope-load builders (G2)", () => {
     );
   });
 
-  it("Q3 summary equals the proven shape and keeps synthetic sessions countable", () => {
+  it("Q3 summary equals the proven shape, counts synthetic sessions and excludes them from sessions (P1-M2)", () => {
     const sql = summarySql(s, CS);
     const unscoped = "application_id = 'web' AND session_id IS NOT NULL";
     expect(sql.split(unscoped).join("{scope}").split(String(CS)).join("{cs}")).toBe(
       PROVEN.Q3_SUMMARY,
     );
-    expect(sql).not.toContain("<> 'synthetics'");
+    // `sessions`/`prev_sessions` must drop synthetics so the KPI matches the "N synthetic sessions
+    // excluded" caption, while `synthetic_sessions` still counts them via its own, unfiltered CASE.
+    expect(sql).toContain(
+      "CASE WHEN _timestamp >= {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS sessions"
+        .replace("{cs}", String(CS)),
+    );
+    expect(sql).toContain(
+      "CASE WHEN _timestamp < {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS prev_sessions"
+        .replace("{cs}", String(CS)),
+    );
+    expect(sql).toContain(
+      `CASE WHEN _timestamp >= ${CS} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`,
+    );
   });
 
   it("Q3 without session_type or candidates reports zero synthetics and no identity pairs", () => {

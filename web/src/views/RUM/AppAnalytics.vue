@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onVersionChange"
       />
       <DateTimePickerDashboard
+        ref="dateTimePickerRef"
         :model-value="state.datetime"
         menu-align="end"
         data-test="rum-analytics-date-picker"
@@ -350,6 +351,7 @@ let active = false;
 let activatedOnce = false;
 const invalidDismissed = ref(false);
 const identityOpen = ref(false);
+const dateTimePickerRef = ref<any>(null);
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
@@ -470,6 +472,12 @@ const sameRange = (a: AnalyticsDateTime, b: AnalyticsDateTime) =>
     ? a.relativeTimePeriod === b.relativeTimePeriod
     : a.startTime === b.startTime && a.endTime === b.endTime);
 
+// The picker reads this shape into an already-mounted DateTime (see DateTimePickerDashboard.setSavedDate).
+const toPickerSavedDate = (dt: AnalyticsDateTime) =>
+  dt.valueType === "absolute"
+    ? { type: "absolute", startTime: dt.startTime, endTime: dt.endTime }
+    : { type: "relative", relativeTimePeriod: dt.relativeTimePeriod };
+
 const onDateChange = (value: AnalyticsDateTime) => {
   if (sameRange(value, state.datetime)) return;
   pa.setScope({ datetime: { ...value } });
@@ -512,6 +520,9 @@ const resumesScope = () =>
 const enter = async () => {
   if (!resumesScope()) {
     pa.initFromRoute(route.query, { keepFunnel: route.name === PA_ROUTES.funnels });
+    // The picker reads its range only on mount, so a reload or a shared link (both land here
+    // after it has already mounted with the default range) must move the mounted picker too.
+    dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime));
   }
   enteredOrg = org.value;
   invalidDismissed.value = false;
