@@ -53,6 +53,25 @@
             })
           }}
         </p>
+        <p
+          v-if="costEstimate"
+          class="text-text-secondary mt-1 mb-0 text-xs leading-normal"
+          data-test="ai-experiment-form-cost-estimate"
+        >
+          {{
+            costEstimate.estimatedCost === null
+              ? t("aiObservability.experiments.form.costUnknown")
+              : t("aiObservability.experiments.form.costEstimate", {
+                  cost: formatEstimatedCost(costEstimate.estimatedCost),
+                })
+          }}
+          <template v-if="costEstimate.estimatedCost !== null && costEstimate.incomplete">
+            · {{ t("aiObservability.experiments.form.costLowerBound") }}
+          </template>
+          <template v-if="!costEstimate.taskCostEstimated">
+            · {{ t("aiObservability.experiments.form.costScoringOnly") }}
+          </template>
+        </p>
 
         <!-- Skip accounting. A row with no expected_output cannot be scored by a
            reference-based scorer, so it is either dropped entirely or scored on
@@ -143,6 +162,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { ExperimentPreview } from "@/services/llm-experiments.service";
+import { formatEstimatedCost } from "../../views/AIObservability/experimentPreview";
 
 const props = defineProps<{
   datasetSelected: boolean;
@@ -163,5 +183,6 @@ const { t } = useI18nTyped();
 
 const emptyValue = computed(() => t("aiObservability.experiments.form.summaryEmpty"));
 const applicability = computed(() => props.preview?.applicability ?? null);
+const costEstimate = computed(() => props.preview?.costEstimate ?? null);
 const formattedSlots = computed(() => (props.preview?.slotCount ?? 0).toLocaleString());
 </script>
