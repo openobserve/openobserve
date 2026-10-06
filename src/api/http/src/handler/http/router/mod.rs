@@ -28,12 +28,14 @@ use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::cloud;
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::org_domains;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    org_domains, organization, rum_analytics, service_accounts, short_url, slos, sourcemaps,
-    status, status_pages, stream, synthetics, users,
+    organization, rum_analytics, service_accounts, short_url, slos, sourcemaps, status,
+    status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
