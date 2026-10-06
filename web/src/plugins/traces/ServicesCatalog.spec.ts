@@ -3162,4 +3162,61 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.selectedServiceRow).toBeNull();
     });
   });
+
+  describe("side panel time range", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const mockOneService = () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks?.data?.(null, {
+          type: "search_response_hits",
+          content: {
+            results: {
+              hits: [{ service_name: "email-service", _is_real_service: 1, total_requests: 1 }],
+            },
+          },
+        });
+        callbacks?.complete?.(null, {});
+      });
+    };
+
+    it("resolves a relative range against the time the panel opens", async () => {
+      mockOneService();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const openedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(openedAt);
+
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("timeRange")).toEqual({
+        startTime: (openedAt - 15 * 60 * 1000) * 1000,
+        endTime: openedAt * 1000,
+      });
+    });
+
+    it("re-resolves when the panel opens again later", async () => {
+      mockOneService();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const firstOpen = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(firstOpen);
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+      wrapper.vm.handleCloseSidePanel();
+      await flushPromises();
+
+      const secondOpen = firstOpen + 10 * 60 * 1000;
+      vi.setSystemTime(secondOpen);
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("timeRange").endTime).toBe(secondOpen * 1000);
+    });
+  });
 });

@@ -10525,11 +10525,9 @@
       "or": "Oder:",
       "askAi": "Bitten Sie die KI, das Tracing einzurichten"
     },
-    "configureFullTextSearch": "um ein Volltextsuchfeld für den Stream zu konfigurieren.",
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
     "timeRangeUpdated": "Der ausgewählte Zeitbereich enthielt diesen Trace nicht. Der Zeitbereich wurde aktualisiert, um dem Zeitstempel des Traces zu entsprechen.",
-    "errorRetrievingTraces": "Beim Abrufen der Traces ist ein Fehler aufgetreten.",
     "fetchingTraces": "Lade Traces...",
     "noStream": {
       "title": "Wähle einen Stream aus, um mit der Erkundung zu beginnen",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Abfragetrend in der Datenbanküberwachung anzeigen"
     },
     "index": {
-      "clickHere": "Hier klicken",
       "changeStreamTitle": "Stream wechseln?",
       "switchStream": "Stream wechseln",
       "cancel": "Abbrechen",

@@ -10525,11 +10525,9 @@
       "or": "Veya:",
       "askAi": "Yapay zekadan izleme ayarlamasını isteyin"
     },
-    "configureFullTextSearch": "akışa tam metin arama alanını yapılandırmak için.",
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
     "timeRangeUpdated": "Seçilen zaman aralığı bu izi içermiyordu. Zaman aralığı, izin zaman damgasıyla eşleşecek şekilde güncellendi.",
-    "errorRetrievingTraces": "İzler alınırken bir hata oluştu.",
     "fetchingTraces": "İzler yükleniyor...",
     "noStream": {
       "title": "Keşfetmeye başlamak için bir yayın seçin",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Veritabanı İzleme'de sorgu eğilimini görüntüle"
     },
     "index": {
-      "clickHere": "Buraya tıklayın",
       "changeStreamTitle": "Akışı değiştir?",
       "switchStream": "Akışı değiştir",
       "cancel": "İptal",

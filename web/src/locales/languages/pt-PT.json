@@ -10525,11 +10525,9 @@
       "or": "Ou:",
       "askAi": "Peça à IA para configurar o rastreamento"
     },
-    "configureFullTextSearch": "para configurar um campo de pesquisa de texto completo para o fluxo.",
     "collapseFields": "Colapsar campos",
     "openFields": "Campos abertos",
     "timeRangeUpdated": "O intervalo de tempo selecionado não incluía este rastreamento. O intervalo de tempo foi atualizado para corresponder ao timestamp do rastreamento.",
-    "errorRetrievingTraces": "Ocorreu um erro ao recuperar os rastreamentos.",
     "fetchingTraces": "Carregando rastreamentos...",
     "noStream": {
       "title": "Escolha um stream para começar a explorar",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Ver tendência de consulta no Monitoramento de Banco de Dados"
     },
     "index": {
-      "clickHere": "Clique aqui",
       "changeStreamTitle": "Alterar stream?",
       "switchStream": "Alternar stream",
       "cancel": "Cancelar",
