@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroup
           :model-value="baseline"
           class="shrink-0"
+          mobile-dropdown
           data-test="dbm-queries-baseline"
           @update:model-value="onBaselineChange"
         >
