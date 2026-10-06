@@ -171,19 +171,8 @@ const ERROR_REASONS = new Set([
 
 const PRESSURE_CONDITIONS = ["MemoryPressure", "DiskPressure", "PIDPressure"];
 
-const KSM_POD_QUERIES: QueryId[] = [
-  "P1",
-  "P2",
-  "P3",
-  "P4",
-  "P6",
-  "P7",
-  "P8",
-  "P9",
-  "P10",
-  "P11",
-  "P12",
-];
+// Only always-fetched current state names a uid: range or tab-only queries would make tiles differ per tab.
+const UID_QUERIES: QueryId[] = ["P1", "P2", "P9", "P10", "P11", "P12"];
 
 const NEAR_LIMIT_PCT = 90;
 
@@ -229,6 +218,17 @@ const worstReadiness = (values: Set<string>): Readiness | null => {
   return values.has("true") ? "true" : null;
 };
 
+// A Completed sidecar or init container is routine, so it never hides a real termination.
+const pickLastReason = (reasons: Map<string, string>) => {
+  const all = [...reasons.values()];
+  return (
+    all.find((reason) => reason === "OOMKilled") ??
+    all.find((reason) => reason !== "Completed") ??
+    all[0] ??
+    null
+  );
+};
+
 const pickReason = (reasons: Map<string, string>) => {
   const all = [...reasons.values()];
   return all.find((reason) => ERROR_REASONS.has(reason)) ?? all[0] ?? null;
@@ -237,7 +237,7 @@ const pickReason = (reasons: Map<string, string>) => {
 // Several uids under one name: the newest kube_pod_created wins, and without it nothing is guessed.
 function selectUids(results: QueryResults): Map<string, string | null> {
   const uids = new Map<string, Set<string>>();
-  for (const id of KSM_POD_QUERIES) {
+  for (const id of UID_QUERIES) {
     for (const s of results.get(id) ?? []) {
       const key = ksmPodKey(s.metric);
       let set = uids.get(key);
@@ -274,6 +274,7 @@ function accumulatePods(results: QueryResults, current: Map<string, string | nul
   const replicaSetOwner = new Map<string, Owner>();
   for (const s of results.get("P5") ?? []) {
     const m = s.metric;
+    if (m.owner_is_controller === "false") continue;
     replicaSetOwner.set(encodeCompound([clusterOf(m), m.namespace ?? "", m.replicaset ?? ""]), {
       kind: m.owner_kind,
       name: m.owner_name,
@@ -297,6 +298,7 @@ function accumulatePods(results: QueryResults, current: Map<string, string | nul
   each("P2", (acc, m) => acc.waiting.set(m.container, m.reason));
   each("P3", (acc, m) => acc.lastTerminated.set(m.container, m.reason));
   each("P4", (acc, m) => {
+    if (m.owner_is_controller === "false") return;
     const rs =
       m.owner_kind === "ReplicaSet"
         ? replicaSetOwner.get(encodeCompound([clusterOf(m), m.namespace ?? "", m.owner_name]))
@@ -315,16 +317,30 @@ function accumulatePods(results: QueryResults, current: Map<string, string | nul
 function accumulateUsage(
   series: Series[] | undefined,
   current: Map<string, string | null>,
+  ambiguous: Set<string>,
 ): Map<string, UsageAcc> {
   const out = new Map<string, UsageAcc>();
+  const uidsWithoutKsm = new Map<string, Set<string>>();
   for (const s of series ?? []) {
     const m = s.metric;
     const key = encodeCompound([clusterOf(m), m.k8s_namespace_name ?? "", m.k8s_pod_name ?? ""]);
     const uid = m.k8s_pod_uid || null;
-    if (uid && current.has(key) && current.get(key) !== uid) continue;
+    const ksmUid = current.get(key);
+    if (uid && current.has(key) && ksmUid !== "" && ksmUid !== uid) continue;
+    if (uid && !current.has(key)) {
+      const seen = uidsWithoutKsm.get(key) ?? new Set<string>();
+      uidsWithoutKsm.set(key, seen.add(uid));
+    }
     const acc = out.get(key);
     if (acc) acc.total += s.value;
     else out.set(key, { total: s.value, clusterLabel: clusterLabelOf(m), uid });
+  }
+  // Without KSM nothing says which instance is current, so several uids are never summed.
+  for (const [key, uids] of uidsWithoutKsm) {
+    if (uids.size > 1) {
+      out.delete(key);
+      ambiguous.add(key);
+    }
   }
   return out;
 }
@@ -423,7 +439,7 @@ function buildPodRow(
     phase,
     ready,
     waitingReason: acc ? pickReason(acc.waiting) : null,
-    lastTerminatedReason: acc ? pickReason(acc.lastTerminated) : null,
+    lastTerminatedReason: acc ? pickLastReason(acc.lastTerminated) : null,
     status: podStatus(acc, phase, ready),
     owner: acc?.owner ?? null,
     node: acc?.node ?? null,
@@ -456,20 +472,21 @@ function buildPodRow(
 function buildPods(results: QueryResults): PodRow[] {
   const current = selectUids(results);
   const accs = accumulatePods(results, current);
-  const cpu = accumulateUsage(results.get("K1"), current);
-  const memory = accumulateUsage(results.get("K2"), current);
-  const keys = new Set<string>([...cpu.keys(), ...memory.keys()]);
+  const kubeletAmbiguous = new Set<string>();
+  const cpu = accumulateUsage(results.get("K1"), current, kubeletAmbiguous);
+  const memory = accumulateUsage(results.get("K2"), current, kubeletAmbiguous);
+  const keys = new Set<string>([...cpu.keys(), ...memory.keys(), ...kubeletAmbiguous]);
   for (const s of results.get("P1") ?? []) keys.add(ksmPodKey(s.metric));
   return [...keys].map((key) => {
-    const ambiguous = current.has(key) && current.get(key) == null;
+    const ambiguous = (current.has(key) && current.get(key) == null) || kubeletAmbiguous.has(key);
     return buildPodRow(
       key,
       results,
       accs.get(key),
       ambiguous,
       current.get(key) ?? null,
-      cpu.get(key),
-      memory.get(key),
+      kubeletAmbiguous.has(key) ? undefined : cpu.get(key),
+      kubeletAmbiguous.has(key) ? undefined : memory.get(key),
     );
   });
 }
@@ -570,15 +587,16 @@ function buildDeployments(results: QueryResults, pods: PodRow[]): DeploymentRow[
       desired: s.value,
       available: available.get(key) ?? null,
       status,
-      pods: results.has("P4")
-        ? pods.filter(
-            (p) =>
-              p.cluster === cluster &&
-              p.namespace === namespace &&
-              p.owner?.kind === "Deployment" &&
-              p.owner.name === name,
-          ).length
-        : null,
+      pods:
+        results.has("P4") && results.has("P5")
+          ? pods.filter(
+              (p) =>
+                p.cluster === cluster &&
+                p.namespace === namespace &&
+                p.owner?.kind === "Deployment" &&
+                p.owner.name === name,
+            ).length
+          : null,
       issues: unhealthy ? ["deploymentsUnavailable"] : [],
     };
   });

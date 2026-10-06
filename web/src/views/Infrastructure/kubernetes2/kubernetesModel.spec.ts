@@ -304,6 +304,20 @@ describe("buildInventory — pods", () => {
     expect(row.issues).toContain("podsRestarting");
   });
 
+  it.each([
+    [{ a: "Completed", b: "OOMKilled", c: "Error" }, "OOMKilled"],
+    [{ a: "Completed", b: "Error" }, "Error"],
+    [{ a: "Completed" }, "Completed"],
+  ])("prefers OOMKilled, then anything but Completed, for Last: %j", (reasons, expected) => {
+    const row = onlyPod({
+      P1: [ksm({ ...pod("l"), phase: "Running" })],
+      P3: Object.entries(reasons).map(([container, reason]) =>
+        ksm({ ...pod("l"), container, reason }),
+      ),
+    });
+    expect(row.lastTerminatedReason).toBe(expected);
+  });
+
   describe("OOMKilled per container", () => {
     const base = (restartsA: number, restartsB: number) => ({
       P1: [ksm({ ...pod("an"), phase: "Running" })],
@@ -335,6 +349,12 @@ describe("buildInventory — pods", () => {
           ],
           P4: [
             ksm({ ...pod("web-a"), owner_kind: "ReplicaSet", owner_name: "web-rs" }),
+            ksm({
+              ...pod("web-a"),
+              owner_kind: "Node",
+              owner_name: "n1",
+              owner_is_controller: "false",
+            }),
             ksm({ ...pod("web-b"), owner_kind: "ReplicaSet", owner_name: "web-rs" }),
           ],
           P5: [
@@ -343,6 +363,13 @@ describe("buildInventory — pods", () => {
               replicaset: "web-rs",
               owner_kind: "Deployment",
               owner_name: "web",
+            }),
+            ksm({
+              namespace: "shop",
+              replicaset: "web-rs",
+              owner_kind: "Other",
+              owner_name: "x",
+              owner_is_controller: "false",
             }),
           ],
           D1: [ksm({ namespace: "shop", deployment: "web" }, 2)],
@@ -354,6 +381,18 @@ describe("buildInventory — pods", () => {
         { kind: "Deployment", name: "web" },
       ]);
       expect(inventory.deployments[0].pods).toBe(2);
+    });
+
+    it("leaves the Deployment pod count unknown without the ReplicaSet owner join", () => {
+      const inventory = buildInventory(
+        results({
+          P1: [ksm({ ...pod("web-a"), phase: "Running" })],
+          P4: [ksm({ ...pod("web-a"), owner_kind: "ReplicaSet", owner_name: "web-rs" })],
+          D1: [ksm({ namespace: "shop", deployment: "web" }, 1)],
+          D2: [ksm({ namespace: "shop", deployment: "web" }, 1)],
+        }),
+      );
+      expect(inventory.deployments[0].pods).toBeNull();
     });
 
     it("keeps a Job owner as it is", () => {
@@ -395,6 +434,47 @@ describe("buildInventory — pods", () => {
       );
       expect(inventory.pods[0].status).toBeNull();
       expect(inventory.pods[0].issues).toEqual([]);
+    });
+  });
+
+  describe("uid handling", () => {
+    it("joins uid-labelled usage when the KSM series carry no uid", () => {
+      const row = onlyPod({
+        P1: [ksm({ namespace: "shop", pod: "p", phase: "Running" })],
+        K2: [kub({ k8s_namespace_name: "shop", k8s_pod_name: "p", k8s_pod_uid: "X" }, 7)],
+      });
+      expect(row.memoryBytes).toBe(7);
+    });
+
+    it("marks a kubeletstats-only pod with several uids ambiguous instead of summing", () => {
+      const row = onlyPod({
+        K2: [
+          kub({ k8s_namespace_name: "shop", k8s_pod_name: "p", k8s_pod_uid: "A" }, 900),
+          kub({ k8s_namespace_name: "shop", k8s_pod_name: "p", k8s_pod_uid: "B" }, 100),
+        ],
+      });
+      expect(row.ambiguous).toBe(true);
+      expect(row.memoryBytes).toBeNull();
+      expect(row.usage).toBeNull();
+    });
+
+    it("counts the same tiles on every tab when only tab or range queries see an old uid", () => {
+      const current = { namespace: "shop", pod: "db-0", uid: "B" };
+      const old = { ...current, uid: "A" };
+      const always = {
+        P1: [ksm({ ...current, phase: "Pending" })],
+        P7: [ksm({ ...old, container: "c" }, 3), ksm({ ...current, container: "c" }, 0)],
+      };
+      const podsTab = buildInventory(
+        results({ ...always, P6: [ksm({ ...old, node: "n1" })], P4: [], P8: [] }),
+      );
+      const deploymentsTab = buildInventory(results({ ...always, P4: [] }));
+      const scope = { cluster: null, namespace: null };
+      expect(issueCounts(podsTab, scope, allIssuesVisible)).toEqual(
+        issueCounts(deploymentsTab, scope, allIssuesVisible),
+      );
+      expect(podsTab.pods[0].ambiguous).toBe(false);
+      expect(issueCounts(podsTab, scope, allIssuesVisible).podsNotRunning).toBe(1);
     });
   });
 
