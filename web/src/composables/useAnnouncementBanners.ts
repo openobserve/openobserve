@@ -42,11 +42,6 @@ export interface Banner {
   counts?: { module: string; count: number }[];
 }
 
-/** A rendered banner; `remaining_secs` ticks for a banner that has an end. */
-export interface RenderedBanner extends Banner {
-  remaining_secs: number | null;
-}
-
 /** The banner as it arrives from the API, before its copy is branded via `raw()`. */
 interface WireBanner extends Omit<Banner, "message" | "cta"> {
   message: string;
@@ -63,9 +58,6 @@ const POLL_INTERVAL_MS = 3 * 60 * 1000;
 const MAX_TIMER_MS = 60 * 60 * 1000;
 
 const DISMISSED_STORAGE_KEY = "o2_dismissed_announcements";
-
-/** How often a countdown on screen moves. */
-const COUNTDOWN_TICK_MS = 30 * 1000;
 
 function readDismissed(): string[] {
   try {
@@ -108,13 +100,12 @@ export function useAnnouncementBanners() {
   const clockSkewMs = ref(0);
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
-  let countdownTimer: ReturnType<typeof setInterval> | undefined;
-  const tick = ref(0);
 
   const isEnterprise = computed(() => config.isEnterprise === "true");
   const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
-  const serverNowMicros = () => (Date.now() + clockSkewMs.value) * 1000;
+  const serverNowMs = () => Date.now() + clockSkewMs.value;
+  const serverNowMicros = () => serverNowMs() * 1000;
 
   const isActive = (banner: Banner, nowMicros: number) => {
     if (banner.starts_at != null && nowMicros < banner.starts_at) return false;
@@ -135,15 +126,7 @@ export function useAnnouncementBanners() {
   });
 
   /** Same resolver the settings preview uses, so the two always agree. */
-  const renderedBanners = computed<RenderedBanner[]>(() => {
-    void tick.value;
-    const nowMicros = serverNowMicros();
-    return orderBanners(visibleBanners.value).map((banner) => ({
-      ...banner,
-      remaining_secs:
-        banner.ends_at != null ? Math.floor((banner.ends_at - nowMicros) / 1_000_000) : null,
-    }));
-  });
+  const renderedBanners = computed<Banner[]>(() => orderBanners(visibleBanners.value));
 
   const clearBoundaryTimer = () => {
     if (boundaryTimer) {
@@ -216,7 +199,6 @@ export function useAnnouncementBanners() {
   const start = () => {
     void fetchBanners();
     pollTimer = setInterval(() => void fetchBanners(), POLL_INTERVAL_MS);
-    countdownTimer = setInterval(() => (tick.value += 1), COUNTDOWN_TICK_MS);
   };
 
   // Switching orgs changes which banners apply, so refetch rather than carrying
@@ -225,7 +207,6 @@ export function useAnnouncementBanners() {
 
   onScopeDispose(() => {
     if (pollTimer) clearInterval(pollTimer);
-    if (countdownTimer) clearInterval(countdownTimer);
     clearBoundaryTimer();
   });
 
@@ -234,5 +215,6 @@ export function useAnnouncementBanners() {
     dismiss,
     start,
     refresh: fetchBanners,
+    serverNowMs,
   };
 }

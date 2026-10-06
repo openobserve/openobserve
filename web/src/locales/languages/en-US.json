@@ -9042,7 +9042,8 @@
       },
       "banner": {
         "ended": "ended",
-        "endsInUnderMinute": "ends in under a minute",
+        "endsInUnderMinute": "ends in less than a minute",
+        "endsInMinutes": "ends in {count} minute | ends in {count} minutes",
         "endsIn": "ends in {duration}",
         "count": "{module} {count}",
         "showBanner": "Show a banner to everyone in the org while this downtime is active",

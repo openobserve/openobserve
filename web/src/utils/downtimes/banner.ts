@@ -24,12 +24,26 @@ export interface BannerCount {
   count: number;
 }
 
-/** "ends in 1 h 30 min", "ends in under a minute", or "ended"; minutes round up. */
+const MINUTE_SECS = 60;
+const HOUR_SECS = 3600;
+
+/** "ends in 2 h 15 min", "ends in 5 minutes", "ends in less than a minute", or "ended"; minutes round down. */
 export function countdownText(remainingSecs: number, t: TranslateFn): I18nText {
   if (remainingSecs <= 0) return t("alerts.downtimes.banner.ended");
-  if (remainingSecs < 60) return t("alerts.downtimes.banner.endsInUnderMinute");
-  const minutes = Math.ceil(remainingSecs / 60);
-  return t("alerts.downtimes.banner.endsIn", { duration: formatDuration(minutes * 60, t) });
+  if (remainingSecs < MINUTE_SECS) return t("alerts.downtimes.banner.endsInUnderMinute");
+  const minutes = Math.floor(remainingSecs / MINUTE_SECS);
+  if (remainingSecs < HOUR_SECS) {
+    return t("alerts.downtimes.banner.endsInMinutes", { count: minutes }, minutes);
+  }
+  return t("alerts.downtimes.banner.endsIn", {
+    duration: formatDuration(minutes * MINUTE_SECS, t),
+  });
+}
+
+/** Milliseconds until `countdownText` reads differently, or `null` once it reads "ended". */
+export function msUntilCountdownChanges(remainingMs: number): number | null {
+  if (remainingMs <= 0) return null;
+  return remainingMs % (MINUTE_SECS * 1000) || MINUTE_SECS * 1000;
 }
 
 const isModule = (m: string): m is TargetModule =>
