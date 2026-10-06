@@ -145,11 +145,14 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
             NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
         } else if s.contains('.') {
             // Handle formats with decimal seconds: "2025-05-14T01:15:25.047"
+            let fraction = s.split('.').next_back().unwrap_or("");
+            // the zone is part of this text, so "12Z" and "12345Z" are as long as 3 and 6 digits
+            let zone_less = fraction.bytes().all(|b| b.is_ascii_digit());
             // First check if it has milliseconds (3 decimal places)
-            if s.split('.').next_back().unwrap_or("").len() == 3 {
+            if zone_less && fraction.len() == 3 {
                 let fmt = "%Y-%m-%dT%H:%M:%S%.3f";
                 NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
-            } else if s.split('.').next_back().unwrap_or("").len() == 6 {
+            } else if zone_less && fraction.len() == 6 {
                 // Handle microseconds (6 decimal places)
                 let fmt = "%Y-%m-%dT%H:%M:%S%.6f";
                 NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
@@ -422,6 +425,27 @@ mod tests {
         );
         assert!(test_fn("2021-01-01T00:00:00.123Z").is_ok_and(|v| v == 1609459200123000));
         assert!(test_fn("2021-01-01T00:00:00.123456789").is_err());
+    }
+
+    #[test]
+    fn test_parse_str_to_time_rfc3339_fraction_lengths() {
+        let v_exp_arr = [
+            ("2021-01-01T00:00:00.1Z", 1609459200100000),
+            ("2021-01-01T00:00:00.12Z", 1609459200120000),
+            ("2021-01-01T00:00:00.123Z", 1609459200123000),
+            ("2021-01-01T00:00:00.1234Z", 1609459200123400),
+            ("2021-01-01T00:00:00.12345Z", 1609459200123450),
+            ("2021-01-01T00:00:00.123456Z", 1609459200123456),
+            ("2021-01-01T00:00:00.1234567Z", 1609459200123456),
+            ("2021-01-01T00:00:00.12345678Z", 1609459200123456),
+            ("2021-01-01T00:00:00.123456789Z", 1609459200123456),
+            ("2021-01-01T00:00:00.12+08:00", 1609430400120000),
+            ("2021-01-01T00:00:00.12345-08:00", 1609488000123450),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
+            assert_eq!(got, Some(v_exp), "{input}");
+        }
     }
 
     #[test]
