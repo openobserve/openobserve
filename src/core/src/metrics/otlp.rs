@@ -71,6 +71,10 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+/// The `flag` of every stored gauge or sum row; a stale marker's too, so its series keeps its
+/// labels.
+const STORED_NUMBER_POINT_FLAG: &str = "DATA_POINT_FLAGS_DO_NOT_USE";
+
 /// A number point's labels, rebuilt per point on top of its metric's base labels.
 struct PointLabels {
     /// Slots past `len` are spare; their strings keep their capacity for the next point.
@@ -771,7 +775,7 @@ fn stored_as_counter(
             .is_some_and(|meta| meta.metric_type == MetricType::Counter)
 }
 
-/// One hashed record per gauge or sum data point that has a value.
+/// One hashed record per gauge or sum data point that writes one, stale markers included.
 fn number_point_records<'a>(
     rec: &json::Value,
     data_points: impl IntoIterator<Item = &'a NumberDataPoint>,
@@ -870,7 +874,7 @@ fn append_number_point(
         "start_time",
         start_time.format(data_point.start_time_unix_nano),
     );
-    scratch.push(base_labels.len(), "flag", data_point_flag(data_point.flags));
+    scratch.push(base_labels.len(), "flag", STORED_NUMBER_POINT_FLAG);
 
     let labels = scratch.labels();
     let Some(label_bytes) = columnar.resolve_columns(labels) else {
@@ -987,7 +991,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bo
     rec[VALUE_LABEL] = value.map_or(json::Value::Null, Into::into);
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
-    rec["flag"] = data_point_flag(data_point.flags).into();
+    rec["flag"] = STORED_NUMBER_POINT_FLAG.into();
     process_exemplars(rec, &data_point.exemplars);
     true
 }
@@ -1226,7 +1230,7 @@ fn data_point_flag(flags: u32) -> &'static str {
     }
 }
 
-/// A point carrying `NO_RECORDED_VALUE` marks a gap (a staleness marker); it writes no record.
+/// A point carrying `NO_RECORDED_VALUE` marks a gap: a staleness marker.
 fn no_recorded_value(flags: u32) -> bool {
     flags & (DataPointFlags::NoRecordedValueMask as u32) != 0
 }
@@ -3794,6 +3798,12 @@ mod tests {
             assert_eq!(records[1][VALUE_LABEL], json::Value::Null);
             assert_eq!(records[1][TIMESTAMP_COL_NAME], json!(1640995260000000_i64));
             assert_eq!(records[0][HASH_LABEL], records[1][HASH_LABEL]);
+            // a new label value would relabel the series and split `by (flag)`
+            assert_eq!(records[1]["flag"], records[0]["flag"]);
+            assert_eq!(
+                records[1]["flag"],
+                json!(DataPointFlags::DoNotUse.as_str_name())
+            );
         }
 
         /// The flag is a bit mask, so it must be honoured when other bits are set too.
@@ -3838,6 +3848,10 @@ mod tests {
             let values = batch.column(3).as_primitive::<Float64Type>();
             assert_eq!(values.len(), 1);
             assert!(values.is_null(0));
+            assert_eq!(
+                batch.column(2).as_string::<i32>().value(0),
+                DataPointFlags::DoNotUse.as_str_name()
+            );
         }
 
         #[test]

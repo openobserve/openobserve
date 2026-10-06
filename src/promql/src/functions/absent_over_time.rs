@@ -158,6 +158,14 @@ mod tests {
     }
 
     #[test]
+    fn test_absent_over_time_counts_a_marker_only_window_as_absent() {
+        let mut marked = series(&[3000]);
+        marked.samples[0].value = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let result = absent_over_time_test_helper(Value::Matrix(vec![marked])).unwrap();
+        assert_eq!(reported(&result), vec![(3000, 1.0)]);
+    }
+
+    #[test]
     fn test_absent_over_time_invalid_input_returns_err() {
         let result = absent_over_time_test_helper(Value::Float(1.0));
         assert!(result.is_err());

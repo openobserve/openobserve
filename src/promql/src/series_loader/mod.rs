@@ -258,8 +258,12 @@ fn append_batch_samples(
     let mut i = 0;
     while i < hashes.len() {
         let run_len = batch_run_len(hashes, i);
-        let entry = match metrics.entry(hashes[i]) {
-            Entry::Occupied(entry) => entry.into_mut(),
+        let rows = i..i + run_len;
+        match metrics.entry(hashes[i]) {
+            Entry::Occupied(entry) => {
+                let samples = &mut entry.into_mut().samples;
+                extend_samples(samples, timestamps, values, rows, 0, stale_markers);
+            }
             Entry::Vacant(entry) => {
                 let capacity = initial_series_capacity(
                     run_len,
@@ -268,22 +272,19 @@ fn append_batch_samples(
                     timestamps[i + run_len - 1],
                     query_duration,
                 );
-                entry.insert(RangeValue {
-                    labels: vec![],
-                    samples: Vec::with_capacity(capacity),
-                    exemplars: None,
-                    time_window: None,
-                })
+                let mut samples = Vec::with_capacity(capacity);
+                extend_samples(&mut samples, timestamps, values, rows, 0, stale_markers);
+                // with markers off, a series of only NULL rows is no series at all
+                if !samples.is_empty() {
+                    entry.insert(RangeValue {
+                        labels: vec![],
+                        samples,
+                        exemplars: None,
+                        time_window: None,
+                    });
+                }
             }
-        };
-        extend_samples(
-            &mut entry.samples,
-            timestamps,
-            values,
-            i..i + run_len,
-            0,
-            stale_markers,
-        );
+        }
         i += run_len;
     }
 }
@@ -631,6 +632,12 @@ mod tests {
             .map(|s| (s.timestamp, s.value))
             .collect();
         assert_eq!(kept, vec![(1, 1.0), (3, 3.0)]);
+
+        // a series whose rows are all NULL must not come back as an empty series
+        let mut metrics = HashMap::new();
+        let values = Float64Array::from(vec![Some(1.0), None, None]);
+        append_batch_samples(&mut metrics, &[7, 8, 8], &[1, 2, 3], &values, 1, 0, false);
+        assert_eq!(metrics.keys().copied().collect::<Vec<_>>(), vec![7]);
     }
 
     #[tokio::test]

@@ -82,12 +82,13 @@ pub enum SanitizedValue {
 impl SanitizedValue {
     /// The row's `value` cell: `Some(None)` is a stale marker's NULL, `None` writes no row.
     pub fn row_value(self) -> Option<Option<f64>> {
+        self.row_value_with(config::get_config().prom.staleness_markers_enabled)
+    }
+
+    fn row_value_with(self, stale_markers: bool) -> Option<Option<f64>> {
         match self {
             Self::Value(v) => Some(Some(v)),
-            Self::Stale => config::get_config()
-                .prom
-                .staleness_markers_enabled
-                .then_some(None),
+            Self::Stale => stale_markers.then_some(None),
             Self::Drop => None,
         }
     }
@@ -432,6 +433,15 @@ mod tests {
         assert_eq!(SanitizedValue::Value(1.5).row_value(), Some(Some(1.5)));
         assert_eq!(SanitizedValue::Stale.row_value(), Some(None));
         assert_eq!(SanitizedValue::Drop.row_value(), None);
+    }
+
+    #[test]
+    fn test_row_value_drops_a_stale_marker_with_markers_off() {
+        assert_eq!(SanitizedValue::Stale.row_value_with(false), None);
+        assert_eq!(
+            SanitizedValue::Value(1.5).row_value_with(false),
+            Some(Some(1.5))
+        );
     }
 
     #[test]

@@ -53,6 +53,8 @@ pub(super) struct ColumnarStream {
     /// Scratch reused across the samples of a request, not state.
     label_cols: Vec<usize>,
     present: Vec<bool>,
+    /// Whether the JSON twin of a stale marker keeps `"value":null`; OTLP's flattens it away.
+    json_null_value: bool,
 }
 
 impl ColumnarStream {
@@ -89,7 +91,14 @@ impl ColumnarStream {
                 .req_cols_per_record_limit
                 .saturating_sub(IDENTITY_COLUMNS),
             label_cols: Vec::new(),
+            json_null_value: false,
         })
+    }
+
+    /// Counts a stale marker's `"value":null` in its size, as remote write's JSON path does.
+    pub(super) fn keeping_json_null_value(mut self) -> Self {
+        self.json_null_value = true;
+        self
     }
 
     /// `None` sends the series down the JSON path; `Some` is its share of the record's json size.
@@ -140,7 +149,13 @@ impl ColumnarStream {
         bucket
             .column(self.hash_col, ColumnKind::UInt64)
             .append_u64(hash);
-        bucket.finish_row(estimated_record_bytes(label_bytes, value, timestamp, hash));
+        let value_bytes = value_entry_bytes(value, self.json_null_value);
+        bucket.finish_row(estimated_record_bytes(
+            label_bytes,
+            value_bytes,
+            timestamp,
+            hash,
+        ));
     }
 
     pub(super) fn into_entries(
@@ -152,7 +167,8 @@ impl ColumnarStream {
     }
 }
 
-/// Streams nothing downstream needs as JSON: no pipeline, UDS, alert, partition key or odd type.
+/// Remote write's streams nothing downstream needs as JSON: no pipeline, UDS, alert, partition key
+/// or odd type.
 pub(super) fn plan_columnar_streams(
     org_id: &str,
     unique_metrics: &HashSet<String>,
@@ -174,7 +190,7 @@ pub(super) fn plan_columnar_streams(
                 stream_alerts_map,
                 stream_partitioning_map,
             )
-            .map(|columnar| (name.clone(), columnar))
+            .map(|columnar| (name.clone(), columnar.keeping_json_null_value()))
         })
         .collect()
 }
@@ -259,19 +275,24 @@ fn estimated_label_bytes<L: LabelPair>(labels: &[L]) -> usize {
         .sum()
 }
 
+/// The `value` entry's share of the JSON size; `None` is a stale marker.
+fn value_entry_bytes(value: Option<f64>, json_null_value: bool) -> usize {
+    match value {
+        Some(value) => estimate_json_entry_bytes(VALUE_LABEL, value.json_bytes()),
+        None if json_null_value => estimate_json_entry_bytes(VALUE_LABEL, "null".len()),
+        None => 0,
+    }
+}
+
 /// What `estimate_json_bytes` would count for this record, without building it.
 fn estimated_record_bytes(
     label_bytes: usize,
-    value: Option<f64>,
+    value_bytes: usize,
     timestamp: i64,
     hash: u64,
 ) -> usize {
-    // OTLP's JSON path flattens a stale marker's NULL `value` away
-    let value_entry = value.map_or(0, |value| {
-        estimate_json_entry_bytes(VALUE_LABEL, value.json_bytes())
-    });
     let entries = label_bytes
-        + value_entry
+        + value_bytes
         + estimate_json_entry_bytes(TIMESTAMP_COL_NAME, timestamp.json_bytes())
         + estimate_json_entry_bytes(HASH_LABEL, hash.json_bytes());
     // {?} extra 2, less the ',' the entry rule counts for the last entry
@@ -340,10 +361,29 @@ mod tests {
     }
 
     #[test]
-    fn test_estimated_record_bytes_counts_no_value_for_a_stale_marker() {
-        let marker = estimated_record_bytes(0, None, 5, 42);
-        let sample = estimated_record_bytes(0, Some(1.0), 5, 42);
-        assert_eq!(sample - marker, estimate_json_entry_bytes(VALUE_LABEL, 3));
+    fn test_stale_marker_size_matches_each_json_twin() {
+        let labels = vec![(NAME_LABEL.to_string(), "up".to_string())];
+        let (timestamp, hash) = (1_700_000_000_000_000_i64, 42_u64);
+        let mut record = json::Map::new();
+        record.insert(NAME_LABEL.to_string(), json::json!("up"));
+        record.insert(TIMESTAMP_COL_NAME.to_string(), json::json!(timestamp));
+        record.insert(HASH_LABEL.to_string(), json::json!(hash));
+        // OTLP flattens the NULL away; remote write keeps `"value":null`
+        let otlp = json::estimate_json_bytes(&json::Value::Object(record.clone()));
+        record.insert(VALUE_LABEL.to_string(), json::Value::Null);
+        let remote_write = json::estimate_json_bytes(&json::Value::Object(record));
+
+        for (keep_null, expected) in [(false, otlp), (true, remote_write)] {
+            let schema = columnar_schema(&[NAME_LABEL]);
+            let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
+            if keep_null {
+                columnar = columnar.keeping_json_null_value();
+            }
+            let label_bytes = columnar.resolve_columns(&labels).unwrap();
+            columnar.append(&labels, label_bytes, None, timestamp, hash);
+            let entries = columnar.into_entries("nexus", "up").unwrap();
+            assert_eq!(entries[0].data_size, expected, "keep_null: {keep_null}");
+        }
     }
 
     #[test]
@@ -395,7 +435,12 @@ mod tests {
         let record = map;
 
         assert_eq!(
-            estimated_record_bytes(estimated_label_bytes(&labels), Some(value), timestamp, hash),
+            estimated_record_bytes(
+                estimated_label_bytes(&labels),
+                value_entry_bytes(Some(value), false),
+                timestamp,
+                hash
+            ),
             json::estimate_json_bytes(&json::Value::Object(record))
         );
     }

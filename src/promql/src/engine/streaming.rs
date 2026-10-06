@@ -1637,4 +1637,70 @@ mod tests {
             );
         }
     }
+
+    /// The values an instant query answers at `BASE + seconds`, all series together.
+    async fn instant_values(provider: StreamingProvider, query: &str, seconds: i64) -> Vec<f64> {
+        enable_streaming();
+        let at = BASE + seconds * SECOND;
+        let eval_ctx = EvalContext::new(at, at, 0, "test_trace".into());
+        let mut ctx = PromqlContext::new(
+            create_test_query_ctx("test_trace", "test_org", 30),
+            provider,
+            vec![],
+        );
+        ctx.start = at;
+        ctx.end = at;
+        let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
+        let expr = promql_parser::parser::parse(query).unwrap();
+        match engine.exec(&expr).await.unwrap().0 {
+            Value::None => vec![],
+            value => canonical(value)
+                .into_iter()
+                .flat_map(|(_, samples)| samples.into_iter().map(|(_, value)| value))
+                .collect(),
+        }
+    }
+
+    /// Ported from Prometheus `promql/promqltest/testdata/staleness.test`, with its 3.x
+    /// left-open windows.
+    #[tokio::test]
+    async fn test_upstream_staleness_cases() {
+        let stale = f64::from_bits(STALE_NAN_BITS);
+        // load 10s: metric 0 1 stale 2
+        let marked = [(0, 0.0), (10, 1.0), (20, stale), (30, 2.0)];
+        let marked: Vec<_> = marked
+            .iter()
+            .map(|&(s, v)| (BASE + s * SECOND, 7, v))
+            .collect();
+        // load 10s: metric 0
+        let single = [(BASE, 7, 0.0)];
+        type Case<'a> = (&'a [(i64, u64, f64)], &'a str, i64, &'a [f64]);
+        let cases: [Case; 15] = [
+            (&marked, "m", 10, &[1.0]),
+            (&marked, "m", 20, &[]),
+            (&marked, "m", 30, &[2.0]),
+            (&marked, "m", 40, &[2.0]),
+            (&marked, "m", 329, &[2.0]),
+            (&marked, "m", 330, &[]),
+            (&marked, "count_over_time(m[1m])", 30, &[3.0]),
+            (&marked, "count_over_time(m[1s])", 10, &[1.0]),
+            (&marked, "count_over_time(m[10s])", 10, &[1.0]),
+            (&marked, "count_over_time(m[1s])", 20, &[]),
+            (&marked, "count_over_time(m[10s])", 20, &[]),
+            (&single, "m", 0, &[0.0]),
+            (&single, "m", 150, &[0.0]),
+            (&single, "m", 299, &[0.0]),
+            (&single, "m", 300, &[]),
+        ];
+        for streams in [true, false] {
+            for (rows, query, seconds, expected) in cases {
+                let provider = provider_rows(streams, false, rows);
+                assert_eq!(
+                    instant_values(provider, query, seconds).await,
+                    expected,
+                    "{query} at {seconds}s (streams: {streams})"
+                );
+            }
+        }
+    }
 }

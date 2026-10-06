@@ -394,13 +394,14 @@ pub async fn remote_write(
             let has_writable = event
                 .samples
                 .iter()
-                .any(|s| super::sanitize_metric_value(s.value).row_value().is_some());
+                .any(|s| sample_cell(s.value, metric_schema_map.get(&metric_name)).is_some());
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 return Ok(());
             }
             for sample in &event.samples {
-                if let Some(value) = super::sanitize_metric_value(sample.value).row_value() {
+                if let Some(value) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
+                {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
@@ -425,17 +426,10 @@ pub async fn remote_write(
         let can_move_labels = event.histograms.is_empty();
         for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
-            // NaN -> no observation -> no record, a stale marker -> NULL; infinities clamp.
-            // Shared with the OTLP writer so the two ingestion paths cannot drift apart on this.
-            let Some(sample_val) = super::sanitize_metric_value(sample.value).row_value() else {
+            let Some(sample_val) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
+            else {
                 continue;
             };
-            // a stale marker needs the stream's `value` column; a new stream gets it from samples
-            if sample_val.is_none()
-                && !ingest::has_value_column(metric_schema_map.get(&metric_name))
-            {
-                continue;
-            }
 
             if !gate.admit().await {
                 // do not accept any entries for this request
@@ -1095,6 +1089,13 @@ fn finish_identity_columns(json_data: &mut [PendingRecord]) {
             json::Value::Number((*timestamp).into()),
         );
     }
+}
+
+/// A sample's `value` cell under the policy OTLP shares, `None` for no row; `Some(None)` is a
+/// stale marker, kept only once the stream has a `value` column, which real samples create.
+fn sample_cell(value: f64, schema: Option<&SchemaCache>) -> Option<Option<f64>> {
+    let cell = super::sanitize_metric_value(value).row_value()?;
+    (cell.is_some() || ingest::has_value_column(schema)).then_some(cell)
 }
 
 /// `value: None` is a stale marker, written as a NULL `value`.
@@ -1810,6 +1811,29 @@ mod tests {
             crate::metrics::signature_of_series_labels(&label_pairs),
             crate::metrics::signature_without_labels(&record, &[VALUE_LABEL])
         );
+    }
+
+    #[test]
+    fn test_sample_cell_keeps_a_stale_marker_only_for_a_stream_with_a_value_column() {
+        use datafusion::arrow::datatypes::{DataType, Field};
+
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let with_value = SchemaCache::new(Schema::new(vec![
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+        ]));
+        let without_value = SchemaCache::new(Schema::new(vec![Field::new(
+            NAME_LABEL,
+            DataType::Utf8,
+            true,
+        )]));
+
+        assert_eq!(sample_cell(stale, Some(&with_value)), Some(None));
+        // a first batch made only of markers: no stream yet, so no row and no schema
+        assert_eq!(sample_cell(stale, None), None);
+        assert_eq!(sample_cell(stale, Some(&without_value)), None);
+        assert_eq!(sample_cell(1.5, None), Some(Some(1.5)));
+        assert_eq!(sample_cell(f64::NAN, Some(&with_value)), None);
     }
 
     #[test]
