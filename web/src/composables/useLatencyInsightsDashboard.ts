@@ -393,9 +393,10 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
 
       const valueExpr = `COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)')`;
       // A heatmap box carries the editor text from before the box; an empty one means no filter, never the banded baseFilter.
-      const preBoxFilter = config.baselineFilter?.trim();
-      const scopeFilter =
-        config.baselineFilter === undefined ? baseFilters : preBoxFilter ? `(${preBoxFilter})` : "";
+      const preBoxFilter =
+        config.baselineFilter === undefined ? baseFilters : config.baselineFilter.trim();
+      // Grouped, so an OR filter cannot bind against the time and duration clauses.
+      const scopeFilter = preBoxFilter ? `(${preBoxFilter})` : "";
       const toWhere = (parts: string[]) => {
         const kept = parts.filter((f) => f);
         return kept.length ? `WHERE ${kept.join(" AND ")}` : "";
@@ -417,7 +418,7 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
             approx_percentile_cont(duration, \${percentile}) AS percentile_latency
           FROM "${config.streamName}"
           ${tracesSelectedWhere}
-          GROUP BY ${dimensionName}
+          GROUP BY ${valueExpr}
           ORDER BY percentile_latency DESC LIMIT 5)
         SELECT value, series, percentile_latency FROM selected
         UNION
@@ -425,7 +426,7 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
           approx_percentile_cont(duration, \${percentile}) AS percentile_latency
         FROM "${config.streamName}"
         ${tracesBaselineWhere} AND ${inSelected}
-        GROUP BY ${dimensionName}
+        GROUP BY ${valueExpr}
         ORDER BY percentile_latency DESC
       `.trim();
     }

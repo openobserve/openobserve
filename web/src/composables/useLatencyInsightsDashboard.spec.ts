@@ -100,6 +100,22 @@ describe("useLatencyInsightsDashboard — buildComparisonQuery", () => {
       expect(baseline).not.toContain("()");
     });
 
+    it("parenthesises an OR baseFilter on both sides when no baselineFilter is given", () => {
+      const sql = sqlOf(config({ baseFilter: "a = '1' or b = '2'" }));
+      expect(part(sql, "Selected")).toContain("duration < 500 AND (a = '1' or b = '2')");
+      expect(part(sql, "Baseline")).toContain(
+        `_timestamp <= ${BASE.endTime} AND (a = '1' or b = '2')`,
+      );
+    });
+
+    it("groups both sides by the displayed value, so null and '(no value)' share one row", () => {
+      const sql = sqlOf(config({ baselineFilter }));
+      const grouped = "GROUP BY COALESCE(CAST(service_name AS VARCHAR), '(no value)')";
+      expect(part(sql, "Selected")).toContain(grouped);
+      expect(part(sql, "Baseline")).toContain(grouped);
+      expect(sql).not.toMatch(/GROUP BY service_name\b/);
+    });
+
     it("keeps baseFilter when no baselineFilter is given", () => {
       const sql = sqlOf(config());
       expect(part(sql, "Selected")).toContain("service_name = 'api'");
