@@ -32,8 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, rum_analytics, service_accounts, short_url, slos, sourcemaps, status,
-    status_pages, stream, synthetics, users,
+    organization, query_history, rum_analytics, service_accounts, short_url, slos, sourcemaps,
+    status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
@@ -999,6 +999,9 @@ pub fn service_routes() -> Router {
         // Saved views
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
+
+        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
+        .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
 
         // Functions
         .route("/{org_id}/functions", get(functions::list_functions).post(functions::save_function))
@@ -2807,6 +2810,41 @@ mod tests {
             .unwrap();
 
         assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+    }
+
+    // auth_middleware answers before routing, so the limit is pinned on a router with these routes.
+    #[tokio::test]
+    async fn query_history_body_over_the_route_limit_is_413_before_the_handler() {
+        let app = Router::new()
+            .route(
+                "/{org_id}/query_history",
+                post(query_history::record)
+                    .layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)),
+            )
+            .layer(DefaultBodyLimit::max(get_config().limit.req_payload_limit));
+        let body_of = |len: usize| {
+            let query = "x".repeat(len);
+            serde_json::to_vec(&serde_json::json!({ "query": query, "context": {} })).unwrap()
+        };
+        let post_body = |body: Vec<u8>| {
+            Request::builder()
+                .method(Method::POST)
+                .uri("/default/query_history")
+                .header("content-type", "application/json")
+                .header("user_id", "someone@example.com")
+                .body(Body::from(body))
+                .unwrap()
+        };
+
+        let over = body_of(query_history::MAX_BODY_BYTES);
+        assert!(over.len() > query_history::MAX_BODY_BYTES);
+        let resp = app.clone().oneshot(post_body(over)).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+
+        // Under the route limit the handler runs and its own 16 KB field check answers.
+        let under = body_of(query_history::MAX_BODY_BYTES / 2);
+        let resp = app.oneshot(post_body(under)).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     /// axum resolves the route table when the `Router` is built, panicking on two paths it cannot

@@ -42,7 +42,17 @@ export interface ExplorerFilterState {
   viewMode: "grid" | "rows";
   /** Page mode — the Explore grid vs the query-driven Visualize workspace. */
   mode: "explore" | "visualize" | "workspace";
+  /** The open detail view's metric; not a mode, so closing returns to the grid that was showing. */
+  metric?: string | null;
+  /** The detail view's tab. Meaningful only alongside `metric`. */
+  tab?: DetailTab | null;
+  /** The label the Breakdown tab charts. Meaningful only alongside `metric`. */
+  breakdownLabel?: string | null;
 }
+
+export type DetailTab = "breakdown" | "related";
+
+const DETAIL_TABS = new Set<string>(["breakdown", "related"]);
 
 /** Every key this module may write — cleared before each sync so a removed filter leaves the URL. */
 export const EXPLORER_FILTER_PARAM_KEYS = [
@@ -55,6 +65,10 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "sort",
   "view",
   "mode",
+  // Never `stream`: that is an editor key and would redirect /metrics to the editor.
+  "metric",
+  "tab",
+  "breakdown_label",
 ] as const;
 
 const TYPE_IDS = new Set(["counter", "gauge", "histogram", "summary", "other"]);
@@ -93,6 +107,11 @@ export function explorerFiltersToQuery(
   if (state.viewMode === "rows") query.view = "rows";
   // Explore is the default landing mode, so only the non-default is serialized.
   if (state.mode === "visualize" || state.mode === "workspace") query.mode = state.mode;
+  if (state.metric) {
+    query.metric = state.metric;
+    if (state.tab) query.tab = state.tab;
+    if (state.breakdownLabel) query.breakdown_label = state.breakdownLabel;
+  }
   return query;
 }
 
@@ -128,8 +147,21 @@ export function queryToExplorerFilters(
   if (query.view === "rows") out.viewMode = "rows";
   if (query.mode === "visualize" || query.mode === "workspace") out.mode = query.mode;
 
+  if (typeof query.metric === "string" && query.metric) {
+    out.metric = query.metric;
+    if (typeof query.tab === "string" && DETAIL_TABS.has(query.tab)) {
+      out.tab = query.tab as DetailTab;
+    }
+    // A label name is embedded into PromQL, so only a well-formed one is kept.
+    if (typeof query.breakdown_label === "string" && LABEL_NAME.test(query.breakdown_label)) {
+      out.breakdownLabel = query.breakdown_label;
+    }
+  }
+
   return out;
 }
+
+const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 // `=~` before `=` so the regex operator is not split into `=` + a value
 // starting with `~`. The `s` flag lets a matcher value carry newlines.

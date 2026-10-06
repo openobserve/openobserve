@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, type PropType } from "vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
+import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
 
 export default defineComponent({
   name: "MetricCardChart",
@@ -59,6 +60,13 @@ export default defineComponent({
     unitCustom: { type: String, default: null },
     bucketUnit: { type: String, default: null },
     bucketUnitCustom: { type: String, default: null },
+    /** A heatmap's colour range, when it must match other heatmaps drawn beside it. */
+    visualMapRange: {
+      type: Object as PropType<{ min: number; max: number } | null>,
+      default: null,
+    },
+    /** Overrides the precision read off `results`, so heatmaps drawn together label buckets alike. */
+    decimals: { type: Number, default: null },
     color: { type: String, required: true },
     height: { type: String, default: "100%" },
     /**
@@ -78,6 +86,7 @@ export default defineComponent({
      * place to author an alert.
      */
     allowAlertCreation: { type: Boolean, default: false },
+    legend: { type: Boolean, default: false },
     /** The card's exemplar state; the explorer grid owns the fetch. */
     injectedExemplars: {
       type: Object as PropType<InjectedExemplars | undefined>,
@@ -92,32 +101,6 @@ export default defineComponent({
    */
   emits: ["error", "zoom"],
   setup(props, { emit }) {
-    /**
-     * Decimal places that keep the axis readable at the data's magnitude.
-     *
-     * The shared formatter applies no magnitude scaling to `numbers`/`custom`
-     * units, so a rate of 0.004 c/s renders as a column of identical "0.00"
-     * ticks at the default 2 decimals. Scaling the precision to the series keeps
-     * the axis readable.
-     */
-    const adaptiveDecimals = () => {
-      let max = 0;
-      for (const response of props.results ?? []) {
-        for (const series of response?.result ?? []) {
-          for (const [, raw] of series?.values ?? []) {
-            const v = Math.abs(parseFloat(raw));
-            if (Number.isFinite(v) && v > max) max = v;
-          }
-        }
-      }
-      if (max === 0) return 2;
-      if (max < 0.001) return 6;
-      if (max < 0.01) return 5;
-      if (max < 0.1) return 4;
-      if (max < 1) return 3;
-      return 2;
-    };
-
     /** How many series the chart will actually draw, across every query. */
     const seriesCount = () => {
       let n = 0;
@@ -135,10 +118,10 @@ export default defineComponent({
      * Hashing the series NAME into the palette also keeps p50 the same colour on
      * every re-render and between the tile and the card it applies to.
      */
-    const colorConfig = () =>
-      seriesCount() > 1
-        ? { mode: "palette-classic-by-series" }
-        : { mode: "fixed", fixedColor: [props.color] };
+    const colorConfig = () => {
+      if (seriesCount() <= 1) return { mode: "fixed", fixedColor: [props.color] };
+      return { mode: props.legend ? "palette-classic" : "palette-classic-by-series" };
+    };
 
     /**
      * The panel schema. The same shape the drill-in hands the editor, which is
@@ -159,8 +142,8 @@ export default defineComponent({
       config: {
         unit: props.unit,
         unit_custom: props.unitCustom,
-        decimals: adaptiveDecimals(),
-        show_legends: false,
+        decimals: props.decimals ?? adaptiveDecimals(props.results),
+        show_legends: props.legend,
         // Gridlines make a small chart readable — without them a sparkline is
         // just a shape. The heatmap is solid colour, so they'd only add noise.
         show_gridlines: props.chartType !== "heatmap",
@@ -182,6 +165,7 @@ export default defineComponent({
               compact_preview: true,
               bucket_unit: props.bucketUnit,
               bucket_unit_custom: props.bucketUnitCustom,
+              ...(props.visualMapRange ? { visual_map_range: props.visualMapRange } : {}),
             }
           : {}),
       },
