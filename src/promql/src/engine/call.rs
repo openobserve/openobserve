@@ -254,6 +254,16 @@ impl Engine {
 
                 functions::sort(input, func_name == Func::SortDesc, &self.eval_ctx)
             }
+            // the query's result is ordered after evaluation, and only by a top-level call
+            Func::SortByLabel | Func::SortByLabelDesc => {
+                if args.len() < 2 {
+                    return Err(DataFusionError::NotImplemented(
+                        "Invalid args, expected sort_by_label(v instant-vector, label string, ...)"
+                            .into(),
+                    ));
+                }
+                self.call_expr_arg(args, 0).await
+            }
             Func::HistogramAvg
             | Func::HistogramCount
             | Func::HistogramStddev

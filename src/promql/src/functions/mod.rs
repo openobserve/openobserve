@@ -151,6 +151,8 @@ pub(crate) enum Func {
     Sin,
     Sinh,
     Sort,
+    SortByLabel,
+    SortByLabelDesc,
     SortDesc,
     Sqrt,
     StddevOverTime,
