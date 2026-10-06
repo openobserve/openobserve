@@ -69,7 +69,7 @@ test.describe('Metrics PromQL builder round-trip', () => {
     tag: ['@metrics', '@builder', '@P2', '@all'],
   }, async ({ page }, testInfo) => {
     const pm = await openEditor(page, testInfo);
-      const builder = pm.metricsBuilderPage;
+    const builder = pm.metricsBuilderPage;
     const query = 'max without (instance)(node_load1)';
     await setCodeQuery(builder, page, query);
 
