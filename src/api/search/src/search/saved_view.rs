@@ -251,11 +251,57 @@ mod tests {
         Router,
         body::Body,
         http::{Request, StatusCode},
-        routing::post,
+        routing::{post, put},
     };
+    use serde_json::{Value, json};
     use tower::ServiceExt;
 
     use super::*;
+
+    fn app() -> Router {
+        Router::new()
+            .route("/{org_id}/savedviews", post(create_view).get(get_views))
+            .route(
+                "/{org_id}/savedviews/{view_id}",
+                put(update_view).get(get_view),
+            )
+    }
+
+    async fn call(method: &str, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(body.map_or_else(Body::empty, |b| Body::from(b.to_string())))
+            .unwrap();
+        let resp = app().oneshot(req).await.unwrap();
+        let status = resp.status();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        )
+    }
+
+    async fn create(org: &str, name: &str, view_type: Option<&str>) -> (StatusCode, Value) {
+        let mut body = json!({"data": {"v": 1}, "view_name": name});
+        if let Some(t) = view_type {
+            body["view_type"] = json!(t);
+        }
+        call("POST", &format!("/{org}/savedviews"), Some(body)).await
+    }
+
+    async fn list(org: &str) -> Vec<Value> {
+        let (status, body) = call("GET", &format!("/{org}/savedviews"), None).await;
+        assert_eq!(status, StatusCode::OK);
+        body["views"].as_array().cloned().unwrap_or_default()
+    }
+
+    fn new_org() -> String {
+        format!("svorg{}", config::ider::uuid()).to_lowercase()
+    }
 
     #[tokio::test]
     async fn test_create_view_post() {
@@ -263,6 +309,7 @@ mod tests {
         let payload = CreateViewRequest {
             data: "base64-encoded-data".into(),
             view_name: format!("query-for-blah-{}", config::ider::uuid()),
+            view_type: None,
         };
         let app = Router::new().route("/{org_id}/savedviews", post(create_view));
         let req = Request::builder()
@@ -273,5 +320,92 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert!(resp.status() == StatusCode::OK || resp.status().is_success());
+    }
+
+    #[tokio::test]
+    async fn test_traces_view_type_is_stored_listed_and_kept_on_update() {
+        infra::db::create_table().await.unwrap();
+        let org = new_org();
+        let (status, created) = create(&org, "checkout errors", Some("traces")).await;
+        assert_eq!(status, StatusCode::OK);
+        let view_id = created["view_id"].as_str().unwrap().to_string();
+
+        let views = list(&org).await;
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0]["view_type"], "traces");
+
+        let (status, updated) = call(
+            "PUT",
+            &format!("/{org}/savedviews/{view_id}"),
+            Some(json!({"data": {"v": 2}, "view_name": "checkout errors", "view_type": "logs"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(updated["view_type"], "traces");
+        assert_eq!(list(&org).await[0]["view_type"], "traces");
+    }
+
+    #[tokio::test]
+    async fn test_metrics_explorer_view_type_is_stored_and_listed() {
+        infra::db::create_table().await.unwrap();
+        let org = new_org();
+        assert_eq!(create(&org, "grid", None).await.0, StatusCode::OK);
+        let (status, _) = create(&org, "grid", Some("metrics_explorer")).await;
+        assert_eq!(status, StatusCode::OK);
+        let views = list(&org).await;
+        assert_eq!(views.len(), 2);
+        assert!(views.iter().any(|v| v["view_type"] == "metrics_explorer"));
+    }
+
+    #[tokio::test]
+    async fn test_create_view_rejects_unknown_type() {
+        infra::db::create_table().await.unwrap();
+        let org = new_org();
+        let (status, _) = create(&org, "bad", Some("metrics")).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(list(&org).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_view_names_are_unique_per_type() {
+        infra::db::create_table().await.unwrap();
+        let org = new_org();
+        assert_eq!(create(&org, "dup", None).await.0, StatusCode::OK);
+        assert_eq!(create(&org, "DUP", Some("traces")).await.0, StatusCode::OK);
+        assert_eq!(
+            create(&org, "Dup", Some("traces")).await.0,
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            create(&org, "dup", Some("logs")).await.0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_traces_view_to_a_logs_view_name_succeeds() {
+        infra::db::create_table().await.unwrap();
+        let org = new_org();
+        assert_eq!(create(&org, "alpha", None).await.0, StatusCode::OK);
+        let (status, created) = create(&org, "beta", Some("traces")).await;
+        assert_eq!(status, StatusCode::OK);
+        let view_id = created["view_id"].as_str().unwrap();
+        let (status, _) = call(
+            "PUT",
+            &format!("/{org}/savedviews/{view_id}"),
+            Some(json!({"data": {}, "view_name": "alpha"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_an_org_sharing_a_name_prefix_keeps_its_views_separate() {
+        infra::db::create_table().await.unwrap();
+        let org = new_org();
+        let longer_org = format!("{org}b");
+        assert_eq!(create(&longer_org, "shared", None).await.0, StatusCode::OK);
+        assert!(list(&org).await.is_empty());
+        assert_eq!(create(&org, "shared", None).await.0, StatusCode::OK);
     }
 }

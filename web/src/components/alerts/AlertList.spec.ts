@@ -1850,3 +1850,112 @@ describe("AlertList - trigger", () => {
     ]);
   });
 });
+
+describe("AlertList - triggered in the last 15 minutes", () => {
+  const nowUs = () => Date.now() * 1000;
+
+  const loadRows = async () => {
+    const ranUs = nowUs() - 60_000_000;
+    const oldUs = nowUs() - 3 * 60 * 60 * 1_000_000;
+    const scheduled = { is_real_time: false };
+    alertsDB = [
+      makeAlert(1, { ...scheduled, name: "ran-not-fired", last_triggered_at: ranUs }),
+      makeAlert(2, {
+        ...scheduled,
+        name: "ran-and-fired",
+        last_triggered_at: ranUs,
+        last_satisfied_at: ranUs,
+      }),
+      makeAlert(3, {
+        ...scheduled,
+        name: "ran-fired-long-ago",
+        last_triggered_at: ranUs,
+        last_satisfied_at: oldUs,
+      }),
+      {
+        ...makeAlert(4, { ...scheduled, name: "anomaly-ran-not-fired", last_triggered_at: ranUs }),
+        alert_type: "anomaly_detection",
+        last_satisfied_at: null,
+      } as any,
+      {
+        ...makeAlert(5, {
+          ...scheduled,
+          name: "anomaly-fired",
+          last_triggered_at: ranUs,
+          last_satisfied_at: ranUs,
+        }),
+        alert_type: "anomaly_detection",
+      } as any,
+      {
+        ...makeAlert(6, {
+          ...scheduled,
+          name: "composite-ran-not-fired",
+          last_triggered_at: ranUs,
+        }),
+        alert_type: "composite",
+      } as any,
+      {
+        ...makeAlert(7, {
+          ...scheduled,
+          name: "composite-fired",
+          last_triggered_at: ranUs,
+          last_satisfied_at: ranUs,
+        }),
+        alert_type: "composite",
+      } as any,
+      makeAlert(8, {
+        is_real_time: true,
+        name: "realtime-fired",
+        last_triggered_at: ranUs,
+        last_satisfied_at: ranUs,
+      }),
+      makeAlert(9, {
+        is_real_time: true,
+        name: "realtime-fired-long-ago",
+        last_triggered_at: ranUs,
+        last_satisfied_at: oldUs,
+      }),
+      makeAlert(10, {
+        is_real_time: true,
+        name: "realtime-woke-not-fired",
+        last_triggered_at: ranUs,
+      }),
+    ];
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("counts only alerts that fired recently, not ones that merely ran", async () => {
+    const wrapper = await loadRows();
+    expect(wrapper.vm.filteredResults).toHaveLength(10);
+    expect(wrapper.vm.stateCounts.recent).toBe(4);
+  });
+
+  it("filters the recent state down to alerts that fired recently", async () => {
+    const wrapper = await loadRows();
+    wrapper.vm.onStatSelect("recent");
+    await flushPromises();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name).sort()).toEqual([
+      "anomaly-fired",
+      "composite-fired",
+      "ran-and-fired",
+      "realtime-fired",
+    ]);
+  });
+
+  it("marks the Last Satisfied time of a recent firing, not a Never cell", async () => {
+    const wrapper = await loadRows();
+    // A stale ?action=update from an earlier spec's navigation can swap the table for the editor.
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    const cells = wrapper.findAll('[data-test="o2-table-cell-last_satisfied_at"]');
+    const never = cells.filter((c: any) => c.text().includes("Never"));
+    const fired = cells.filter((c: any) => !c.text().includes("Never"));
+    expect(never.length).toBeGreaterThan(0);
+    expect(never.every((c: any) => !c.find(".rounded-full").exists())).toBe(true);
+    expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
+  });
+});

@@ -340,6 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :spanDimensions="spanDimensions"
               :isCollapsed="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
               :spanData="spanMap[(spans as any[])[virtualRow.index].spanId]"
+              :showCriticalPath="showCriticalPath"
               @toggle-collapse="toggleSpanCollapse"
               @select-span="selectSpan"
               @select-span-event="selectSpanEvent"
@@ -439,6 +440,10 @@ export default defineComponent({
       default: "",
     },
     isSidebarOpen: {
+      type: Boolean,
+      default: false,
+    },
+    showCriticalPath: {
       type: Boolean,
       default: false,
     },

@@ -83,6 +83,19 @@ describe("MetricCardChart builds the panel schema from its props", () => {
     expect(panelProp(wrapper, "panelSchema").config.unit_custom).toBe("s/s");
   });
 
+  it("hands a heatmap a shared colour range and precision only when given them", () => {
+    const own = panelProp(mountChart({ chartType: "heatmap" }), "panelSchema").config;
+    expect(own.visual_map_range).toBeUndefined();
+    expect(own.decimals).toBe(2);
+
+    const shared = panelProp(
+      mountChart({ chartType: "heatmap", visualMapRange: { min: 0, max: 40 }, decimals: 5 }),
+      "panelSchema",
+    ).config;
+    expect(shared.visual_map_range).toEqual({ min: 0, max: 40 });
+    expect(shared.decimals).toBe(5);
+  });
+
   it("carries the histogram bucket unit for a heatmap and updates it", async () => {
     const wrapper = mountChart({
       chartType: "heatmap",
@@ -159,6 +172,18 @@ describe("MetricCardChart colours multi-series charts per series", () => {
       queries: [50, 90, 99].map((p) => ({ expr: `q${p}`, legendTemplate: `p${p}` })),
     });
     expect(panelProp(wrapper, "panelSchema").config.color.mode).toBe("palette-classic-by-series");
+  });
+
+  it("turns the legend on with the palette-classic colour mode when asked", () => {
+    const config = panelProp(
+      mountChart({ results: matrix(3), legend: true }),
+      "panelSchema",
+    ).config;
+    expect(config.show_legends).toBe(true);
+    expect(config.color.mode).toBe("palette-classic");
+    expect(panelProp(mountChart({ results: matrix(3) }), "panelSchema").config.show_legends).toBe(
+      false,
+    );
   });
 
   it("re-evaluates when the results change", async () => {

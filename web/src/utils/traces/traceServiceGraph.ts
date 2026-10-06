@@ -1,0 +1,139 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import type { Span } from "@/ts/interfaces/traces/span.types";
+import { isSpanError } from "@/utils/traces/patternDetection";
+import { useSpanServiceDetection } from "@/utils/traces/useSpanServiceDetection";
+
+export interface TraceServiceGraphNode {
+  id: string;
+  label: string;
+  requests: number;
+  errors: number;
+  service_type?: string;
+}
+
+export interface TraceServiceGraphEdge {
+  from: string;
+  to: string;
+  total_requests: number;
+}
+
+export interface TraceServiceGraph {
+  nodes: TraceServiceGraphNode[];
+  edges: TraceServiceGraphEdge[];
+}
+
+interface TraceGraphSpan {
+  span_id?: string;
+  reference_parent_span_id?: string;
+  service_name?: string;
+  infer_service_name?: string;
+  infer_service_system?: string;
+  infer_service_type?: string;
+  span_status?: string;
+  status_code?: number;
+}
+
+interface NamedTreeNode {
+  name: string;
+  children?: NamedTreeNode[];
+}
+
+export function buildTraceServiceGraph(
+  spans: TraceGraphSpan[],
+  unknownServiceLabel = "unknown",
+): TraceServiceGraph {
+  const { resolveSpanIdentity } = useSpanServiceDetection();
+  const identityBySpanId = new Map<string, string>();
+  const nodes = new Map<string, TraceServiceGraphNode>();
+  const edges = new Map<string, TraceServiceGraphEdge>();
+
+  const identities = spans.map((span) => resolveSpanIdentity(span as Span) || unknownServiceLabel);
+  spans.forEach((span, i) => {
+    const id = identities[i];
+    if (span.span_id) identityBySpanId.set(span.span_id, id);
+    const node = nodes.get(id) ?? {
+      id,
+      label: id,
+      requests: 0,
+      errors: 0,
+      service_type: undefined,
+    };
+    if (!node.service_type && (span.infer_service_name || span.infer_service_system)) {
+      node.service_type = span.infer_service_type || undefined;
+    }
+    nodes.set(id, node);
+  });
+
+  spans.forEach((span, i) => {
+    const to = identities[i];
+    const from = identityBySpanId.get(span.reference_parent_span_id ?? "");
+    if (from === to) return;
+    // Only entries into a service count as its requests; its internal child spans do not.
+    const node = nodes.get(to)!;
+    node.requests += 1;
+    if (isSpanError(span)) node.errors += 1;
+    if (!from) return;
+    const key = `${from}\u0000${to}`;
+    const edge = edges.get(key) ?? {
+      from,
+      to,
+      total_requests: 0,
+    };
+    edge.total_requests += 1;
+    edges.set(key, edge);
+  });
+
+  return {
+    nodes: [...nodes.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    edges: [...edges.values()].sort(
+      (a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to),
+    ),
+  };
+}
+
+/** ServiceGraph.vue `applyFilters` rule, but isolated matching nodes are also kept. */
+export function filterTraceServiceGraph(
+  graph: TraceServiceGraph,
+  search: string,
+): TraceServiceGraph {
+  const trimmed = search.trim().toLowerCase();
+  if (!trimmed) return graph;
+  const matchingNodeIds = new Set(
+    graph.nodes.filter((n) => n.label.toLowerCase().includes(trimmed)).map((n) => n.id),
+  );
+  const edges = graph.edges.filter((e) => matchingNodeIds.has(e.from) || matchingNodeIds.has(e.to));
+  const usedNodeIds = new Set([...edges.map((e) => e.from), ...edges.map((e) => e.to)]);
+  return {
+    nodes: graph.nodes.filter((n) => matchingNodeIds.has(n.id) || usedNodeIds.has(n.id)),
+    edges,
+  };
+}
+
+export function filterTraceTree<T extends NamedTreeNode>(nodes: T[], search: string): T[] {
+  const trimmed = search.trim().toLowerCase();
+  if (!trimmed) return nodes;
+  const prune = (list: T[], parentMatched: boolean): T[] =>
+    list.flatMap((node) => {
+      const matched = node.name.toLowerCase().includes(trimmed);
+      const children = prune((node.children ?? []) as T[], matched);
+      if (matched || children.length) {
+        return [{ ...node, children: children.length ? children : undefined }];
+      }
+      return parentMatched ? [{ ...node, children: undefined }] : [];
+    });
+  return prune(nodes, false);
+}

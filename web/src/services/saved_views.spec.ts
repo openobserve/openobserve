@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import savedViews from "@/services/saved_views";
+import savedViews, { viewTypeOf } from "@/services/saved_views";
 import http from "@/services/http";
 import analytics from "@/services/product_analytics";
 
@@ -318,6 +318,17 @@ describe("saved_views service", () => {
       await expect((savedViews as any)[fn](...(args as any[]))).rejects.toThrow("boom");
 
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("viewTypeOf", () => {
+    it("reads a view without view_type as a logs view", () => {
+      expect(viewTypeOf({ view_id: "a" })).toBe("logs");
+      expect(viewTypeOf({ view_id: "a", view_type: null })).toBe("logs");
+    });
+
+    it("returns the stored view_type", () => {
+      expect(viewTypeOf({ view_type: "metrics_explorer" })).toBe("metrics_explorer");
     });
   });
 });
