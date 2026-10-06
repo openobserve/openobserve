@@ -68,7 +68,7 @@ import {
   objectListSql,
   parseObjects,
 } from "./kubernetesObjects";
-import type { K8sUrlState } from "./kubernetesUrlState";
+import { encodeDetails, type DetailsRef, type K8sUrlState } from "./kubernetesUrlState";
 
 export type Detection = "unknown" | "error" | "undetected" | "detected";
 
@@ -139,7 +139,7 @@ export function useKubernetesInventory(
   const loadedFor = shallowRef<{
     cluster: string | null;
     end: number;
-    detailKind: DetailKind | null;
+    details: DetailsRef | null;
   } | null>(null);
 
   // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
@@ -441,7 +441,7 @@ export function useKubernetesInventory(
       detailLoading.value = false;
       return;
     }
-    commit(main, cluster, t, s.details?.kind ?? null);
+    commit(main, cluster, t, s.details);
     const detail = s.details;
     if (detail) {
       const row = findRow(
@@ -474,13 +474,13 @@ export function useKubernetesInventory(
     main: Settled,
     cluster: string | null,
     t: K8sTime,
-    detailKind: DetailKind | null,
+    details: DetailsRef | null,
   ) => {
     pageError.value = null;
     results.value = main.results;
     sql.value = main.sql;
     failed.value = main.failed;
-    loadedFor.value = { cluster, end: t.end, detailKind };
+    loadedFor.value = { cluster, end: t.end, details };
     lastUpdatedAt.value = main.updatedAt;
     loading.value = false;
     loaded.value = true;
@@ -516,7 +516,7 @@ export function useKubernetesInventory(
       if (name.startsWith("O:"))
         joinObjects(inv, name.slice(2) as DetailKind, cluster, parseObjects(hits));
     }
-    const detailKind = loadedFor.value?.detailKind;
+    const detailKind = loadedFor.value?.details?.kind;
     const one = sql.value.get("O1obj");
     if (detailKind && one) joinObjects(inv, detailKind, cluster, parseObjects(one));
     attachWarningEvents(inv, warnings.value.rows);
@@ -527,12 +527,21 @@ export function useKubernetesInventory(
 
   const eventsCapped = computed(() => (sql.value.get("E") ?? []).length >= EVENTS_LIMIT);
 
-  const detailEvents = computed<EventRow[] | null>(() => {
-    const hits = sql.value.get("DE");
-    return hits ? parseEvents(hits) : null;
+  // A drawer swapped in place must not show the previous object's data while its own loads.
+  const detailCurrent = computed(() => {
+    const loadedDetails = loadedFor.value?.details;
+    const current = state().details;
+    return !!loadedDetails && !!current && encodeDetails(loadedDetails) === encodeDetails(current);
   });
 
-  const detailObserved = computed(() => (sql.value.get("O1obj") ?? []).length > 0);
+  const detailEvents = computed<EventRow[] | null>(() => {
+    const hits = sql.value.get("DE");
+    return hits && detailCurrent.value ? parseEvents(hits) : null;
+  });
+
+  const detailObserved = computed(
+    () => detailCurrent.value && parseObjects(sql.value.get("O1obj") ?? []).some((r) => !r.deleted),
+  );
 
   const namespaceOptions = computed(() => {
     const names = new Set(state().namespaces);

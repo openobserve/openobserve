@@ -417,6 +417,16 @@ describe("KubernetesPage", () => {
       expect(wrapper.findComponent(ListStub).props("anchorMissing")).toBe("kube_pod_status_phase");
     });
 
+    it("lets an events-only org go back to the Cluster overview after landing on Events", async () => {
+      fixture = {};
+      await mountPage({}, { metrics: [] });
+      expect(query().view).toBe("events");
+      await wrapper.find('[data-test="k8s2-rail-cluster"]').trigger("click");
+      await flushPromises();
+      expect(query().view).toBeUndefined();
+      expect(wrapper.findComponent(ClusterStub).exists()).toBe(true);
+    });
+
     it("shows the stream-list error with a forced Retry", async () => {
       getStreams.mockRejectedValueOnce(new Error("down"));
       await mountPage();

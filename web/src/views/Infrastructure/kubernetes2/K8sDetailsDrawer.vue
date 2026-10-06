@@ -57,6 +57,7 @@ const props = defineProps<{
   inventory: Inventory;
   pending: boolean;
   observed: boolean;
+  hasEvents: boolean;
   eventsScoped: boolean;
   events: EventRow[] | null;
   range: { start: number; end: number };
@@ -226,7 +227,6 @@ const viewLogs = async () => {
         }}</OText>
       </div>
       <template v-else>
-        <!-- A long name fills the header at lg and above, so the status and action sit here to keep the close button in view. -->
         <div
           v-if="headerStatus || details.kind === 'pod'"
           class="flex items-center justify-between gap-2"
@@ -352,7 +352,10 @@ const viewLogs = async () => {
           <OText variant="card-title" as="h3" class="border-border-default border-b pb-1">{{
             t("infra.k8s2.drawerEvents")
           }}</OText>
-          <OText v-if="!eventsScoped" variant="meta" data-test="k8s2-drawer-events-unscoped">{{
+          <OText v-if="!hasEvents" variant="meta" data-test="k8s2-drawer-events-no-stream">{{
+            t("infra.k8s2.drawerEventsNoStream", { stream: raw("k8s_events") })
+          }}</OText>
+          <OText v-else-if="!eventsScoped" variant="meta" data-test="k8s2-drawer-events-unscoped">{{
             t("infra.k8s2.drawerEventsUnscoped")
           }}</OText>
           <OSpinner v-else-if="events === null" size="sm" data-test="k8s2-drawer-events-pending" />

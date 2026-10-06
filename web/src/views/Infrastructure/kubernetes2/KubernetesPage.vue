@@ -190,18 +190,10 @@ const loadKey = computed(() => {
 
 const load = () => k8s.load();
 
-// Set while picker.refresh() re-anchors a relative range, so its re-emit leaves the fetch to Refresh.
-let reAnchoring = false;
-
 const onRefresh = async () => {
   await k8s.loadStreams({ force: true });
   if (detection.value !== "detected") return;
-  reAnchoring = true;
-  try {
-    dateTimePickerRef.value?.refresh?.();
-  } finally {
-    reAnchoring = false;
-  }
+  dateTimePickerRef.value?.refresh?.();
   await k8s.load({ force: true });
 };
 
@@ -216,25 +208,19 @@ const onDateChange = (date: {
     end: date.endTime,
     relative: date.valueType !== "absolute",
   };
-  if (date.userChangedValue === false || reAnchoring) return;
+  if (date.userChangedValue === false) return;
   load();
 };
 
 watch(loadKey, () => load());
 
+// An events-only org has nothing for the metric views, so it lands on Events once, on arrival.
 watch(detection, (next, prev) => {
-  if (next === "detected" && prev !== "detected") load();
+  if (next !== "detected" || prev === "detected") return;
+  const eventsOnly = !k8s.metricsDetected.value && k8s.hasEvents.value;
+  if (eventsOnly && route.query.view == null) replace(withView(state.value, "events"));
+  else load();
 });
-
-// An events-only org has nothing for the metric views, so it lands on Events.
-watch(
-  () => [detection.value, k8s.metricsDetected.value, route.query.view] as const,
-  ([det, metrics, view]) => {
-    if (det === "detected" && !metrics && view == null && k8s.hasEvents.value) {
-      replace(withView(state.value, "events"));
-    }
-  },
-);
 
 watch(
   () => store.state.selectedOrganization?.identifier,
@@ -409,6 +395,7 @@ k8s.loadStreams();
       :inventory="k8s.inventory.value"
       :pending="k8s.detailLoading.value || !k8s.loaded.value"
       :observed="k8s.detailObserved.value"
+      :has-events="k8s.hasEvents.value"
       :events-scoped="k8s.eventsScoped.value"
       :events="k8s.detailEvents.value"
       :range="range"

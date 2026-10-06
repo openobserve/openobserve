@@ -554,6 +554,55 @@ describe("useKubernetesInventory", () => {
     });
   });
 
+  describe("drawer data belongs to the drawer it was loaded for", () => {
+    const pods = {
+      P1: [
+        ksm({ namespace: "a", pod: "p", uid: "u1", phase: "Running" }),
+        ksm({ namespace: "a", pod: "q", uid: "u2", phase: "Running" }),
+      ],
+    };
+    const objectFor = (uid: string, bodyType = "MODIFIED") => ({
+      uid,
+      event_name: "p",
+      k8s_namespace_name: "a",
+      body_type: bodyType,
+      body_object_metadata: "{}",
+      body_object_spec: "{}",
+      body_object_status: "{}",
+    });
+
+    it("hides the previous drawer's events and object while the next one loads", async () => {
+      fixture = { ...CL(), ...pods };
+      sqlHits = (sql) =>
+        sql.endsWith("LIMIT 100")
+          ? [
+              {
+                event_name: "e",
+                body_object_note: "for p",
+                body_object_regarding: '{"kind":"Pod","name":"p"}',
+              },
+            ]
+          : sql.endsWith("LIMIT 1")
+            ? [objectFor("u1")]
+            : [];
+      const { inv, state } = await setup({ view: "pods", details: "pod/prod/a/p" });
+      await inv.load();
+      expect(inv.detailEvents.value?.map((e) => e.note)).toEqual(["for p"]);
+      expect(inv.detailObserved.value).toBe(true);
+      state.value = parseUrlState({ view: "pods", details: "pod/prod/a/q" });
+      expect(inv.detailEvents.value).toBeNull();
+      expect(inv.detailObserved.value).toBe(false);
+    });
+
+    it("treats a latest DELETED record as not observed", async () => {
+      fixture = { ...CL(), ...pods };
+      sqlHits = (sql) => (sql.endsWith("LIMIT 1") ? [objectFor("u1", "DELETED")] : []);
+      const { inv } = await setup({ view: "pods", details: "pod/prod/a/p" });
+      await inv.load();
+      expect(inv.detailObserved.value).toBe(false);
+    });
+  });
+
   it("lists namespace options from NS1 plus the current selection", async () => {
     fixture = {
       ...CL(),
