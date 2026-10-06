@@ -19,6 +19,7 @@ import { reactive } from "vue";
 import QueryTypeSelector from "./QueryTypeSelector.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 
 const { parsePromqlQuery, removeXYFilters, applyDefaultPanelFields, panel } = vi.hoisted(() => ({
   parsePromqlQuery: vi.fn(),
@@ -122,6 +123,27 @@ describe("QueryTypeSelector code to builder", () => {
     ]);
     expect(removeXYFilters).not.toHaveBeenCalled();
     expect(applyDefaultPanelFields).not.toHaveBeenCalled();
+  });
+
+  it("returns to the builder's own state, unparsed, when the code is what the builder last wrote", async () => {
+    const labels = [{ label: "", op: "=", value: "" }];
+    const operations = [{ id: "rate", params: ["5m"] }];
+    const text = promqlRenderer.renderQuery({ metric: "http_requests_total", labels, operations });
+    const data = mountWith(text);
+    data.data.queries[0].fields.promql_labels = labels;
+    data.data.queries[0].fields.promql_operations = operations;
+    // A click lands after mount has settled the toggle, which ignores updates until then.
+    await flushPromises();
+
+    await wrapper.vm.onUpdateBuilderMode("builder");
+    await flushPromises();
+
+    const slot = data.data.queries[0];
+    expect(parsePromqlQuery).not.toHaveBeenCalled();
+    expect(slot.customQuery).toBe(false);
+    expect(slot.query).toBe(text);
+    expect(slot.fields.promql_labels).toEqual(labels);
+    expect(slot.fields.promql_operations).toEqual(operations);
   });
 
   it("stays in code mode with the reason when the builder cannot show the query", async () => {

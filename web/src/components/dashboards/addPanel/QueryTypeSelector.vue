@@ -89,6 +89,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 import { promqlToBuilder } from "@/components/promql/astToBuilder";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
+import { normalizeSteps } from "@/components/promql/types";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -220,6 +222,13 @@ export default defineComponent({
       const index = dashboardPanelData.layout.currentQueryIndex;
       const slot = dashboardPanelData.data.queries[index];
       const text = slot.query;
+      // Unedited since the builder wrote it: its saved state (incomplete filters too) is the exact answer.
+      if (text === builderRendering(slot)) {
+        dashboardPanelData.meta.errors.queryErrors = [];
+        selectedButtonType.value = "builder";
+        dashboardPanelData.layout.showQueryBar = true;
+        return;
+      }
       const mapped = await promqlToBuilder(store.state.selectedOrganization?.identifier, text);
       // The user moved tab or edited the code while this parsed; the result describes neither.
       if (
@@ -239,6 +248,18 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = [];
       selectedButtonType.value = "builder";
       dashboardPanelData.layout.showQueryBar = true;
+    };
+
+    const builderRendering = (slot: any): string | null => {
+      try {
+        return promqlRenderer.renderQuery({
+          metric: slot.fields?.stream ?? "",
+          labels: slot.fields?.promql_labels ?? [],
+          operations: normalizeSteps(slot.fields?.promql_operations ?? []),
+        });
+      } catch {
+        return null;
+      }
     };
 
     const onUpdateBuilderMode = async (selectedQueryType: any) => {
