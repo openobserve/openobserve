@@ -1084,6 +1084,13 @@ describe("TracesAnalysisDashboard", () => {
       });
     });
 
+    it("should forward baselineFilter into the generateDashboard config", async () => {
+      await wrapper.setProps({ baselineFilter: "a = '1' or b = '2'" });
+      await wrapper.vm.loadAnalysis();
+      await flushPromises();
+      expect(mockGenerateDashboard.mock.calls.at(-1)[1].baselineFilter).toBe("a = '1' or b = '2'");
+    });
+
     it("should pass selectedDimensions to generateDashboard config", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
@@ -1275,6 +1282,32 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.vm.dashboardRenderKey).toBe(renderKeyBefore);
       expect(chartsEl()).toBe(chartsBefore);
       expect(mockGenerateDashboard).not.toHaveBeenCalled();
+    });
+
+    it("forwards baselineFilter to dimensions added after the dashboard opens", async () => {
+      await wrapper.setProps({ baselineFilter: "service_name = 'a'" });
+      await flushPromises();
+      mockGenerateDashboard.mockClear();
+      mockGenerateDashboard.mockReturnValueOnce({
+        tabs: [
+          {
+            panels: [
+              {
+                id: "panel-method",
+                title: "http_method",
+                layout: { x: 0, y: 0, w: 64, h: 16, i: "i-method" },
+              },
+            ],
+          },
+        ],
+      });
+
+      wrapper.vm.toggleDimension("http_method");
+      await flushPromises();
+
+      const config = mockGenerateDashboard.mock.calls.at(-1)[1];
+      expect(config.dimensions).toEqual(["http_method"]);
+      expect(config.baselineFilter).toBe("service_name = 'a'");
     });
 
     it("adds a panel for a newly ticked dimension without remounting the existing ones", async () => {

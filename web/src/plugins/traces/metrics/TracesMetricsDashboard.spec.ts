@@ -767,6 +767,64 @@ describe("TracesMetricsDashboard", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Drill-down baseline filter (pre-box editor text)
+  // -------------------------------------------------------------------------
+  describe("Drill-down baseline filter", () => {
+    const raw = "(service_name = 'a' or duration >= '1ms') and span_kind = 'Server'";
+    const analysis = () => wrapper.find('[data-test="traces-analysis-dashboard"]');
+
+    beforeEach(() => {
+      vi.mocked(parseDurationWhereClause).mockImplementation((f: string) =>
+        f.replace("'1ms'", "1000"),
+      );
+    });
+
+    afterEach(() => {
+      vi.mocked(parseDurationWhereClause).mockImplementation((f: string) => f);
+    });
+
+    it("passes the pre-box editor text, decoded, and keeps it when the editor changes later", async () => {
+      mockSearchObj.data.editorValue = raw;
+      await wrapper.vm.onHeatmapSelect({
+        timeStartUs: 1_000_000,
+        timeEndUs: 2_000_000,
+        durationLoUs: 100,
+        durationHiUs: 500,
+      });
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      const decoded = "(service_name = 'a' or duration >= 1000) and span_kind='2'";
+      expect(analysis().attributes("baselinefilter")).toBe(decoded);
+
+      mockSearchObj.data.editorValue = "service_name = 'zzz'";
+      await flushPromises();
+      expect(analysis().attributes("baselinefilter")).toBe(decoded);
+    });
+
+    it("passes no baselineFilter for a Rate selection", async () => {
+      mockMetricsRangeFilters.set("rate", {
+        panelTitle: "Rate",
+        start: -1,
+        end: -1,
+        timeStart: 1_000_000,
+        timeEnd: 2_000_000,
+      });
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+      expect(analysis().attributes("baselinefilter")).toBeUndefined();
+    });
+
+    it("passes no baselineFilter on a baseline-only Drill down", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+      expect(analysis().attributes("baselinefilter")).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Insights button — driven via the exposed openUnifiedAnalysisDashboard API
   // (the insights button DOM element was removed from the template; the
   //  function is invoked by the parent via defineExpose)

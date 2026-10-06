@@ -366,40 +366,67 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
         return singleQuery;
       }
 
+      if (config.streamType !== "traces") {
+        // Comparison mode: baseline vs selected
+        const baselineQuery = `
+          SELECT
+            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+            'Baseline' AS series,
+            approx_percentile_cont(duration, \${percentile}) AS percentile_latency
+          FROM "${config.streamName}"
+          ${baselineWhere}
+          GROUP BY ${dimensionName}
+        `.trim();
+
+        const selectedQuery = `
+          SELECT
+            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+            'Selected' AS series,
+            approx_percentile_cont(duration, \${percentile}) AS percentile_latency
+          FROM "${config.streamName}"
+          ${selectedWhere}
+          GROUP BY ${dimensionName}
+        `.trim();
+
+        return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 5`;
+      }
+
+      const valueExpr = `COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)')`;
+      // A heatmap box carries the editor text from before the box, so both sides share it, grouped.
+      const scopeFilter = config.baselineFilter?.trim()
+        ? `(${config.baselineFilter.trim()})`
+        : baseFilters;
+      const toWhere = (parts: string[]) => {
+        const kept = parts.filter((f) => f);
+        return kept.length ? `WHERE ${kept.join(" AND ")}` : "";
+      };
       // The traces table query ends its range exclusively, so Selected must too.
-      const latencySelectedWhere =
-        config.streamType === "traces"
-          ? `WHERE ${[
-              `_timestamp >= ${config.selectedTimeRange.startTime} AND _timestamp < ${config.selectedTimeRange.endTime}`,
-              filterClause,
-              baseFilters,
-            ]
-              .filter((f) => f)
-              .join(" AND ")}`
-          : selectedWhere;
+      const tracesSelectedWhere = toWhere([
+        `_timestamp >= ${config.selectedTimeRange.startTime} AND _timestamp < ${config.selectedTimeRange.endTime}`,
+        filterClause,
+        scopeFilter,
+      ]);
+      const tracesBaselineWhere = toWhere([baselineTimeFilter, scopeFilter]);
+      const inSelected = `${valueExpr} IN (SELECT value FROM selected)`;
 
-      // Comparison mode: baseline vs selected
-      const baselineQuery = `
-        SELECT
-          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Baseline' AS series,
+      // Top values come from Selected alone; a cross-series LIMIT would return almost only Selected rows.
+      return `
+        WITH selected AS (
+          SELECT ${valueExpr} AS value, 'Selected' AS series,
+            approx_percentile_cont(duration, \${percentile}) AS percentile_latency
+          FROM "${config.streamName}"
+          ${tracesSelectedWhere}
+          GROUP BY ${dimensionName}
+          ORDER BY percentile_latency DESC LIMIT 5)
+        SELECT * FROM selected
+        UNION
+        SELECT ${valueExpr} AS value, 'Baseline' AS series,
           approx_percentile_cont(duration, \${percentile}) AS percentile_latency
         FROM "${config.streamName}"
-        ${baselineWhere}
+        ${tracesBaselineWhere ? `${tracesBaselineWhere} AND ${inSelected}` : `WHERE ${inSelected}`}
         GROUP BY ${dimensionName}
+        ORDER BY percentile_latency DESC
       `.trim();
-
-      const selectedQuery = `
-        SELECT
-          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-          'Selected' AS series,
-          approx_percentile_cont(duration, \${percentile}) AS percentile_latency
-        FROM "${config.streamName}"
-        ${latencySelectedWhere}
-        GROUP BY ${dimensionName}
-      `.trim();
-
-      return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 5`;
     }
   };
 
@@ -427,7 +454,11 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
       config.streamType &&
       config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
-    const isComparisonMode = hasTimeBasedFilter && !isSameTimeRange;
+    const isLatencyAnalysis = !isVolumeAnalysis && !isErrorAnalysis;
+    // Traces latency SQL compares whenever a box exists, even one spanning the whole range.
+    const isComparisonMode =
+      hasTimeBasedFilter &&
+      (!isSameTimeRange || (isLatencyAnalysis && config.streamType === "traces"));
 
     const panels = analyses.map((analysis, index) => {
       // Build panel description based on analysis type

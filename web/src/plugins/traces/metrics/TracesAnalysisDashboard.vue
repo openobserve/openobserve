@@ -399,6 +399,7 @@ interface Props {
   streamName: string;
   streamType?: string; // logs or traces
   baseFilter?: string;
+  baselineFilter?: string; // Pre-box editor filter (decoded) for a heatmap Duration selection
   analysisType?: "duration" | "volume" | "error"; // Initial/default analysis type
   availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
   streamFields?: any[]; // Stream schema fields for smart dimension selection
@@ -831,6 +832,7 @@ const loadAnalysis = async () => {
       baselineTimeRange: baselineTimeRange.value,
       ...filterConfig,
       baseFilter: props.baseFilter,
+      baselineFilter: props.baselineFilter,
       dimensions: selectedDimensions.value,
       analysisType: activeAnalysisType.value,
       percentile: getCurrentPercentile() || undefined,
@@ -1015,6 +1017,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       baselineTimeRange: baselineTimeRange.value,
       ...filterConfig,
       baseFilter: props.baseFilter,
+      baselineFilter: props.baselineFilter,
       dimensions: addedDimensions,
       analysisType: activeAnalysisType.value,
     };

@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :durationFilter="analysisDurationFilter"
         :errorFilter="analysisErrorFilter"
         :baseFilter="parsedEffectiveFilter"
+        :baselineFilter="analysisBaselineFilter"
         :streamFields="streamFields"
         :analysisType="defaultAnalysisTab"
         :availableAnalysisTypes="['volume', 'error', 'duration']"
@@ -131,8 +132,8 @@ const effectiveFilter = computed(() => searchObj.data.editorValue);
 // Query editor text may contain human-readable duration/span_kind literals
 // (e.g. duration <= '1.64s') for display; decode them back to raw SQL values
 // (microseconds, numeric OTEL keys) before use in any generated query.
-const parseEffectiveFilter = (): string => {
-  const trimmed = effectiveFilter.value?.trim();
+const decodeFilter = (text: string | undefined): string => {
+  const trimmed = text?.trim();
   if (!trimmed) return "";
   const parsed = parseDurationWhereClause(
     trimmed,
@@ -145,6 +146,7 @@ const parseEffectiveFilter = (): string => {
     searchObj.data.stream.selectedStream.value,
   );
 };
+const parseEffectiveFilter = (): string => decodeFilter(effectiveFilter.value);
 const parsedEffectiveFilter = computed(() => parseEffectiveFilter());
 
 const effectiveTimeRange = computed<TimeRange>(() => ({
@@ -183,6 +185,7 @@ watch(
 const analysisDurationFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const analysisRateFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const analysisErrorFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
+const analysisBaselineFilter = ref<string | undefined>(undefined);
 const defaultAnalysisTab = ref<"duration" | "volume" | "error">("volume");
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
@@ -469,6 +472,7 @@ const openUnifiedAnalysisDashboard = () => {
     analysisDurationFilter.value = undefined;
     analysisRateFilter.value = undefined;
     analysisErrorFilter.value = undefined;
+    analysisBaselineFilter.value = undefined;
 
     // Default to volume tab when no brush selection
     defaultAnalysisTab.value = "volume";
@@ -488,6 +492,7 @@ const openUnifiedAnalysisDashboard = () => {
       errorTimeStart = null,
       errorTimeEnd = null;
     let latestFilterType = null;
+    let baselineFilter: string | undefined;
 
     rangeFilters.value.forEach((filter) => {
       if (filter.panelTitle === "Duration") {
@@ -496,6 +501,7 @@ const openUnifiedAnalysisDashboard = () => {
         // The picker applies the box to the second, so Selected must use what it applied.
         durationTimeStart = filter.appliedStart ?? filter.timeStart;
         durationTimeEnd = filter.appliedEnd ?? filter.timeEnd;
+        baselineFilter = filter.baselineFilter;
         latestFilterType = "duration";
       } else if (filter.panelTitle === "Rate") {
         rateStart = filter.start;
@@ -511,6 +517,9 @@ const openUnifiedAnalysisDashboard = () => {
         latestFilterType = "error";
       }
     });
+
+    analysisBaselineFilter.value =
+      baselineFilter === undefined ? undefined : decodeFilter(baselineFilter);
 
     // Set all filters
     analysisDurationFilter.value = {

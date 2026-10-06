@@ -67,6 +67,84 @@ describe("useLatencyInsightsDashboard — buildComparisonQuery", () => {
     });
   });
 
+  describe("baseline from before the box (latency comparison, traces)", () => {
+    const baselineFilter = "service_name = 'x' or a = '1'";
+
+    it("ANDs the parenthesised pre-box filter into both sides instead of baseFilter", () => {
+      const sql = sqlOf(config({ baselineFilter }));
+      expect(part(sql, "Selected")).toContain(
+        `WHERE _timestamp >= ${SEL.startTime} AND _timestamp < ${SEL.endTime} AND duration >= 100 AND duration < 500 AND (${baselineFilter})`,
+      );
+      expect(part(sql, "Baseline")).toContain(
+        `WHERE _timestamp >= ${BASE.startTime} AND _timestamp <= ${BASE.endTime} AND (${baselineFilter})`,
+      );
+      expect(sql).not.toContain("service_name = 'api'");
+    });
+
+    it("keeps baseFilter when no baselineFilter is given", () => {
+      const sql = sqlOf(config());
+      expect(part(sql, "Selected")).toContain("service_name = 'api'");
+      expect(part(sql, "Baseline")).toContain("service_name = 'api'");
+    });
+
+    it("takes the top 5 values from Selected and restricts Baseline to them", () => {
+      const sql = sqlOf(config({ baselineFilter }));
+      expect(sql).toMatch(/^WITH selected AS \(/);
+      expect(part(sql, "Selected")).toMatch(
+        /ORDER BY percentile_latency DESC LIMIT 5\)\s*SELECT \* FROM selected\s*$/,
+      );
+      expect(part(sql, "Baseline")).toContain(
+        "AND COALESCE(CAST(service_name AS VARCHAR), '(no value)') IN (SELECT value FROM selected)",
+      );
+      expect(sql.match(/\bLIMIT\b/g)).toHaveLength(1);
+    });
+
+    it("leaves the volume and error queries unchanged by baselineFilter", () => {
+      const volume = config({
+        analysisType: "volume",
+        rateFilter: { start: -1, end: -1, timeStart: SEL.startTime, timeEnd: SEL.endTime },
+      });
+      const error = config({
+        analysisType: "error",
+        errorFilter: { start: -1, end: -1, timeStart: SEL.startTime, timeEnd: SEL.endTime },
+      });
+      expect(sqlOf({ ...volume, baselineFilter })).toBe(sqlOf(volume));
+      expect(sqlOf({ ...error, baselineFilter })).toBe(sqlOf(error));
+    });
+  });
+
+  describe("comparison mode", () => {
+    const sameRange = { baselineTimeRange: SEL, selectedTimeRange: SEL };
+    const isComparison = (cfg: LatencyInsightsConfig) => {
+      const panel = panelOf(cfg);
+      return {
+        legends: panel.config.show_legends,
+        breakdown: panel.queries[0].fields.breakdown.map((b: any) => b.alias),
+      };
+    };
+
+    it("stays on for the traces latency tab when a full-width box equals the baseline range", () => {
+      expect(isComparison(config(sameRange))).toEqual({ legends: true, breakdown: ["series"] });
+    });
+
+    it("stays off for the volume and error tabs with equal ranges", () => {
+      const time = { start: -1, end: -1, timeStart: SEL.startTime, timeEnd: SEL.endTime };
+      expect(
+        isComparison(config({ ...sameRange, analysisType: "volume", rateFilter: time })),
+      ).toEqual({ legends: false, breakdown: [] });
+      expect(
+        isComparison(config({ ...sameRange, analysisType: "error", errorFilter: time })),
+      ).toEqual({ legends: false, breakdown: [] });
+    });
+
+    it("stays off for logs with equal ranges", () => {
+      expect(isComparison(config({ ...sameRange, streamType: "logs" }))).toEqual({
+        legends: false,
+        breakdown: [],
+      });
+    });
+  });
+
   describe("other tabs and logs are unchanged", () => {
     it("keeps an inclusive Selected end on the volume tab", () => {
       const sql = sqlOf(

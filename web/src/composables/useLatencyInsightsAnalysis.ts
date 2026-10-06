@@ -64,6 +64,8 @@ export interface LatencyInsightsConfig {
     timeEnd?: number;
   };
   baseFilter?: string;
+  // Editor text from before a heatmap box; replaces baseFilter on both sides of the latency comparison.
+  baselineFilter?: string;
   dimensions: string[]; // List of dimension names to analyze
   analysisType?: "duration" | "volume" | "error"; // Type of analysis to perform
   percentile?: string; // Latency percentile value (e.g., "0.95" for P95)
