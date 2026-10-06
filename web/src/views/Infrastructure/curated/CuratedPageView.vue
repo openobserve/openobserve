@@ -26,6 +26,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OText from "@/lib/core/Typography/OText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -286,8 +287,14 @@ const dormantGroups = computed(() =>
     }),
 );
 
-// Stream names and exact dates are for whoever restarts the collector, so the list leads with one line per source.
-const showDormantDetails = ref(false);
+// Each source keeps its stream list to one line until that row is opened, so the screen's one action stays in view.
+const expandedDormantRows = ref(new Set<string>());
+const toggleDormantRow = (groupId: string) => {
+  const next = new Set(expandedDormantRows.value);
+  if (next.has(groupId)) next.delete(groupId);
+  else next.add(groupId);
+  expandedDormantRows.value = next;
+};
 
 const expandedSetupSlug = ref<string | null>(null);
 const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"]) => {
@@ -594,7 +601,7 @@ watch(
 </script>
 
 <template>
-  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon">
+  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed>
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime
@@ -653,7 +660,7 @@ watch(
       }}</OText>
     </div>
 
-    <div v-else-if="face === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
+    <div v-else-if="face === 'undetected'" class="px-page-edge min-h-0 flex-1 overflow-y-auto">
       <div
         class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
         data-test="curated-setup-state"
@@ -707,47 +714,48 @@ watch(
           />
         </template>
         <template #extra>
-          <div class="flex w-full max-w-xl flex-col items-center gap-1">
-            <ul
-              class="border-border-default divide-border-default rounded-surface flex w-full flex-col divide-y border text-start"
+          <ul
+            class="border-border-default divide-border-default rounded-surface flex w-full max-w-3xl flex-col divide-y border text-start"
+          >
+            <li
+              v-for="hidden in dormantGroups"
+              :key="hidden.group.id"
+              class="flex flex-col gap-1 px-4 py-2"
+              data-test="curated-dormant-stream"
             >
-              <li
-                v-for="hidden in dormantGroups"
-                :key="hidden.group.id"
-                class="flex flex-col gap-1 px-4 py-2"
-                data-test="curated-dormant-stream"
+              <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+                <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
+                <OText variant="meta" as="span">{{ hidden.stoppedAgo }}</OText>
+              </div>
+              <button
+                type="button"
+                class="rounded-default focus-visible:ring-focus-ring-accent flex w-full min-w-0 items-start gap-1 text-start outline-none focus-visible:ring-2"
+                :aria-expanded="expandedDormantRows.has(hidden.group.id)"
+                data-test="curated-dormant-stream-detail"
+                @click="toggleDormantRow(hidden.group.id)"
               >
-                <div class="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
-                  <OText variant="meta" as="span">{{ hidden.stoppedAgo }}</OText>
-                </div>
-                <p
-                  v-if="showDormantDetails"
-                  class="leading-5 break-words"
-                  data-test="curated-dormant-stream-detail"
+                <span
+                  :class="[
+                    'min-w-0 flex-1 leading-5',
+                    expandedDormantRows.has(hidden.group.id) ? 'break-words' : 'truncate',
+                  ]"
                 >
                   <OText variant="meta">{{ hidden.detail }}</OText>
-                </p>
-              </li>
-            </ul>
-            <OButton
-              variant="ghost-primary"
-              size="xs"
-              :aria-expanded="showDormantDetails"
-              data-test="curated-dormant-details-toggle"
-              @click="showDormantDetails = !showDormantDetails"
-            >
-              {{
-                showDormantDetails ? t("infra.curated.hideDetails") : t("infra.curated.showDetails")
-              }}
-            </OButton>
-          </div>
+                </span>
+                <OIcon
+                  :name="expandedDormantRows.has(hidden.group.id) ? 'expand-less' : 'expand-more'"
+                  size="sm"
+                  class="text-text-secondary shrink-0"
+                />
+              </button>
+            </li>
+          </ul>
         </template>
       </OEmptyState>
     </div>
 
     <div v-else-if="dashboard" class="flex min-h-0 flex-1 flex-col">
-      <div v-if="singleClusterName" class="flex flex-wrap items-end gap-3 pb-2">
+      <div v-if="singleClusterName" class="px-page-edge flex flex-wrap items-end gap-3 pb-2">
         <OText variant="meta" data-test="curated-single-cluster">{{
           raw(singleClusterName)
         }}</OText>

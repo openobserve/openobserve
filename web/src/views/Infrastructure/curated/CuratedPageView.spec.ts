@@ -2091,14 +2091,16 @@ describe("CuratedPageView", () => {
       // ...and offers NO setup CTA, since installing is not the fix.
       expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="curated-setup-route-cta"]').exists()).toBe(false);
-      // It names what stopped and when; the stream names wait behind "Show details".
+      // It names what stopped and when, with its streams on one line that the row opens in full.
       const row = () => wrapper.find('[data-test="curated-dormant-stream"]');
+      const detail = () => row().find('[data-test="curated-dormant-stream-detail"]');
       expect(row().text()).toMatch(/stopped .+ ago/);
-      expect(row().text()).not.toContain("k8s_node_cpu_usage");
-      await wrapper.find('[data-test="curated-dormant-details-toggle"]').trigger("click");
-      expect(row().find('[data-test="curated-dormant-stream-detail"]').text()).toContain(
-        "k8s_node_cpu_usage",
-      );
+      expect(detail().text()).toContain("k8s_node_cpu_usage");
+      expect(detail().attributes("aria-expanded")).toBe("false");
+      expect(detail().find(".truncate").exists()).toBe(true);
+      await detail().trigger("click");
+      expect(detail().attributes("aria-expanded")).toBe("true");
+      expect(detail().find(".truncate").exists()).toBe(false);
     });
 
     it("offers ONE click to the last window every source was still reporting", async () => {
