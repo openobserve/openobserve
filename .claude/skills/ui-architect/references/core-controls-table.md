@@ -26,7 +26,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 **Key props:**
 
 - `variant` (default `"primary"`) — one of: `primary`, `secondary`, `outline`, `ghost`, `ghost-primary`, `ghost-muted`, `ghost-subtle`, `ghost-destructive`, `ghost-success`, `ghost-warning`, `ghost-neutral`, `outline-destructive`, `sidebar-toggle`, `panel-collapse`, `sidebar-button`, `destructive`, `ai-gradient`, `on-dark-primary`, `on-dark-ghost`, `warning`, `preview-slack`, `preview-teams`, `preview-email`, `preview-action`, `webinar-dismiss`, `pricing-chip`, `outline-primary`
-- `size` (default `"md"`) — one of: `xs`, `chip`, `sm`, `sm-action`, `md`, `lg`, `icon`, `icon-xs`, `icon-xs-circle`, `icon-xs-sq`, `icon-chip`, `icon-sm`, `icon-md`, `icon-lg`, `icon-circle`, `icon-circle-sm`, `icon-toolbar`, `icon-panel`, `sidebar-button`, `sm-toolbar`, `chip-12`
+- `size` (default `"md"`) — one of: `xs`, `chip`, `sm`, `sm-action`, `md`, `lg`, `icon`, `icon-xs`, `icon-xs-circle`, `icon-xs-sq`, `icon-chip`, `icon-sm`, `icon-md`, `icon-lg`, `icon-circle`, `icon-circle-sm`, `icon-toolbar`, `icon-toolbar-menu`, `icon-panel`, `sidebar-button`, `sm-toolbar`, `chip-12`
 - `iconLeft` (`IconName`) — renders an OIcon before the label; `#icon-left` slot takes precedence if present
 - `iconRight` (`IconName`) — renders an OIcon after the label; `#icon-right` slot takes precedence if present
 - `loading` (boolean, default `false`) — shows a centered spinner overlay, keeps dimensions, disables interaction

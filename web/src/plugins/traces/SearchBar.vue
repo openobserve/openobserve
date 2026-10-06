@@ -274,11 +274,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="traces-search-bar-saved-views-btn"
                 variant="outline"
-                size="icon-toolbar"
-                :title="t('search.listSavedViews')"
+                size="icon-toolbar-menu"
               >
                 <OIcon name="saved-search" size="sm" />
-                <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
+                <OIcon name="arrow-drop-down" size="sm" />
+                <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
               </OButton>
             </template>
             <ODropdownGroup :label="t('search.savedViewsLabel')">
