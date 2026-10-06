@@ -637,6 +637,41 @@ export function inScope(row: AnyRow, scope: Scope) {
   return scope.namespaces.includes(row.namespace);
 }
 
+// Lens searches the name plus a few text fields per kind (§4.0).
+export function searchText(row: AnyRow): string {
+  switch (row.kind) {
+    case "pod":
+      return [
+        row.name,
+        row.status?.text,
+        row.phase,
+        row.ready === "false" ? "NotReady" : "",
+        row.node,
+        row.ip,
+      ].join(" ");
+    case "node":
+      return [
+        row.name,
+        ...(row.roles ?? []),
+        row.info?.kubelet_version,
+        ...nodeConditionWords(row).map((w) => w.text),
+      ].join(" ");
+    case "deployment":
+      return [row.name, ...row.conditions.map((c) => c.text)].join(" ");
+    case "cronjob":
+      return [row.name, row.schedule].join(" ");
+    default:
+      return row.name;
+  }
+}
+
+export function filterRows<T extends AnyRow>(rows: T[], scope: Scope, search: string): T[] {
+  const needle = search.trim().toLowerCase();
+  return rows.filter(
+    (row) => inScope(row, scope) && (!needle || searchText(row).toLowerCase().includes(needle)),
+  );
+}
+
 export function sortRows<T>(
   rows: T[],
   value: (row: T) => string | number | null,
@@ -733,7 +768,12 @@ export const toneOf = (variant: BadgeVariant | undefined): Tone =>
 export const chipLabel = (chip: StatusChip, t: TranslateFn): I18nText =>
   chip.key ? t(chip.key) : raw(chip.text ?? "");
 
-export const warningLabel = (w: Warning, t: TranslateFn): I18nText => t(w.key, w.params ?? {});
+export const warningLabel = (w: Warning, t: TranslateFn, endUs: number | null): I18nText => {
+  if (w.lastSeen == null) return t(w.key, w.params ?? {});
+  const count = Number(w.params?.count ?? 1);
+  const age = formatAge(endUs == null ? null : endUs - w.lastSeen);
+  return t(w.key, { ...w.params, age, count }, count);
+};
 
 export const severityOf = (warnings: Warning[]): Severity | null =>
   warnings.length === 0 ? null : warnings.some((w) => w.severity === "error") ? "error" : "warning";

@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import type { QueryId } from "./kubernetesQueries";
 import {
   buildInventory,
+  filterRows,
   formatAge,
   formatBytes,
   formatCores,
@@ -27,6 +28,7 @@ import {
   parseVector,
   sortRows,
   usageBarVariant,
+  warningLabel,
   type PodRow,
   type Series,
   type WarningEvent,
@@ -763,6 +765,14 @@ describe("pods — Lens redesign", () => {
       ]);
     });
 
+    it("labels an event warning with its reason, age and count", () => {
+      const t = (key: string, params: Record<string, unknown>, plural?: number) =>
+        `${key}|${params.reason}|${params.age}|${params.count}|${plural}`;
+      expect(warningLabel(withEvents([event({})]).warnings[0], t as any, END)).toBe(
+        "infra.k8s2.warnEvents|BackOff|59m|3|3",
+      );
+    });
+
     it("never attaches an event on a previous uid of the same name", () => {
       expect(withEvents([event({ uid: "old-uid" })]).warnings).toEqual([]);
     });
@@ -1187,6 +1197,28 @@ describe("scope and sorting", () => {
       inventory.pods.filter((r) => inScope(r, { cluster: "dev", namespaces: ["data"] })),
     ).toHaveLength(1);
     expect(inventory.nodes.filter((r) => inScope(r, scope))).toHaveLength(1);
+  });
+
+  it("searches the name plus each kind's extra fields, case-insensitively", () => {
+    const inventory = buildInventory(
+      results({
+        P1: [ksm({ ...pod("web"), phase: "Running" }), ksm({ ...pod("db"), phase: "Pending" })],
+        P6: [ksm({ ...pod("web"), node: "ip-10-0-1-1", pod_ip: "10.1.2.3" })],
+        P2: [ksm({ ...pod("db"), container: "c", reason: "CrashLoopBackOff" })],
+        N1: [ksm({ node: "n1", condition: "MemoryPressure", status: "true" })],
+        N3: [ksm({ node: "n1", kubelet_version: "v1.29.3" })],
+        CJ1: [ksm({ namespace: "data", cronjob: "nightly", schedule: "0 2 * * *" })],
+      }),
+    );
+    const scope = { cluster: null, namespaces: [] };
+    const names = (rows: { name: string }[]) => rows.map((r) => r.name);
+    expect(names(filterRows(inventory.pods, scope, "IP-10-0"))).toEqual(["web"]);
+    expect(names(filterRows(inventory.pods, scope, "10.1.2"))).toEqual(["web"]);
+    expect(names(filterRows(inventory.pods, scope, "crashloop"))).toEqual(["db"]);
+    expect(names(filterRows(inventory.nodes, scope, "pressure"))).toEqual(["n1"]);
+    expect(names(filterRows(inventory.nodes, scope, "v1.29"))).toEqual(["n1"]);
+    expect(names(filterRows(inventory.cronjobs, scope, "0 2"))).toEqual(["nightly"]);
+    expect(filterRows(inventory.pods, { cluster: null, namespaces: ["other"] }, "")).toEqual([]);
   });
 
   it("puts null values last in both directions", () => {
