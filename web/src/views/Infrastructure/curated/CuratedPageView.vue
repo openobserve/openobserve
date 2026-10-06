@@ -44,6 +44,7 @@ import { curatedPacks } from "./packs";
 import { FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./packs/kubernetes.page";
 import { useCuratedPage } from "./useCuratedPage";
 import type { HiddenGroupInfo, StaleGroupInfo } from "./resolve";
+import type { RequirementGroup } from "./types";
 
 const props = defineProps<{ workload: WorkloadId }>();
 
@@ -314,11 +315,10 @@ const staleDurations = computed(() =>
     // The label, not the capability sentence: "... are unavailable stopped 3 hours ago" does not parse.
     const capability = t(stale.group.labelKey);
     return {
-      id: stale.group.id,
+      group: stale.group,
       noDataYet,
       capability,
       duration: noDataYet ? "" : humanDuration(stale.lastSeenUs),
-      setupHintKey: stale.group.setupHintKey,
       detail: noDataYet
         ? t("infra.curated.staleNoDataBannerShort", { capability })
         : t("infra.curated.streamsStale", { list: capability, date: formatUs(stale.lastSeenUs) }),
@@ -344,6 +344,104 @@ const staleBannerText = computed(() => {
         duration: first.duration,
       });
 });
+
+interface StripLine {
+  text: I18nText;
+  dataTest?: string;
+}
+
+interface StripRow {
+  group: RequirementGroup;
+  status: I18nText[];
+  lines: StripLine[];
+  canSetUp: boolean;
+}
+
+// One row per data source, so a group that is both partial and stale reads as one entry.
+const stripRows = computed(() => {
+  const rows = new Map<string, StripRow>();
+  const rowFor = (group: RequirementGroup) => {
+    const row = rows.get(group.id) ?? { group, status: [], lines: [], canSetUp: false };
+    rows.set(group.id, row);
+    return row;
+  };
+  for (const hidden of hiddenGroups.value) {
+    const row = rowFor(hidden.group);
+    row.status.push(panelCountText(hidden.panelCount));
+    row.lines.push(...hiddenGroupLines(hidden));
+    // A PRESENT group's collector already works; only a field is missing, so no "Set up".
+    row.canSetUp = !presentGroupIds.value.includes(hidden.group.id);
+  }
+  for (const partial of partialGroups.value) {
+    const row = rowFor(partial.group);
+    row.status.push(panelCountText(partial.hiddenPanelIds.length));
+    row.lines.push({
+      text: streamsMissingText(partial.missingStreams.map((entry) => entry.name)),
+      dataTest: "curated-strip-streams-missing",
+    });
+  }
+  for (const stale of staleDurations.value) {
+    const row = rowFor(stale.group);
+    row.status.push(
+      stale.noDataYet
+        ? t("infra.curated.staleNoDataBadge")
+        : t("infra.curated.stoppedAgo", { duration: stale.duration }),
+    );
+    row.lines.push({ text: stale.detail, dataTest: "curated-strip-stale" });
+  }
+  // Each part is already translated; joining them widens to string without untranslating either.
+  return [...rows.values()].map((row) => ({ ...row, statusText: raw(row.status.join(" · ")) }));
+});
+
+function panelCountText(count: number) {
+  return t("infra.curated.hiddenPanelCount", { count }, count);
+}
+
+function streamsMissingText(names: string[]) {
+  return t(
+    "infra.curated.streamsMissing",
+    { count: names.length, list: raw(names.join(", ")) },
+    names.length,
+  );
+}
+
+function hiddenGroupLines(hidden: HiddenGroupInfo): StripLine[] {
+  const lines: StripLine[] = [];
+  const absent = absentStreams(hidden);
+  if (absent.length > 0) {
+    lines.push({
+      text: streamsMissingText(absent.map((entry) => entry.name)),
+      dataTest: "curated-strip-streams-missing",
+    });
+  }
+  const stale = staleStreams(hidden);
+  if (stale.length > 0) {
+    lines.push({
+      text: t("infra.curated.streamsStale", {
+        list: raw(stale.map((entry) => entry.name).join(", ")),
+        date: formatUs(stale[0].lastSeenUs),
+      }),
+      dataTest: "curated-strip-streams-stale",
+    });
+  }
+  for (const concept of hidden.unresolvedConcepts ?? []) {
+    lines.push({
+      text: t("infra.curated.fieldUnresolved", {
+        display: raw(concept.display),
+        stream: raw(hidden.group.anchorStream ?? ""),
+      }),
+    });
+  }
+  if (hidden.missingFields?.length) {
+    lines.push({
+      text: t("infra.curated.probeFieldsMissing", {
+        stream: raw(hidden.probeStream ?? ""),
+        list: raw(hidden.missingFields.join(", ")),
+      }),
+    });
+  }
+  return lines;
+}
 
 function humanDuration(sinceUs: number): string {
   // Measured against the later of window-end and wall clock, so a trailing range never reports a negative age.
@@ -718,9 +816,11 @@ watch(
               <OCollapsible>
                 <template #trigger="{ open }">
                   <span class="flex min-w-0 flex-1 flex-col gap-1">
-                    <span class="flex flex-wrap items-baseline justify-between gap-x-3">
-                      <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
-                      <OText variant="meta" as="span">{{ hidden.stoppedAgo }}</OText>
+                    <span class="flex items-baseline gap-x-3 max-md:flex-col">
+                      <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{
+                        t(hidden.group.labelKey)
+                      }}</OText>
+                      <OText variant="meta" as="span" nowrap>{{ hidden.stoppedAgo }}</OText>
                     </span>
                     <OText
                       v-if="!open"
@@ -824,129 +924,80 @@ watch(
                 data-test="curated-strip"
                 :label="collapsedCapabilities"
               >
-                <div class="flex flex-col gap-3 px-2 pt-2 pb-2" data-test="curated-strip-expanded">
-                  <div
-                    v-for="hidden in hiddenGroups"
-                    :key="hidden.group.id"
-                    class="flex flex-col gap-1"
-                    :data-test="`curated-strip-group-${hidden.group.id}`"
-                  >
-                    <div class="flex items-center justify-between gap-2">
-                      <OText>{{ t(hidden.group.capabilityKey) }}</OText>
-                      <!-- A PRESENT group's collector already works; only a field is missing, so no "Set up". -->
-                      <OButton
-                        v-if="!presentGroupIds.includes(hidden.group.id)"
-                        variant="outline"
-                        size="sm-action"
-                        data-test="curated-strip-setup"
-                        @click="onStripSetup(hidden.group)"
-                      >
-                        {{ t("infra.curated.setUp") }}
-                      </OButton>
-                    </div>
-                    <OText variant="meta" data-test="curated-strip-hint">{{
-                      t(hidden.group.setupHintKey)
-                    }}</OText>
-                    <OText
-                      v-if="absentStreams(hidden).length"
-                      variant="meta"
-                      data-test="curated-strip-streams-missing"
-                      >{{
-                        t(
-                          "infra.curated.streamsMissing",
-                          {
-                            count: absentStreams(hidden).length,
-                            list: raw(
-                              absentStreams(hidden)
-                                .map((s) => s.name)
-                                .join(", "),
-                            ),
-                          },
-                          absentStreams(hidden).length,
-                        )
-                      }}</OText
+                <div class="flex flex-col gap-1 pb-1" data-test="curated-strip-expanded">
+                  <ul class="divide-border-default flex flex-col divide-y">
+                    <li
+                      v-for="row in stripRows"
+                      :key="row.group.id"
+                      class="flex flex-col gap-1 py-1"
+                      :data-test="`curated-strip-group-${row.group.id}`"
                     >
-                    <OText
-                      v-if="staleStreams(hidden).length"
-                      variant="meta"
-                      data-test="curated-strip-streams-stale"
-                      >{{
-                        t("infra.curated.streamsStale", {
-                          list: raw(
-                            staleStreams(hidden)
-                              .map((s) => s.name)
-                              .join(", "),
-                          ),
-                          date: formatUs(staleStreams(hidden)[0].lastSeenUs),
-                        })
-                      }}</OText
-                    >
-                    <OText
-                      v-for="concept in hidden.unresolvedConcepts ?? []"
-                      :key="concept.groupId"
-                      variant="meta"
-                      >{{
-                        t("infra.curated.fieldUnresolved", {
-                          display: raw(concept.display),
-                          stream: raw(hidden.group.anchorStream ?? ""),
-                        })
-                      }}</OText
-                    >
-                    <OText v-if="hidden.missingFields?.length" variant="meta">{{
-                      t("infra.curated.probeFieldsMissing", {
-                        stream: raw(hidden.probeStream ?? ""),
-                        list: raw(hidden.missingFields.join(", ")),
-                      })
-                    }}</OText>
-                    <OText variant="meta">{{
-                      t(
-                        "infra.curated.hiddenPanelCount",
-                        { count: hidden.panelCount },
-                        hidden.panelCount,
-                      )
-                    }}</OText>
-                    <DataSourceSetupCard
-                      v-if="
-                        hidden.group.setup.kind === 'card' &&
-                        expandedSetupSlug === hidden.group.setup.slug
-                      "
-                      :slug="hidden.group.setup.slug"
-                      @detected="runRefresh(true)"
-                    />
-                  </div>
-
-                  <div
-                    v-for="partial in partialGroups"
-                    :key="`partial-${partial.group.id}`"
-                    class="flex flex-col gap-1"
-                  >
-                    <OText>{{ t(partial.group.labelKey) }}</OText>
-                    <OText variant="meta">{{
-                      t(
-                        "infra.curated.streamsMissing",
-                        {
-                          count: partial.missingStreams.length,
-                          list: raw(partial.missingStreams.map((s) => s.name).join(", ")),
-                        },
-                        partial.missingStreams.length,
-                      )
-                    }}</OText>
-                  </div>
-
-                  <div
-                    v-for="stale in staleDurations"
-                    :key="`stale-${stale.id}`"
-                    class="flex flex-col gap-1"
-                    data-test="curated-strip-stale"
-                  >
-                    <OText>{{ stale.detail }}</OText>
-                    <OText variant="meta" data-test="curated-strip-hint">{{
-                      t(stale.setupHintKey)
-                    }}</OText>
-                  </div>
-
+                      <div class="flex items-start gap-2">
+                        <OCollapsible class="min-w-0 flex-1">
+                          <template #trigger="{ open }">
+                            <span class="flex min-w-0 flex-1 flex-col gap-1">
+                              <span class="flex items-baseline gap-x-3 max-md:flex-col">
+                                <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{
+                                  t(row.group.labelKey)
+                                }}</OText>
+                                <OText variant="meta" as="span" nowrap>{{ row.statusText }}</OText>
+                              </span>
+                              <OText
+                                v-if="!open && row.lines[0]"
+                                variant="meta"
+                                truncate
+                                :data-test="row.lines[0].dataTest"
+                                >{{ row.lines[0].text }}</OText
+                              >
+                            </span>
+                            <OIcon
+                              name="expand-more"
+                              size="sm"
+                              class="text-text-secondary shrink-0 transition-transform duration-200"
+                              :class="open ? 'rotate-180' : 'rotate-0'"
+                            />
+                          </template>
+                          <div class="flex flex-col gap-1 px-2 pb-2">
+                            <p
+                              v-for="(line, index) in row.lines"
+                              :key="index"
+                              class="leading-5 break-words"
+                            >
+                              <OText variant="meta" :data-test="line.dataTest">{{
+                                line.text
+                              }}</OText>
+                            </p>
+                            <p class="leading-5">
+                              <OText variant="meta" data-test="curated-strip-hint">{{
+                                t(row.group.setupHintKey)
+                              }}</OText>
+                            </p>
+                          </div>
+                        </OCollapsible>
+                        <OButton
+                          v-if="row.canSetUp"
+                          variant="outline"
+                          size="sm-action"
+                          class="mt-1.5 shrink-0"
+                          data-test="curated-strip-setup"
+                          @click="onStripSetup(row.group)"
+                        >
+                          {{ t("infra.curated.setUp") }}
+                        </OButton>
+                      </div>
+                      <DataSourceSetupCard
+                        v-if="
+                          row.group.setup.kind === 'card' &&
+                          expandedSetupSlug === row.group.setup.slug
+                        "
+                        :slug="row.group.setup.slug"
+                        @detected="runRefresh(true)"
+                      />
+                    </li>
+                  </ul>
                   <OText
                     variant="meta"
+                    class="px-2"
                     data-test="curated-strip-hedge"
                     data-copy-key="infra.curated.hiddenFootnote"
                     >{{ t("infra.curated.hiddenFootnote") }}</OText

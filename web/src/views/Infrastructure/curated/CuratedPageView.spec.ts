@@ -878,16 +878,41 @@ describe("CuratedPageView", () => {
       expect(wrapper.find('[data-test="curated-strip-expanded"]').exists()).toBe(false);
     });
 
-    it("an expanded row leads with the capability sentence + Set-up BEFORE the stream list", async () => {
+    it("a row shows Set-up and one line of its streams without being opened", async () => {
       wrapper = await mountView(
         {},
         { hiddenGroups: ref([hiddenGroup()]), stripAutoExpand: ref(true) },
       );
-      const html = wrapper.find('[data-test="curated-strip-group-kube-state"]').html();
-      expect(html.indexOf("curated-strip-setup")).toBeGreaterThan(-1);
-      expect(html.indexOf("curated-strip-setup")).toBeLessThan(
-        html.indexOf("kube_pod_status_phase"),
+      const row = wrapper.find('[data-test="curated-strip-group-kube-state"]');
+      expect(row.find('[data-test="curated-strip-setup"]').exists()).toBe(true);
+      const rowContent = row.find('[data-test="o-collapsible-content"]');
+      expect(rowContent.find('[data-test="curated-strip-setup"]').exists()).toBe(false);
+      const streams = row.find('[data-test="curated-strip-streams-missing"]');
+      expect(streams.text()).toContain("kube_pod_status_phase");
+      expect(streams.classes()).toContain("truncate");
+    });
+
+    it("a group that is both partial and stale reads as ONE row", async () => {
+      wrapper = await mountView(
+        {},
+        {
+          partialGroups: ref([
+            {
+              group: hiddenGroup().group,
+              hiddenPanelIds: ["k8s_nd_memory"],
+              missingStreams: [{ name: "k8s_node_memory_usage", state: "absent" }],
+            },
+          ]),
+          staleGroups: ref([
+            { group: hiddenGroup().group, lastSeenUs: NOW_US - 3 * 24 * HOUR_US, panelIds: ["p1"] },
+          ]),
+          stripAutoExpand: ref(true),
+        },
       );
+      expect(wrapper.findAll('[data-test^="curated-strip-group-"]')).toHaveLength(1);
+      const row = wrapper.find('[data-test="curated-strip-group-kube-state"]');
+      expect(row.text()).toContain("1 panel hidden");
+      expect(row.text()).toMatch(/stopped .+ ago/);
     });
 
     it("a card-kind Set-up expands the DataSourceSetupCard inline in an accordion", async () => {
@@ -1002,6 +1027,7 @@ describe("CuratedPageView", () => {
           stripAutoExpand: ref(true),
         },
       );
+      await wrapper.find('[data-test="curated-strip-group-kube-state"] button').trigger("click");
       expect(wrapper.find('[data-test="curated-strip-hint"]').exists()).toBe(true);
     });
 
