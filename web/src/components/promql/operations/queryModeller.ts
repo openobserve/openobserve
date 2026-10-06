@@ -212,14 +212,18 @@ class PromqlRendererImpl implements PromqlRenderer {
     // innermost and the last one outermost.
     // Example: [max, rate, sum] renders as: sum(rate(max(...)))
     let currentExpr = queryStr;
-    for (let i = 0; i < query.operations.length; i++) {
-      const inner = SCALAR_PRECEDENCE[normalizeStepId(query.operations[i - 1]?.id ?? "")];
-      const outer = SCALAR_PRECEDENCE[normalizeStepId(query.operations[i].id)];
+    let inner: number | undefined;
+    for (const operation of query.operations) {
+      const id = normalizeStepId(operation.id);
+      // An unknown step renders nothing, so the expression it was given stays the inner one.
+      if (!this.operations.has(id)) continue;
+      const outer = SCALAR_PRECEDENCE[id];
       // A binary input binds looser than (or as loose as) the operator now wrapping it.
       if (inner !== undefined && outer !== undefined && inner <= outer) {
         currentExpr = `(${currentExpr})`;
       }
-      currentExpr = this.renderOperation(query.operations[i], currentExpr);
+      currentExpr = this.renderOperation(operation, currentExpr);
+      inner = outer;
     }
 
     return currentExpr;
@@ -234,7 +238,7 @@ class PromqlRendererImpl implements PromqlRenderer {
 
   /** Every step in one group of the picker. */
   getStepsForGroup(group: string): PromqlStepSpec[] {
-    return Array.from(this.operations.values()).filter((op) => op.group === group);
+    return Array.from(this.operations.values()).filter((op) => op.group === group && !op.retired);
   }
 
   /** The picker's groups, in declaration order. */

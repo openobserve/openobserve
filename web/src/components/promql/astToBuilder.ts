@@ -109,7 +109,7 @@ const functionLayer = (func: string, args: PromqlTree[]): Layer => {
 
 const callLayer = (node: PromqlTree): Layer => {
   const spec = promqlRenderer.getStepSpec(node.func);
-  if (!spec) return { reason: cannotShow(`${node.func}()`) };
+  if (!spec || spec.retired) return { reason: cannotShow(`${node.func}()`) };
   return spec.group === PromqlStepGroup.RateAndRange
     ? rangeLayer(node.func, node.args)
     : functionLayer(node.func, node.args);
@@ -117,7 +117,9 @@ const callLayer = (node: PromqlTree): Layer => {
 
 const aggregateLayer = (node: PromqlTree): Layer => {
   const spec = promqlRenderer.getStepSpec(node.op);
-  if (spec?.group !== PromqlStepGroup.Aggregation) return { reason: cannotShow(node.op) };
+  if (spec?.group !== PromqlStepGroup.Aggregation || spec.retired) {
+    return { reason: cannotShow(node.op) };
+  }
   const takesParam = spec.params.length === 2;
   if (takesParam !== !!node.param || (node.param && !isNumber(node.param))) {
     return { reason: cannotShow(node.op) };
@@ -127,6 +129,9 @@ const aggregateLayer = (node: PromqlTree): Layer => {
 };
 
 const binaryLayer = (node: PromqlTree): Layer => {
+  // A side the backend could not express hides its metric, so name what it is instead.
+  const opaque = [node.lhs, node.rhs].find((side) => side?.type === "unsupported");
+  if (opaque) return { reason: cannotShow(opaque.kind) };
   const stepId = SCALAR_STEPS[node.op];
   if (stepId && isNumber(node.rhs)) {
     return { step: { id: stepId, params: [node.rhs.value] }, inner: node.lhs };

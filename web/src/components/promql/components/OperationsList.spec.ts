@@ -514,6 +514,17 @@ describe("OperationsList", () => {
     });
   });
 
+  describe("retired steps", () => {
+    it("are not offered in the picker", async () => {
+      wrapper = createWrapper({ operations: [] });
+      await wrapper.find('[data-test="promql-add-operation"]').trigger("click");
+      expect(wrapper.find('[data-test="promql-operation-option-pi"]').exists()).toBe(false);
+      expect(
+        wrapper.find(`[data-test="promql-operation-option-${PromqlStepId.Deg}"]`).exists(),
+      ).toBe(true);
+    });
+  });
+
   describe("range functions only as the first step", () => {
     const rateOption = () =>
       wrapper.find(`[data-test="promql-operation-option-${PromqlStepId.Rate}"]`);

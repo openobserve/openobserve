@@ -117,6 +117,16 @@ describe("treeToBuilder", () => {
     expect(reason(num(3))).toBe("The builder needs a query over one named metric");
   });
 
+  it("names an unsupported construct on either side of a binary", () => {
+    expect(reason(bin("/", sel("x"), { type: "unsupported", kind: "offset" }))).toBe(
+      "The builder cannot show offset",
+    );
+  });
+
+  it("does not map onto a retired step", () => {
+    expect(reason(call("pi", sel("x")))).toBe("The builder cannot show pi()");
+  });
+
   it("points a binary between two metrics at formulas", () => {
     expect(reason(bin("/", call("rate", matrix("a", "5m")), call("rate", matrix("b", "5m"))))).toBe(
       "The builder cannot show a binary operation between two metrics — use a formula",

@@ -17778,6 +17778,7 @@
       "clampMinDoc": "Clamp values to minimum",
       "degDoc": "Convert radians to degrees",
       "radDoc": "Convert degrees to radians",
+      "piDoc": "Returns the mathematical constant π (pi)",
       "hourDoc": "Hour of the day (0-23)",
       "minuteDoc": "Minute of the hour (0-59)",
       "monthDoc": "Month of the year (1-12)",

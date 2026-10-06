@@ -19,16 +19,16 @@ use std::time::Duration;
 
 use config::utils::json::{Value, json};
 use promql_parser::{
-    label::{METRIC_NAME, MatchOp, Matchers},
+    label::Matchers,
     parser::{
         AggregateExpr, BinaryExpr, Call, Expr, LabelModifier, MatrixSelector,
         VectorMatchCardinality, VectorSelector,
     },
-    util::display_duration,
+    util::{display_duration, parse_duration},
 };
 
-/// Far above any range a query would use, so a stand-in cannot collide with a real one.
-const TOKEN_RANGE_BASE_MS: u64 = 1_000_000_007;
+/// Ten thousand years and up, so no real range collides with a stand-in.
+const TOKEN_RANGE_BASE_YEARS: usize = 10_000;
 
 /// Template tokens in range position, swapped for durations so the query parses.
 struct RangeTokens(Vec<String>);
@@ -47,16 +47,15 @@ impl RangeTokens {
             if ch == '$' && in_range && quote.is_none() {
                 let end = token_end(&chars, i);
                 if end > i + 1 {
-                    let ms = TOKEN_RANGE_BASE_MS + tokens.len() as u64;
+                    out.push_str(&format!("{}y", TOKEN_RANGE_BASE_YEARS + tokens.len()));
                     tokens.push(chars[i..end].iter().collect());
-                    out.push_str(&format!("{ms}ms"));
                     i = end;
                     continue;
                 }
             }
             match (quote, ch) {
                 (Some(q), c) if c == q => quote = None,
-                (Some(_), '\\') => {
+                (Some(q), '\\') if q != '`' => {
                     out.push(ch);
                     i += 1;
                     if let Some(next) = chars.get(i) {
@@ -77,11 +76,13 @@ impl RangeTokens {
     }
 
     fn display(&self, range: &Duration) -> String {
-        let index = (range.as_millis() as u64).checked_sub(TOKEN_RANGE_BASE_MS);
-        index
-            .and_then(|index| self.0.get(index as usize))
-            .cloned()
-            .unwrap_or_else(|| display_duration(range))
+        self.0
+            .iter()
+            .enumerate()
+            .find(|(index, _)| {
+                parse_duration(&format!("{}y", TOKEN_RANGE_BASE_YEARS + index)).ok() == Some(*range)
+            })
+            .map_or_else(|| display_duration(range), |(_, token)| token.clone())
     }
 }
 
@@ -127,7 +128,7 @@ fn selector_modifier(vs: &VectorSelector) -> Option<&'static str> {
 }
 
 fn selector_fields(vs: &VectorSelector) -> Value {
-    json!({ "name": vs.name, "matchers": matchers(&vs.matchers, vs.name.as_deref()) })
+    json!({ "name": vs.name, "matchers": matchers(&vs.matchers) })
 }
 
 fn selector_node(vs: &VectorSelector) -> Value {
@@ -150,16 +151,10 @@ fn matrix_node(ms: &MatrixSelector, tokens: &RangeTokens) -> Value {
     })
 }
 
-/// The selector's matchers, minus the `__name__` matcher its name already states.
-fn matchers(matchers: &Matchers, name: Option<&str>) -> Vec<Value> {
+fn matchers(matchers: &Matchers) -> Vec<Value> {
     matchers
         .matchers
         .iter()
-        .filter(|m| {
-            !(m.name == METRIC_NAME
-                && matches!(m.op, MatchOp::Equal)
-                && Some(m.value.as_str()) == name)
-        })
         .map(|m| json!({ "label": m.name, "op": m.op.to_string(), "value": m.value }))
         .collect()
 }
@@ -185,6 +180,11 @@ fn aggregate_node(agg: &AggregateExpr, tokens: &RangeTokens) -> Value {
 }
 
 fn binary_node(bin: &BinaryExpr, tokens: &RangeTokens) -> Value {
+    let op = bin.op.to_string();
+    // The parser marks every set operator many-to-many, so name it rather than its matching.
+    if matches!(op.as_str(), "and" | "or" | "unless") {
+        return unsupported(&op);
+    }
     if let Some(modifier) = &bin.modifier {
         if modifier.return_bool {
             return unsupported("bool");
@@ -196,7 +196,7 @@ fn binary_node(bin: &BinaryExpr, tokens: &RangeTokens) -> Value {
     }
     json!({
         "type": "binary",
-        "op": bin.op.to_string(),
+        "op": op,
         "lhs": node(&bin.lhs, tokens),
         "rhs": node(&bin.rhs, tokens),
     })
@@ -232,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn serialises_a_selector_without_the_name_matcher() {
+    fn serialises_a_selector_and_its_matchers() {
         assert_eq!(
             tree(r#"x{job="api",code=~"5.."}"#),
             selector(
@@ -329,6 +329,44 @@ mod tests {
         let parsed = tree("rate(a[5m]) / rate(b[5m])");
         assert_eq!(parsed["type"], json!("binary"));
         assert_eq!(parsed["rhs"]["type"], json!("call"));
+    }
+
+    #[test]
+    fn names_set_operators_and_keeps_vector_matching_for_modifiers() {
+        assert_eq!(
+            tree("sum(rate(x[5m])) or vector(0)"),
+            json!({ "type": "unsupported", "kind": "or" })
+        );
+        assert_eq!(
+            tree("a unless b"),
+            json!({ "type": "unsupported", "kind": "unless" })
+        );
+        assert_eq!(
+            tree("a * on(job) group_left b"),
+            json!({ "type": "unsupported", "kind": "vector matching" })
+        );
+    }
+
+    #[test]
+    fn marks_or_matchers_unsupported() {
+        assert_eq!(
+            tree(r#"x{a="1" or b="2"}"#),
+            json!({ "type": "unsupported", "kind": "or matchers" })
+        );
+    }
+
+    #[test]
+    fn a_backslash_in_a_raw_string_does_not_escape_its_quote() {
+        let (neutral, tokens) = RangeTokens::neutralise(r#"x{p=~`C:\`}[$__rate_interval]"#);
+        assert_eq!(neutral, r#"x{p=~`C:\`}[10000y]"#);
+        assert_eq!(tokens.0, vec!["$__rate_interval".to_string()]);
+    }
+
+    #[test]
+    fn a_real_range_is_never_taken_for_a_token() {
+        let parsed = tree("rate(x[$__interval]) + rate(y[1000000007ms])");
+        assert_eq!(parsed["lhs"]["args"][0]["range"], json!("$__interval"));
+        assert_ne!(parsed["rhs"]["args"][0]["range"], json!("$__interval"));
     }
 
     #[test]

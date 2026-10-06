@@ -737,4 +737,24 @@ describe("QueryModeller", () => {
       expect(render(PromqlStepId.ClampMin, 0)).toBe("clamp_min(x{}, 0)");
     });
   });
+
+  describe("a step the picker no longer offers", () => {
+    const render = (operations: { id: string; params: any[] }[]) =>
+      promqlRenderer.renderQuery({ metric: "x", labels: [], operations });
+
+    it("still renders a saved pi step instead of dropping it", () => {
+      expect(render([{ id: "pi", params: [] }])).toBe("pi(x{})");
+      expect(promqlRenderer.getStepSpec("pi")?.name).toBe("Pi");
+    });
+
+    it("keeps precedence across a step id the catalog does not know", () => {
+      expect(
+        render([
+          { id: PromqlStepId.Addition, params: [1] },
+          { id: "no_such_step", params: [] },
+          { id: PromqlStepId.MultiplyBy, params: [2] },
+        ]),
+      ).toBe("(x{} + 1) * 2");
+    });
+  });
 });

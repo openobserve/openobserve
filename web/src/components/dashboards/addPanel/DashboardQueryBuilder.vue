@@ -1234,8 +1234,8 @@ export default defineComponent({
       operations: [],
     });
 
-    // The builder state as entering builder mode loaded it; the query text is the user's until it changes.
-    let enteredState: string | null = null;
+    // Per query, the builder state as loaded from the panel; that query's text is the user's until it changes.
+    const loadedStates = new WeakMap<object, string>();
 
     /**
      * Reads a panel's saved operations, upgrading any step ids it was stored
@@ -1355,7 +1355,7 @@ export default defineComponent({
           // panel was saved under.
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
-          enteredState = JSON.stringify(promqlBuilderQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
       { immediate: true },
@@ -1415,6 +1415,7 @@ export default defineComponent({
           // Load saved builder state, migrating any legacy step ids (see above).
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
     );
@@ -1426,11 +1427,11 @@ export default defineComponent({
       () => {
         // Only rebuild if in promql-builder mode (queryType = "promql" && customQuery = false)
         if (!promqlBuilderMode.value) return;
-        if (enteredState !== null && JSON.stringify(promqlBuilderQuery) === enteredState) return;
-        enteredState = null;
 
         const currentQuery =
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+        if (loadedStates.get(currentQuery) === JSON.stringify(promqlBuilderQuery)) return;
+        loadedStates.delete(currentQuery);
 
         // Save labels and operations to schema
         currentQuery.fields.promql_labels = promqlBuilderQuery.labels;
